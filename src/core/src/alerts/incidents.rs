@@ -1908,7 +1908,7 @@ async fn find_open_siem_case(
     let mut open = Vec::new();
     for candidate in infra::table::alert_incidents::find_correlation_candidates(
         org_id,
-        infra::table::alert_incidents::CaseFilter::All,
+        infra::table::alert_incidents::CaseFilter::OnlyCases,
     )
     .await?
     {
@@ -1938,8 +1938,12 @@ async fn find_open_detection_case(
     span: (i64, i64),
     window: i64,
 ) -> Result<Option<infra::table::entity::alert_incidents::Model>, anyhow::Error> {
-    let open =
-        infra::table::alert_incidents::find_open_incidents_by_alert_id(org_id, alert_id).await?;
+    let open = infra::table::alert_incidents::find_open_incidents_by_alert_id(
+        org_id,
+        alert_id,
+        infra::table::alert_incidents::CaseFilter::OnlyCases,
+    )
+    .await?;
     Ok(o2_enterprise::enterprise::security::cases::pick_open_case(
         open,
         &HashMap::new(),
@@ -3400,8 +3404,18 @@ async fn find_or_create_incident(
             find_open_detection_case(org_id, &subject.id, span, window).await?
         }
         (KeyType::AlertId, None) => {
-            infra::table::alert_incidents::find_open_incident_by_alert_id(org_id, &subject.id)
-                .await?
+            // An alert switched between SIEM and ops must not keep firing into the other kind.
+            let cases = if subject.security_case {
+                infra::table::alert_incidents::CaseFilter::OnlyCases
+            } else {
+                infra::table::alert_incidents::CaseFilter::NoCases
+            };
+            infra::table::alert_incidents::find_open_incident_by_alert_id(
+                org_id,
+                &subject.id,
+                cases,
+            )
+            .await?
         }
         (_, Some(window)) => find_open_siem_case(org_id, group_values, span, window).await?,
         _ => None,
@@ -8080,6 +8094,176 @@ mod tests {
         );
     }
 
+    // An ops incident can carry a detection's entity keys, and marking it would turn it into a
+    // case.
+    #[tokio::test]
+    async fn a_detection_never_takes_an_ops_incident_on_its_entity() {
+        use infra::table::alert_incidents::{CaseActivity, create, get_rw};
+
+        const HOUR: i64 = 3_600_000_000;
+        let _db = crate::alerts::rca_runs::tests::db().await;
+        let org = format!("siem_skips_ops_{}", config::ider::uuid());
+        let entity: HashMap<String, String> =
+            [("security_host".to_string(), "web-1".to_string())].into();
+        let dims = serde_json::to_value(&entity).unwrap();
+        create(&org, "P3", dims, "Primary", HOUR, None)
+            .await
+            .unwrap();
+
+        let found = find_open_siem_case(&org, &entity, (HOUR, HOUR), HOUR)
+            .await
+            .unwrap();
+        assert_eq!(found.map(|row| row.id), None);
+
+        let detection = CorrelationSubject {
+            siem_case_window: Some(HOUR),
+            security_case: true,
+            case_activity: Some(CaseActivity {
+                first_event_at: HOUR,
+                last_event_at: HOUR,
+                historical: false,
+            }),
+            ..ops_subject(&org)
+        };
+        let correlation = find_or_create_incident(
+            &org,
+            &entity,
+            config::meta::alerts::incidents::KeyType::Primary,
+            &detection,
+            HOUR,
+            "entity",
+            "web-1",
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+        assert!(correlation.created);
+        let case = get_rw(&org, correlation.outcome.incident_id())
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(case.security_case);
+        let found = find_open_siem_case(&org, &entity, (HOUR, HOUR), HOUR)
+            .await
+            .unwrap();
+        assert_eq!(found.map(|row| row.id), Some(case.id));
+    }
+
+    // An alert switched from SIEM to ops while its case is open must stop firing into the case.
+    #[tokio::test]
+    async fn an_ops_alert_id_firing_never_joins_a_case_its_alert_fired_into() {
+        use infra::table::alert_incidents::{
+            CaseActivity, add_firing_to_case, create_security_case,
+        };
+
+        let _db = crate::alerts::rca_runs::tests::db().await;
+        let org = format!("ops_skips_case_{}", config::ider::uuid());
+        let activity = CaseActivity {
+            first_event_at: 1,
+            last_event_at: 1,
+            historical: false,
+        };
+        let case = create_security_case(
+            &org,
+            "P2",
+            serde_json::json!({}),
+            "AlertId",
+            activity,
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+        add_firing_to_case(
+            &case.id,
+            "go-gc",
+            "go_gc_rate_high",
+            "internal",
+            1,
+            "alert_id",
+            activity,
+        )
+        .await
+        .unwrap();
+
+        let correlation = find_or_create_incident(
+            &org,
+            &HashMap::new(),
+            config::meta::alerts::incidents::KeyType::AlertId,
+            &ops_subject(&org),
+            2,
+            "alert_id",
+            "go",
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+
+        assert!(correlation.created);
+        assert_ne!(correlation.outcome.incident_id(), case.id);
+    }
+
+    // An alert switched from ops to SIEM must open a case, not mark its open ops incident.
+    #[tokio::test]
+    async fn a_detection_never_takes_an_ops_incident_its_alert_fired_into() {
+        use infra::table::alert_incidents::{CaseActivity, add_alert_to_incident, create, get_rw};
+
+        const HOUR: i64 = 3_600_000_000;
+        let _db = crate::alerts::rca_runs::tests::db().await;
+        let org = format!("case_skips_ops_{}", config::ider::uuid());
+        let ops = create(&org, "P3", serde_json::json!({}), "AlertId", 1, None)
+            .await
+            .unwrap();
+        add_alert_to_incident(
+            &ops.id,
+            "go-gc",
+            "go_gc_rate_high",
+            "internal",
+            1,
+            "alert_id",
+        )
+        .await
+        .unwrap();
+
+        let found = find_open_detection_case(&org, "go-gc", (1, 1), HOUR)
+            .await
+            .unwrap();
+        assert_eq!(found.map(|row| row.id), None);
+
+        let detection = CorrelationSubject {
+            security_case: true,
+            case_activity: Some(CaseActivity {
+                first_event_at: 2,
+                last_event_at: 2,
+                historical: false,
+            }),
+            ..ops_subject(&org)
+        };
+        let correlation = find_or_create_incident(
+            &org,
+            &HashMap::new(),
+            config::meta::alerts::incidents::KeyType::AlertId,
+            &detection,
+            2,
+            "alert_id",
+            "go",
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+
+        assert!(correlation.created);
+        assert_ne!(correlation.outcome.incident_id(), ops.id);
+        let case = get_rw(&org, correlation.outcome.incident_id())
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(case.security_case);
+    }
+
     #[tokio::test]
     async fn correlation_selection_continues_after_stale_projected_matches() {
         use infra::table::entity::alert_incidents;
@@ -9357,9 +9541,13 @@ mod tests {
         );
         assert!(stored.historical, "the run time never becomes last seen");
 
-        let open = infra::table::alert_incidents::find_open_incidents_by_alert_id(&org, "det-1")
-            .await
-            .unwrap();
+        let open = infra::table::alert_incidents::find_open_incidents_by_alert_id(
+            &org,
+            "det-1",
+            infra::table::alert_incidents::CaseFilter::OnlyCases,
+        )
+        .await
+        .unwrap();
         assert_eq!(open.len(), 1);
         assert!(
             find_open_detection_case(&org, "det-1", (40 * HOUR, 40 * HOUR), 2 * HOUR)

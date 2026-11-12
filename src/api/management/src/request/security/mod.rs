@@ -147,23 +147,17 @@ pub async fn incident_touches_siem(org_id: &str, incident_id: &str) -> bool {
             return true;
         }
     }
-    let fired_by_detection = match alert_incidents::get_incident_alerts(incident_id).await {
+    // Never marks: the firings may predate the alert becoming a detection, and rows cannot tell.
+    match alert_incidents::get_incident_alerts(incident_id).await {
         Ok(links) => {
             db::alerts::alert::any_siem_alert(org_id, links.iter().map(|l| l.alert_id.as_str()))
                 .await
         }
         Err(e) => {
             log::error!("[SECURITY] reading the firings of {org_id}/{incident_id}: {e}");
-            return true;
+            true
         }
-    };
-    // Heals a case whose marker write was lost, so lists and the stale sweep agree with it.
-    if fired_by_detection
-        && let Err(e) = alert_incidents::mark_security_case(org_id, incident_id).await
-    {
-        log::error!("[SECURITY] marking {org_id}/{incident_id} a security case: {e}");
     }
-    fired_by_detection
 }
 
 /// Which incidents a user may list: security cases need the Security read grant.
@@ -688,6 +682,10 @@ pub(crate) mod tests {
             let org = format!("gate_{}", config::ider::uuid());
             let id = plant_siem_detection(&org).await;
             let case = unmarked_case(&org, &id).await;
+            // The case's insert, or the migration for an older one, sets the marker.
+            infra::table::alert_incidents::mark_security_case(&org, &case)
+                .await
+                .unwrap();
             assert!(incident_touches_siem(&org, &case).await);
             forget_detection(&org, &id).await;
 
@@ -975,6 +973,55 @@ pub(crate) mod tests {
                     .await
                     .is_empty()
             );
+        }
+
+        // Its alert became a detection after firing as ops, so the incident still holds ops
+        // firings.
+        #[tokio::test]
+        async fn test_viewing_an_ops_incident_never_hands_it_to_a_detection() {
+            use infra::table::alert_incidents::{CaseFilter, get_rw};
+
+            let org = format!("gate_{}", config::ider::uuid());
+            let id = plant_siem_detection(&org).await;
+            let incident = unmarked_case(&org, &id).await;
+            incident_touches_siem(&org, &incident).await;
+
+            let (_, alert) = common::infra::config::ALERTS
+                .read()
+                .await
+                .get(&db::alerts::alert::cache_alert_key(&org, &id))
+                .cloned()
+                .unwrap();
+            let row = serde_json::json!({"_timestamp": 2})
+                .as_object()
+                .unwrap()
+                .clone();
+            openobserve_core::alerts::incidents::correlate_alert_to_incident(
+                &alert,
+                &row,
+                std::slice::from_ref(&row),
+                2,
+                None,
+                None,
+                None,
+                None,
+            )
+            .await
+            .unwrap();
+
+            let stored = get_rw(&org, &incident).await.unwrap().unwrap();
+            assert_eq!((stored.security_case, stored.alert_count), (false, 1));
+            let (cases, _) = openobserve_core::alerts::incidents::list_incidents_filtered(
+                &org,
+                None,
+                CaseFilter::OnlyCases,
+                10,
+                0,
+            )
+            .await
+            .unwrap();
+            assert_eq!(cases.len(), 1);
+            assert_ne!(cases[0].id, incident);
         }
 
         #[tokio::test]

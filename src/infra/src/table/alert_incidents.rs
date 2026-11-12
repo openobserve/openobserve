@@ -1519,6 +1519,7 @@ pub async fn get_incident_alerts_rw(
 pub async fn find_open_incident_by_alert_id(
     org_id: &str,
     alert_id: &str,
+    cases: CaseFilter,
 ) -> Result<Option<alert_incidents::Model>, errors::Error> {
     // The primary: a replica behind a just-opened incident would let the next firing open another.
     let client = get_orm_client_rw().await;
@@ -1537,11 +1538,15 @@ pub async fn find_open_incident_by_alert_id(
     let incident_ids: Vec<String> = rows.into_iter().map(|r| r.incident_id).collect();
 
     // Step 2: find the open AlertId incident from those IDs
-    alert_incidents::Entity::find()
+    let mut query = alert_incidents::Entity::find()
         .filter(alert_incidents::Column::OrgId.eq(org_id))
         .filter(alert_incidents::Column::Status.ne("resolved"))
         .filter(alert_incidents::Column::KeyType.eq("AlertId"))
-        .filter(alert_incidents::Column::Id.is_in(incident_ids))
+        .filter(alert_incidents::Column::Id.is_in(incident_ids));
+    if let Some(condition) = case_condition(cases) {
+        query = query.filter(condition);
+    }
+    query
         .one(client)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
@@ -1551,6 +1556,7 @@ pub async fn find_open_incident_by_alert_id(
 pub async fn find_open_incidents_by_alert_id(
     org_id: &str,
     alert_id: &str,
+    cases: CaseFilter,
 ) -> Result<Vec<alert_incidents::Model>, errors::Error> {
     let client = get_orm_client_ro().await;
     let holding = alert_incident_alerts::Entity::find()
@@ -1558,11 +1564,15 @@ pub async fn find_open_incidents_by_alert_id(
         .column(alert_incident_alerts::Column::IncidentId)
         .filter(alert_incident_alerts::Column::AlertId.eq(alert_id))
         .into_query();
-    alert_incidents::Entity::find()
+    let mut query = alert_incidents::Entity::find()
         .filter(alert_incidents::Column::OrgId.eq(org_id))
         .filter(alert_incidents::Column::Status.ne("resolved"))
         .filter(alert_incidents::Column::KeyType.eq("AlertId"))
-        .filter(alert_incidents::Column::Id.in_subquery(holding))
+        .filter(alert_incidents::Column::Id.in_subquery(holding));
+    if let Some(condition) = case_condition(cases) {
+        query = query.filter(condition);
+    }
+    query
         .all(client)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
