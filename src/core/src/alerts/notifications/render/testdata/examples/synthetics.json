@@ -437,5 +437,24 @@
       }
     ],
     "dedup_key": "chk_9d"
+  },
+  "opsgenie_firing": {
+    "message": "🔴 checkout API failing",
+    "description": "checkout API is failing\nconnection timed out after 10s",
+    "priority": "P1",
+    "details": {
+      "Event": "Firing",
+      "Check": "checkout API (http)",
+      "Target": "https://shop.acme.com/api/health",
+      "Status": "Failing",
+      "Locations": "1 of 2 failed: us-east-1",
+      "Environments": "production",
+      "Error": "connection timed out after 10s",
+      "Time": "2026-11-02 10:05:00 UTC"
+    }
+  },
+  "servicenow_firing": {
+    "short_description": "🔴 checkout API failing",
+    "description": "checkout API is failing\nconnection timed out after 10s\n\nEvent: Firing\nCheck: checkout API (http)\nTarget: https://shop.acme.com/api/health\nStatus: Failing\nLocations: 1 of 2 failed: us-east-1\nEnvironments: production\nError: connection timed out after 10s\nTime: 2026-11-02 10:05:00 UTC"
   }
 }

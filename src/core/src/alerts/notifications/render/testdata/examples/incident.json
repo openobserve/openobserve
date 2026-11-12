@@ -452,5 +452,22 @@
       }
     ],
     "dedup_key": "inc_7f3a"
+  },
+  "opsgenie_firing": {
+    "message": "🔴 High error rate firing",
+    "description": "Error rate above 5% for 5 minutes",
+    "priority": "P1",
+    "details": {
+      "Level": "P2",
+      "Event": "Firing",
+      "Stream": "web-logs",
+      "Threshold": "> 5",
+      "Value": "12.4",
+      "Time": "2026-11-02 10:05:00 UTC"
+    }
+  },
+  "servicenow_firing": {
+    "short_description": "🔴 High error rate firing",
+    "description": "Error rate above 5% for 5 minutes\n\nLevel: P2\nEvent: Firing\nStream: web-logs\nThreshold: > 5\nValue: 12.4\nTime: 2026-11-02 10:05:00 UTC"
   }
 }

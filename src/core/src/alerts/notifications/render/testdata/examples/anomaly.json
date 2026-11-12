@@ -428,5 +428,22 @@
       }
     ],
     "dedup_key": "a1b2c3"
+  },
+  "opsgenie_firing": {
+    "message": "🔴 error rate on web-logs firing",
+    "description": "3 anomalies in window 2026-11-02 09:50 UTC–2026-11-02 10:05 UTC | worst value: 342.00 (expected ~98.00 for this hour) | score 0.91 vs threshold 0.80 (score 14.0% over its bar)",
+    "priority": "P1",
+    "details": {
+      "Level": "Critical",
+      "Event": "Firing",
+      "Stream": "web-logs",
+      "Value": "342.00",
+      "Score": "0.91 vs 0.80",
+      "Time": "2026-11-02 10:05:00 UTC"
+    }
+  },
+  "servicenow_firing": {
+    "short_description": "🔴 error rate on web-logs firing",
+    "description": "3 anomalies in window 2026-11-02 09:50 UTC–2026-11-02 10:05 UTC | worst value: 342.00 (expected ~98.00 for this hour) | score 0.91 vs threshold 0.80 (score 14.0% over its bar)\n\nLevel: Critical\nEvent: Firing\nStream: web-logs\nValue: 342.00\nScore: 0.91 vs 0.80\nTime: 2026-11-02 10:05:00 UTC"
   }
 }

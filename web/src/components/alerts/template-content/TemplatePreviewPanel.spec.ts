@@ -365,6 +365,43 @@ describe("TemplatePreviewPanel", () => {
     expect(note.text()).toBe("1 link is not shown as a button: D");
   });
 
+  it("names an overflow link that repeats the URL of a shown button", async () => {
+    const links = [
+      { label: "A", url: "https://x/A" },
+      { label: "B", url: "https://x/B" },
+      { label: "C", url: "https://x/C" },
+      { label: "Again", url: "https://x/A" },
+    ];
+    vi.spyOn(templateService, "preview").mockResolvedValue(
+      makePreviewResponse({
+        payload: {
+          blocks: [
+            {
+              type: "actions",
+              elements: ["A", "B", "C"].map((l) => ({ type: "button", url: `https://x/${l}` })),
+            },
+          ],
+        },
+        preview_model: {
+          title: "Alert fired",
+          body_html: "",
+          fields: [],
+          links,
+          color: "#ff0000",
+          severity: null,
+          footer: null,
+          chart_placeholder: false,
+        },
+      }) as any,
+    );
+    const w = await mountPanel();
+    await vi.advanceTimersByTimeAsync(300);
+    await flushPromises();
+    expect(w.find('[data-test="template-preview-panel-slack-hidden-links"]').text()).toBe(
+      "1 link is not shown as a button: Again",
+    );
+  });
+
   it("puts Channel first, Severity next and Kind last in the preview row", async () => {
     vi.spyOn(templateService, "preview").mockResolvedValue(makePreviewResponse() as any);
     const w = mount(TemplatePreviewPanel, {

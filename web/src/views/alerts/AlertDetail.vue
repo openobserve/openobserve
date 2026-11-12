@@ -163,7 +163,7 @@
         preset="load-error"
         :title="t('alerts.groups.loadFailedTitle')"
         data-test="alerts-alertdetail-load-error"
-        @action="fetchAlert"
+        @action="loadPage"
       />
       <OEmptyState
         v-else
@@ -1022,14 +1022,13 @@ const editAlert = () => {
   });
 };
 
-onMounted(async () => {
+// Mount and Retry share it, so a recovered page loads what the first load skipped.
+const loadPage = async () => {
   await fetchAlert();
+  if (unavailable.value) return;
   await fetchSloName();
   if (isCompositeAlert.value) return;
-  // Multi-alerts land on Groups (the reason the page exists for them); everything
-  // else has no groups tab, so History is the only sensible default. The alert is
-  // fetched exactly once and never re-fetched, so handling the initial load here
-  // is enough — a separate watch on isMultiAlert would just re-fire fetchGroups().
+  // Multi-alerts land on Groups, the reason the page exists for them; other alerts have no groups tab.
   if (isMultiAlert.value) {
     activeTab.value = "groups";
     await fetchGroups();
@@ -1037,5 +1036,7 @@ onMounted(async () => {
   // Anomaly configs never write to the transitions table.
   if (isAnomalyAlert.value) return;
   await fetchTransitions();
-});
+};
+
+onMounted(loadPage);
 </script>

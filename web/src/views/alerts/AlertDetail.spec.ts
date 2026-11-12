@@ -452,6 +452,7 @@ describe("AlertDetail — History tab", () => {
       await flushPromises();
       expect(alertsService.get_by_alert_id).toHaveBeenCalledTimes(2);
       expect(wrapper.find('[data-test="alerts-alertdetail-load-error"]').exists()).toBe(false);
+      expect(alertsService.list_group_transitions).toHaveBeenCalledTimes(1);
     });
   });
 

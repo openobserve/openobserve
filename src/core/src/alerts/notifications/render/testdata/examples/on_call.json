@@ -362,5 +362,21 @@
       }
     ],
     "dedup_key": "resp_31"
+  },
+  "opsgenie_firing": {
+    "message": "🔴 [P2] High error rate on web-logs — checkout paged",
+    "description": "P2 · High error rate on web-logs\n\npaged by policy checkout-escalation for checkout.\n\nerror rate 12.4% over the 5% threshold on checkout\n\nRunbook: https://wiki.acme.com/runbooks/checkout\n\nDetails: https://o2.acme.com/web/oncall/responses/resp_31?org_identifier=acme\nAcknowledge: https://o2.acme.com/api/acme/oncall/ack/resp_31\n",
+    "priority": "P1",
+    "details": {
+      "Level": "P2",
+      "Event": "Paged",
+      "Team": "checkout",
+      "Reason": "paged by policy checkout-escalation",
+      "Time": "2026-11-02 10:05:00 UTC"
+    }
+  },
+  "servicenow_firing": {
+    "short_description": "🔴 [P2] High error rate on web-logs — checkout paged",
+    "description": "P2 · High error rate on web-logs\n\npaged by policy checkout-escalation for checkout.\n\nerror rate 12.4% over the 5% threshold on checkout\n\nRunbook: https://wiki.acme.com/runbooks/checkout\n\nDetails: https://o2.acme.com/web/oncall/responses/resp_31?org_identifier=acme\nAcknowledge: https://o2.acme.com/api/acme/oncall/ack/resp_31\n\n\nLevel: P2\nEvent: Paged\nTeam: checkout\nReason: paged by policy checkout-escalation\nTime: 2026-11-02 10:05:00 UTC"
   }
 }

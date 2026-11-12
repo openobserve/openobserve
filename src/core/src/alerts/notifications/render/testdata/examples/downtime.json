@@ -339,5 +339,20 @@
         "text": "Open downtime"
       }
     ]
+  },
+  "opsgenie_firing": {
+    "message": "🔵 Nightly database upgrade started",
+    "description": "CHG-1042 Postgres 17 upgrade",
+    "priority": "P2",
+    "details": {
+      "Event": "Started",
+      "Window": "2026-11-02 22:00 UTC to 2026-11-03 00:00 UTC",
+      "Muted": "alerts, synthetics checks",
+      "Time": "2026-11-02 22:00:00 UTC"
+    }
+  },
+  "servicenow_firing": {
+    "short_description": "🔵 Nightly database upgrade started",
+    "description": "CHG-1042 Postgres 17 upgrade\n\nEvent: Started\nWindow: 2026-11-02 22:00 UTC to 2026-11-03 00:00 UTC\nMuted: alerts, synthetics checks\nTime: 2026-11-02 22:00:00 UTC"
   }
 }

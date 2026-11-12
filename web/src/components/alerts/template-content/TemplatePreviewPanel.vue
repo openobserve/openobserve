@@ -580,12 +580,21 @@ const footerLabel = computed<I18nText>(() =>
 const slackHiddenLinks = computed<string[]>(() => {
   if (channel.value !== "slack" || !previewModel.value || !previewData.value) return [];
   const blocks = (previewData.value.payload as { blocks?: unknown[] } | null)?.blocks ?? [];
-  const shown = new Set<string>();
+  // Buttons are counted per URL, so a second link to a URL already shown still counts as hidden.
+  const shown = new Map<string, number>();
   for (const block of blocks as { type?: string; elements?: { url?: string }[] }[]) {
     if (block.type !== "actions") continue;
-    for (const el of block.elements ?? []) if (el.url) shown.add(el.url);
+    for (const el of block.elements ?? []) {
+      if (el.url) shown.set(el.url, (shown.get(el.url) ?? 0) + 1);
+    }
   }
-  return previewModel.value.links.filter((link) => !shown.has(link.url)).map((link) => link.label);
+  return previewModel.value.links
+    .filter((link) => {
+      const left = shown.get(link.url) ?? 0;
+      if (left > 0) shown.set(link.url, left - 1);
+      return left === 0;
+    })
+    .map((link) => link.label);
 });
 
 const openLink = (url: string) => {

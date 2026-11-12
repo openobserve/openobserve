@@ -436,5 +436,22 @@
         "text": "Open alert"
       }
     ]
+  },
+  "opsgenie_firing": {
+    "message": "🔴 Sample CPU alert firing",
+    "description": "cpu > 80 for 10m",
+    "priority": "P1",
+    "details": {
+      "Level": "Critical",
+      "Event": "Firing",
+      "Stream": "app_logs",
+      "Threshold": ">= 80",
+      "Value": "92.5",
+      "Time": "2026-08-01 10:10:00 UTC"
+    }
+  },
+  "servicenow_firing": {
+    "short_description": "🔴 Sample CPU alert firing",
+    "description": "cpu > 80 for 10m\n\nLevel: Critical\nEvent: Firing\nStream: app_logs\nThreshold: >= 80\nValue: 92.5\nTime: 2026-08-01 10:10:00 UTC"
   }
 }

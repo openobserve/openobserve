@@ -728,6 +728,8 @@ mod tests {
             "teams_message_firing": rendered(kind, false, ChannelFormat::TeamsMessageCard),
             "discord_firing": rendered(kind, false, ChannelFormat::Discord),
             "pagerduty_firing": rendered(kind, false, ChannelFormat::PagerDuty),
+            "opsgenie_firing": rendered(kind, false, ChannelFormat::Opsgenie),
+            "servicenow_firing": rendered(kind, false, ChannelFormat::ServiceNow),
         })
     }
 
