@@ -52,6 +52,7 @@ const mountHistory = async () => {
       plugins: [i18n, store, router],
       stubs: {
         ODialog: true,
+        OTooltip: true,
         DateTime: { template: "<div />" },
         OSelect: { template: "<div />" },
         NoData: { template: "<div />" },
@@ -305,7 +306,8 @@ describe("AlertHistory sort failure", () => {
   });
 });
 
-describe("AlertHistory failed page read", () => {
+// These cases render up to 50 full rows several times, about 1s locally and past 5s on a CI shard.
+describe("AlertHistory failed page read", { timeout: 20_000 }, () => {
   const TOTAL = 60;
   const pagedHistory = () =>
     vi.mocked(alertsService.getHistory).mockImplementation(async (_org: any, q: any) => {
