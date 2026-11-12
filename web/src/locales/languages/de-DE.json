@@ -2130,6 +2130,8 @@
     "translatingStackTrace": "Übersetze Stacktrace mit Source Maps...",
     "translatingStackTraceHint": "Dies kann einen Moment dauern",
     "sourceMapsNotAvailable": "Source Maps nicht verfügbar",
+    "mobileSourceMapsNotApplicable": "Source Maps gelten nicht für iOS- und Android-Fehler",
+    "mobileSourceMapsNotApplicableBody": "Hochgeladene JavaScript-Source-Maps können native mobile Stack-Frames nicht auflösen. Den ursprünglichen Stack finden Sie in der Registerkarte {tab}.",
     "sourceMapsNotAvailableBody": "Um detaillierte Stacktraces mit originalem Quellcode und Zeilennummern anzuzeigen, laden Sie bitte Source Maps für diese Anwendung hoch.",
     "serviceBadge": "Dienst:",
     "versionBadge": "Version:",

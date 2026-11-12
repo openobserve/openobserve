@@ -2130,6 +2130,8 @@
     "translatingStackTrace": "A traduzir stack trace com source maps...",
     "translatingStackTraceHint": "Isto pode demorar alguns instantes",
     "sourceMapsNotAvailable": "Source Maps Não Disponíveis",
+    "mobileSourceMapsNotApplicable": "Os source maps não se aplicam a erros de iOS e Android",
+    "mobileSourceMapsNotApplicableBody": "Os source maps de JavaScript carregados não conseguem resolver frames de pilha nativos de aplicações móveis. Consulte a pilha original no separador {tab}.",
     "sourceMapsNotAvailableBody": "Para visualizar stack traces detalhados com código-fonte original e números de linha, carregue os source maps para esta aplicação.",
     "serviceBadge": "Serviço:",
     "versionBadge": "Versão:",

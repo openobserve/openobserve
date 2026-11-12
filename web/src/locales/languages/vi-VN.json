@@ -2130,6 +2130,8 @@
     "translatingStackTrace": "Đang dịch stack trace với source maps...",
     "translatingStackTraceHint": "Quá trình này có thể mất vài giây",
     "sourceMapsNotAvailable": "Source Maps không khả dụng",
+    "mobileSourceMapsNotApplicable": "Source map không áp dụng cho lỗi iOS và Android",
+    "mobileSourceMapsNotApplicableBody": "Source map JavaScript đã tải lên không thể phân giải các khung ngăn xếp native trên thiết bị di động. Xem ngăn xếp gốc trong tab {tab}.",
     "sourceMapsNotAvailableBody": "Để xem stack trace chi tiết với mã nguồn gốc và số dòng, vui lòng tải lên source maps cho ứng dụng này.",
     "serviceBadge": "Dịch vụ:",
     "versionBadge": "Phiên bản:",
