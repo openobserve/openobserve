@@ -24,7 +24,9 @@ use std::collections::HashSet;
 
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, PaginatorTrait,
-    QueryFilter, QueryOrder, QuerySelect, TransactionTrait, prelude::Expr,
+    QueryFilter, QueryOrder, QuerySelect, TransactionTrait,
+    prelude::Expr,
+    sea_query::{LockType, Query},
 };
 
 use super::entity::{
@@ -424,15 +426,15 @@ pub async fn upsert_snapshot<C: ConnectionTrait>(
         .await?;
     if res.rows_affected == 0 {
         // First snapshot for this page: both halves are required.
-        let model = status_page_snapshots::Model {
-            status_page_id: page_id.to_string(),
-            org_id: org_id.to_string(),
-            history: history.unwrap_or("{}").to_string(),
-            current: current.unwrap_or("{}").to_string(),
-            history_generated_at: now,
-            current_generated_at: now,
-        };
-        model.into_active_model().insert(conn).await?;
+        insert_snapshot_of_live_page(
+            conn,
+            page_id,
+            org_id,
+            history.unwrap_or("{}"),
+            current.unwrap_or("{}"),
+            now,
+        )
+        .await?;
     }
     Ok(())
 }
@@ -556,12 +558,14 @@ pub async fn delete_by_org(org_id: &str) -> Result<(), errors::Error> {
         .filter(status_page_custom_domains::Column::OrgId.eq(org_id))
         .exec(&txn)
         .await?;
-    status_page_snapshots::Entity::delete_many()
-        .filter(status_page_snapshots::Column::OrgId.eq(org_id))
-        .exec(&txn)
-        .await?;
+    // Pages before snapshots: a snapshot insert that locked its page commits before this
+    // delete can take the page, so the snapshot delete below sees that row.
     status_pages::Entity::delete_many()
         .filter(status_pages::Column::OrgId.eq(org_id))
+        .exec(&txn)
+        .await?;
+    status_page_snapshots::Entity::delete_many()
+        .filter(status_page_snapshots::Column::OrgId.eq(org_id))
         .exec(&txn)
         .await?;
     txn.commit().await?;
@@ -1044,6 +1048,47 @@ pub async fn mapped_check_ids<C: ConnectionTrait>(
     Ok(ids.into_iter().collect())
 }
 
+/// A caller read the page before its deletion may have run, so the insert reads it again.
+/// KEY SHARE holds a concurrent delete of the page until this row is visible to it.
+async fn insert_snapshot_of_live_page<C: ConnectionTrait>(
+    conn: &C,
+    page_id: &str,
+    org_id: &str,
+    history: &str,
+    current: &str,
+    now: i64,
+) -> Result<(), errors::Error> {
+    let mut live_page = Query::select();
+    live_page
+        .exprs([
+            Expr::val(page_id),
+            Expr::val(org_id),
+            Expr::val(history),
+            Expr::val(current),
+            Expr::val(now),
+            Expr::val(now),
+        ])
+        .from(status_pages::Entity)
+        .and_where(status_pages::Column::Id.eq(page_id))
+        .lock(LockType::KeyShare);
+    let mut insert = Query::insert();
+    insert
+        .into_table(status_page_snapshots::Entity)
+        .columns([
+            status_page_snapshots::Column::StatusPageId,
+            status_page_snapshots::Column::OrgId,
+            status_page_snapshots::Column::History,
+            status_page_snapshots::Column::Current,
+            status_page_snapshots::Column::HistoryGeneratedAt,
+            status_page_snapshots::Column::CurrentGeneratedAt,
+        ])
+        .select_from(live_page)
+        .map_err(|e| errors::Error::Message(e.to_string()))?;
+    conn.execute(conn.get_database_backend().build(&insert))
+        .await?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use sea_orm::{ActiveValue, ConnectOptions, Database, DatabaseConnection, Schema};
@@ -1122,5 +1167,73 @@ mod tests {
         let found = mapped_check_ids(&db, None).await.unwrap();
 
         assert_eq!(found.len(), 2);
+    }
+
+    async fn snapshot_db() -> DatabaseConnection {
+        let db = db().await;
+        let backend = db.get_database_backend();
+        let schema = Schema::new(backend);
+        for table in [
+            schema.create_table_from_entity(status_pages::Entity),
+            schema.create_table_from_entity(status_page_snapshots::Entity),
+        ] {
+            db.execute(backend.build(&table)).await.unwrap();
+        }
+        db
+    }
+
+    async fn insert_test_page(db: &DatabaseConnection, id: &str) {
+        status_pages::Model {
+            id: id.to_string(),
+            org_id: "acme".to_string(),
+            name: id.to_string(),
+            slug: id.to_string(),
+            description: None,
+            visibility: 1,
+            password_hash: None,
+            noindex: true,
+            show_uptime_percent: false,
+            show_timeline_bars: false,
+            show_response_time: false,
+            confirm_failures: 1,
+            confirm_recovery: 1,
+            confirm_after_secs: None,
+            brand_name: None,
+            accent_color: None,
+            logo_img: None,
+            favicon_img: None,
+            tracking_since: None,
+            owner: None,
+            created_at: 1,
+            updated_at: 1,
+        }
+        .into_active_model()
+        .insert(db)
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn the_first_snapshot_of_a_page_is_inserted() {
+        let db = snapshot_db().await;
+        insert_test_page(&db, "p1").await;
+
+        upsert_snapshot(&db, "p1", "acme", Some("[]"), None, 5)
+            .await
+            .unwrap();
+
+        let row = get_snapshot(&db, "p1").await.unwrap().unwrap();
+        assert_eq!((row.history.as_str(), row.current.as_str()), ("[]", "{}"));
+    }
+
+    #[tokio::test]
+    async fn a_snapshot_write_after_its_page_is_deleted_inserts_nothing() {
+        let db = snapshot_db().await;
+
+        upsert_snapshot(&db, "gone", "acme", Some("[]"), Some("{}"), 5)
+            .await
+            .unwrap();
+
+        assert!(get_snapshot(&db, "gone").await.unwrap().is_none());
     }
 }
