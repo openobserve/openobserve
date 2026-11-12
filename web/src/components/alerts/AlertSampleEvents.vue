@@ -35,9 +35,11 @@ const { t } = useI18nTyped();
 const store = useStore();
 const query = useAlertStreamQuery();
 
+const timestampColumn = computed(() => store.state.zoConfig?.timestamp_column || "_timestamp");
+
 const rows = computed(() =>
   query.hits.value.slice(0, SAMPLE_SIZE).map((hit) => {
-    const { _timestamp: timestamp, ...fields } = hit;
+    const { [timestampColumn.value]: timestamp, ...fields } = hit;
     const field = MESSAGE_FIELDS.find((name) => typeof fields[name] === "string");
     return {
       time: timestampToTimezoneDate(Number(timestamp), store.state.timezone, "HH:mm:ss"),
@@ -52,7 +54,7 @@ watch(
     if (!props.streamName) return;
     const now = Date.now() * 1000;
     query.run({
-      sql: `SELECT * FROM "${props.streamName.replace(/"/g, '""')}" ORDER BY _timestamp DESC`,
+      sql: `SELECT * FROM "${props.streamName.replace(/"/g, '""')}" ORDER BY "${timestampColumn.value}" DESC`,
       streamType: props.streamType,
       startTime: now - WINDOW_US,
       endTime: now,

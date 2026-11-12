@@ -1489,7 +1489,7 @@ export default defineComponent({
     });
     const editHeader = useAlertEditHeader({
       alertId: () => (isEditingAlert.value ? editAlertId.value : ""),
-      name: () => String(alertForm.formData.value?.name ?? ""),
+      name: () => String(unsaved.baseline.value?.name ?? alertForm.formData.value?.name ?? ""),
       folderId: () => editFolderId.value,
       onEnabledSaved: (enabled) => {
         alertForm.setF("enabled", enabled);

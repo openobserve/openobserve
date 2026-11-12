@@ -303,7 +303,13 @@ const options = computed(() => {
 const listOptions = computed(() =>
   options.value.filter((option): option is Option => !("header" in option)),
 );
-const showsList = computed(() => props.list && listOptions.value.length <= LIST_MAX);
+// Group headers and missing/locked badges only render in the dropdown, so the list is for plain destinations.
+const showsList = computed(
+  () =>
+    props.list &&
+    listOptions.value.length <= LIST_MAX &&
+    options.value.every((option) => !("header" in option) && !("badge" in option)),
+);
 
 // Split the tagged selection back into the two backend fields. Keep the control's
 // own order in `model` so the chips don't jump when props round-trip back.

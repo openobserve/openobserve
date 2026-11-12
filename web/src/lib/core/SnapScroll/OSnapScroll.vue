@@ -34,7 +34,7 @@ const MIN_STOP = 0.1;
 const REVEAL_BEHAVIOR: ScrollBehavior = "instant";
 
 const BUTTON_LIKE =
-  'button, a[href], summary, [role="button"], [role="switch"], [role="checkbox"], [role="radio"], [role="tab"]';
+  'button, summary, [role="button"], [role="switch"], [role="checkbox"], [role="radio"], [role="tab"]';
 
 const sections = (): HTMLElement[] =>
   root.value ? Array.from(root.value.querySelectorAll<HTMLElement>("[data-snap-section]")) : [];
@@ -216,7 +216,8 @@ const onPageKey = (e: KeyboardEvent | undefined, run: () => void): void => {
   const focused = document.activeElement;
   // The shortcut swallowed Space, so a focused button still has to be pressed.
   if (e?.key === " " && focused instanceof HTMLElement && focused.matches(BUTTON_LIKE)) {
-    focused.click();
+    // A held Space presses a native button once, not once per key repeat.
+    if (!e.repeat) focused.click();
     return;
   }
   run();

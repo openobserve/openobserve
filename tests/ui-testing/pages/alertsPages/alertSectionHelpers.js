@@ -1,5 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
 
+import { expect } from '@playwright/test';
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
 
 /** Sections of the alert editor's snapping column, in order; rare settings hide behind a per-section "N more" link. */
@@ -106,7 +107,14 @@ export async function destinationsShowAsList(page) {
 /** Picks one destination by name in either form of the destinations field. */
 export async function pickAlertDestination(page, destinationName) {
     if (await destinationsShowAsList(page)) {
-        await page.locator(DESTINATION_LIST_OPTION).filter({ hasText: destinationName }).first().click();
+        const option = page
+            .locator(DESTINATION_LIST_OPTION)
+            .filter({ has: page.getByText(destinationName, { exact: true }) })
+            .first();
+        if ((await option.locator('[aria-checked]').first().getAttribute('aria-checked')) !== 'true') {
+            await option.click();
+        }
+        await expect(option.locator('[aria-checked="true"]')).toHaveCount(1);
         return;
     }
     await page.locator(DESTINATION_TRIGGER).first().click();

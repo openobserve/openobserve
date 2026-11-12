@@ -30,7 +30,7 @@ export interface AlertStreamQueryRequest {
 
 interface AlertStreamChunk {
   type?: string;
-  content?: { results?: { hits?: Record<string, unknown>[] } };
+  content?: { streaming_aggs?: boolean; results?: { hits?: Record<string, unknown>[] } };
 }
 
 /** One SQL search over the streaming endpoint, collecting every chunk of hits; a new run cancels the last. */
@@ -77,7 +77,9 @@ export function useAlertStreamQuery() {
       {
         data: (_payload: unknown, response: AlertStreamChunk | undefined) => {
           if (!owns() || response?.type !== "search_response_hits") return;
-          hits.value = [...hits.value, ...(response.content?.results?.hits ?? [])];
+          const chunk = response.content?.results?.hits ?? [];
+          // A streaming aggregation resends the whole result in every chunk, so it replaces rather than appends.
+          hits.value = response.content?.streaming_aggs ? chunk : [...hits.value, ...chunk];
         },
         error: () => {
           if (!owns()) return;
