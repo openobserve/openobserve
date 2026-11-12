@@ -31,8 +31,7 @@ use datafusion::{
     arrow::datatypes::Schema,
     catalog::TableProvider,
     error::{DataFusionError, Result},
-    physical_plan::{ExecutionPlan, execute_stream},
-    prelude::SessionContext,
+    physical_plan::execute_stream,
 };
 use futures::TryStreamExt;
 pub use mode::{MergeMode, MergeOutput};
@@ -133,11 +132,22 @@ async fn run_merge_query(
     tokio::sync::mpsc::Receiver<RecordBatch>,
     tokio::task::JoinHandle<Result<()>>,
 )> {
-    let (ctx, physical_plan) = plan_merge_query(sql, sort_order, schema, tables).await?;
+    let cfg = get_config();
+    let ctx = DataFusionContextBuilder::new()
+        .trace_id("merge_parquet_files")
+        .sort_order(sort_order)
+        .build(cfg.limit.datafusion_min_partition_num)
+        .await?;
+    // register union table
+    let union_table = Arc::new(NewUnionTable::new(schema, tables));
+    ctx.register_table("tbl", union_table)?;
+
+    let plan = ctx.state().create_logical_plan(sql).await?;
+    let physical_plan = ctx.state().create_physical_plan(&plan).await?;
     let schema = physical_plan.schema();
 
     // print the physical plan
-    if get_config().common.print_key_sql {
+    if cfg.common.print_key_sql {
         log::info!(
             "{}",
             config::meta::plan::generate_plan_string("merge_parquet_files", physical_plan.as_ref())
@@ -167,28 +177,6 @@ async fn run_merge_query(
         Ok(())
     });
     Ok((schema, rx, read_task))
-}
-
-/// The physical plan of `sql` over the union of `tables`, with the session it runs in.
-pub(super) async fn plan_merge_query(
-    sql: &str,
-    sort_order: FileSortOrder,
-    schema: Arc<Schema>,
-    tables: Vec<Arc<dyn TableProvider>>,
-) -> Result<(SessionContext, Arc<dyn ExecutionPlan>)> {
-    let cfg = get_config();
-    let ctx = DataFusionContextBuilder::new()
-        .trace_id("merge_parquet_files")
-        .sort_order(sort_order)
-        .build(cfg.limit.datafusion_min_partition_num)
-        .await?;
-    // register union table
-    let union_table = Arc::new(NewUnionTable::new(schema, tables));
-    ctx.register_table("tbl", union_table)?;
-
-    let plan = ctx.state().create_logical_plan(sql).await?;
-    let physical_plan = ctx.state().create_physical_plan(&plan).await?;
-    Ok((ctx, physical_plan))
 }
 
 /// A temp file under `data_tmp_dir`, never the OS temp dir (often a RAM-backed tmpfs).
