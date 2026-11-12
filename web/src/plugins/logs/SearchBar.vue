@@ -2622,20 +2622,22 @@ export default defineComponent({
     // Approximate rendered widths (px) of each pinned control and of the fixed
     // left-section content, used only to decide how many pinned items fit before
     // they would clip. Hidden pinned items stay reachable inside the More menu.
-    const PIN_BUTTON_WIDTH = computed(() => (windowWidth.value < 1366 ? 72 : 84));
-    const SAVED_VIEWS_PIN_WIDTH = computed(() => (windowWidth.value < 1366 ? 93 : 105));
-    const SYNTAX_GUIDE_LABEL_WIDTH = computed(() => (windowWidth.value < 1366 ? 119 : 131));
+    // Toolbar buttons narrow their padding below 85.5rem (OButton sm-toolbar).
+    const isNarrowToolbar = computed(() => windowWidth.value < 1368);
+    const PIN_BUTTON_WIDTH = computed(() => (isNarrowToolbar.value ? 72 : 76));
+    const SAVED_VIEWS_PIN_WIDTH = computed(() => (isNarrowToolbar.value ? 93 : 97));
+    const SYNTAX_GUIDE_LABEL_WIDTH = computed(() => (isNarrowToolbar.value ? 119 : 123));
     const SYNTAX_GUIDE_ICON_WIDTH = 40;
     const PIN_ITEM_GAP = 8;
 
     // Rendered widths (px) of the left-section controls at the 34px toolbar size; collapse
     // thresholds derive from them so they cannot drift apart when a control is resized.
-    const TOGGLE_LABELS_WIDTH = computed(() => (windowWidth.value < 1366 ? 385 : 401));
+    const TOGGLE_LABELS_WIDTH = computed(() => (isNarrowToolbar.value ? 367 : 383));
     const TOGGLE_ICONS_WIDTH = 168;
     const TOGGLE_DROPDOWN_WIDTH = 120;
-    const RESET_LABEL_WIDTH = 89;
+    const RESET_LABEL_WIDTH = computed(() => (isNarrowToolbar.value ? 77 : 81));
     const RESET_ICON_WIDTH = 34;
-    const MORE_BUTTON_WIDTH = computed(() => (windowWidth.value < 1366 ? 73 : 85));
+    const MORE_BUTTON_WIDTH = computed(() => (isNarrowToolbar.value ? 73 : 77));
     const TOOLBAR_GAP = 8;
     const COLLAPSE_BUFFER = 16;
 
@@ -2649,7 +2651,8 @@ export default defineComponent({
       COLLAPSE_BUFFER;
     const shouldHideToolbarButtonText = computed(
       () =>
-        availableLeftWidth.value < leftContentWidth(TOGGLE_LABELS_WIDTH.value, RESET_LABEL_WIDTH),
+        availableLeftWidth.value <
+        leftContentWidth(TOGGLE_LABELS_WIDTH.value, RESET_LABEL_WIDTH.value),
     );
     const toolbarToggleIconOnly = computed(
       () =>
@@ -2667,7 +2670,8 @@ export default defineComponent({
       else w += TOGGLE_LABELS_WIDTH.value;
       if (!toolbarMoveResetToMenu.value) {
         w +=
-          (shouldHideToolbarButtonText.value ? RESET_ICON_WIDTH : RESET_LABEL_WIDTH) + TOOLBAR_GAP;
+          (shouldHideToolbarButtonText.value ? RESET_ICON_WIDTH : RESET_LABEL_WIDTH.value) +
+          TOOLBAR_GAP;
       }
       w += MORE_BUTTON_WIDTH.value + 2 * TOOLBAR_GAP;
       return w;

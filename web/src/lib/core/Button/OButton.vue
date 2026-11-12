@@ -444,7 +444,7 @@ const sizeClasses: Record<NonNullable<ButtonProps["size"]>, string> = {
   sm: "h-[2.125rem] ps-3.5 pe-3.5 max-[85.5rem]:ps-3 max-[85.5rem]:pe-3 text-sm gap-2 rounded-default",
   // Every toolbar control shares this box so a bar never mixes heights or padding.
   "sm-toolbar":
-    "h-8.5 ps-4 pe-4 max-[85.5rem]:ps-2.5 max-[85.5rem]:pe-2.5 text-xs gap-1.5 rounded-default",
+    "h-8.5 ps-3 pe-3 max-[85.5rem]:ps-2.5 max-[85.5rem]:pe-2.5 text-xs gap-1.5 rounded-default",
   "xs-grouped":
     "h-6.5 ps-2.5 pe-2.5 max-[85.5rem]:ps-2 max-[85.5rem]:pe-2 text-xs gap-1.5 rounded-default",
   // Compact labeled size for inline field chips (axis items) — ~28px, matches the dense button size
