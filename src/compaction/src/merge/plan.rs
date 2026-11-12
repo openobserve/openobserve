@@ -59,32 +59,16 @@ pub(super) async fn plan_batches(
         .map(|group| (group, MergeMode::Classic))
         .collect();
 
-    let mode_files = indexed_hour_scope(mode_files, mode, limits.max_file_size, stream);
-    // the open-hour round is a whole batch too, but only of the pending ingester files
-    if mode.merges_open_hour_pending() {
-        batches.extend(
-            ingester_batches(&mode_files, OPEN_HOUR_MERGE_FILES, limits.max_merge_groups)
-                .into_iter()
-                .map(|pending| (pending, mode.clone())),
-        );
-    } else if mode.merges_whole_batch() {
-        let pre_merge = if matches!(mode, MergeMode::MetricsIndexed) {
-            pre_merge_batches(&mode_files, limits.max_merge_groups, schema, stream).await
-        } else {
-            Vec::new()
-        };
-        if !pre_merge.is_empty() {
-            batches.extend(pre_merge);
-        } else if !mode_files.is_empty() {
-            batches.push((mode_files, mode.clone()));
-        }
-    } else {
-        batches.extend(
-            size_bounded_groups(&mode_files, limits)
-                .into_iter()
-                .map(|group| (group, mode.clone())),
-        );
-    }
+    batches.extend(match mode {
+        MergeMode::MetricsHashMerged => open_hour_batches(&mode_files, limits),
+        MergeMode::MetricsIndexed => closed_hour_batches(mode_files, limits, schema, stream).await,
+        _ if mode.merges_whole_batch() && mode_files.is_empty() => Vec::new(),
+        _ if mode.merges_whole_batch() => vec![(mode_files, mode.clone())],
+        _ => size_bounded_groups(&mode_files, limits)
+            .into_iter()
+            .map(|group| (group, mode.clone()))
+            .collect(),
+    });
     batches
 }
 
@@ -99,16 +83,34 @@ fn split_legacy_metrics(files: Vec<FileKey>, mode: &MergeMode) -> (Vec<FileKey>,
         .partition(|f| MetricsFileLayout::is_hash_ordered(&f.key))
 }
 
-/// What a closed indexed metrics hour merges, see [`MetricsIndexMergeScope`].
-fn indexed_hour_scope(
-    mut files: Vec<FileKey>,
-    mode: &MergeMode,
-    max_file_size: usize,
+/// The open metrics hour: its pending ingester files merge into hash-merged output.
+fn open_hour_batches(files: &[FileKey], limits: &BatchLimits<'_>) -> Vec<PlannedBatch> {
+    ingester_batches(files, OPEN_HOUR_MERGE_FILES, limits.max_merge_groups)
+        .into_iter()
+        .map(|pending| (pending, MergeMode::MetricsHashMerged))
+        .collect()
+}
+
+/// The closed metrics hour: a pre-merge while over the merge-group cap, else its indexed merge.
+async fn closed_hour_batches(
+    files: Vec<FileKey>,
+    limits: &BatchLimits<'_>,
+    schema: &Arc<Schema>,
     stream: &str,
-) -> Vec<FileKey> {
-    if mode.metrics_file_layout() != Some(MetricsFileLayout::Indexed) {
-        return files;
+) -> Vec<PlannedBatch> {
+    let files = indexed_hour_scope(files, limits.max_file_size, stream);
+    let pre_merge = pre_merge_batches(&files, limits.max_merge_groups, schema, stream).await;
+    if !pre_merge.is_empty() {
+        return pre_merge;
     }
+    if files.is_empty() {
+        return Vec::new();
+    }
+    vec![(files, MergeMode::MetricsIndexed)]
+}
+
+/// What a closed indexed metrics hour merges, see [`MetricsIndexMergeScope`].
+fn indexed_hour_scope(mut files: Vec<FileKey>, max_file_size: usize, stream: &str) -> Vec<FileKey> {
     match metrics_index_merge_scope(&files, max_file_size) {
         MetricsIndexMergeScope::Skip => Vec::new(),
         MetricsIndexMergeScope::LateFilesOnly => {
