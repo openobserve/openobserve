@@ -147,6 +147,37 @@ describe("useStarterPackFlow", () => {
     });
   });
 
+  it("adds the ids the user unticked to the ones the preview left out", async () => {
+    fake.previewPack.mockResolvedValue({
+      items: [],
+      names: {},
+      notIncluded: [{ itemId: "no", reason: "no_data" }],
+    });
+    fake.installPack.mockResolvedValue(record());
+    const flow = setup();
+    await flow.install(undefined, { exclude: ["v1", "no"] });
+    expect(fake.installPack.mock.calls[0][1].exclude).toEqual(["no", "v1"]);
+    expect(fake.installPack.mock.calls[0][1].enableAlerts).toBe(false);
+  });
+
+  it("asks for started alerts and counts them on without a re-read", async () => {
+    fake.installPack.mockResolvedValue(record());
+    const flow = setup();
+    await flow.install(undefined, { enableAlerts: true });
+    expect(fake.installPack.mock.calls[0][1].enableAlerts).toBe(true);
+    expect(flow.alertsOn.value).toBe(1);
+    expect(flow.enabledAlertIds.value.has("al1")).toBe(true);
+    expect(flow.remindAlerts.value).toBe(false);
+  });
+
+  it("keeps alerts silent by default", async () => {
+    fake.installPack.mockResolvedValue(record());
+    const flow = setup();
+    await flow.install();
+    expect(fake.installPack.mock.calls[0][1].enableAlerts).toBe(false);
+    expect(flow.alertsOn.value).toBe(0);
+  });
+
   it("counts alerts off from the alerts the install created", async () => {
     const items = record().items;
     fake.installs = [

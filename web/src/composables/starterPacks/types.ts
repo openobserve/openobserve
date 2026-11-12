@@ -299,8 +299,10 @@ export interface PackPreview {
 }
 
 export interface PackInstallOptions {
-  /** Item ids the preview left out; a resumed install keeps its own list. */
+  /** Item ids to skip, matched on an item's own id or the id it copies; created items stay. */
   exclude?: string[];
+  /** Created alerts start enabled instead of silent. */
+  enableAlerts?: boolean;
   repairs?: PackRepair[];
   bindings?: PackBinding[];
   flavours?: Record<string, string>;

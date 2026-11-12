@@ -304,6 +304,22 @@ describe("useStarterPacks", () => {
       expect(record.items.filter(({ copyOf }) => copyOf === "k8s/one")).toHaveLength(2);
     });
 
+    it("skips one unticked Use all copy and keeps the other", async () => {
+      const record = await packs().installPack(
+        { ...PACK, alerts: ["k8s/one"] },
+        {
+          repairs: [{ from: "s", to: "a", also: ["b"] }],
+          copies: [
+            { copyOf: "k8s/one", stream: "a" },
+            { copyOf: "k8s/one", stream: "b" },
+          ],
+          exclude: ["k8s/one@b"],
+        },
+      );
+      expect(fake.state.alerts.map((alert) => alert.stream_name)).toEqual(["a"]);
+      expect(record.items.filter(({ copyOf }) => copyOf === "k8s/one")).toHaveLength(1);
+    });
+
     it("repoints the saved view at the repaired stream", async () => {
       await packs().installPack(PACK, { repairs: [{ from: "e", to: "renamed" }] });
       expect(JSON.stringify(fake.state.views[0])).toContain("renamed");
@@ -461,6 +477,22 @@ describe("useStarterPacks", () => {
         "library:k8s/two",
       ]);
       expect(fake.state.dashboards[0].folder_id).toBe(fake.state.folders.dashboards[0].folderId);
+    });
+
+    it("creates the alerts enabled when asked to start them", async () => {
+      await packs().installPack(PACK, { enableAlerts: true });
+      expect(fake.state.alerts).toHaveLength(2);
+      for (const alert of fake.state.alerts) {
+        expect(alert.enabled).toBe(true);
+        expect(alert.destinations).toEqual([]);
+      }
+    });
+
+    it("leaves out the items the user unticked", async () => {
+      const record = await packs().installPack(PACK, { exclude: ["k8s/two", "events"] });
+      expect(fake.state.alerts.map((a) => a.tags.at(-1))).toEqual(["library:k8s/one"]);
+      expect(fake.state.views).toHaveLength(0);
+      expect(record.items.some(({ itemId }) => itemId === "k8s/two")).toBe(false);
     });
 
     it("writes the record before the first item and after each item", async () => {
