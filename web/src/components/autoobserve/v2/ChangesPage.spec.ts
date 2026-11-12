@@ -181,6 +181,37 @@ describe.each([
     expect(sel(w, `${prefix}-more`).exists()).toBe(false);
   });
 
+  it("details show what a change was applied on, and say so when that was not recorded", async () => {
+    const saw = {
+      confidence: "High",
+      rule_id: "noise",
+      pattern: "short_blips",
+      schema_version: 2,
+      title: "Fires in short blips",
+      columns: {
+        evidence_shortblips_complete_episodes: 12,
+        evidence_shortblips_would_not_alert: 9,
+      },
+    } as const;
+    const kept = view("f-1");
+    kept.change = { ...kept.change!, evidence: saw };
+    api.list.mockResolvedValue(list([kept, view("f-2")]));
+    const w = await mountPage(comp);
+    for (const id of ["f-1", "f-2"])
+      await w
+        .find(`[data-test^="${rowPrefix}alert_finding:${id}-"][aria-expanded]`)
+        .trigger("click");
+    const details = (id: string, part: string) =>
+      sel(w, `autoobserve2-change-alert_finding:${id}-${part}`);
+    expect(details("f-1", "confidence").text()).toBe("High");
+    const shown = details("f-1", "evidence").text();
+    expect(shown).toContain("Fires in short blips");
+    expect(shown).toMatch(/12.*9/s);
+    expect(details("f-1", "evidence-none").exists()).toBe(false);
+    expect(details("f-2", "confidence").exists()).toBe(false);
+    expect(details("f-2", "evidence-none").exists()).toBe(true);
+  });
+
   it("says nothing more when the list fits", async () => {
     api.list.mockResolvedValue(list([view("f-1")]));
     const w = await mountPage(comp);

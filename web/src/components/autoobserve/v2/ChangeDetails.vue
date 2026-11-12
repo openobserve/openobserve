@@ -39,6 +39,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <dd class="text-text-body min-w-0">
         <span v-for="(line, i) in actors" :key="i" class="block">{{ line }}</span>
       </dd>
+      <template v-if="evidence?.confidence">
+        <dt class="text-text-secondary">{{ t("autoobserve.issueLive.confidence.label") }}</dt>
+        <dd
+          class="text-text-body min-w-0"
+          :data-test="`autoobserve2-change-${change.id}-confidence`"
+        >
+          {{ evidence.confidence }}
+        </dd>
+      </template>
+      <template v-if="evidence === null || evidence?.summary || evidence?.lines.length">
+        <dt class="text-text-secondary">{{ t("autoobserve.activityLive.details.saw") }}</dt>
+        <dd
+          v-if="evidence"
+          class="text-text-body flex min-w-0 flex-col gap-1"
+          :data-test="`autoobserve2-change-${change.id}-evidence`"
+        >
+          <span v-if="evidence.summary" class="break-words">{{ evidence.summary }}</span>
+          <span v-if="evidence.lines.length" class="flex flex-wrap gap-x-6 gap-y-1">
+            <span v-for="line in evidence.lines" :key="line.column" class="min-w-0">
+              <span class="text-text-secondary">{{ line.label }}</span>
+              <span class="ms-1.5 font-medium tabular-nums">{{ line.value }}</span>
+            </span>
+          </span>
+        </dd>
+        <dd
+          v-else
+          class="text-text-secondary min-w-0"
+          :data-test="`autoobserve2-change-${change.id}-evidence-none`"
+        >
+          {{ t("autoobserve.activityLive.details.sawNotRecorded") }}
+        </dd>
+      </template>
     </dl>
     <div v-if="change.shifts.length" class="grid grid-cols-1 gap-3 sm:grid-cols-2">
       <OCodeBlock
@@ -85,7 +117,7 @@ import { computed } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
-import { configText, type Change } from "./changes";
+import { configText, evidenceOf, type Change } from "./changes";
 
 const props = defineProps<{ change: Change; actors: I18nText[]; alertHref: string | null }>();
 
@@ -94,6 +126,12 @@ const { t, locale } = useI18nTyped();
 const title = computed(() =>
   props.change.entry.title ? raw(props.change.entry.title) : t("autoobserveLive.history.untitled"),
 );
+
+// Unset means the server has not listed this change yet, which says nothing either way.
+const evidence = computed(() => {
+  const saw = props.change.entry.evidence;
+  return saw ? evidenceOf(t, locale.value, saw) : saw;
+});
 
 const settings = computed(() =>
   raw(

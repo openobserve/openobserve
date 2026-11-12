@@ -30601,6 +30601,8 @@
       "details": {
         "who": "Who",
         "noFields": "This change named no setting AutoObserve can show.",
+        "saw": "What AutoObserve saw",
+        "sawNotRecorded": "Not recorded. This change was made before AutoObserve kept what it saw.",
         "undoNote": "Undo puts the alert's settings back the way they were.",
         "undoneNote": "This change was undone; the alert is back the way it was."
       },

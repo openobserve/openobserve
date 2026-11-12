@@ -340,7 +340,7 @@ pub async fn undo_decision(
     tag = "AutoObserve",
     operation_id = "AutoObserveListDecisions",
     summary = "List decisions in force and applied changes",
-    description = "The dismissals and accepts in force on items the caller can read, and every change applied to an alert the caller can read, newest first: who, why, until when, and the revision an undo needs. An applied change has action `apply`, state `applied` or `undone`, `via` (`apply` or `editor`) and `change` with the alert's id and title and each field from old to new; undone changes stay listed. `total` counts only readable decisions. A note is returned only to its author and to callers who may decide; others see `has_note`.",
+    description = "The dismissals and accepts in force on items the caller can read, and every change applied to an alert the caller can read, newest first: who, why, until when, and the revision an undo needs. An applied change has action `apply`, state `applied` or `undone`, `via` (`apply` or `editor`) and `change` with the alert's id and title, each field from old to new, and `evidence`: the finding's confidence and evidence as they read when the change was applied, absent for a change applied before they were kept; undone changes stay listed. `total` counts only readable decisions. A note is returned only to its author and to callers who may decide; others see `has_note`.",
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
@@ -1271,6 +1271,7 @@ mod tests {
                 alert_id: alert_id.to_string(),
                 patch: vec![FieldPatch::PendingPeriodSecs { from: 0, to: 120 }],
                 acknowledged: None,
+                evidence: None,
             }
         }
 

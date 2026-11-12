@@ -15,12 +15,16 @@
 
 import { raw, type I18nKey, type I18nText, type TranslateFn } from "@/types/i18n";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import {
   APPLY_FIELDS,
   type ApplyCopy,
   type ApplyField,
 } from "@/components/alert_calibration/applySuggestion";
-import type { FieldChange } from "@/services/autoobserveDecisions";
+import type { DigestRecord, RuleId } from "@/components/alert_calibration/digests";
+import { formatEvidenceField } from "@/components/alert_calibration/format";
+import { evidenceFor, RULE_META } from "@/components/alert_calibration/rules";
+import type { AppliedEvidence, FieldChange } from "@/services/autoobserveDecisions";
 import type { AppliedEntry } from "../decisions/appliedChanges";
 import { dayKey, formatWhen } from "../live/liveCopy";
 
@@ -238,6 +242,48 @@ export const whoText = (t: TranslateFn, entry: AppliedEntry, me: string | undefi
   const { view } = entry;
   if (view.state !== "undone") return who(view.actor);
   return t("autoobserve.activityLive.whoUndone", { actor: who(view.undone_by ?? view.actor) });
+};
+
+/** What AutoObserve saw when it made a change, in the finding card's own labels and formats. */
+export interface ChangeEvidence {
+  confidence: I18nText | null;
+  summary: string | null;
+  lines: { column: string; label: I18nText; value: I18nText }[];
+}
+
+const CONFIDENCE_KEY: Record<string, I18nKey> = {
+  High: "autoobserve.issueLive.confidence.high",
+  Medium: "autoobserve.issueLive.confidence.medium",
+  Low: "autoobserve.issueLive.confidence.low",
+};
+
+const isRule = (rule: string | undefined): rule is RuleId =>
+  rule !== undefined && Object.hasOwn(RULE_META, rule);
+
+export const evidenceOf = (
+  t: TranslateFn,
+  locale: string,
+  saw: AppliedEvidence,
+): ChangeEvidence => {
+  const { rule_id, pattern, schema_version } = saw;
+  const confidence = saw.confidence && CONFIDENCE_KEY[saw.confidence];
+  // A rule this build cannot name shows its confidence and summary without rows.
+  const record = isRule(rule_id)
+    ? ({ ...saw.columns, rule_id, pattern, schema_version } as DigestRecord & { rule_id: RuleId })
+    : null;
+  return {
+    confidence: confidence ? t(confidence) : null,
+    summary: saw.title || null,
+    lines: record
+      ? evidenceFor(record)
+          .filter((field) => record[field.column] != null)
+          .map((field) => ({
+            column: field.column,
+            label: t(field.labelKey),
+            value: formatEvidenceField(t, record, field, locale),
+          }))
+      : [],
+  };
 };
 
 /** The before and after the details show, one `setting: value` line per field. */

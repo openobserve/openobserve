@@ -65,6 +65,17 @@ export interface ChangePreview {
   acknowledged_firings_dropped?: { count: number; of: number; first_at?: number };
 }
 
+/** What a finding said when its change was applied; a change from before this was kept has none. */
+export interface AppliedEvidence {
+  confidence?: string;
+  rule_id?: string;
+  pattern?: string;
+  schema_version?: number;
+  title?: string;
+  /** The finding's own `evidence_*` columns by name. */
+  columns?: Record<`evidence_${string}`, number | string | boolean>;
+}
+
 export interface DecisionView {
   /** `{family}:{id}`; the undo path, never shown. */
   decision_id: string;
@@ -85,7 +96,11 @@ export interface DecisionView {
   /** Only the list sends it. */
   subject?: SubjectInfo;
   /** An apply's alert and fields, on servers that list applies. */
-  change?: { alert: { id: string; title: string }; fields: FieldChange[] };
+  change?: {
+    alert: { id: string; title: string };
+    fields: FieldChange[];
+    evidence?: AppliedEvidence;
+  };
   via?: "apply" | "editor";
   /** When and by whom an apply was undone, on servers that keep `decided_at` as the change time. */
   undone_at?: number | null;
