@@ -86,12 +86,18 @@ describe("AlertSampleEvents", () => {
 
   it("keeps only the latest chunk of a streaming aggregation instead of stacking chunks", async () => {
     stream.mockImplementation((_req: unknown, handlers: Handlers) => {
-      const chunk = (message: string) => ({
-        type: "search_response_hits",
-        content: { streaming_aggs: true, results: { hits: [{ _timestamp: 1, message }] } },
-      });
-      handlers.data({}, chunk("first pass"));
-      handlers.data({}, chunk("final pass"));
+      const partition = (message: string) => {
+        handlers.data({}, { type: "search_response_metadata", content: { streaming_aggs: true } });
+        handlers.data(
+          {},
+          {
+            type: "search_response_hits",
+            content: { results: { hits: [{ _timestamp: 1, message }] } },
+          },
+        );
+      };
+      partition("first pass");
+      partition("final pass");
       handlers.complete();
     });
     const wrapper = mountSamples();
@@ -99,6 +105,25 @@ describe("AlertSampleEvents", () => {
     const rows = wrapper.findAll('[data-test="add-alert-sample-event"]');
     expect(rows).toHaveLength(1);
     expect(rows[0].text()).toContain("final pass");
+  });
+
+  it("appends hits batches when the search is not a streaming aggregation", async () => {
+    stream.mockImplementation((_req: unknown, handlers: Handlers) => {
+      handlers.data({}, { type: "search_response_metadata", content: { streaming_aggs: false } });
+      for (const message of ["one", "two"]) {
+        handlers.data(
+          {},
+          {
+            type: "search_response_hits",
+            content: { results: { hits: [{ _timestamp: 1, message }] } },
+          },
+        );
+      }
+      handlers.complete();
+    });
+    const wrapper = mountSamples();
+    await flushPromises();
+    expect(wrapper.findAll('[data-test="add-alert-sample-event"]')).toHaveLength(2);
   });
 
   it("says so when the stream has nothing recent", async () => {

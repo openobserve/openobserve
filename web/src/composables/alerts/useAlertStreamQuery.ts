@@ -56,6 +56,7 @@ export function useAlertStreamQuery() {
     hits.value = [];
     state.value = "loading";
     const owns = () => traceId === mine;
+    let streamingAggs = false;
     fetchQueryDataWithHttpStream(
       {
         queryReq: {
@@ -76,10 +77,15 @@ export function useAlertStreamQuery() {
       },
       {
         data: (_payload: unknown, response: AlertStreamChunk | undefined) => {
-          if (!owns() || response?.type !== "search_response_hits") return;
+          if (!owns()) return;
+          // The flag rides on the metadata event; each streaming-aggregation hits batch then carries the whole result.
+          if (response?.type === "search_response_metadata") {
+            streamingAggs = response.content?.streaming_aggs === true;
+            return;
+          }
+          if (response?.type !== "search_response_hits") return;
           const chunk = response.content?.results?.hits ?? [];
-          // A streaming aggregation resends the whole result in every chunk, so it replaces rather than appends.
-          hits.value = response.content?.streaming_aggs ? chunk : [...hits.value, ...chunk];
+          hits.value = streamingAggs ? chunk : [...hits.value, ...chunk];
         },
         error: () => {
           if (!owns()) return;

@@ -1667,6 +1667,33 @@ describe("AddAlert (OForm owner)", () => {
       expect(alertsService.update_by_alert_id).not.toHaveBeenCalled();
     });
 
+    it("can focus hold-for after it appears, though it was hidden when the editor opened", async () => {
+      breakpoint.lgUp.value = false;
+      wrapper = mountAlert(
+        { isUpdated: true, modelValue: savedAlert({ pending_period_sec: 0 }) },
+        {
+          global: {
+            provide: { store },
+            plugins: [i18n, router],
+            stubs: { ...stubs, AlertSettings: false },
+          },
+        },
+      );
+      await flushPromises();
+      expect(wrapper.find('[data-test="alert-settings-pending-period-input"]').exists()).toBe(
+        false,
+      );
+      wrapper.vm.form.setFieldValue("pending_period_sec", 300);
+      await flushPromises();
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      wrapper.vm.focusManager.focusField("pending_period");
+
+      expect(warn).not.toHaveBeenCalledWith(expect.stringContaining("not registered"));
+      warn.mockRestore();
+      breakpoint.lgUp.value = true;
+    });
+
     it("moves focus to the picked section's heading", async () => {
       wrapper = mountAlert({}, { attachTo: document.body });
       await flushPromises();

@@ -529,6 +529,11 @@ describe("AlertTargetsSelect — checkbox list", () => {
     expect(list(wrapper).exists()).toBe(true);
   });
 
+  it("names the checkbox group for screen readers", () => {
+    const wrapper = createWrapper({ list: true, destinationOptions: ["slack"] });
+    expect(list(wrapper).find('[role="group"]').attributes("aria-label")).toBe("Destination");
+  });
+
   it("keeps the dropdown when a selected destination is missing, so its Missing badge stays visible", () => {
     const wrapper = createWrapper({
       list: true,

@@ -3046,26 +3046,35 @@ export function useAlertForm(
               },
             });
           }
-          if ((newVal as any).pendingPeriodFieldRef) {
-            focusManager.registerField("pending_period", {
-              ref: (newVal as any).pendingPeriodFieldRef,
-              onBeforeFocus: () => {
-                if (isAnomalyMode.value) {
-                  activeTab.value = "anomaly-alerting";
-                } else {
-                  activeTab.value = "condition";
-                }
+          // Hold-for and keep-firing render only once shown, so resolve their element at focus time.
+          const settings = newVal as {
+            pendingPeriodFieldRef?: unknown;
+            keepFiringForFieldRef?: unknown;
+          };
+          focusManager.registerField("pending_period", {
+            ref: {
+              get value() {
+                return settings.pendingPeriodFieldRef;
               },
-            });
-          }
-          if ((newVal as any).keepFiringForFieldRef) {
-            focusManager.registerField("keep_firing_for", {
-              ref: (newVal as any).keepFiringForFieldRef,
-              onBeforeFocus: () => {
+            },
+            onBeforeFocus: () => {
+              if (isAnomalyMode.value) {
+                activeTab.value = "anomaly-alerting";
+              } else {
                 activeTab.value = "condition";
+              }
+            },
+          });
+          focusManager.registerField("keep_firing_for", {
+            ref: {
+              get value() {
+                return settings.keepFiringForFieldRef;
               },
-            });
-          }
+            },
+            onBeforeFocus: () => {
+              activeTab.value = "condition";
+            },
+          });
         });
       }
     },

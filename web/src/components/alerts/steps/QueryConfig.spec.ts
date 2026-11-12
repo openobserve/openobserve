@@ -332,6 +332,20 @@ describe("QueryConfig.vue", () => {
     }
   });
 
+  describe("Operator wording", () => {
+    it("echoes a count warning row's operator in the same words as its select", () => {
+      expect(wrapper.vm.operatorLabel(">=")).toBe("at least");
+      expect(wrapper.vm.operatorLabel("<")).toBe("fewer than");
+      expect(wrapper.vm.operatorLabel("~=")).toBe("~=");
+    });
+
+    it("stores the same operator symbols whether a row shows words or symbols", () => {
+      expect(wrapper.vm.plainOperators.map((o: { value: string }) => o.value).sort()).toEqual(
+        [...wrapper.vm.numericOperators].sort(),
+      );
+    });
+  });
+
   describe("Timezone Options", () => {
     it("lists 'Browser Time' and 'UTC' shortcuts at the top of the options", () => {
       const options = wrapper.vm.filteredTimezones;
