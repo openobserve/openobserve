@@ -55,10 +55,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :envs="envs"
         :agent-names="agentNames"
         :versions="versions"
+        :agent-streams="agentStreams"
+        :selected-agent-stream="effectiveStream"
         :selected-stream-count="selectedStreamCount"
         :streams-loaded="true"
         :agents-loaded="agentsLoaded"
         @filter-mode-change="onFilterModeChange"
+        @update:selected-agent-stream="selectedAgentStream = $event"
         @agent-pick="modeExplicit = true"
       >
         <!-- Version-agnostic hint. Agent Graph hides the cascade's Version
@@ -137,6 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :agent-id="filterMode === 'agent' ? (selectedAgent?.id ?? null) : null"
       :agent-name="filterMode === 'agent' ? (selectedAgent?.name ?? null) : null"
       :agent-env="filterMode === 'agent' ? (selectedAgent?.env ?? null) : null"
+      :agent-scope="nodeBehaviorScope"
       :viz-type="vizType"
       :layout-type="layoutType"
       hide-stream-selector
@@ -202,6 +206,7 @@ import type { GenAiAgentListItem } from "@/services/gen-ai-agent-mapping.service
 import AiScopeBar from "@/enterprise/components/AIObservability/AiScopeBar.vue";
 import AiNoAgentIdentityBanner from "@/enterprise/components/AIObservability/AiNoAgentIdentityBanner.vue";
 import AiAgentsLoadError from "@/enterprise/components/AIObservability/AiAgentsLoadError.vue";
+import { replaceRouteQuery } from "@/utils/url/replaceRouteQuery";
 import { useAiDateController } from "@/enterprise/composables/useAiDateController";
 import { useChildRefresh } from "@/enterprise/composables/useChildRefresh";
 import { useLlmTraceStreams } from "@/enterprise/composables/useLlmTraceStreams";
@@ -214,6 +219,7 @@ import {
   scopeUrlQuery,
   type ScopeMode,
 } from "@/enterprise/composables/useAgentScope";
+import { selectedAgentScope } from "./agentScope";
 
 defineOptions({ name: "AIAgentGraphPage" });
 
@@ -224,16 +230,12 @@ const router = useRouter();
 
 // Shared AI-module date range — the same singleton LLM Insights / Sessions /
 // Agent Behavior use, so picking a time on any AI tab lands on all of them.
-// Agent Graph has no from/to/period URL sync (urlSync:false), matching its
-// prior behavior of resolving from shared state only. `timeRange` is the
-// resolved absolute window (µs) the graph + agent-list queries read.
 const {
   dateState,
   timeRange,
   applyRelative,
   onDateChange: onDateStateChange,
-  mountResolve,
-} = useAiDateController({ urlSync: false });
+} = useAiDateController();
 
 const ServiceGraph = defineAsyncComponent(() => import("@/plugins/traces/ServiceGraph.vue"));
 
@@ -253,9 +255,14 @@ const scopeReady = ref(false);
 // picks, whose agents may differ (unless the user chose the mode).
 let modeSettled = false;
 // Seeded once from the URL after the first agents load, then cleared.
-let pendingUrlScope: { env: string; name: string; version: string } | null =
+let pendingUrlScope: { env: string; name: string; version: string; stream: string } | null =
   urlScope.agent || urlScope.env || urlScope.version
-    ? { env: urlScope.env, name: urlScope.agent, version: urlScope.version }
+    ? {
+        env: urlScope.env,
+        name: urlScope.agent,
+        version: urlScope.version,
+        stream: urlScope.agentStream,
+      }
     : null;
 const activeStream = ref<string>(urlScope.stream);
 
@@ -352,6 +359,8 @@ const {
   selectedEnv,
   selectedAgentName,
   selectedVersion,
+  agentStreams,
+  selectedAgentStream,
   selectAgentByScope,
 } = useAgentScope({
   filterMode,
@@ -370,6 +379,13 @@ const {
   // must resolve an agent from env + name alone (auto-pick the first version).
   versionAgnostic: true,
   t,
+});
+
+// Version stays open: this page hides the version picker.
+const nodeBehaviorScope = computed(() => {
+  const scope =
+    filterMode.value === "agent" ? selectedAgentScope(selectedAgent.value, agents.value) : null;
+  return scope && { ...scope, version: null };
 });
 
 // Nothing to graph in the current org / time window: no agent to pick in Agent
@@ -394,15 +410,25 @@ const graphReady = computed(
 
 function syncScopeUrl() {
   const agent = selectedAgent.value
-    ? { name: selectedAgent.value.name, env: selectedEnv.value, version: selectedVersion.value }
+    ? {
+        name: selectedAgent.value.name,
+        env: selectedEnv.value,
+        version: selectedVersion.value,
+        stream: selectedAgentStream.value,
+      }
     : null;
-  const query = scopeUrlQuery(route.query, {
-    mode: filterMode.value,
-    explicit: modeExplicit.value,
-    stream: activeStream.value,
-    agent,
+  void replaceRouteQuery(router, route, (current) => {
+    const next = scopeUrlQuery(current, {
+      mode: filterMode.value,
+      explicit: modeExplicit.value,
+      stream: activeStream.value,
+      agent,
+    });
+    // An org switch updates the store before the route; reading the route would write the previous org back.
+    const org = store.state.selectedOrganization?.identifier;
+    if (org && next.org_identifier != null) next.org_identifier = org;
+    return next;
   });
-  router.replace({ query }).catch(() => {});
 }
 
 // A toggle click is an explicit choice: kept in the URL and remembered for the
@@ -415,7 +441,7 @@ function onFilterModeChange(mode: boolean | AcceptableValue | AcceptableValue[])
   syncScopeUrl();
 }
 
-watch([activeStream, selectedEnv, selectedAgentName], () => {
+watch([activeStream, selectedEnv, selectedAgentName, selectedAgentStream], () => {
   if (scopeReady.value) syncScopeUrl();
 });
 
@@ -443,7 +469,12 @@ async function loadAgents(force = false, windowPicked = false) {
   }
   if (!agentsError.value) modeSettled = true;
   if (pendingUrlScope && agents.value.length) {
-    selectAgentByScope(pendingUrlScope.env, pendingUrlScope.name, pendingUrlScope.version);
+    selectAgentByScope(
+      pendingUrlScope.env,
+      pendingUrlScope.name,
+      pendingUrlScope.version,
+      pendingUrlScope.stream,
+    );
     pendingUrlScope = null;
   }
   if (activeStream.value && !availableStreams.value.includes(activeStream.value)) {
@@ -466,10 +497,6 @@ function onDateChange(value: any) {
 }
 
 onMounted(() => {
-  // Resolve the shared range to an absolute window on mount (re-anchoring a
-  // relative range to "now"), so the graph and agent list query the same window
-  // the other AI tabs use. urlSync:false → no URL read, resolve from shared state.
-  mountResolve();
   loadAgents();
 });
 </script>

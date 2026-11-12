@@ -17,6 +17,7 @@ import {
   type AlertFormFacts,
   type ExtraLiveValues,
 } from "@/composables/alerts/useTemplatePreview";
+import { parseContentSpec } from "@/components/alerts/template-content/contentSpec";
 
 const props = withDefaults(
   defineProps<{
@@ -90,10 +91,19 @@ const title = computed(() => {
 
 const ctx = computed(() => buildPreviewContext(props.facts, props.extra));
 
+/** The text to preview: a Content template's stored JSON spec becomes its title and body. */
+function displayBody(tpl: any): string {
+  const text = typeof tpl.body === "string" ? tpl.body : JSON.stringify(tpl.body, null, 2);
+  if (tpl.kind !== "content") return text;
+  const spec = parseContentSpec(text);
+  if (!spec) return text;
+  return [spec.title, spec.body].filter((part) => part?.trim()).join("\n\n");
+}
+
 function bodyOf(name: string): string {
   const tpl = props.templates.find((x: any) => x.name === name);
   if (!tpl) return "";
-  return typeof tpl.body === "string" ? tpl.body : JSON.stringify(tpl.body, null, 2);
+  return displayBody(tpl);
 }
 
 function segmentsFor(name: string): PreviewSegment[] {
@@ -122,12 +132,7 @@ function destTemplateInfo(destName: string): { name: string; body: string } {
   }
   // full Template object on the destination
   const name = tpl.name ?? "";
-  const body =
-    tpl.body != null
-      ? typeof tpl.body === "string"
-        ? tpl.body
-        : JSON.stringify(tpl.body, null, 2)
-      : bodyOf(name);
+  const body = tpl.body != null ? displayBody(tpl) : bodyOf(name);
   return { name, body };
 }
 

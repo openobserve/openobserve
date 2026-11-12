@@ -34,7 +34,7 @@ describe("useAIObservabilityRouteChildren — online evaluations gate", () => {
       "aiQueueWorkbench",
       "aiDatasets",
       "aiDatasetDetail",
-      "aiPlayground",
+      "aiEvaluations",
       "aiExperiments",
       "aiExperimentCreate",
       "aiExperimentCompare",
@@ -43,19 +43,45 @@ describe("useAIObservabilityRouteChildren — online evaluations gate", () => {
       "aiRemoteTaskCreate",
       "aiRemoteTaskEdit",
       "aiRemoteTaskDetail",
-      "aiEvaluations",
+      "aiPlayground",
+      // `/providers` is registered only with evaluations on.
+      "llmProviders",
     ]);
   });
 
-  it("leaves Monitor and Prompts alone — their APIs do not depend on evaluations", () => {
+  it("leaves Monitor, Prompts, Agent Mapping and Model Pricing alone — their APIs do not depend on evaluations", () => {
     expect(namesWhere(false)).toEqual([
       "aiLLMInsights",
       "aiSessions",
+      "aiUsers",
+      "aiBudgets",
       "aiAgentGraph",
       "aiAgentBehavior",
       "aiPrompts",
       "aiPromptCreate",
       "aiPromptVersionCreate",
+      "modelPricing",
+      "modelPricingGaps",
+      "modelPricingEditor",
+      "genAiAgentMapping",
     ]);
+  });
+});
+
+describe("useAIObservabilityRouteChildren — tab titles", () => {
+  const children = useAIObservabilityRouteChildren();
+
+  it("titles each tab of the shared evaluations route by the rail item that lists it", () => {
+    const evaluations = children.find((r) => r.name === "aiEvaluations")!;
+    expect(evaluations.meta?.titleKeyByTab).toEqual({
+      quality: "aiObservability.nav.evaluations",
+      jobs: "aiObservability.nav.evaluations",
+      scorers: "aiObservability.nav.scorers",
+      scoreConfigs: "aiObservability.nav.scorers",
+    });
+  });
+
+  it("gives a route that only one rail item uses no per-tab titles", () => {
+    expect(children.find((r) => r.name === "aiExperiments")!.meta?.titleKeyByTab).toBeUndefined();
   });
 });

@@ -41,6 +41,7 @@ use config::{
     },
 };
 use cron::Schedule;
+use datafusion::{common::SchemaError, error::DataFusionError};
 #[cfg(feature = "enterprise")]
 use db::workflows::{AssociationDeleteEvent, WorkflowTriggerType};
 use db::{
@@ -369,6 +370,11 @@ pub enum AlertError {
     MultiAlertGroupingError(String),
     #[error("Group by column {column} not found on stream {stream_name}")]
     GroupByColumnNotFound { column: String, stream_name: String },
+    /// A SQL multi-alert naming a column its stream has not received.
+    #[error(
+        "Stream {stream_name} has no field {field} yet. Alerts can only use fields that exist in the stream."
+    )]
+    FieldNotFound { field: String, stream_name: String },
     #[error("{reason}")]
     JiraDestinationNotSupported { destination: String, reason: String },
 }
@@ -526,6 +532,20 @@ fn validate_custom_group_by(
             column,
             stream_name: stream_name.to_owned(),
         })
+}
+
+fn multi_alert_plan_error(stream_name: &str, err: anyhow::Error) -> AlertError {
+    if let Some(DataFusionError::SchemaError(schema_err, _)) = err
+        .downcast_ref::<DataFusionError>()
+        .map(DataFusionError::find_root)
+        && let SchemaError::FieldNotFound { field, .. } = schema_err.as_ref()
+    {
+        return AlertError::FieldNotFound {
+            field: field.name.clone(),
+            stream_name: stream_name.to_owned(),
+        };
+    }
+    AlertError::MultiAlertGroupingError(err.to_string())
 }
 
 /// Structural half only: `{var}` tokens are unresolved until send time, so a body shaped right but
@@ -1169,7 +1189,7 @@ async fn prepare_alert(
                 .map_err(|e| AlertError::MultiAlertGroupingError(e.to_string()))?;
             let schema = get_result_schema(sql, false, true)
                 .await
-                .map_err(|e| AlertError::MultiAlertGroupingError(e.to_string()))?;
+                .map_err(|e| multi_alert_plan_error(stream_name, e))?;
 
             // this is mostly API check, FE already has a restriction
             if !schema.projections.contains(&agg.having.column) {
@@ -2615,9 +2635,19 @@ fn incident_path_notified(
     match outcome {
         Outcome::NewIncidentCreated { .. }
         | Outcome::NewAlertTypeJoined { .. }
-        | Outcome::SeverityEscalated { .. } => true,
+        | Outcome::SeverityEscalated { .. }
+        | Outcome::FiredAfterReopen { .. } => true,
         Outcome::ExistingAlertRepeated { .. } => false,
     }
+}
+
+/// `FiredAfterReopen` notifies destinations but pages nobody, so the manual trigger still pages.
+#[cfg(feature = "enterprise")]
+fn incident_path_paged(
+    outcome: &config::meta::alerts::incidents::IncidentCorrelationOutcome,
+) -> bool {
+    use config::meta::alerts::incidents::IncidentCorrelationOutcome as Outcome;
+    !matches!(outcome, Outcome::FiredAfterReopen { .. }) && incident_path_notified(outcome)
 }
 
 pub async fn trigger_by_id<C: ConnectionTrait>(
@@ -2637,7 +2667,7 @@ pub async fn trigger_by_id<C: ConnectionTrait>(
     // For creates_incident=true alerts the incident correlation path handles
     // the notification. For all other cases send the direct notification.
     #[cfg(feature = "enterprise")]
-    let (incident_notified, incident_notify_error) = if alert.creates_incident
+    let (incident_notified, incident_paged, incident_notify_error) = if alert.creates_incident
         && crate::alerts::incidents::incidents_enabled()
     {
         let synthetic_row = manual_trigger_row(&alert);
@@ -2665,6 +2695,7 @@ pub async fn trigger_by_id<C: ConnectionTrait>(
                 );
                 (
                     incident_path_notified(&correlated.outcome),
+                    incident_path_paged(&correlated.outcome),
                     correlated.notify_error,
                 )
             }
@@ -2673,17 +2704,17 @@ pub async fn trigger_by_id<C: ConnectionTrait>(
                     "No incident correlation for manually triggered alert {org_id}/{}",
                     alert.name
                 );
-                (false, None)
+                (false, false, None)
             }
             Err(e) => {
                 log::error!(
                     "Error correlating manual trigger to incident, falling back to direct notification: {e}"
                 );
-                (false, None)
+                (false, false, None)
             }
         }
     } else {
-        (false, None)
+        (false, false, None)
     };
 
     #[cfg(not(feature = "enterprise"))]
@@ -2704,7 +2735,7 @@ pub async fn trigger_by_id<C: ConnectionTrait>(
     // somebody checks a new on-call alert pages before trusting it, and it only
     // answers that question if it pages.
     #[cfg(feature = "enterprise")]
-    if o2_enterprise::enterprise::oncall::is_enabled() && !incident_notified {
+    if o2_enterprise::enterprise::oncall::is_enabled() && !incident_paged {
         crate::alerts::scheduler::handlers::page_for_alert_firing(&trace_id, &alert, &rows).await;
     }
     #[cfg(feature = "enterprise")]
@@ -5165,13 +5196,21 @@ mod threshold_validation_tests {
 
 #[cfg(test)]
 mod group_by_validation_tests {
+    use std::sync::Arc;
+
     use arrow_schema::{DataType, Field, Schema};
     use config::{
         meta::alerts::{AggFunction, Aggregation, Condition, Operator, QueryType, alert::Alert},
         utils::json::json,
     };
+    use datafusion::{
+        common::{DFSchema, unqualified_field_not_found},
+        datasource::MemTable,
+        error::DataFusionError,
+        prelude::SessionContext,
+    };
 
-    use super::{AlertError, validate_custom_group_by};
+    use super::{AlertError, multi_alert_plan_error, validate_custom_group_by};
 
     fn schema() -> Schema {
         Schema::new(vec![
@@ -5229,14 +5268,60 @@ mod group_by_validation_tests {
         alert.query_condition.query_type = QueryType::SQL;
         assert!(validate_custom_group_by("svc", &schema(), &alert).is_ok());
     }
+
+    fn assert_names_missing_field(err: AlertError) {
+        assert!(matches!(
+            &err,
+            AlertError::FieldNotFound { field, stream_name }
+                if field == "feature_name" && stream_name == "svc"
+        ));
+        assert_eq!(
+            err.to_string(),
+            "Stream svc has no field feature_name yet. Alerts can only use fields that exist in the stream."
+        );
+        let response = axum::response::Response::from(err);
+        assert_eq!(response.status(), axum::http::StatusCode::BAD_REQUEST);
+    }
+
+    #[test]
+    fn test_a_missing_field_is_named_not_quoted_from_the_planner() {
+        let err = unqualified_field_not_found("feature_name", &DFSchema::empty());
+        assert_names_missing_field(multi_alert_plan_error("svc", err.into()));
+        // Wrapped by the planner, the field is still found.
+        let err = unqualified_field_not_found("feature_name", &DFSchema::empty()).context("plan");
+        assert_names_missing_field(multi_alert_plan_error("svc", err.into()));
+    }
+
+    #[tokio::test]
+    async fn test_a_query_planned_on_a_missing_column_names_the_field() {
+        let ctx = SessionContext::new();
+        let table = MemTable::try_new(Arc::new(schema()), vec![vec![]]).unwrap();
+        ctx.register_table("svc", Arc::new(table)).unwrap();
+        let err = ctx
+            .state()
+            .create_logical_plan(
+                "SELECT feature_name, SUM(latency) AS spent FROM \"svc\" \
+                 WHERE feature_name = 'x' GROUP BY feature_name",
+            )
+            .await
+            .unwrap_err();
+        assert_names_missing_field(multi_alert_plan_error("svc", err.into()));
+    }
+
+    #[test]
+    fn test_other_planner_errors_stay_grouping_errors() {
+        let err = DataFusionError::Plan("bad".into());
+        assert!(matches!(
+            multi_alert_plan_error("svc", err.into()),
+            AlertError::MultiAlertGroupingError(msg) if msg.contains("bad")
+        ));
+    }
 }
 
 #[cfg(test)]
 mod send_path_tests {
     use config::meta::destinations::{Endpoint, HTTPType, Template, TemplateKind};
 
-    #[cfg(feature = "enterprise")]
-    use super::incident_path_notified;
     #[cfg(feature = "enterprise")]
     use super::is_license_denial;
     use super::{
@@ -5245,6 +5330,8 @@ mod send_path_tests {
         send_attempted, send_discord_with_attachment, send_error_message, send_failure_message,
         send_http_notification, workflows_denial_as_warning,
     };
+    #[cfg(feature = "enterprise")]
+    use super::{incident_path_notified, incident_path_paged};
     use crate::{
         alerts::notifications::platform::{Platform, send_resolve},
         ssrf_test_support::{hanging_server, isolated, secret_server, truncated_server},
@@ -5677,6 +5764,23 @@ mod send_path_tests {
         // the incident path sends NOTHING for this outcome, so skipping the alert's
         // destinations here would mean nobody is notified at all
         assert!(!incident_path_notified(&Outcome::ExistingAlertRepeated {
+            incident_id: "i1".to_string(),
+            service_name: "svc".to_string(),
+        }));
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn a_firing_after_reopen_skips_destinations_but_still_pages() {
+        use config::meta::alerts::incidents::IncidentCorrelationOutcome as Outcome;
+
+        let outcome = Outcome::FiredAfterReopen {
+            incident_id: "i1".to_string(),
+            service_name: "svc".to_string(),
+        };
+        assert!(incident_path_notified(&outcome));
+        assert!(!incident_path_paged(&outcome));
+        assert!(!incident_path_paged(&Outcome::ExistingAlertRepeated {
             incident_id: "i1".to_string(),
             service_name: "svc".to_string(),
         }));
@@ -9462,6 +9566,55 @@ mod tests {
 
         assert!(
             matches!(res, Err(AlertError::RepeatSuppressionOnRealtimeAlert)),
+            "{res:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn prepare_alert_names_a_multi_alert_field_the_stream_lacks() {
+        use infra::schema::{STREAM_SCHEMAS_LATEST, SchemaCache};
+
+        let org_id = "test_org_alert_save_missing_field";
+        let key = format!("{org_id}/{}/spans", StreamType::Traces);
+        STREAM_SCHEMAS_LATEST.write().await.insert(
+            key.clone(),
+            SchemaCache::new(arrow_schema::Schema::new(vec![
+                arrow_schema::Field::new("_timestamp", DataType::Int64, false),
+                arrow_schema::Field::new("trace_id", DataType::Utf8, true),
+                arrow_schema::Field::new("gen_ai_usage_cost", DataType::Float64, true),
+            ])),
+        );
+        let mut alert = Alert::default();
+        alert.stream_type = StreamType::Traces;
+        alert.trigger_condition.frequency = 60;
+        alert.query_condition.query_type = QueryType::SQL;
+        alert.query_condition.sql = Some(
+            "SELECT feature_name, SUM(gen_ai_usage_cost) AS spent FROM \"spans\" \
+             WHERE feature_name = 'x' GROUP BY feature_name"
+                .to_string(),
+        );
+        alert.query_condition.aggregation = Some(config::meta::alerts::Aggregation {
+            group_by: Some(vec![]),
+            function: config::meta::alerts::AggFunction::Count,
+            having: config::meta::alerts::Condition {
+                column: "spent".into(),
+                operator: config::meta::alerts::Operator::GreaterThanEquals,
+                value: json!(10),
+                ignore_case: false,
+                case_insensitive: None,
+            },
+            warning_value: None,
+            multi_alert: true,
+        });
+        let res = prepare_alert(org_id, "spans", "budget", &mut alert, true, false).await;
+        STREAM_SCHEMAS_LATEST.write().await.remove(&key);
+
+        assert!(
+            matches!(
+                &res,
+                Err(AlertError::FieldNotFound { field, stream_name })
+                    if field == "feature_name" && stream_name == "spans"
+            ),
             "{res:?}"
         );
     }

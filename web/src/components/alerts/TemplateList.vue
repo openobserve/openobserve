@@ -145,7 +145,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 labelKey="label"
                 valueKey="value"
                 size="sm"
-                class="w-44 shrink-0"
+                width="sm"
+                class="shrink-0"
                 :aria-label="t('alert_templates.appliesTo')"
                 data-test="template-list-applies-to-filter"
               />
@@ -172,7 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OEmptyState
               size="hero"
               preset="no-alert-templates"
-              :filtered="!!filterQuery"
+              :filtered="!!filterQuery || appliesToFilter !== 'any'"
               :actions="[
                 {
                   id: 'create',
@@ -190,7 +191,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @action="
                 (id) =>
                   id === 'clear-filters'
-                    ? (filterQuery = '')
+                    ? clearListFilters()
                     : id === 'import'
                       ? importTemplate()
                       : editTemplate(null)
@@ -558,6 +559,7 @@ const viewState = useListViewState("alertTemplates", {
   pageSize: 20,
   sortBy: "",
   sortOrder: "asc" as "asc" | "desc",
+  appliesTo: "any" as AppliesToFilter,
 });
 const filterQuery = ref(viewState.filterQuery);
 const pageSize = ref(viewState.pageSize);
@@ -855,10 +857,12 @@ const cancelDeleteTemplate = () => {
 const toggleTemplateEditor = () => {
   showTemplateEditor.value = !showTemplateEditor.value;
   if (!showTemplateEditor.value) {
+    // `applies_to` seeds only the editor it opened; the next new template starts on Inferred.
     const {
       action: _action,
       name: _name,
       clone: _clone,
+      applies_to: _appliesTo,
       ...restQuery
     } = router.currentRoute.value.query;
     router.push({
@@ -906,7 +910,11 @@ watch(
   () => {
     if (!templatesList.data.value) return;
     updateRoute();
-    loadDepGraph(orgIdForList.value, graphInputsStale ? ["alerts", "destinations"] : []);
+    // The graph reads its own templates query (it carries usage counts), so a refresh re-reads it too.
+    loadDepGraph(
+      orgIdForList.value,
+      graphInputsStale ? ["alerts", "destinations", "templates"] : [],
+    );
     graphInputsStale = false;
   },
   { immediate: true },
@@ -916,24 +924,35 @@ watch(
 type AppliesToFilter = "any" | "all_kinds" | NotificationKind;
 const isAppliesToFilter = (v: unknown): v is AppliesToFilter =>
   v === "any" || v === "all_kinds" || NOTIFICATION_KINDS.includes(v as NotificationKind);
+// A valid address value wins, then the filter kept from the last visit, then "any".
 const routeAppliesTo = router.currentRoute.value.query.applies_to;
 const appliesToFilter = ref<AppliesToFilter>(
-  isAppliesToFilter(routeAppliesTo) ? routeAppliesTo : "any",
+  isAppliesToFilter(routeAppliesTo)
+    ? routeAppliesTo
+    : isAppliesToFilter(viewState.appliesTo)
+      ? viewState.appliesTo
+      : "any",
 );
+watch(appliesToFilter, (value) => {
+  viewState.appliesTo = value;
+});
 const appliesToFilterOptions = computed(() => [
   { label: t("alert_templates.appliesToAny"), value: "any" },
   { label: t("alert_templates.appliesToAll"), value: "all_kinds" },
   ...NOTIFICATION_KINDS.map((kind) => ({ label: t(kindLabelKey(kind)), value: kind })),
 ]);
 const isAllKinds = (row: Template) => !row.applies_to?.length;
+// Other kinds skip a prebuilt channel template; only prebuilt_default serves every kind.
 const appliesToText = (row: Template) =>
-  isAllKinds(row)
-    ? t("alert_templates.appliesToAll")
-    : raw(
-        NOTIFICATION_KINDS.filter((k) => row.applies_to?.includes(k))
-          .map((k) => String(t(kindLabelKey(k))))
-          .join(", "),
-      );
+  row.isPrebuilt && row.name !== "prebuilt_default"
+    ? t(kindLabelKey("alert"))
+    : isAllKinds(row)
+      ? t("alert_templates.appliesToAll")
+      : raw(
+          NOTIFICATION_KINDS.filter((k) => row.applies_to?.includes(k))
+            .map((k) => String(t(kindLabelKey(k))))
+            .join(", "),
+        );
 
 // The upgrade stored every existing template as every kind; the notice stays until dismissed.
 const allKindsNoticeKey = computed(() => `o2-templates-all-kinds-notice:${orgIdForList.value}`);
@@ -959,6 +978,10 @@ const dismissAllKindsNotice = () => {
     // The notice still hides for this visit.
   }
 };
+const clearListFilters = () => {
+  filterQuery.value = "";
+  appliesToFilter.value = "any";
+};
 const reviewAllKinds = () => {
   activeTab.value = "custom";
   appliesToFilter.value = "all_kinds";
@@ -981,6 +1004,15 @@ const visibleRows = computed(() => {
         : byTab.filter((row) => templateAppliesTo(row, filter));
   if (!filterQuery.value) return byKind;
   return filterData(byKind, filterQuery.value);
+});
+// Unselect rows that tab, filter, or search hide; selections on other pages stay.
+watch(visibleRows, (rows) => {
+  if (!selectedTemplates.value.length) return;
+  const visible = new Map(rows.map((r: any) => [r.name, r]));
+  const kept = selectedTemplates.value
+    .map((tpl: any) => visible.get(tpl.name))
+    .filter((r: any) => r && !r.isPrebuilt);
+  if (kept.length !== selectedTemplates.value.length) selectedTemplates.value = kept;
 });
 const openBulkDeleteDialog = () => {
   confirmBulkDelete.value = true;

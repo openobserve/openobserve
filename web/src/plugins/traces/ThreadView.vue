@@ -254,6 +254,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-html="renderMarkdown(msg.content)"
               />
 
+              <BehindThisStep
+                v-if="explain(turn.span.span_id)"
+                :step="explain(turn.span.span_id)!"
+              />
+
               <!-- Footer. -->
               <div
                 class="thread-turn__footer border-border-default text-text-secondary mt-2 flex flex-wrap items-center gap-[0.35rem] border-t border-dashed pt-2 text-xs"
@@ -320,7 +325,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, inject, ref } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
@@ -354,7 +359,6 @@ import {
   getModel,
   getCost,
   getTokens,
-  classify,
   buildTraceGroup,
   spanTimeBounds,
   type Message,
@@ -364,10 +368,16 @@ import {
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import ThreadToolCalls from "./ThreadToolCalls.vue";
+import BehindThisStep from "./BehindThisStep.vue";
+import { REQUEST_TIMELINE_KEY, stepToExplain } from "./timeAttribution";
 import { renderMarkdown } from "./markdown";
 import { formatTimeWithSuffix } from "@/utils/zincutils";
 
 const { t } = useI18nTyped();
+
+// Provided by TraceDetails only: a turn that failed or ran slow shows what was behind it.
+const timeline = inject(REQUEST_TIMELINE_KEY, null);
+const explain = (spanId: string) => stepToExplain(timeline, spanId);
 
 interface ThreadHead {
   systemPrompt: string;
@@ -458,7 +468,11 @@ const showSystemFull = ref(false);
 const summary = computed(() => {
   const all = props.spans || [];
   const allTurnSpans = traceGroups.value.flatMap((g) => g.turns.map((t) => t.span));
-  const toolCount = all.filter((s) => classify(s) === "tool_call").length;
+  // The cards shown: attached tool spans plus calls the SDK recorded without a span.
+  const toolCount = traceGroups.value.reduce(
+    (n, g) => n + g.turns.reduce((m, t) => m + t.toolCalls.length, 0),
+    0,
+  );
 
   let totalCost = 0;
   for (const t of allTurnSpans) totalCost += getCost(t);

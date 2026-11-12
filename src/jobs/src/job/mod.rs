@@ -1254,6 +1254,21 @@ pub async fn init() -> Result<(), anyhow::Error> {
             },
         );
 
+        o2_enterprise::enterprise::llm_evaluations::eval_jobs::health::register_budget_transition(
+            |org_id, job_id, pause_at_spend| {
+                Box::pin(async move {
+                    openobserve_core::llm_evaluations::eval_jobs::transition_for_budget(
+                        &org_id,
+                        &job_id,
+                        pause_at_spend,
+                    )
+                    .await
+                    .map(|_| ())
+                    .map_err(|error| anyhow::anyhow!(error))
+                })
+            },
+        );
+
         o2_enterprise::enterprise::llm_evaluations::eval_jobs::async_executor::register_experiment_task_runner(
             |pointer| {
                 Box::pin(async move {
@@ -1281,6 +1296,11 @@ pub async fn init() -> Result<(), anyhow::Error> {
                 .get("total")
                 .copied()
             },
+        );
+
+        // Registered here: the enterprise crate can't depend on the transform crate's QuickJS.
+        o2_enterprise::enterprise::llm_evaluations::scorers::code::register_code_runner(
+            transform::js::run_score_fn,
         );
 
         o2_enterprise::enterprise::llm_evaluations::eval_jobs::async_executor::start_eval_task_consumers();

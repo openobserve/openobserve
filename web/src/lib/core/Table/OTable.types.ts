@@ -603,6 +603,8 @@ export interface OTableEmits<TData = any> {
   "update:currentPage": [page: number];
   "update:pageSize": [size: number];
   "pagination-change": [params: OTablePaginationParams];
+  /** The error state's Retry; also re-emits `pagination-change` for server data. */
+  retry: [];
 
   // Sorting
   "update:sortBy": [columnId: string];

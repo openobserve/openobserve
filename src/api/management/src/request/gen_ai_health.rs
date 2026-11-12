@@ -35,7 +35,7 @@ use config::{
         search::{Query as SearchQuery, Request as SearchRequest, RequestEncoding},
         stream::StreamType,
     },
-    utils::{json, time::now_micros},
+    utils::{json, sql::quote_sql_string, time::now_micros},
 };
 use db::model_pricing::DefinitionMatch;
 use serde::{Deserialize, Serialize};
@@ -212,10 +212,6 @@ const CHECK_IDS: [CheckId; 4] = [
     CheckId::MissingSessionId,
 ];
 
-fn quote_str(value: &str) -> String {
-    format!("'{}'", value.replace('\'', "''"))
-}
-
 fn quote_ident(value: &str) -> String {
     format!("\"{}\"", value.replace('"', "\"\""))
 }
@@ -231,7 +227,7 @@ fn check_pred(id: CheckId, cols: &Columns, pricing_enabled: bool) -> Pred {
         CheckId::UnpricedModels if pricing_enabled && cols.has(COST_STATUS_COLUMN) => {
             Pred::Sql(format!(
                 "{COST_STATUS_COLUMN} = {}",
-                quote_str(CostStatus::Unpriced.as_str())
+                quote_sql_string(CostStatus::Unpriced.as_str())
             ))
         }
         CheckId::UnpricedModels => Pred::Never,
@@ -294,7 +290,7 @@ fn base_where(cols: &Columns, query: &DataHealthQuery) -> Option<String> {
         if !cols.has(column) {
             return None;
         }
-        preds.push(format!("{column} = {}", quote_str(value)));
+        preds.push(format!("{column} = {}", quote_sql_string(value)));
     }
     Some(preds.join(" AND "))
 }
@@ -972,8 +968,8 @@ pub struct UnpricedModelRow {
 fn listed_status_pred() -> String {
     format!(
         "{COST_STATUS_COLUMN} IN ({}, {})",
-        quote_str(CostStatus::Unpriced.as_str()),
-        quote_str(CostStatus::Approximate.as_str())
+        quote_sql_string(CostStatus::Unpriced.as_str()),
+        quote_sql_string(CostStatus::Approximate.as_str())
     )
 }
 

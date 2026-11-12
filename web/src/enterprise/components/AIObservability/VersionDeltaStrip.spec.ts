@@ -129,6 +129,15 @@ describe("VersionDeltaStrip", () => {
     );
   });
 
+  it("a rise from a zero baseline (0% → 37.5% errors) reads as worse, not neutral", () => {
+    const r = result([
+      metric({ key: "errorRate", a: 0, b: 0.375, deltaPct: null, verdict: "nochange", ci: null }),
+    ]);
+    const wrapper = mountStrip(r);
+    const delta = wrapper.find('[data-test="version-delta-strip-delta-errorRate"]');
+    expect(delta.classes()).toContain("text-error-600");
+  });
+
   it("P99 is colored by direction like the other latency metrics", () => {
     // p99 500→300 (fell) → green. P99 is now a first-class directional metric,
     // not a neutral display-only cell.

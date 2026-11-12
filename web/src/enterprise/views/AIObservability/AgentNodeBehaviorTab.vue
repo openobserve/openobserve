@@ -109,6 +109,8 @@
       :source-stream="sourceStream"
       :start-time="startTime"
       :end-time="endTime"
+      :agent-env="nodeScope.env"
+      :agent-version="nodeScope.version"
     />
   </div>
 </template>
@@ -121,7 +123,9 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import AgentSignalDetailPanel from "./AgentSignalDetailPanel.vue";
+import { formatTokens } from "@/utils/llmUtils";
 import agentSignalsService, { type AgentSignalRecord } from "@/services/agent_signals";
+import { buildFailureRows, buildLoopRows, matchesAgentScope } from "./agentScope";
 
 const props = defineProps<{
   /** The clicked agent's resolved name (from the graph node identity). */
@@ -129,6 +133,8 @@ const props = defineProps<{
   sourceStream?: string;
   startTime?: number;
   endTime?: number;
+  /** Agent Graph's Agent-mode selection; applies when it is this node's agent. */
+  agentScope?: { name: string; env: string | null; version: string | null } | null;
 }>();
 
 const { t } = useI18nTyped();
@@ -142,49 +148,39 @@ const detailRow = ref<any>(null);
 
 const orgId = computed(() => store.state.selectedOrganization?.identifier as string);
 
-/** Only this agent's signals — the drawer/page already resolve agent names the
- *  same way, so a name match is the scoping key (see design §4b id-vs-name note). */
-const mySignals = computed(() =>
-  signals.value.filter((s) => (s.agent_name ?? "") === props.agentName),
+/** The page's env/version when the clicked node is that agent, else null. */
+const nodeScope = computed(() =>
+  props.agentScope && props.agentScope.name === props.agentName
+    ? { env: props.agentScope.env, version: props.agentScope.version }
+    : { env: null, version: null },
 );
 
+/** This agent's signals at the page's env/version; names are the scoping key since drawer and page resolve them alike. */
+const mySignals = computed(() =>
+  signals.value.filter((s) => matchesAgentScope(s, { name: props.agentName, ...nodeScope.value })),
+);
+
+// One row per tool / failure class over the range, as on the Agent Behavior page.
 const loopRows = computed(() =>
-  mySignals.value
-    .filter((s) => s.signal_type === "loop")
-    .map((s) => ({
-      agent: props.agentName,
-      agentRaw: s.agent_name ?? props.agentName ?? null,
-      tool: s.tool_name ?? "",
-      calls: s.calls ?? 0,
-      traces: s.distinct_traces ?? 0,
-      ratio:
-        s.distinct_traces && s.distinct_traces > 0
-          ? Math.round(((s.calls ?? 0) / s.distinct_traces) * 100) / 100
-          : 0,
-    }))
-    .sort((a, b) => b.ratio - a.ratio),
+  buildLoopRows(mySignals.value, t("aiObservability.behavior.unknownAgent")),
 );
 
 const failureRows = computed(() =>
-  mySignals.value
-    .filter((s) => s.signal_type === "failure")
-    .map((s) => ({
-      agent: props.agentName,
-      agentRaw: s.agent_name ?? props.agentName ?? null,
-      failClass: s.fail_class ?? "unclassified",
-      count: s.count ?? 0,
-    }))
-    .sort((a, b) => b.count - a.count),
+  buildFailureRows(mySignals.value, t("aiObservability.behavior.unknownAgent")),
 );
 
 /** Cost is a headline summary, not a table (design §2). */
 const costSummary = computed(() => {
-  const c = mySignals.value.find((s) => s.signal_type === "cost");
-  if (!c) return null;
+  // One cost row per hourly window × env × version: total them over the range.
+  const rows = mySignals.value.filter((s) => s.signal_type === "cost");
+  if (!rows.length) return null;
+  const hasCost = rows.some((s) => s.cost != null);
+  const sum = (key: "cost" | "tokens" | "errors") =>
+    rows.reduce((acc, s) => acc + Number(s[key] ?? 0), 0);
   return {
-    cost: c.cost != null ? `$${Number(c.cost).toFixed(2)}` : "—",
-    tokens: c.tokens ?? 0,
-    errors: c.errors ?? 0,
+    cost: hasCost ? `$${sum("cost").toFixed(2)}` : "—",
+    tokens: formatTokens(sum("tokens")),
+    errors: sum("errors"),
   };
 });
 
@@ -234,7 +230,10 @@ const failureColumns = computed<OTableColumnDef[]>(() => [
   },
 ]);
 
+// Picking another node or range refetches; only the latest call's answer lands.
+let seq = 0;
 const fetchSignals = async () => {
+  const mine = ++seq;
   if (!orgId.value || !props.sourceStream || !props.agentName) {
     signals.value = [];
     return;
@@ -245,9 +244,11 @@ const fetchSignals = async () => {
       end_time: props.endTime,
       source_stream: props.sourceStream,
     });
+    if (mine !== seq) return;
     signals.value = res.data?.signals ?? [];
     disabledHint.value = "";
   } catch {
+    if (mine !== seq) return;
     // 403 = feature/flag off for this deployment, or stream absent — name the
     // config choice rather than showing a blank tab (design FR-6.5).
     signals.value = [];
