@@ -981,6 +981,8 @@ export class StreamsPage {
             testLogger.warn('Save did not complete — Add Stream dialog still open', { dialogText });
             await expect(toast).toBeVisible({ timeout: 1000 });
         }
+        // The dialog closes only after the post-create schema fetch; deleting the stream before that keeps it open.
+        await expect(this.addStreamModal).toBeHidden({ timeout: 15000 });
     }
 
     /**
