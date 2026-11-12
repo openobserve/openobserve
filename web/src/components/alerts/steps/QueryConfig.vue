@@ -248,7 +248,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             >
                             <span
                               class="text-text-secondary text-compact w-field-width-xs shrink-0 text-center leading-8.5 font-semibold"
-                              >{{ triggerOperator }}</span
+                              >{{ operatorLabel(triggerOperator) }}</span
                             >
                             <div class="flex flex-col gap-1">
                               <OFormInput
@@ -625,7 +625,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             >
                             <span
                               class="text-text-secondary text-compact w-field-width-xs shrink-0 text-center leading-8.5 font-semibold"
-                              >{{ triggerOperator }}</span
+                              >{{ operatorLabel(triggerOperator) }}</span
                             >
                             <div class="flex flex-col gap-1">
                               <OFormInput
@@ -1523,7 +1523,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         >
                         <span
                           class="text-text-secondary text-compact w-field-width-xs shrink-0 text-center leading-8.5 font-semibold"
-                          >{{ triggerOperator }}</span
+                          >{{ operatorLabel(triggerOperator) }}</span
                         >
                         <div class="flex flex-col gap-1">
                           <OFormInput
@@ -2496,6 +2496,8 @@ export default defineComponent({
       { label: t("alerts.sections.operators.eq"), value: "=" },
       { label: t("alerts.sections.operators.ne"), value: "!=" },
     ]);
+    const operatorLabel = (op: unknown) =>
+      plainOperators.value.find((option) => option.value === op)?.label ?? raw(String(op ?? ""));
 
     // Selected function — bare mode-discriminator (drives conditional rendering
     // + the aggregation payload). Stays a ref (bridged into `_meta` for the
@@ -4057,6 +4059,7 @@ export default defineComponent({
       isEventBased,
       logFunctionOptions,
       numericOperators,
+      operatorLabel,
       plainOperators,
       selectedFunction,
       conditionOperator,

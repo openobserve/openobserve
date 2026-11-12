@@ -36,7 +36,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :class="['flex items-center max-md:flex-wrap max-md:gap-y-2', wrap ? 'flex-wrap gap-y-2' : '']"
   >
     <div v-if="showsList" class="w-full" data-test="alert-destinations-list">
-      <OCheckboxGroup v-if="listOptions.length" :model-value="model" @update:model-value="onUpdate">
+      <OCheckboxGroup
+        v-if="listOptions.length"
+        :model-value="model"
+        :aria-label="t('alerts.destination')"
+        @update:model-value="onUpdate"
+      >
         <div class="grid grid-cols-[repeat(auto-fill,minmax(12rem,1fr))] gap-2">
           <OCheckbox
             v-for="option in listOptions"
