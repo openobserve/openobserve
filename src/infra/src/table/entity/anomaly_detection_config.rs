@@ -64,7 +64,8 @@ pub struct Model {
     pub priority: Option<i32>,
     /// Feature 2 (PT-6): JSON array of normalized tags. NULL = none.
     pub tags: Option<Json>,
-    /// 0=waiting, 1=ready, 2=training, 3=failed, 4=disabled
+    /// 0=waiting, 1=ready, 2=training, 3=failed, 4=disabled, 5=waiting_for_data, 6=not_applicable.
+    /// The re-check delay of 5 and 6 starts at `training_started_at`.
     pub status: i32,
     pub retries: i32,
     /// When the last training attempt FAILED, in microseconds — the retry backoff's anchor.
