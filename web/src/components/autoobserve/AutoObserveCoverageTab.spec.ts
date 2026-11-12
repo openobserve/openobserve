@@ -23,7 +23,6 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import AutoObserveCoverageTab from "./AutoObserveCoverageTab.vue";
 import { toCoverageSource, type CoverageSource, type SourceState } from "./live/liveAdapter";
-import { LIVE_DOT } from "./live/liveCopy";
 
 const routeQuery: Record<string, string> = {};
 vi.mock("vue-router", async (importOriginal) => ({
@@ -58,11 +57,17 @@ const READY: SourceState = { status: "ready", retry: () => undefined };
 const live = (data?: AutoObserveCoverage, state: Partial<SourceState> = {}): CoverageSource =>
   toCoverageSource(gt, data, { ...READY, ...state }, "en-US");
 
-const FEW = coverage([row("api", "covered"), row("web", "none"), row("db", "covered")]);
+// Every check covered; row() covers only the checks it names.
+const watched = (name: string) => ({
+  ...row(name, "covered", "covered"),
+  cells: { errors: cell("covered"), latency: cell("covered"), absence: cell("covered") },
+});
+
+const FEW = coverage([watched("api"), row("web", "none"), watched("db")]);
 
 const mountTab = (source: CoverageSource, skeleton = false) =>
   mount(AutoObserveCoverageTab, {
-    props: { ledger: [], scenario: "steady", source, skeleton, explain: true },
+    props: { source, skeleton, explain: true },
     global: {
       plugins: [i18n, store],
       stubs: { CoverageHexMap: HexMapStub, CoverageServiceDrawer: true },
@@ -71,7 +76,7 @@ const mountTab = (source: CoverageSource, skeleton = false) =>
 
 const mountUnderHeaderBar = (source: CoverageSource, skeleton = false) =>
   mount(AutoObserveCoverageTab, {
-    props: { ledger: [], scenario: "steady", source, skeleton, explain: true, headerBar: true },
+    props: { source, skeleton, explain: true, headerBar: true },
     global: {
       plugins: [i18n, store],
       stubs: { CoverageHexMap: HexMapStub, CoverageServiceDrawer: true },
@@ -93,7 +98,7 @@ describe("AutoObserveCoverageTab under the page's coverage bar", () => {
   });
 });
 
-describe("AutoObserveCoverageTab map beside an open service drawer (T5-25)", () => {
+describe("AutoObserveCoverageTab map beside an open service drawer", () => {
   it("makes room for the drawer, so it doesn't cover the hexes", async () => {
     const wrapper = mountTab(live(FEW));
     const scroller = () => wrapper.find('[data-test="autoobserve-coverage-map-scroller"]');
@@ -180,21 +185,75 @@ describe("AutoObserveCoverageTab in live mode", () => {
     });
   });
 
-  describe("two state words only", () => {
-    it("gives the map legend Coverage gap and Watched, and no learning", () => {
+  describe("the live state words", () => {
+    it("gives the map legend Coverage gap and Watched, and no empty state", () => {
       const wrapper = mountTab(live(FEW));
       const chips = wrapper.findAll('[data-test^="autoobserve-coverage-legend-"]');
       const text = chips.map((c) => c.text()).join(" ");
       expect(has(wrapper, "autoobserve-coverage-legend-gap")).toBe(true);
       expect(has(wrapper, "autoobserve-coverage-legend-watched")).toBe(true);
       expect(has(wrapper, "autoobserve-coverage-legend-learning")).toBe(false);
+      expect(has(wrapper, "autoobserve-coverage-legend-partial")).toBe(false);
       expect(wrapper.find('[data-test="autoobserve-coverage-legend-gap"]').text()).toContain(
         "Coverage gap",
       );
-      expect(text).not.toMatch(/learning/i);
+      expect(text).not.toMatch(/learning|partly/i);
     });
 
-    it("counts the legend over the services the search matches (T2-15)", async () => {
+    it("a service with one or two of three checks reads Partly watched everywhere", async () => {
+      routeQuery.cov = "table";
+      const wrapper = mountTab(
+        live(coverage([watched("api"), row("cart", "covered"), row("web", "none")])),
+      );
+      expect(wrapper.find('[data-test="autoobserve-coverage-state-cart"]').text()).toBe(
+        "Partly watched",
+      );
+      const tag = wrapper
+        .findAllComponents({ name: "OTag" })
+        .find((c) => String(c.props("label")) === "Partly watched");
+      expect(tag?.props("variant")).toBe("warning-outline");
+      const filters = wrapper.findAll('[data-test^="autoobserve-coverage-filter-"]');
+      expect(filters.map((f) => f.attributes("data-test"))).toContain(
+        "autoobserve-coverage-filter-partial",
+      );
+      wrapper
+        .findComponent('[data-test="autoobserve-coverage-filter"]')
+        .vm.$emit("update:modelValue", "partial");
+      await flushPromises();
+      const shown = (wrapper.findComponent(OTable).props("data") as { service: string }[]).map(
+        (r) => r.service,
+      );
+      expect(shown).toEqual(["cart"]);
+      const rail = wrapper.findComponent(OTable).props("rowRailTone") as (r: unknown) => string;
+      expect(rail(wrapper.findComponent(OTable).props("data")[0])).toBeNull();
+    });
+
+    it("the map legend counts Partly watched only while a service is partly watched", () => {
+      const wrapper = mountTab(live(coverage([watched("api"), row("cart", "covered")])));
+      expect(wrapper.find('[data-test="autoobserve-coverage-legend-partial"]').text()).toContain(
+        "Partly watched",
+      );
+      const items = wrapper.findComponent(HexMapStub).props("items") as {
+        key: string;
+        cls: string;
+      }[];
+      expect(items.find((i) => i.key === "cart")?.cls).toBe("partial");
+    });
+
+    it("opens on the filter a link names, by its own name or the home's", () => {
+      routeQuery.cov = "table";
+      routeQuery.filter = "attention";
+      const gaps = mountTab(live(FEW));
+      const shown = (w: ReturnType<typeof mountTab>) =>
+        (w.findComponent(OTable).props("data") as { service: string }[]).map((r) => r.service);
+      expect(shown(gaps)).toEqual(["web"]);
+      routeQuery.filter = "watched";
+      expect(shown(mountTab(live(FEW)))).toEqual(["api", "db"]);
+      routeQuery.filter = "learning";
+      expect(shown(mountTab(live(FEW)))).toEqual(["web", "api", "db"]);
+    });
+
+    it("counts the legend over the services the search matches", async () => {
       routeQuery.cov = "map";
       const wrapper = mountTab(
         live(coverage([row("api", "covered"), row("web", "none"), row("db", "none")])),
@@ -206,7 +265,7 @@ describe("AutoObserveCoverageTab in live mode", () => {
       );
     });
 
-    it("buckets detector counts for three live checks, not the fixture's 6 and 5 (T2-22)", async () => {
+    it("buckets detector counts for three checks: 3+, 2, 1 or none", async () => {
       routeQuery.cov = "map";
       const wrapper = mountTab(live(FEW));
       wrapper.findComponent(OSelect).vm.$emit("update:modelValue", "detectors");
@@ -225,16 +284,17 @@ describe("AutoObserveCoverageTab in live mode", () => {
       expect(options.map((o) => o.value)).toEqual(["state", "detectors", "scanned"]);
     });
 
-    it("filters the table by All, Watched and Coverage gap only", () => {
+    it("filters the table by All, Watched, Partly watched and Coverage gap while nothing learns", () => {
       routeQuery.cov = "table";
       const wrapper = mountTab(live(FEW));
       const filters = wrapper.findAll('[data-test^="autoobserve-coverage-filter-"]');
       expect(filters.map((f) => f.attributes("data-test"))).toEqual([
         "autoobserve-coverage-filter-all",
         "autoobserve-coverage-filter-watched",
+        "autoobserve-coverage-filter-partial",
         "autoobserve-coverage-filter-gaps",
       ]);
-      expect(filters[2].text()).toContain("Coverage gap");
+      expect(filters[3].text()).toContain("Coverage gap");
       const key = wrapper.find('[data-test="autoobserve-coverage-legend"]').text();
       expect(key).not.toMatch(/learning/i);
     });
@@ -251,9 +311,9 @@ describe("AutoObserveCoverageTab in live mode", () => {
     });
   });
 
-  describe("the live table (mockup j2-few)", () => {
+  describe("the live table", () => {
     const MIXED = coverage([
-      row("api", "covered"),
+      watched("api"),
       row("web", "none"),
       row("db", "silent"),
       row("cart", "none", "covered"),
@@ -281,39 +341,32 @@ describe("AutoObserveCoverageTab in live mode", () => {
       ]);
     });
 
-    it("says Watched or Coverage gap in each cell, and never GAP", () => {
+    it("marks a gap cell with the Gap chip and keeps each cell's state in its label", () => {
       const wrapper = mountTable();
-      expect(text(wrapper, "autoobserve-coverage-cell-api-errors")).toBe("Watched");
-      expect(text(wrapper, "autoobserve-coverage-cell-web-errors")).toBe("Coverage gap");
-      expect(text(wrapper, "autoobserve-coverage-cell-db-errors")).toBe("Coverage gap");
-      expect(text(wrapper, "autoobserve-coverage-cell-cart-absence")).toBe("Watched");
-      const table = text(wrapper, "autoobserve-coverage-matrix");
-      expect(table).not.toContain("GAP");
-      expect(table).not.toMatch(/Requests|Saturation|Log patterns|Dependencies/);
+      const cell = (id: string) => wrapper.find(`[data-test="autoobserve-coverage-cell-${id}"]`);
+      expect(cell("web-errors").findComponent({ name: "OTag" }).exists()).toBe(true);
+      expect(cell("api-errors").findComponent({ name: "OTag" }).exists()).toBe(false);
+      expect(cell("web-errors").attributes("aria-label")).toMatch(/gap/i);
+      expect(text(wrapper, "autoobserve-coverage-matrix")).not.toMatch(
+        /Requests|Saturation|Log patterns|Dependencies/,
+      );
     });
 
-    it("tags each service Watched or Coverage gap, agreeing with its three cells", () => {
+    it("tags each service by its three cells: all Watched, some Partly watched, none a gap", () => {
       const wrapper = mountTable();
       expect(text(wrapper, "autoobserve-coverage-state-api")).toBe("Watched");
-      expect(text(wrapper, "autoobserve-coverage-state-cart")).toBe("Watched");
+      expect(text(wrapper, "autoobserve-coverage-state-cart")).toBe("Partly watched");
       expect(text(wrapper, "autoobserve-coverage-state-web")).toBe("Coverage gap");
       expect(text(wrapper, "autoobserve-coverage-state-db")).toBe("Coverage gap");
     });
 
-    it("keys the cells, not the fixture marks, in the footer", () => {
+    it("keys the check cells in the footer", () => {
       const key = text(mountTable(), "autoobserve-coverage-legend");
       expect(key).toContain("Watched");
       expect(key).toContain("Coverage gap");
       expect(key).not.toMatch(
         /GAP|Anomaly|Threshold|Not applicable|Covered|Not watched|Falls short/,
       );
-    });
-
-    it("keys every gap with the one amber dot and the word Coverage gap", () => {
-      const item = mountTable().find('[data-test="autoobserve-coverage-legend-gap-key"]');
-      expect(item.exists()).toBe(true);
-      expect(item.text()).toBe("Coverage gap");
-      expect(item.find("span").classes().join(" ")).toContain(LIVE_DOT.gap);
     });
 
     it("searches the Where column it shows, not the stream it hides", async () => {
@@ -332,7 +385,7 @@ describe("AutoObserveCoverageTab in live mode", () => {
       expect(shown()).toEqual([]);
     });
 
-    it("says the filter hides the matches, not that nothing matches (T2-12)", async () => {
+    it("says the filter hides the matches, not that nothing matches", async () => {
       const wrapper = mountTable(coverage([row("api", "none"), row("web", "none")]));
       await wrapper.find('[data-test="autoobserve-coverage-search"] input').setValue("prod-eu");
       const watched = wrapper.findComponent('[data-test="autoobserve-coverage-filter"]');
@@ -351,7 +404,7 @@ describe("AutoObserveCoverageTab in live mode", () => {
       );
     });
 
-    it("rails a Coverage gap row in the Coverage gap chip's amber, not the warning yellow (T5-N3)", () => {
+    it("rails a Coverage gap row in the Coverage gap chip's amber, not the warning yellow", () => {
       const tone = mountTable().findComponent(OTable).props("rowRailTone") as (r: {
         service: string;
       }) => string | null;
@@ -361,31 +414,12 @@ describe("AutoObserveCoverageTab in live mode", () => {
       expect(byName("api")).toBeNull();
     });
 
-    it("sorts by every column (T2-19)", () => {
+    it("sorts by every column", () => {
       const columns = mountTable().findComponent(OTable).props("columns") as {
         id: string;
         sortable?: boolean;
       }[];
       expect(columns.every((c) => c.sortable)).toBe(true);
-    });
-
-    it("leaves the fixture table as it was", () => {
-      routeQuery.cov = "table";
-      const wrapper = mount(AutoObserveCoverageTab, {
-        props: { ledger: [], scenario: "demo" },
-        global: {
-          plugins: [i18n, store],
-          stubs: { CoverageHexMap: HexMapStub, CoverageServiceDrawer: true },
-        },
-      });
-      const headers = wrapper
-        .findComponent(OTable)
-        .props("columns")
-        .map((c: { header: string }) => c.header);
-      expect(headers).toContain("Saturation");
-      expect(headers).toContain("Stream");
-      expect(headers).not.toContain("Stops sending");
-      expect(text(wrapper, "autoobserve-coverage-legend")).toContain("Anomaly");
     });
   });
 

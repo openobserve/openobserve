@@ -20,11 +20,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-autoobserve-coverage
     data-test="autoobserve-coverage"
   >
-    <span v-if="source" class="sr-only" role="status" data-test="autoobserve-coverage-announce">{{
+    <span class="sr-only" role="status" data-test="autoobserve-coverage-announce">{{
       loadText
     }}</span>
     <div
-      v-if="source && liveHolds"
+      v-if="liveHolds"
       class="relative flex min-h-60 min-w-0 flex-1 flex-col"
       data-test="autoobserve-coverage-live-status"
     >
@@ -120,8 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :class="view === 'map' ? 'max-lg:flex-none' : ''"
     >
       <div
-        class="px-page-edge border-border-default flex flex-wrap items-center gap-x-5 gap-y-2 border-b py-3"
-        :class="source ? 'min-h-14' : ''"
+        class="px-page-edge border-border-default flex min-h-14 flex-wrap items-center gap-x-5 gap-y-2 border-b py-3"
         data-test="autoobserve-coverage-summary"
       >
         <span class="text-text-heading text-base font-semibold tabular-nums">{{
@@ -151,7 +150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </span>
         <LiveRefreshFailed
-          v-if="source?.stale"
+          v-if="source.stale"
           class="ms-auto min-w-0"
           dense
           surface="coverage"
@@ -304,94 +303,46 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #cell-service="{ row }">
             <span class="text-text-heading font-medium">{{ row.service }}</span>
           </template>
-          <template #cell-coverage="{ row }">
-            <span
-              class="flex items-center gap-2"
-              :title="coverageLabel(row)"
-              :aria-label="coverageLabel(row)"
-              role="img"
-              :data-test="`autoobserve-coverage-summary-${row.service}`"
-            >
-              <span class="flex gap-0.5" aria-hidden="true">
-                <span
-                  v-for="signal in applicable(row)"
-                  :key="signal"
-                  class="h-1.5 w-3 rounded-full"
-                  :class="SEGMENT_CLASS[row.cells[signal].state]"
-                />
-              </span>
-              <span class="text-text-secondary text-xs tabular-nums" aria-hidden="true">{{
-                t("autoobserve.coverage.coverageCount", {
-                  watched: watchedCount(row),
-                  total: applicable(row).length,
-                })
-              }}</span>
-            </span>
-          </template>
-          <template #cell-stream="{ row }">
-            <OText variant="mono" class="text-text-secondary">{{ row.stream }}</OText>
-          </template>
-          <template v-for="signal in SIGNALS" :key="signal" #[`cell-${signal}`]="{ row }">
-            <button
-              type="button"
-              class="hover:bg-surface-subtle-hover focus-visible:outline-focus-ring-accent rounded-default inline-flex h-7 min-w-10 cursor-pointer items-center justify-center gap-1 px-2 focus-visible:outline-2 focus-visible:outline-offset-1"
-              :class="isSelected(row.service, signal) ? 'ring-accent bg-surface-base ring-2' : ''"
-              :title="cellTip(row.cells[signal], signal)"
-              :aria-label="cellTip(row.cells[signal], signal)"
-              :aria-pressed="isSelected(row.service, signal)"
-              :data-test="`autoobserve-coverage-cell-${row.service}-${signal}`"
-              @click="selected = { service: row.service, signal }"
-            >
-              <template v-if="row.cells[signal].state === 'watched'">
-                <span
-                  class="border-icon-chip-success-text size-2.5 rounded-full border-2"
-                  :class="row.cells[signal].method === 'anomaly' ? 'bg-icon-chip-success-text' : ''"
-                />
-              </template>
-              <template v-else-if="row.cells[signal].state === 'learning'">
-                <span class="bg-progress-bar-track relative h-1 w-6 overflow-hidden rounded-full">
-                  <span
-                    class="bg-status-neutral-text absolute inset-y-0 start-0 rounded-full"
-                    :style="{ width: `${progressPct(row.cells[signal])}%` }"
-                  />
-                </span>
-                <span class="text-text-secondary text-2xs tabular-nums">{{
-                  daysShort(row.cells[signal])
-                }}</span>
-              </template>
-              <span v-else-if="row.cells[signal].state === 'gap'" :class="GAP_CHIP">{{
-                t("autoobserve.coverage.gapChip")
-              }}</span>
-              <span v-else class="text-text-secondary text-sm leading-none">–</span>
-            </button>
-          </template>
           <template #cell-where="{ row }">
             <span class="text-text-secondary">{{ row.where }}</span>
           </template>
           <template v-for="check in LIVE_CHECKS" :key="check" #[`cell-check-${check}`]="{ row }">
-            <button
+            <OButton
               v-if="row.checks"
-              type="button"
-              class="hover:bg-surface-subtle-hover focus-visible:outline-focus-ring-accent rounded-default text-text-body -ms-1.5 inline-flex h-7 cursor-pointer items-center gap-1.5 px-1.5 focus-visible:outline-2 focus-visible:outline-offset-1"
+              variant="ghost"
+              size="sm"
+              class="text-text-body -ms-1.5 gap-1.5 px-1.5 font-normal"
+              :active="isSelected(row.service, check)"
               :title="row.checks[check].state === 'gap' ? row.checks[check].reason : undefined"
               :aria-label="liveCellAria(row, check)"
               :aria-pressed="isSelected(row.service, check)"
               :data-test="`autoobserve-coverage-cell-${row.service}-${check}`"
               @click="selected = { service: row.service, signal: check }"
             >
-              <span
-                class="size-2 shrink-0 rounded-full"
-                :class="LIVE_DOT[cellLook(row, check)]"
-                aria-hidden="true"
-              />{{
-                liveCellWord(t, row.checks[check].engine?.stateKey ?? "none", isAdded(row, check))
-              }}
-            </button>
+              <OTag
+                v-if="cellMark(row, check) === 'gap'"
+                variant="warning-soft"
+                size="xs"
+                :label="t('autoobserve.coverageLive.gapChip')"
+              />
+              <span v-else-if="cellMark(row, check) === 'learning'" class="text-text-secondary">{{
+                coverageWord(t, "learning")
+              }}</span>
+              <template v-else>
+                <span
+                  class="size-2 shrink-0 rounded-full"
+                  :class="LIVE_DOT[cellLook(row, check)]"
+                  aria-hidden="true"
+                /><span :class="cellMark(row, check) === 'covered' ? 'sr-only' : ''">{{
+                  liveCellWord(t, row.checks[check].engine?.stateKey ?? "none", isAdded(row, check))
+                }}</span>
+              </template>
+            </OButton>
           </template>
           <template #cell-state="{ row }">
             <OTag
               v-if="row.status"
-              :variant="row.status.state === 'gap' ? 'amber-soft' : 'success-soft'"
+              :variant="STATE_TAG[row.status.state]"
               size="sm"
               :label="row.status.label"
               :data-test="`autoobserve-coverage-state-${row.service}`"
@@ -429,50 +380,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             t("autoobserve.coverage.showing", { shown: rows.length, total: totals.total })
           }}</span>
           <ul
-            v-if="source"
             class="ms-auto flex flex-wrap items-center gap-x-4 gap-y-1"
             :aria-label="t('autoobserve.coverage.legendLabel')"
           >
             <li
-              v-for="look in LIVE_LEGEND"
-              :key="look"
               class="flex items-center gap-1.5"
-              :data-test="`autoobserve-coverage-legend-${look}-key`"
+              data-test="autoobserve-coverage-legend-covered-key"
             >
-              <span class="size-2 rounded-full" :class="LIVE_DOT[look]" />{{
-                liveLookWord(t, look)
+              <span class="size-2 rounded-full" :class="LIVE_DOT.covered" />{{
+                liveLookWord(t, "covered")
               }}
-            </li>
-          </ul>
-          <ul
-            v-else
-            class="ms-auto flex flex-wrap items-center gap-x-4 gap-y-1"
-            :aria-label="t('autoobserve.coverage.legendLabel')"
-          >
-            <li class="flex items-center gap-1.5">
-              <span class="bg-icon-chip-success-text size-2.5 rounded-full" />{{
-                t("autoobserve.coverage.anomaly")
-              }}
-            </li>
-            <li class="flex items-center gap-1.5">
-              <span class="border-icon-chip-success-text size-2.5 rounded-full border-2" />{{
-                t("autoobserve.coverage.threshold")
-              }}
-            </li>
-            <li class="flex items-center gap-1.5">
-              <span class="bg-progress-bar-track relative h-1 w-6 overflow-hidden rounded-full">
-                <span
-                  class="bg-status-neutral-text absolute inset-y-0 start-0 w-1/2 rounded-full"
-                />
-              </span>
-              {{ t("autoobserve.coverage.learning") }}
             </li>
             <li class="flex items-center gap-1.5" data-test="autoobserve-coverage-legend-gap-key">
-              <span :class="GAP_CHIP">{{ t("autoobserve.coverage.gapChip") }}</span
-              >{{ t("autoobserve.coverage.gap") }}
+              <OTag
+                variant="warning-soft"
+                size="xs"
+                :label="t('autoobserve.coverageLive.gapChip')"
+              />
+              {{ liveLookWord(t, "gap") }}
             </li>
-            <li class="flex items-center gap-1.5">
-              <span aria-hidden="true">–</span>{{ t("autoobserve.coverage.na") }}
+            <li
+              v-if="totals.learning"
+              class="flex items-center gap-1.5"
+              data-test="autoobserve-coverage-legend-learning-key"
+            >
+              {{ coverageWord(t, "learning") }}
             </li>
           </ul>
         </div>
@@ -483,12 +415,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="selectedRow"
       :row="selectedRow"
       :service-states="serviceStates"
-      :scenario="scenario"
-      :ledger="ledger"
       :expanded="selected?.signal ?? null"
       :anchor="DRAWER_ANCHOR"
+      :history-days-needed="source.learning?.history_days_needed"
       message=""
-      :live="!!source"
       @close="closeDrawer"
       @expand="(signal) => selected && (selected = { ...selected, signal })"
       @select="(service) => (selected = { service, signal: null })"
@@ -502,33 +432,26 @@ import { useRoute, useRouter } from "vue-router";
 import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import OText from "@/lib/core/Typography/OText.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import type { OTableColumnDef, RowRailTone } from "@/lib/core/Table/OTable.types";
 import CoverageHexMap, { type HexClass, type HexItem } from "./CoverageHexMap.vue";
 import CoverageServiceDrawer from "./CoverageServiceDrawer.vue";
 import {
-  SIGNAL_LABEL,
   SIGNALS,
-  coverageFor,
-  coverageStats,
   detectorsOf,
   LIVE_CHECKS,
-  planFor,
-  type CellState,
-  type CoverageCell,
   type CoverageRow,
-  type LedgerEntry,
   type LiveCheck,
-  type Scenario,
   type Signal,
-} from "./fixtures";
+} from "./aoTypes";
 import type { CoverageSource } from "./live/liveAdapter";
 import {
   coverageWord,
@@ -551,10 +474,10 @@ import { justAdded } from "./insight/coverageCta";
 import LiveNoticeState from "./live/LiveNoticeState.vue";
 import LiveRefreshFailed from "./live/LiveRefreshFailed.vue";
 
-type CoverageFilter = "all" | "watched" | "learning" | "gaps" | "cantWatch";
+type CoverageFilter = "all" | "watched" | "partial" | "learning" | "gaps";
 type CoverageView = "map" | "table";
-type CoverageFill = "state" | "learning" | "detectors" | "scanned";
-type ServiceState = "watched" | "learning" | "gap";
+type CoverageFill = "state" | "detectors" | "scanned";
+type ServiceState = "watched" | "partial" | "learning" | "gap";
 
 const { t, locale } = useI18nTyped();
 const store = useStore();
@@ -563,56 +486,55 @@ const router = useRouter();
 
 const SEARCH_ID = "autoobserve-coverage-search";
 const DRAWER_ANCHOR = "[data-autoobserve-coverage]";
-const GAP_CHIP =
-  "bg-button-warning text-button-warning-foreground rounded-default px-1.5 py-0.5 text-2xs leading-none font-semibold";
 const MAP_SKELETON_HEXES = 18;
-const FILTERS: CoverageFilter[] = ["all", "watched", "learning", "gaps", "cantWatch"];
-// Live coverage has two states only, so learning and the fixture-only "can't watch" subset drop out.
-const LIVE_FILTERS: CoverageFilter[] = ["all", "watched", "gaps"];
+// Learning shows only while some service learns.
+const FILTERS: CoverageFilter[] = ["all", "watched", "partial", "learning", "gaps"];
 const VIEWS: CoverageView[] = ["map", "table"];
-const FILLS: CoverageFill[] = ["state", "learning", "detectors", "scanned"];
-const LIVE_FILLS: CoverageFill[] = ["state", "detectors", "scanned"];
-const LIVE_FILTER_WORD: Partial<Record<CoverageFilter, LiveCoverageState>> = {
+const FILLS: CoverageFill[] = ["state", "detectors", "scanned"];
+const FILTER_WORD: Partial<Record<CoverageFilter, LiveCoverageState>> = {
   watched: "watched",
+  partial: "partial",
+  learning: "learning",
   gaps: "gap",
 };
-// Live coverage has three checks, so a service's alerts fall in 3+, 2, 1 or none, not the fixture's 6/5.
-const LIVE_DETECTOR_LEGEND: { cls: HexClass; key: I18nKey }[] = [
+// The home and the coverage bar name a filter by what the reader wants to see.
+const FILTER_ALIAS: Record<string, CoverageFilter> = {
+  attention: "gaps",
+  watching: "watched",
+};
+// Partly watched and learning appear in the legend only while some service is in them.
+const OPTIONAL_STATES: ReadonlySet<HexClass> = new Set(["partial", "learning"]);
+const SERVICE_RANK: Record<ServiceState, number> = { gap: 0, partial: 1, learning: 2, watched: 3 };
+const STATE_TAG: Record<ServiceState, BadgeVariant> = {
+  gap: "warning-soft",
+  partial: "warning-outline",
+  learning: "default-soft",
+  watched: "success-soft",
+};
+// Three checks, so a service's alerts fall in 3+, 2, 1 or none.
+const DETECTOR_LEGEND: { cls: HexClass; key: I18nKey }[] = [
   { cls: "s1", key: "autoobserveLive.coverage.bucketThree" },
   { cls: "s2", key: "autoobserveLive.coverage.bucketTwo" },
   { cls: "s3", key: "autoobserveLive.coverage.bucketOne" },
   { cls: "none", key: "autoobserve.coverage.bucketNone" },
 ];
-const LIVE_STATE_LEGEND: { cls: HexClass; state: LiveCoverageState }[] = [
+const STATE_LEGEND: { cls: HexClass; state: LiveCoverageState }[] = [
   { cls: "gap", state: "gap" },
+  { cls: "partial", state: "partial" },
+  { cls: "learning", state: "learning" },
   { cls: "watched", state: "watched" },
 ];
 
-const FILTER_LABEL: Record<CoverageFilter, I18nKey> = {
-  all: "autoobserve.coverage.all",
-  watched: "autoobserve.coverage.watched",
-  learning: "autoobserve.coverage.learning",
-  gaps: "autoobserve.coverage.gaps",
-  cantWatch: "autoobserve.coverage.cantWatch",
-};
-const LIVE_LEGEND: LiveCellLook[] = ["covered", "gap"];
-
 const FILL_LABEL: Record<CoverageFill, I18nKey> = {
   state: "autoobserve.coverage.fillState",
-  learning: "autoobserve.coverage.fillLearning",
   detectors: "autoobserve.coverage.fillDetectors",
   scanned: "autoobserve.coverage.fillScanned",
 };
-const SEGMENT_CLASS: Record<CellState, string> = {
-  watched: "bg-icon-chip-success-text",
-  learning: "bg-status-neutral-text",
-  gap: "bg-badge-amber-soft-text",
-  na: "",
-};
 const SWATCH: Record<HexClass, string> = {
   watched: "bg-badge-success-soft-text/15 border border-badge-success-soft-text/60",
+  partial: "bg-ingest-accent-amber/25 border border-ingest-accent-amber",
   learning: "bg-badge-default-soft-bg border border-dashed border-status-neutral-text",
-  gap: "bg-badge-amber-soft-text",
+  gap: "bg-ingest-accent-amber",
   none: "bg-status-neutral-text",
   s1: "bg-map-seq-1",
   s2: "bg-map-seq-2",
@@ -620,37 +542,15 @@ const SWATCH: Record<HexClass, string> = {
   s4: "bg-map-seq-4",
   s5: "bg-map-seq-5",
 };
-const LEGEND: Record<CoverageFill, { cls: HexClass; key: I18nKey }[]> = {
-  state: [
-    { cls: "gap", key: "autoobserve.coverage.gap" },
-    { cls: "learning", key: "autoobserve.coverage.learning" },
-    { cls: "watched", key: "autoobserve.coverage.watched" },
-  ],
-  learning: [
-    { cls: "s1", key: "autoobserve.coverage.bucketLearned" },
-    { cls: "s2", key: "autoobserve.coverage.bucketDays67" },
-    { cls: "s3", key: "autoobserve.coverage.bucketDays35" },
-    { cls: "s4", key: "autoobserve.coverage.bucketDays02" },
-    { cls: "none", key: "autoobserve.coverage.bucketNoData" },
-  ],
-  detectors: [
-    { cls: "s1", key: "autoobserve.coverage.bucketSix" },
-    { cls: "s2", key: "autoobserve.coverage.bucketFive" },
-    { cls: "s3", key: "autoobserve.coverage.bucketFewer" },
-    { cls: "none", key: "autoobserve.coverage.bucketNone" },
-  ],
-  scanned: [
-    { cls: "s1", key: "autoobserve.coverage.bucketFresh" },
-    { cls: "s2", key: "autoobserve.coverage.bucketRecent" },
-    { cls: "s3", key: "autoobserve.coverage.bucketHour" },
-    { cls: "s5", key: "autoobserve.coverage.bucketStale" },
-    { cls: "none", key: "autoobserve.coverage.bucketNotScanned" },
-  ],
-};
+const SCANNED_LEGEND: { cls: HexClass; key: I18nKey }[] = [
+  { cls: "s1", key: "autoobserve.coverage.bucketFresh" },
+  { cls: "s2", key: "autoobserve.coverage.bucketRecent" },
+  { cls: "s3", key: "autoobserve.coverage.bucketHour" },
+  { cls: "s5", key: "autoobserve.coverage.bucketStale" },
+  { cls: "none", key: "autoobserve.coverage.bucketNotScanned" },
+];
 const props = defineProps<{
-  ledger: LedgerEntry[];
-  scenario: Scenario;
-  source?: CoverageSource;
+  source: CoverageSource;
   skeleton?: boolean;
   explain?: boolean;
   /** The page above already draws the watched-and-gap bar, so this tab must not draw a second one. */
@@ -660,56 +560,41 @@ const props = defineProps<{
 const emit = defineEmits<{ "how-it-works": [] }>();
 
 const liveHolds = computed(
-  () =>
-    !!props.source &&
-    (props.skeleton || props.source.status !== "ready" || !props.source.rows.length),
+  () => props.skeleton || props.source.status !== "ready" || !props.source.rows.length,
 );
 
 const liveNoticeView = computed(() =>
-  props.source?.status === "error" && props.source.failure
+  props.source.status === "error" && props.source.failure
     ? liveNotice(t, "coverage", props.source.failure)
     : null,
 );
 
-const emptyNotice = computed(() =>
-  emptyCoverageNotice(t, locale.value, props.source?.passMinutes ?? null),
-);
+const emptyNotice = computed(() => emptyCoverageNotice(t, locale.value, props.source.passMinutes));
 
 const loadPhase = useLoadPhase(
-  () => props.source?.status ?? "ready",
+  () => props.source.status,
   computed(() => !!props.skeleton),
 );
 const loadText = computed(() => liveLoadText(t, "coverage", loadPhase.value));
 
-const filters = computed(() => (props.source ? LIVE_FILTERS : FILTERS));
-const fills = computed(() => (props.source ? LIVE_FILLS : FILLS));
+const filters = computed(() =>
+  FILTERS.filter((f) => f !== "learning" || props.source.totals.learning > 0),
+);
 
 const filterLabel = (option: CoverageFilter): I18nText => {
-  const word = props.source ? LIVE_FILTER_WORD[option] : undefined;
-  return word ? coverageWord(t, word) : t(FILTER_LABEL[option]);
+  const word = FILTER_WORD[option];
+  return word ? coverageWord(t, word) : t("autoobserve.coverage.all");
 };
 
-const hasState = (row: CoverageRow, state: CellState) =>
-  SIGNALS.some((s) => row.cells[s].state === state);
+// The adapter states every live row; a row without one has no covered check.
+const serviceState = (row: CoverageRow): ServiceState => row.status?.state ?? "gap";
 
-const rank = (row: CoverageRow) => {
-  if (row.status) return row.status.state === "gap" ? 0 : 2;
-  if (hasState(row, "gap")) return 0;
-  return hasState(row, "learning") ? 1 : 2;
-};
-
-const serviceState = (row: CoverageRow): ServiceState =>
-  (["gap", "learning", "watched"] as const)[rank(row)];
-
-const learnedDays = (row: CoverageRow) =>
-  SIGNALS.map((s) => row.cells[s].progress).find(Boolean) ?? null;
+const rank = (row: CoverageRow) => SERVICE_RANK[serviceState(row)];
 
 const allRows = computed(() =>
-  [...(props.source ? props.source.rows : coverageFor(props.scenario, t))].sort(
-    (a, b) => rank(a) - rank(b) || a.service.localeCompare(b.service),
-  ),
+  [...props.source.rows].sort((a, b) => rank(a) - rank(b) || a.service.localeCompare(b.service)),
 );
-const totals = computed(() => props.source?.totals ?? coverageStats(props.scenario));
+const totals = computed(() => props.source.totals);
 
 const serviceStates = computed(() =>
   Object.fromEntries(allRows.value.map((r) => [r.service, serviceState(r)])),
@@ -721,8 +606,9 @@ const watchedPct = computed(() =>
 
 const split = computed(() => [
   { cls: "bg-badge-success-soft-text", count: totals.value.fullyWatched },
+  { cls: "bg-ingest-accent-amber/50", count: totals.value.partial },
   { cls: "bg-status-neutral-text/60", count: totals.value.learning },
-  { cls: "bg-badge-amber-soft-text", count: totals.value.gaps },
+  { cls: "bg-ingest-accent-amber", count: totals.value.gaps },
 ]);
 
 const summaryText = computed(() => {
@@ -731,26 +617,14 @@ const summaryText = computed(() => {
     total: totals.value.total,
     pct: watchedPct.value,
   };
-  return props.source
-    ? t("autoobserveLive.coverage.summaryWatched", params)
-    : t("autoobserve.coverage.summaryWatched", params);
+  return t("autoobserveLive.coverage.summaryWatched", params);
 });
 
 const splitLabel = computed(() =>
-  props.source
-    ? t("autoobserveLive.coverage.splitLabel", {
-        watched: totals.value.fullyWatched,
-        gaps: totals.value.gaps,
-      })
-    : t("autoobserve.coverage.splitLabel", {
-        watched: totals.value.fullyWatched,
-        learning: totals.value.learning,
-        gaps: totals.value.gaps,
-      }),
-);
-
-const planned = computed(
-  () => props.source?.planned ?? new Set(planFor(props.scenario).map((p) => p.service)),
+  t("autoobserveLive.coverage.splitLabel", {
+    watched: totals.value.fullyWatched,
+    gaps: totals.value.total - totals.value.fullyWatched,
+  }),
 );
 
 const pick = <T extends string>(value: unknown, options: T[], fallback: T): T =>
@@ -758,9 +632,11 @@ const pick = <T extends string>(value: unknown, options: T[], fallback: T): T =>
 
 const query = ref("");
 const term = computed(() => query.value.trim().toLowerCase());
-const filter = ref<CoverageFilter>("all");
+const filter = ref<CoverageFilter>(
+  pick(FILTER_ALIAS[String(route.query.filter)] ?? route.query.filter, filters.value, "all"),
+);
 const view = ref<CoverageView>(pick(route.query.cov, VIEWS, "map"));
-const fill = ref<CoverageFill>(pick(route.query.fill, fills.value, "state"));
+const fill = ref<CoverageFill>(pick(route.query.fill, FILLS, "state"));
 const highlight = ref<HexClass[]>([]);
 
 const initialService = typeof route.query.service === "string" ? route.query.service : null;
@@ -794,27 +670,23 @@ watch([view, fill, selected], () => {
 });
 
 const inFilter = (row: CoverageRow, f: CoverageFilter) => {
-  if (f === "watched") return rank(row) === 2;
-  if (f === "learning") return rank(row) === 1;
-  if (f === "gaps") return rank(row) === 0;
-  if (f === "cantWatch") return planned.value.has(row.service);
+  if (f === "watched") return serviceState(row) === "watched";
+  if (f === "partial") return serviceState(row) === "partial";
+  if (f === "learning") return serviceState(row) === "learning";
+  if (f === "gaps") return serviceState(row) === "gap";
   return true;
 };
 
-// Search matches the columns on screen: the live table shows Where, the fixture table shows Stream.
+// Search matches the columns on screen: service and Where.
 const searched = computed(() =>
   allRows.value.filter(
     (r) =>
       !term.value ||
       r.service.toLowerCase().includes(term.value) ||
-      (props.source ? (r.where ?? "") : r.stream).toLowerCase().includes(term.value),
+      (r.where ?? "").toLowerCase().includes(term.value),
   ),
 );
-const searchPlaceholder = computed(() =>
-  props.source
-    ? t("autoobserveLive.coverage.searchPlaceholder")
-    : t("autoobserve.coverage.searchPlaceholder"),
-);
+const searchPlaceholder = computed(() => t("autoobserveLive.coverage.searchPlaceholder"));
 const rows = computed(() => searched.value.filter((r) => inFilter(r, filter.value)));
 
 const matches = computed(() => (term.value ? new Set(searched.value.map((r) => r.service)) : null));
@@ -831,11 +703,8 @@ const announcement = computed(() => {
   return term.value ? t("autoobserve.coverage.matchCount", { count }, count) : "";
 });
 
-// Live search matches service, cluster and namespace; the fixture table's matches service or stream.
 const noMatchTitle = computed(() =>
-  props.source
-    ? t("autoobserveLive.coverage.noMatch", { query: raw(term.value) })
-    : t("autoobserve.coverage.noMatch", { query: raw(term.value) }),
+  t("autoobserveLive.coverage.noMatch", { query: raw(term.value) }),
 );
 
 const filterHidesTitle = computed(() => {
@@ -858,19 +727,10 @@ const clearSearch = () => {
 const fillClass = (row: CoverageRow): HexClass => {
   const state = serviceState(row);
   if (fill.value === "state") return state;
-  if (fill.value === "learning") {
-    if (state === "gap" || props.source) return "none";
-    const days = learnedDays(row)?.[0];
-    if (days == null) return "s1";
-    if (days >= 6) return "s2";
-    return days >= 3 ? "s3" : "s4";
-  }
   if (fill.value === "detectors") {
     const n = detectorsOf(row);
     if (n === 0) return "none";
-    if (props.source) return n >= 3 ? "s1" : n === 2 ? "s2" : "s3";
-    if (n >= 6) return "s1";
-    return n === 5 ? "s2" : "s3";
+    return n >= 3 ? "s1" : n === 2 ? "s2" : "s3";
   }
   const minutes = row.scannedMinutes;
   if (minutes == null) return "none";
@@ -879,16 +739,7 @@ const fillClass = (row: CoverageRow): HexClass => {
   return minutes < 60 ? "s3" : "s5";
 };
 
-const stateText = (row: CoverageRow): I18nText => {
-  if (row.status) return row.status.label;
-  const state = serviceState(row);
-  const days = learnedDays(row);
-  if (state === "learning" && days)
-    return t("autoobserve.coverage.stateLearning", { days: days[0], total: days[1] });
-  return state === "gap"
-    ? t("autoobserve.coverage.stateGap")
-    : t("autoobserve.coverage.stateWatched");
-};
+const stateText = (row: CoverageRow): I18nText => row.status?.label ?? coverageWord(t, "gap");
 
 const detectorText = (row: CoverageRow) => detectorCountText(t, detectorsOf(row));
 
@@ -911,18 +762,21 @@ const toItem = (row: CoverageRow): HexItem => ({
 const items = computed(() => allRows.value.map(toItem));
 
 const legend = computed(() =>
-  (props.source && fill.value === "state"
-    ? LIVE_STATE_LEGEND.map(({ cls, state }) => ({ cls, label: coverageWord(t, state) }))
-    : (props.source && fill.value === "detectors" ? LIVE_DETECTOR_LEGEND : LEGEND[fill.value]).map(
-        ({ cls, key }) => ({ cls, label: t(key) }),
-      )
-  ).map((item) => ({
-    ...item,
-    count: searched.value.filter((r) => fillClass(r) === item.cls).length,
-  })),
+  (fill.value === "state"
+    ? STATE_LEGEND.map(({ cls, state }) => ({ cls, label: coverageWord(t, state) }))
+    : (fill.value === "detectors" ? DETECTOR_LEGEND : SCANNED_LEGEND).map(({ cls, key }) => ({
+        cls,
+        label: t(key),
+      }))
+  )
+    .map((item) => ({
+      ...item,
+      count: searched.value.filter((r) => fillClass(r) === item.cls).length,
+    }))
+    .filter((item) => !(OPTIONAL_STATES.has(item.cls) && !item.count)),
 );
 
-const fillOptions = computed(() => fills.value.map((f) => ({ label: t(FILL_LABEL[f]), value: f })));
+const fillOptions = computed(() => FILLS.map((f) => ({ label: t(FILL_LABEL[f]), value: f })));
 
 const mapLabel = computed(() =>
   t(
@@ -942,49 +796,16 @@ const selectedRow = computed(() =>
 const isSelected = (service: string, signal: Signal | LiveCheck) =>
   selected.value?.service === service && selected.value.signal === signal;
 
-const railTone = (row: CoverageRow): RowRailTone | null =>
-  (["amber", "neutral", null] as const)[rank(row)];
+const RAIL_TONE: Record<ServiceState, RowRailTone | null> = {
+  gap: "amber",
+  partial: null,
+  learning: "neutral",
+  watched: null,
+};
+const railTone = (row: CoverageRow): RowRailTone | null => RAIL_TONE[serviceState(row)];
 
 const rowClass = (row: CoverageRow) =>
   row.service === selected.value?.service ? "bg-table-row-selected-bg" : "";
-
-const applicable = (row: CoverageRow) => SIGNALS.filter((s) => row.cells[s].state !== "na");
-const watchedCount = (row: CoverageRow) =>
-  SIGNALS.filter((s) => row.cells[s].state === "watched").length;
-const coverageLabel = (row: CoverageRow) =>
-  t("autoobserve.coverage.coverageLabel", {
-    watched: watchedCount(row),
-    total: applicable(row).length,
-  });
-
-const progressPct = (cell: CoverageCell) =>
-  cell.progress ? Math.round((100 * cell.progress[0]) / cell.progress[1]) : 0;
-
-const daysShort = (cell: CoverageCell) =>
-  cell.progress
-    ? t("autoobserve.coverage.daysShort", { days: cell.progress[0], total: cell.progress[1] })
-    : "";
-
-const cellTip = (cell: CoverageCell, signal: Signal): I18nText => {
-  const name = t(SIGNAL_LABEL[signal]);
-  if (cell.state === "watched")
-    return cell.method === "anomaly"
-      ? t("autoobserve.coverage.tipAnomaly", { signal: name })
-      : t("autoobserve.coverage.tipThreshold", { signal: name });
-  if (cell.state === "learning")
-    return t("autoobserve.coverage.tipLearning", {
-      signal: name,
-      days: cell.progress?.[0] ?? 0,
-      total: cell.progress?.[1] ?? 0,
-    });
-  if (cell.state === "gap")
-    return props.source && cell.reason
-      ? cell.reason
-      : t("autoobserve.coverage.tipGap", { signal: name });
-  return props.source
-    ? t("autoobserveLive.cell.tipNoClass", { signal: name })
-    : t("autoobserve.coverage.tipNa", { signal: name });
-};
 
 // The drawer returns focus to whatever opened it first; the hex selected last is the one to land on.
 const closeDrawer = () => {
@@ -1000,8 +821,12 @@ const closeDrawer = () => {
 };
 
 const isAdded = (row: CoverageRow, check: LiveCheck) =>
-  !!props.source &&
   justAdded(String(store.state.selectedOrganization?.identifier ?? ""), row, check);
+// A learning service has no baseline yet, so its unwatched checks wait instead of reading as gaps.
+const cellMark = (row: CoverageRow, check: LiveCheck): LiveCellLook | "learning" => {
+  const look = cellLook(row, check);
+  return look === "gap" && serviceState(row) === "learning" ? "learning" : look;
+};
 const cellLook = (row: CoverageRow, check: LiveCheck) =>
   liveCellLook(row.checks?.[check].engine?.stateKey ?? "none", isAdded(row, check));
 const liveCellAria = (row: CoverageRow, check: LiveCheck) =>
@@ -1025,7 +850,7 @@ const CHECK_RANK: Record<string, number> = {
   covered: 5,
 };
 
-const liveColumns: OTableColumnDef<CoverageRow>[] = [
+const columns: OTableColumnDef<CoverageRow>[] = [
   SERVICE_COLUMN,
   {
     id: "where",
@@ -1056,34 +881,4 @@ const liveColumns: OTableColumnDef<CoverageRow>[] = [
     sortable: true,
   },
 ];
-
-const fixtureColumns: OTableColumnDef<CoverageRow>[] = [
-  SERVICE_COLUMN,
-  {
-    id: "coverage",
-    header: t("autoobserve.coverage.coverage"),
-    accessorFn: (row: CoverageRow) => watchedCount(row),
-    size: 140,
-  },
-  {
-    id: "stream",
-    header: t("autoobserve.coverage.stream"),
-    accessorKey: "stream",
-    size: 130,
-  },
-  ...SIGNALS.map((signal) => ({
-    id: signal,
-    header: t(SIGNAL_LABEL[signal]),
-    accessorFn: (row: CoverageRow) => row.cells[signal].state,
-    size: 104,
-  })),
-  {
-    id: "lastScanned",
-    header: t("autoobserve.coverage.lastScanned"),
-    accessorKey: "lastScanned",
-    size: 120,
-  },
-];
-
-const columns = computed(() => (props.source ? liveColumns : fixtureColumns));
 </script>

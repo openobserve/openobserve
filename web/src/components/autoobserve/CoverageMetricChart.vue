@@ -172,7 +172,7 @@ import {
   type MetricDef,
   type MetricSeries,
 } from "./coverageSeries";
-import type { CoverageCell } from "./fixtures";
+import type { CoverageCell } from "./aoTypes";
 import { liveCellWord } from "./live/liveCopy";
 import type { ServiceChartStatus } from "./live/useServiceCharts";
 

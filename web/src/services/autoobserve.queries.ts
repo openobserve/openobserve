@@ -23,7 +23,7 @@ import autoobserve, {
 } from "./autoobserve";
 import { autoobserveKeys } from "./autoobserve.querykeys";
 import { LIVE_STALE_TIME } from "@/composables/query/cachePolicy";
-import type { IssuesRange } from "@/components/autoobserve/v2/fixtures";
+import type { IssuesRange } from "@/components/autoobserve/v2/autoobserveRoute";
 import {
   PAGED_POLL_MS,
   anyLive,

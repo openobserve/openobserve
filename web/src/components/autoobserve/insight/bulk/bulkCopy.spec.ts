@@ -258,8 +258,11 @@ describe("bulkCopy — rows and groups", () => {
 
 describe("bulkCopy — results", () => {
   it("reports a partial failure with one reason per row", () => {
-    expect(partialBanner(t, 1, 8)).toBe("1 of 8 alerts wasn't created.");
-    expect(partialBanner(t, 2, 8)).toBe("2 of 8 alerts weren't created.");
+    expect(partialBanner(t, 1, 8)).toBe("1 alert out of 8 wasn't created.");
+    expect(partialBanner(t, 2, 8)).toBe("2 alerts out of 8 weren't created.");
+    // FU-U4-PLURAL: the noun follows the failed count, so one of one reads right.
+    expect(partialBanner(t, 1, 1)).toBe("1 alert out of 1 wasn't created.");
+    expect(partialBanner(t, 3, 3)).toBe("3 alerts out of 3 weren't created.");
     expect(failureLine(t, "svc-j", { code: "forbidden", folder: "payments" })).toBe(
       "svc-j: You can't create alerts. Your role is missing the Create permission on Alerts. The alert was going to folder payments.",
     );

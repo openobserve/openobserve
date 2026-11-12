@@ -21,7 +21,7 @@ import store from "@/test/unit/helpers/store";
 import { gt } from "@/types/i18n";
 import type { AutoObserveCoverage } from "@/services/autoobserve";
 import CoverageServiceDrawer from "./CoverageServiceDrawer.vue";
-import { coverageFor, detectorsOf, type CoverageRow } from "./fixtures";
+import type { CoverageRow } from "./aoTypes";
 import { toCoverageSource } from "./live/liveAdapter";
 import { LIVE_DOT } from "./live/liveCopy";
 
@@ -115,20 +115,16 @@ const liveRow = (
 const mountDrawer = (
   row: CoverageRow,
   state: "watched" | "gap",
-  live = true,
   expanded: "absence" | null = null,
 ) =>
   mount(CoverageServiceDrawer, {
     props: {
       row,
       serviceStates: { [row.service]: state },
-      scenario: "demo",
-      ledger: [],
       expanded,
       anchor: "body",
       fix: null,
       message: "",
-      live,
     },
     global: {
       plugins: [i18n, store],
@@ -171,8 +167,8 @@ describe("CoverageServiceDrawer: a check just added here (COVERAGE-AFTER-ADD)", 
   });
 });
 
-describe("CoverageServiceDrawer: when a covered check's alert last fired (T2-13)", () => {
-  it("shows no 'Last fired' for an alert that has only been evaluated, never fired (T2-N2)", async () => {
+describe("CoverageServiceDrawer: when a covered check's alert last fired", () => {
+  it("shows no 'Last fired' for an alert that has only been evaluated, never fired", async () => {
     api.listAlerts.mockResolvedValue({
       data: {
         list: [
@@ -192,7 +188,7 @@ describe("CoverageServiceDrawer: when a covered check's alert last fired (T2-13)
         latency: cell("none"),
         absence: cell("covered", "checkout-errors"),
       });
-      const wrapper = mountDrawer(row, "watched", true, "absence");
+      const wrapper = mountDrawer(row, "watched", "absence");
       await flushPromises();
       const detail = wrapper
         .findAllComponents({ name: "CoverageSignalDetail" })
@@ -225,7 +221,7 @@ describe("CoverageServiceDrawer: when a covered check's alert last fired (T2-13)
         latency: cell("none"),
         absence: cell("covered", "checkout-errors"),
       });
-      const wrapper = mountDrawer(row, "watched", true, "absence");
+      const wrapper = mountDrawer(row, "watched", "absence");
       await flushPromises();
       const detail = wrapper
         .findAllComponents({ name: "CoverageSignalDetail" })
@@ -237,7 +233,7 @@ describe("CoverageServiceDrawer: when a covered check's alert last fired (T2-13)
   });
 });
 
-describe("CoverageServiceDrawer: the threshold line on a live chart (G7)", () => {
+describe("CoverageServiceDrawer: the threshold line on a live chart", () => {
   it("draws where the service's own latency alert fires", async () => {
     api.listAlerts.mockResolvedValue({
       data: {
@@ -293,7 +289,7 @@ describe("CoverageServiceDrawer: the threshold line on a live chart (G7)", () =>
   });
 });
 
-describe("CoverageServiceDrawer header for a logs-only service (T2-7)", () => {
+describe("CoverageServiceDrawer header for a logs-only service", () => {
   it("offers Open in Logs instead of Traces and the Service Catalog", () => {
     const row = liveRow({ errors: cell("none"), latency: cell("none"), absence: cell("none") }, [
       { type: "logs", name: "ingest_e" },
@@ -339,15 +335,18 @@ describe("CoverageServiceDrawer in live mode", () => {
     expect(wrapper.find('[data-test="autoobserve-coverage-drawer-logs"]').exists()).toBe(false);
   });
 
-  it("counts detectors over the three checks, the same count the table and map use", () => {
+  it("counts watched checks in the subtitle, as the chips list them, with no placeholder part", () => {
     const row = liveRow({
       errors: cell("none"),
       latency: cell("none"),
       absence: cell("covered", "checkout-heartbeat"),
       saturation: cell("none"),
     });
-    expect(detectorsOf(row)).toBe(1);
-    expect(mountDrawer(row, "watched").text()).toContain("1 detector");
+    const subtitle = mountDrawer(row, "watched")
+      .find('[data-test="autoobserve-coverage-drawer-subtitle"]')
+      .text();
+    expect(subtitle).toMatch(/\b1 of 3\b/);
+    expect(subtitle).not.toContain("—");
   });
 
   it("explains a gap from each check's own reason, grouping the checks with no monitor", () => {
@@ -371,86 +370,38 @@ describe("CoverageServiceDrawer in live mode", () => {
     expect(wrapper.text()).not.toContain("No scoped monitor");
   });
 
-  it("names the service's streams that are still learning, with their ready date (W3)", () => {
+  it("lists each learning stream with the paired engine's reason", () => {
     const until = (Date.now() + 5 * 86_400_000) * 1000;
-    const day = new Intl.DateTimeFormat("en-US", {
-      month: "short",
-      day: "numeric",
-      timeZone: "UTC",
-    });
-    const row = liveRow({ errors: cell("none"), latency: cell("none"), absence: cell("none") }, [
-      { type: "logs", name: "app_logs", learning_until: until },
-      { type: "traces", name: "app_traces", learning_until: null },
+    const streams = [
+      {
+        type: "logs",
+        name: "kept",
+        learning_until: until,
+        history_days_found: 4,
+        reason: "retention_short",
+      },
+      {
+        type: "logs",
+        name: "fresh",
+        learning_until: until,
+        history_days_found: 9,
+        reason: "young",
+      },
+    ];
+    const row = liveRow(
+      { errors: cell("none"), latency: cell("none"), absence: cell("none") },
+      streams as never,
+    );
+    const rows = mountDrawer(row, "gap")
+      .findAll('[data-test="autoobserve-coverage-drawer-learning-stream"]')
+      .map((r) => r.text());
+    expect(rows).toEqual([
+      expect.stringMatching(/^fresh.*9 of 14/),
+      expect.stringMatching(/^kept.*less than 14/),
     ]);
-    const line = mountDrawer(row, "gap").find('[data-test="autoobserve-coverage-drawer-learning"]');
-    expect(line.text()).toBe(`Learning until ${day.format(until / 1000)} · app_logs (logs)`);
   });
 
-  describe("every learning stream shows its own date (D10)", () => {
-    const day = new Intl.DateTimeFormat("en-US", {
-      month: "short",
-      day: "numeric",
-      timeZone: "UTC",
-    });
-    const inDays = (d: number) => (Date.now() + d * 86_400_000) * 1000;
-    const learningRows = (count: number) =>
-      liveRow(
-        { errors: cell("none"), latency: cell("none"), absence: cell("none") },
-        Array.from({ length: count }, (_, i) => ({
-          type: "logs",
-          name: `s${String(i).padStart(2, "0")}`,
-          learning_until: inDays(count - i),
-        })),
-      );
-    const rowsOf = (row: CoverageRow) =>
-      mountDrawer(row, "gap")
-        .findAll('[data-test="autoobserve-coverage-drawer-learning-stream"]')
-        .map((r) =>
-          r
-            .findAll("span")
-            .map((s) => s.text())
-            .join(" "),
-        );
-
-    it("one stream reads as one sentence, with no list", () => {
-      const row = learningRows(1);
-      const wrapper = mountDrawer(row, "gap");
-      expect(wrapper.find('[data-test="autoobserve-coverage-drawer-learning"]').text()).toBe(
-        `Learning until ${day.format(inDays(1) / 1000)} · s00 (logs)`,
-      );
-      expect(wrapper.findAll('[data-test="autoobserve-coverage-drawer-learning-stream"]')).toEqual(
-        [],
-      );
-    });
-
-    it("three streams a day apart each list their own date, soonest first", () => {
-      const row = learningRows(3);
-      const wrapper = mountDrawer(row, "gap");
-      expect(
-        wrapper.find('[data-test="autoobserve-coverage-drawer-learning-summary"]').text(),
-      ).toBe("Learning 3 streams");
-      expect(rowsOf(row)).toEqual([
-        `s02 (logs) until ${day.format(inDays(1) / 1000)}`,
-        `s01 (logs) until ${day.format(inDays(2) / 1000)}`,
-        `s00 (logs) until ${day.format(inDays(3) / 1000)}`,
-      ]);
-    });
-
-    it("many streams are all listed, none folded into a count", () => {
-      const row = learningRows(14);
-      const rows = rowsOf(row);
-      expect(rows).toHaveLength(14);
-      for (let i = 0; i < 14; i += 1)
-        expect(rows[i]).toBe(
-          `s${String(13 - i).padStart(2, "0")} (logs) until ${day.format(inDays(i + 1) / 1000)}`,
-        );
-      expect(
-        mountDrawer(row, "gap").find('[data-test="autoobserve-coverage-drawer-learning"]').text(),
-      ).not.toMatch(/more stream/);
-    });
-  });
-
-  it("has no learning line when the server sends no learning_until (W3)", () => {
+  it("has no learning line when the server sends no learning_until", () => {
     const row = liveRow({ errors: cell("none"), latency: cell("none"), absence: cell("none") }, [
       { type: "logs", name: "app_logs" },
     ]);
@@ -494,7 +445,7 @@ describe("CoverageServiceDrawer in live mode", () => {
       latency: cell("none"),
       absence: cell("covered", "checkout-heartbeat"),
     });
-    const wrapper = mountDrawer(row, "watched", true, "absence");
+    const wrapper = mountDrawer(row, "watched", "absence");
     expect(wrapper.find('[data-test="autoobserve-coverage-drawer-absence-detail"]').exists()).toBe(
       true,
     );
@@ -513,13 +464,10 @@ describe("CoverageServiceDrawer live charts", () => {
       props: {
         row,
         serviceStates: { [row.service]: "watched" },
-        scenario: "demo",
-        ledger: [],
         expanded: null,
         anchor: "body",
         fix: null,
         message: "",
-        live: true,
       },
       global: {
         plugins: [i18n, store],
@@ -593,16 +541,7 @@ describe("CoverageServiceDrawer live charts", () => {
   });
 });
 
-describe("CoverageServiceDrawer in fixture mode", () => {
-  it("keeps the six design signals and the log patterns section", () => {
-    const row = coverageFor("demo", gt)[0];
-    const wrapper = mountDrawer(row, "watched", false);
-    expect(chips(wrapper)).toHaveLength(6);
-    expect(wrapper.find('[data-test="autoobserve-coverage-drawer-logs"]').exists()).toBe(true);
-  });
-});
-
-describe("CoverageServiceDrawer synthetic check inputs (F6)", () => {
+describe("CoverageServiceDrawer synthetic check inputs", () => {
   it("reads the health address and the locations only once Synthetic check opens", async () => {
     const enterprise = config.isEnterprise;
     config.isEnterprise = "true";
@@ -664,7 +603,7 @@ describe("CoverageServiceDrawer synthetic check inputs (F6)", () => {
     expect(target.prefill.locations).toEqual(["pub-1"]);
   });
 
-  it("fills the folder and who gets notified from the service's own alerts (F6)", async () => {
+  it("fills the folder and who gets notified from the service's own alerts", async () => {
     const enterprise = config.isEnterprise;
     config.isEnterprise = "true";
     onTestFinished(() => {
@@ -708,7 +647,7 @@ describe("CoverageServiceDrawer synthetic check inputs (F6)", () => {
   });
 });
 
-describe("CoverageServiceDrawer gap CTA counts what it can build (T2-11)", () => {
+describe("CoverageServiceDrawer gap CTA counts what it can build", () => {
   it("offers one Add alert when the stream has no field to count errors by", async () => {
     const enterprise = config.isEnterprise;
     config.isEnterprise = "true";
@@ -747,7 +686,7 @@ describe("CoverageServiceDrawer gap CTA counts what it can build (T2-11)", () =>
   });
 });
 
-describe("CoverageServiceDrawer Service Catalog link (T2-7)", () => {
+describe("CoverageServiceDrawer Service Catalog link", () => {
   it("opens the catalog filtered to the service", async () => {
     api.push.mockReset();
     const row = liveRow(

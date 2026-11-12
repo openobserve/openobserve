@@ -20,7 +20,7 @@ import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import { gt, raw } from "@/types/i18n";
 import type { AutoObserveSuggestion } from "@/services/autoobserve";
-import { say } from "../v2/fixtures";
+import { say } from "../v2/requestTypes";
 import LiveSuggestions from "./LiveSuggestions.vue";
 import { toRequests, toSuggestionRows } from "./liveAdapter";
 import type { RailSource } from "./liveModel";

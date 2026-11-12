@@ -13,21 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { computed } from "vue";
-import { useRoute, useRouter } from "vue-router";
-import { SCENARIOS, type Scenario } from "./facts";
+export type IssuesRange = "7d" | "30d" | "90d";
+export const ISSUES_RANGES: IssuesRange[] = ["7d", "30d", "90d"];
 
-export const useScenario = () => {
-  const route = useRoute();
-  const router = useRouter();
-
-  const scenario = computed<Scenario>(() => {
-    const value = route.query.scenario;
-    return SCENARIOS.includes(value as Scenario) ? (value as Scenario) : "demo";
-  });
-
-  const setScenario = (next: Scenario) =>
-    router.replace({ query: { ...route.query, scenario: next } });
-
-  return { scenario, setScenario };
-};
+/** The drawers the AutoObserve page opens from its `drawer` query value. */
+export const AUTOOBSERVE_DRAWERS = ["history", "settings", "howItWorks", "suggestions"] as const;
+export type AutoObserveDrawer = (typeof AUTOOBSERVE_DRAWERS)[number];

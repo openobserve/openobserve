@@ -51,10 +51,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon name="history" size="sm" />
             <span>{{ t("autoobserve.tabs.activity") }}</span>
             <OTag
-              v-if="awaitingCount"
+              v-if="approvals"
               variant="warning-soft"
               size="xs"
-              :label="raw(String(awaitingCount))"
+              :label="raw(String(approvals))"
+              data-test="autoobserve-tab-activity-badge"
             />
           </OTab>
           <OTab name="policy" data-test="autoobserve-tab-policy">
@@ -64,42 +65,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OTabs>
       </template>
 
-      <LiveIssues v-if="tab === 'issues' && live" range="30d" />
-      <AutoObserveIssuesTab
-        v-else-if="tab === 'issues'"
-        :issues="issues"
-        :scenario="scenario"
-        @open-issue="openIssue"
-      />
+      <LiveIssues v-if="tab === 'issues'" range="30d" />
       <AutoObserveCoverageTab
         v-else-if="tab === 'coverage'"
-        :ledger="ledger"
-        :scenario="scenario"
-        :source="live ? liveData.source.value : undefined"
-        :skeleton="live && liveData.coverageSkeleton.value"
+        :source="liveData.source.value"
+        :skeleton="liveData.coverageSkeleton.value"
       />
-      <AppliedChangesList v-else-if="tab === 'activity' && live">
-        <LiveSurfaceEmpty surface="changes" @action="allOpen = true" />
-      </AppliedChangesList>
       <AutoObserveActivityTab
         v-else-if="tab === 'activity'"
-        :ledger="ledger"
-        @update-entry="updateEntry"
-        @open-incident="openIncident"
+        :requests="liveData.requests.value"
+        :requests-loading="liveData.railSkeleton.value"
+        @see-suggestions="setDrawer('suggestions')"
       />
-      <LiveSettingsPanel v-else-if="tab === 'policy' && live" in-page @action="howOpen = true" />
-      <AutoObservePolicyTab v-else-if="tab === 'policy'" />
+      <LivePolicy v-else @how-it-works="setDrawer('howItWorks')" />
     </OPageLayout>
 
-    <AutoObserveIssueDrawer
-      v-model:open="drawerOpen"
-      :issue="selectedIssue"
-      :ledger="ledger"
-      :scenario="scenario"
-      @update-entry="updateEntry"
+    <AllSuggestionsDrawer
+      :open="drawer === 'suggestions'"
+      @update:open="(v) => setDrawer(v ? 'suggestions' : null)"
     />
-    <AllSuggestionsDrawer v-if="live" v-model:open="allOpen" />
-    <HowItWorksDrawer v-model:open="howOpen" />
+    <HowItWorksDrawer
+      :open="drawer === 'howItWorks'"
+      @update:open="(v) => setDrawer(v ? 'howItWorks' : null)"
+    />
   </div>
 </template>
 
@@ -112,36 +100,28 @@ import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import AutoObserveIssuesTab from "@/components/autoobserve/AutoObserveIssuesTab.vue";
 import AutoObserveCoverageTab from "@/components/autoobserve/AutoObserveCoverageTab.vue";
 import AutoObserveActivityTab from "@/components/autoobserve/AutoObserveActivityTab.vue";
-import AutoObservePolicyTab from "@/components/autoobserve/AutoObservePolicyTab.vue";
-import AutoObserveIssueDrawer from "@/components/autoobserve/AutoObserveIssueDrawer.vue";
+import LivePolicy from "@/components/autoobserve/detailed/LivePolicy.vue";
 import ViewSwitch from "@/components/autoobserve/v2/ViewSwitch.vue";
 import HowItWorksDrawer from "@/components/autoobserve/v2/HowItWorksDrawer.vue";
-import { useLiveAutoObserve, useLiveMode } from "@/components/autoobserve/live/liveModel";
+import { useLiveAutoObserve } from "@/components/autoobserve/live/liveModel";
 import LiveIssues from "@/components/autoobserve/live/LiveIssues.vue";
-import LiveSurfaceEmpty from "@/components/autoobserve/live/LiveSurfaceEmpty.vue";
-import LiveSettingsPanel from "@/components/autoobserve/live/LiveSettingsPanel.vue";
-import AppliedChangesList from "@/components/autoobserve/decisions/AppliedChangesList.vue";
 import AllSuggestionsDrawer from "@/components/autoobserve/live/AllSuggestionsDrawer.vue";
 import { useLiveIssues } from "@/components/autoobserve/live/useLiveIssues";
 import { openBadge } from "@/components/autoobserve/live/incidentsCopy";
-import type { IssuesRange } from "@/components/autoobserve/v2/fixtures";
-import { issuesFor, type Issue, type Scenario } from "@/components/autoobserve/fixtures";
-import { problemsIn } from "@/components/autoobserve/data/facts";
-import { useIssueLedger } from "@/components/autoobserve/useIssueLedger";
+import {
+  AUTOOBSERVE_DRAWERS,
+  type AutoObserveDrawer,
+  type IssuesRange,
+} from "@/components/autoobserve/v2/autoobserveRoute";
 
 const NERD_TABS = ["issues", "coverage", "activity", "policy"] as const;
 type NerdTab = (typeof NERD_TABS)[number];
 
 const { t, locale } = useI18nTyped();
-
-// Nerd ignores the shared ?scenario= param; only Standard switches scenario.
-const scenario = computed<Scenario>(() => "demo");
 const route = useRoute();
 const router = useRouter();
-const live = useLiveMode();
 const liveData = useLiveAutoObserve();
 const linkedTab = route.query.tab;
 const tab = ref<NerdTab>(NERD_TABS.find((name) => name === linkedTab) ?? "issues");
@@ -149,7 +129,7 @@ const tab = ref<NerdTab>(NERD_TABS.find((name) => name === linkedTab) ?? "issues
 watch(tab, (next) => {
   const value = next === "issues" ? undefined : next;
   if (value !== (route.query.tab ?? undefined))
-    void router.replace({ query: { ...route.query, tab: value } });
+    void router.replace({ query: { ...route.query, tab: value, section: undefined } });
 });
 watch(
   () => route.query.tab,
@@ -159,45 +139,23 @@ watch(
   },
 );
 const liveIssues = useLiveIssues(computed<IssuesRange>(() => "30d"));
-const { overrides, ledger, updateEntry, issueByIncident } = useIssueLedger(scenario, t);
-const drawerOpen = ref(false);
-const selectedIssue = ref<Issue | null>(null);
+// A drawer lives in the URL, so browser Back closes it and a shared link opens it.
+const drawer = computed<AutoObserveDrawer | null>(
+  () => AUTOOBSERVE_DRAWERS.find((d) => d === route.query.drawer) ?? null,
+);
+const setDrawer = (next: AutoObserveDrawer | null) => {
+  if (next === drawer.value) return;
+  const query = { ...route.query, drawer: next ?? undefined };
+  void (next ? router.push({ query }) : router.replace({ query }));
+};
 
-const issues = computed(() => issuesFor(scenario.value, t, overrides.value.fixed));
-const openIssues = computed(() =>
-  issues.value.filter((i) => i.status !== "resolved" && !i.deferred),
+// Proposals whose next step is the Review change editor wait in the ledger's approval group.
+const approvals = computed(
+  () =>
+    liveData.requests.value.filter((r) => r.insight.cta?.target.type === "review_change").length,
 );
-const awaitingCount = computed(() =>
-  live.value ? 0 : ledger.value.filter((e) => e.status === "awaiting").length,
-);
-const allOpen = ref(false);
-const howOpen = ref(false);
 const badge = computed(() => {
-  if (!live.value) return openIssues.value.length ? raw(String(openIssues.value.length)) : null;
   const open = liveIssues.openCount.value;
   return open ? openBadge(locale.value, open, liveIssues.hasMore.value) : null;
 });
-
-const openIssue = (issue: Issue) => {
-  selectedIssue.value = issue;
-  drawerOpen.value = true;
-};
-
-const openIncident = (incidentId: string) => {
-  const issue = issues.value.find((i) => i.id === incidentId) ?? issueByIncident(incidentId);
-  if (issue) openIssue(issue);
-};
-
-const linkedIssue = typeof route.query.issue === "string" ? route.query.issue : null;
-// Only an incident the current scenario contains opens; any other link is dropped from the URL.
-const knownIssue =
-  linkedIssue &&
-  !live.value &&
-  problemsIn(scenario.value, "month").some((p) => p.incidentId === linkedIssue);
-if (linkedIssue && knownIssue) {
-  const issue = issues.value.find((i) => i.id === linkedIssue) ?? issueByIncident(linkedIssue);
-  if (issue) openIssue(issue);
-} else if (linkedIssue) {
-  void router.replace({ query: { ...route.query, issue: undefined } });
-}
 </script>

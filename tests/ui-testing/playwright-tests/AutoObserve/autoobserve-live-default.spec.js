@@ -35,7 +35,6 @@ test.describe('AutoObserve is live by default', { tag: ['@autoobserve', '@enterp
     await expect(ao.paged).toBeVisible({ timeout: 30000 });
     await expect(ao.topbarSearch).toBeVisible();
     await expect(ao.footerChanges).toBeVisible();
-    await expect(ao.scenarioLive).toBeVisible();
     await ao.expectNoFixture();
     await ao.expectPagedReasonOnce();
   });
@@ -60,25 +59,31 @@ test.describe('AutoObserve is live by default', { tag: ['@autoobserve', '@enterp
     await ao.expectAnalysisReasonsOnce();
   });
 
-  test('History and Settings stay, with honest empty states and a next step', async ({ page }) => {
+  test('History and Settings stay, keep their drawer in the URL and lead to a next step', async ({ page }) => {
     const ao = new AutoObserveLivePage(page);
     await ao.open(ORG);
     await expect(ao.paged).toBeVisible({ timeout: 30000 });
     await ao.settings.click();
-    await expect(ao.liveEmpty('settings')).toBeVisible();
-    await ao.liveEmptyAction('settings').click();
+    await expect(ao.settingsLive).toBeVisible();
+    await expect(page).toHaveURL(/drawer=settings/);
+    await page.goBack();
+    await expect(ao.settingsLive).toBeHidden();
+    await ao.settings.click();
+    await ao.settingsHow.click();
     await expect(ao.howItWorksDrawer).toBeVisible();
     await page.keyboard.press('Escape');
     await expect(ao.howItWorksDrawer).toBeHidden();
     await ao.history.click();
-    await expect(ao.liveEmpty('history')).toBeVisible();
+    await expect(page).toHaveURL(/drawer=history/);
+    // The org holds incidents, so History lists them; its filter is kept in the URL too.
+    await expect(ao.historyList).toBeVisible({ timeout: 30000 });
     await ao.expectNoFixture();
-    await ao.liveEmptyAction('history').click();
-    await expect(page).toHaveURL(/page=issues/);
-    await expect(ao.liveIssues).toBeVisible({ timeout: 30000 });
+    await ao.historyFilter('incident').click();
+    await expect(page).toHaveURL(/history=incident/);
+    await expect(ao.historyList).toBeVisible();
   });
 
-  test('the Issues page lists the org incidents and a row opens the incident page', async ({ page }) => {
+  test('the Issues page lists the org incidents, a row opens its drawer and the drawer opens the incident page', async ({ page }) => {
     expect(items.length).toBeGreaterThan(0);
     const ao = new AutoObserveLivePage(page);
     await ao.open(ORG, 'page=issues');
@@ -87,18 +92,20 @@ test.describe('AutoObserve is live by default', { tag: ['@autoobserve', '@enterp
     await ao.expectNoFixture();
     await ao.expectAnalysisReasonsOnce();
     await ao.issueRows.first().click();
+    await expect(ao.issueBody).toBeVisible({ timeout: 30000 });
+    await expect(page).toHaveURL(new RegExp(`incident=${items[0].incident.id}`));
+    await ao.issueOpenIncident.click();
     await expect(page).toHaveURL(new RegExp(`/web/incidents/${items[0].incident.id}`), { timeout: 30000 });
   });
 
-  test('a Changes page link opens the Changes page with an honest empty state', async ({ page }) => {
+  test('a Changes page link opens the Changes page with the org ledger', async ({ page }) => {
     const ao = new AutoObserveLivePage(page);
     await ao.open(ORG, 'page=activity');
     await expect(ao.changesPage).toBeVisible({ timeout: 30000 });
-    await expect(ao.liveEmpty('changes')).toBeVisible();
+    // The stats and the timeline once changes exist, the empty state with its next step before.
+    await expect(ao.changesStats.or(ao.liveEmpty('changes'))).toBeVisible({ timeout: 30000 });
     await expect(page).toHaveURL(/page=activity/);
     await ao.expectNoFixture();
-    await ao.liveEmptyAction('changes').click();
-    await expect(ao.suggestionsDrawer).toBeVisible();
   });
 
   test('the Nerd view keeps all four tabs and lists the same incidents', async ({ page }) => {
@@ -107,9 +114,10 @@ test.describe('AutoObserve is live by default', { tag: ['@autoobserve', '@enterp
     await expect(ao.tabs).toBeVisible({ timeout: 30000 });
     expect(await ao.tabNames()).toEqual(['issues', 'coverage', 'activity', 'policy']);
     await expect(page).toHaveURL(/tab=policy/);
-    await expect(ao.liveEmpty('settings')).toBeVisible();
+    await expect(ao.policy).toBeVisible();
+    await expect(ao.policyModesReason).toBeVisible();
     await ao.tab('activity').click();
-    await expect(ao.liveEmpty('changes')).toBeVisible();
+    await expect(ao.activityLedger).toBeVisible();
     await ao.expectNoFixture();
     await ao.tab('issues').click();
     await expect(ao.liveIssues).toBeVisible();

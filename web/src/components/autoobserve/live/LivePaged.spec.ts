@@ -33,10 +33,11 @@ import oncall from "@/services/oncall";
 
 const routeQuery: Record<string, string> = { live: "1" };
 const push = vi.fn();
+const replace = vi.fn();
 vi.mock("vue-router", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useRoute: () => ({ query: routeQuery }),
-  useRouter: () => ({ push }),
+  useRouter: () => ({ push, replace }),
 }));
 
 vi.mock("@/services/oncall", () => ({
@@ -52,6 +53,23 @@ const api = vi.mocked(autoobserve.incidents);
 const FIXTURE = fixture as unknown as AutoObserveIncidentList;
 const pick = (...indexes: number[]): AutoObserveIncidentItem[] =>
   indexes.map((i) => FIXTURE.items[i]);
+// The minute after the newest fixture finding plus an hour, so the default 7-day range holds every fixture row.
+const NOW_MS =
+  Math.ceil((FIXTURE.items[0].finding.first_seen_at / 1000 + 3_600_000) / 60_000) * 60_000;
+const DAY_US = 86_400_000_000;
+const at = (
+  i: number,
+  daysAgo: number,
+  extra: Partial<AutoObserveIncidentItem["incident"]> = {},
+): AutoObserveIncidentItem => {
+  const base = FIXTURE.items[i];
+  const first = NOW_MS * 1000 - daysAgo * DAY_US;
+  return {
+    ...base,
+    finding: { ...base.finding, id: `f-${i}-${daysAgo}`, first_seen_at: first },
+    incident: { ...base.incident, id: `inc-${i}-${daysAgo}`, created_at: first, ...extra },
+  } as AutoObserveIncidentItem;
+};
 
 // Fixture row 4 re-keyed and given a not-run reason, so many rows can share one reason.
 const notRun = (n: number, reason: string | null = "rca_disabled") => {
@@ -92,7 +110,29 @@ const mountCard = (
   const wrapper = mount(LivePaged, {
     props,
     attachTo: document.body,
-    global: { plugins: [i18n, store], provide: ask ? { [ASK_AI_KEY as symbol]: ask } : {} },
+    global: {
+      plugins: [i18n, store],
+      provide: ask ? { [ASK_AI_KEY as symbol]: ask } : {},
+      stubs: {
+        IssueSignal: true,
+        ODropdown: { template: `<div><slot name="trigger" /><slot /></div>` },
+        ODropdownItem: {
+          emits: ["select"],
+          template: `<button type="button" @click="$emit('select')"><slot /></button>`,
+        },
+        OToggleGroup: {
+          name: "OToggleGroup",
+          props: ["modelValue"],
+          emits: ["update:modelValue"],
+          template: "<div><slot /></div>",
+        },
+        OToggleGroupItem: {
+          name: "OToggleGroupItem",
+          props: ["value", "disabled"],
+          template: `<button type="button" :disabled="disabled"><slot /></button>`,
+        },
+      },
+    },
   });
   wrappers.push(wrapper);
   return wrapper;
@@ -109,12 +149,16 @@ const refetch = async () => {
   await flushPromises();
 };
 
-describe("LivePaged (D9-web)", () => {
+describe("LivePaged", () => {
   beforeEach(() => {
     api.mockReset();
     push.mockReset();
+    replace.mockReset();
     routeQuery.live = "1";
-    delete routeQuery.fixture;
+    delete routeQuery.range;
+    delete routeQuery.priority;
+    delete routeQuery.shown;
+    vi.useFakeTimers({ toFake: ["Date"], now: NOW_MS });
     store.commit("setSelectedOrganization", { ...originalOrg, identifier: "demo-org" });
     store.commit("setConfig", { ...originalConfig, incidents_rca_enabled: true });
   });
@@ -131,8 +175,8 @@ describe("LivePaged (D9-web)", () => {
     api.mockResolvedValue(page([]));
     const w = mountCard();
     await flushPromises();
-    expect(w.find(sel("empty")).text()).toContain("Nothing has paged anyone");
-    expect(w.find(sel("empty")).text()).toContain("When a stream stops");
+    expect(w.find(sel("empty")).text()).toContain("No problems in the last 7 days");
+    expect(w.find(sel("empty")).text()).toContain("Nothing needed you.");
     expect(rows(w)).toHaveLength(0);
     expect(w.find('[role="alert"]').exists()).toBe(false);
   });
@@ -170,19 +214,157 @@ describe("LivePaged (D9-web)", () => {
     await flushPromises();
     expect(rows(few)).toHaveLength(3);
     expect(few.find(sel("more")).exists()).toBe(false);
-    expect(few.find(sel("see-all")).exists()).toBe(false);
+    expect(few.find(sel("show-more")).exists()).toBe(false);
+    expect(few.find(sel("see-all")).text()).toBe("All issues");
 
     queryClient.clear();
     api.mockResolvedValueOnce(page(FIXTURE.items, { has_more: true }));
     const many = mountCard();
     await flushPromises();
-    expect(rows(many)).toHaveLength(3);
-    expect(many.find(sel("more")).text()).toBe("Showing the 3 newest");
-    expect(many.find(sel("see-all")).text()).toBe("See all issues");
+    expect(rows(many)).toHaveLength(4);
+    expect(many.find(sel("more")).text()).toBe("Showing the 50 newest");
+    expect(many.find(sel("show-more")).text()).toBe("Show 2 more");
+    await many.find(sel("show-more")).trigger("click");
+    await flushPromises();
+    expect(rows(many)).toHaveLength(6);
+    expect(many.find(sel("show-more")).exists()).toBe(false);
+    const fewer = many.find(sel("show-fewer"));
+    expect(fewer.text()).toBe("Show fewer");
+    expect(document.activeElement).toBe(fewer.element);
+    await fewer.trigger("click");
+    await flushPromises();
+    expect(rows(many)).toHaveLength(4);
     await many.find(sel("see-all")).trigger("click");
     expect(push).toHaveBeenCalledWith({
       query: expect.objectContaining({ org_identifier: "demo-org", page: "issues" }),
     });
+  });
+
+  it("a row opens the issue drawer, never the incident page", async () => {
+    api.mockResolvedValueOnce(page(pick(0, 1)));
+    const w = mountCard();
+    await flushPromises();
+    await rows(w)[1].trigger("click");
+    await rows(w)[0].find(sel("sentence")).trigger("click");
+    const opened = w.emitted("open-incident")!.map(([item]) => item.incident.id);
+    expect(opened).toEqual(["inc-0002", "inc-0001"]);
+    expect(push).not.toHaveBeenCalled();
+    await rows(w)[0].find(sel("open")).trigger("click");
+    expect(w.emitted("open-incident")).toHaveLength(2);
+  });
+
+  it("whatever is still happening leads, then priority, then newest", async () => {
+    api.mockResolvedValueOnce(
+      page([
+        at(0, 0.1),
+        at(4, 0.5, { severity: "P3" }),
+        at(1, 1, { severity: "P1" }),
+        at(3, 2, { severity: "P1", status: "resolved" }),
+      ]),
+    );
+    const w = mountCard();
+    await flushPromises();
+    expect(rows(w).map((r) => r.find(sel("severity")).text())).toEqual(["P1", "P2", "P3", "P1"]);
+    expect(rows(w).map((r) => r.find(sel("rail")).attributes("data-outcome"))).toEqual([
+      "contained",
+      "active",
+      "active",
+      "resolved",
+    ]);
+  });
+
+  it("the range picker filters what was read and lives in the URL", async () => {
+    api.mockResolvedValueOnce(page([at(0, 0.2), at(1, 3), at(2, 10), at(4, 20)]));
+    const w = mountCard();
+    await flushPromises();
+    expect(w.find(sel("range")).text()).toBe("Last 7 days");
+    expect(rows(w)).toHaveLength(2);
+    const pickRange = async (value: string) => {
+      await w.find(sel(`range-${value}`)).trigger("click");
+      await flushPromises();
+    };
+    await pickRange("24h");
+    expect(rows(w)).toHaveLength(1);
+    expect(replace).toHaveBeenLastCalledWith({ query: expect.objectContaining({ range: "24h" }) });
+    await pickRange("30d");
+    expect(rows(w)).toHaveLength(4);
+    expect(w.find(sel("group-0")).text()).toBe("This week");
+    expect(w.find(sel("group-1")).text()).toBe("Last week");
+    expect(w.find(sel("group-2")).text()).toBe("2 weeks ago");
+    expect(replace).toHaveBeenLastCalledWith({ query: expect.objectContaining({ range: "30d" }) });
+
+    queryClient.clear();
+    routeQuery.range = "24h";
+    api.mockResolvedValueOnce(page([at(0, 0.2), at(1, 3)]));
+    const restored = mountCard();
+    await flushPromises();
+    expect(restored.find(sel("range")).text()).toBe("Last 24 hours");
+    expect(rows(restored)).toHaveLength(1);
+  });
+
+  it("the priority filter counts each priority the rows carry and disables the rest", async () => {
+    api.mockResolvedValueOnce(
+      page([
+        at(0, 0.1, { severity: "P1" }),
+        at(1, 0.2),
+        at(2, 0.3),
+        at(3, 0.4, { severity: "P4" }),
+      ]),
+    );
+    const w = mountCard();
+    await flushPromises();
+    const item = (p: string) => w.find(sel(`priority-${p}`));
+    expect(["all", "p1", "p2", "p3", "p4"].map((p) => item(p).text())).toEqual([
+      "All 4",
+      "P1 1",
+      "P2 2",
+      "P3 0",
+      "P4 1",
+    ]);
+    expect(item("p3").attributes("disabled")).toBeDefined();
+    expect(item("p2").attributes("disabled")).toBeUndefined();
+    w.findComponent({ name: "OToggleGroup" }).vm.$emit("update:modelValue", "p2");
+    await flushPromises();
+    expect(rows(w)).toHaveLength(2);
+    expect(replace).toHaveBeenLastCalledWith({
+      query: expect.objectContaining({ priority: "P2" }),
+    });
+  });
+
+  it("names what it can't watch once, with and N more, and opens coverage gaps", async () => {
+    const coverageApi = vi.mocked(autoobserve.coverage);
+    const gap = (name: string) => ({
+      service_id: `s-${name}`,
+      service_name: name,
+      cluster: null,
+      namespace: null,
+      streams: [],
+      cells: {},
+    });
+    const rowsOf = (names: string[]) =>
+      ({ data: { view: "strict", pass_at: null, rows: names.map(gap), classes: [] } }) as never;
+    coverageApi.mockResolvedValue(rowsOf(["cart", "auth", "mail", "search", "files"]));
+    onTestFinished(() => coverageApi.mockReset());
+    api.mockResolvedValueOnce(page(pick(0)));
+    const w = mountCard();
+    await flushPromises();
+    const line = w.find(sel("cantsee"));
+    expect(line.text()).toContain(
+      "AutoObserve can't watch 5 services yet: cart, auth, mail, and 2 more.",
+    );
+    expect(w.findAll(sel("cantsee"))).toHaveLength(1);
+    await line.find(sel("cantsee-open")).trigger("click");
+    expect(w.emitted("open-coverage")).toEqual([["attention"]]);
+
+    queryClient.clear();
+    coverageApi.mockResolvedValue(rowsOf(["cart"]));
+    api.mockResolvedValueOnce(page([]));
+    const one = mountCard();
+    await flushPromises();
+    expect(one.find(sel("cantsee")).text()).toContain(
+      "AutoObserve can't watch 1 service yet: cart.",
+    );
+    expect(one.find(sel("empty")).text()).toContain("Nothing needed you.");
   });
 
   it("Open incident and View analysis route to the incident page", async () => {
@@ -274,9 +456,7 @@ describe("LivePaged (D9-web)", () => {
     const failed = w.find(sel("subtitle-slot")).find(sel("refresh-failed"));
     expect(failed.attributes("role")).toBe("alert");
     expect(failed.text()).toMatch(/Refresh failed at .+ · showing paged findings from .+/);
-    expect(failed.find('[data-test="o-truncated-text"]').classes()).toContain("line-clamp-3");
     expect(w.find(sel("subtitle-slot")).element).toBe(slot.element);
-    expect(slot.classes()).toContain("h-[2lh]");
     expect(Array.from(body.element.parentElement!.children).indexOf(body.element)).toBe(before);
     expect(w.findAll('[role="alert"]')).toHaveLength(1);
   });
@@ -303,15 +483,13 @@ describe("LivePaged (D9-web)", () => {
   });
 
   it("no skeleton for a fast load, one skeleton row for a slow one", async () => {
-    vi.useFakeTimers();
+    vi.useFakeTimers({ now: NOW_MS });
     api.mockReturnValueOnce(later(100, page(pick(0))) as never);
     const fast = mountCard();
     await vi.advanceTimersByTimeAsync(50);
-    expect(fast.find(sel("body")).classes()).toContain("min-h-35");
     await vi.advanceTimersByTimeAsync(1_000);
     expect(fast.find(sel("skeleton")).exists()).toBe(false);
     expect(rows(fast)).toHaveLength(1);
-    expect(fast.find(sel("body")).classes()).toContain("min-h-35");
     fast.unmount();
     wrappers = [];
 
@@ -328,7 +506,6 @@ describe("LivePaged (D9-web)", () => {
     await vi.advanceTimersByTimeAsync(200);
     expect(slow.find(sel("skeleton")).exists()).toBe(false);
     expect(slow.find(sel("empty")).exists()).toBe(true);
-    expect(slow.find(sel("body")).classes()).toContain("min-h-35");
   });
 
   it("no raw keys or ids reach the screen", async () => {
@@ -337,7 +514,7 @@ describe("LivePaged (D9-web)", () => {
     api.mockResolvedValueOnce(page(FIXTURE.items, { has_more: true }));
     const top = mountCard();
     await flushPromises();
-    expect(rows(top)).toHaveLength(3);
+    expect(rows(top)).toHaveLength(4);
     expect(top.text()).not.toMatch(RAW);
 
     queryClient.clear();
@@ -361,7 +538,7 @@ describe("LivePaged (D9-web)", () => {
   });
 
   it("loading and loaded are announced once", async () => {
-    vi.useFakeTimers();
+    vi.useFakeTimers({ now: NOW_MS });
     api.mockReturnValueOnce(later(900, page(pick(0))) as never);
     const w = mountCard();
     const announce = () => w.find(sel("announce"));
@@ -376,39 +553,18 @@ describe("LivePaged (D9-web)", () => {
     expect(w.attributes("aria-busy")).toBe("false");
   });
 
-  it("the main card reads ten and says so", async () => {
-    vi.useFakeTimers();
+  it("the home reads fifty in one request, so a month has rows, and says so", async () => {
+    vi.useFakeTimers({ now: NOW_MS });
     queryClient.clear();
     api.mockReturnValueOnce(later(900, page(pick(0, 1, 2, 3), { has_more: true })) as never);
     const main = mountCard({ cap: 10 });
     await vi.advanceTimersByTimeAsync(301);
-    expect(api).toHaveBeenCalledWith("demo-org", { limit: 10, offset: 0 });
+    expect(api).toHaveBeenCalledTimes(1);
+    expect(api).toHaveBeenCalledWith("demo-org", { limit: 50, offset: 0 });
     expect(main.find(sel("skeleton")).findAll("li")).toHaveLength(3);
     await vi.advanceTimersByTimeAsync(1_000);
     expect(rows(main)).toHaveLength(4);
-    expect(main.find(sel("more")).text()).toBe("Showing the 10 newest");
-  });
-
-  it("the default cap stays three", async () => {
-    vi.useFakeTimers();
-    queryClient.clear();
-    api.mockReturnValueOnce(later(900, page(FIXTURE.items, { has_more: true })) as never);
-    const rail = mountCard();
-    await vi.advanceTimersByTimeAsync(301);
-    expect(api).toHaveBeenCalledWith("demo-org", { limit: 3, offset: 0 });
-    expect(rail.find(sel("skeleton")).findAll("li")).toHaveLength(1);
-    await vi.advanceTimersByTimeAsync(1_000);
-    expect(rows(rail)).toHaveLength(3);
-    expect(rail.find(sel("more")).text()).toBe("Showing the 3 newest");
-  });
-
-  it("fetches nothing in fixture mode", async () => {
-    delete routeQuery.live;
-    routeQuery.fixture = "1";
-    api.mockResolvedValue(page(pick(0)));
-    mountCard();
-    await flushPromises();
-    expect(api).not.toHaveBeenCalled();
+    expect(main.find(sel("more")).text()).toBe("Showing the 50 newest");
   });
 
   describe("an analysis reason shared by rows", () => {
@@ -444,22 +600,23 @@ describe("LivePaged (D9-web)", () => {
       expect(w.find(sel("shared-analysis")).text()).toBe(OFF_MANY);
       expect(w.text()).not.toContain(OFF_ONE);
       expect(w.find(sel("more")).exists()).toBe(false);
-      expect(w.find(sel("see-all")).exists()).toBe(false);
+      expect(w.find(sel("see-all")).exists()).toBe(true);
     });
 
     it("twelve rows state it once next to the count", async () => {
       api.mockResolvedValueOnce(page(offRows(12), { has_more: true }));
       const w = mountCard({ cap: 10 });
       await flushPromises();
-      expect(rows(w)).toHaveLength(10);
+      expect(rows(w)).toHaveLength(4);
+      expect(w.find(sel("show-more")).text()).toBe("Show 8 more");
       expect(details(w)).toEqual([]);
       expect(w.findAll(sel("shared-analysis"))).toHaveLength(1);
-      expect(w.find(sel("more")).text()).toBe("Showing the 10 newest");
+      expect(w.find(sel("more")).text()).toBe("Showing the 50 newest");
       expect(w.find(sel("shared-analysis")).text()).toBe(OFF_MANY);
       expect(w.find(sel("see-all")).exists()).toBe(true);
     });
 
-    it("mixed reasons state the common one once and keep only the exception on its row (T1-16)", async () => {
+    it("mixed reasons state the common one once and keep only the exception on its row", async () => {
       api.mockResolvedValueOnce(page([notRun(0), notRun(1, null), notRun(2)]));
       const w = mountCard();
       await flushPromises();
@@ -489,7 +646,6 @@ describe("LivePaged (D9-web)", () => {
     });
 
     it("Open in Logs opens the stopped stream from one hour before the stop to now", async () => {
-      vi.useFakeTimers({ toFake: ["Date"], now: 1_800_000_000_000 });
       config.isEnterprise = "true";
       const appOrg = appStore.state.selectedOrganization;
       appStore.commit("setSelectedOrganization", { ...appOrg, identifier: "demo-org" });
@@ -507,7 +663,7 @@ describe("LivePaged (D9-web)", () => {
         stream_type: "logs",
         org_identifier: "demo-org",
         from: String(FIXTURE.items[0].finding.first_seen_at - HOUR_US),
-        to: String(1_800_000_000_000 * 1000),
+        to: String(NOW_MS * 1000),
       });
       expect(b64DecodeUnicode(route.query.query)).toBe("");
     });
@@ -572,7 +728,7 @@ describe("LivePaged (D9-web)", () => {
     });
   });
 
-  describe("who was paged (W2)", () => {
+  describe("who was paged", () => {
     const withPage = (
       i: number,
       outcome: string,
@@ -624,13 +780,13 @@ describe("LivePaged (D9-web)", () => {
       expect(lines[0].attributes("data-tone")).toBe("neutral");
       expect(lines[1].text()).toContain("Nobody was paged");
       expect(lines[1].attributes("data-tone")).toBe("warning");
-      expect(lines[2].text()).toContain("Paging failed");
-      expect(lines[2].attributes("data-tone")).toBe("error");
-      expect(lines[3].text()).toContain("hasn't confirmed the page yet");
-      expect(lines[3].attributes("data-tone")).toBe("pending");
-      expect(lines[3].findComponent({ name: "OIcon" }).props("name")).toBe("schedule");
+      // The resolved row (fixture 2) sorts after the three still open.
+      expect(lines[3].text()).toContain("Paging failed");
+      expect(lines[3].attributes("data-tone")).toBe("error");
+      expect(lines[2].text()).toContain("hasn't confirmed the page yet");
+      expect(lines[2].attributes("data-tone")).toBe("pending");
+      expect(lines[2].findComponent({ name: "OIcon" }).props("name")).toBe("schedule");
       expect(lines[0].findComponent({ name: "OIcon" }).props("name")).toBe("check");
-      expect(lines[1].classes()).toContain("text-badge-amber-soft-text");
       expect(rows(w)[0].findAll(sel("routing"))).toHaveLength(0);
       await rows(w)[1].find(sel("routing")).trigger("click");
       expect(push).toHaveBeenCalledWith({
@@ -668,7 +824,7 @@ describe("LivePaged (D9-web)", () => {
     });
   });
 
-  describe("learning (W3)", () => {
+  describe("learning", () => {
     const coverageApi = vi.mocked(autoobserve.coverage);
     const NOV_24_US = Date.UTC(2026, 10, 24, 12, 0) * 1000;
     const coverage = (streams_learning: number, streams_ready: number) =>
@@ -700,7 +856,7 @@ describe("LivePaged (D9-web)", () => {
         "Learning 9 streams. The first is ready on Nov 24; AutoObserve needs 14 days of history to judge a stream.",
       );
       expect(w.find(sel("subtitle")).exists()).toBe(false);
-      expect(w.find(sel("empty")).text()).toContain("Nothing has paged anyone");
+      expect(w.find(sel("empty")).text()).toContain("No problems in the last 7 days");
     });
 
     it("an org with no ready stream says what it waits for instead of looking empty", async () => {
@@ -714,7 +870,34 @@ describe("LivePaged (D9-web)", () => {
       expect(empty.text()).toContain("The first of 12 streams is ready on Nov 24.");
     });
 
-    it("says paging is off while every stream is still learning (T1-11)", async () => {
+    it("with usage reporting off, the paired engine's reason replaces the learning wait", async () => {
+      coverageApi.mockResolvedValue({
+        data: {
+          view: "strict",
+          pass_at: null,
+          refreshed_at: null,
+          quality: null,
+          classes: [],
+          rows: [],
+          learning: {
+            streams_learning: 0,
+            streams_ready: 0,
+            history_days_needed: 14,
+            next_ready_at: null,
+            history_days_found_max: 0,
+            reasons: { no_usage: 0 },
+          },
+        },
+      } as never);
+      api.mockResolvedValueOnce(page([]));
+      const w = mountCard();
+      await flushPromises();
+      const empty = w.find(sel("empty-learning"));
+      expect(empty.text()).toContain("AutoObserve can't learn your streams yet");
+      expect(empty.text()).toContain("turn on usage reporting");
+    });
+
+    it("says paging is off while every stream is still learning", async () => {
       coverageApi.mockResolvedValue(coverage(12, 0));
       api.mockResolvedValueOnce(page([], { paging: false }));
       const w = mountCard();

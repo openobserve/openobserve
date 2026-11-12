@@ -16,7 +16,7 @@
 import { raw, type I18nKey, type I18nText, type TranslateFn } from "@/types/i18n";
 import type { AutoObserveSuggestion } from "@/services/autoobserve";
 import { ADVICE_LABEL, LIMITATION_LABEL } from "@/components/alert_calibration/rules";
-import type { Msg } from "../v2/fixtures";
+import type { Msg } from "../v2/requestTypes";
 import { agoText } from "./liveCopy";
 
 interface Sentence {

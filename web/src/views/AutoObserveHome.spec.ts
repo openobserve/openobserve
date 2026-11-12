@@ -23,10 +23,6 @@ const view = ref<"standard" | "nerd">("standard");
 vi.mock("@/components/autoobserve/v2/useAutoObserveView", () => ({
   useAutoObserveView: () => ({ view }),
 }));
-vi.mock("@/components/autoobserve/data/useScenario", () => ({
-  useScenario: () => ({ scenario: ref("default") }),
-}));
-vi.mock("@/components/autoobserve/live/liveModel", () => ({ useFixtureMode: () => ref(false) }));
 
 // A card deep in either view asks through the injected key, never through an emit chain.
 const DeepCard = defineComponent({

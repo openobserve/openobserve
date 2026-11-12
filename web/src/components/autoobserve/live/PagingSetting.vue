@@ -34,26 +34,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @update:model-value="(v) => paging.set(v === true)"
       />
     </div>
-    <OButton
-      variant="ghost-primary"
-      size="sm"
-      class="-ms-3 self-start"
-      data-test="autoobserve-paging-routing"
-      @click="openRouting"
-    >
-      {{ t("autoobserveLive.paging.routing") }}
-    </OButton>
-    <p
-      class="flex min-h-8 items-start gap-1.5 text-xs leading-4"
-      :class="status?.tone === 'error' ? 'text-status-error-text' : 'text-text-secondary'"
-      :role="status?.tone === 'error' ? 'alert' : undefined"
-      data-test="autoobserve-paging-status"
-    >
-      <template v-if="status">
-        <OIcon :name="status.icon" size="xs" class="mt-0.5 shrink-0" />
-        <span>{{ status.text }}</span>
-      </template>
-    </p>
+    <!-- The save status shares the link's row, so it takes no space of its own until it speaks. -->
+    <div class="flex min-h-6 flex-wrap items-center gap-x-3 gap-y-1">
+      <OButton
+        variant="ghost-primary"
+        size="xs"
+        icon-right="arrow-forward"
+        class="-ms-2"
+        data-test="autoobserve-paging-routing"
+        @click="openRouting"
+      >
+        {{ t("autoobserveLive.paging.routing") }}
+      </OButton>
+      <p
+        class="flex items-start gap-1.5 text-xs leading-4"
+        :class="status?.tone === 'error' ? 'text-status-error-text' : 'text-text-secondary'"
+        :role="status?.tone === 'error' ? 'alert' : undefined"
+        data-test="autoobserve-paging-status"
+      >
+        <template v-if="status">
+          <OIcon :name="status.icon" size="xs" class="mt-0.5 shrink-0" />
+          <span>{{ status.text }}</span>
+        </template>
+      </p>
+    </div>
   </div>
 </template>
 

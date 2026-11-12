@@ -409,7 +409,6 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSparkline from "@/lib/data/Sparkline/OSparkline.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import { identifierBreaks } from "@/utils/formatters";
-import { sparkPoints } from "./fixtures";
 import type {
   UnfoldCard,
   UnfoldKind,
@@ -555,6 +554,12 @@ const cardW = computed(() =>
 const colGap = computed(() => (props.liveIssue ? LIVE_COL_GAP : COL_GAP));
 
 const rem = (n: number) => `${n}rem`;
+
+// Forecast points render muted, so a projection never reads as a measurement.
+const sparkPoints = ({ points = [], projected }: UnfoldCard) => {
+  const from = points.length - (projected ?? 0);
+  return projected ? points.map((value, i) => ({ value, provisional: i >= from })) : points;
+};
 const canvasBg = computed(() => (props.compact ? "bg-surface-base" : "bg-surface-subtle"));
 const canvasClass = computed(
   () =>

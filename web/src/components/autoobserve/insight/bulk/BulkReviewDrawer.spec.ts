@@ -356,7 +356,7 @@ describe("BulkReviewDrawer — results", () => {
     await openWith();
     await click("bulk-review-create");
     expect(review.state.open).toBe(true);
-    expect(text("bulk-review-failures")).toContain("1 of 11 alerts wasn't created.");
+    expect(text("bulk-review-failures")).toContain("1 alert out of 11 wasn't created.");
     expect(text("bulk-review-failure-j")).toBe(
       "svc-j: You can't create alerts. Your role is missing the Create permission on Alerts. The alert was going to folder payments.",
     );

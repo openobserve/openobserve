@@ -18,6 +18,8 @@ class AutoObserveLivePage {
     this.fixtureIssues = page.locator('[data-test="autoobserve-issues-table"]');
     this.issueRows = this.liveIssues.locator('[data-test^="o2-table-row-"]');
     this.sentences = this.liveIssues.locator('[data-test="autoobserve-live-issues-sentence"]');
+    this.issueBody = page.locator('[data-test="autoobserve-live-issue"]');
+    this.issueOpenIncident = page.locator('[data-test="autoobserve-issue-open-incident"]');
     this.count = page.locator('[data-test="autoobserve-live-issues-count"]');
     this.empty = page.locator('[data-test="autoobserve-live-issues-empty"]');
     this.noMatch = page.locator('[data-test="autoobserve-live-issues-no-match"]');
@@ -26,10 +28,16 @@ class AutoObserveLivePage {
     this.tabs = page.locator('[data-test="autoobserve-tabs"]');
     this.coverageDenied = page.locator('[data-test="autoobserve-coverage-denied"]');
     this.changesPage = page.locator('[data-test="autoobserve2-activity-page"]');
+    this.changesStats = page.locator('[data-test="autoobserve2-activity-stats"]');
     this.footerChanges = page.locator('[data-test="autoobserve2-footer-activity"]');
     this.suggestionsDrawer = page.locator('[data-test="autoobserve2-suggestions-drawer"]');
     this.howItWorksDrawer = page.locator('[data-test="autoobserve2-how-it-works-drawer"]');
-    this.scenarioLive = page.locator('[data-test="autoobserve2-scenario-live"]');
+    this.settingsLive = page.locator('[data-test="autoobserve-settings-live"]');
+    this.settingsHow = page.locator('[data-test="autoobserve-settings-how"]');
+    this.historyList = page.locator('[data-test="autoobserve-live-history-list"]');
+    this.policy = page.locator('[data-test="autoobserve-policy"]');
+    this.policyModesReason = page.locator('[data-test="autoobserve-policy-modes-reason"]');
+    this.activityLedger = page.locator('[data-test="autoobserve-activity"]');
     this.sharedAnalysis = page.locator('[data-test="autoobserve-live-issues-shared-analysis"]');
     this.analysisDetails = page.locator('[data-test="autoobserve-live-issues-analysis-detail"]');
     this.issuesRefreshFailed = page.locator('[data-test="autoobserve-live-issues-refresh-failed"]');
@@ -45,6 +53,10 @@ class AutoObserveLivePage {
 
   liveEmptyAction(surface) {
     return this.page.locator(`[data-test="autoobserve-live-empty-${surface}-action"]`);
+  }
+
+  historyFilter(name) {
+    return this.page.locator(`[data-test="autoobserve2-history-filter-${name}"]`);
   }
 
   tab(name) {

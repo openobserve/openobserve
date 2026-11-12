@@ -19,7 +19,6 @@ import i18n from "@/locales";
 import { gt, raw } from "@/types/i18n";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import AutoObserveUnfoldGraph from "./AutoObserveUnfoldGraph.vue";
-import { issuesFor } from "./fixtures";
 import type { UnfoldCard } from "./unfold.types";
 
 const mountGraph = (props: InstanceType<typeof AutoObserveUnfoldGraph>["$props"]) =>
@@ -27,25 +26,55 @@ const mountGraph = (props: InstanceType<typeof AutoObserveUnfoldGraph>["$props"]
 
 describe("AutoObserveUnfoldGraph on AutoObserve issues", () => {
   it("draws one card per signal with its title and gap, and none of the incident options", () => {
-    for (const issue of issuesFor("demo", gt)) {
-      const wrapper = mountGraph({ cards: issue.unfold });
-      for (const signal of issue.unfold) {
-        const el = wrapper.findAll(`[data-test="autoobserve-unfold-card-${signal.id}"]`);
-        expect(el).toHaveLength(1);
-        expect(el[0].text()).toContain(signal.title);
-        // The name-first card sized to its content is an incident option.
-        expect(el[0].find('[data-test^="autoobserve-unfold-title-"]').exists()).toBe(false);
-        expect((el[0].element as HTMLElement).style.height).not.toBe("");
-        if (signal.via) expect(wrapper.text()).toContain(signal.via);
-      }
-      if (issue.unfold.length > 1) expect(wrapper.text()).toMatch(/\+\d+ (min|h|d)|Same minute/);
-      expect(wrapper.find('[data-test^="autoobserve-unfold-live-"]').exists()).toBe(false);
-      expect(wrapper.find('[data-test="autoobserve-unfold-later"]').exists()).toBe(false);
-      expect(wrapper.get('[data-test="autoobserve-unfold-detail"]').text()).toContain(
-        issue.unfold[0].title,
-      );
-      wrapper.unmount();
+    const unfold: UnfoldCard[] = [
+      {
+        id: "deploy",
+        kind: "change",
+        lane: "checkout",
+        at: "14:00",
+        minute: 0,
+        title: raw("Deploy v2"),
+        tone: "info",
+      },
+      {
+        id: "errors",
+        kind: "metric",
+        lane: "checkout",
+        at: "14:05",
+        minute: 5,
+        title: raw("Error rate up"),
+        tone: "danger",
+      },
+      {
+        id: "page",
+        kind: "outcome",
+        outcome: "paged",
+        lane: null,
+        at: "14:06",
+        minute: 6,
+        title: raw("Paged on-call"),
+        tone: "warning",
+        after: "errors",
+        via: raw("by policy"),
+      },
+    ];
+    const wrapper = mountGraph({ cards: unfold });
+    for (const signal of unfold) {
+      const el = wrapper.findAll(`[data-test="autoobserve-unfold-card-${signal.id}"]`);
+      expect(el).toHaveLength(1);
+      expect(el[0].text()).toContain(signal.title);
+      // The name-first card sized to its content is an incident option.
+      expect(el[0].find('[data-test^="autoobserve-unfold-title-"]').exists()).toBe(false);
+      expect((el[0].element as HTMLElement).style.height).not.toBe("");
+      if (signal.via) expect(wrapper.text()).toContain(signal.via);
     }
+    expect(wrapper.text()).toMatch(/\+\d+ (min|h|d)|Same minute/);
+    expect(wrapper.find('[data-test^="autoobserve-unfold-live-"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="autoobserve-unfold-later"]').exists()).toBe(false);
+    expect(wrapper.get('[data-test="autoobserve-unfold-detail"]').text()).toContain(
+      unfold[0].title,
+    );
+    wrapper.unmount();
   });
 });
 

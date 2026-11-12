@@ -13,47 +13,48 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import type { I18nKey } from "@/types/i18n";
+import { raw, type I18nKey, type I18nText, type TranslateFn } from "@/types/i18n";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
-import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import {
-  AUTONOMY,
-  DAY_DATE,
-  DEMO_NOW,
-  LEDGER,
-  daysBefore,
-  type DayKey,
-  type LedgerFact,
-} from "../data/facts";
-import type { LedgerEntry } from "../fixtures";
-import type { FixPhase } from "./useDecisions";
+  APPLY_FIELDS,
+  type ApplyCopy,
+  type ApplyField,
+} from "@/components/alert_calibration/applySuggestion";
+import type { FieldChange } from "@/services/autoobserveDecisions";
+import type { AppliedEntry } from "../decisions/appliedChanges";
+import { dayKey, formatWhen } from "../live/liveCopy";
 
-export type ChangeFilter = "all" | "fixes" | "watching" | "tuning";
-export type ChangeKind = "fix" | "permission" | "watching" | "tuning";
-// A suggestion that notifies no one is a failure, a look no ledger change ever wears.
-export type LookKind = ChangeKind | "notify";
-export type ChangeState = "applying" | "worked" | "done" | "review" | "didntHelp" | "undone";
+export type ChangeFilter = "all" | "inForce" | "undone";
+export type ChangeState = "done" | "undone";
 
-export interface Change {
-  entry: LedgerEntry;
-  fact: LedgerFact;
-  kind: ChangeKind;
-  state: ChangeState;
-  reviewDays?: number;
-  day: DayKey;
-  time?: string;
+/** One field an apply changed, as the reader sees it. */
+export interface ChangeShift {
+  setting: I18nText;
+  from: I18nText;
+  to: I18nText;
 }
 
-export const TRUST_WINDOW_DAYS = 7;
+export interface Change {
+  entry: AppliedEntry;
+  id: string;
+  state: ChangeState;
+  /** Milliseconds. */
+  at: number;
+  day: string;
+  shifts: ChangeShift[];
+}
 
-export const CHANGE_FILTERS: ChangeFilter[] = ["all", "fixes", "watching", "tuning"];
+export const CHANGE_FILTERS: ChangeFilter[] = ["all", "inForce", "undone"];
 
 export const FILTER_LABEL: Record<ChangeFilter, I18nKey> = {
   all: "autoobserve2.activityPage.filters.all",
-  fixes: "autoobserve2.activityPage.filters.fixes",
-  watching: "autoobserve2.activityPage.filters.watching",
-  tuning: "autoobserve2.activityPage.filters.tuning",
+  inForce: "autoobserve.activityLive.filters.inForce",
+  undone: "autoobserve.activityLive.filters.undone",
 };
+
+export type ChangeKind = "fix" | "permission" | "watching" | "tuning";
+// A suggestion that notifies no one is a failure, a look no ledger change ever wears.
+export type LookKind = ChangeKind | "notify";
 
 export const KIND_LOOK: Record<LookKind, { icon: IconName; badge: string; accent: string }> = {
   fix: {
@@ -88,111 +89,157 @@ export const KIND_LOOK: Record<LookKind, { icon: IconName; badge: string; accent
   },
 };
 
-export const FILTER_DOT: Record<ChangeFilter, string | undefined> = {
-  all: undefined,
-  fixes: KIND_LOOK.fix.accent,
-  watching: KIND_LOOK.watching.accent,
-  tuning: KIND_LOOK.tuning.accent,
+// Every change AutoObserve makes today is an alert setting, so every row wears the tuning look.
+export const TUNING_LOOK = KIND_LOOK.tuning;
+
+// A state tag carries no icon, so Undone never reads as the Undo button beside it.
+export const STATE_LOOK: Record<ChangeState, { variant: BadgeVariant; key: I18nKey }> = {
+  done: { variant: "blue-soft", key: "autoobserve.activityLive.status.inForce" },
+  undone: { variant: "default-soft", key: "autoobserve2.activityPage.status.undone" },
 };
 
-export const STATE_LOOK: Record<
-  ChangeState,
-  { variant: BadgeVariant; key: I18nKey; icon?: IconName }
-> = {
-  applying: {
-    variant: "primary-soft",
-    key: "autoobserve2.activityPage.status.applying",
-    icon: "schedule",
-  },
-  worked: {
-    variant: "success-soft",
-    key: "autoobserve2.activityPage.status.worked",
-    icon: "check",
-  },
-  done: { variant: "blue-soft", key: "autoobserve2.activityPage.status.done", icon: "check" },
-  review: {
-    variant: "indigo-soft",
-    key: "autoobserve2.activityPage.status.review",
-    icon: "schedule",
-  },
-  didntHelp: {
-    variant: "orange-soft",
-    key: "autoobserve2.activityPage.status.didntHelp",
-    icon: "warning",
-  },
-  undone: { variant: "purple-soft", key: "autoobserve2.activityPage.status.undone", icon: "undo" },
-};
+const isApplyField = (field: string): field is ApplyField => field in APPLY_FIELDS;
 
-// Read on use, since the sample ledger loads after this module; every entry comes from it.
-const factOf = (id: string): LedgerFact => LEDGER.find((f) => f.id === id) as LedgerFact;
-
-// The investigation loop's only change is an alert-query fix, so it reads as alert tuning.
-const kindOf = (fact: LedgerFact): ChangeKind => {
-  if (fact.loop === "coverage") return "watching";
-  if (fact.loop !== "action") return "tuning";
-  return fact.actionClass === "RaiseAutonomy" ? "permission" : "fix";
-};
-
-export const filterOf = (kind: ChangeKind): ChangeFilter =>
-  kind === "watching" ? "watching" : kind === "tuning" ? "tuning" : "fixes";
-
-const fixOutcome = (fact: LedgerFact) => fact.history.find((h) => h.kind === "fixes")?.worked;
-
-const stateOf = (entry: LedgerEntry, fact: LedgerFact, phase?: FixPhase): ChangeState => {
-  if (entry.status === "rolled_back") return "undone";
-  if (phase) return phase === "fixing" ? "applying" : "worked";
-  if (entry.status === "kept") return "worked";
-  const outcome = fixOutcome(fact);
-  if (outcome !== undefined) return outcome ? "worked" : "didntHelp";
-  return entry.status === "auto_applied" && fact.reviewWindow ? "review" : "done";
-};
-
-const reviewDaysOf = (fact: LedgerFact) => {
-  const days = Number.parseInt(fact.reviewWindow ?? "", 10);
-  return Number.isNaN(days) ? undefined : days;
-};
-
-// A proposal still awaiting an answer, or turned down, never changed anything.
-export const isChange = (entry: LedgerEntry) =>
-  entry.status !== "awaiting" && entry.status !== "rejected";
-
-// An answered request happened now, so it moves to today however old the proposal is.
-export const toChanges = (ledger: LedgerEntry[], phases: Record<string, FixPhase>): Change[] =>
-  ledger.filter(isChange).map((entry) => {
-    const fact = factOf(entry.id);
-    return {
-      entry,
-      fact,
-      kind: kindOf(fact),
-      state: stateOf(entry, fact, entry.decided ? phases[entry.id] : undefined),
-      reviewDays: reviewDaysOf(fact),
-      day: entry.decided ? "today" : fact.day,
-      time: entry.decided ? DEMO_NOW : fact.time,
-    };
+export const shiftsOf = (copy: ApplyCopy, fields: readonly FieldChange[]): ChangeShift[] =>
+  fields.flatMap((f) => {
+    if (!isApplyField(f.field)) return [];
+    const key = APPLY_FIELDS[f.field];
+    return [
+      { setting: copy.fieldLabel(key), from: copy.value(key, f.from), to: copy.value(key, f.to) },
+    ];
   });
 
-export const byNewest = (a: Change, b: Change) =>
-  `${DAY_DATE[b.day]} ${b.time ?? "00:00"}`.localeCompare(
-    `${DAY_DATE[a.day]} ${a.time ?? "00:00"}`,
+/** Applies newest first, each keyed to the reader's own calendar day. */
+export const toChanges = (
+  entries: readonly AppliedEntry[],
+  copy: ApplyCopy,
+  timeZone: string,
+): Change[] =>
+  entries
+    .map((entry) => {
+      const at = entry.view.decided_at / 1000;
+      return {
+        entry,
+        id: entry.view.decision_id,
+        state: (entry.view.state === "undone" ? "undone" : "done") as ChangeState,
+        at,
+        day: dayKey(at, timeZone),
+        shifts: shiftsOf(copy, entry.fields),
+      };
+    })
+    .sort((a, b) => b.at - a.at);
+
+/** A long ledger shows this many changes first and says how many more there are. */
+export const CHANGES_SHOWN = 20;
+
+export const capList = <T>(items: readonly T[], all: boolean, limit = CHANGES_SHOWN) => ({
+  shown: all ? [...items] : items.slice(0, limit),
+  more: all ? 0 : Math.max(0, items.length - limit),
+});
+
+export const matches = (change: Change, filter: ChangeFilter) =>
+  filter === "all" || (filter === "undone") === (change.state === "undone");
+
+export const changeCounts = (changes: readonly Change[]): Record<ChangeFilter, number> => ({
+  all: changes.length,
+  inForce: changes.filter((c) => c.state === "done").length,
+  undone: changes.filter((c) => c.state === "undone").length,
+});
+
+/** Today and yesterday by name, a day this week by weekday, older days by date. */
+export const dayLabel = (
+  t: TranslateFn,
+  zone: { locale: string; timeZone: string },
+  at: number,
+  nowMs: number,
+): I18nText => {
+  const key = dayKey(at, zone.timeZone);
+  if (key === dayKey(nowMs, zone.timeZone)) return t("autoobserve.activityLive.days.today");
+  if (key === dayKey(nowMs - 86_400_000, zone.timeZone))
+    return t("autoobserve.activityLive.days.yesterday");
+  const recent = nowMs - at < 6 * 86_400_000;
+  return raw(
+    new Intl.DateTimeFormat(
+      zone.locale,
+      recent
+        ? { weekday: "long", timeZone: zone.timeZone }
+        : { dateStyle: "medium", timeZone: zone.timeZone },
+    ).format(new Date(at)),
   );
-
-// Undo applies where the ledger can restore a prior state; a fix that already reversed itself has none.
-export const canUndo = (change: Change) =>
-  !!change.entry.decided ||
-  (change.entry.status === "auto_applied" && change.state !== "didntHelp");
-
-export const recurringBug = (actionClass: string) =>
-  AUTONOMY.find((a) => a.actionClass === actionClass)?.recurringBug;
-
-// A change worked when it is in place and nothing says otherwise; review and applying are not judged yet.
-export const trustCounts = (changes: Change[]) => {
-  const recent = changes.filter((c) => daysBefore(c.day) < TRUST_WINDOW_DAYS);
-  const count = (states: ChangeState[]) => recent.filter((c) => states.includes(c.state)).length;
-  return {
-    made: recent.length,
-    worked: count(["worked", "done"]),
-    review: count(["review"]),
-    applying: count(["applying"]),
-    undone: count(["undone", "didntHelp"]),
-  };
 };
+
+export const dayGroups = (
+  changes: readonly Change[],
+  filter: ChangeFilter,
+): { day: string; changes: Change[] }[] => {
+  const groups: { day: string; changes: Change[] }[] = [];
+  for (const change of changes) {
+    if (!matches(change, filter)) continue;
+    const last = groups[groups.length - 1];
+    if (last?.day === change.day) last.changes.push(change);
+    else groups.push({ day: change.day, changes: [change] });
+  }
+  return groups;
+};
+
+export const timeText = (zone: { locale: string; timeZone: string }, at: number, nowMs: number) =>
+  formatWhen(at, zone.locale, zone.timeZone, nowMs);
+
+/** Who made and who undid the change, in the reader's words; "you" for the reader's own. */
+export const actorLines = (
+  t: TranslateFn,
+  zone: { locale: string; timeZone: string },
+  entry: AppliedEntry,
+  me: string | undefined,
+  nowMs: number,
+): I18nText[] => {
+  const who = (actor: string) => (actor === me ? t("insight.decisions.applied.you") : raw(actor));
+  const when = (us: number) => timeText(zone, us / 1000, nowMs);
+  const { view } = entry;
+  if (view.state !== "undone")
+    return [
+      t("autoobserve.activityLive.by", { actor: who(view.actor), when: when(view.decided_at) }),
+    ];
+  // Without undone_at the server moved decided_at and actor to the undo, so they describe the undo.
+  if (view.undone_at == null)
+    return [
+      t("autoobserve.activityLive.undoneBy", {
+        actor: who(view.actor),
+        when: when(view.decided_at),
+      }),
+    ];
+  return [
+    t("autoobserve.activityLive.by", { actor: who(view.actor), when: when(view.decided_at) }),
+    t("autoobserve.activityLive.undoneBy", {
+      actor: who(view.undone_by ?? view.actor),
+      when: when(view.undone_at),
+    }),
+  ];
+};
+
+/** What changed, naming the setting when there is one, so a list of changes reads apart. */
+export const changeHeadline = (t: TranslateFn, change: Change): I18nText => {
+  const alert = raw(change.entry.title || String(t("autoobserveLive.history.untitled")));
+  const [first] = change.shifts;
+  if (change.shifts.length === 1)
+    return t("autoobserve.activityLive.headlineOne", { setting: first.setting, alert });
+  if (change.shifts.length > 1)
+    return t(
+      "autoobserve.activityLive.headlineMany",
+      { count: change.shifts.length, alert },
+      change.shifts.length,
+    );
+  return t("autoobserve.activityLive.headline", { alert });
+};
+
+/** The ledger's Who cell: who made it, or who undid it; the When column carries the time. */
+export const whoText = (t: TranslateFn, entry: AppliedEntry, me: string | undefined): I18nText => {
+  const who = (actor: string) => (actor === me ? t("insight.decisions.applied.you") : raw(actor));
+  const { view } = entry;
+  if (view.state !== "undone") return who(view.actor);
+  return t("autoobserve.activityLive.whoUndone", { actor: who(view.undone_by ?? view.actor) });
+};
+
+/** The before and after the details show, one `setting: value` line per field. */
+export const configText = (shifts: readonly ChangeShift[], side: "from" | "to"): string =>
+  shifts.map((s) => `${s.setting}: ${s[side]}`).join("\n");
