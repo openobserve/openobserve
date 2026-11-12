@@ -58,6 +58,9 @@ export class SyntheticsListPage {
   nameCell(id) { return `[data-test="${TABLE}-name-${id}"]`; }
   rowSelect(index) { return `[data-test="o2-table-select-${index}"]`; }
   rowAction(action) { return `[data-test="${TABLE}-${action}"]`; }
+  statusCard(status) { return `[data-test="synthetics-summary-${status}"]`; }
+  cell(id, column) { return this.getRow(id).locator(`[data-test="o2-table-cell-${column}"]`); }
+  columnHeader(column) { return this.page.locator(this.locators.table).locator(`[data-test="o2-table-th-${column}"]`); }
 
   async goto(orgId, { folder = null, section = null } = {}) {
     const params = new URLSearchParams({ org_identifier: orgId });
@@ -168,6 +171,54 @@ export class SyntheticsListPage {
   async bulkPause() { await this.page.locator(this.locators.pauseSelectedButton).click(); }
   async bulkEnable() { await this.page.locator(this.locators.enableSelectedButton).click(); }
   async bulkTrigger() { await this.page.locator(this.locators.triggerSelectedButton).click(); }
+
+  async selectStatusCard(status) {
+    const card = this.page.locator(this.statusCard(status));
+    await card.click();
+    await expect(card).toHaveAttribute('aria-pressed', 'true', { timeout: 15000 });
+  }
+
+  async expectStatusCardPressed(status, pressed) {
+    await expect(this.page.locator(this.statusCard(status))).toHaveAttribute('aria-pressed', String(pressed), { timeout: 15000 });
+  }
+
+  async expectResponseTime(id, text, tone) {
+    const value = this.cell(id, 'responseTime').locator('span').first();
+    await expect(value).toHaveText(text, { timeout: 30000 });
+    for (const t of ['success', 'warning', 'error']) {
+      const toneClass = new RegExp(`(^|\\s)text-status-${t}-text(\\s|$)`);
+      if (t === tone) await expect(value).toHaveClass(toneClass);
+      else await expect(value).not.toHaveClass(toneClass);
+    }
+  }
+
+  async hiddenLocationCount(id) {
+    const more = this.cell(id, 'locations').locator('[data-test="fit-items-more"]');
+    if ((await more.count()) === 0) return 0;
+    return Number(((await more.textContent()) ?? '').replace(/\D/g, ''));
+  }
+
+  // The resize handle has no test id of its own; it is the header's only `.resizer`.
+  async widenColumn(column, byPx) {
+    const header = this.columnHeader(column);
+    await header.scrollIntoViewIfNeeded();
+    // The sticky actions column covers the handle until the table is scrolled to its right end.
+    await header.evaluate((th) => {
+      let el = th.parentElement;
+      while (el && !(el.scrollWidth > el.clientWidth + 1 && /(auto|scroll)/.test(getComputedStyle(el).overflowX))) el = el.parentElement;
+      if (el) el.scrollLeft = el.scrollWidth;
+    });
+    const before = (await header.boundingBox()).width;
+    const handle = await header.locator('.resizer').boundingBox();
+    const x = handle.x + handle.width / 2;
+    const y = handle.y + handle.height / 2;
+    await this.page.mouse.move(x, y);
+    await this.page.mouse.down();
+    await this.page.mouse.move(x + byPx / 2, y, { steps: 5 });
+    await this.page.mouse.move(x + byPx, y, { steps: 5 });
+    await this.page.mouse.up();
+    await expect.poll(async () => (await header.boundingBox()).width, { timeout: 10000 }).toBeGreaterThan(before + byPx / 2);
+  }
 
   async expectListVisible() {
     await expect(this.page.locator(this.locators.newCheckButton)).toBeVisible();

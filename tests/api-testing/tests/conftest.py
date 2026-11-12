@@ -11,7 +11,7 @@ import base64
 
 # Make the new framework fixtures available to all tests (Phase 4+).
 # Legacy tests still use create_session/base_url/org_id below.
-from support.fixtures import client, temp_stream_name, temp_user_email, temp_dashboard_id  # noqa: F401
+from support.fixtures import client, created_synthetics, make_synthetic, synthetics_location, temp_stream_name, temp_user_email, temp_dashboard_id  # noqa: F401
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')

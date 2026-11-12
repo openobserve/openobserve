@@ -22,12 +22,18 @@ const {
   assertSyntheticsEnabled,
   ensureSyntheticsLocation,
   uniqueName,
+  createCheck,
   getCheck,
+  deleteCheck,
   findCheckByName,
+  createAlertTemplate,
+  createAlertDestination,
+  deleteAlertDestinationAndTemplate,
   cleanupWorkerEntities,
 } = require('../utils/synthetics-helpers.js');
 
 const ORG = process.env['ORGNAME'];
+const HTTP_CONFIG = { method: 'GET', timeout_ms: 10000, follow_redirects: true, headers: [] };
 
 test.describe.configure({ mode: 'parallel' });
 
@@ -160,4 +166,132 @@ test.describe('Synthetics create — HTTP', { tag: ['@synthetics', '@all'] }, ()
     expect(cron.frequency.type).toBe('cron');
     expect(cron.frequency.cron).toBe('0 */10 * * * *');
   });
+
+  test(
+    'every assertion operator saves under the name the prober reads',
+    { tag: ['@P1'] },
+    async ({ page }, testInfo) => {
+      const name = uniqueName('ops', testInfo);
+      const create = pm.syntheticsCreatePage;
+      testLogger.info('Adding one assertion per operator', { name });
+      await create.gotoCreate(ORG, 'http');
+      await create.fillName(name);
+      await create.fillTarget('https://example.com');
+      await create.addAssertion('status_code', 'ne', 500);
+      await create.addAssertion('response_time_ms', 'lt', 5000);
+      await create.addAssertion('response_time_ms', 'gt', 1);
+      await create.addAssertion('body', 'contains', 'Example');
+      await create.addAssertion('body', 'not_contains', 'Server Error');
+      await create.selectLocation(locationId);
+      await create.setEnabled(false);
+      const expected = [
+        { field: 'status_code', operator: 'eq', value: 200 },
+        { field: 'status_code', operator: 'ne', value: 500 },
+        { field: 'response_time_ms', operator: 'lt', value: 5000 },
+        { field: 'response_time_ms', operator: 'gt', value: 1 },
+        { field: 'body', operator: 'contains', value: 'Example' },
+        { field: 'body', operator: 'not_contains', value: 'Server Error' },
+      ];
+      const { payload, status } = await create.saveCapturingPayload();
+      expect(status).toBe(200);
+      expect(payload.config.assertions).toEqual(expected);
+      await create.expectSavedAndListed();
+
+      const saved = await findCheckByName(page, name);
+      const { body } = await getCheck(page, saved.id);
+      expect(body.config.assertions).toEqual(expected);
+    },
+  );
+
+  test(
+    'editing a check keeps its assertions, and removing one leaves the rest as saved',
+    { tag: ['@P1'] },
+    async ({ page }, testInfo) => {
+      const assertions = [
+        { field: 'status_code', operator: 'eq', value: 200 },
+        { field: 'body', operator: 'contains', value: 'Example Domain' },
+        { field: 'response_time_ms', operator: 'lt', value: 3000 },
+      ];
+      const check = await createCheck(page, 'http', testInfo, {
+        locations: [locationId],
+        config: { ...HTTP_CONFIG, assertions },
+      });
+      const create = pm.syntheticsCreatePage;
+      testLogger.info('Opening a check with three assertions', { id: check.id });
+      await create.gotoEdit(ORG, check.id);
+      await create.expectNameValue(check.name);
+      await create.expectAssertionChips(assertions);
+
+      testLogger.info('Removing the body assertion and saving');
+      await create.removeAssertionAt(1);
+      const kept = [assertions[0], assertions[2]];
+      const { payload, status } = await create.saveCapturingPayload();
+      expect(status).toBe(200);
+      expect(payload.config.assertions).toEqual(kept);
+      await create.expectUpdatedAndListed();
+
+      testLogger.info('Reopening the check');
+      await create.gotoEdit(ORG, check.id);
+      await create.expectNameValue(check.name);
+      await create.expectAssertionChips(kept);
+    },
+  );
+
+  test(
+    'an assertion left without a value is dropped, never saved empty',
+    { tag: ['@P2'] },
+    async ({ page }, testInfo) => {
+      const name = uniqueName('noval', testInfo);
+      const create = pm.syntheticsCreatePage;
+      testLogger.info('Starting a body assertion and leaving it at the value step', { name });
+      await create.gotoCreate(ORG, 'http');
+      await create.fillName(name);
+      await create.fillTarget('https://example.com');
+      await create.abandonAssertionAtValue('body', 'contains');
+      await create.selectLocation(locationId);
+      await create.setEnabled(false);
+      const { payload, status } = await create.saveCapturingPayload();
+      expect(status).toBe(200);
+      expect(payload.config.assertions).toEqual([{ field: 'status_code', operator: 'eq', value: 200 }]);
+      await create.expectSavedAndListed();
+      expect(await findCheckByName(page, name)).toBeTruthy();
+    },
+  );
+
+  test(
+    'a template override on the Alerts step persists after save and reopen',
+    { tag: ['@P1'] },
+    async ({ page }, testInfo) => {
+      const stem = uniqueName('tpl', testInfo);
+      const create = pm.syntheticsCreatePage;
+      let destinationTemplate = null;
+      let override = null;
+      let destination = null;
+      let check = null;
+      try {
+        destinationTemplate = await createAlertTemplate(page, `${stem}_dest_tpl`);
+        override = await createAlertTemplate(page, `${stem}_override`, ['synthetics']);
+        destination = await createAlertDestination(page, `${stem}_dest`, destinationTemplate);
+        check = await createCheck(page, 'http', testInfo, { locations: [locationId], destinations: [destination] });
+        testLogger.info('Picking a template override on a check with a destination', { id: check.id, override });
+        await create.gotoEdit(ORG, check.id);
+        await create.expectNameValue(check.name);
+        await create.selectTemplateOverride(override);
+        const { payload, status } = await create.saveCapturingPayload();
+        expect(status).toBe(200);
+        expect(payload.template).toBe(override);
+        await create.expectUpdatedAndListed();
+        expect((await getCheck(page, check.id)).body.template).toBe(override);
+
+        testLogger.info('Reopening the check');
+        await create.gotoEdit(ORG, check.id);
+        await create.expectNameValue(check.name);
+        await create.expectTemplateOverride(override);
+      } finally {
+        if (check) await deleteCheck(page, check.id);
+        await deleteAlertDestinationAndTemplate(page, destination, destinationTemplate);
+        await deleteAlertDestinationAndTemplate(page, null, override);
+      }
+    },
+  );
 });
