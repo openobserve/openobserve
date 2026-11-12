@@ -21,6 +21,7 @@ interface MarkLineConfig {
   value?: unknown;
   color?: string;
   show_label?: boolean;
+  label?: string;
 }
 
 interface MarkLinePanel {
@@ -39,7 +40,7 @@ const getMarkLineData = (panelSchema: MarkLinePanel | null | undefined) => {
         label: {
           // The alert preview hides labels: its lines are colour-coded and a label clips at the top.
           show: markLine.show_label !== false,
-          formatter: markLine.name ? "{b}:{c}" : "{c}",
+          formatter: markLine.label ?? (markLine.name ? "{b}:{c}" : "{c}"),
           position: "insideEndTop",
         },
         ...(markLine.color ? { lineStyle: { color: markLine.color } } : {}),
