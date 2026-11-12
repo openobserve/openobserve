@@ -307,3 +307,18 @@ describe("AddAlert — editing an anomaly seeds its stream", () => {
     });
   });
 });
+
+describe("AddAlert — anomaly save gates", () => {
+  it("brings the notify section into view when a window share is out of range", async () => {
+    wrapper = await mountAnomalyEdit();
+    wrapper.vm.anomalyStep2Ref = { validate: async () => true };
+    wrapper.vm.anomalyConfig.alert_window_fire_pct = 150;
+    const scrollToSection = vi.fn();
+    wrapper.vm.$refs.snapScrollRef.scrollToSection = scrollToSection;
+
+    await wrapper.vm.saveAnomalyDetection();
+
+    expect(scrollToSection).toHaveBeenCalledWith("notify");
+    expect(anomalyService.update).not.toHaveBeenCalled();
+  });
+});

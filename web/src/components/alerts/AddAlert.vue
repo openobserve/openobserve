@@ -1403,9 +1403,7 @@ export default defineComponent({
       alertForm.updateStreams();
     };
 
-    // Alert type is not an OFormSelect, so it writes
-    // the ONE form directly. The existing watch on is_real_time still drives the
-    // anomaly/composite tab switch.
+    // Alert type is not an OFormSelect, so it writes the form directly.
     const onAlertTypeChange = (value: unknown) => {
       if (value === "anomaly" && anomalyLicenseLocked.value) return;
       alertForm.setF("is_real_time", value);
@@ -1686,13 +1684,20 @@ export default defineComponent({
       closeOverflowingTiers();
     };
     let tierResizeObserver: ResizeObserver | null = null;
+    const observeTierContent = () => {
+      tierResizeObserver?.disconnect();
+      const content = sectionsScroller()?.firstElementChild;
+      if (!content || typeof ResizeObserver === "undefined") return;
+      tierResizeObserver ??= new ResizeObserver(closeOverflowingTiers);
+      tierResizeObserver.observe(content);
+    };
     onMounted(() => {
       nextTick(openSettingsThatFit);
-      const content = sectionsScroller()?.firstElementChild;
-      if (content && typeof ResizeObserver !== "undefined") {
-        tierResizeObserver = new ResizeObserver(closeOverflowingTiers);
-        tierResizeObserver.observe(content);
-      }
+      observeTierContent();
+    });
+    // Discard remounts the keyed form, so the observer must follow the new content element.
+    watch(snapScrollRef, () => {
+      nextTick(observeTierContent);
     });
     onBeforeUnmount(() => tierResizeObserver?.disconnect());
     watch(
