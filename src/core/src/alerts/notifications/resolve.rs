@@ -48,6 +48,52 @@ pub const UNMATCHED_MARKER: &str = "–";
 /// Families whose renderers send the body as plain text, so escaped values would show backslashes.
 const PLAIN_TEXT_BODY_FAMILIES: [&str; 3] = ["opsgenie", "pagerduty", "servicenow"];
 
+/// What a link is for, so renderers find the system buttons without reading labels.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LinkRole {
+    Authored,
+    /// The data button, from `alert_url`.
+    Primary,
+    /// The object button, from `alert_detail_url`.
+    Detail,
+}
+
+/// One resolved link.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Link {
+    pub label: String,
+    pub url: String,
+    pub role: LinkRole,
+    /// Takes a Slack slot first: Primary, Detail, or an authored link that stands in for Detail.
+    pub reserved: bool,
+}
+
+impl Link {
+    pub fn authored(label: impl Into<String>, url: impl Into<String>) -> Self {
+        Self {
+            label: label.into(),
+            url: url.into(),
+            role: LinkRole::Authored,
+            reserved: false,
+        }
+    }
+
+    pub fn is_system(&self) -> bool {
+        self.role != LinkRole::Authored
+    }
+
+    /// The label a human-facing channel shows; an empty one reads [`DEFAULT_LINK_LABEL`].
+    ///
+    /// [`DEFAULT_LINK_LABEL`]: super::render::DEFAULT_LINK_LABEL
+    pub fn display_label(&self) -> &str {
+        if self.label.is_empty() {
+            super::render::DEFAULT_LINK_LABEL
+        } else {
+            &self.label
+        }
+    }
+}
+
 /// Fully resolved, still-raw content for one channel render.
 pub struct RenderedContent {
     /// Per-channel override already applied.
@@ -56,8 +102,8 @@ pub struct RenderedContent {
     pub body_markdown: String,
     /// `show_when`-filtered, substituted.
     pub fields: Vec<(String, String)>,
-    /// (label, url); alert-URL link appended.
-    pub links: Vec<(String, String)>,
+    /// Authored links in template order, then Primary, then Detail when it applies.
+    pub links: Vec<Link>,
     /// ≤ `rows.max`, column-ordered per `RowsSpec`.
     pub rows: Vec<Vec<(String, String)>>,
     /// Present when `RowsSpec.enabled` is true and `RowsSpec.format` is set.
@@ -130,11 +176,9 @@ pub fn resolve_content(
         {
             continue;
         }
-        links.push((label, url));
+        links.push(Link::authored(label, url));
     }
-    // Appended alert link: empty label — renderers supply the localized
-    // default ("View alert" is an i18n/FE concern, Task 12), not this layer.
-    links.push((String::new(), ctx.alert_url.clone()));
+    append_system_links(&mut links, ctx);
 
     let max = if spec.rows.enabled {
         spec.rows.max as usize
@@ -182,6 +226,39 @@ pub fn resolve_content(
         severity: ctx.level,
         unknown_variables,
     }
+}
+
+/// Appends Primary, then Detail unless it is blank or repeats `alert_url`.
+/// An authored link to the Detail URL stands in for it, so the object link shows once.
+pub(crate) fn append_system_links(links: &mut Vec<Link>, ctx: &NotificationContext) {
+    links.push(Link {
+        label: ctx.alert_url_label.clone(),
+        url: ctx.alert_url.clone(),
+        role: LinkRole::Primary,
+        reserved: true,
+    });
+    let Some(detail_url) = detail_url(ctx) else {
+        return;
+    };
+    if let Some(stand_in) = links
+        .iter_mut()
+        .find(|l| l.role == LinkRole::Authored && l.url.trim() == detail_url)
+    {
+        stand_in.reserved = true;
+        return;
+    }
+    links.push(Link {
+        label: ctx.alert_detail_label.clone(),
+        url: detail_url.to_string(),
+        role: LinkRole::Detail,
+        reserved: true,
+    });
+}
+
+/// The object URL when it adds a second button: not blank and not the data URL.
+pub(crate) fn detail_url(ctx: &NotificationContext) -> Option<&str> {
+    let url = ctx.alert_detail_url.trim();
+    (!url.is_empty() && url != ctx.alert_url.trim()).then_some(url)
 }
 
 /// The body with markdown-escaped values, for surfaces that parse it as markdown on any family.
@@ -515,6 +592,9 @@ pub(crate) fn scalar_vars(ctx: &NotificationContext) -> Vec<(&'static str, &str)
         ("alert_start_time", ctx.alert_start_time.as_str()),
         ("alert_end_time", ctx.alert_end_time.as_str()),
         ("alert_url", ctx.alert_url.as_str()),
+        ("alert_url_label", ctx.alert_url_label.as_str()),
+        ("alert_detail_url", ctx.alert_detail_url.as_str()),
+        ("alert_detail_label", ctx.alert_detail_label.as_str()),
         (
             "alert_trigger_time_str",
             ctx.alert_trigger_time_str.as_str(),
@@ -616,7 +696,7 @@ pub(crate) const EXTRA_SCALAR_NAMES: [&str; 15] = [
 mod tests {
     use std::collections::BTreeMap;
 
-    use config::meta::alerts::level::AlertLevel;
+    use config::meta::alerts::{content_spec::ContentLink, level::AlertLevel};
 
     use super::*;
     use crate::alerts::notifications::context::NotificationContext;
@@ -898,11 +978,15 @@ mod tests {
         assert_eq!(
             r.links,
             vec![
-                ("always".to_string(), "https://example/always".to_string()),
-                (String::new(), ctx.alert_url.clone()),
+                Link::authored("always", "https://example/always"),
+                Link {
+                    label: String::new(),
+                    url: ctx.alert_url.clone(),
+                    role: LinkRole::Primary,
+                    reserved: true,
+                },
             ]
         );
-        assert_eq!(r.links.last().unwrap().0, "");
     }
 
     /// The reported bug, at the substitution boundary.
@@ -1012,8 +1096,8 @@ mod tests {
         assert_eq!(r.title, r#"CPU "high""#); // no backslashes
         assert!(!r.title.contains('\\'));
         assert_eq!(r.fields[0].1, ">=");
-        assert_eq!(r.links[0].0, ">=");
-        assert_eq!(r.links[0].1, "https://x/?op=>=");
+        assert_eq!(r.links[0].label, ">=");
+        assert_eq!(r.links[0].url, "https://x/?op=>=");
     }
 
     #[test]
@@ -1248,5 +1332,97 @@ mod tests {
         };
         let r = resolve_content(&spec, &ctx, "slack");
         assert_eq!(r.title, "Homepage ()");
+    }
+
+    fn with_detail(detail: &str) -> NotificationContext {
+        let mut ctx = fixture_ctx();
+        ctx.alert_url_label = "View logs".into();
+        ctx.alert_detail_url = detail.into();
+        ctx.alert_detail_label = "Open alert".into();
+        ctx
+    }
+
+    fn authored(links: &[(&str, &str)]) -> ContentSpec {
+        let mut spec = ContentSpec::default();
+        spec.links = links
+            .iter()
+            .map(|(label, url)| ContentLink {
+                label: (*label).into(),
+                url: (*url).into(),
+                show_when: None,
+            })
+            .collect();
+        spec
+    }
+
+    #[test]
+    fn primary_then_detail_are_appended_after_authored_links() {
+        let ctx = with_detail("https://o2.example/web/alerts/detail/a1");
+        let r = resolve_content(&authored(&[("Runbook", "https://rb")]), &ctx, "slack");
+        let roles: Vec<(LinkRole, bool)> = r.links.iter().map(|l| (l.role, l.reserved)).collect();
+        assert_eq!(
+            roles,
+            vec![
+                (LinkRole::Authored, false),
+                (LinkRole::Primary, true),
+                (LinkRole::Detail, true),
+            ]
+        );
+        assert_eq!(r.links[1].label, "View logs");
+        assert_eq!(r.links[1].url, ctx.alert_url);
+        assert_eq!(r.links[2].label, "Open alert");
+    }
+
+    #[test]
+    fn detail_drops_when_blank_or_equal_to_the_data_link() {
+        for detail in ["", "   "] {
+            let r = resolve_content(&ContentSpec::default(), &with_detail(detail), "slack");
+            assert!(
+                r.links.iter().all(|l| l.role != LinkRole::Detail),
+                "{detail:?}"
+            );
+        }
+        let ctx = with_detail("https://o2.example/short/abc");
+        assert_eq!(ctx.alert_detail_url, ctx.alert_url);
+        let r = resolve_content(&ContentSpec::default(), &ctx, "slack");
+        assert_eq!(r.links.len(), 1);
+        assert_eq!(r.links[0].role, LinkRole::Primary);
+    }
+
+    #[test]
+    fn an_authored_link_to_the_detail_url_stands_in_and_keeps_role_and_position() {
+        let detail = "https://o2.example/web/alerts/detail/a1";
+        let ctx = with_detail(detail);
+        let r = resolve_content(
+            &authored(&[("Mine", detail), ("Runbook", "https://rb")]),
+            &ctx,
+            "slack",
+        );
+        assert_eq!(r.links.len(), 3);
+        assert_eq!(
+            r.links[0],
+            Link {
+                label: "Mine".into(),
+                url: detail.into(),
+                role: LinkRole::Authored,
+                reserved: true,
+            }
+        );
+        assert!(!r.links[1].reserved);
+        assert_eq!(r.links[2].role, LinkRole::Primary);
+    }
+
+    #[test]
+    fn the_three_link_variables_substitute_in_templates() {
+        let ctx = with_detail("https://o2.example/web/alerts/detail/a1");
+        let (out, unknown) = substitute_raw(
+            "{alert_url_label} {alert_detail_label}: {alert_detail_url}",
+            &ctx,
+        );
+        assert_eq!(
+            out,
+            "View logs Open alert: https://o2.example/web/alerts/detail/a1"
+        );
+        assert!(unknown.is_empty());
     }
 }

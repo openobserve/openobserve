@@ -270,6 +270,101 @@ describe("TemplatePreviewPanel", () => {
     expect(button.text()).toBe("View in OpenObserve");
   });
 
+  it("shows the server's data label, then the object button, after the authored links", async () => {
+    vi.spyOn(templateService, "preview").mockResolvedValue(
+      makePreviewResponse({
+        preview_model: {
+          title: "Alert fired",
+          body_html: "<p>body</p>",
+          fields: [],
+          links: [{ label: "Runbook", url: "https://wiki/rb" }],
+          color: "#ff0000",
+          severity: null,
+          footer: "https://o2.example/short/abc",
+          footer_label: "View logs",
+          detail: { label: "Open alert", url: "https://o2.example/web/alerts/detail/a1" },
+          chart_placeholder: false,
+        },
+      }) as any,
+    );
+    const open = vi.spyOn(window, "open").mockReturnValue(null);
+
+    const w = await mountPanel();
+    await vi.advanceTimersByTimeAsync(300);
+    await flushPromises();
+
+    const row = w.find('[data-test="template-preview-panel-links"]');
+    const labels = row.findAll("button").map((b) => b.text());
+    expect(labels).toEqual(["Runbook", "View logs", "Open alert"]);
+    await w.find('[data-test="template-preview-panel-detail-link"]').trigger("click");
+    expect(open).toHaveBeenCalledWith(
+      "https://o2.example/web/alerts/detail/a1",
+      "_blank",
+      "noopener,noreferrer",
+    );
+  });
+
+  it("shows one system button when the kind has no object button", async () => {
+    vi.spyOn(templateService, "preview").mockResolvedValue(
+      makePreviewResponse({
+        preview_model: {
+          title: "Downtime started",
+          body_html: "",
+          fields: [],
+          links: [],
+          color: "#ff0000",
+          severity: null,
+          footer: "https://o2.example/web/downtimes/d1",
+          footer_label: "Open downtime",
+          detail: null,
+          chart_placeholder: false,
+        },
+      }) as any,
+    );
+    const w = await mountPanel();
+    await vi.advanceTimersByTimeAsync(300);
+    await flushPromises();
+    expect(w.find('[data-test="template-preview-panel-default-link"]').text()).toBe(
+      "Open downtime",
+    );
+    expect(w.find('[data-test="template-preview-panel-detail-link"]').exists()).toBe(false);
+  });
+
+  it("names the authored links that Slack puts under the buttons", async () => {
+    const links = ["A", "B", "C", "D"].map((l) => ({ label: l, url: `https://x/${l}` }));
+    vi.spyOn(templateService, "preview").mockResolvedValue(
+      makePreviewResponse({
+        payload: {
+          blocks: [
+            {
+              type: "actions",
+              elements: ["A", "B", "C"].map((l) => ({ type: "button", url: `https://x/${l}` })),
+            },
+            { type: "context", elements: [{ type: "mrkdwn", text: "<https://x/D|D>" }] },
+          ],
+        },
+        preview_model: {
+          title: "Alert fired",
+          body_html: "",
+          fields: [],
+          links,
+          color: "#ff0000",
+          severity: null,
+          footer: "https://o2.example/short/abc",
+          footer_label: "View logs",
+          detail: { label: "Open alert", url: "https://o2.example/web/alerts/detail/a1" },
+          chart_placeholder: false,
+        },
+      }) as any,
+    );
+    const w = await mountPanel();
+    await vi.advanceTimersByTimeAsync(300);
+    await flushPromises();
+    const note = w.find('[data-test="template-preview-panel-slack-hidden-links"]');
+    expect(note.exists()).toBe(true);
+    expect(note.text()).toBe("1 link is not shown as a button: D");
+  });
+
   it("puts Channel first, Severity next and Kind last in the preview row", async () => {
     vi.spyOn(templateService, "preview").mockResolvedValue(makePreviewResponse() as any);
     const w = mount(TemplatePreviewPanel, {

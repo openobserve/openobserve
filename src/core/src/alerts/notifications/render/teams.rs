@@ -19,10 +19,13 @@
 use serde_json::{Value, json};
 
 use super::{
-    DEFAULT_LINK_LABEL, clamp, dispatchable_url,
+    clamp, dispatchable_url,
     markdown::{escape_html, markdown_to_plaintext},
 };
-use crate::alerts::notifications::{NotificationContext, resolve::RenderedContent};
+use crate::alerts::notifications::{
+    NotificationContext,
+    resolve::{LinkRole, RenderedContent},
+};
 
 /// Body only: other surfaces hold raw values, which a markdown parse would cut, such as `>`.
 fn card_text(s: &str) -> String {
@@ -103,19 +106,16 @@ pub fn render_teams_adaptive_card(c: &RenderedContent, ctx: &NotificationContext
     let actions: Vec<Value> = c
         .links
         .iter()
-        .filter_map(|(label, url)| dispatchable_url(url).map(|url| (label, url)))
-        .map(|(label, url)| {
-            let is_default_link = label.is_empty();
+        .filter_map(|link| dispatchable_url(&link.url).map(|url| (link, url)))
+        .map(|(link, url)| {
             let mut action = json!({
                 "type": "Action.OpenUrl",
-                "title": if is_default_link { DEFAULT_LINK_LABEL.to_string() } else { label.clone() },
+                "title": link.display_label(),
                 "url": url,
             });
-            // Mirrors the Slack "primary"-style fix: the default
-            // "View in OpenObserve" action is the card's primary CTA and
-            // gets Adaptive Card's "positive" style (renders filled/green in
-            // Teams) so it stands out from author-added links.
-            if is_default_link {
+            // The data button is the card's primary action; the object button keeps the default
+            // style.
+            if link.role == LinkRole::Primary {
                 action["style"] = json!("positive");
             }
             action
@@ -198,11 +198,11 @@ pub fn render_teams_message_card(c: &RenderedContent) -> Value {
     let actions: Vec<Value> = c
         .links
         .iter()
-        .filter_map(|(label, url)| dispatchable_url(url).map(|url| (label, url)))
-        .map(|(label, url)| {
+        .filter_map(|link| dispatchable_url(&link.url).map(|url| (link, url)))
+        .map(|(link, url)| {
             json!({
                 "@type": "OpenUri",
-                "name": if label.is_empty() { DEFAULT_LINK_LABEL.to_string() } else { escape_html(label) },
+                "name": if link.label.is_empty() { link.display_label().to_string() } else { escape_html(&link.label) },
                 "targets": [{"os": "default", "uri": url}],
             })
         })

@@ -18,10 +18,13 @@
 use serde_json::{Value, json};
 
 use super::{
-    DEFAULT_LINK_LABEL, clamp, dispatchable_url,
+    clamp, dispatchable_url,
     markdown::{escape_mrkdwn, guard_leading_blockquote, markdown_to_mrkdwn},
 };
-use crate::alerts::notifications::{NotificationContext, resolve::RenderedContent};
+use crate::alerts::notifications::{
+    NotificationContext,
+    resolve::{Link, LinkRole, RenderedContent},
+};
 
 /// Block Kit's hard cap on `fields` per section block.
 const MAX_SECTION_FIELDS: usize = 10;
@@ -31,6 +34,8 @@ const HEADER_MAX: usize = 150;
 const SECTION_TEXT_MAX: usize = 3000;
 /// Block Kit's hard cap on elements in an `actions` block.
 const MAX_ACTION_ELEMENTS: usize = 5;
+/// A context block holds 10 elements; one is kept for the "more links" count.
+const MAX_CONTEXT_LINKS: usize = 9;
 
 pub fn render_slack(c: &RenderedContent, ctx: &NotificationContext) -> Value {
     let mut blocks: Vec<Value> = Vec::new();
@@ -130,53 +135,45 @@ pub fn render_slack(c: &RenderedContent, ctx: &NotificationContext) -> Value {
     // dispatched is therefore DROPPED here rather than emitted: the alert is
     // worth more than the button. This filter runs BEFORE the 5-element cap
     // so a dropped link frees its slot for a deliverable one.
-    let deliverable: Vec<(&String, &str)> = c
+    let deliverable: Vec<(&Link, &str)> = c
         .links
         .iter()
-        .filter_map(|(label, url)| dispatchable_url(url).map(|url| (label, url)))
+        .filter_map(|link| dispatchable_url(&link.url).map(|url| (link, url)))
         .collect();
 
     if !deliverable.is_empty() {
-        // The appended "View in OpenObserve" link (empty label, always last —
-        // resolve.rs) is the notification's primary action: it must survive
-        // the 5-element cap, so author links only fill the remaining slots.
-        let default_count = deliverable.iter().filter(|(l, _)| l.is_empty()).count();
-        let author_cap = MAX_ACTION_ELEMENTS.saturating_sub(default_count.min(MAX_ACTION_ELEMENTS));
+        // Reserved links (Primary, Detail or a stand-in) take slots first; authored ones fill the
+        // rest in template order, and the ones that do not fit go to a context block.
+        let reserved = deliverable.iter().filter(|(l, _)| l.reserved).count();
+        let author_cap = MAX_ACTION_ELEMENTS.saturating_sub(reserved.min(MAX_ACTION_ELEMENTS));
         let mut authored_kept = 0usize;
-        let elements: Vec<Value> = deliverable
-            .iter()
-            .filter(|(label, _)| {
-                if label.is_empty() {
-                    true
-                } else {
-                    authored_kept += 1;
-                    authored_kept <= author_cap
+        let mut overflow: Vec<(&Link, &str)> = Vec::new();
+        let mut elements: Vec<Value> = Vec::new();
+        for (link, url) in &deliverable {
+            if !link.reserved {
+                authored_kept += 1;
+                if authored_kept > author_cap {
+                    overflow.push((link, url));
+                    continue;
                 }
-            })
-            .take(MAX_ACTION_ELEMENTS)
-            .map(|(label, url)| {
-                let is_default_link = label.is_empty();
-                let label = if is_default_link {
-                    DEFAULT_LINK_LABEL
-                } else {
-                    label.as_str()
-                };
-                let mut button = json!({
-                    "type": "button",
-                    "text": {"type": "plain_text", "text": clamp(label, 75)},
-                    "url": url,
-                });
-                // The default "View in OpenObserve" link is the notification's
-                // primary action — Slack's "primary" button style renders it
-                // green so it stands out from author-added links (e.g. a
-                // runbook), which keep the neutral default style.
-                if is_default_link {
-                    button["style"] = json!("primary");
-                }
-                button
-            })
-            .collect();
+            }
+            if elements.len() == MAX_ACTION_ELEMENTS {
+                continue;
+            }
+            let mut button = json!({
+                "type": "button",
+                "text": {"type": "plain_text", "text": clamp(link.display_label(), 75)},
+                "url": url,
+            });
+            if link.role == LinkRole::Primary {
+                button["style"] = json!("primary");
+            }
+            elements.push(button);
+        }
         tail_blocks.push(json!({"type": "actions", "elements": elements}));
+        if let Some(block) = overflow_context_block(&overflow) {
+            tail_blocks.push(block);
+        }
     }
 
     // Metric-history chart (stateless signed render URL — Slack's image
@@ -195,6 +192,45 @@ pub fn render_slack(c: &RenderedContent, ctx: &NotificationContext) -> Value {
 
     blocks.extend(tail_blocks);
     json!({ "blocks": blocks })
+}
+
+/// Authored links that found no button slot, one mrkdwn element each, never cut.
+/// A link too long for one text object is counted in the last element instead.
+pub(crate) fn overflow_context_block(links: &[(&Link, &str)]) -> Option<Value> {
+    if links.is_empty() {
+        return None;
+    }
+    let mut elements: Vec<Value> = Vec::new();
+    let mut hidden = 0usize;
+    for (link, url) in links {
+        let text = format!(
+            "<{}|{}>",
+            mrkdwn_link_url(url),
+            mrkdwn_link_label(link.display_label())
+        );
+        if elements.len() < MAX_CONTEXT_LINKS && text.chars().count() <= SECTION_TEXT_MAX {
+            elements.push(json!({"type": "mrkdwn", "text": text}));
+        } else {
+            hidden += 1;
+        }
+    }
+    if hidden > 0 {
+        let noun = if hidden == 1 { "link" } else { "links" };
+        elements.push(json!({"type": "mrkdwn", "text": format!("{hidden} more {noun} not shown")}));
+    }
+    Some(json!({"type": "context", "elements": elements}))
+}
+
+/// `|`, `<` and `>` end a mrkdwn link, so they are percent-encoded in its URL.
+fn mrkdwn_link_url(url: &str) -> String {
+    url.replace('|', "%7C")
+        .replace('<', "%3C")
+        .replace('>', "%3E")
+}
+
+/// The label is entity-escaped, and a `|` that would end it early becomes a look-alike.
+fn mrkdwn_link_label(label: &str) -> String {
+    escape_mrkdwn(label).replace('|', "\u{ff5c}")
 }
 
 // ---------------------------------------------------------------------------

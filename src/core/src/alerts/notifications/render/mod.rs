@@ -75,6 +75,9 @@ pub mod sns;
 pub mod teams;
 pub mod webhook;
 
+#[cfg(test)]
+mod link_tests;
+
 use config::meta::alerts::level::AlertLevel;
 
 use super::{context::NotificationContext, format::ChannelFormat, resolve::RenderedContent};
@@ -336,6 +339,16 @@ mod tests {
     use config::meta::alerts::level::AlertLevel;
 
     use super::*;
+    use crate::alerts::notifications::resolve::{Link, LinkRole};
+
+    fn primary(url: impl Into<String>) -> Link {
+        Link {
+            label: String::new(),
+            url: url.into(),
+            role: LinkRole::Primary,
+            reserved: true,
+        }
+    }
 
     /// Mirrors `resolve`'s fixture context (itself mirroring Task 5's).
     fn fixture_ctx() -> NotificationContext {
@@ -399,8 +412,8 @@ mod tests {
                 ("cpu".into(), "92.5".into()),
             ],
             links: vec![
-                ("Runbook".into(), "https://rb.example/x".into()),
-                ("".into(), "https://o2.example/short/abc".into()),
+                Link::authored("Runbook", "https://rb.example/x"),
+                primary("https://o2.example/short/abc"),
             ],
             rows: vec![vec![
                 ("host".into(), "web-1".into()),
@@ -567,17 +580,14 @@ mod tests {
         // source rather than being interpreted as HTML.
         assert!(embed["description"].as_str().unwrap().contains("<script>"));
         assert!(embed.get("color").is_none());
-        // The FIRST link becomes the embed's clickable title link (a Discord
-        // embed has one), whatever it is — here that's the author-added
-        // "Runbook" link, since it precedes the alert URL in `hostile_content`.
-        assert_eq!(embed["url"], "https://rb.example/x");
-        // The alert URL (second link, empty label) has no embed slot left,
-        // so it's folded into the description as a markdown link.
+        // The Primary link takes the embed's one title link; the authored Runbook goes to the
+        // description as a markdown link.
+        assert_eq!(embed["url"], "https://o2.example/short/abc");
         assert!(
             embed["description"]
                 .as_str()
                 .unwrap()
-                .contains("https://o2.example/short/abc")
+                .contains("[Runbook](https://rb.example/x)")
         );
         let fields = embed["fields"].as_array().unwrap();
         assert!(fields.iter().any(|f| f["name"] == "host"));
@@ -671,7 +681,7 @@ mod tests {
         let content = hostile_content();
         let ctx = fixture_ctx();
         // The fixture's second link is the appended alert URL, empty-labelled.
-        assert_eq!(content.links[1].0, "");
+        assert_eq!(content.links[1].label, "");
 
         // Machine contract: empty label survives verbatim...
         let envelope = webhook::render_webhook(&content, &ctx);
@@ -816,7 +826,7 @@ mod tests {
     #[test]
     fn email_drops_hostile_href_scheme() {
         let mut c = hostile_content();
-        c.links = vec![("evil".into(), "javascript:alert(1)".into())];
+        c.links = vec![Link::authored("evil", "javascript:alert(1)")];
         let (_, html, text) = email::render_email(&c, &fixture_ctx());
         assert!(!html.contains("javascript:"));
         assert!(html.contains(r##"href="#""##));
@@ -863,8 +873,8 @@ mod tests {
             // "dropped" assertions below could pass vacuously on a renderer
             // that emitted no actions at all for an unrelated reason.
             c.links = vec![
-                ("evil".into(), hostile.into()),
-                ("Runbook".into(), "https://rb.example/x".into()),
+                Link::authored("evil", hostile),
+                Link::authored("Runbook", "https://rb.example/x"),
             ];
             let survivor = "https://rb.example/x";
 
@@ -1054,9 +1064,9 @@ mod tests {
     fn hostile_link_is_dropped_not_emitted_as_blocked_url() {
         let mut c = hostile_content();
         c.links = vec![
-            ("click".into(), "javascript:alert(1)".into()),
-            ("Runbook".into(), "https://rb.example/x".into()),
-            ("".into(), "https://o2.example/short/abc".into()),
+            Link::authored("click", "javascript:alert(1)"),
+            Link::authored("Runbook", "https://rb.example/x"),
+            primary("https://o2.example/short/abc"),
         ];
 
         let slack = slack::render_slack(&c, &fixture_ctx());
@@ -1111,7 +1121,7 @@ mod tests {
         let mut ctx = fixture_ctx();
         ctx.alert_url = "/web/logs?stream=app&org_identifier=default".into();
         let mut c = hostile_content();
-        c.links = vec![("".into(), ctx.alert_url.clone())];
+        c.links = vec![primary(ctx.alert_url.clone())];
 
         let slack = slack::render_slack(&c, &ctx);
         // Only the content blocks remain: no buttons, no chart.
@@ -1143,7 +1153,7 @@ mod tests {
     #[test]
     fn email_still_substitutes_blocked_url_rather_than_dropping() {
         let mut c = hostile_content();
-        c.links = vec![("evil".into(), "javascript:alert(1)".into())];
+        c.links = vec![Link::authored("evil", "javascript:alert(1)")];
 
         let (_, html, text) = email::render_email(&c, &fixture_ctx());
         assert!(
@@ -1200,7 +1210,7 @@ mod tests {
     fn slack_truncates_beyond_vendor_caps() {
         let mut c = hostile_content();
         c.links = (0..8)
-            .map(|i| (format!("link{i}"), format!("https://example/{i}")))
+            .map(|i| Link::authored(format!("link{i}"), format!("https://example/{i}")))
             .collect();
         let v = slack::render_slack(&c, &fixture_ctx());
         let actions = slack_block(&v, "actions");
@@ -1235,10 +1245,9 @@ mod tests {
     fn slack_default_link_survives_action_cap_and_stays_primary() {
         let mut c = hostile_content();
         c.links = (0..6)
-            .map(|i| (format!("link{i}"), format!("https://example/{i}")))
+            .map(|i| Link::authored(format!("link{i}"), format!("https://example/{i}")))
             .collect();
-        c.links
-            .push((String::new(), "https://o2.example/short/abc".into()));
+        c.links.push(primary("https://o2.example/short/abc"));
         let v = slack::render_slack(&c, &fixture_ctx());
         let actions = slack_block(&v, "actions");
         let elements = actions["elements"].as_array().unwrap();

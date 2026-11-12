@@ -901,7 +901,8 @@ fn description(ctx: &NotificationContext) -> String {
         text_line("Current value", &ctx.alert_agg_value),
         line("Started", &started),
         text_line("Alert description", &ctx.alert_description),
-        line("View in OpenObserve", &ctx.alert_url),
+        line(primary_label(ctx), &ctx.alert_url),
+        detail_line(ctx),
     ];
     let head = cut(
         &head.into_iter().flatten().collect::<Vec<_>>().join("\n"),
@@ -951,12 +952,33 @@ fn anomaly_description(ctx: &NotificationContext) -> String {
         line("Window start", &millis(&ctx.alert_start_time_millis)),
         line("Window end", &millis(&ctx.alert_end_time_millis)),
         text_line("Details", &ctx.alert_description),
-        line("View in OpenObserve", &ctx.alert_url),
+        line(primary_label(ctx), &ctx.alert_url),
+        detail_line(ctx),
     ];
     cut(
         &lines.into_iter().flatten().collect::<Vec<_>>().join("\n"),
         DESCRIPTION_MAX_CHARS,
     )
+}
+
+/// The data link label: the kind's own, else the label Jira issues always carried.
+fn primary_label(ctx: &NotificationContext) -> &str {
+    if ctx.alert_url_label.is_empty() {
+        super::render::DEFAULT_LINK_LABEL
+    } else {
+        &ctx.alert_url_label
+    }
+}
+
+/// `Open alert: <url>` when the message has an object link apart from the data link.
+fn detail_line(ctx: &NotificationContext) -> Option<String> {
+    let url = super::resolve::detail_url(ctx)?;
+    let label = if ctx.alert_detail_label.is_empty() {
+        "Open alert"
+    } else {
+        &ctx.alert_detail_label
+    };
+    Some(format!("{label}: {url}"))
 }
 
 fn stream_text(ctx: &NotificationContext) -> String {
@@ -989,11 +1011,19 @@ fn row_text(row: &Map<String, Value>) -> String {
 }
 
 fn comment(ctx: &NotificationContext) -> String {
-    let link = |label: &str| {
+    let link = |fallback: &str| {
+        let detail = detail_line(ctx)
+            .map(|l| format!(" {l}"))
+            .unwrap_or_default();
         if ctx.alert_url.is_empty() {
-            String::new()
+            detail
         } else {
-            format!(" {label}: {}", ctx.alert_url)
+            let label = if ctx.alert_url_label.is_empty() {
+                fallback
+            } else {
+                &ctx.alert_url_label
+            };
+            format!(" {label}: {}{detail}", ctx.alert_url)
         }
     };
     if !ctx.incident_id.is_empty() {
@@ -1215,6 +1245,32 @@ mod tests {
              Alert description: 5xx responses from checkout.\n\
              View in OpenObserve: https://o2.example.com/s/abc"
         );
+    }
+
+    #[test]
+    fn the_issue_names_the_data_link_and_adds_the_object_link() {
+        let mut ctx = alert_ctx();
+        ctx.alert_url_label = "View logs".into();
+        ctx.alert_detail_url = "https://o2.example.com/web/alerts/detail/7Kx2".into();
+        ctx.alert_detail_label = "Open alert".into();
+        let text = description(&ctx);
+        assert!(
+            text.ends_with(
+                "View logs: https://o2.example.com/s/abc\n\
+                 Open alert: https://o2.example.com/web/alerts/detail/7Kx2"
+            ),
+            "{text}"
+        );
+        assert!(
+            comment(&ctx).ends_with(
+                " View logs: https://o2.example.com/s/abc \
+                 Open alert: https://o2.example.com/web/alerts/detail/7Kx2"
+            ),
+            "{}",
+            comment(&ctx)
+        );
+        ctx.alert_detail_url = ctx.alert_url.clone();
+        assert!(!description(&ctx).contains("Open alert"));
     }
 
     #[test]

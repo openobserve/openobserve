@@ -72,15 +72,8 @@ pub fn render_pagerduty(c: &RenderedContent, ctx: &NotificationContext) -> Value
     let links: Vec<Value> = c
         .links
         .iter()
-        .filter_map(|(label, url)| super::dispatchable_url(url).map(|url| (label, url)))
-        .map(|(label, url)| {
-            let text = if label.is_empty() {
-                super::DEFAULT_LINK_LABEL
-            } else {
-                label.as_str()
-            };
-            json!({"href": url, "text": text})
-        })
+        .filter_map(|link| super::dispatchable_url(&link.url).map(|url| (link, url)))
+        .map(|(link, url)| json!({"href": url, "text": link.display_label()}))
         .collect();
 
     // Only ever a trigger: `platform::send_resolve` writes the resolve without a template.

@@ -255,6 +255,9 @@ const builtInVars: { name: string; desc: I18nText }[] = [
     desc: t("alerts.alertSettings.builtInVars.alertEndTimeMillis"),
   },
   { name: "alert_url", desc: t("alerts.alertSettings.builtInVars.alertUrl") },
+  { name: "alert_url_label", desc: t("alerts.alertSettings.builtInVars.alertUrlLabel") },
+  { name: "alert_detail_url", desc: t("alerts.alertSettings.builtInVars.alertDetailUrl") },
+  { name: "alert_detail_label", desc: t("alerts.alertSettings.builtInVars.alertDetailLabel") },
   {
     name: "alert_trigger_time",
     desc: t("alerts.alertSettings.builtInVars.alertTriggerTime"),

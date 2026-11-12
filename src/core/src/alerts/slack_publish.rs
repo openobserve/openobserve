@@ -39,8 +39,11 @@ use sha2::{Digest, Sha256};
 use crate::alerts::notifications::{
     apply_custom_template,
     context::NotificationContext,
-    render::markdown::{escape_mrkdwn, markdown_to_mrkdwn},
-    resolve::{RenderedContent, resolve_content},
+    render::{
+        DEFAULT_LINK_LABEL,
+        markdown::{escape_mrkdwn, markdown_to_mrkdwn},
+    },
+    resolve::{LinkRole, RenderedContent, detail_url, resolve_content},
 };
 
 /// A larger chart is dropped and the message goes out without it (§7.4).
@@ -440,15 +443,19 @@ pub fn wire_from_content(c: &RenderedContent, ctx: &NotificationContext) -> Rend
     let links = c
         .links
         .iter()
-        .filter(|(label, url)| !(label.is_empty() && *url == ctx.alert_url))
-        .cloned()
+        .filter(|l| l.role == LinkRole::Authored)
+        .map(|l| (l.label.clone(), l.url.clone()))
         .collect();
+    let detail = c.links.iter().find(|l| l.role == LinkRole::Detail);
     RenderedWire {
         title: c.title.clone(),
         body,
         fields: c.fields.clone(),
         links,
         open_url: ctx.alert_url.clone(),
+        open_label: open_label(ctx),
+        detail_url: detail.map(|l| l.url.clone()).unwrap_or_default(),
+        detail_label: detail.map(|l| l.label.clone()).unwrap_or_default(),
     }
 }
 
@@ -457,10 +464,12 @@ pub fn wire_from_custom(msg: &str, ctx: &NotificationContext) -> RenderedWire {
     let mut wire = RenderedWire {
         title: ctx.alert_name.clone(),
         open_url: ctx.alert_url.clone(),
+        open_label: open_label(ctx),
         ..Default::default()
     };
     let Ok(Value::Object(doc)) = serde_json::from_str::<Value>(msg) else {
         wire.body = msg.trim().to_string();
+        set_custom_detail(&mut wire, ctx);
         return wire;
     };
     let mut body = Vec::new();
@@ -492,7 +501,28 @@ pub fn wire_from_custom(msg: &str, ctx: &NotificationContext) -> RenderedWire {
         read_attachment(attachment, ctx, &mut wire, &mut body);
     }
     wire.body = body.join("\n");
+    set_custom_detail(&mut wire, ctx);
     wire
+}
+
+/// The data button label; a kind with no label of its own reads the channel default.
+fn open_label(ctx: &NotificationContext) -> String {
+    if ctx.alert_url_label.is_empty() {
+        DEFAULT_LINK_LABEL.to_string()
+    } else {
+        ctx.alert_url_label.clone()
+    }
+}
+
+/// The object button, unless a button of the custom body already opens that page.
+fn set_custom_detail(wire: &mut RenderedWire, ctx: &NotificationContext) {
+    let Some(url) = detail_url(ctx) else {
+        return;
+    };
+    if wire.links.iter().all(|(_, u)| u.trim() != url) {
+        wire.detail_url = url.to_string();
+        wire.detail_label = ctx.alert_detail_label.clone();
+    }
 }
 
 /// Clamps the body, then fields, then links, so the stored content fits its column.
@@ -881,6 +911,7 @@ mod tests {
     use serde_json::json;
 
     use super::*;
+    use crate::alerts::notifications::resolve::Link;
 
     const PREBUILT_SLACK: &str = r#"{
   "text": "[{alert_status}] {alert_name}",
@@ -1229,15 +1260,17 @@ mod tests {
 
     #[test]
     fn a_content_template_body_becomes_mrkdwn_and_the_alert_link_becomes_open() {
-        let ctx = ctx();
+        let mut ctx = ctx();
+        ctx.alert_url_label = "View logs".into();
+        ctx.alert_detail_url = "https://o2.test/web/alerts/detail/a1?org_identifier=prod".into();
+        ctx.alert_detail_label = "Open alert".into();
+        let mut links = vec![Link::authored("Dashboard", "https://o2.test/d/1")];
+        crate::alerts::notifications::resolve::append_system_links(&mut links, &ctx);
         let content = RenderedContent {
             title: "Errors on checkout".into(),
             body_markdown: "**6.8%** of requests failed".into(),
             fields: vec![("env".into(), "prod".into())],
-            links: vec![
-                ("Dashboard".into(), "https://o2.test/d/1".into()),
-                (String::new(), ctx.alert_url.clone()),
-            ],
+            links,
             rows: vec![],
             row_lines: Some(vec!["host=web-1".into()]),
             severity: None,
@@ -1250,6 +1283,52 @@ mod tests {
             vec![("Dashboard".to_string(), "https://o2.test/d/1".to_string())]
         );
         assert_eq!(wire.open_url, ctx.alert_url);
+        assert_eq!(wire.open_label, "View logs");
+        assert_eq!(wire.detail_url, ctx.alert_detail_url);
+        assert_eq!(wire.detail_label, "Open alert");
+    }
+
+    #[test]
+    fn an_authored_link_to_the_detail_page_stands_in_for_the_object_button() {
+        let mut ctx = ctx();
+        ctx.alert_detail_url = "https://o2.test/web/alerts/detail/a1?org_identifier=prod".into();
+        ctx.alert_detail_label = "Open alert".into();
+        let mut links = vec![Link::authored("My alert", ctx.alert_detail_url.clone())];
+        crate::alerts::notifications::resolve::append_system_links(&mut links, &ctx);
+        let content = RenderedContent {
+            title: "t".into(),
+            body_markdown: String::new(),
+            fields: vec![],
+            links,
+            rows: vec![],
+            row_lines: None,
+            severity: None,
+            unknown_variables: vec![],
+        };
+        let wire = wire_from_content(&content, &ctx);
+        assert_eq!(
+            wire.links,
+            vec![("My alert".to_string(), ctx.alert_detail_url.clone())]
+        );
+        assert!(wire.detail_url.is_empty(), "{wire:?}");
+        assert_eq!(wire.open_label, DEFAULT_LINK_LABEL);
+    }
+
+    #[test]
+    fn a_custom_body_gets_the_object_button_unless_it_has_one() {
+        let mut ctx = ctx();
+        ctx.alert_url_label = "View logs".into();
+        ctx.alert_detail_url = "https://o2.test/web/alerts/detail/a1?org_identifier=prod".into();
+        ctx.alert_detail_label = "Open alert".into();
+        let plain = wire_from_custom("disk full", &ctx);
+        assert_eq!(plain.open_label, "View logs");
+        assert_eq!(plain.detail_url, ctx.alert_detail_url);
+        let body = format!(
+            r#"{{"blocks":[{{"type":"actions","elements":[{{"type":"button","text":{{"type":"plain_text","text":"Mine"}},"url":"{}"}}]}}]}}"#,
+            ctx.alert_detail_url
+        );
+        let own = wire_from_custom(&body, &ctx);
+        assert!(own.detail_url.is_empty(), "{own:?}");
     }
 
     #[test]
@@ -1264,6 +1343,7 @@ mod tests {
                 .map(|i| (format!("l{i}"), format!("https://o2.test/{i}")))
                 .collect(),
             open_url: "https://o2.test/a".into(),
+            ..Default::default()
         };
         let fitted = fit_wire(wire);
         assert!(serde_json::to_vec(&fitted).unwrap().len() <= MAX_CONTENT_BYTES);

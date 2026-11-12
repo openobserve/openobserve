@@ -167,6 +167,9 @@ pub(crate) fn apply_custom_template_plain(
         )
         .replace("{alert_end_time_millis}", &esc(&ctx.alert_end_time_millis))
         .replace("{alert_url}", &esc(&ctx.alert_url))
+        .replace("{alert_url_label}", &esc(&ctx.alert_url_label))
+        .replace("{alert_detail_url}", &esc(&ctx.alert_detail_url))
+        .replace("{alert_detail_label}", &esc(&ctx.alert_detail_label))
         .replace("{alert_trigger_time}", &evaluation_timestamp.to_string())
         .replace(
             "{alert_trigger_time_millis}",

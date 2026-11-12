@@ -318,6 +318,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <b>{{ raw("episode_id") }}</b>
                 {{ t("alert_templates.variableEpisodeIdDescription") }}
               </div>
+              <div data-test="add-template-variable-alert-url-label">
+                <b>{{ raw("alert_url_label") }}</b>
+                {{ t("alert_templates.variableAlertUrlLabelDescription") }}
+              </div>
+              <div data-test="add-template-variable-alert-detail-url">
+                <b>{{ raw("alert_detail_url") }}</b>
+                {{ t("alert_templates.variableAlertDetailUrlDescription") }}
+              </div>
+              <div data-test="add-template-variable-alert-detail-label">
+                <b>{{ raw("alert_detail_label") }}</b>
+                {{ t("alert_templates.variableAlertDetailLabelDescription") }}
+              </div>
               <div data-test="add-template-variable-rows">
                 <b>{{ raw("rows") }}</b> {{ t("alert_templates.variableRowsDescription") }}
               </div>

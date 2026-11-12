@@ -441,6 +441,11 @@ pub struct RenderedWire {
     pub fields: Vec<(String, String)>,
     pub links: Vec<(String, String)>,
     pub open_url: String,
+    /// The label of the `open_url` button; empty on a message stored before labels existed.
+    pub open_label: String,
+    /// The object page button, empty when the message has none.
+    pub detail_url: String,
+    pub detail_label: String,
 }
 
 /// One message on the `slack_outbound` stream; the consumer re-reads the truth, never this payload.

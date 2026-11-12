@@ -97,7 +97,7 @@ pub const DOWNTIME_VARIABLES: [&str; 9] = [
     "downtime_url",
 ];
 
-const COMMON_VARIABLES: [&str; 27] = [
+const COMMON_VARIABLES: [&str; 30] = [
     "org_name",
     "stream_type",
     "stream_name",
@@ -120,6 +120,9 @@ const COMMON_VARIABLES: [&str; 27] = [
     "alert_start_time",
     "alert_end_time",
     "alert_url",
+    "alert_url_label",
+    "alert_detail_url",
+    "alert_detail_label",
     "alert_trigger_time_str",
     "alert_time",
     "alert_description",
@@ -335,6 +338,7 @@ fn anomaly_example(resolved: bool) -> NotificationContext {
     let mut ctx = base(NotificationKind::Anomaly, resolved, level);
     ctx.alert_name = "error rate on web-logs".into();
     ctx.alert_url = link.into();
+    ctx.alert_url_label = "Open detector".into();
     ctx.event = event_of(resolved);
     ctx.episode_id = Some("a1b2c3".into());
     let (start, end) = if resolved {
@@ -406,6 +410,7 @@ fn synthetics_example(check: CheckSample) -> NotificationContext {
     ctx.alert_level = String::new();
     ctx.alert_name = "checkout API".into();
     ctx.alert_url = url.into();
+    ctx.alert_url_label = "Open check".into();
     ctx.episode_id = Some("chk_9d".into());
     // A live degraded or flaky send is a notice, which platforms skip.
     ctx.event = match check {
@@ -520,6 +525,7 @@ fn on_call_example(resolved: bool, priority: &str) -> NotificationContext {
     ctx.stream_name = String::new();
     ctx.alert_status = if resolved { "acknowledged" } else { "paged" }.into();
     ctx.alert_url = url.into();
+    ctx.alert_url_label = "Open page".into();
     ctx.episode_id = Some("resp_31".into());
     ctx.event = event_of(resolved);
     ctx.alert_trigger_time_str = "2026-11-02 10:05:00".into();
@@ -561,6 +567,7 @@ fn downtime_example(resolved: bool) -> NotificationContext {
     ctx.level = None;
     ctx.alert_name = "Nightly database upgrade".into();
     ctx.alert_url = url.into();
+    ctx.alert_url_label = "Open downtime".into();
     ctx.event = event_of(resolved);
     ctx.alert_start_time = "2026-11-02 22:00 UTC".into();
     ctx.alert_end_time = "2026-11-03 00:00 UTC".into();
@@ -598,7 +605,7 @@ fn downtime_example(resolved: bool) -> NotificationContext {
 }
 
 fn incident_example(resolved: bool, priority: &str) -> NotificationContext {
-    let url = "https://o2.acme.com/web/alerts/incidents/inc_7f3a?org_identifier=acme";
+    let url = "https://o2.acme.com/web/incidents/inc_7f3a?org_identifier=acme";
     let level = if resolved {
         AlertLevel::Ok
     } else {
@@ -612,6 +619,10 @@ fn incident_example(resolved: bool, priority: &str) -> NotificationContext {
     ctx.alert_threshold = "5".into();
     ctx.alert_agg_value = "12.4".into();
     ctx.alert_url = url.into();
+    ctx.alert_url_label = "Open incident".into();
+    ctx.alert_id = "7Kx2".into();
+    ctx.alert_detail_url = "https://o2.acme.com/web/alerts/detail/7Kx2?org_identifier=acme".into();
+    ctx.alert_detail_label = "Open alert".into();
     ctx.incident_id = "inc_7f3a".into();
     ctx.episode_id = Some("inc_7f3a".into());
     let event = if resolved {

@@ -28,15 +28,15 @@
 -->
 <template>
   <OPageLayout
-    :title="notFound ? t('alerts.groups.notFoundTitle') : raw(alert?.name || '')"
+    :title="unavailableTitle ?? raw(alert?.name || '')"
     icon="notifications"
-    :subtitle="notFound ? raw('') : subtitle"
+    :subtitle="unavailable ? raw('') : subtitle"
     :back="backTarget"
     title-data-test="alerts-alertdetail-title"
     bleed
   >
     <template #title-trail>
-      <div v-if="!notFound" class="flex items-center gap-2">
+      <div v-if="!unavailable" class="flex items-center gap-2">
         <OTag
           v-if="isMultiAlert"
           variant="purple-soft"
@@ -121,7 +121,7 @@
         :groups="firingGroups"
         @changed="onAckMuteChanged"
       />
-      <OTooltip v-if="!notFound && editAnomalyLocked" :content="anomalyLockedReason">
+      <OTooltip v-if="!unavailable && editAnomalyLocked" :content="anomalyLockedReason">
         <span class="inline-flex">
           <OButton variant="outline" size="sm-action" disabled data-test="alerts-alertdetail-edit">
             <template #icon-left>
@@ -137,7 +137,7 @@
         </span>
       </OTooltip>
       <OButton
-        v-else-if="!notFound"
+        v-else-if="!unavailable"
         variant="outline"
         size="sm-action"
         icon-left="edit"
@@ -148,8 +148,25 @@
       </OButton>
     </template>
 
-    <OContent v-if="notFound" class="py-6">
+    <OContent v-if="unavailable" class="py-6">
       <OEmptyState
+        v-if="loadFailure === 'forbidden'"
+        size="hero"
+        preset="no-access"
+        :title="t('alerts.groups.noAccessTitle')"
+        :description="t('alerts.groups.noAccessDescription')"
+        data-test="alerts-alertdetail-no-access"
+      />
+      <OEmptyState
+        v-else-if="loadFailure === 'failed'"
+        size="hero"
+        preset="load-error"
+        :title="t('alerts.groups.loadFailedTitle')"
+        data-test="alerts-alertdetail-load-error"
+        @action="fetchAlert"
+      />
+      <OEmptyState
+        v-else
         size="hero"
         :title="t('alerts.groups.notFoundTitle')"
         :description="t('alerts.groups.notFoundDescription')"
@@ -411,7 +428,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import { useQuery } from "@tanstack/vue-query";
-import { raw, useI18nTyped, type I18nKey } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 
@@ -497,10 +514,21 @@ const transitions = ref<AlertGroupTransition[]>([]);
 const loadingGroups = ref(false);
 const loadingTransitions = ref(false);
 const historyGroupFilter = ref<AlertGroup | null>(null);
-// The alert could not be loaded — deleted, mistyped id, or no access. Without
-// this the page rendered a phantom alert: the raw id as the title, live-looking
-// tabs and a working Edit button for something that does not exist.
-const notFound = ref(false);
+// Why the alert could not be loaded; without it the page showed a phantom alert with a live Edit.
+const loadFailure = ref<"not-found" | "forbidden" | "failed" | null>(null);
+const unavailable = computed(() => loadFailure.value !== null);
+const unavailableTitle = computed<I18nText | null>(() => {
+  switch (loadFailure.value) {
+    case "forbidden":
+      return t("alerts.groups.noAccessTitle");
+    case "failed":
+      return t("alerts.groups.loadFailedTitle");
+    case "not-found":
+      return t("alerts.groups.notFoundTitle");
+    default:
+      return null;
+  }
+});
 const activeTab = ref<string | number>("history");
 // Simple alerts only: which reading of "history" the tab shows. Evaluations
 // is the default — the transitions log is write-on-change, so it answers
@@ -741,7 +769,9 @@ const acksQuery = useQuery(() =>
   }),
 );
 
-const showHeaderActions = computed(() => !!alert.value && !notFound.value && !isAnomalyAlert.value);
+const showHeaderActions = computed(
+  () => !!alert.value && !unavailable.value && !isAnomalyAlert.value,
+);
 
 const isFiringNow = computed(() => {
   const row = listRow.value;
@@ -878,14 +908,15 @@ const fetchAlert = async () => {
   try {
     const res = await alertsService.get_by_alert_id(orgId.value, alertId.value);
     alert.value = res.data;
-    notFound.value = !res.data;
+    loadFailure.value = res.data ? null : "not-found";
     // Same tick as the assignment, not down in onMounted: setting alert.value
     // queues the render, so any await before this one lets the default History
     // tab mount and fire a fetch for a page that is about to switch away.
     if (isAnomalyAlert.value) activeTab.value = "charts";
-  } catch {
+  } catch (e: unknown) {
     alert.value = null;
-    notFound.value = true;
+    const status = (e as { response?: { status?: number } })?.response?.status;
+    loadFailure.value = status === 403 ? "forbidden" : status === 404 ? "not-found" : "failed";
   }
 };
 

@@ -176,13 +176,7 @@ async fn send(
     use crate::alerts::notifications::notify::notify;
 
     let counts = super::match_counts(row).await.ok();
-    let vars = variables(
-        row,
-        due.event,
-        &due.window,
-        counts.as_ref(),
-        &get_config().common.web_url,
-    );
+    let vars = variables(row, due.event, &due.window, counts.as_ref(), &web_root());
     let ctx = downtime_context(row, due, claimed_at, vars);
     let mut results = Vec::with_capacity(destinations.len());
     let mut templates = Vec::new();
@@ -223,13 +217,7 @@ pub async fn send_test(
 
     let due = DueEvent::of_window(NotificationEvent::Started, window);
     let counts = super::match_counts(row).await.ok();
-    let vars = variables(
-        row,
-        due.event,
-        &due.window,
-        counts.as_ref(),
-        &get_config().common.web_url,
-    );
+    let vars = variables(row, due.event, &due.window, counts.as_ref(), &web_root());
     let ctx = downtime_context(row, &due, now, vars);
     let mut results = Vec::new();
     for name in test_destinations(row, requested) {
@@ -362,6 +350,7 @@ fn downtime_context(
         alert_start_time_millis: (due.window.start / 1000).to_string(),
         alert_end_time_millis: (due.window.end / 1000).to_string(),
         alert_url: url,
+        alert_url_label: "Open downtime".to_string(),
         alert_trigger_time: claimed_at,
         alert_trigger_time_str: utc(claimed_at),
         alert_description: row.reason.clone().unwrap_or_default(),
@@ -461,6 +450,12 @@ fn variables(
         ),
         ("org_name", row.org.clone()),
     ]
+}
+
+/// The web URL with the base path, so a link works behind a path prefix.
+fn web_root() -> String {
+    let cfg = get_config();
+    format!("{}{}", cfg.common.web_url, cfg.common.base_uri)
 }
 
 /// The window's state as the title reads it: `{name} started`.
@@ -775,6 +770,24 @@ mod tests {
             "Downtime Nightly \"deploy\" <db>: ends soon. 1970-01-01 10:00 UTC to 1970-01-01 12:00 UTC, muting 2 alerts, 1 synthetics check. https://o2.example.com/web/downtimes/2f9KQe4b7Nq1vH3sT0mLzXpRcWd?org_identifier=acme"
         );
         assert_eq!(route(&resolved_for("slack"), &ctx).unwrap(), Route::Render);
+    }
+
+    #[test]
+    fn the_downtime_link_keeps_the_base_path_and_is_open_downtime() {
+        let vars = variables(
+            &row(None),
+            NotificationEvent::Started,
+            &window(),
+            None,
+            "https://o2.example.com/o2",
+        );
+        let ctx = downtime_context(&row(None), &due(NotificationEvent::Started), 7, vars);
+        assert_eq!(
+            ctx.alert_url,
+            "https://o2.example.com/o2/web/downtimes/2f9KQe4b7Nq1vH3sT0mLzXpRcWd?org_identifier=acme"
+        );
+        assert_eq!(ctx.alert_url_label, "Open downtime");
+        assert!(ctx.alert_detail_url.is_empty());
     }
 
     #[test]

@@ -58,10 +58,20 @@
 //!   authored from one this renderer defaulted. The empty string is the unambiguous signal.
 //!
 //! [`DEFAULT_LINK_LABEL`]: super::DEFAULT_LINK_LABEL
+//!
+//! # Contract: the object link is in `context`, not in `links[]`
+//!
+//! `context.alert_url_label`, `context.alert_detail_url` and `context.alert_detail_label` name the
+//! data button and the page of the object that sent the message. They are additive keys, `null`
+//! when empty, so the envelope version stays 1. `links[]` keeps authored links and the empty-label
+//! alert link only, because a labelled system link would break the rule above.
 
 use serde_json::{Map, Value, json};
 
-use crate::alerts::notifications::{context::NotificationContext, resolve::RenderedContent};
+use crate::alerts::notifications::{
+    context::NotificationContext,
+    resolve::{LinkRole, RenderedContent},
+};
 
 pub fn render_webhook(c: &RenderedContent, ctx: &NotificationContext) -> Value {
     let fields: Map<String, Value> = c
@@ -72,10 +82,15 @@ pub fn render_webhook(c: &RenderedContent, ctx: &NotificationContext) -> Value {
 
     // `label` is passed through VERBATIM — an empty one is a meaningful
     // signal, not a value to be defaulted. See this module's contract docs.
+    // The Detail link stays out: a labelled system link would break the empty-label contract.
     let links: Vec<Value> = c
         .links
         .iter()
-        .map(|(label, url)| json!({"label": label, "url": url}))
+        .filter_map(|link| match link.role {
+            LinkRole::Authored => Some(json!({"label": link.label, "url": link.url})),
+            LinkRole::Primary => Some(json!({"label": "", "url": link.url})),
+            LinkRole::Detail => None,
+        })
         .collect();
 
     json!({

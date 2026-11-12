@@ -31,7 +31,7 @@ use super::{
     context::NotificationContext,
     format::ChannelFormat,
     render::{RenderedMessage, markdown::markdown_to_html, render, severity_color},
-    resolve::{empty_variables, escaped_body_markdown, resolve_content},
+    resolve::{LinkRole, empty_variables, escaped_body_markdown, resolve_content},
 };
 
 #[derive(Debug, Clone, Deserialize, ToSchema)]
@@ -78,6 +78,10 @@ pub struct PreviewModel {
     pub color: String,
     pub severity: Option<String>,
     pub footer: String,
+    /// The data button label; empty when the server has none for this kind.
+    pub footer_label: String,
+    /// The object button; `null` when the message has no second system button.
+    pub detail: Option<PreviewLink>,
     pub chart_placeholder: bool,
 }
 
@@ -191,6 +195,10 @@ pub fn synthetic_context(level: Option<AlertLevel>) -> NotificationContext {
         alert_start_time_millis: "1785578400000".into(),
         alert_end_time_millis: "1785579000000".into(),
         alert_url: "https://example.openobserve.ai/alerts/sample".into(),
+        alert_url_label: "View logs".into(),
+        alert_detail_url:
+            "https://example.openobserve.ai/web/alerts/detail/sample?org_identifier=default".into(),
+        alert_detail_label: "Open alert".into(),
         alert_trigger_time: 1_785_579_000_000_000,
         alert_trigger_time_str: "2026-08-01T10:10:00".into(),
         alert_description: "cpu > 80 for 10m".into(),
@@ -259,12 +267,14 @@ pub fn preview(req: &PreviewRequest) -> Result<PreviewResponse, PreviewError> {
         }
     };
 
-    let footer = content
-        .links
-        .iter()
-        .find(|(label, _)| label.is_empty())
-        .map(|(_, url)| url.clone())
+    let system = |role: LinkRole| content.links.iter().find(|l| l.role == role);
+    let (footer, footer_label) = system(LinkRole::Primary)
+        .map(|l| (l.url.clone(), l.label.clone()))
         .unwrap_or_default();
+    let detail = system(LinkRole::Detail).map(|l| PreviewLink {
+        label: l.label.clone(),
+        url: l.url.clone(),
+    });
 
     let preview_model = PreviewModel {
         title: content.title.clone(),
@@ -280,15 +290,17 @@ pub fn preview(req: &PreviewRequest) -> Result<PreviewResponse, PreviewError> {
         links: content
             .links
             .iter()
-            .filter(|(label, _)| !label.is_empty())
-            .map(|(label, url)| PreviewLink {
-                label: label.clone(),
-                url: url.clone(),
+            .filter(|l| l.role == LinkRole::Authored)
+            .map(|l| PreviewLink {
+                label: l.label.clone(),
+                url: l.url.clone(),
             })
             .collect(),
         color: severity_color(level).to_string(),
         severity: req.severity.clone(),
         footer,
+        footer_label,
+        detail,
         chart_placeholder: req.definition.chart.enabled,
     };
 
@@ -360,6 +372,39 @@ mod tests {
             err.to_string().contains("click"),
             "error should name the offending link, got: {err}"
         );
+    }
+
+    #[test]
+    fn preview_names_the_data_button_and_returns_the_object_button() {
+        let req = |kind| PreviewRequest {
+            definition: sample_spec(),
+            channel: "slack".into(),
+            severity: Some("critical".into()),
+            sample: None,
+            kind,
+        };
+        let alert = preview(&req(NotificationKind::Alert))
+            .unwrap()
+            .preview_model;
+        assert_eq!(alert.footer_label, "View logs");
+        let detail = alert.detail.expect("an alert has an object button");
+        assert_eq!(detail.label, "Open alert");
+        assert!(detail.url.contains("/web/alerts/detail/"));
+        assert!(alert.links.iter().all(|l| l.url != detail.url));
+
+        let incident = preview(&req(NotificationKind::Incident))
+            .unwrap()
+            .preview_model;
+        assert_eq!(incident.footer_label, "Open incident");
+        assert_eq!(incident.detail.unwrap().label, "Open alert");
+
+        let downtime = preview(&req(NotificationKind::Downtime))
+            .unwrap()
+            .preview_model;
+        assert_eq!(downtime.footer_label, "Open downtime");
+        assert!(downtime.detail.is_none());
+        let json = serde_json::to_value(&downtime).unwrap();
+        assert!(json["detail"].is_null(), "{json}");
     }
 
     #[test]

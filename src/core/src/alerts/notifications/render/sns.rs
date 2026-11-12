@@ -47,7 +47,8 @@ pub fn render_sns(c: &RenderedContent) -> (String, String) {
         parts.push(
             c.links
                 .iter()
-                .map(|(label, url)| {
+                .map(|link| {
+                    let (label, url) = (&link.label, &link.url);
                     // Same scheme filter as email's plaintext part: an SNS
                     // subscription fans out to email/SMS clients that
                     // linkify bare URLs, so a hostile scheme must not

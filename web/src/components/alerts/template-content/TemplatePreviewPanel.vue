@@ -247,7 +247,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
           <div
-            v-if="previewModel.links.length > 0 || previewModel.footer"
+            v-if="previewModel.links.length > 0 || previewModel.footer || previewModel.detail"
             class="flex flex-wrap gap-2"
             data-test="template-preview-panel-links"
           >
@@ -255,30 +255,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-for="(link, index) in previewModel.links"
               :key="`${link.label}-${index}`"
               variant="outline"
-              size="sm-action"
+              size="sm"
               :data-test="`template-preview-panel-link-${index}`"
               @click="openLink(link.url)"
               >{{ link.label }}</OButton
             >
-            <!-- `footer` is the default alert-URL link with no authored
-                 label (§4.2: an empty label means "use the channel's
-                 default text"). Every real channel renders it as a styled
-                 button — often the primary one, e.g. Slack's green
-                 "View in OpenObserve" (see slack.rs render_slack) — so the
-                 preview must too, not as trailing plain-text URL, or the
-                 card looks like it's missing the button real messages show.
-                 `preview-action` (not a per-channel brand color) matches
-                 this card's normalized, channel-agnostic design — the
-                 fidelity note below already directs users to Payload for
-                 the exact per-channel styling. -->
+            <!-- The server names the data button per kind; an older server sends no label. -->
             <OButton
               v-if="previewModel.footer"
-              variant="preview-action"
+              variant="primary"
+              size="sm"
               data-test="template-preview-panel-default-link"
               @click="openLink(previewModel.footer)"
-              >{{ t("alert_templates.viewAlertLinkLabel") }}</OButton
+              >{{ footerLabel }}</OButton
+            >
+            <OButton
+              v-if="previewModel.detail"
+              variant="outline"
+              size="sm"
+              data-test="template-preview-panel-detail-link"
+              @click="openLink(previewModel.detail.url)"
+              >{{ previewModel.detail.label }}</OButton
             >
           </div>
+          <p
+            v-if="slackHiddenLinks.length > 0"
+            class="text-text-secondary text-xs"
+            data-test="template-preview-panel-slack-hidden-links"
+          >
+            {{
+              t(
+                "alert_templates.slackLinksNotShown",
+                { count: slackHiddenLinks.length, links: slackHiddenLinks.join(", ") },
+                slackHiddenLinks.length,
+              )
+            }}
+          </p>
           <!-- `chart_placeholder` is a BOOLEAN flag from the preview endpoint
                (preview.rs) — a real chart needs a real alert's evaluation
                history, so the preview shows a labeled placeholder box. -->
@@ -377,6 +389,10 @@ interface PreviewModel {
   color: string;
   severity: string | null;
   footer: string | null;
+  /** The data button label; absent from an older server, empty when the server has none. */
+  footer_label?: string;
+  /** The object button; null when the message has none. */
+  detail?: PreviewLink | null;
   // Boolean in the backend (preview.rs `chart_placeholder: bool`); the old
   // `string | null` here was a latent type mismatch.
   chart_placeholder: boolean;
@@ -553,6 +569,24 @@ const sanitizedBodyHtml = computed(() =>
 const rawPayloadJson = computed(() =>
   previewData.value ? JSON.stringify(previewData.value.payload, null, 2) : "",
 );
+
+const footerLabel = computed<I18nText>(() =>
+  previewModel.value?.footer_label
+    ? raw(previewModel.value.footer_label)
+    : t("alert_templates.viewAlertLinkLabel"),
+);
+
+// Authored links the real Slack message shows in its context block, read from the rendered payload.
+const slackHiddenLinks = computed<string[]>(() => {
+  if (channel.value !== "slack" || !previewModel.value || !previewData.value) return [];
+  const blocks = (previewData.value.payload as { blocks?: unknown[] } | null)?.blocks ?? [];
+  const shown = new Set<string>();
+  for (const block of blocks as { type?: string; elements?: { url?: string }[] }[]) {
+    if (block.type !== "actions") continue;
+    for (const el of block.elements ?? []) if (el.url) shown.add(el.url);
+  }
+  return previewModel.value.links.filter((link) => !shown.has(link.url)).map((link) => link.label);
+});
 
 const openLink = (url: string) => {
   window.open(url, "_blank", "noopener,noreferrer");
