@@ -184,7 +184,7 @@ export function useAlertEditHeader(input: AlertEditHeaderInput): AlertEditHeader
   const unmute = async (): Promise<boolean> => {
     const current = muted.value;
     if (!current) return false;
-    const ok = await actions.endMute(target(), current.id);
+    const ok = (await actions.endMute(target(), current)) === "ok";
     if (ok) {
       holdLocal();
       localMute.value = null;
