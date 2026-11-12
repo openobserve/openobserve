@@ -1965,6 +1965,7 @@
     "slos": "SLO",
     "reliability": "Độ tin cậy",
     "onCall": "Trực",
+    "response": "Phản hồi",
     "toggleNavigation": "Bật/tắt điều hướng",
     "ingestionText": "Tiếp nhận dữ liệu",
     "navigationLink": "Liên kết điều hướng",
