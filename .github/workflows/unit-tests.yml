@@ -578,8 +578,7 @@ jobs:
         if: env.LABEL_NOISE != 'true'
         working-directory: web
         env:
-          # vue-tsc now peaks near 9GB of heap on this project; a lower ceiling
-          # OOMs (exit 134) instead of reporting errors.
+          # vue-tsc needs ~8 GB of heap here (main alone peaks at 7.9 GB); a lower cap OOMs with exit 134.
           NODE_OPTIONS: "--max-old-space-size=12288"
         run: npm run type-check:app
 

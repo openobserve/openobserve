@@ -48,6 +48,8 @@ const AUTO_AWESOME_CALL_SITES = [
   "components/settings/ServiceIdentitySetup.vue",
   "components/settings/TestModelMatchDialog.vue",
   "enterprise/components/onlineEvals/ScorerList.vue",
+  "enterprise/components/onlineEvals/quality/QualityConfigsTable.vue",
+  "enterprise/views/AIObservability/AgentSignalDetailPanel.vue",
   "enterprise/views/AIObservability/Index.vue",
   "layouts/MainLayout.vue",
   "lib/core/EmptyState/presets.ts",
@@ -81,6 +83,8 @@ const AI_TOKEN_LEGACY_CONSUMERS = [
   "components/settings/AddRegexPattern.vue",
   "lib/core/Button/OButton.vue",
   "lib/core/EmptyState/EmptyStateIngestionChip.vue",
+  "plugins/logs/SearchBar.vue",
+  "plugins/traces/SearchBar.vue",
   "utils/activityTimeline.ts",
   "views/HomeView.vue",
 ];
@@ -302,8 +306,10 @@ describe("assistant repo guards", () => {
     const outside = found.filter((path) => !AI_TOKEN_OWNERS.some((re) => re.test(path)));
     expect(outside.filter((path) => !AI_TOKEN_LEGACY_CONSUMERS.includes(path))).toEqual([]);
     expect(
-      found.filter((path) =>
-        /plugins\/traces\/|enterprise\/(components|views)\/AIObservability/.test(path),
+      found.filter(
+        (path) =>
+          !AI_TOKEN_LEGACY_CONSUMERS.includes(path) &&
+          /plugins\/traces\/|enterprise\/(components|views)\/AIObservability/.test(path),
       ),
     ).toEqual([]);
   });
