@@ -1968,7 +1968,7 @@ describe("AddAlert (OForm owner)", () => {
         wrapper = mountAlert();
         await flushPromises();
         const anomaly = wrapper.vm.alertTypeOptions.find((o: any) => o.value === "anomaly");
-        expect(anomaly?.locked).toBe(true);
+        expect(anomaly?.disabled).toBe(true);
         const item = wrapper.find('[data-test="add-alert-type-tab-anomaly"]');
         expect(item.attributes("disabled")).toBeDefined();
         wrapper.vm.onAlertTypeChange("anomaly");
