@@ -13,6 +13,7 @@ import {
   defaultDowntimeValues,
   downtimeToFormValues,
   exclusiveAllFolders,
+  movePastWindow,
   nextFullHourMs,
   scheduleForRepeat,
   unnarrowedModules,
@@ -257,6 +258,37 @@ describe("buildDowntimeRequest", () => {
     const body = buildDowntimeRequest(defaultDowntimeValues(NOW, "UTC"));
     expect(body).not.toHaveProperty("name");
     expect(body).not.toHaveProperty("reason");
+  });
+});
+
+describe("duplicate of a past window", () => {
+  const once = (start: string, end: string): Downtime => ({
+    ...flow1,
+    schedule: {
+      repeat: "none",
+      starts_at: Date.parse(start) * 1000,
+      ends_at: Date.parse(end) * 1000,
+      timezone: "UTC",
+      duration_secs: (Date.parse(end) - Date.parse(start)) / 1000,
+      weekdays: [],
+    },
+  });
+
+  it("moves an ended one-time window to the next full hour with the same duration", () => {
+    const values = movePastWindow(
+      downtimeToFormValues(once("2026-09-10T20:00:00Z", "2026-09-10T22:30:00Z"), "duplicate"),
+      NOW,
+    );
+    const s = buildDowntimeRequest(values).schedule;
+    expect(s.starts_at).toBe(Date.parse("2026-09-17T13:00:00Z") * 1000);
+    expect(s.ends_at).toBe(Date.parse("2026-09-17T15:30:00Z") * 1000);
+  });
+
+  it("keeps a window that is still ahead and leaves a recurring row alone", () => {
+    const ahead = downtimeToFormValues(once("2026-09-18T20:00:00Z", "2026-09-18T22:00:00Z"));
+    expect(movePastWindow(ahead, NOW)).toBe(ahead);
+    const weekly = downtimeToFormValues(flow1);
+    expect(movePastWindow(weekly, NOW)).toBe(weekly);
   });
 });
 
