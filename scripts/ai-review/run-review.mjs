@@ -33,6 +33,7 @@ import {
   NOTICE_TAG,
   REVIEW_HEADING,
   REVIEW_TITLE,
+  automaticPassCount,
   bodyAtFailedRun,
   bodyAtPassLimit,
   bodyAtReviewedHead,
@@ -41,6 +42,7 @@ import {
   claimedReviewBody,
   finishReviewBody,
   isPlaceholderComment,
+  manualReviews,
   parseMaxPasses,
   previousReviewText,
   redactProviderIdentity,
@@ -51,6 +53,7 @@ import {
   sanitizeReviewBody,
   selectOwnReviewComment,
   shouldSkipAsUnchangedDiff,
+  withManualTag,
   withPassTag,
 } from "./src/comments.mjs";
 import {
@@ -139,11 +142,13 @@ const REVIEW_MARKER = process.env.REVIEW_MARKER || "<!-- ai-code-review -->";
 const REVIEW_BOT_LOGIN = process.env.REVIEW_BOT_LOGIN || "";
 // Inline review comments are opt-in; the summary comment is posted either way.
 const REVIEW_INLINE = (process.env.REVIEW_INLINE || "false").toLowerCase() === "true";
-// Optional ceiling on paid reviews per PR, 0 for none; the count lives in the review comment, so deleting that comment resets it.
+// Optional ceiling on automatic reviews per PR, 0 for none; the count lives in the review comment, so deleting that comment resets it.
 const REVIEW_MAX_PASSES = parseMaxPasses(process.env.REVIEW_MAX_PASSES);
 const REVIEW_IGNORE_PASS_LIMIT = process.env.REVIEW_IGNORE_PASS_LIMIT === "true";
 // A run someone started by hand always reviews, even a diff the last review already read.
 const REVIEW_MANUAL_RUN = process.env.REVIEW_MANUAL_RUN === "true";
+// Only a dispatch sets any of these, and a paired repo receives the last two only from a hand-started run, so a push-driven review never counts as manual.
+const REVIEW_IS_MANUAL = REVIEW_MANUAL_RUN || REVIEW_IGNORE_PASS_LIMIT || process.env.FORCE_FULL === "true";
 // Anything but an exact known mode is "off": the gate must be opted into.
 const AUTO_APPROVE_MODE = parseAutoApproveMode(process.env.REVIEW_AUTO_APPROVE);
 // Only the workflow's "no open PR on this branch" path sets this; any failed or skipped pairing lookup leaves it unset.
@@ -1165,12 +1170,12 @@ function passesDoneIn(comment) {
 }
 
 // Recorded before any reviewer starts, so a run stopped midway (label removed, draft, crash) still uses up its pass; returns the comment id.
-function claimReviewPass(prNumber, existingComment, count, key) {
+function claimReviewPass(prNumber, existingComment, count, key, manual) {
   if (existingComment) {
-    return updateReviewComment(prNumber, existingComment.id, claimedReviewBody(existingComment.body, count, key)).id;
+    return updateReviewComment(prNumber, existingComment.id, claimedReviewBody(existingComment.body, count, key, manual)).id;
   }
   const placeholder = `${REVIEW_MARKER}\n${NOTICE_TAG}\n${REVIEW_HEADING}\n\n> [!NOTE]\n> Review in progress.`;
-  return postReviewComment(prNumber, withPassTag(placeholder, count));
+  return postReviewComment(prNumber, withManualTag(withPassTag(placeholder, count), manual));
 }
 
 // Advisory like the review: the skip stands whether or not the note lands.
@@ -1328,12 +1333,11 @@ function variantProblem() {
 
 // Fetched ahead of the cap check, and only when the comment holds a fingerprint, so a push that changed nothing is skipped even past the cap.
 function unchangedDiffCheck(prNumber, comment) {
-  const force = REVIEW_MANUAL_RUN || REVIEW_IGNORE_PASS_LIMIT || process.env.FORCE_FULL === "true";
-  if (force || !reviewedDiffFingerprint(comment?.body)) return null;
+  if (REVIEW_IS_MANUAL || !reviewedDiffFingerprint(comment?.body)) return null;
   try {
     const fetched = fetchPrDiff(prNumber);
     const fingerprint = diffFingerprint(fetched.diff);
-    const unchanged = shouldSkipAsUnchangedDiff(comment.body, fingerprint, { pinned: fetched.pinned, force }) && hunksLocatable(fetched.diff, readBaseFile);
+    const unchanged = shouldSkipAsUnchangedDiff(comment.body, fingerprint, { pinned: fetched.pinned }) && hunksLocatable(fetched.diff, readBaseFile);
     return { fetched, unchanged };
   } catch (err) {
     console.warn(`[${isoNow()}] Could not fetch the diff to compare with the last review, so it is reviewed: ${execErrorText(err).slice(0, 300)}`);
@@ -1384,21 +1388,28 @@ async function main() {
     const lookup = findExistingReviewComment(prNumber);
     const existingComment = lookup.comment;
     const passesDone = passesDoneIn(existingComment);
+    const manualDone = manualReviews(existingComment?.body);
     TRACE.endSpan(existingSpan, {
       "github.pr.existing_review_found": Boolean(existingComment),
       "github.pr.existing_review_comment_id": existingComment?.id,
     });
-    TRACE.setSpanAttributes(rootSpan, { "review.passes_done": passesDone, "review.max_passes": REVIEW_MAX_PASSES });
+    TRACE.setSpanAttributes(rootSpan, {
+      "review.passes_done": passesDone,
+      "review.manual_passes": manualDone.count,
+      "review.manual_run": REVIEW_IS_MANUAL,
+      "review.max_passes": REVIEW_MAX_PASSES,
+    });
     if (!REVIEW_IGNORE_PASS_LIMIT && !lookup.ok) {
       outcome = "misconfigured";
       TRACE.setSpanAttributes(rootSpan, { "review.skipped": true, "review.skip_reason": "pass_count_unknown" });
       throw new Error("Cannot read this PR's review comments (no reviewer app token, or the comment list failed), so the reviewed commit and the review limit cannot be checked; not reviewing.");
     }
     const headKey = reviewKey(process.env.HEAD_SHA, PAIRED.head);
+    const manualAfterRun = REVIEW_IS_MANUAL ? { count: manualDone.count + 1, key: headKey } : manualDone;
     const skipReason = reviewSkipReason({
       body: existingComment?.body,
       key: headKey,
-      passesDone,
+      passesDone: automaticPassCount(passesDone, manualDone.count),
       maxPasses: REVIEW_MAX_PASSES,
       ignorePassLimit: REVIEW_IGNORE_PASS_LIMIT,
       forceFull: process.env.FORCE_FULL === "true",
@@ -1423,7 +1434,7 @@ async function main() {
       return;
     }
     if (skipReason) {
-      console.log(`[${isoNow()}] PR #${prNumber} skipped (${skipReason}): ${headKey || "no head"}, ${passesDone} review(s) so far. Dispatch the workflow with ignore_pass_limit to review again.`);
+      console.log(`[${isoNow()}] PR #${prNumber} skipped (${skipReason}): ${headKey || "no head"}, ${passesDone} review(s) so far, ${manualDone.count} by hand. Dispatch the workflow with ignore_pass_limit to review again.`);
       if (skipReason === "pass_limit_reached") noteSkippedPush(prNumber, existingComment, headKey);
       else noteReviewedHead(prNumber, existingComment);
       outcome = "skipped";
@@ -1447,8 +1458,9 @@ async function main() {
         // The key's env var name is named in the log but not in the comment: it carries the
         // provider name, and the posted comment must not.
         const notice = `${REVIEW_MARKER}\n${NOTICE_TAG}\n${REVIEW_HEADING}\n\n> [!CAUTION]\n> ### ⛔ Not reviewed\n> The review API key is not set. OpenObserve Code Review did not run for this PR — this is a CI misconfiguration, not a skip. Please confirm the review secrets are provisioned.`;
-        if (existingComment) updateReviewComment(prNumber, existingComment.id, withPassTag(notice, passesDone));
-        else postReviewComment(prNumber, withPassTag(notice, passesDone));
+        const tagged = withManualTag(withPassTag(notice, passesDone), manualDone);
+        if (existingComment) updateReviewComment(prNumber, existingComment.id, tagged);
+        else postReviewComment(prNumber, tagged);
       } catch (postErr) {
         console.error(`[${isoNow()}] Also failed to post the misconfiguration notice: ${postErr.message}`);
       }
@@ -1580,7 +1592,7 @@ async function main() {
     let existingCommentId = existingComment?.id ?? null;
     if (lookup.ok) {
       try {
-        existingCommentId = claimReviewPass(prNumber, existingComment, passesDone + 1, headKey);
+        existingCommentId = claimReviewPass(prNumber, existingComment, passesDone + 1, headKey, manualAfterRun);
       } catch (err) {
         throw new Error(`Could not record the review pass, so the review count cannot be kept; not reviewing: ${execErrorText(err).slice(0, 300)}`);
       }
@@ -1750,12 +1762,13 @@ async function main() {
     // A run where no reviewer finished reviewed nothing, so it does not use up a pass.
     const reviewed = completedAgents.length > 0;
     const passes = reviewed ? passesDone + 1 : passesDone;
+    const manual = reviewed ? manualAfterRun : manualDone;
     const complete = reviewComplete(passResults, coordinatorResult);
     // A reviewer reads at most MAX_DIFF_TOKENS chars of diff, so a longer one was never fully reviewed.
     const fullyRead = diff.length <= MAX_DIFF_TOKENS;
     if (reviewed && !complete) console.warn(`[${isoNow()}] The review was partial, so the next push re-reviews even an unchanged diff`);
     if (reviewed && !diffPinned) console.warn(`[${isoNow()}] The reviewed diff is not tied to ${headKey}, so the commit stays reviewable`);
-    finalReview = finishReviewBody(sanitizedReview, { key: headKey, passes, maxPasses: REVIEW_MAX_PASSES, reviewed: reviewed && diffPinned, confidence, gateLine: autoApproveLine(autoApprove), diffFingerprint: complete && fullyRead && diffPinned && hunksLocatable(diff, readBaseFile) ? fingerprint : "" });
+    finalReview = finishReviewBody(sanitizedReview, { key: headKey, passes, manual, maxPasses: REVIEW_MAX_PASSES, reviewed: reviewed && diffPinned, confidence, gateLine: autoApproveLine(autoApprove), diffFingerprint: complete && fullyRead && diffPinned && hunksLocatable(diff, readBaseFile) ? fingerprint : "" });
     TRACE.setSpanAttributes(rootSpan, { "review.final_length": finalReview.length });
     console.log(`[${isoNow()}] Final review length: ${finalReview.length} chars`);
 

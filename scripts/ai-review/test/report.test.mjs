@@ -796,8 +796,8 @@ const silentReviewer = key => ({ ...finishedReviewer(key), parsed: false, rawTex
 const smallRawDiff = "diff --git a/docs/a.md b/docs/a.md\n--- a/docs/a.md\n+++ b/docs/a.md\n@@ -1 +1 @@\n-old\n+new\n";
 
 // Every default makes the run an approvable one, so a test changes the single fact it is about.
-async function runMain({ results = [finishedReviewer("security"), finishedReviewer("correctness")], byPass = null, pinned = {}, mode = "approve", existing = null, reviewedBody = "plain words", prNow = {}, paired = {}, contextFails = false, noiseOnly = false, diffFails = false, manual = false, head = MAIN_HEAD, coordinatorOutput = cleanCoordinatorOutput, rawDiff = smallRawDiff, keptDiff = null, variantError = "", ignorePassLimit = false, forceFull = false, baseFile = "old\n" } = {}) {
-  const run = { posted: "", approvals: [], logs: [], coordinatorCalls: 0, coordinatorArgs: null, reviewerCalls: [], artifact: null, updates: 0, creates: 0, claims: 0, sanitized: 0 };
+async function runMain({ results = [finishedReviewer("security"), finishedReviewer("correctness")], byPass = null, pinned = {}, mode = "approve", existing = null, reviewedBody = "plain words", prNow = {}, paired = {}, contextFails = false, noiseOnly = false, diffFails = false, manual = false, head = MAIN_HEAD, coordinatorOutput = cleanCoordinatorOutput, rawDiff = smallRawDiff, keptDiff = null, variantError = "", ignorePassLimit = false, forceFull = false, baseFile = "old\n", maxPasses = 0 } = {}) {
+  const run = { posted: "", approvals: [], logs: [], coordinatorCalls: 0, coordinatorArgs: null, reviewerCalls: [], artifact: null, updates: 0, creates: 0, claims: 0, sanitized: 0, attributes: {} };
   const pr = { ...eligibleInput().pr, title: "fix a bug", body: "plain words", head: { sha: head }, changed_files: 1, additions: 1, deletions: 1, ...prNow };
   const noop = () => {};
   const scope = {
@@ -805,10 +805,10 @@ async function runMain({ results = [finishedReviewer("security"), finishedReview
     REVIEW_COLD_PASSES: 2, REVIEWER_CONCURRENCY: 16,
     process: { env: { PR_NUMBER: "1", GITHUB_REPOSITORY: "test/repo", HEAD_SHA: head, MERGE_BASE_SHA: "c".repeat(40), ...(forceFull ? { FORCE_FULL: "true" } : {}) } },
     console: { log: (...args) => run.logs.push(args.join(" ")), warn: noop, error: noop },
-    TRACE: { startSpan: () => ({}), endSpan: noop, setSpanAttributes: noop }, activeRootSpan: null, isoNow: () => "now", prepareReviewTree: noop,
+    TRACE: { startSpan: () => ({}), endSpan: noop, setSpanAttributes: (span, attrs) => Object.assign(run.attributes, attrs) }, activeRootSpan: null, isoNow: () => "now", prepareReviewTree: noop,
     findExistingReviewComment: () => ({ comment: existing, ok: true }),
     passesDoneIn: comment => (comment ? commentsModule.reviewPassCount(comment.body) : 0),
-    REVIEW_IGNORE_PASS_LIMIT: ignorePassLimit, REVIEW_MANUAL_RUN: manual, MAX_DIFF_TOKENS: 150_000, diffFingerprint, hunksLocatable, readBaseFile: () => baseFile, variantProblem: () => variantError, MODEL_VARIANT: "high", COORDINATOR_VARIANT: "high", REVIEW_MAX_PASSES: 0, REVIEW_BOT_LOGIN: "review[bot]", REVIEW_PAIR_CLEAR: true, AUTO_APPROVE_MODE: mode,
+    REVIEW_IGNORE_PASS_LIMIT: ignorePassLimit, REVIEW_MANUAL_RUN: manual, REVIEW_IS_MANUAL: manual || ignorePassLimit || forceFull, MAX_DIFF_TOKENS: 150_000, diffFingerprint, hunksLocatable, readBaseFile: () => baseFile, variantProblem: () => variantError, MODEL_VARIANT: "high", COORDINATOR_VARIANT: "high", REVIEW_MAX_PASSES: maxPasses, REVIEW_BOT_LOGIN: "review[bot]", REVIEW_PAIR_CLEAR: true, AUTO_APPROVE_MODE: mode,
     REVIEW_MARKER: "<!-- ai-code-review -->", PAIRED: { repo: "", prNumber: "", dir: "", mergeBase: "", head: "", ...paired }, PR_DIR: "/pr", resolve: (...parts) => parts.join("/"),
     githubReviewApi: () => ({ readPr: () => pr, listReviews: () => [], dismissReview: noop, approve: payload => run.approvals.push(payload) }),
     noteSkippedPush: noop, apiKey: () => "configured", API_KEY_VAR_NAME: "TEST_KEY", MODEL_SLUG: "test/model",
@@ -975,6 +975,55 @@ test("a hand-started, force-full or pass-limit-ignoring run reviews the head the
   const automatic = await runMain({ mode: "off", existing });
   assert.ok(automatic.logs.some(line => line.includes("already_reviewed")));
   assert.deepEqual(automatic.reviewerCalls, []);
+});
+
+test("a hand-started run counts as manual, and the cap counts only the reviews pushes started", async () => {
+  const short = PAIRED_MAIN_HEAD.slice(0, 7);
+  const third = await runMain({ mode: "off", maxPasses: 3, existing: { id: 1, body: commentsModule.withPassTag((await runMain({ mode: "off" })).posted, 2) }, head: "c".repeat(40), rawDiff: `${smallRawDiff}+more\n` });
+  assert.match(third.posted, /> This PR has used its 3 automatic reviews; later pushes are not reviewed\./);
+  for (const bypass of [{ ignorePassLimit: true }, { forceFull: true }, { manual: true }]) {
+    const run = await runMain({ mode: "off", maxPasses: 3, existing: { id: 1, body: third.posted }, head: PAIRED_MAIN_HEAD, ...bypass });
+    const expectReview = Boolean(bypass.ignorePassLimit);
+    assert.equal(run.reviewerCalls.length > 0, expectReview, JSON.stringify(bypass));
+    assert.equal(run.attributes["review.manual_run"], true);
+    assert.equal(run.attributes["review.manual_passes"], 0);
+    if (!expectReview) {
+      assert.ok(run.logs.some(line => line.includes("pass_limit_reached") && line.includes("3 review(s) so far, 0 by hand")), JSON.stringify(bypass));
+      continue;
+    }
+    assert.equal(commentsModule.reviewPassCount(run.posted), 4);
+    assert.deepEqual(commentsModule.manualReviews(run.posted), { count: 1, key: PAIRED_MAIN_HEAD });
+    assert.match(run.posted, new RegExp(`Reviewed commit \`${short}\` · review 4 · 3 of 3 automatic · 1 manual`));
+    assert.ok(run.posted.includes(`to review it again. Manual reviews so far: 1 (latest on \`${short}\`).`));
+    const push = await runMain({ mode: "off", maxPasses: 3, existing: { id: 1, body: run.posted }, head: "d".repeat(40), rawDiff: `${smallRawDiff}+other\n` });
+    assert.deepEqual(push.reviewerCalls, []);
+    assert.ok(push.logs.some(line => line.includes("pass_limit_reached") && line.includes("4 review(s) so far, 1 by hand")));
+    assert.equal(push.attributes["review.manual_run"], false);
+    assert.equal(push.attributes["review.manual_passes"], 1);
+    assert.equal(push.attributes["review.passes_done"], 4);
+  }
+});
+
+test("a manual review under the cap leaves the automatic reviews to later pushes and keeps its count through them", async () => {
+  const first = await runMain({ mode: "off", maxPasses: 2 });
+  const manual = await runMain({ mode: "off", maxPasses: 2, manual: true, existing: { id: 1, body: first.posted }, head: PAIRED_MAIN_HEAD });
+  assert.deepEqual(commentsModule.manualReviews(manual.posted), { count: 1, key: PAIRED_MAIN_HEAD });
+  assert.equal(manual.posted.includes("automatic reviews"), false);
+  const push = await runMain({ mode: "off", maxPasses: 2, existing: { id: 1, body: manual.posted }, head: "c".repeat(40), rawDiff: `${smallRawDiff}+more\n` });
+  assert.ok(push.reviewerCalls.length > 0);
+  assert.equal(commentsModule.reviewPassCount(push.posted), 3);
+  assert.deepEqual(commentsModule.manualReviews(push.posted), { count: 1, key: PAIRED_MAIN_HEAD });
+  assert.match(push.posted, /· review 3 · 2 of 2 automatic · 1 manual<\/sub>/);
+  assert.ok(push.posted.includes(`Manual reviews so far: 1 (latest on \`${PAIRED_MAIN_HEAD.slice(0, 7)}\`).`));
+});
+
+test("a manual run in which no reviewer finished gives its manual pass back", async () => {
+  const first = await runMain({ mode: "off" });
+  const run = await runMain({ mode: "off", manual: true, existing: { id: 1, body: first.posted }, results: [silentReviewer("security"), silentReviewer("correctness")] });
+  assert.equal(commentsModule.reviewPassCount(run.posted), 1);
+  assert.deepEqual(commentsModule.manualReviews(run.posted), { count: 0, key: "" });
+  const counted = await runMain({ mode: "off", manual: true, existing: { id: 1, body: first.posted } });
+  assert.match(counted.posted, /· review 2 · 1 manual<\/sub>/);
 });
 
 test("reviewers cut short at their soft deadline are not finished, so the verdict is not High and the gate does not approve", async () => {
