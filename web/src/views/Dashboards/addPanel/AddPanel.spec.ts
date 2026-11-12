@@ -154,7 +154,11 @@ vi.mock("@/composables/dashboard/useDashboardSaveConflict", () => ({
 
 // Mock vue-router hooks
 vi.mock("vue-router", async () => {
-  const actual = await vi.importActual("vue-router");
+  const actual = await vi.importActual<typeof import("vue-router")>("vue-router");
+  const parser = actual.createRouter({
+    history: actual.createMemoryHistory(),
+    routes: [{ path: "/:any(.*)", component: { render: () => null } }],
+  });
   return {
     ...actual,
     onBeforeRouteLeave: vi.fn(),
@@ -171,7 +175,7 @@ vi.mock("vue-router", async () => {
       onError: vi.fn(() => vi.fn()),
       options: { history: { location: "/dashboards/add_panel" } },
       currentRoute: { value: { fullPath: "/dashboards/add_panel" } },
-      resolve: vi.fn((location: string) => ({ fullPath: location })),
+      resolve: (location: string) => parser.resolve(location),
     })),
   };
 });
@@ -867,9 +871,26 @@ describe("AddPanel.vue", () => {
         wrapper.vm.onLeaveChoice("stay");
         await done;
         expect(editorRouter().replace).not.toHaveBeenCalled();
+        pickerReturns("1h");
+        wrapper.vm.updateDateTime();
+        expect(editorRouter().replace).not.toHaveBeenCalled();
 
         editorRouter().options.history.location = "/dashboards/add_panel";
         window.dispatchEvent(new PopStateEvent("popstate"));
+        expect(editorRouter().replace).toHaveBeenCalledTimes(1);
+        expect(lastReplacedQuery()).toMatchObject({ period: "1h" });
+      });
+
+      it("treats a browser-encoded ' in the URL as the same location when replaying after Stay", async () => {
+        editorRouter().currentRoute.value.fullPath = "/dashboards/add_panel?var-team=o'brien";
+        editorRouter().options.history.location = "/dashboards/add_panel?var-team=o%27brien";
+        const { done } = await openLeaveDialog();
+        editorRouter().replace.mockClear();
+        wrapper.vm.variablesDataUpdated(variables);
+
+        wrapper.vm.onLeaveChoice("stay");
+        await done;
+
         expect(editorRouter().replace).toHaveBeenCalledTimes(1);
       });
 
@@ -956,13 +977,36 @@ describe("AddPanel.vue", () => {
         expect(editorRouter().replace).toHaveBeenCalledTimes(1);
       });
 
-      it("stops listening for navigation errors when the editor unmounts", () => {
-        const stop = editorRouter().onError.mock.results.at(-1)!.value;
-        expect(stop).not.toHaveBeenCalled();
+      it("stops listening for navigation ends and errors when the editor unmounts", () => {
+        const stopEnd = editorRouter().afterEach.mock.results.at(-1)!.value;
+        const stopError = editorRouter().onError.mock.results.at(-1)!.value;
+        expect(stopEnd).not.toHaveBeenCalled();
+        expect(stopError).not.toHaveBeenCalled();
 
         wrapper.unmount();
 
-        expect(stop).toHaveBeenCalledTimes(1);
+        expect(stopEnd).toHaveBeenCalledTimes(1);
+        expect(stopError).toHaveBeenCalledTimes(1);
+      });
+
+      it("stops waiting for the history restore when the editor unmounts", async () => {
+        const { done } = await openLeaveDialog();
+        editorRouter().options.history.location = "/dashboards/view";
+        const added = vi.spyOn(window, "addEventListener");
+        const removed = vi.spyOn(window, "removeEventListener");
+        try {
+          wrapper.vm.onLeaveChoice("stay");
+          await done;
+          const waiter = added.mock.calls.find(([type]) => type === "popstate")![1];
+          removed.mockClear();
+
+          wrapper.unmount();
+
+          expect(removed).toHaveBeenCalledWith("popstate", waiter);
+        } finally {
+          added.mockRestore();
+          removed.mockRestore();
+        }
       });
     });
   });

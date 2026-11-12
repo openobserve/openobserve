@@ -150,6 +150,10 @@ const nav = vi.hoisted(() => ({
 
 vi.mock("vue-router", async () => {
   const actual: any = await vi.importActual("vue-router");
+  const parser = actual.createRouter({
+    history: actual.createMemoryHistory(),
+    routes: [{ path: "/:any(.*)", component: { render: () => null } }],
+  });
   return {
     ...actual,
     onBeforeRouteLeave: vi.fn(),
@@ -161,7 +165,7 @@ vi.mock("vue-router", async () => {
       onError: () => () => {},
       options: { history: { location: "/dashboards/add_panel" } },
       currentRoute: { value: { fullPath: "/dashboards/add_panel" } },
-      resolve: (location: string) => ({ fullPath: location }),
+      resolve: (location: string) => parser.resolve(location),
     }),
   };
 });

@@ -659,9 +659,11 @@ export default defineComponent({
     let leaveTarget: RouteLocationNormalized | null = null;
     // Syncs held back during a leave stack here, so the first one after it writes them all.
     let deferredRouteQuery: LocationQueryRaw | null = null;
+    // A refused browser Back restores its entry asynchronously; a replace before then rewrites the previous page's entry.
+    let historyRestorePending = false;
     const routeQueryBase = () => deferredRouteQuery ?? route.query;
     const syncRouteQuery = (query: LocationQueryRaw) => {
-      if (leaveTarget) {
+      if (leaveTarget || historyRestorePending) {
         deferredRouteQuery = query;
         return;
       }
@@ -1649,16 +1651,23 @@ export default defineComponent({
       return true;
     };
 
+    // The browser percent-encodes characters such as ' that the router keeps raw, so compare parsed forms.
+    const normalizedLocation = (location: string) => {
+      const resolved = router.resolve(location);
+      return `${resolved.path}?${stringifyQuery(resolved.query)}${resolved.hash}`;
+    };
+
     const replayRouteQuery = () => {
       window.removeEventListener("popstate", replayRouteQuery);
-      if (editorDisposed || leaveTarget || !deferredRouteQuery) return;
-      const { history } = router.options;
-      // A refused browser Back restores its entry asynchronously; replacing first would rewrite the previous page's entry.
-      if (router.resolve(history.location).fullPath !== router.currentRoute.value.fullPath) {
+      if (editorDisposed || leaveTarget) return;
+      historyRestorePending =
+        normalizedLocation(router.options.history.location) !==
+        normalizedLocation(router.currentRoute.value.fullPath);
+      if (historyRestorePending) {
         window.addEventListener("popstate", replayRouteQuery, { once: true });
         return;
       }
-      syncRouteQuery(deferredRouteQuery);
+      if (deferredRouteQuery) syncRouteQuery(deferredRouteQuery);
     };
 
     // A guard settling late must not end the leave a newer navigation has started.
