@@ -370,9 +370,6 @@ import { debounce } from "lodash-es";
 import searchState from "@/composables/useLogs/searchState";
 import { useNLQuery } from "@/composables/useNLQuery";
 import { HELPER_PREFIXES } from "@/composables/assistant/pure";
-import { isAssistantV2 } from "@/composables/assistant/flags";
-import { requestGoTo } from "@/composables/goto/goToRequests";
-import { GO_TO_EDITOR_ACTION_ID } from "@/lib/vue-shortcut-manager/shortcutRegistry";
 import { type I18nText, useI18nTyped, raw } from "@/types/i18n";
 import useNotifications from "@/composables/useNotifications";
 import { isAuthError } from "@/utils/authErrors";
@@ -529,7 +526,6 @@ export default defineComponent({
     const editorRef: any = ref();
     let editorObj: any = null;
     let chordAction: { dispose(): void } | null = null;
-    let goToAction: { dispose(): void } | null = null;
     // Monaco is a large chunk; until it mounts the query is drawn as plain text so it is readable at once.
     const editorReady = ref(false);
     const previewLines = computed(() => {
@@ -1122,14 +1118,6 @@ export default defineComponent({
               editorObj?.trigger("keyboard", "editor.action.triggerSuggest", {});
           },
         });
-      // Monaco reads ⌘K as a chord prefix, so the global Go to binding never sees it inside the editor.
-      if (isAssistantV2())
-        goToAction = editorObj.addAction({
-          id: GO_TO_EDITOR_ACTION_ID,
-          label: t("shortcuts.actions.goTo"),
-          keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyK],
-          run: () => requestGoTo("editor"),
-        });
       editorObj.onDidFocusEditorWidget(() => {
         emit("focus");
       });
@@ -1321,8 +1309,6 @@ export default defineComponent({
 
         chordAction?.dispose();
         chordAction = null;
-        goToAction?.dispose();
-        goToAction = null;
         // Dispose the editor
         editorObj.dispose();
         editorObj = null;

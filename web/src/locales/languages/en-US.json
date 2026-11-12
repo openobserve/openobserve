@@ -10482,8 +10482,6 @@
     "resources": "Resources",
     "explore": "Explore",
     "agent": {
-      "goToPlaceholder": "Go to a page, dashboard, alert or stream…",
-      "goToName": "Go to",
       "askOff": {
         "budget": "AI credits for this month are used up, so {product} cannot answer",
         "oss": "{product}, the AI assistant, is part of OpenObserve Enterprise. This Open Source build has no assistant and no incidents.",
@@ -10759,23 +10757,7 @@
       }
     },
     "goTo": {
-      "heading": "Go to",
-      "hint": "Go to from any page",
-      "open": "Open",
       "close": "Close",
-      "ask": "Ask: {text}",
-      "group": {
-        "pages": "Pages",
-        "alertFolders": "Alert folders",
-        "alerts": "Alerts",
-        "dashboards": "Dashboards"
-      },
-      "more": {
-        "alerts": "Search alerts for “{text}”",
-        "dashboards": "Search dashboards for “{text}”"
-      },
-      "empty": "No pages match",
-      "placeholder": "Go to a page",
       "back": "Back to Home"
     }
   },
@@ -26217,7 +26199,6 @@
       "fleetFlowCloseDetails": "Close the path details or collapse the map",
       "securityRecordNext": "Next record",
       "securityRecordPrev": "Previous record",
-      "goTo": "Go to",
       "threadsBarOpen": "Open the Threads bar",
       "homeFocusAsk": "Focus the Ask box"
     }

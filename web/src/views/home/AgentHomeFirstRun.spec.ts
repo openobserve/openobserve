@@ -35,7 +35,7 @@ vi.mock("./AgentHomeGreeting.vue", () => ({
 vi.mock("@/components/ai-assistant/welcome/AssistantLauncher.vue", () => ({
   default: {
     name: "AssistantLauncher",
-    props: ["layout", "goToOnly"],
+    props: ["layout"],
     template: '<div data-test="launcher-stub" :data-layout="layout" />',
   },
 }));

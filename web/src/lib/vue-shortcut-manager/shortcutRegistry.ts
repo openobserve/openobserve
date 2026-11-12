@@ -110,11 +110,7 @@ const dictationReady = shallowRef(false);
 // Cluster-scoped admin surfaces only render inside the _meta org.
 const metaAdmin = (c: ShortcutCapabilities) => c.isEnterprise && c.isMetaOrg;
 const cloudMetaAdmin = (c: ShortcutCapabilities) => c.isCloud && c.isMetaOrg;
-// Go to needs no AI: it is navigation, gated only on the v2 preview.
-const goToPalette = () => isAssistantV2();
-
-/** Monaco owns ⌘K as a chord prefix, so O2 editors bind the `goTo` chord as this editor action. */
-export const GO_TO_EDITOR_ACTION_ID = "o2.goTo";
+const assistantV2Only = () => isAssistantV2();
 
 /**
  * Groups the flat SHORTCUT_REGISTRY into modules for the cheatsheet. Each module
@@ -292,14 +288,6 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
         visible: assistantChat,
       },
       {
-        id: "goTo",
-        keyForWindows: "ctrl+k",
-        keyForMac: "meta+k",
-        descriptionKey: "shortcuts.actions.goTo",
-        allowInInput: true,
-        visible: goToPalette,
-      },
-      {
         id: "threadsBarOpen",
         // Shift turns the period into ">" in the key the browser reports.
         keyForWindows: "ctrl+shift+>",
@@ -320,7 +308,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
         id: "homeFocusAsk",
         key: "/",
         descriptionKey: "shortcuts.actions.homeFocusAsk",
-        visible: goToPalette,
+        visible: assistantV2Only,
       },
     ],
   },

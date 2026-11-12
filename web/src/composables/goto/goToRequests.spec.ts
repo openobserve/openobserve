@@ -16,29 +16,12 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
-  onGoToRequest,
   onOverviewFocusRequest,
   overviewFocusListening,
-  requestGoTo,
   requestOverviewFocus,
 } from "./goToRequests";
 
 describe("goToRequests", () => {
-  it("passes the source to every subscriber until it unsubscribes", () => {
-    const handler = vi.fn();
-    const off = onGoToRequest(handler);
-    requestGoTo("shortcut");
-    requestGoTo("editor");
-    expect(handler.mock.calls).toEqual([["shortcut"], ["editor"]]);
-    off();
-    requestGoTo("shortcut");
-    expect(handler).toHaveBeenCalledTimes(2);
-  });
-
-  it("is a no-op with no Go to subscriber", () => {
-    expect(() => requestGoTo("shortcut")).not.toThrow();
-  });
-
   it("returns false from requestOverviewFocus when no Home ask field listens", () => {
     expect(requestOverviewFocus()).toBe(false);
   });
@@ -62,27 +45,5 @@ describe("goToRequests", () => {
     expect(overviewFocusListening.value).toBe(true);
     offB();
     expect(overviewFocusListening.value).toBe(false);
-  });
-
-  it("keeps the two channels apart", () => {
-    const goTo = vi.fn();
-    const focus = vi.fn();
-    const offGoTo = onGoToRequest(goTo);
-    const offFocus = onOverviewFocusRequest(focus);
-    requestGoTo("editor");
-    expect(focus).not.toHaveBeenCalled();
-    requestOverviewFocus();
-    expect(goTo).toHaveBeenCalledTimes(1);
-    offGoTo();
-    offFocus();
-  });
-
-  it("lets a handler unsubscribe itself while being called", () => {
-    const later = vi.fn();
-    const off = onGoToRequest(() => off());
-    const offLater = onGoToRequest(later);
-    requestGoTo("shortcut");
-    expect(later).toHaveBeenCalledTimes(1);
-    offLater();
   });
 });

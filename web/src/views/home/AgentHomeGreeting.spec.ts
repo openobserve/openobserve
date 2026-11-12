@@ -21,9 +21,8 @@ import i18n from "@/locales";
 
 import AgentHomeGreeting from "./AgentHomeGreeting.vue";
 
-const mountGreeting = (email?: string, props: Record<string, number> = {}) =>
+const mountGreeting = (email?: string) =>
   mount(AgentHomeGreeting, {
-    props,
     global: { plugins: [i18n, createStore({ state: { userInfo: email ? { email } : {} } })] },
   });
 
@@ -47,12 +46,10 @@ describe("AgentHomeGreeting", () => {
     );
   });
 
-  it("greets without a name, keeps the answers-ready chip and draws no needs-you chip", () => {
-    const wrapper = mountGreeting(undefined, { answersReady: 2, needYou: 3 });
+  it("greets without a name and draws no chips", () => {
+    const wrapper = mountGreeting();
     expect(wrapper.find('[data-test="agent-home-greeting-name"]').exists()).toBe(false);
     expect(wrapper.get('[data-test="agent-home-greeting-text"]').text()).not.toContain(",");
-    expect(wrapper.get('[data-test="agent-home-greeting-answers"]').text()).toContain("2");
-    expect(wrapper.find('[data-test="agent-home-greeting-need-you"]').exists()).toBe(false);
-    expect(wrapper.text()).not.toMatch(/need/i);
+    expect(wrapper.find('[data-test="agent-home-greeting-answers"]').exists()).toBe(false);
   });
 });

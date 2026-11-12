@@ -323,7 +323,7 @@ describe("assistant entries", () => {
     "shortcuts.pages.queryEditor",
   ];
 
-  // Earlier suites resolve the cached flag through the goTo gate, so each case starts uncached.
+  // Earlier suites resolve the cached flag, so each case starts uncached.
   beforeEach(() => {
     resetAssistantV2ForTests();
   });
@@ -402,41 +402,6 @@ describe("getShortcutDisplay (K1)", () => {
       (e) => e.keyForWindows === "ctrl+shift+z" && e.keyForMac === "shift+meta+z",
     );
     expect(getShortcutDisplay(redo!.id, true)).toBe("ctrl+shift+z");
-  });
-});
-
-describe("goTo entry", () => {
-  afterEach(() => {
-    delete window.__O2_ASSISTANT_V2__;
-    resetAssistantV2ForTests();
-  });
-
-  it("binds ⌘K / Ctrl+K globally, firing from inputs", () => {
-    expect(getShortcutDef("goTo")).toMatchObject({
-      keyForWindows: "ctrl+k",
-      keyForMac: "meta+k",
-      descriptionKey: "shortcuts.actions.goTo",
-      allowInInput: true,
-      scope: undefined,
-    });
-    const group = SHORTCUT_REGISTRY.find((g) => g.shortcuts.some((e) => e.id === "goTo"));
-    expect(group?.pageKey).toBe("shortcuts.pages.global");
-  });
-
-  it("is listed only under the v2 flag, with or without AI", () => {
-    window.__O2_ASSISTANT_V2__ = false;
-    for (const caps of [OSS, ENTERPRISE, CLOUD]) expect(entryVisible("goTo", caps)).toBe(false);
-    resetAssistantV2ForTests();
-    window.__O2_ASSISTANT_V2__ = true;
-    for (const caps of [OSS, ENTERPRISE, CLOUD]) expect(entryVisible("goTo", caps)).toBe(true);
-    expect(entryVisible("goTo", { ...ENTERPRISE, aiEnabled: false, assistantCanChat: false })).toBe(
-      true,
-    );
-  });
-
-  it("is registered once", () => {
-    const ids = SHORTCUT_REGISTRY.flatMap((group) => group.shortcuts.map((e) => e.id));
-    expect(ids.filter((id) => id === "goTo")).toHaveLength(1);
   });
 });
 

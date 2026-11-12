@@ -20,7 +20,6 @@ import { computed } from "vue";
 import { contextRegistry } from "@/composables/contextProviders/registry";
 import OFile from "@/lib/forms/File/OFile.vue";
 import { requestOverviewFocus } from "@/composables/goto/goToRequests";
-import { GO_TO_PAGES, type GoToPage } from "@/composables/goto/types";
 
 import type { CapabilityAgent, GateCode, Starter } from "@/composables/assistant";
 import { raw } from "@/types/i18n";
@@ -79,7 +78,14 @@ vi.mock("@/components/ai-assistant/context/AssistantMentionMenu.vue", async () =
   return {
     default: defineComponent({
       name: "AssistantMentionMenu",
-      props: { open: null, query: null, org: null, listboxId: null, sid: null, hideAgents: Boolean },
+      props: {
+        open: null,
+        query: null,
+        org: null,
+        listboxId: null,
+        sid: null,
+        hideAgents: Boolean,
+      },
       setup(props, { expose }) {
         expose({
           current: () => mentionPick.current,
@@ -129,14 +135,6 @@ const input = (wrapper: ReturnType<typeof setup>["wrapper"]) => wrapper.get("tex
 const plus = (wrapper: ReturnType<typeof setup>["wrapper"], action: ComposerPlusAction) =>
   wrapper.findComponent(AssistantComposerPlusMenu).vm.$emit("select", action);
 
-const PAGES: GoToPage[] = [
-  {
-    id: "logs",
-    label: raw("Logs"),
-    route: { path: "/logs", query: { org_identifier: "default" } },
-  },
-];
-
 function setupOn(
   props: Record<string, unknown>,
   routes: { path: string; name: string }[] = [],
@@ -154,7 +152,6 @@ function setupOn(
     props,
     global: {
       plugins: [router, fakeVuex()],
-      provide: { [GO_TO_PAGES as symbol]: computed(() => PAGES) },
     },
     attachTo: document.body,
   });
@@ -216,7 +213,6 @@ describe("AssistantLauncher", () => {
     expect(wrapper.get('[data-test="assistant-mention-panel"]').attributes("data-query")).toBe(
       "ta_comp",
     );
-    expect(wrapper.find('[data-test="assistant-launcher-go-to"]').exists()).toBe(false);
     await input(wrapper).trigger("keydown", { key: "Enter" });
     await flushPromises();
     expect(open).not.toHaveBeenCalled();
@@ -299,21 +295,6 @@ describe("AssistantLauncher", () => {
     await input(wrapper).trigger("keydown", { key: "Enter" });
     await flushPromises();
     expect(router.currentRoute.value.name).toBe("assistant");
-  });
-
-  it("keeps the text on Escape while Home's Go to results are open (HOME-03)", async () => {
-    const { wrapper } = setupOn({ layout: "overview", goToOnly: true });
-    await flushPromises();
-    await input(wrapper).setValue("keep this");
-    await flushPromises();
-    expect(wrapper.find('[data-test="assistant-launcher-go-to"]').exists()).toBe(true);
-    (input(wrapper).element as HTMLTextAreaElement).focus();
-    await input(wrapper).trigger("keydown", { key: "Escape" });
-    expect((input(wrapper).element as HTMLTextAreaElement).value).toBe("keep this");
-    expect(document.activeElement).not.toBe(input(wrapper).element);
-    expect(wrapper.find('[data-test="assistant-launcher-go-to"]').exists()).toBe(false);
-    await input(wrapper).setValue("keep this too");
-    expect(wrapper.find('[data-test="assistant-launcher-go-to"]').exists()).toBe(true);
   });
 
   it("keeps the text on Escape and clears it only with the clear button (HOME-03, round 1 X-20)", async () => {
@@ -525,7 +506,9 @@ describe("AssistantLauncher", () => {
     beforeEach(() => toastCall.mockReset());
 
     it("opens the picker from + and shows the pick as a removable thumbnail chip in the bottom row", async () => {
-      const click = vi.spyOn(HTMLInputElement.prototype, "click").mockImplementation(() => undefined);
+      const click = vi
+        .spyOn(HTMLInputElement.prototype, "click")
+        .mockImplementation(() => undefined);
       const { wrapper } = setupOn({ layout: "overview" });
       await flushPromises();
       plus(wrapper, "attach");
@@ -553,9 +536,17 @@ describe("AssistantLauncher", () => {
       );
       await input(wrapper).setValue("what is this?");
       await input(wrapper).trigger("keydown", { key: "Enter" });
-      expect(open.mock.calls[0][0]).toMatchObject({ intent: "send", payload: { text: "what is this?" } });
+      expect(open.mock.calls[0][0]).toMatchObject({
+        intent: "send",
+        payload: { text: "what is this?" },
+      });
       expect(open.mock.calls[0][0].payload.images).toEqual([
-        expect.objectContaining({ filename: "a.png", mimeType: "image/png", size: 10, data: "AAAAAAAAAAAAAA==" }),
+        expect.objectContaining({
+          filename: "a.png",
+          mimeType: "image/png",
+          size: 10,
+          data: "AAAAAAAAAAAAAA==",
+        }),
         expect.objectContaining({ filename: "b.png", mimeType: "image/png", size: 20 }),
       ]);
       expect(thumbs(wrapper)).toHaveLength(0);
@@ -569,7 +560,9 @@ describe("AssistantLauncher", () => {
       });
       pick(wrapper, [png("d.png")]);
       await vi.waitFor(() => expect(thumbs(wrapper)).toHaveLength(1));
-      expect(wrapper.get('[data-test="assistant-launcher-ask"]').attributes("disabled")).toBeUndefined();
+      expect(
+        wrapper.get('[data-test="assistant-launcher-ask"]').attributes("disabled"),
+      ).toBeUndefined();
       await input(wrapper).trigger("keydown", { key: "Enter" });
       expect(open.mock.calls[2][0].payload).toMatchObject({
         text: "",
@@ -580,7 +573,10 @@ describe("AssistantLauncher", () => {
     it("refuses with the composer's lines: a fifth image, a wrong type and an image over the size cap", async () => {
       const { wrapper } = setupOn({ layout: "overview" });
       await flushPromises();
-      pick(wrapper, ["1", "2", "3", "4", "5"].map((n) => png(`${n}.png`)));
+      pick(
+        wrapper,
+        ["1", "2", "3", "4", "5"].map((n) => png(`${n}.png`)),
+      );
       await vi.waitFor(() => expect(toastCall).toHaveBeenCalledTimes(1));
       expect(toastCall.mock.calls[0][0].message).toMatch(/^5\.png wasn't added\. Up to 4 images/);
       pick(wrapper, [new File([new Uint8Array(4)], "a.gif", { type: "image/gif" })]);
@@ -590,9 +586,9 @@ describe("AssistantLauncher", () => {
       expect(toastCall.mock.calls[2][0].message).toMatch(/^big\.png is .+ Up to 4 images/);
       await input(wrapper).setValue("why?");
       await input(wrapper).trigger("keydown", { key: "Enter" });
-      expect(open.mock.calls[0][0].payload.images.map((i: { filename: string }) => i.filename)).toEqual(
-        ["1.png", "2.png", "3.png", "4.png"],
-      );
+      expect(
+        open.mock.calls[0][0].payload.images.map((i: { filename: string }) => i.filename),
+      ).toEqual(["1.png", "2.png", "3.png", "4.png"]);
     });
   });
 
@@ -684,26 +680,11 @@ describe("AssistantLauncher", () => {
       expect(wrapper.find('[data-state="ghost"]').exists()).toBe(false);
       await input(wrapper).setValue("why?");
       await input(wrapper).trigger("keydown", { key: "Enter" });
-      expect(open.mock.calls[0][0].payload).toEqual({ text: "why?", chips: [], timeOverride: range });
-    });
-
-    it("lists Go to matches and opens the first with the way back in go-to-only mode", async () => {
-      const { wrapper, router } = setupOn({
-        layout: "overview",
-        goToOnly: true,
-        pageRange: { from: 1_000, to: 2_000, period: "1h" },
+      expect(open.mock.calls[0][0].payload).toEqual({
+        text: "why?",
+        chips: [],
+        timeOverride: range,
       });
-      await flushPromises();
-      await input(wrapper).setValue("logs");
-      await flushPromises();
-      const options = wrapper.findAll('[data-test^="assistant-launcher-go-to-results-option-"]');
-      expect(options.map((o) => o.attributes("data-kind"))).toEqual(["page"]);
-      expect(input(wrapper).attributes("role")).toBe("combobox");
-      await input(wrapper).trigger("keydown", { key: "Enter" });
-      await flushPromises();
-      expect(router.currentRoute.value.name).toBe("logs");
-      expect(router.currentRoute.value.query.home_return).toBe("period=1h&focus=ask");
-      expect(open).not.toHaveBeenCalled();
     });
 
     it("sends Enter's line, its @ chips and the page range as a new chat in the full view", async () => {
@@ -741,12 +722,11 @@ describe("AssistantLauncher", () => {
       });
     });
 
-    it("opens no Go to list or Ask row while typing when the assistant is usable", async () => {
+    it("opens no results list or Ask row while typing when the assistant is usable", async () => {
       const { wrapper } = setupOn({ layout: "overview" });
       await flushPromises();
       await input(wrapper).setValue("logs");
       await flushPromises();
-      expect(wrapper.find('[data-test="assistant-launcher-go-to"]').exists()).toBe(false);
       expect(wrapper.find('[role="listbox"]').exists()).toBe(false);
       expect(wrapper.text()).not.toContain("Ask:");
       await input(wrapper).trigger("keydown", { key: "Enter" });

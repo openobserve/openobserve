@@ -261,11 +261,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <CommunitySlackInvite v-if="!focusMode" />
     <PredefinedThemes />
     <ShortcutCheatsheet v-model:open="showShortcuts" />
-    <GoToPalette
-      v-if="assistantV2 && goToOpen"
-      v-model:open="goToOpen"
-      :home-return="goToHomeReturn"
-    />
     <PaidOverageConsentDialog v-if="assistantV2 ? canBill : config.isCloud == 'true'" />
     <DashboardSaveConflictDialog
       v-if="dashboardSaveConflict.mounted"
@@ -383,11 +378,6 @@ import { purgeOrgQueries, queryClient } from "@/composables/query/queryClient";
 import { useShortcuts, ShortcutCheatsheet } from "@/lib/vue-shortcut-manager";
 import { useHomeDashboard } from "@/composables/useHomeDashboard";
 import { isAssistantV2 } from "@/composables/assistant/flags";
-import { onGoToRequest } from "@/composables/goto/goToRequests";
-import type { HomeReturnState } from "@/composables/goto/homeReturn";
-import { GO_TO_PAGES } from "@/composables/goto/types";
-import { goToPagesFromMenu } from "@/composables/goto/useGoToIndex";
-import { isGateOpen, useNavGateContext } from "@/lib/core/Navbar/useNavGateContext";
 import { isAutoObserveEnabled } from "@/components/autoobserve/autoObserveGate";
 
 // Back from a drill-out (Analytics to Session Viewer, Traces to a trace or its logs) must land on the same results without rerunning them.
@@ -456,7 +446,6 @@ export default defineComponent({
     AssistantSkipLink: defineAsyncComponent(
       () => import("@/components/ai-assistant/shell/AssistantSkipLink.vue"),
     ),
-    GoToPalette: defineAsyncComponent(() => import("@/components/goto/GoToPalette.vue")),
     HomeReturnBar: defineAsyncComponent(() => import("@/components/goto/HomeReturnBar.vue")),
   },
   methods: {
@@ -781,19 +770,6 @@ export default defineComponent({
           ? securityNavLinks
           : linksList.value,
     );
-
-    // Built from the rail's own list and gates, so Go to never offers a page the menu hides.
-    const navGates = useNavGateContext();
-    const goToPages = computed(() =>
-      goToPagesFromMenu(navLinks.value, t, {
-        org: store.state.selectedOrganization?.identifier ?? "",
-        hasRoute: (name) => router.hasRoute(name),
-        gateOpen: (gate) => isGateOpen(navGates.value, gate),
-        hiddenMenus: navGates.value.hiddenMenus,
-        features: navGates.value.features,
-      }),
-    );
-    provide(GO_TO_PAGES, goToPages);
 
     const langList = [
       {
@@ -2056,20 +2032,6 @@ export default defineComponent({
       useShortcuts([{ id: "aiChatToggle", handler: () => toggleAIChat() }]);
     }
 
-    const goToOpen = ref(false);
-    const goToHomeReturn = ref<HomeReturnState | null>(null);
-    // ⌘K is the one door on every page, Home included; `/` focuses the Home Ask box.
-    const openGoTo = () => {
-      const onHome = router.currentRoute.value.name === "home";
-      goToHomeReturn.value = onHome ? { focus: "ask" } : null;
-      goToOpen.value = true;
-    };
-    if (assistantV2) {
-      useShortcuts([{ id: "goTo", handler: openGoTo }]);
-      const stopGoTo = onGoToRequest(openGoTo);
-      onUnmounted(stopGoTo);
-    }
-
     return {
       signOutDraftsOpen,
       signOutDraftCount,
@@ -2141,8 +2103,6 @@ export default defineComponent({
       openPredefinedThemes,
       showShortcuts,
       openShortcutsList,
-      goToOpen,
-      goToHomeReturn,
       isPredefinedThemesOpen,
       handleMenuHover,
     };

@@ -105,13 +105,13 @@ const OPEN_ACTION = {
 
 type SendVerb = "explain" | "troubleshoot" | "fix";
 
-/** `intent: "send"` is legal only for the explicit verbs and the typed line of the Home launcher or Go to palette. */
+/** `intent: "send"` is legal only for the explicit verbs and the typed line of the Home launcher. */
 export type OpenAssistantCall = (
   | (OpenAssistantArgs & { intent: "open" | "stage" })
   | (OpenAssistantArgs & { intent: "send"; entryVerb: SendVerb })
   | (OpenAssistantArgs & {
       intent: "send";
-      entryKind: "home_launcher" | "go_to_palette";
+      entryKind: "home_launcher";
       entryVerb: "ask";
     })
 ) & {

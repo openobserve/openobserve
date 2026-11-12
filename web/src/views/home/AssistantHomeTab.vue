@@ -29,22 +29,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="assistant-home-tab"
       :data-state="state"
     >
-      <!-- A fixed top offset, not centring, so Problems or Go to results arriving below never move the Ask box -->
+      <!-- A fixed top offset, not centring, so rows arriving below never move the Ask box -->
       <div
         class="relative mx-auto flex max-w-5xl min-w-0 flex-col gap-4 pt-[12vh] max-md:pt-0"
         data-test="assistant-home-main"
       >
-        <AgentHomeGreeting :answers-ready="answersReady" :class="entering && RISE.greeting" />
+        <AgentHomeGreeting :class="entering && RISE.greeting" />
+        <AgentHomeAskNote
+          v-if="offReason"
+          :reason="offReason"
+          :org="data.org.value"
+          class="mx-auto max-w-3xl"
+        />
         <AssistantLauncher
+          v-else
           layout="overview"
           :page-range="pageRange"
-          :go-to-only="offReason !== null"
           class="mx-auto max-w-3xl"
-        >
-          <template #note>
-            <AgentHomeAskNote v-if="offReason" :reason="offReason" :org="data.org.value" />
-          </template>
-        </AssistantLauncher>
+        />
         <HomeNeedsAttention
           class="mt-4"
           :snapshot="attentionSnapshot"
@@ -55,22 +57,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @view-all="openOverview"
           @retry="() => void data.load(true)"
           @send-data="go({ name: 'ingestion', query: { org_identifier: data.org.value } })"
-        />
-        <HomeNowList
-          v-if="wide && split.problems.length > 0"
-          :org="data.org.value"
-          :timezone="data.timezone.value"
-          :trend="data.trend.value"
-          :return-state="returnState"
-          :traces-locked="data.tracesLocked.value"
-          :snapshot="problemsSnapshot"
-          :row-meta="rowMeta"
-          :create-alert="{ enabled: canCreateAlert }"
-          @select="selectRow"
-          @open="openRow"
-          @service="openService"
-          @fallback="openRow"
-          @create-alert="createAlert"
         />
       </div>
       <AlertHistoryDrawer
@@ -89,13 +75,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, defineAsyncComponent, onDeactivated, onMounted, ref } from "vue";
 import { useRoute, useRouter, type RouteLocationRaw } from "vue-router";
-import { useStore } from "vuex";
 
 import AssistantLauncher from "@/components/ai-assistant/welcome/AssistantLauncher.vue";
-import { useAssistantRuns, type ComposerState } from "@/composables/assistant";
+import type { ComposerState } from "@/composables/assistant";
 import { HOME_TAB_QUERY_KEY } from "@/composables/assistant/pure";
-import type { PrefillTimeRange } from "@/utils/alerts/alertPrefill";
-import { requestAlertCreation } from "@/composables/alerts/useAlertCreation";
 import type { OverviewNowRow, OverviewNowSnapshot } from "@/composables/contextProviders/types";
 import { withHomeReturn } from "@/composables/goto/homeReturn";
 import useBreakpoint from "@/composables/useBreakpoint";
@@ -106,17 +89,11 @@ import { sqlEquals } from "@/utils/query/sqlFilterBuilder";
 import AgentHomeAskNote from "./AgentHomeAskNote.vue";
 import AgentHomeGreeting from "./AgentHomeGreeting.vue";
 import HomeNeedsAttention, { type EmptyState } from "./HomeNeedsAttention.vue";
-import HomeNowList from "./HomeNowList.vue";
 import type { NowRowMeta } from "./HomeNowRow.vue";
-import { canCreateAlerts, serviceAlertPrefill } from "./homeAlertPrefill";
 import { healthState } from "./homeHealth";
 import { HOME_RAIL_CLASS } from "./homeState";
-import {
-  homeReturnState,
-  readHomeUrl,
-  writeHomeUrl,
-} from "./homeUrl";
-import { groupNowRows, incidentService, needsYou, splitNowRows } from "./nowGrouping";
+import { homeReturnState, readHomeUrl, writeHomeUrl } from "./homeUrl";
+import { groupNowRows, incidentService, needsYou } from "./nowGrouping";
 import { useAgentHomeState } from "./useAgentHomeState";
 import { useHomeNowData } from "./useHomeNowData";
 import { useHomeRefresh } from "./useHomeRefresh";
@@ -140,7 +117,6 @@ const RISE = {
 const { t } = useI18nTyped();
 const router = useRouter();
 const route = useRoute();
-const store = useStore();
 const { lgUp } = useBreakpoint();
 const { state, offReason } = useAgentHomeState();
 
@@ -148,7 +124,6 @@ const urlState = readHomeUrl(route.query);
 const data = useHomeNowData(urlState.range);
 if (urlState.row) data.nowList.selectedKey.value = urlState.row;
 
-// A phone draws no Problems list, so there the agent reads the services no alert matches among the other rows.
 const wide = computed(() => lgUp.value);
 const refreshes = computed(() => data.range.value.type === "relative");
 useHomeRefresh(
@@ -185,9 +160,6 @@ const incidentServices = computed(() => {
 const grouped = computed(() =>
   groupNowRows(data.nowList.snapshot.value.rows, (id) => incidentServices.value.get(id) ?? null),
 );
-const split = computed(() =>
-  wide.value ? splitNowRows(grouped.value) : { now: grouped.value.filter(needsYou), problems: [] },
-);
 const rowMeta = computed<Record<string, NowRowMeta>>(() =>
   Object.fromEntries(
     grouped.value.map((item) => [
@@ -196,10 +168,6 @@ const rowMeta = computed<Record<string, NowRowMeta>>(() =>
     ]),
   ),
 );
-const problemsSnapshot = computed<OverviewNowSnapshot>(() => ({
-  ...data.nowList.snapshot.value,
-  rows: split.value.problems.map((item) => item.row),
-}));
 // The most urgent rows that need attention, every kind; a failed source only drops its own rows, the strip says why.
 const attentionSnapshot = computed<OverviewNowSnapshot>(() => ({
   ...data.nowList.snapshot.value,
@@ -225,16 +193,6 @@ const attentionEmpty = computed<EmptyState | null>(() => {
   if (state === "allClear") return "clear";
   return state === "nothingMonitored" ? "no-data" : null;
 });
-const canCreateAlert = computed(
-  () => !data.alertsLocked.value && canCreateAlerts(store.state.currentuser?.role),
-);
-
-// The Open Source build has no assistant runtime to read.
-const assistantRuns = state.value === "oss" ? null : useAssistantRuns();
-const answersReady = computed(
-  () =>
-    assistantRuns?.rows.value.filter((row) => row.group === "ready" && !row.otherOrg).length ?? 0,
-);
 
 // The entrance plays once per mount; a kept-alive return re-inserts the nodes, which would replay it.
 const entering = ref(true);
@@ -261,10 +219,18 @@ function go(location: RouteLocationRaw): void {
 function openRow(row: OverviewNowRow): void {
   selectRow(row);
   if (row.kind === "incident")
-    go({ name: "incidentDetail", params: { id: row.id }, query: { org_identifier: data.org.value } });
+    go({
+      name: "incidentDetail",
+      params: { id: row.id },
+      query: { org_identifier: data.org.value },
+    });
   else if (row.kind === "service") openService(row);
   else if (row.kind === "anomaly")
-    historyAlert.value = { details: { name: row.name }, id: row.configId, type: "anomaly_detection" };
+    historyAlert.value = {
+      details: { name: row.name },
+      id: row.configId,
+      type: "anomaly_detection",
+    };
   else {
     const item = data.alertList.value?.find((alert) => alert.alert_id === row.alertId);
     historyAlert.value = {
@@ -296,23 +262,6 @@ function openService(row: OverviewNowRow): void {
       org_identifier: data.org.value,
     },
   });
-}
-
-function createAlert(row: OverviewNowRow): void {
-  if (row.kind !== "service" || !canCreateAlert.value) return;
-  const prefill = serviceAlertPrefill(row, streamOf(row.service), datetimeOfRange());
-  requestAlertCreation(prefill, {}, () => prefill);
-}
-
-function datetimeOfRange(): PrefillTimeRange {
-  const range = data.range.value;
-  const window = data.window.value;
-  return {
-    type: range.type,
-    ...(range.type === "relative" && { relativeTimePeriod: range.period }),
-    startTime: window.start,
-    endTime: window.end,
-  };
 }
 
 function rangeQuery(): Record<string, string> {

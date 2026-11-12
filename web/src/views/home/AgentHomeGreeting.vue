@@ -46,17 +46,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <h2 v-else :class="HEADING_CLASS" data-test="agent-home-greeting-text">
         {{ greeting }}
       </h2>
-      <div v-if="chips.length" class="flex min-w-0 flex-wrap items-center justify-center gap-1.5">
-        <OTag
-          v-for="chip in chips"
-          :key="chip.id"
-          :variant="chip.variant"
-          dot
-          size="xs"
-          :label="chip.label"
-          :data-test="`agent-home-greeting-${chip.id}`"
-        />
-      </div>
     </div>
   </div>
 </template>
@@ -67,14 +56,10 @@ import { useStore } from "vuex";
 
 import { useGreeting } from "@/components/ai-assistant/welcome/useGreeting";
 import { useTheme } from "@/composables/useTheme";
-import OTag from "@/lib/core/Badge/OTag.vue";
-import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
-import { useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
+import { useI18nTyped, type I18nKey } from "@/types/i18n";
 import { getImageURL } from "@/utils/zincutils";
 
 const HEADING_CLASS = "text-text-heading text-3xl leading-tight font-semibold max-md:text-2xl";
-
-const props = withDefaults(defineProps<{ answersReady?: number }>(), { answersReady: 0 });
 
 const { t } = useI18nTyped();
 const vuex = useStore();
@@ -85,16 +70,4 @@ const logoSrc = computed(() =>
 const { greeting, displayName, period } = useGreeting(() => vuex?.state.userInfo?.email);
 // The name sits in the translated sentence as a slot, so the language still decides where it goes.
 const namedKey = computed<I18nKey>(() => `aiAssistant.greetingNamed.${period.value}`);
-
-// One chip and no sentence: the answers ready to read (H2).
-const chips = computed(() => {
-  const list: { id: string; label: I18nText; variant: BadgeVariant }[] = [];
-  if (props.answersReady > 0)
-    list.push({
-      id: "answers",
-      label: t("home.answersReady", { count: props.answersReady }, props.answersReady),
-      variant: "primary-soft",
-    });
-  return list;
-});
 </script>

@@ -120,9 +120,8 @@ vi.mock("vue-router", () => ({
 vi.mock("@/components/ai-assistant/welcome/AssistantLauncher.vue", () => ({
   default: {
     name: "AssistantLauncher",
-    props: ["layout", "goToOnly", "pageRange"],
-    template:
-      '<div data-test="launcher-stub" :data-layout="layout" :data-go-to="goToOnly ? \'yes\' : \'no\'"><slot name="note" /></div>',
+    props: ["layout", "pageRange"],
+    template: '<div data-test="launcher-stub" :data-layout="layout" />',
   },
 }));
 vi.mock("./AgentHomeAskNote.vue", () => ({
@@ -137,7 +136,7 @@ vi.mock("./HomeNowList.vue", () => ({
     name: "HomeNowList",
     props: ["snapshot", "createAlert", "rowMeta"],
     template:
-      "<section data-test=\"now-list-problems\" :data-rows=\"snapshot.rows.map((r) => r.key).join(',')\" :data-create=\"createAlert ? String(createAlert.enabled) : 'none'\" />",
+      '<section data-test="now-list-problems" :data-rows="snapshot.rows.map((r) => r.key).join(\',\')" :data-create="createAlert ? String(createAlert.enabled) : \'none\'" />',
   },
 }));
 
@@ -187,23 +186,14 @@ describe("AssistantHomeTab", () => {
     store.state.currentuser.role = "admin";
   });
 
-  it("with the agent on, shows the greeting, then the Ask box, then Problems with no alert in one centred column, and loads once without asking the agent", async () => {
-    mocks.runRows = [
-      { group: "ready" },
-      { group: "ready", otherOrg: true },
-      { group: "answering" },
-    ];
+  it("with the agent on, shows the greeting, then the Ask box, in one centred column, and loads once without asking the agent", async () => {
     const wrapper = mountTab();
     await flushPromises();
-    expect(
-      wrapper.find('[data-test="launcher-stub"][data-layout="overview"]').attributes("data-go-to"),
-    ).toBe("no");
-    expect(wrapper.get('[data-test="agent-home-greeting-answers"]').text()).toBe("1 answer ready");
+    expect(wrapper.find('[data-test="launcher-stub"][data-layout="overview"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="ask-note-stub"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="agent-home-greeting-answers"]').exists()).toBe(false);
     const main = wrapper.get('[data-test="assistant-home-main"]').element;
-    const order = [...main.querySelectorAll("[data-test]")]
-      .map((el) => el.getAttribute("data-test"))
-      .filter((id) => id === "now-list-problems" || id === "launcher-stub");
-    expect(order).toEqual(["launcher-stub", "now-list-problems"]);
+    expect(main).toBeTruthy();
     expect(wrapper.findAll('[data-test="launcher-stub"]')).toHaveLength(1);
     expect(wrapper.get('[data-test="assistant-home-main"]').classes()).toEqual(
       expect.arrayContaining(["mx-auto", "max-w-5xl"]),
@@ -216,9 +206,6 @@ describe("AssistantHomeTab", () => {
     ]) {
       expect(wrapper.find(`[data-test="${gone}"]`).exists()).toBe(false);
     }
-    expect(wrapper.get('[data-test="now-list-problems"]').attributes("data-rows")).toBe(
-      "service:checkout",
-    );
     expect(mocks.load).toHaveBeenCalledTimes(1);
   });
 
@@ -302,19 +289,16 @@ describe("AssistantHomeTab", () => {
     }
   });
 
-  it("with credits used up, turns the Ask box into Go to with the reason", async () => {
+  it("with credits used up, swaps the Ask box for the reason", async () => {
     set(mocks.state, "budget");
     set(mocks.offReason, "budget");
     const wrapper = mountTab();
     await flushPromises();
-    expect(
-      wrapper.find('[data-test="launcher-stub"][data-layout="overview"]').attributes("data-go-to"),
-    ).toBe("yes");
+    expect(wrapper.find('[data-test="launcher-stub"]').exists()).toBe(false);
     expect(wrapper.get('[data-test="ask-note-stub"]').attributes("data-reason")).toBe("budget");
-    expect(wrapper.find('[data-test="now-list-problems"]').exists()).toBe(true);
   });
 
-  it("with no agent, keeps Problems with no alert readable", async () => {
+  it("with no agent, keeps Needs Attention readable", async () => {
     set(mocks.state, "noai");
     set(mocks.offReason, "off_for_org");
     const wrapper = mountTab();
@@ -322,24 +306,16 @@ describe("AssistantHomeTab", () => {
     expect(wrapper.get('[data-test="ask-note-stub"]').attributes("data-reason")).toBe(
       "off_for_org",
     );
-    expect(wrapper.find('[data-test="now-list-problems"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="home-attention"]').exists()).toBe(true);
   });
 
-  it("on Open Source, reads no assistant runtime and shows Now and Problems with no alert", async () => {
+  it("on Open Source, reads no assistant runtime", async () => {
     set(mocks.state, "oss");
     set(mocks.offReason, "oss");
     const wrapper = mountTab();
     await flushPromises();
     expect(mocks.runtimeRead).not.toHaveBeenCalled();
     expect(wrapper.get('[data-test="ask-note-stub"]').attributes("data-reason")).toBe("oss");
-    expect(wrapper.find('[data-test="now-list-problems"]').exists()).toBe(true);
-  });
-
-  it("shows a viewer Create alert disabled", async () => {
-    store.state.currentuser.role = "viewer";
-    const wrapper = mountTab();
-    await flushPromises();
-    expect(wrapper.get('[data-test="now-list-problems"]').attributes("data-create")).toBe("false");
   });
 
   it("reads no RCA runs on load", async () => {
@@ -348,22 +324,12 @@ describe("AssistantHomeTab", () => {
     expect(mocks.listOrgRcaRuns).not.toHaveBeenCalled();
   });
 
-  it("draws no Needs you section, empty or with rows, and Problems with no alert only while it has rows", async () => {
+  it("draws no Needs you section and no Problems with no alert list", async () => {
     const wrapper = mountTab();
     await flushPromises();
-    const lists = wrapper.findAllComponents({ name: "HomeNowList" });
-    expect(lists).toHaveLength(1);
-    expect(lists[0].attributes("data-rows")).toBe("service:checkout");
+    expect(wrapper.findAllComponents({ name: "HomeNowList" })).toHaveLength(0);
     expect(wrapper.text()).not.toContain("Needs you");
     expect(wrapper.find('[data-test="agent-home-greeting-need-you"]').exists()).toBe(false);
-    for (const rows of [[incidentRow("inc-1"), alertRow("hot")], []]) {
-      set(mocks.rows, rows);
-      const quiet = mountTab();
-      await flushPromises();
-      expect(quiet.findAllComponents({ name: "HomeNowList" })).toHaveLength(0);
-      expect(quiet.text()).not.toContain("Needs you");
-      quiet.unmount();
-    }
   });
 
   it("draws no health strip: no chips and no pages line, the greeting flows into the Ask box", async () => {
@@ -375,10 +341,8 @@ describe("AssistantHomeTab", () => {
     const main = wrapper.get('[data-test="assistant-home-main"]').element;
     const order = [...main.querySelectorAll("[data-test]")]
       .map((el) => el.getAttribute("data-test"))
-      .filter((id) =>
-        ["agent-home-greeting", "launcher-stub", "now-list-problems"].includes(id ?? ""),
-      );
-    expect(order).toEqual(["agent-home-greeting", "launcher-stub", "now-list-problems"]);
+      .filter((id) => ["agent-home-greeting", "launcher-stub"].includes(id ?? ""));
+    expect(order).toEqual(["agent-home-greeting", "launcher-stub"]);
   });
 
   it("draws no capability cards under Ask and no dashboards section", async () => {
@@ -426,7 +390,7 @@ describe("AssistantHomeTab", () => {
     const keys = (w: ReturnType<typeof mountTab>) =>
       w.findAll('[data-test^="home-attention-row-"]').map((row) => row.attributes("data-test"));
 
-    it("sits under the Ask box and above Problems with no alert, with the three most urgent rows of every kind", async () => {
+    it("sits under the Ask box, with the three most urgent rows of every kind", async () => {
       set(mocks.rows, [
         serviceRow("checkout", { coverage: "none" }),
         incidentRow("inc-1"),
@@ -439,8 +403,8 @@ describe("AssistantHomeTab", () => {
       const main = wrapper.get('[data-test="assistant-home-main"]').element;
       const order = [...main.querySelectorAll("[data-test]")]
         .map((el) => el.getAttribute("data-test"))
-        .filter((id) => ["launcher-stub", "home-attention", "now-list-problems"].includes(id ?? ""));
-      expect(order).toEqual(["launcher-stub", "home-attention", "now-list-problems"]);
+        .filter((id) => ["launcher-stub", "home-attention"].includes(id ?? ""));
+      expect(order).toEqual(["launcher-stub", "home-attention"]);
       expect(keys(wrapper)).toEqual([
         "home-attention-row-service:checkout",
         "home-attention-row-incident:inc-1",
@@ -456,7 +420,9 @@ describe("AssistantHomeTab", () => {
       const quiet = mountTab();
       await flushPromises();
       expect(quiet.get("[data-test='home-attention'] h2").text()).toBe("Needs Attention");
-      expect(quiet.get('[data-test="home-attention-empty"]').attributes("data-empty")).toBe("clear");
+      expect(quiet.get('[data-test="home-attention-empty"]').attributes("data-empty")).toBe(
+        "clear",
+      );
     });
 
     it("says No Data Yet, not All Clear, when nothing is monitored", async () => {
@@ -476,7 +442,10 @@ describe("AssistantHomeTab", () => {
       await flushPromises();
       await empty.get('[data-test="home-attention-send-data"]').trigger("click");
       expect(mocks.push).toHaveBeenCalledWith(
-        expect.objectContaining({ name: "ingestion", query: expect.objectContaining({ org_identifier: "default" }) }),
+        expect.objectContaining({
+          name: "ingestion",
+          query: expect.objectContaining({ org_identifier: "default" }),
+        }),
       );
       expect(empty.find('[data-test="home-attention-create-alert"]').exists()).toBe(false);
     });
@@ -552,9 +521,9 @@ describe("AssistantHomeTab", () => {
       await flushPromises();
       await open(anomaly, "anomaly:spike");
       await vi.waitFor(() =>
-        expect(anomaly.get('[data-test="assistant-home-alert-history"]').attributes("data-type")).toBe(
-          "anomaly_detection",
-        ),
+        expect(
+          anomaly.get('[data-test="assistant-home-alert-history"]').attributes("data-type"),
+        ).toBe("anomaly_detection"),
       );
     });
 

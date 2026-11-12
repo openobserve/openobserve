@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="assistant-launcher"
     data-assistant-surface
     data-dd-privacy="mask"
-    :data-state="goToOnly ? 'go_to' : state"
+    :data-state="state"
     :data-layout="layout"
   >
     <component
@@ -64,11 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :is-admin="capability.isAdmin"
         :context="{ org, feature: 'chat' }"
       />
-      <div
-        v-else
-        ref="field"
-        class="relative min-w-0"
-      >
+      <div v-else ref="field" class="relative min-w-0">
         <AssistantMentionMenu
           ref="mention"
           :open="mentionAt !== null"
@@ -85,23 +81,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ref="input"
           :model-value="shownText"
           :glow="layout === 'overview'"
-          :state="goToOnly ? 'go_to' : (state ?? undefined)"
-          :disabled="fieldLoading && !goToOnly"
+          :state="state ?? undefined"
+          :disabled="fieldLoading"
           :placeholder="placeholder"
           :input-attrs="{
-            'aria-label': goToOnly
-              ? t('home.agent.goToName')
-              : t('assistant.welcome.launcher.inputName', { product }),
+            'aria-label': t('assistant.welcome.launcher.inputName', { product }),
             maxlength: MAX_LAUNCHER_CHARS,
             enterkeyhint: 'send',
-            ...(goToShown && {
-              role: 'combobox',
-              'aria-haspopup': 'listbox',
-              'aria-expanded': 'true',
-              'aria-autocomplete': 'list',
-              'aria-controls': GO_TO_LISTBOX_ID,
-              'aria-activedescendant': results?.activeDescendant,
-            }),
             ...(mentionAt !== null && {
               role: 'combobox',
               'aria-haspopup': 'listbox',
@@ -118,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <template #bar>
             <AssistantComposerBottomRow divided>
-              <template v-if="!goToOnly" #agent>
+              <template #agent>
                 <AssistantComposerPlusMenu
                   v-if="mentionsOn"
                   :actions="['attach', 'context']"
@@ -153,7 +139,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :image-src="item.src"
                       :popup="false"
                       :data-test="
-                        item.src ? 'assistant-launcher-image-chip' : 'assistant-launcher-mention-chip'
+                        item.src
+                          ? 'assistant-launcher-image-chip'
+                          : 'assistant-launcher-mention-chip'
                       "
                       @remove="removeTrayChip(item.chip)"
                     />
@@ -169,14 +157,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               <AssistantDictationWave v-if="voice.mine.value" :elapsed-ms="voice.elapsedMs.value" />
               <AssistantDictateButton
-                v-if="!goToOnly && voice.mic.value !== 'none'"
+                v-if="voice.mic.value !== 'none'"
                 :mic="voice.mic.value"
                 :pressed="voice.mine.value"
                 :disabled-reason="voice.helperLine.value ?? undefined"
                 @press="onMicPress"
               />
               <AssistantIconButton
-                v-if="!goToOnly"
                 variant="primary"
                 size="md"
                 :label="t('assistant.welcome.launcher.ask')"
@@ -203,23 +190,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @type-error="() => refuse('type', t('assistant.context.imageType'))"
         />
       </div>
-      <div
-        v-if="goToShown"
-        class="border-border-default rounded-default bg-surface-base -mt-2 flex max-h-80 flex-col overflow-y-auto border border-[0.0625em] p-1"
-        data-test="assistant-launcher-go-to"
-      >
-        <GoToResults
-          ref="results"
-          v-model:active="goToActive"
-          :matches="goToMatches"
-          :query="text"
-          :listbox-id="GO_TO_LISTBOX_ID"
-          data-test="assistant-launcher-go-to-results"
-          @select="onGoToSelect"
-          @close="dismissGoTo"
-        />
-      </div>
-      <slot v-if="goToOnly" name="note" />
       <div
         v-if="layout === 'card'"
         :class="[
@@ -408,7 +378,6 @@ import AssistantContextChip from "@/components/ai-assistant/context/AssistantCon
 import AssistantMentionMenu, {
   type MentionOption,
 } from "@/components/ai-assistant/context/AssistantMentionMenu.vue";
-import GoToResults from "@/components/goto/GoToResults.vue";
 import AssistantTimePrefix from "@/components/ai-assistant/context/AssistantTimePrefix.vue";
 import AssistantGateState from "@/components/ai-assistant/gate/AssistantGateState.vue";
 import {
@@ -428,9 +397,6 @@ import {
   type TimeWindow,
 } from "@/composables/assistant";
 import { onOverviewFocusRequest } from "@/composables/goto/goToRequests";
-import type { HomeReturnState } from "@/composables/goto/homeReturn";
-import type { GoToMatch } from "@/composables/goto/types";
-import { openGoToMatch, useGoToIndex } from "@/composables/goto/useGoToIndex";
 import useBreakpoint from "@/composables/useBreakpoint";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -477,14 +443,11 @@ const props = withDefaults(
     layout?: "card" | "overview";
     /** The page range in ms; the time chip mirrors it and a pick moves it. */
     pageRange?: ComposerState["timeOverride"];
-    /** Set on Home when the agent cannot answer: the field is Go to only and the `note` slot says why. */
-    goToOnly?: boolean;
     /** Home's wide tab: the capability cards under the field; a pick stages its prompt in the field. */
   }>(),
-  { layout: "card", pageRange: null, goToOnly: false },
+  { layout: "card", pageRange: null },
 );
 
-const GO_TO_LISTBOX_ID = "assistant-launcher-go-to-listbox";
 const MENTION_LISTBOX_ID = "assistant-launcher-mention-listbox";
 // The menu's max height (20rem) plus the header's height.
 const MENTION_ROOM_PX = 400;
@@ -534,7 +497,6 @@ const state = computed(() => {
   const gated = launcherState(capability.gate.value);
   return gated === "ready" && starterList?.loading.value ? "loading" : gated;
 });
-const goToOnly = computed(() => props.layout === "overview" && props.goToOnly);
 // Starters refetch when the @ menu loads the same lists; only the gate may disable the field, or it drops focus.
 const fieldReady = computed(() => launcherState(capability.gate.value) === "ready");
 const fieldLoading = computed(() => capability.gate.value === "loading");
@@ -544,19 +506,17 @@ const canSend = computed(
 // The card names itself with its heading; the Home layouts draw none, so they carry the name.
 const sectionName = computed(() => {
   if (isCard) return undefined;
-  return goToOnly.value
-    ? t("home.agent.goToName")
-    : t("assistant.welcome.launcher.inputName", { product });
+  return t("assistant.welcome.launcher.inputName", { product });
 });
 // On the Overview the ask field stays with the dock open, and always starts a new chat.
 const shown = computed(
-  () => goToOnly.value || (state.value !== null && (props.layout !== "card" || !sidebarOpen.value)),
+  () => state.value !== null && (props.layout !== "card" || !sidebarOpen.value),
 );
 const creditsExhausted = computed(() => capability.value.creditMode === "exhausted");
 const shownStarters = computed(() => starterList?.starters.value.slice(0, LAUNCHER_ROWS) ?? []);
 // The sidebar is the assistant while it is open, so Home shows no second one beside it.
 const sidebarOpen = computed(() => assistant.state.shell.placement.kind === "sidebar");
-const showSuggestions = computed(() => state.value !== "gate" && !goToOnly.value);
+const showSuggestions = computed(() => state.value !== "gate");
 
 // The Home field folds chips into "+N" at the composer's widths, so a phone never squashes them.
 const field = ref<HTMLElement | null>(null);
@@ -584,24 +544,8 @@ const hiddenTrayLabels = computed(() =>
   trayChips.value.slice(shownTrayChips.value.length).map((item) => String(item.chip.label)),
 );
 
-const results = ref<InstanceType<typeof GoToResults> | null>(null);
-const goToActive = ref(-1);
-const { matches: goToMatches } = useGoToIndex(text, {
-  canAsk: () => false,
-  enabled: () => goToOnly.value && shown.value,
-});
-const goToDismissed = ref(false);
-const goToShown = computed(
-  () =>
-    goToOnly.value &&
-    text.value.trim() !== "" &&
-    mentionAt.value === null &&
-    !goToDismissed.value,
-);
-const mentionsOn = computed(() => fieldReady.value && !goToOnly.value);
-const placeholder = computed(() =>
-  goToOnly.value ? t("home.agent.goToPlaceholder") : t("assistant.composer.placeholderAt"),
-);
+const mentionsOn = computed(() => fieldReady.value);
+const placeholder = computed(() => t("assistant.composer.placeholderAt"));
 
 const coarse = ref(!!globalThis.matchMedia?.("(pointer: coarse)")?.matches);
 const voice = useAssistantVoice({
@@ -609,7 +553,7 @@ const voice = useAssistantVoice({
   ensureSid: () => LAUNCHER_DRAFT,
   draftOf: () => text.value,
   writeDraft: (_sid, value) => (text.value = value),
-  blocked: () => !shown.value || state.value !== "ready" || goToOnly.value,
+  blocked: () => !shown.value || state.value !== "ready",
   tap: () => undefined,
   touch: () => !mdUp.value && coarse.value,
   say: () => undefined,
@@ -618,7 +562,6 @@ const shownText = computed(() => voice.shown(text.value));
 
 function onInput(value: string): void {
   text.value = value;
-  goToDismissed.value = false;
   voice.noteEdit(input.value?.textarea?.selectionStart ?? value.length);
   void nextTick(detectMention);
 }
@@ -747,37 +690,13 @@ function addContext(): void {
   });
 }
 
-// A Go to trip from the Overview returns to its row and range with the field focused.
-function homeReturnState(): HomeReturnState {
-  const state: HomeReturnState = { focus: "ask" };
-  const row = route.query.row;
-  if (typeof row === "string") state.row = row;
-  const range = props.pageRange;
-  if (range?.period) state.period = range.period;
-  else if (range) {
-    state.from = range.from * 1000;
-    state.to = range.to * 1000;
-  }
-  return state;
-}
-
-function onGoToSelect(match: GoToMatch): void {
-  if (match.kind === "ask") {
-    ask(false);
-    return;
-  }
-  const line = text.value.trim();
-  text.value = "";
-  openGoToMatch(match, router, line, homeReturnState());
-}
-
 function focusField(clear: boolean): void {
   if (clear) text.value = "";
   input.value?.focus();
 }
 
 // `/` on Home lands here while the field can take a question; nothing listens while it is hidden or gated.
-const askListening = computed(() => shown.value && (state.value === "ready" || goToOnly.value));
+const askListening = computed(() => shown.value && state.value === "ready");
 let stopFocusListener: (() => void) | null = null;
 watch(
   askListening,
@@ -844,32 +763,18 @@ onBeforeUnmount(() => {
 function onKeydown(event: KeyboardEvent): void {
   if (event.isComposing || event.keyCode === 229) return;
   if (mentionAt.value !== null && mentionKey(event)) return;
-  if (goToShown.value && !event.shiftKey && results.value?.onKeydown(event)) return;
   if (event.key === "Enter") {
     event.preventDefault();
-    if (goToOnly.value) openFirstMatch();
-    else ask(event.shiftKey);
+    ask(event.shiftKey);
   } else if (event.key === "Escape") {
     // Escape never clears what was typed; only the clear button does (round 1 X-20).
     (event.target as HTMLElement | null)?.blur();
   }
 }
 
-// Escape on the results closes them and leaves the field; it never clears what was typed (X-20).
-function dismissGoTo(): void {
-  goToDismissed.value = true;
-  input.value?.textarea?.blur();
-}
-
-// With no agent to ask, Enter opens the best match, as the palette does.
-function openFirstMatch(): void {
-  const first = goToMatches.value.find((match) => match.kind !== "ask");
-  if (first) onGoToSelect(first);
-}
-
 // The launcher is a door, not a composer: the line goes to `/assistant` and nothing stays here (`70` §5 note 6).
 function ask(stage: boolean): void {
-  if (!fieldReady.value || goToOnly.value) return;
+  if (!fieldReady.value) return;
   if (voice.mine.value) voice.stop("send");
   const line = text.value.trim();
   const attached = images.value;

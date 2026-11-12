@@ -445,24 +445,6 @@ describe("container resolution (10 §3.3)", () => {
     expect(pushRoute).toHaveBeenCalledWith({ name: "assistant", params: { chatId: result.sid } });
   });
 
-  it("sends the Go to palette's Ask row into a new chat outside the full view", async () => {
-    const { open, store, send, pushRoute } = setup();
-    const result = ok(
-      await open({
-        entryKind: "go_to_palette",
-        entryVerb: "ask",
-        objectKind: "none",
-        intent: "send",
-        thread: "new",
-        payload: { chips: [], text: "why is checkout slow" },
-      }),
-    );
-    expect(result).toMatchObject({ container: "sidebar", sent: true });
-    expect(store.state.sessions[result.sid].origin.entryKind).toBe("go_to_palette");
-    expect(send).toHaveBeenCalledTimes(1);
-    expect(pushRoute).not.toHaveBeenCalled();
-  });
-
   it("writes payload.removedPageKeys to the new chat before the send, so the wire omits them", async () => {
     const { open, store, send } = setup();
     const page = { currentPage: "home", currentSQLQuery: "SELECT 1", alertId: "a1" };
@@ -508,7 +490,12 @@ describe("container resolution (10 §3.3)", () => {
         thread: "new",
         payload: { chips: [], text: `look ${intent}`, images },
       });
-    ok(await door("send", ["1", "2", "3", "4", "5"].map((n) => image(`${n}.png`))));
+    ok(
+      await door(
+        "send",
+        ["1", "2", "3", "4", "5"].map((n) => image(`${n}.png`)),
+      ),
+    );
     expect(sent).toEqual(["1.png", "2.png", "3.png", "4.png"]);
     const staged = ok(await door("stage", [image("a.png"), image("b.gif", "image/gif")]));
     expect(send).toHaveBeenCalledTimes(1);
@@ -740,7 +727,7 @@ describe("org safety and ordering", () => {
 });
 
 describe("types", () => {
-  it("allows send only for explain, troubleshoot, fix, the Home launcher and the Go to palette", () => {
+  it("allows send only for explain, troubleshoot, fix, and the Home launcher", () => {
     expectTypeOf<{
       entryKind: "object_verb";
       entryVerb: "add_to_chat";
@@ -759,18 +746,6 @@ describe("types", () => {
       objectKind: "none";
       intent: "send";
     }>().toMatchTypeOf<OpenAssistantCall>();
-    expectTypeOf<{
-      entryKind: "go_to_palette";
-      entryVerb: "ask";
-      objectKind: "none";
-      intent: "send";
-    }>().toMatchTypeOf<OpenAssistantCall>();
-    expectTypeOf<{
-      entryKind: "go_to_palette";
-      entryVerb: "explain" | "add_to_chat" | "generate_query";
-      objectKind: "none";
-      intent: "send";
-    }>().not.toMatchTypeOf<OpenAssistantCall>();
     expectTypeOf<{
       entryKind: "header_button";
       entryVerb: "ask";

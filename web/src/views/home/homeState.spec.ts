@@ -29,7 +29,7 @@ describe("agentHomeState", () => {
     ).toBe("oss");
   });
 
-  it("says why the Ask box is Go to only", () => {
+  it("says why the Ask box is unavailable", () => {
     expect(askOffReason({ ...ent, gate: "available", creditMode: null })).toBeNull();
     expect(askOffReason({ ...ent, gate: "available", creditMode: "exhausted" })).toBe("budget");
     expect(askOffReason({ ...ent, gate: "no_permission", creditMode: null })).toBe("no_permission");
