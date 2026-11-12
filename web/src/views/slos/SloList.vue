@@ -993,7 +993,7 @@ const visibleRows = computed(() => {
 });
 
 function onStatSelect(key: string | null) {
-  healthFilter.value = key === "total" ? null : key;
+  healthFilter.value = key === "total" || healthFilter.value === key ? null : key;
 }
 
 // The first real load lands after mount and races TanStack's own auto-reset-on-data-change, which resolves through its own deferred microtask queue — setTimeout(0) runs strictly after that queue drains, so the restored page reliably wins.
