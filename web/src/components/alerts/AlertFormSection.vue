@@ -48,19 +48,19 @@ provide(SETTING_ROW_BARE_KEY, true);
   <section
     :data-snap-section="id"
     :data-test="`add-alert-section-${id}`"
-    class="max-lg:border-border-default flex flex-col max-lg:border-b max-lg:last:border-b-0 [&_[data-snap-stop]]:scroll-mt-28"
+    class="max-lg:border-border-default flex flex-col max-lg:border-b max-lg:last:border-b-0 [&_[data-snap-stop]]:scroll-mt-24"
   >
     <header
-      class="bg-surface-base sticky top-0 z-1 flex items-start gap-4 px-6 pt-6 pb-4 max-lg:static max-lg:z-auto max-lg:pt-4 max-md:gap-3 max-md:px-4"
+      class="bg-surface-base sticky top-0 z-1 flex items-start gap-3 px-5 pt-4 pb-3 max-lg:static max-lg:z-auto max-lg:pt-3 max-md:px-4"
     >
       <span
         v-if="icon"
-        class="bg-surface-subtle text-accent rounded-surface flex size-10 shrink-0 items-center justify-center"
+        class="bg-surface-subtle text-accent rounded-surface flex size-8 shrink-0 items-center justify-center"
         :data-test="`add-alert-section-${id}-icon`"
       >
-        <OIcon :name="icon" size="md" />
+        <OIcon :name="icon" size="sm" />
       </span>
-      <div class="flex min-w-0 flex-1 flex-col gap-1">
+      <div class="flex min-w-0 flex-1 flex-col gap-0.5">
         <span class="text-text-secondary text-xs" :data-test="`add-alert-section-${id}-eyebrow`">
           {{
             def?.optional
@@ -69,7 +69,7 @@ provide(SETTING_ROW_BARE_KEY, true);
           }}
         </span>
         <h2
-          class="text-text-heading m-0 text-2xl font-semibold focus:outline-none"
+          class="text-text-heading m-0 text-xl font-semibold focus:outline-none"
           tabindex="-1"
           data-snap-heading
           :data-test="`add-alert-section-${id}-title`"
@@ -93,9 +93,9 @@ provide(SETTING_ROW_BARE_KEY, true);
         <OTooltip side="left" :content="t('alerts.sections.back', { title: t(previous.navKey) })" />
       </OButton>
     </header>
-    <div class="flex flex-1 flex-col ps-20 pe-6 pb-6 max-lg:ps-6 max-md:px-4">
+    <div class="flex flex-1 flex-col px-5 pb-4 max-md:px-4">
       <slot />
-      <div v-if="next" class="sticky bottom-4 mt-auto flex justify-end pt-6 max-md:hidden">
+      <div v-if="next" class="sticky bottom-4 mt-auto flex justify-end pt-4 max-md:hidden">
         <OButton
           variant="primary"
           size="icon-circle-lg"
