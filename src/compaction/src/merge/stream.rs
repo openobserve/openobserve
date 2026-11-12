@@ -43,7 +43,7 @@ use super::{
     plan::{BatchLimits, plan_batches},
 };
 use crate::{
-    bloom::compact::OrphanBlooms,
+    bloom::compact::RetiredBlooms,
     worker::{MergeBatch, MergeSender},
 };
 
@@ -53,7 +53,7 @@ const HOUR_SEGMENT: usize = 7;
 /// What one partition's merge round left behind.
 #[derive(Default)]
 struct PartitionOutcome {
-    orphan_blooms: OrphanBlooms,
+    retired_blooms: RetiredBlooms,
     /// A closed hour only pre-merged into hash-merged files: the indexed merge is still due.
     pre_merged: bool,
 }
@@ -257,7 +257,7 @@ pub async fn merge_by_stream(
 
             let mut last_error = None;
             let mut check_guard = HashSet::with_capacity(batch_groups.len());
-            let mut orphan_blooms = OrphanBlooms::default();
+            let mut retired_blooms = RetiredBlooms::default();
             for ret in worker_results {
                 let (batch_id, new_files, retire_files) = match ret {
                     Ok(v) => v,
@@ -295,11 +295,11 @@ pub async fn merge_by_stream(
                     file_data::delete::add(retire_files.iter().map(|f| f.key.clone()).collect());
                 }
 
-                // collect orphan blooms after writing file list successfully
+                // collect retired blooms after writing file list successfully
                 for file in retire_files.iter().filter(|f| f.meta.bloom_ver > 0) {
                     // a `.bf` lives under the hour of the file it covers, not under the job's
                     if let Ok((_, date, _)) = parse_file_key_columns(&file.key) {
-                        orphan_blooms
+                        retired_blooms
                             .entry(date)
                             .or_default()
                             .push(file.meta.bloom_ver);
@@ -311,7 +311,7 @@ pub async fn merge_by_stream(
                 return Err(e);
             }
             Ok(PartitionOutcome {
-                orphan_blooms,
+                retired_blooms,
                 pre_merged,
             })
         });
@@ -319,13 +319,13 @@ pub async fn merge_by_stream(
     }
 
     // collect bloom files which need to be clean
-    let mut orphan_blooms = OrphanBlooms::default();
+    let mut retired_blooms = RetiredBlooms::default();
     let mut pre_merged = false;
     for task in tasks {
         let outcome = task.await??;
         pre_merged |= outcome.pre_merged;
-        for (date, bloom_vers) in outcome.orphan_blooms {
-            orphan_blooms.entry(date).or_default().extend(bloom_vers);
+        for (date, bloom_vers) in outcome.retired_blooms {
+            retired_blooms.entry(date).or_default().extend(bloom_vers);
         }
     }
 
@@ -337,9 +337,10 @@ pub async fn merge_by_stream(
         stream_type,
         stream_name,
         &date_start,
-        // a pre-merged hour is rewritten by the re-armed round: blooms built now would be orphans
+        // a pre-merged hour is rewritten by the re-armed round: blooms built now would go
+        // unreferenced at once
         is_incremental || pre_merged,
-        orphan_blooms,
+        retired_blooms,
     )
     .await
     {
