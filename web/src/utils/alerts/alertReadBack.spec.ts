@@ -38,6 +38,25 @@ describe("describeAlertInPlainWords", () => {
     );
   });
 
+  it("reads an emptied look-back as 0 minutes, matching the field beside it", () => {
+    const text = describeAlertInPlainWords(
+      alert({ trigger_condition: { ...alert().trigger_condition, period: "" } }),
+      t,
+    );
+    expect(text).toContain("turn up in 0 minutes");
+  });
+
+  it("keeps singular and plural units right for 1 and 2 hours", () => {
+    const period = (n: number) =>
+      describeAlertInPlainWords(
+        alert({ trigger_condition: { ...alert().trigger_condition, period: n } }),
+        t,
+      );
+    expect(period(1)).toContain("turn up in 1 minute,");
+    expect(period(60)).toContain("turn up in 1 hour,");
+    expect(period(120)).toContain("turn up in 2 hours,");
+  });
+
   it("names the destinations and the hold", () => {
     expect(
       describeAlertInPlainWords(alert({ destinations: ["team-email"], pending_period_sec: 60 }), t),
