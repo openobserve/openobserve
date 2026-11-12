@@ -275,7 +275,7 @@ export default defineComponent({
         return isDark.value ? "text-tabs-active-text" : "text-accent";
       }
       return isDark.value
-        ? "text-tabs-active-text bg-tabs-active-bg ring-1 ring-inset ring-accent"
+        ? "text-tabs-active-text bg-surface-accent-active ring-1 ring-inset ring-accent"
         : "text-accent bg-surface-base shadow-xs ring-1 ring-inset ring-accent";
     });
     const activeIconClass = computed(() =>
@@ -401,10 +401,10 @@ export default defineComponent({
       // Sit above the rail's sliding pill so icon/label stay readable.
       slideActive.value ? "z-10" : "",
       props.locked
-        ? "cursor-pointer text-tabs-inactive-text bg-transparent hover:bg-tabs-hover-bg dark:hover:bg-tabs-rail-hover-bg"
+        ? "cursor-pointer text-tabs-inactive-text bg-transparent hover:bg-tabs-hover-bg dark:hover:bg-surface-accent-hover"
         : isActive.value
           ? activePillClass.value
-          : "text-tabs-inactive-text bg-transparent hover:bg-tabs-hover-bg dark:hover:bg-tabs-rail-hover-bg",
+          : "text-tabs-inactive-text bg-transparent hover:bg-tabs-hover-bg dark:hover:bg-surface-accent-hover",
       isActive.value ? "nav-menu-item--active" : "",
       props.title === "Functions" ? "menu-link-function" : "",
       // Reset native <button> chrome so the trigger looks EXACTLY like a link.
