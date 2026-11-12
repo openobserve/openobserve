@@ -99,7 +99,10 @@ const expandVariablesForScopes = (variables: VariableConfig[]): VariableRuntimeS
   const getInitialValue = (variable: VariableConfig) => {
     // If value is explicitly set (not empty string), use it
     if (variable.value !== "" && variable.value !== undefined && variable.value !== null) {
-      return variable.value;
+      // A scalar saved on a multi-select would skip the array quoting in SQL
+      return variable.multiSelect && !Array.isArray(variable.value)
+        ? [variable.value]
+        : variable.value;
     }
 
     // For query_values with custom or "all" configuration, set the appropriate default
