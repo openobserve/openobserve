@@ -13,24 +13,24 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Bloom filter build + orphan cleanup for the compactor.
+//! Bloom filter build + retired bloom cleanup for the compactor.
 //!
 //! One public entry point, [`build_for_stream`], called once per hour bucket
 //! at the end of a compaction merge round. It does two things in order:
 //!
-//! 1. **Orphan cleanup.** Given the `bloom_ver` values of the files this merge round just deleted,
-//!    [`cleanup_orphan_blooms`] retires any `.bf` no longer referenced by a live row in the bucket.
+//! 1. **Retired bloom cleanup.** Given the `bloom_ver`s of the files this merge round deleted,
+//!    [`cleanup_retired_blooms`] retires any `.bf` no live row in the bucket still references.
 //! 2. **Build.** It queries the bucket itself (`query_for_bloom` → rows with `index_size > 0` and
 //!    `bloom_ver = 0`) and builds `.bf` coverage for those files. The caller does not pass a file
 //!    list; this module owns both the "which files" and the "how to bloom" decisions.
 //!
 //! `bloom_ver` is not append-only: a merge produces new output files with a
 //! fresh `bloom_ver` and deletes the small inputs, so an old `.bf` whose every
-//! file got merged away becomes an orphan — step 1 catches it.
+//! file got merged away is left unreferenced — step 1 catches it.
 //!
 //! Failure is **always non-fatal**. A failed build leaves `bloom_ver = 0`
 //! on the affected files and the search side falls back to opening every
-//! tantivy file in the bucket. A failed cleanup leaves an orphan `.bf` for
+//! tantivy file in the bucket. A failed cleanup leaves an unreferenced `.bf` for
 //! data-retention to reap. Neither affects correctness, so neither
 //! propagates to the caller as a hard error.
 
@@ -59,13 +59,13 @@ use tantivy_utils::puffin_directory::{
 use super::builder::build_blooms_from_index;
 
 /// `bloom_ver`s of the files a merge round retired, by the `file_list.date` of each file.
-pub(crate) type OrphanBlooms = hashbrown::HashMap<String, Vec<i64>>;
+pub(crate) type RetiredBlooms = hashbrown::HashMap<String, Vec<i64>>;
 
-/// Clean orphan `.bf`s for `orphan_blooms`, then build `.bf` coverage for the
+/// Clean the unreferenced `.bf`s among `retired_blooms`, then build `.bf` coverage for the
 /// bucket's `bloom_ver = 0` files (queried internally via `query_for_bloom`).
 ///
 /// `date_key` is the `YYYY/MM/DD/HH` string used in `file_list.date`.
-/// `orphan_blooms` (see [`OrphanBlooms`]) come from the files the merge round just
+/// `retired_blooms` (see [`RetiredBlooms`]) come from the files the merge round just
 /// deleted — used only for cleanup. Files already carrying a non-zero
 /// `bloom_ver` are never re-stamped, so no live file migrates off a `bloom_ver`
 /// that a dumped row may still point to.
@@ -80,7 +80,7 @@ pub(crate) async fn build_for_stream(
     stream_name: &str,
     date_key: &str,
     is_incremental: bool,
-    orphan_blooms: OrphanBlooms,
+    retired_blooms: RetiredBlooms,
 ) -> Result<bool> {
     let cfg = get_config();
     if !cfg.common.bloom_filter_enabled {
@@ -88,11 +88,11 @@ pub(crate) async fn build_for_stream(
     }
 
     // a day-wide job retires files of other hours, whose `.bf`s live under those hours
-    for (date, bloom_vers) in orphan_blooms {
+    for (date, bloom_vers) in retired_blooms {
         if let Err(e) =
-            cleanup_orphan_blooms(org_id, stream_type, stream_name, &date, bloom_vers).await
+            cleanup_retired_blooms(org_id, stream_type, stream_name, &date, bloom_vers).await
         {
-            log::warn!("[BLOOM_BUILD] cleanup orphan blooms of {date} failed: {e}");
+            log::warn!("[BLOOM_BUILD] cleanup retired blooms of {date} failed: {e}");
         }
     }
 
@@ -331,23 +331,23 @@ async fn get_tantivy_directory(
 /// that version; if none, the `.bf` is enqueued for deletion via the existing
 /// `file_list_deleted` queue.
 ///
-/// Orphan detection is a **cleanup optimization, not correctness**: if the
+/// Detecting unreferenced blooms is a **cleanup optimization, not correctness**: if the
 /// EXISTS probe or the enqueue fails, we log and move on — the stale `.bf`
 /// stays until data-retention reaps the day's subtree. Errors never
 /// propagate.
-async fn cleanup_orphan_blooms(
+async fn cleanup_retired_blooms(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
     date_key: &str,
-    orphan_blooms: Vec<i64>,
+    retired_blooms: Vec<i64>,
 ) -> Result<()> {
-    if orphan_blooms.is_empty() {
+    if retired_blooms.is_empty() {
         return Ok(());
     }
-    let candidates: HashSet<i64> = orphan_blooms.into_iter().collect();
+    let candidates: HashSet<i64> = retired_blooms.into_iter().collect();
 
-    let mut orphans: Vec<FileListDeleted> = Vec::new();
+    let mut unreferenced: Vec<FileListDeleted> = Vec::new();
     for v_old in candidates {
         match infra_file_list::bloom_ver_referenced(
             org_id,
@@ -360,7 +360,7 @@ async fn cleanup_orphan_blooms(
         {
             Ok(true) => {} // still referenced by a live file — keep the `.bf`
             Ok(false) => {
-                orphans.push(bloom_file_deleted(
+                unreferenced.push(bloom_file_deleted(
                     org_id,
                     stream_type,
                     stream_name,
@@ -376,21 +376,21 @@ async fn cleanup_orphan_blooms(
             }
         }
     }
-    if orphans.is_empty() {
+    if unreferenced.is_empty() {
         return Ok(());
     }
 
     let created_at = now_micros();
-    let n = orphans.len();
-    if let Err(e) = infra_file_list::batch_add_deleted(org_id, created_at, &orphans).await {
+    let n = unreferenced.len();
+    if let Err(e) = infra_file_list::batch_add_deleted(org_id, created_at, &unreferenced).await {
         log::warn!(
             "[BLOOM_CLEANUP] {org_id}/{stream_type}/{stream_name}/{date_key}: \
-             enqueue {n} orphan `.bf` for deletion failed: {e}"
+             enqueue {n} unreferenced `.bf` for deletion failed: {e}"
         );
     } else {
         log::info!(
             "[BLOOM_CLEANUP] {org_id}/{stream_type}/{stream_name}/{date_key}: \
-             enqueued {n} orphan `.bf` for deletion"
+             enqueued {n} unreferenced `.bf` for deletion"
         );
     }
     Ok(())
