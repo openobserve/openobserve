@@ -1,8 +1,9 @@
 // Copyright 2026 OpenObserve Inc.
 
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { mount } from "@vue/test-utils";
+import { flushPromises, mount } from "@vue/test-utils";
 import { defineComponent, h } from "vue";
+import { createMemoryHistory, createRouter } from "vue-router";
 import store from "@/test/unit/helpers/store";
 import announcements from "@/services/announcements";
 import { useAnnouncementBanners } from "@/composables/useAnnouncementBanners";
@@ -130,5 +131,73 @@ describe("MutedChip", () => {
     const tip = tooltipOf({ ends_at: at(52), alert_groups: [{ alert_id: "a1", group_key: "k1" }] });
     expect(tip).toContain("Muted by Quick mute until");
     expect(tip).not.toContain("Groups:");
+  });
+
+  const linkRouter = async () => {
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path: "/", name: "alertList", component: { template: "<div />" } },
+        { path: "/downtimes/:id", name: "downtimeDetail", component: { template: "<div />" } },
+      ],
+    });
+    await router.push("/");
+    return router;
+  };
+
+  it("opens the downtime in its own folder, from the keyboard too", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+    const router = await linkRouter();
+    const wrapper = mount(MutedChip, {
+      props: { downtime: { id: "d1", name: "Quick mute", ends_at: at(52), folder_id: "ops" } },
+      global: { plugins: [store, router] },
+    });
+    const link = wrapper.find('[data-test="muted-chip"] a');
+    expect(link.exists()).toBe(true);
+    expect(link.attributes("href")).toContain("/downtimes/d1");
+    expect(link.attributes("href")).toContain("folder=ops");
+    expect(link.attributes("href")).toContain("org_identifier=default");
+    await link.trigger("click");
+    await flushPromises();
+    expect(router.currentRoute.value.name).toBe("downtimeDetail");
+    expect(router.currentRoute.value.query).toEqual({ org_identifier: "default", folder: "ops" });
+    expect(String(wrapper.findComponent({ name: "OTooltip" }).props("content"))).toContain(
+      "Muted by Quick mute until",
+    );
+  });
+
+  it("leaves a modifier or middle click to the browser, so it opens a new tab", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+    const router = await linkRouter();
+    const wrapper = mount(MutedChip, {
+      props: { downtime: { id: "d1", name: "Quick mute", ends_at: at(52), folder_id: "ops" } },
+      global: { plugins: [store, router] },
+    });
+    const link = wrapper.find('[data-test="muted-chip"] a');
+    for (const init of [
+      { ctrlKey: true },
+      { metaKey: true },
+      { shiftKey: true },
+      { altKey: true },
+      { button: 1 },
+    ]) {
+      const click = new MouseEvent("click", { bubbles: true, cancelable: true, ...init });
+      link.element.dispatchEvent(click);
+      await flushPromises();
+      expect(click.defaultPrevented, JSON.stringify(init)).toBe(false);
+      expect(router.currentRoute.value.name).toBe("alertList");
+    }
+  });
+
+  it("stays plain text where no router is mounted", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+    const wrapper = mount(MutedChip, {
+      props: { downtime: { id: "d1", name: "Quick mute", ends_at: at(52) } },
+    });
+    expect(wrapper.text()).toContain("Muted · ends in");
+    expect(wrapper.find("a").exists()).toBe(false);
   });
 });

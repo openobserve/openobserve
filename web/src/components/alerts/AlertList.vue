@@ -569,13 +569,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     })
                   "
                 >
-                  <OTag
-                    variant="default-soft"
-                    icon="notifications-paused"
-                    size="sm"
-                    :label="t('alerts.downtimes.mute.firingMuted')"
-                    :data-test="`alert-list-${row.name}-last-outcome`"
-                  />
+                  <router-link
+                    :to="downtimeLinkOf(row)"
+                    class="focus-visible:outline-focus-ring-accent rounded-default inline-flex no-underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-solid"
+                    :data-test="`alert-list-${row.name}-muted-link`"
+                    @click.stop
+                  >
+                    <OTag
+                      variant="default-soft"
+                      icon="notifications-paused"
+                      size="sm"
+                      :label="t('alerts.downtimes.mute.firingMuted')"
+                      :data-test="`alert-list-${row.name}-last-outcome`"
+                    />
+                  </router-link>
                 </OTooltip>
                 <OTooltip v-else-if="isAckedFiring(row)" :content="runOutcomeTooltip(row)">
                   <OTag
@@ -824,26 +831,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </template>
                     <template v-if="downtimesEnabled && !anomalyRowLocked(row)">
                       <ODropdownSeparator />
-                      <template v-if="isAlertScopedMute(row) && row.active_downtime">
-                        <MuteMenuItems
-                          labels="extend"
-                          until-clear
-                          :data-test-prefix="`alert-list-${row.name}-extend`"
-                          @preset="(secs) => extendRow(row, { minutes: secs / 60 })"
-                          @until-clear="extendRow(row, { untilClear: true })"
-                          @until="openExtendUntil(row)"
-                        />
-                        <ODropdownItem
-                          variant="destructive"
-                          :data-test="`alert-list-${row.name}-end-mute`"
-                          @select="endRowMute(row)"
-                        >
-                          <template #icon-left>
-                            <OIcon name="notifications-active" size="sm" />
-                          </template>
-                          {{ t("alerts.downtimes.mute.endNow") }}
-                        </ODropdownItem>
-                      </template>
+                      <RowMuteMenu
+                        v-if="row.active_downtime"
+                        :downtime="row.active_downtime"
+                        :until-clear="isAlertScopedMute(row)"
+                        :count-groups="isAlertScopedMute(row)"
+                        :extend-test-prefix="`alert-list-${row.name}-extend`"
+                        :end-test="`alert-list-${row.name}-end-mute`"
+                        :muted-by-test="`alert-list-${row.name}-muted-by`"
+                        @preset="(secs) => extendRow(row, { minutes: secs / 60 })"
+                        @until-clear="extendRow(row, { untilClear: true })"
+                        @until="openExtendUntil(row)"
+                        @end="endRowMute(row)"
+                      />
                       <MuteMenuItems
                         v-else
                         :data-test-prefix="`alert-list-${row.name}-mute`"
@@ -1218,6 +1218,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :target="extendUntilRow ? rowActionTarget(extendUntilRow) : null"
       :downtime="extendUntilRow ? rowMuteRef(extendUntilRow) : null"
       @done="refreshAlerts"
+      @settled="refreshAlerts"
+    />
+    <ExtendDowntimeDialog
+      v-if="downtimesEnabled"
+      v-model:open="downtimeRowActions.extendUntilOpen.value"
+      :downtime="downtimeRowActions.extendUntilRow.value"
+      :submit="downtimeRowActions.extendUntil"
+      @settled="refreshAlerts"
     />
     <ExportResourceDialog
       v-model:open="showExportDialog"
@@ -1310,8 +1318,13 @@ import {
 } from "@/composables/alerts/useAlertActions";
 import type { AlertMuteEnd, QuickMuteAlertContext } from "@/utils/downtimes/quickMute";
 import MuteMenuItems from "./downtimes/MuteMenuItems.vue";
+import RowMuteMenu from "./downtimes/RowMuteMenu.vue";
+import ExtendDowntimeDialog from "./downtimes/ExtendDowntimeDialog.vue";
 import QuickMuteDialog from "./downtimes/QuickMuteDialog.vue";
 import { useRowMute } from "@/composables/downtimes/useRowMute";
+import { useDowntimeRowActions } from "@/composables/downtimes/useDowntimeRowActions";
+import { downtimeLink } from "@/utils/downtimes/link";
+import type { MuteActionResult } from "@/utils/downtimes/muteResult";
 import { invalidateDependencyGraphCache } from "@/composables/alerts/useDependencyGraph";
 import useBreakpoint from "@/composables/useBreakpoint";
 import { useListViewState } from "@/composables/useListViewState";
@@ -1375,6 +1388,8 @@ export default defineComponent({
     AckChip,
     AlertMuteUntilDialog,
     MuteMenuItems,
+    RowMuteMenu,
+    ExtendDowntimeDialog,
     QuickMuteDialog,
     OPageLayout,
     AddAlert: defineAsyncComponent(() => import("@/components/alerts/AddAlert.vue")),
@@ -2814,6 +2829,7 @@ export default defineComponent({
 
     // ── Acknowledge and the alert's own mute (MK-3) ─────────────────────────
     const alertActions = useAlertActions();
+    const downtimeRowActions = useDowntimeRowActions();
     const extendUntilOpen = ref(false);
     const extendUntilRow = ref<any>(null);
 
@@ -2832,8 +2848,12 @@ export default defineComponent({
             id: row.active_downtime.id,
             ends_at: row.active_downtime.ends_at,
             version: row.active_downtime.version,
+            folder_id: row.active_downtime.folder_id,
           }
         : null;
+
+    const downtimeLinkOf = (row: any) =>
+      downtimeLink(row.active_downtime, store.state.selectedOrganization?.identifier ?? "");
 
     // A multi-alert is offered Acknowledge while any firing group is still un-acked.
     const canAcknowledgeRow = (row: any): boolean => {
@@ -2865,16 +2885,33 @@ export default defineComponent({
 
     const muteRowUntilClear = (row: any) => muteRowWith(row, { untilClear: true });
 
-    const extendRow = async (row: any, end: AlertMuteEnd) => {
-      const downtime = rowMuteRef(row);
-      if (!downtime) return false;
-      return refreshAfter(await alertActions.extend(rowActionTarget(row), downtime, end));
+    // Any answer refreshes: a refused End or Extend means the row shows a stale mute.
+    const refreshAfterMute = async (result: MuteActionResult) => {
+      if (result !== "failed") await refreshAlerts();
+      return result;
     };
 
-    const endRowMute = async (row: any) => {
+    // An anomaly row has no Until it clears, so its only extend is by a preset.
+    const extendRow = async (row: any, end: AlertMuteEnd): Promise<MuteActionResult> => {
       const downtime = rowMuteRef(row);
-      if (!downtime) return false;
-      return refreshAfter(await alertActions.endMute(rowActionTarget(row), downtime.id));
+      if (!downtime) return "failed";
+      if (!isAlertScopedMute(row)) {
+        if (!("minutes" in end)) return "failed";
+        return refreshAfterMute(
+          await downtimeRowActions.extendBy(row.active_downtime, end.minutes * 60),
+        );
+      }
+      return refreshAfterMute(await alertActions.extend(rowActionTarget(row), downtime, end));
+    };
+
+    const endRowMute = async (row: any): Promise<MuteActionResult> => {
+      const downtime = rowMuteRef(row);
+      if (!downtime) return "failed";
+      return refreshAfterMute(
+        isAlertScopedMute(row)
+          ? await alertActions.endMute(rowActionTarget(row), downtime)
+          : await downtimeRowActions.end(row.active_downtime),
+      );
     };
 
     // Until… for one alert opens the alert-scoped Quick Mute, so an on-call responder can use it.
@@ -2900,7 +2937,13 @@ export default defineComponent({
       openMuteDialog(selectedAlerts.value);
     };
 
-    const openExtendUntil = (row: any) => {
+    const openExtendUntil = async (row: any) => {
+      if (!isAlertScopedMute(row)) {
+        // The list loads without a query observer, so a refused open refreshes it here.
+        const opened = await downtimeRowActions.openExtendUntil(row.active_downtime);
+        if (opened === "conflict") await refreshAlerts();
+        return;
+      }
       extendUntilRow.value = row;
       extendUntilOpen.value = true;
     };
@@ -4683,6 +4726,8 @@ export default defineComponent({
       muteRowUntilClear,
       extendRow,
       endRowMute,
+      downtimeRowActions,
+      downtimeLinkOf,
       openExtendUntil,
       extendUntilOpen,
       extendUntilRow,

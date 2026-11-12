@@ -33,13 +33,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ raw(view?.name ?? alertId ?? "") }}
           </OTruncatedText>
           <template v-if="view">
-            <OTag
+            <router-link
               v-if="view.active_downtime"
-              variant="default-soft"
-              icon="notifications-paused"
-              size="sm"
-              :label="t('alerts.firing.chipMuted')"
-            />
+              :to="downtimeLink(view.active_downtime, orgId)"
+              class="focus-visible:outline-focus-ring-accent rounded-default inline-flex no-underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-solid"
+              data-test="alerts-firing-drawer-muted"
+            >
+              <OTag
+                variant="default-soft"
+                icon="notifications-paused"
+                size="sm"
+                :label="t('alerts.firing.chipMuted')"
+              />
+            </router-link>
             <OTag v-else type="alertState" :value="titleState" size="sm" />
           </template>
         </div>
@@ -254,6 +260,7 @@ import { FIRING_CLOCK_MS } from "@/composables/alerts/useFiringAlerts";
 import { useDowntimesEnabled } from "@/composables/downtimes/useDowntimesEnabled";
 import { useViewerTimezone } from "@/composables/downtimes/useViewerTimezone";
 import { useOrgId } from "@/composables/query";
+import { downtimeLink } from "@/utils/downtimes/link";
 import {
   alertAcksQuery,
   alertDetailQuery,

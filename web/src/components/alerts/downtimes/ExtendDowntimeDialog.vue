@@ -57,6 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, watch } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import type { DowntimeListItem, ExtendDowntimeResponse } from "@/services/downtimes";
+import type { MuteActionResult } from "@/utils/downtimes/muteResult";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import { useExtendDowntime } from "@/composables/downtimes/useExtendDowntime";
 import { extensionStart, followUpName, isRecurring } from "@/utils/downtimes/extend";
@@ -78,11 +79,15 @@ const FORM_ID = "extend-downtime-form";
 const props = defineProps<{
   open: boolean;
   downtime: DowntimeListItem | null;
+  /** A row's own extend, with its version and messages; absent on the Downtimes pages. */
+  submit?: (until: number) => Promise<MuteActionResult>;
 }>();
 
 const emit = defineEmits<{
   "update:open": [value: boolean];
   extended: [result: ExtendDowntimeResponse];
+  /** A row's submit got an answer, so the row's screen refreshes. */
+  settled: [];
 }>();
 
 const { t } = useI18nTyped();
@@ -102,6 +107,15 @@ const form = useOForm<ExtendForm>({
     const d = props.downtime;
     const until = extendUntil(values, timezone);
     if (!d || until === null) return;
+    if (props.submit) {
+      const outcome = await props.submit(until);
+      // A refusal leaves the row's version stale, so the dialog closes and the row refetches.
+      if (outcome !== "failed") {
+        emit("settled");
+        emit("update:open", false);
+      }
+      return;
+    }
     const result = await extend(d, { until });
     if (!result) return;
     emit("extended", result);

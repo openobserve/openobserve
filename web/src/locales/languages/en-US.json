@@ -14503,6 +14503,9 @@
         "muteGroup": "Mute this group",
         "endNow": "End mute now",
         "endMute": "End mute",
+        "endNowGroups": "End mute ({count} group) | End mute ({count} groups)",
+        "mutedBy": "Muted by {name}",
+        "rowActions": "Mute actions",
         "mutedUntilClear": "Muted until it clears · 24 h at most",
         "mutedUntilClearGroups": "Muted until it clears · {count} group | Muted until it clears · {count} groups",
         "mutedGroups": "Muted · {count} group · ends in {duration} | Muted · {count} groups · ends in {duration}",
@@ -24436,7 +24439,9 @@
       "pageNotSnoozed": "{team} page not snoozed: {why}",
       "teamlessPageNotSnoozed": "page not snoozed: {why}",
       "timeTomorrow": "{time} tomorrow",
-      "notQuickMute": "This mute was set on the Downtimes page. Change it there."
+      "notQuickMute": "This mute was set on the Downtimes page. Change it there.",
+      "muteChangedOpen": "This mute changed. Open the downtime.",
+      "noPermissionToEnd": "You do not have permission to end this mute."
     }
   },
   "cipherKeys": {

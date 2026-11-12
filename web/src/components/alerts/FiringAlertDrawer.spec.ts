@@ -270,6 +270,15 @@ describe("FiringAlertDrawer", () => {
     expect(has(await mountDrawer(baseRow), "alerts-firing-drawer-mute")).toBe(false);
   });
 
+  it("links the Muted tag to the downtime in its own folder", async () => {
+    const active_downtime = { id: "d7", name: "Weekly patch", ends_at: 1, folder_id: "ops" };
+    const wrapper = await mountDrawer({ ...baseRow, active_downtime });
+    const href = wrapper.find('[data-test="alerts-firing-drawer-muted"]').attributes("href")!;
+    const url = new URL(href, "http://x");
+    expect(url.pathname).toBe("/downtimes/d7");
+    expect(url.searchParams.get("folder")).toBe("ops");
+  });
+
   it("links to Logs in a new tab for the alert query and firing window", async () => {
     const wrapper = await mountDrawer(baseRow);
     const link = wrapper.find('[data-test="alerts-firing-drawer-logs"]');
