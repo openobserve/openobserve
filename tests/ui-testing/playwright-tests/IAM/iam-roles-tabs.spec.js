@@ -1,4 +1,5 @@
 // IAM → Edit Role · tabs and leaving the page (T-01 .. T-04, T-B1)
+// IAM → Roles list · member counts that open the matching tab (MC-01 .. MC-04, openobserve#16543)
 //
 // Plan: .claude/commands/nvpworkflow/iam-roles-redesign-tests.md (Wave 2, flows 22-24)
 //
@@ -16,7 +17,8 @@ const { openNavFlyoutChild } = require('../../pages/commonActions.js');
 const testLogger = require('../utils/test-logger.js');
 const {
     ns, req, listRoles, listUsers, createRole, getPerms, makeTracker,
-    MEMBER_PASSWORD, uniq, org, rbacEnabled,
+    MEMBER_PASSWORD, uniq, uniqueEmail, org, rbacEnabled,
+    createMember, createServiceAccount, addRoleMembers, listMemberRoles,
 } = require('./iam-fixtures.js');
 
 // This file's own namespace. Every artifact it creates lives under it, and its
@@ -233,5 +235,151 @@ test.describe('IAM · Edit Role · tabs and leaving', { tag: '@enterprise' }, ()
             stored.includes(obj('pipeline')) || !claimsClean,
             'the grant made during the save was marked saved but never sent',
         ).toBe(true);
+    });
+});
+
+// ---------------- roles list member counts (openobserve#16543) ----------------
+
+test.describe('IAM · Roles list · member counts', { tag: '@enterprise' }, () => {
+    // Serial: the roles and members are made once in beforeAll and every test reads them.
+    test.describe.configure({ mode: 'serial' });
+
+    const counted = makeTracker();
+    const ROLE_MIXED = `${NS}_mc_mixed_${uniq()}`;
+    const ROLE_NO_SA = `${NS}_mc_nosa_${uniq()}`;
+    const MIXED_USER = uniqueEmail(`${NS}_mc_user`);
+    const NO_SA_USER = uniqueEmail(`${NS}_mc_user`);
+    const MIXED_SAS = [uniqueEmail(`${NS}_mc_sa`), uniqueEmail(`${NS}_mc_sa`)].sort();
+    const MEMBER_NAME = { firstName: 'Automation', lastName: 'TestUser' };
+
+    let pm;
+
+    test.beforeAll(async ({ browser }) => {
+        const page = await browser.newPage();
+        try {
+            test.skip(!(await rbacEnabled(page)), 'RBAC is off (OSS build)');
+            await createRole(page, counted.role(ROLE_MIXED));
+            await createRole(page, counted.role(ROLE_NO_SA));
+            await createMember(page, counted.user(MIXED_USER), 'user', MEMBER_NAME);
+            await createMember(page, counted.user(NO_SA_USER), 'user', MEMBER_NAME);
+            for (const email of MIXED_SAS) {
+                await createServiceAccount(page, counted.serviceAccount(email));
+            }
+            await addRoleMembers(page, ROLE_MIXED, [MIXED_USER, ...MIXED_SAS]);
+            await addRoleMembers(page, ROLE_NO_SA, [NO_SA_USER]);
+
+            // The list counts from this map, so it must hold every membership before a page loads.
+            await expect.poll(async () => {
+                const map = await listMemberRoles(page);
+                return [MIXED_USER, ...MIXED_SAS].every((e) => (map[e] || []).includes(ROLE_MIXED))
+                    && (map[NO_SA_USER] || []).includes(ROLE_NO_SA);
+            }, { timeout: 30000, message: 'role memberships never reached /users/roles/all' }).toBe(true);
+            testLogger.info('member-count fixtures ready');
+        } finally {
+            await page.close();
+        }
+    });
+
+    test.afterAll(async ({ browser }) => {
+        const page = await browser.newPage();
+        try {
+            const gone = await counted.cleanup(page);
+            testLogger.info(`teardown removed ${gone.roles.length} roles, ${gone.users.length} users, `
+                + `${gone.serviceAccounts.length} service accounts`);
+            const left = await counted.survivors(page);
+            if (left.length) throw new Error(`teardown left its own artifacts behind: ${left}`);
+        } finally {
+            await page.close();
+        }
+    });
+
+    test.beforeEach(async ({ page }) => {
+        await navigateToBase(page);
+        pm = new PageManager(page);
+        test.skip(!(await rbacEnabled(page)), 'RBAC is off (OSS build)');
+        await pm.rolesPage.gotoRoles();
+    });
+
+    test('MC-01 · each role shows its exact user and service account counts', {
+        tag: ['@iam', '@iamRolesMemberCounts', '@P0', '@all']
+    }, async () => {
+        await pm.rolesPage.filterRoleList(ROLE_MIXED);
+        const mixedSa = pm.rolesPage.roleMemberCount(ROLE_MIXED, 'service-accounts');
+        await expect(mixedSa).toHaveText('2', { timeout: 30000 });
+        // Service accounts share the member map with users, so Users must read 1 here, not 3.
+        await expect(pm.rolesPage.roleMemberCount(ROLE_MIXED, 'users')).toHaveText('1');
+        await expect(mixedSa).toHaveAttribute('aria-label', `${ROLE_MIXED}: 2 Service Accounts`);
+        await expect(mixedSa).toHaveAttribute('data-o2-variant', 'ghost-primary');
+
+        await pm.rolesPage.filterRoleList(ROLE_NO_SA);
+        const noSa = pm.rolesPage.roleMemberCount(ROLE_NO_SA, 'service-accounts');
+        await expect(noSa).toHaveText('0', { timeout: 30000 });
+        await expect(noSa).toHaveAttribute('aria-label', `${ROLE_NO_SA}: 0 Service Accounts`);
+        await expect(noSa).toHaveAttribute('data-o2-variant', 'ghost-muted');
+        await expect(pm.rolesPage.roleMemberCount(ROLE_NO_SA, 'users')).toHaveText('1');
+    });
+
+    test('MC-02 · the service account count opens that role on Service Accounts, listing exactly its accounts', {
+        tag: ['@iam', '@iamRolesMemberCounts', '@P0', '@all']
+    }, async ({ page }) => {
+        await pm.rolesPage.filterRoleList(ROLE_MIXED);
+        const count = pm.rolesPage.roleMemberCount(ROLE_MIXED, 'service-accounts');
+        await expect(count).toHaveText('2', { timeout: 30000 });
+        await count.click();
+
+        await expect(page).toHaveURL(new RegExp(`/iam/roles/edit/${ROLE_MIXED}\\?(.*&)?tab=serviceAccounts(&|$)`),
+            { timeout: 15000 });
+        await pm.rolesPage.expectTabActive('serviceAccounts');
+        await expect(pm.rolesPage.tab('permissions')).toHaveAttribute('data-state', 'off');
+        await expect(pm.rolesPage.tab('users')).toHaveAttribute('data-state', 'off');
+
+        await expect(pm.rolesPage.serviceAccountMemberRows).toHaveCount(MIXED_SAS.length, { timeout: 30000 });
+        await expect(pm.rolesPage.serviceAccountMemberRows.first()).toBeVisible();
+        expect(await pm.rolesPage.serviceAccountMemberEmails()).toEqual(MIXED_SAS);
+        for (const email of MIXED_SAS) {
+            await expect(pm.rolesPage.serviceAccountMemberCheckbox(email)).toHaveAttribute('aria-checked', 'true');
+        }
+    });
+
+    test('MC-03 · the user count opens that role on Users, listing exactly its users', {
+        tag: ['@iam', '@iamRolesMemberCounts', '@P1', '@all']
+    }, async ({ page }) => {
+        await pm.rolesPage.filterRoleList(ROLE_MIXED);
+        const count = pm.rolesPage.roleMemberCount(ROLE_MIXED, 'users');
+        await expect(count).toHaveText('1', { timeout: 30000 });
+        await count.click();
+
+        await expect(page).toHaveURL(new RegExp(`/iam/roles/edit/${ROLE_MIXED}\\?(.*&)?tab=users(&|$)`),
+            { timeout: 15000 });
+        await pm.rolesPage.expectTabActive('users');
+        await expect(pm.rolesPage.tab('serviceAccounts')).toHaveAttribute('data-state', 'off');
+
+        await expect(pm.rolesPage.userMemberRows).toHaveCount(1, { timeout: 30000 });
+        await expect(pm.rolesPage.userMemberRows.first()).toBeVisible();
+        expect(await pm.rolesPage.userMemberEmails()).toEqual([MIXED_USER]);
+        await expect(pm.rolesPage.userMemberCheckbox(MIXED_USER)).toHaveAttribute('aria-checked', 'true');
+    });
+
+    test('MC-04 · a zero service account count opens an empty Service Accounts tab', {
+        tag: ['@iam', '@iamRolesMemberCounts', '@P1', '@all']
+    }, async ({ page }) => {
+        await pm.rolesPage.filterRoleList(ROLE_NO_SA);
+        const count = pm.rolesPage.roleMemberCount(ROLE_NO_SA, 'service-accounts');
+        await expect(count).toHaveText('0', { timeout: 30000 });
+        await count.click();
+
+        await expect(page).toHaveURL(new RegExp(`/iam/roles/edit/${ROLE_NO_SA}\\?(.*&)?tab=serviceAccounts(&|$)`),
+            { timeout: 15000 });
+        await pm.rolesPage.expectTabActive('serviceAccounts');
+
+        // Selected is also empty before the list loads, so prove the load through All first.
+        await pm.rolesPage.serviceAccountShowToggle('all').click();
+        for (const email of MIXED_SAS) {
+            await expect(pm.rolesPage.serviceAccountMemberCheckbox(email))
+                .toHaveAttribute('aria-checked', 'false', { timeout: 30000 });
+        }
+        await pm.rolesPage.serviceAccountShowToggle('selected').click();
+        await expect(pm.rolesPage.serviceAccountMemberRows).toHaveCount(0, { timeout: 15000 });
+        await expect(pm.rolesPage.serviceAccountMembersEmpty).toBeVisible();
     });
 });

@@ -15833,6 +15833,7 @@
     "generalDesc": "Theme, query defaults, and core preferences",
     "orgDesc": "Organization parameters and identifiers",
     "cipherKeysDesc": "Encryption keys for sensitive fields",
+    "aiToolsetsDesc": "MCP servers and CLI tools the AI assistant can use",
     "regexPatternsDesc": "Reusable regex patterns for redaction",
     "domainManagementDesc": "Restrict sign-in to allowed SSO domains",
     "passwordPolicy": "Password Policy",
