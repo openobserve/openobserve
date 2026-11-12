@@ -45,7 +45,6 @@ describe("assistant copy renders through vue-i18n", () => {
       "Always for pausing alerts",
     );
     expect(t("home.answersReady", { count: 1 }, 1)).toBe("1 answer ready");
-    expect(t("home.needYou", { count: 3 }, 3)).toBe("3 need you");
     expect(t("alerts.incidents.rcaRun.cancelConfirmBody", { number: 482 })).toBe(
       "Cancel the analysis for everyone on incident #482?",
     );
@@ -77,14 +76,6 @@ describe("assistant copy renders through vue-i18n", () => {
     expect(
       t("assistant.history.autoRuns.openName", { title: "Checkout 5xx", state: "Failed" }),
     ).toBe("Open Checkout 5xx, Failed");
-    expect(t("home.agent.failedRunTitle", { title: "Checkout 5xx" })).toBe(
-      "Auto RCA for Checkout 5xx",
-    );
-    expect(t("home.agent.failedRunDetail", { code: "timeout" })).toBe("Auto-run · timeout");
-    expect(t("home.agent.followInThreadName", { row: "Checkout 5xx" })).toBe(
-      "Follow Checkout 5xx in thread",
-    );
-    expect(t("home.agent.runLine", { state: "Running", time: "13:58" })).toBe("Running · 13:58");
     expect(t("aiAssistant.greeting.evening")).toBe("Good evening");
     expect(t("aiAssistant.greetingNamed.night", { name: "Harsh" })).toBe("Working late, Harsh");
   });

@@ -26,6 +26,7 @@ import { raw } from "@/types/i18n";
 
 import { fakeAssistant, fakeRouter, fakeVuex, hintBus } from "../__tests__/fakeAssistant";
 import { historyStubs } from "../__tests__/historyStubs";
+import AssistantComposerPlusMenu from "../composer/AssistantComposerPlusMenu.vue";
 import { fakeRuns } from "../runs/runsTestKit";
 import AssistantShareControl from "../share/AssistantShareControl.vue";
 import AssistantThreadHeader from "../thread/AssistantThreadHeader.vue";
@@ -79,8 +80,8 @@ vi.mock("@/composables/assistant", async (importOriginal) => ({
 vi.mock("./AssistantHeaderSees.vue", () => ({
   default: {
     name: "AssistantHeaderSees",
-    props: ["sid"],
-    template: '<span data-test="assistant-shell-sees-host" />',
+    props: ["sid", "label"],
+    template: '<span data-test="assistant-shell-sees-host" :data-label="label" />',
   },
 }));
 vi.mock("@/lib/feedback/Toast/useToast", async (importOriginal) => ({
@@ -360,6 +361,46 @@ describe("AssistantShell chrome and focus", () => {
     expect(docked.get('[data-test="assistant-shell-chrome"]').classes()).toContain("h-10");
   });
 
+  it("draws its controls as icons in the chat's corner when bare, and keeps the bar by default", async () => {
+    const { wrapper, store } = setup({ placement: "full", bare: true });
+    const sid = store.createSession({
+      origin: { entryKind: "header_button", objectKind: "none", container: "full_view" },
+    });
+    store.state.sessions[sid].messages.push({ role: "user", content: raw("hi") });
+    await flushPromises();
+    const chrome = wrapper.get("[data-assistant-chrome]");
+    expect(chrome.classes()).not.toContain("border-b");
+    expect(chrome.get('[data-test="assistant-thread-title"]').element.tagName).toBe("DIV");
+    expect(chrome.find('[data-test="assistant-thread-title-button"]').exists()).toBe(false);
+    const controls = ["assistant-shell-place-window", "assistant-shell-sees-host", "assistant-thread-more"];
+    const ids = chrome
+      .findAll("[data-test]")
+      .map((el) => el.attributes("data-test"))
+      .filter((id) => controls.includes(id ?? ""));
+    expect(ids).toEqual(controls);
+    // Home offers the floating window only, so it is one direct icon button, not a menu.
+    const openAs = chrome.get('[data-test="assistant-shell-place-window"]');
+    expect(openAs.attributes("aria-label")).toBe("Floating window");
+    expect(chrome.find('[data-test="assistant-open-as-button"]').exists()).toBe(false);
+    expect(chrome.get('[data-test="assistant-shell-sees-host"]').attributes("data-label")).toBe(
+      "What the Assistant Sees",
+    );
+    expect(chrome.get('[data-test="assistant-thread-more"]').attributes("aria-label")).toBe(
+      "More Actions",
+    );
+    expect(wrapper.find('[data-test="assistant-transcript"]').exists()).toBe(true);
+    document.body.innerHTML = "";
+    const full = setup({ placement: "full" });
+    const own = full.store.createSession({
+      origin: { entryKind: "header_button", objectKind: "none", container: "full_view" },
+    });
+    full.store.state.sessions[own].messages.push({ role: "user", content: raw("hi") });
+    await flushPromises();
+    expect(full.wrapper.find('[data-test="assistant-thread-title-button"]').exists()).toBe(true);
+    expect(full.wrapper.find('[data-test="assistant-thread-more"]').exists()).toBe(false);
+    expect(full.wrapper.get('[data-test="assistant-shell-chrome"]').classes()).toContain("border-b");
+  });
+
   it("leaves the full page by navigating, so it has no ×", () => {
     const { wrapper } = setup({ placement: "full" });
     expect(wrapper.get('[data-test="assistant-open-as-button"]').text()).toBe("Open as");
@@ -537,11 +578,14 @@ describe("AssistantShell rows ⑤–⑦ (WP-05)", () => {
     return { wrapper, store: fake.current.store };
   }
 
-  it("fills the tray and the composer in their rows, with no line under the composer", async () => {
+  it("draws the tray in the composer only once something is in it, with no line under the composer", async () => {
     const { wrapper } = live();
     await flushPromises();
-    expect(wrapper.find('[data-test="assistant-context-tray"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="assistant-context-tray"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="assistant-composer-root"]').exists()).toBe(true);
+    wrapper.findComponent(AssistantComposerPlusMenu).vm.$emit("select", "time");
+    await flushPromises();
+    expect(wrapper.find('[data-test="assistant-context-tray"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="assistant-context-disclosure"]').exists()).toBe(false);
   });
 

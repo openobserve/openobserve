@@ -488,6 +488,33 @@ describe("container resolution (10 §3.3)", () => {
     expect(wire).toMatchObject({ alertId: "a1" });
   });
 
+  it("attaches payload.images to the new chat before the send and on a stage, under the composer's caps", async () => {
+    const { open, store, send } = setup();
+    const image = (filename: string, mimeType = "image/png") =>
+      ({ data: "AAAA", mimeType, filename, size: 3 }) as never;
+    const names = (sid: string) =>
+      store.state.sessions[sid].composer.images.map((i: { filename: string }) => i.filename);
+    let sent: string[] = [];
+    send.mockImplementation((sid: string) => {
+      sent = names(sid);
+      return Promise.resolve(DONE);
+    });
+    const door = (intent: "send" | "stage", images: never[]) =>
+      open({
+        entryKind: "home_launcher",
+        entryVerb: "ask",
+        objectKind: "none",
+        intent,
+        thread: "new",
+        payload: { chips: [], text: `look ${intent}`, images },
+      });
+    ok(await door("send", ["1", "2", "3", "4", "5"].map((n) => image(`${n}.png`))));
+    expect(sent).toEqual(["1.png", "2.png", "3.png", "4.png"]);
+    const staged = ok(await door("stage", [image("a.png"), image("b.gif", "image/gif")]));
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(names(staged.sid)).toEqual(["a.png"]);
+  });
+
   it("leaves removedPageKeys untouched without the payload field", async () => {
     const { open, store } = setup();
     const result = ok(await open(explain({ thread: "new" })));

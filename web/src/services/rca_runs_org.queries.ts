@@ -18,7 +18,7 @@ import { queryOptions } from "@tanstack/vue-query";
 import { LIVE_STALE_TIME } from "@/composables/query/cachePolicy";
 import { orgKey } from "@/composables/query/keys";
 
-import { listOrgRcaRuns, type OrgRcaRun, type OrgRcaRunsParams } from "./rca_runs_org";
+import { listOrgRcaRuns, type OrgRcaRunsParams } from "./rca_runs_org";
 
 // Under the incidents scope, so an incident write that starts or cancels a run refreshes these lists too.
 export const orgRcaRunsKey = (org: string, params: OrgRcaRunsParams) =>
@@ -30,10 +30,3 @@ export const orgRcaRunsQuery = (org: string, params: OrgRcaRunsParams = {}) =>
     queryFn: async () => (await listOrgRcaRuns(org, params)).data,
     staleTime: LIVE_STALE_TIME,
   });
-
-/** The newest run per incident; the list is already newest first. */
-export function latestRunByIncident(runs: readonly OrgRcaRun[]): Map<string, OrgRcaRun> {
-  const latest = new Map<string, OrgRcaRun>();
-  for (const run of runs) if (!latest.has(run.incident_id)) latest.set(run.incident_id, run);
-  return latest;
-}

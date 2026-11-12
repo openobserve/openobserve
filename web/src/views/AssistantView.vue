@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :splitter-limits="[railPx(RAIL_MIN_REM), railPx(RAIL_MAX_REM)]"
     :resizable="view === 'shell'"
   >
-    <template v-if="view === 'shell' && lgUp" #sidebar>
+    <template v-if="view === 'shell' && lgUp && !bare" #sidebar>
       <AssistantHistoryList
         mode="rail"
         :current-sid="store.state.shell.activeSid"
@@ -59,8 +59,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :focus-on-mount="arrivedFromLockedPanel"
         @action="onGateAction"
       />
-      <AssistantShell v-else ref="shell" placement="full" density="roomy">
-        <template #chrome-start>
+      <AssistantShell v-else ref="shell" placement="full" density="roomy" :bare="bare">
+        <!-- Inside Home the page is already Home, so a bare view has no way back of its own -->
+        <template v-if="!bare" #chrome-start>
           <OButton
             variant="ghost"
             size="sm"
@@ -152,7 +153,7 @@ import {
   useAssistantHistory,
   useAssistantStore,
 } from "@/composables/assistant";
-import { fullThreadLocation, withoutThread } from "@/composables/assistant/pure";
+import { fullThreadLocation, homeAskLocation, withoutThread } from "@/composables/assistant/pure";
 import useBreakpoint from "@/composables/useBreakpoint";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
@@ -162,7 +163,14 @@ import { trackAssistant } from "@/services/assistantAnalytics";
 import { useI18nTyped } from "@/types/i18n";
 import Error404 from "@/views/Error404.vue";
 
-const props = withDefaults(defineProps<{ chatId?: string | null }>(), { chatId: null });
+const props = withDefaults(
+  defineProps<{
+    chatId?: string | null;
+    /** Inside Home's own layout: no rail or chat bar, and New chat goes back to Home's Ask box. */
+    bare?: boolean;
+  }>(),
+  { chatId: null, bare: false },
+);
 
 const { t } = useI18nTyped();
 const store = useAssistantStore();
@@ -198,6 +206,10 @@ const chatId = computed(() => props.chatId || null);
 provide(SHELL_ROUTE_CONTEXT, { state: routeState, newChat });
 
 function newChat(): void {
+  if (props.bare) {
+    void router.push(homeAskLocation(route.query)).catch(() => undefined);
+    return;
+  }
   routeState.value = "idle";
   store.startNewChat({
     origin: { entryKind: "deep_link", objectKind: "none", container: "full_view" },
@@ -327,4 +339,6 @@ onActivated(() => {
 
 onBeforeRouteLeave(() => leave());
 onBeforeUnmount(leave);
+
+defineExpose({ focusEntry: () => shell.value?.focusEntry() });
 </script>

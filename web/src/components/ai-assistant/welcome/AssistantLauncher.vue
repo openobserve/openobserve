@@ -64,7 +64,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :is-admin="capability.isAdmin"
         :context="{ org, feature: 'chat' }"
       />
-      <div v-else-if="layout !== 'chats'" ref="field" class="relative min-w-0">
+      <div
+        v-else
+        ref="field"
+        class="relative min-w-0"
+      >
         <AssistantMentionMenu
           ref="mention"
           :open="mentionAt !== null"
@@ -72,6 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :org="org"
           :listbox-id="MENTION_LISTBOX_ID"
           :sid="null"
+          hide-agents
           :class="['md:z-30', mentionBelow && 'md:top-full! md:bottom-auto! md:mt-1! md:mb-0!']"
           @select="pickMention"
           @close="closeMention"
@@ -79,6 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <AssistantComposerFrame
           ref="input"
           :model-value="shownText"
+          :glow="layout === 'overview'"
           :state="goToOnly ? 'go_to' : (state ?? undefined)"
           :disabled="fieldLoading && !goToOnly"
           :placeholder="placeholder"
@@ -105,75 +111,54 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               'aria-activedescendant': mention?.activeId,
             }),
           }"
+          tall
           data-test="assistant-launcher-input"
           @update:model-value="onInput"
           @keydown="onKeydown"
         >
-          <template v-if="!goToOnly" #strip>
-            <AssistantComposerStrip :notice="null">
-              <AssistantChipTray
-                v-model:expanded="chipsExpanded"
-                :items="shownTrayChips"
-                :hidden-count="hiddenTrayChips"
-                data-test="assistant-launcher-chips"
-              >
-                <template #leading>
-                  <AssistantTimePrefix
-                    :window="window"
-                    :disabled="fieldLoading"
-                    align="start"
-                    @change="onTimeChange"
-                  />
-                </template>
-                <template #chip="{ item }">
-                  <AssistantContextChip
-                    v-if="item.role === 'mention'"
-                    :chip="item.chip"
-                    compact
-                    :short-label="item.chip.short"
-                    :popup="false"
-                    data-test="assistant-launcher-mention-chip"
-                    @remove="removeMention(item.chip)"
-                  />
-                  <AssistantContextChip
-                    v-else-if="item.role === 'page'"
-                    :chip="item.chip"
-                    compact
-                    :short-label="item.chip.short"
-                    :popup="false"
-                    data-test="assistant-launcher-page-chip"
-                    @open="showPageSection"
-                    @remove="removePageKey(item.chip)"
-                  />
-                  <AssistantContextChip
-                    v-else
-                    :chip="item.chip"
-                    compact
-                    :short-label="item.chip.short"
-                    state="ghost"
-                    :popup="false"
-                    data-test="assistant-launcher-page-chip"
-                    @open="addBackPageKey(item.chip)"
-                  />
-                </template>
-              </AssistantChipTray>
-              <template #sees>
-                <AssistantContextSeesPopover :sid="null" hide-streams>
-                  <template #trigger>
-                    <AssistantIconButton
-                      :label="t('assistant.context.title')"
-                      :icon="assistantGlyph.info"
-                      data-test="assistant-launcher-sees"
+          <template #bar>
+            <AssistantComposerBottomRow divided>
+              <template v-if="!goToOnly" #agent>
+                <AssistantComposerPlusMenu
+                  v-if="mentionsOn"
+                  :actions="['attach', 'context']"
+                  :disabled="fieldLoading"
+                  @select="onPlus"
+                />
+                <AssistantChipTray
+                  v-model:expanded="chipsExpanded"
+                  :items="shownTrayChips"
+                  :hidden-count="hiddenTrayChips"
+                  :hidden-labels="hiddenTrayLabels"
+                  data-test="assistant-launcher-chips"
+                >
+                  <template #leading>
+                    <span class="flex shrink-0 items-center gap-2">
+                      <AssistantTimePrefix
+                        v-model:open="timeOpen"
+                        :window="window"
+                        :disabled="fieldLoading"
+                        fixed
+                        align="start"
+                        @change="timeOverride = $event"
+                      />
+                      <AssistantLauncherAgent v-model="agent" :disabled="fieldLoading" />
+                    </span>
+                  </template>
+                  <template #chip="{ item }">
+                    <AssistantContextChip
+                      :chip="item.chip"
+                      compact
+                      :short-label="item.chip.short"
+                      :image-src="item.src"
+                      :popup="false"
+                      :data-test="
+                        item.src ? 'assistant-launcher-image-chip' : 'assistant-launcher-mention-chip'
+                      "
+                      @remove="removeTrayChip(item.chip)"
                     />
                   </template>
-                </AssistantContextSeesPopover>
-              </template>
-            </AssistantComposerStrip>
-          </template>
-          <template #bar>
-            <AssistantComposerBottomRow>
-              <template v-if="!goToOnly" #agent>
-                <AssistantAgentPill :agent="agent ?? DEFAULT_AGENT" :disabled="fieldLoading" />
+                </AssistantChipTray>
               </template>
               <AssistantIconButton
                 v-if="text"
@@ -184,7 +169,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               <AssistantDictationWave v-if="voice.mine.value" :elapsed-ms="voice.elapsedMs.value" />
               <AssistantDictateButton
-                v-if="!goToOnly && voice.mic.value !== 'none' && voice.mic.value !== 'off'"
+                v-if="!goToOnly && voice.mic.value !== 'none'"
                 :mic="voice.mic.value"
                 :pressed="voice.mine.value"
                 :disabled-reason="voice.helperLine.value ?? undefined"
@@ -196,14 +181,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="md"
                 :label="t('assistant.welcome.launcher.ask')"
                 :icon="assistantGlyph.send"
-                :disabled="fieldLoading || !text.trim()"
-                :class="ROUND_ACTION_CLASS"
+                :disabled="!canSend"
+                :class="[ROUND_ACTION_CLASS, layout === 'overview' && canSend && SEND_GLOW_CLASS]"
                 data-test="assistant-launcher-ask"
                 @click="ask(false)"
               />
             </AssistantComposerBottomRow>
           </template>
         </AssistantComposerFrame>
+        <OFile
+          v-if="mentionsOn"
+          ref="file"
+          class="hidden"
+          accept="image/png,image/jpeg"
+          :type-error-toast="false"
+          multiple
+          :model-value="null"
+          :max-file-size="MAX_IMAGE_SIZE_BYTES"
+          @change="onPicked"
+          @size-error="(files) => files.forEach(refuseSize)"
+          @type-error="() => refuse('type', t('assistant.context.imageType'))"
+        />
       </div>
       <div
         v-if="goToShown"
@@ -222,15 +220,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
       <slot v-if="goToOnly" name="note" />
-
       <div
+        v-if="layout === 'card'"
         :class="[
           'grid min-w-0 grid-cols-1 gap-x-6 gap-y-3',
-          showSuggestions && layout === 'card' && '@[40rem]:grid-cols-2',
+          showSuggestions && '@[40rem]:grid-cols-2',
         ]"
       >
         <div
-          v-if="showSuggestions && layout !== 'chats'"
+          v-if="showSuggestions"
           class="flex min-w-0 flex-col"
           data-test="assistant-launcher-suggestions"
         >
@@ -241,13 +239,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <li v-for="n in 3" :key="n"><OSkeleton type="text" class="h-5 w-3/5" /></li>
           </ul>
-          <ul
-            v-else
-            :class="[
-              'grid min-w-0 grid-cols-1 gap-2',
-              layout === 'overview' && '@[40rem]:grid-cols-3',
-            ]"
-          >
+          <ul v-else class="grid min-w-0 grid-cols-1 gap-2">
             <li v-for="(starter, index) in shownStarters" :key="starter.id" class="flex min-w-0">
               <AssistantStarterRow
                 :label="starter.label"
@@ -260,7 +252,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <!-- A chat that answers or waits outranks suggestions on a phone (PO A21). -->
         <div
-          v-if="layout !== 'overview'"
           :class="['flex min-w-0 flex-col', hasInProgress && 'max-md:order-first']"
           data-test="assistant-launcher-your-chats"
         >
@@ -356,9 +347,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import type { AgentId, ContextChip, Sid } from "@/composables/assistant";
 
-// A door always starts a new chat with the default agent; the chat's own picker changes it later.
-const DEFAULT_AGENT: AgentId = "o2-ai";
-
 // Dictation writes here, never to a chat; the line becomes a chat only when it is sent.
 const LAUNCHER_DRAFT: Sid = "assistant-launcher";
 
@@ -367,6 +355,9 @@ export const MAX_LAUNCHER_CHARS = 4_000;
 
 /** Rows of each column (`70` §2.1). */
 export const LAUNCHER_ROWS = 3;
+
+// Home's Send lights up once there is a line to send.
+const SEND_GLOW_CLASS = "bg-gradient-ai enabled:hover:shadow-md enabled:hover:shadow-ai-accent/40";
 
 /** In-progress chats can sit below the latest ones, so Your chats looks this far down the list. */
 const RECENT_LOOKUP = 20;
@@ -378,11 +369,11 @@ const HIDDEN_GATES: ReadonlySet<string> = new Set([
   "off_for_org",
 ]);
 
-// A Home chip is the user's @ pick, a page chip, or a removed page chip offered back.
+// A Home chip is the user's @ pick or an attached image, which carries its thumbnail.
 interface TrayChip {
   id: string;
   chip: ContextChip;
-  role: "mention" | "page" | "ghost";
+  src?: string;
 }
 
 /** What the card renders for a gate; `null` renders nothing. */
@@ -410,7 +401,6 @@ import {
   isInProgress,
 } from "@/components/ai-assistant/history/chatStatus";
 import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
-import AssistantContextSeesPopover from "@/components/ai-assistant/context/AssistantContextSeesPopover.vue";
 import AssistantChipTray, {
   useChipCollapse,
 } from "@/components/ai-assistant/context/AssistantChipTray.vue";
@@ -418,15 +408,16 @@ import AssistantContextChip from "@/components/ai-assistant/context/AssistantCon
 import AssistantMentionMenu, {
   type MentionOption,
 } from "@/components/ai-assistant/context/AssistantMentionMenu.vue";
-import AssistantTimePrefix from "@/components/ai-assistant/context/AssistantTimePrefix.vue";
 import GoToResults from "@/components/goto/GoToResults.vue";
+import AssistantTimePrefix from "@/components/ai-assistant/context/AssistantTimePrefix.vue";
 import AssistantGateState from "@/components/ai-assistant/gate/AssistantGateState.vue";
 import {
+  MAX_IMAGES,
   openAssistant,
   starterPayload,
+  periodMs,
   timeWindowOf,
   useAssistantCapability,
-  useAssistantContext,
   useAssistantHistory,
   useAssistantName,
   useAssistantRuns,
@@ -449,39 +440,49 @@ import OText from "@/lib/core/Typography/OText.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import OFile from "@/lib/forms/File/OFile.vue";
+import type { FileValue } from "@/lib/forms/File/OFile.types";
 import { trackAssistant } from "@/services/assistantAnalytics";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { MAX_IMAGE_SIZE_BYTES, type ImageAttachment } from "@/ts/interfaces/chat";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { formatRelativeCompact } from "@/utils/formatters";
+import { getUUIDv7 } from "@/utils/uuid";
 
-import AssistantAgentPill from "@/components/ai-assistant/composer/AssistantAgentPill.vue";
 import AssistantComposerBottomRow, {
   ROUND_ACTION_CLASS,
 } from "@/components/ai-assistant/composer/AssistantComposerBottomRow.vue";
 import AssistantComposerFrame from "@/components/ai-assistant/composer/AssistantComposerFrame.vue";
-import AssistantComposerStrip from "@/components/ai-assistant/composer/AssistantComposerStrip.vue";
+import AssistantComposerPlusMenu, {
+  type ComposerPlusAction,
+} from "@/components/ai-assistant/composer/AssistantComposerPlusMenu.vue";
 import AssistantDictateButton from "@/components/ai-assistant/composer/AssistantDictateButton.vue";
 import AssistantDictationWave from "@/components/ai-assistant/composer/AssistantDictationWave.vue";
+import {
+  attachImageFiles,
+  imageChipOf,
+  imageTooBigLine,
+  type ImageCap,
+} from "@/components/ai-assistant/composer/composerImages";
 import { useAssistantVoice } from "@/components/ai-assistant/composer/useAssistantVoice";
 import { useComposerWidth } from "@/components/ai-assistant/composer/useComposerWidth";
 
+import AssistantLauncherAgent from "./AssistantLauncherAgent.vue";
 import AssistantStarterRow from "./AssistantStarterRow.vue";
 import { starterIcon } from "./starterIcons";
 
 const props = withDefaults(
   defineProps<{
-    /** `overview` is the Overview's ask header (no chats), `chats` its right-column chat list. */
-    layout?: "card" | "overview" | "chats";
+    /** `overview` is Home's ask field alone; `card` adds a heading, starters and recent chats. */
+    layout?: "card" | "overview";
     /** The page range in ms; the time chip mirrors it and a pick moves it. */
     pageRange?: ComposerState["timeOverride"];
     /** Set on Home when the agent cannot answer: the field is Go to only and the `note` slot says why. */
     goToOnly?: boolean;
+    /** Home's wide tab: the capability cards under the field; a pick stages its prompt in the field. */
   }>(),
   { layout: "card", pageRange: null, goToOnly: false },
 );
-
-const emit = defineEmits<{
-  "update:pageRange": [range: NonNullable<ComposerState["timeOverride"]>];
-}>();
 
 const GO_TO_LISTBOX_ID = "assistant-launcher-go-to-listbox";
 const MENTION_LISTBOX_ID = "assistant-launcher-mention-listbox";
@@ -499,11 +500,23 @@ const vuex = useStore();
 const capability = useAssistantCapability();
 const assistant = useAssistantStore();
 const { mdUp } = useBreakpoint();
-const { starters, loading } = useAssistantStarters({ page: "home" });
+// The layout is fixed per mount, and only the card lists starters and recent chats.
+const isCard = props.layout === "card";
+const starterList = isCard ? useAssistantStarters({ page: "home" }) : null;
 
 const titleId = `assistant-launcher-title-${useId()}`;
 const text = ref("");
+// Home asks over the default window until a range is picked; a picked preset slides to the moment of sending.
 const timeOverride = ref<ComposerState["timeOverride"]>(null);
+function sendRange(): ComposerState["timeOverride"] {
+  const range = timeOverride.value;
+  if (!range?.period) return range;
+  const to = Date.now();
+  return { from: to - periodMs(range.period), to, period: range.period };
+}
+// The chip always shows the range the box asks over; Home's own page range stays out of the box.
+const timeOpen = ref(false);
+const window = computed<TimeWindow>(() => timeWindowOf(null, timeOverride.value));
 const input = ref<InstanceType<typeof AssistantComposerFrame> | null>(null);
 const mention = ref<InstanceType<typeof AssistantMentionMenu> | null>(null);
 const mentionAt = ref<number | null>(null);
@@ -511,21 +524,26 @@ const mentionQuery = ref("");
 const mentionBelow = ref(false);
 // The launcher has no chat yet, so its @ picks wait here and go with the line it opens.
 const mentionChips = ref<ContextChip[]>([]);
+// Attached images wait here too, under the composer's caps, and ride with the line into the new chat.
+const images = ref<ImageAttachment[]>([]);
+const file = ref<InstanceType<typeof OFile> | null>(null);
 const agent = ref<AgentId | null>(null);
 
 const org = computed<string>(() => vuex.state.selectedOrganization?.identifier ?? "");
 const state = computed(() => {
   const gated = launcherState(capability.gate.value);
-  return gated === "ready" && loading.value ? "loading" : gated;
+  return gated === "ready" && starterList?.loading.value ? "loading" : gated;
 });
 const goToOnly = computed(() => props.layout === "overview" && props.goToOnly);
 // Starters refetch when the @ menu loads the same lists; only the gate may disable the field, or it drops focus.
 const fieldReady = computed(() => launcherState(capability.gate.value) === "ready");
 const fieldLoading = computed(() => capability.gate.value === "loading");
+const canSend = computed(
+  () => !fieldLoading.value && (text.value.trim() !== "" || images.value.length > 0),
+);
 // The card names itself with its heading; the Home layouts draw none, so they carry the name.
 const sectionName = computed(() => {
-  if (props.layout === "card") return undefined;
-  if (props.layout === "chats") return t("assistant.welcome.launcher.recentThreads");
+  if (isCard) return undefined;
   return goToOnly.value
     ? t("home.agent.goToName")
     : t("assistant.welcome.launcher.inputName", { product });
@@ -535,32 +553,10 @@ const shown = computed(
   () => goToOnly.value || (state.value !== null && (props.layout !== "card" || !sidebarOpen.value)),
 );
 const creditsExhausted = computed(() => capability.value.creditMode === "exhausted");
-const shownStarters = computed(() => starters.value.slice(0, LAUNCHER_ROWS));
+const shownStarters = computed(() => starterList?.starters.value.slice(0, LAUNCHER_ROWS) ?? []);
 // The sidebar is the assistant while it is open, so Home shows no second one beside it.
 const sidebarOpen = computed(() => assistant.state.shell.placement.kind === "sidebar");
 const showSuggestions = computed(() => state.value !== "gate" && !goToOnly.value);
-
-const window = computed<TimeWindow>(() =>
-  props.pageRange ? { ...props.pageRange, source: "page" } : timeWindowOf(null, timeOverride.value),
-);
-
-// The launcher has no chat yet, so it keeps the removals itself and hands them to the new chat on send.
-const context = useAssistantContext(null);
-const removedPageKeys = ref<string[]>([]);
-const allPageChips = computed(() =>
-  props.layout === "overview"
-    ? context.chips.value.filter((chip) => chip.provenance === "page" && chip.kind !== "time")
-    : [],
-);
-const pageChips = computed(() =>
-  allPageChips.value.filter((chip) => !removedPageKeys.value.includes(fieldOf(chip))),
-);
-const ghostChips = computed(() =>
-  allPageChips.value
-    .filter((chip) => removedPageKeys.value.includes(fieldOf(chip)))
-    .map((chip) => ({ ...chip, id: `ghost:${fieldOf(chip)}` })),
-);
-watch(org, () => (removedPageKeys.value = []));
 
 // The Home field folds chips into "+N" at the composer's widths, so a phone never squashes them.
 const field = ref<HTMLElement | null>(null);
@@ -571,9 +567,12 @@ const chipLayout = computed(() => ({
 }));
 const chipsExpanded = ref(false);
 const trayChips = computed<TrayChip[]>(() => [
-  ...mentionChips.value.map((chip) => ({ id: chip.id, chip, role: "mention" as const })),
-  ...pageChips.value.map((chip) => ({ id: chip.id, chip, role: "page" as const })),
-  ...ghostChips.value.map((chip) => ({ id: chip.id, chip, role: "ghost" as const })),
+  ...mentionChips.value.map((chip) => ({ id: chip.id, chip })),
+  ...images.value.map((image) => ({
+    id: image.id ?? image.filename,
+    chip: imageChipOf(image),
+    src: `data:${image.mimeType};base64,${image.data}`,
+  })),
 ]);
 const { shown: shownTrayChips, hiddenCount: hiddenTrayChips } = useChipCollapse(
   trayChips,
@@ -581,16 +580,20 @@ const { shown: shownTrayChips, hiddenCount: hiddenTrayChips } = useChipCollapse(
   chipsExpanded,
 );
 
+const hiddenTrayLabels = computed(() =>
+  trayChips.value.slice(shownTrayChips.value.length).map((item) => String(item.chip.label)),
+);
+
 const results = ref<InstanceType<typeof GoToResults> | null>(null);
 const goToActive = ref(-1);
 const { matches: goToMatches } = useGoToIndex(text, {
-  canAsk: () => state.value === "ready" && !goToOnly.value,
-  enabled: () => props.layout === "overview" && shown.value,
+  canAsk: () => false,
+  enabled: () => goToOnly.value && shown.value,
 });
 const goToDismissed = ref(false);
 const goToShown = computed(
   () =>
-    props.layout === "overview" &&
+    goToOnly.value &&
     text.value.trim() !== "" &&
     mentionAt.value === null &&
     !goToDismissed.value,
@@ -644,12 +647,10 @@ function pickMention(option: MentionOption): void {
   const at = mentionAt.value;
   closeMention();
   if (at === null || text.value[at] !== "@") return;
-  if (option.agent) agent.value = option.agent;
-  else if (option.chip && !mixedStream(option.chip)) {
-    const chip = option.chip;
-    if (!mentionChips.value.some((held) => held.id === chip.id))
-      mentionChips.value = [...mentionChips.value, chip];
-  } else return;
+  const chip = option.chip;
+  if (!chip || mixedStream(chip)) return;
+  if (!mentionChips.value.some((held) => held.id === chip.id))
+    mentionChips.value = [...mentionChips.value, chip];
   const rest = text.value.slice(at).search(/\s/);
   const end = rest === -1 ? text.value.length : at + rest;
   text.value = text.value.slice(0, at) + text.value.slice(end);
@@ -666,8 +667,9 @@ function mixedStream(chip: ContextChip): boolean {
   return !!held && (held.ref?.streamType ?? "logs") !== (chip.ref?.streamType ?? "logs");
 }
 
-function removeMention(chip: ContextChip): void {
-  mentionChips.value = mentionChips.value.filter((held) => held.id !== chip.id);
+function removeTrayChip(chip: ContextChip): void {
+  if (chip.kind === "image") images.value = images.value.filter((image) => image.id !== chip.id);
+  else mentionChips.value = mentionChips.value.filter((held) => held.id !== chip.id);
 }
 
 function mentionKey(event: KeyboardEvent): boolean {
@@ -698,41 +700,51 @@ function mentionKey(event: KeyboardEvent): boolean {
 }
 
 function onMicPress(event: MouseEvent): void {
+  // An admin's first press turns dictation on in this browser; the next one starts it.
+  if (voice.mic.value === "off") return voice.turnOn();
   voice.press("mic");
   if (event.detail > 0) input.value?.focus({ preventScroll: true });
 }
 
-function onTimeChange(range: ComposerState["timeOverride"]): void {
-  if (props.layout !== "overview" || !props.pageRange) {
-    timeOverride.value = range;
-    return;
-  }
-  if (range) emit("update:pageRange", range);
+function onPlus(action: ComposerPlusAction): void {
+  if (action === "attach") file.value?.open();
+  else if (action === "context") addContext();
 }
 
-function fieldOf(chip: ContextChip): string {
-  return chip.ref?.type ?? chip.id.replace(/^ghost:/, "");
+function onPicked(value: FileValue): void {
+  const files = Array.isArray(value) ? value : value ? [value] : [];
+  void attachImageFiles(files, {
+    t,
+    add: (image) => {
+      if (images.value.length >= MAX_IMAGES) return { ok: false, cap: "images" };
+      images.value = [...images.value, { ...image, id: getUUIDv7() }];
+      return { ok: true };
+    },
+    refuse,
+  }).then(() => input.value?.focus());
 }
 
-function removePageKey(chip: ContextChip): void {
-  const field = fieldOf(chip);
-  if (!removedPageKeys.value.includes(field))
-    removedPageKeys.value = [...removedPageKeys.value, field];
+// Home has no chat strip to hold the composer's refusal line, so the same line shows as a toast.
+function refuse(cap: ImageCap, line: I18nText): void {
+  trackAssistant("ai_composer_cap_hit", { cap });
+  toast({ variant: "warning", message: line });
 }
 
-// The page chips summarise Home's Now list, so opening one takes the reader there.
-function showPageSection(): void {
-  const section = document.querySelector<HTMLElement>('[data-test="home-now"]');
-  if (!section) return;
-  const reduce = globalThis.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-  section.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
-  if (!section.hasAttribute("tabindex")) section.setAttribute("tabindex", "-1");
-  section.focus({ preventScroll: true });
+function refuseSize(picked: File): void {
+  refuse("size", imageTooBigLine(t, picked));
 }
 
-function addBackPageKey(chip: ContextChip): void {
-  const field = fieldOf(chip);
-  removedPageKeys.value = removedPageKeys.value.filter((key) => key !== field);
+// Add Context types the `@` at the caret, so it opens the same mention menu typing does.
+function addContext(): void {
+  const value = text.value;
+  const at = input.value?.textarea?.selectionStart ?? value.length;
+  const gap = at > 0 && !/\s/.test(value[at - 1]) ? " " : "";
+  onInput(`${value.slice(0, at)}${gap}@${value.slice(at)}`);
+  void nextTick(() => {
+    input.value?.focus();
+    input.value?.textarea?.setSelectionRange(at + gap.length + 1, at + gap.length + 1);
+    detectMention();
+  });
 }
 
 // A Go to trip from the Overview returns to its row and range with the field focused.
@@ -765,9 +777,7 @@ function focusField(clear: boolean): void {
 }
 
 // `/` on Home lands here while the field can take a question; nothing listens while it is hidden or gated.
-const askListening = computed(
-  () => shown.value && (state.value === "ready" || goToOnly.value) && props.layout !== "chats",
-);
+const askListening = computed(() => shown.value && (state.value === "ready" || goToOnly.value));
 let stopFocusListener: (() => void) | null = null;
 watch(
   askListening,
@@ -783,7 +793,7 @@ onBeforeUnmount(() => stopFocusListener?.());
 watch(
   () => route.query.focus === "ask" && shown.value && state.value === "ready",
   async (focusNow) => {
-    if (!focusNow || props.layout === "chats") return;
+    if (!focusNow) return;
     await nextTick();
     focusField(true);
     const query = { ...route.query };
@@ -811,13 +821,15 @@ const recent = computed(() =>
 );
 const recentFailed = computed(() => history.listState.value.status === "error");
 const hasInProgress = computed(() => recent.value.some((row) => isInProgress(row.status)));
-onMounted(() => history.ensureLoaded());
+onMounted(() => {
+  if (isCard) history.ensureLoaded();
+});
 
 // Only a waiting row with a known end counts down, so the clock runs only then.
 const clock = ref(Date.now());
 let clockTimer: ReturnType<typeof setInterval> | null = null;
 watch(
-  () => recent.value.some((row) => row.status === "needs_you" && row.expiresAt !== null),
+  () => isCard && recent.value.some((row) => row.status === "needs_you" && row.expiresAt !== null),
   (counting) => {
     if (clockTimer) clearInterval(clockTimer);
     clockTimer = counting ? setInterval(() => (clock.value = Date.now()), 1_000) : null;
@@ -860,15 +872,15 @@ function ask(stage: boolean): void {
   if (!fieldReady.value || goToOnly.value) return;
   if (voice.mine.value) voice.stop("send");
   const line = text.value.trim();
-  if (!line) return openFull();
+  const attached = images.value;
+  if (!line && attached.length === 0) return openFull();
   text.value = "";
   const overview = props.layout === "overview";
-  const removed = overview ? removedPageKeys.value : [];
-  const time = overview && props.pageRange ? props.pageRange : timeOverride.value;
+  const time = sendRange() ?? (overview ? props.pageRange : null);
   const chips = mentionChips.value;
   const picked = agent.value;
-  if (overview) removedPageKeys.value = [];
   mentionChips.value = [];
+  images.value = [];
   agent.value = null;
   void openAssistant({
     entryKind: "home_launcher",
@@ -882,7 +894,7 @@ function ask(stage: boolean): void {
       text: line,
       chips,
       ...(time && { timeOverride: time }),
-      ...(removed.length > 0 && { removedPageKeys: removed }),
+      ...(attached.length > 0 && { images: attached }),
     },
   });
 }
@@ -903,7 +915,7 @@ function pickStarter(starter: Starter, index: number): void {
     container: "full",
     payload: {
       ...starterPayload(starter, org.value),
-      ...(timeOverride.value && { timeOverride: timeOverride.value }),
+      ...(timeOverride.value && { timeOverride: sendRange() }),
     },
   });
 }

@@ -15,51 +15,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <section
-    class="@container/firstrun flex min-w-0 flex-col"
-    data-test="agent-home-first-run"
-    :data-state="state"
-  >
+  <section class="flex min-w-0 flex-col" data-test="agent-home-first-run" :data-state="state">
     <div
-      class="mx-auto grid w-full max-w-[90rem] min-w-0 grid-cols-1 gap-x-6 gap-y-4 @[75rem]/firstrun:grid-cols-[minmax(0,1fr)_21.25rem]"
+      class="mx-auto flex w-full max-w-5xl min-w-0 flex-col gap-3"
+      data-test="agent-home-first-run-main"
     >
-      <div class="flex min-w-0 flex-col gap-3" data-test="agent-home-first-run-main">
-        <AgentHomeGreeting />
-        <!-- The note says why Home is empty before the Ask box offers anything (HomeFirstRun board) -->
-        <div
-          class="bg-status-success-bg rounded-default flex min-w-0 gap-2 px-3 py-2.5"
-          data-test="agent-home-first-run-note"
-        >
-          <OIcon
-            name="arrow-forward"
-            size="sm"
-            class="text-status-success-text mt-0.5 shrink-0"
-            aria-hidden="true"
-          />
-          <div class="flex min-w-0 flex-col gap-0.5">
-            <h2
-              class="text-status-success-text text-xs font-semibold"
-              data-test="agent-home-first-run-title"
-            >
-              {{ t("home.agent.firstRun.title") }}
-            </h2>
-            <OText variant="body">{{ t("home.agent.firstRun.note") }}</OText>
-          </div>
-        </div>
-        <AssistantLauncher layout="overview" :go-to-only="offReason !== null">
-          <template #note>
-            <AgentHomeAskNote v-if="offReason" :reason="offReason" :org="org" />
-          </template>
-        </AssistantLauncher>
-      </div>
-      <aside class="flex min-w-0 flex-col gap-4" data-test="agent-home-first-run-aside">
-        <AgentHomeBriefing :can-brief="state === 'ai'" />
-        <AssistantLauncher
-          v-if="state === 'ai' || state === 'budget'"
-          layout="chats"
-          data-test="agent-home-first-run-threads"
+      <AgentHomeGreeting />
+      <!-- The note says why Home is empty before the Ask box offers anything (HomeFirstRun board) -->
+      <div
+        class="bg-status-success-bg rounded-default flex min-w-0 gap-2 px-3 py-2.5"
+        data-test="agent-home-first-run-note"
+      >
+        <OIcon
+          name="arrow-forward"
+          size="sm"
+          class="text-status-success-text mt-0.5 shrink-0"
+          aria-hidden="true"
         />
-      </aside>
+        <div class="flex min-w-0 flex-col gap-0.5">
+          <h2
+            class="text-status-success-text text-xs font-semibold"
+            data-test="agent-home-first-run-title"
+          >
+            {{ t("home.agent.firstRun.title") }}
+          </h2>
+          <OText variant="body">{{ t("home.agent.firstRun.note") }}</OText>
+        </div>
+      </div>
+      <AssistantLauncher layout="overview" :go-to-only="offReason !== null">
+        <template #note>
+          <AgentHomeAskNote v-if="offReason" :reason="offReason" :org="org" />
+        </template>
+      </AssistantLauncher>
     </div>
   </section>
 </template>
@@ -74,7 +61,6 @@ import OText from "@/lib/core/Typography/OText.vue";
 import { useI18nTyped } from "@/types/i18n";
 
 import AgentHomeAskNote from "./AgentHomeAskNote.vue";
-import AgentHomeBriefing from "./AgentHomeBriefing.vue";
 import AgentHomeGreeting from "./AgentHomeGreeting.vue";
 import { useAgentHomeState } from "./useAgentHomeState";
 

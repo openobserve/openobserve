@@ -160,13 +160,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <HomeViewSkeleton v-if="!homePrefsReady" />
+        <!-- The hero's own rail and no chat bar, so a sent question stays on the same Home -->
         <div
           v-else-if="aiHome && threadId !== null"
-          class="-mx-2.5 -mb-2.5 min-h-0 flex-1 overflow-hidden"
+          class="-mx-2.5 -mb-2.5 flex min-h-0 flex-1 overflow-hidden"
           data-test="home-full-thread"
         >
           <HomeThreadContext />
-          <AssistantView :chat-id="threadId" class="h-full" />
+          <aside
+            v-if="threadRail"
+            :aria-label="t('assistant.history.title')"
+            :class="HOME_RAIL_CLASS"
+            data-test="assistant-home-chats"
+          >
+            <HomeChatsRail thread @close="threadView?.focusEntry()" />
+          </aside>
+          <AssistantView
+            ref="threadView"
+            :chat-id="threadId"
+            bare
+            :class="[
+              'h-full min-w-0 flex-1',
+              threadHandoff && 'motion-safe:animate-[assistant-fade-up_0.25s_ease-out_both]',
+            ]"
+          />
         </div>
         <div
           v-else-if="aiFirstRun"
@@ -289,6 +306,7 @@ import {
   onScopeDispose,
   ref,
   watch,
+  onDeactivated,
   onMounted,
   onUnmounted,
 } from "vue";
@@ -335,7 +353,7 @@ import {
   threadParam,
 } from "@/composables/assistant/pure";
 import type { GateCode } from "@/composables/assistant/pure";
-import { aiTabMode, gateHidesAiTab } from "@/views/home/homeState";
+import { aiTabMode, gateHidesAiTab, HOME_RAIL_CLASS, railGate } from "@/views/home/homeState";
 import { useThreadUrlSync } from "@/views/home/useThreadUrl";
 import { isFullConfigLoaded } from "@/services/config.queries";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
@@ -731,6 +749,10 @@ export default defineComponent({
     const aiHome = computed(
       () => assistantV2 && activeHomeTab.value === AI_HOME_TAB && !aiLocked.value,
     );
+    // A thread opened while Home is on screen settles in once; a pasted link or a kept-alive return lands still.
+    const threadHandoff = ref(false);
+    watch(threadId, (id, was) => (threadHandoff.value = id !== null && was === null));
+    onDeactivated(() => (threadHandoff.value = false));
 
     // A thread link or Back to Home can land while Home is already mounted on another tab.
     if (assistantV2) {
@@ -950,8 +972,11 @@ export default defineComponent({
       document.removeEventListener("focusout", syncAssistantFocus);
     });
 
-    const { isMobile } = useBreakpoint();
+    const { isMobile, lgUp } = useBreakpoint();
     const mobileChatsOpen = ref(false);
+    // Below lg the hero draws no rail either, so the chat's own New Chat icon stands in for it.
+    const threadRail = computed(() => lgUp.value && railGate(aiGate.value));
+    const threadView = ref<{ focusEntry(): void } | null>(null);
 
     // the first-data takeover replaces Overview and Usage only behind the empty-data flag; flag off is BASE Home
     const flagOn = computed(() => store.state.zoConfig?.restricted_routes_on_empty_data === true);
@@ -980,6 +1005,10 @@ export default defineComponent({
     return {
       assistantV2,
       threadId,
+      threadHandoff,
+      threadRail,
+      threadView,
+      HOME_RAIL_CLASS,
       aiHome,
       homePrefsReady,
       t,
@@ -1014,6 +1043,7 @@ export default defineComponent({
     HomeNoDataContext,
     HomeThreadContext,
     AssistantView: defineAsyncComponent(() => import("@/views/AssistantView.vue")),
+    HomeChatsRail: defineAsyncComponent(() => import("@/views/home/HomeChatsRail.vue")),
     AgentHomeFirstRun: defineAsyncComponent(() => import("@/views/home/AgentHomeFirstRun.vue")),
     AssistantHomeTab: defineAsyncComponent(() => import("@/views/home/AssistantHomeTab.vue")),
     OverviewTab,

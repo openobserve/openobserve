@@ -10493,8 +10493,6 @@
         "no_permission": "Your role cannot use {product}"
       },
       "admins": "Admins: {names}",
-      "briefMe": "Brief me",
-      "briefMePrompt": "Brief me on what changed and what needs me now.",
       "flapping": "Flapping · {count}×",
       "problems": {
         "title": "Problems with no alert",
@@ -10503,48 +10501,39 @@
         "createAlert": "Create alert",
         "askEditor": "Ask an editor"
       },
+      "attention": {
+        "title": "Needs Attention",
+        "viewAll": "View All",
+        "open": "Open",
+        "openName": "Open {row}",
+        "retry": "Retry",
+        "sendData": "Send Data",
+        "empty": {
+          "clear": {
+            "title": "All Clear",
+            "body": "No open incidents, firing alerts or degraded services right now."
+          },
+          "no-data": {
+            "title": "No Data Yet",
+            "body": "Nothing is being monitored. Send traces or create an alert and problems will show up here."
+          },
+          "failed": {
+            "title": "Couldn't Load Everything",
+            "body": "Some data did not load, so this list may be incomplete."
+          }
+        }
+      },
       "openIncident": "Open incident",
       "openService": "Open service",
       "openAlert": "Open alert",
       "creditsUsedUp": "AI credits are used up, so nothing was sent",
-      "since": {
-        "title": "Since you were last here",
-        "ago": "{time} ago",
-        "none": "Nothing changed since then",
-        "incident_opened": "Incident {title} opened",
-        "incident_resolved": "Incident {title} was resolved",
-        "alert_fired": "Alert {title} started firing",
-        "thread_finished": "Your thread {title} finished",
-        "approval_waiting": "An approval waits for you: {title}",
-        "firstVisit": "This is your first visit on this device. Changes since then show here next time.",
-        "firstVisitAt": "First visit",
-        "thread_stopped": "Your thread {title} was stopped before it finished",
-        "thread_failed": "Your thread {title} ended with an error",
-        "thread_updated": "Your thread {title} has new activity"
-      },
-      "dashboards": {
-        "title": "Recent dashboards",
-        "all": "All dashboards",
-        "none": "Dashboards you open show up here",
-        "viewed": "Viewed {time} ago"
-      },
       "firstRun": {
         "title": "No data yet · send your first logs, metrics or traces",
-        "note": "Home fills in by itself once a service sends data: Now, Problems with no alert and dashboards. Building it uses no AI."
+        "note": "Home fills in by itself once a service sends data: Now and Problems with no alert. Building it uses no AI."
       },
-      "tabLabel": "AI Assistant",
-      "nowClearProblems": "Nothing else is over baseline right now",
-      "needsYouTitle": "Needs you",
-      "briefMeHint": "What changed since you were last here",
-      "failedRunTitle": "Auto RCA for {title}",
-      "failedRunDetail": "Auto-run · {code}",
-      "autoRun": "Auto-run",
-      "retryRunFailed": "Couldn't start the analysis again",
-      "followInThreadName": "Follow {row} in thread",
-      "runLine": "{state} · {time}"
+      "tabLabel": "AI Assistant"
     },
-    "answersReady": "{count} answer ready | {count} answers ready",
-    "needYou": "{count} needs you | {count} need you"
+    "answersReady": "{count} answer ready | {count} answers ready"
   },
   "overview": {
     "alertsSuffix": "alerts",
@@ -10756,21 +10745,9 @@
       "vsBaseline": "{value} vs {baseline} (previous {hours} h)",
       "noBaseline": "Not enough history for a baseline",
       "allRegions": "All regions combined",
-      "partial": "Service figures may be incomplete",
       "partialRow": "partial",
-      "servicesDataUntil": "Services data to {time}",
-      "trendWindowCap": "Baselines need a range of 7 days or less",
-      "moreDegraded": "+{n} more degraded services",
       "recovered": "Recovered",
       "firingCount": "×{count}",
-      "sourceError": "{source} couldn't load",
-      "builtFrom": "Built from",
-      "viewAll": {
-        "incidents": "View all incidents",
-        "services": "View all services",
-        "anomalies": "View all anomalies",
-        "events": "View all events"
-      },
       "sentence": {
         "service": {
           "errors": "{service} errors at {value}",
@@ -11485,7 +11462,10 @@
       "scoped": "Ask about {stream}",
       "askAgent": "Ask {agent}…",
       "sendTo": "Send to {agent}",
-      "attachImage": "Attach image",
+      "attachImage": "Attach Image",
+      "plus": "Add to Message",
+      "addContext": "Add Context",
+      "timeRange": "Time Range",
       "inert": "Decide above to continue",
       "busy": "{product} is busy. Send again in {s} s.",
       "imageCap": "{name} wasn't added. Up to {count} images, {size} each.",
@@ -11493,7 +11473,7 @@
       "offline": "You're offline. Draft kept.",
       "rateLimited": "Wait for the Retry countdown to end.",
       "recalled": "Recalled prompt {n} of {count}",
-      "recentPrompts": "Recent prompts",
+      "recentPrompts": "Recent Prompts",
       "removeImage": "Remove {name}",
       "noAccess": "You can read your chats. Starting or continuing one needs AI access.",
       "replyHelper": "Reply declines the request",
@@ -11655,6 +11635,7 @@
         "fromPage": "page",
         "page": "Time · {range}",
         "swap": "Change time range",
+        "hint": "The assistant looks at data from this time range.",
         "dateRange": "Date range"
       },
       "title": "What the assistant sees",
@@ -13208,7 +13189,13 @@
       "titleName": "{title}, chats and chat actions",
       "titleNameNeeds": "{title}, chats and chat actions, {count} other chat needs you | {title}, chats and chat actions, {count} other chats need you",
       "titleNameAnswering": "{title}, chats and chat actions, {count} other chat answering | {title}, chats and chat actions, {count} other chats answering",
-      "titleTooltip": "{title} · {summary}"
+      "titleTooltip": "{title} · {summary}",
+      "toolbar": {
+        "more": "More Actions",
+        "newChat": "New Chat",
+        "openAs": "Open As",
+        "sees": "What the Assistant Sees"
+      }
     },
     "toolsets": {
       "add": "New toolset",
@@ -13424,6 +13411,7 @@
     "welcome": {
       "lastRange": "last {period}",
       "launcher": {
+        "agentHint": "The agent that answers",
         "ask": "Ask",
         "clear": "Clear question",
         "inputName": "Ask {product}",

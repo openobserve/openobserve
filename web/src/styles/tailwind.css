@@ -342,6 +342,44 @@ html.theme-switching *::after {
     }
   }
 }
+@keyframes assistant-border-flow {
+  from {
+    background-position: 0% 50%;
+  }
+  to {
+    background-position: 100% 50%;
+  }
+}
+/* A gradient border that drifts slowly side to side while its field has focus; still under reduced motion. */
+@utility assistant-border-flow {
+  position: relative;
+  isolation: isolate;
+  /* The same gradient, blurred, blooms out from behind the box. */
+  &::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    background: inherit;
+    filter: blur(1.25rem);
+    opacity: 0;
+    transition: opacity 0.3s ease-out;
+    pointer-events: none;
+  }
+  &:focus-within::before {
+    opacity: 0.5;
+  }
+  &:focus-within {
+    background-size: 200% 100%;
+    animation: assistant-border-flow 3.5s ease-in-out infinite alternate;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    &:focus-within {
+      animation: none;
+    }
+  }
+}
 /* Each bar sets --assistant-wave-peak and --assistant-wave-delay (seconds, unitless) so the bars move out of step. */
 @utility assistant-wave {
   animation: assistant-wave 1.1s ease-in-out infinite;

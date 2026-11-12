@@ -15,62 +15,56 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
-    class="@container/home h-full min-h-0 min-w-0 overflow-y-auto px-4 py-4 max-md:pb-0"
-    data-test="assistant-home-tab"
-    :data-state="state"
-  >
-    <div
-      :class="[
-        'mx-auto grid max-w-[90rem] min-w-0 grid-cols-1 gap-x-6 gap-y-4',
-        wide && '@[75rem]/home:grid-cols-[minmax(0,1fr)_21.25rem]',
-      ]"
-      :data-columns="wide ? 'auto' : 'one'"
+  <div class="relative isolate flex h-full min-h-0 min-w-0">
+    <aside
+      v-if="railShown"
+      :aria-label="t('assistant.history.title')"
+      :class="HOME_RAIL_CLASS"
+      data-test="assistant-home-chats"
     >
-      <div class="flex min-w-0 flex-col gap-4" data-test="assistant-home-main">
-        <AgentHomeGreeting :answers-ready="answersReady" :need-you="needYouCount" />
-        <HomeNowList
-          v-bind="listProps"
-          :snapshot="nowSnapshot"
-          :row-meta="rowMeta"
-          :failed-sources="data.failedSources.value"
-          :denied-sources="data.deniedSources.value"
-          :clear-text="split.problems.length > 0 ? t('home.agent.nowClearProblems') : null"
-          :incident-runs="homeRuns?.byIncident ?? null"
-          :failed-runs="homeRuns?.failedAuto ?? []"
-          @select="selectRow"
-          @open="openRow"
-          @service="openService"
-          @fallback="openRow"
-          @view-all="openSource"
-          @retry="() => data.load(true)"
-          @analysis="openAnalysis"
-          @open-incident="(id) => go(incidentLocation(id))"
-        />
-        <!-- A phone pins Ask on the scroll edge while the list scrolls under it (HomePhone board); an open sheet unpins it -->
+      <HomeChatsRail v-if="railReady" />
+    </aside>
+    <div
+      class="h-full min-h-0 min-w-0 flex-1 overflow-y-auto px-4 py-4"
+      data-test="assistant-home-tab"
+      :data-state="state"
+    >
+      <!-- A fixed top offset, not centring, so Problems or Go to results arriving below never move the Ask box -->
+      <div
+        class="relative mx-auto flex max-w-5xl min-w-0 flex-col gap-4 pt-[12vh] max-md:pt-0"
+        data-test="assistant-home-main"
+      >
+        <AgentHomeGreeting :answers-ready="answersReady" :class="entering && RISE.greeting" />
         <AssistantLauncher
           layout="overview"
           :page-range="pageRange"
           :go-to-only="offReason !== null"
-          :class="[
-            'max-md:bg-surface-base max-md:pt-2 max-md:pb-3 max-md:[&_[data-test=assistant-launcher-suggestions]]:hidden',
-            !sheetOpen && 'max-md:sticky max-md:bottom-0 max-md:z-10',
-          ]"
-          :data-pinned="sheetOpen ? 'no' : 'yes'"
-          @update:page-range="onPageRange"
+          class="mx-auto max-w-3xl"
         >
           <template #note>
             <AgentHomeAskNote v-if="offReason" :reason="offReason" :org="data.org.value" />
           </template>
         </AssistantLauncher>
+        <HomeNeedsAttention
+          class="mt-4"
+          :snapshot="attentionSnapshot"
+          :row-meta="rowMeta"
+          :empty="attentionEmpty"
+          :loading="!data.nowList.state.value"
+          @open="openRow"
+          @view-all="openOverview"
+          @retry="() => void data.load(true)"
+          @send-data="go({ name: 'ingestion', query: { org_identifier: data.org.value } })"
+        />
         <HomeNowList
           v-if="wide && split.problems.length > 0"
-          v-bind="listProps"
-          variant="problems"
+          :org="data.org.value"
+          :timezone="data.timezone.value"
+          :trend="data.trend.value"
+          :return-state="returnState"
+          :traces-locked="data.tracesLocked.value"
           :snapshot="problemsSnapshot"
           :row-meta="rowMeta"
-          :failed-sources="[]"
-          :denied-sources="[]"
           :create-alert="{ enabled: canCreateAlert }"
           @select="selectRow"
           @open="openRow"
@@ -78,116 +72,70 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @fallback="openRow"
           @create-alert="createAlert"
         />
-        <AgentHomeDashboards v-if="wide" />
       </div>
-      <aside v-if="wide" class="flex min-w-0 flex-col gap-4" data-test="assistant-home-aside">
-        <AgentHomeBriefing :can-brief="state === 'ai'" :page-range="pageRange" />
-        <AssistantLauncher
-          v-if="state === 'ai' || state === 'budget'"
-          layout="chats"
-          data-test="assistant-home-threads"
-        />
-        <AgentHomeSince
-          :since="since"
-          :items="sinceItems"
-          :timezone="data.timezone.value"
-          @open="openSinceItem"
-        />
-      </aside>
+      <AlertHistoryDrawer
+        v-if="historyAlert"
+        :open="historyAlert !== null"
+        :alert-details="historyAlert.details"
+        :alert-id="historyAlert.id"
+        :alert-type="historyAlert.type"
+        data-test="assistant-home-alert-history"
+        @update:open="(open: boolean) => !open && (historyAlert = null)"
+      />
     </div>
-    <AlertHistoryDrawer
-      v-if="historyAlert"
-      :open="historyAlert !== null"
-      :alert-details="historyAlert.details"
-      :alert-id="historyAlert.id"
-      :alert-type="historyAlert.type"
-      data-test="assistant-home-alert-history"
-      @update:open="(open: boolean) => !open && (historyAlert = null)"
-    />
   </div>
 </template>
 
 <script setup lang="ts">
-import {
-  computed,
-  defineAsyncComponent,
-  onActivated,
-  onBeforeUnmount,
-  onDeactivated,
-  onMounted,
-  ref,
-  watch,
-} from "vue";
+import { computed, defineAsyncComponent, onDeactivated, onMounted, ref } from "vue";
 import { useRoute, useRouter, type RouteLocationRaw } from "vue-router";
 import { useStore } from "vuex";
-import { useQuery } from "@tanstack/vue-query";
 
 import AssistantLauncher from "@/components/ai-assistant/welcome/AssistantLauncher.vue";
-import {
-  useAssistantHistory,
-  useAssistantRuns,
-  useAssistantStore,
-  type ComposerState,
-  type Sid,
-} from "@/composables/assistant";
-import { fullThreadLocation } from "@/composables/assistant/pure";
+import { useAssistantRuns, type ComposerState } from "@/composables/assistant";
+import { HOME_TAB_QUERY_KEY } from "@/composables/assistant/pure";
+import type { PrefillTimeRange } from "@/utils/alerts/alertPrefill";
 import { requestAlertCreation } from "@/composables/alerts/useAlertCreation";
-import { useHomeContextProvider } from "@/composables/contextProviders/homeContextProvider";
 import type { OverviewNowRow, OverviewNowSnapshot } from "@/composables/contextProviders/types";
 import { withHomeReturn } from "@/composables/goto/homeReturn";
 import useBreakpoint from "@/composables/useBreakpoint";
-import { queryClient } from "@/composables/query/queryClient";
-import { orgRcaRunsQuery } from "@/services/rca_runs_org.queries";
 import { useI18nTyped } from "@/types/i18n";
 import { b64EncodeUnicode } from "@/utils/zincutils";
 import { sqlEquals } from "@/utils/query/sqlFilterBuilder";
 
 import AgentHomeAskNote from "./AgentHomeAskNote.vue";
-import AgentHomeBriefing from "./AgentHomeBriefing.vue";
-import AgentHomeDashboards from "./AgentHomeDashboards.vue";
 import AgentHomeGreeting from "./AgentHomeGreeting.vue";
-import AgentHomeSince from "./AgentHomeSince.vue";
-import type { BuiltFromSource } from "./HomeBuiltFrom.vue";
+import HomeNeedsAttention, { type EmptyState } from "./HomeNeedsAttention.vue";
 import HomeNowList from "./HomeNowList.vue";
 import type { NowRowMeta } from "./HomeNowRow.vue";
 import { canCreateAlerts, serviceAlertPrefill } from "./homeAlertPrefill";
-import { homeUserKey, readLastVisit, writeLastVisit } from "./homeStorage";
+import { healthState } from "./homeHealth";
+import { HOME_RAIL_CLASS } from "./homeState";
 import {
-  homePeriodOf,
   homeReturnState,
   readHomeUrl,
   writeHomeUrl,
-  type HomeRange,
 } from "./homeUrl";
-import {
-  briefingCounts,
-  groupNowRows,
-  incidentService,
-  needsYou,
-  splitNowRows,
-} from "./nowGrouping";
-import {
-  sinceLastVisit,
-  type SinceItem,
-  type SinceThread,
-  type SinceThreadEnd,
-} from "./sinceLastVisit";
+import { groupNowRows, incidentService, needsYou, splitNowRows } from "./nowGrouping";
 import { useAgentHomeState } from "./useAgentHomeState";
-import { homeRunsOf, useHomeNowData } from "./useHomeNowData";
+import { useHomeNowData } from "./useHomeNowData";
 import { useHomeRefresh } from "./useHomeRefresh";
 
+const HomeChatsRail = defineAsyncComponent(() => import("./HomeChatsRail.vue"));
 const AlertHistoryDrawer = defineAsyncComponent(
   () => import("@/components/alerts/AlertHistoryDrawer.vue"),
 );
 
-/** History rows the since-last-visit section scans for finished threads and waiting approvals. */
-const THREAD_LOOKUP = 20;
-
-/** Runs Home reads per load; the window rarely holds more incidents than this. */
-const RCA_RUNS_LIMIT = 100;
-
 /** The traces stream a service alert reads when the topology names none. */
 const DEFAULT_TRACES_STREAM = "default";
+
+/** Needs Attention shows this many rows; View All opens the Overview with the rest. */
+const ATTENTION_ROWS = 3;
+
+// A 0.5s fade-up, none under reduced motion; a literal string so Tailwind emits it.
+const RISE = {
+  greeting: "motion-safe:animate-[assistant-fade-up_0.5s_ease-out_both]",
+} as const;
 
 const { t } = useI18nTyped();
 const router = useRouter();
@@ -200,14 +148,21 @@ const urlState = readHomeUrl(route.query);
 const data = useHomeNowData(urlState.range);
 if (urlState.row) data.nowList.selectedKey.value = urlState.row;
 
-// A phone shows the Ask box and Now only, so the services no alert matches stay in Now there.
+// A phone draws no Problems list, so there the agent reads the services no alert matches among the other rows.
 const wide = computed(() => lgUp.value);
 const refreshes = computed(() => data.range.value.type === "relative");
 useHomeRefresh(
   () => refreshes.value,
   () => void data.load(),
 );
-onMounted(() => void data.load());
+// Past chats stay readable with the credits used up; no agent, Open Source or a loading gate draws no rail.
+const railShown = computed(() => wide.value && (state.value === "ai" || state.value === "budget"));
+// The rail's list reads the chats as it mounts, so it mounts only after Home's own read went out.
+const railReady = ref(false);
+onMounted(() => {
+  void data.load();
+  railReady.value = true;
+});
 
 const pageRange = computed<NonNullable<ComposerState["timeOverride"]>>(() => {
   const range = data.range.value;
@@ -221,21 +176,10 @@ const pageRange = computed<NonNullable<ComposerState["timeOverride"]>>(() => {
 const returnState = computed(() =>
   homeReturnState({ row: data.nowList.selectedKey.value, range: data.range.value }),
 );
-const listProps = computed(() => ({
-  org: data.org.value,
-  timezone: data.timezone.value,
-  trend: data.trend.value,
-  pending: data.pending.value,
-  sources: data.sources.value,
-  moreDegraded: data.nowList.state.value?.moreDegraded ?? 0,
-  returnState: returnState.value,
-  trendCapped: data.trendCapped.value,
-  tracesLocked: data.tracesLocked.value,
-}));
 
 const incidentServices = computed(() => {
   const lists = data.incidents.value;
-  const all = lists ? [...lists.open, ...lists.acknowledged, ...lists.resolved] : [];
+  const all = lists ? [...lists.open, ...lists.acknowledged] : [];
   return new Map(all.map((incident) => [incident.id, incidentService(incident)]));
 });
 const grouped = computed(() =>
@@ -243,23 +187,6 @@ const grouped = computed(() =>
 );
 const split = computed(() =>
   wide.value ? splitNowRows(grouped.value) : { now: grouped.value.filter(needsYou), problems: [] },
-);
-const counts = computed(() => briefingCounts(split.value));
-
-// The incidents' runs since the window opened: one read gives every row's run and the failed auto-runs.
-const rcaRuns = useQuery(
-  computed(() => ({
-    ...orgRcaRunsQuery(data.org.value, {
-      since: data.window.value.start,
-      limit: RCA_RUNS_LIMIT,
-    }),
-    enabled: state.value === "ai" && data.incidentsOn.value && !!data.org.value,
-  })),
-  queryClient,
-);
-const homeRuns = computed(() => (rcaRuns.data.value ? homeRunsOf(rcaRuns.data.value.runs) : null));
-const needYouCount = computed(
-  () => counts.value.needYou + (homeRuns.value?.failedAuto.length ?? 0),
 );
 const rowMeta = computed<Record<string, NowRowMeta>>(() =>
   Object.fromEntries(
@@ -269,102 +196,51 @@ const rowMeta = computed<Record<string, NowRowMeta>>(() =>
     ]),
   ),
 );
-const nowSnapshot = computed<OverviewNowSnapshot>(() => ({
-  ...data.nowList.snapshot.value,
-  rows: split.value.now.map((item) => item.row),
-}));
 const problemsSnapshot = computed<OverviewNowSnapshot>(() => ({
   ...data.nowList.snapshot.value,
   rows: split.value.problems.map((item) => item.row),
 }));
-// The agent and its page chips see the rows Home draws, so a recovered row neither counts nor travels.
-const drawnSnapshot = computed<OverviewNowSnapshot>(() => ({
+// The most urgent rows that need attention, every kind; a failed source only drops its own rows, the strip says why.
+const attentionSnapshot = computed<OverviewNowSnapshot>(() => ({
   ...data.nowList.snapshot.value,
-  rows: [...split.value.now, ...split.value.problems].map((item) => item.row),
+  rows: grouped.value
+    .filter(needsYou)
+    .slice(0, ATTENTION_ROWS)
+    .map((item) => item.row),
 }));
-useHomeContextProvider(
-  () => drawnSnapshot.value,
-  store,
-  () => homePeriodOf(data.range.value),
-);
+// Only a loaded, watched, quiet org reads "clear"; an unwatched one is "no-data", never green.
+const attentionEmpty = computed<EmptyState | null>(() => {
+  const state = data.nowList.state.value
+    ? healthState({
+        incidents: data.incidents.value,
+        trend: data.trend.value,
+        topology: data.topology.value,
+        rows: data.nowList.snapshot.value.rows,
+        alertList: data.alertList.value,
+        failed: data.failedSources.value.length > 0,
+        denied: data.deniedSources.value.length > 0,
+      })
+    : null;
+  if (state === "failed") return "failed";
+  if (state === "allClear") return "clear";
+  return state === "nothingMonitored" ? "no-data" : null;
+});
 const canCreateAlert = computed(
   () => !data.alertsLocked.value && canCreateAlerts(store.state.currentuser?.role),
 );
 
-// The Open Source build has no assistant history to read.
-const history = state.value === "oss" ? null : useAssistantHistory();
-const assistantStore = history ? useAssistantStore() : null;
-const assistantRuns = history ? useAssistantRuns() : null;
-// On a phone the panel is a bottom sheet over Home; a pinned Ask would ride up above it.
-const sheetOpen = computed(() => assistantStore?.state.shell?.placement?.kind === "sidebar");
+// The Open Source build has no assistant runtime to read.
+const assistantRuns = state.value === "oss" ? null : useAssistantRuns();
 const answersReady = computed(
   () =>
     assistantRuns?.rows.value.filter((row) => row.group === "ready" && !row.otherOrg).length ?? 0,
 );
-const recentRows = history?.recent(THREAD_LOOKUP) ?? null;
-const threads = computed<SinceThread[]>(() =>
-  (recentRows?.value ?? []).map((row) => ({
-    sid: row.sid,
-    title: String(row.title),
-    updatedAt: row.updatedAt,
-    activeTurn: row.activeTurn,
-    pendingApproval: row.pendingApproval,
-    ended: threadEnd(row.sid, row.lastTurnEnd),
-  })),
-);
 
-const userKey = computed(() => {
-  const email = store.state.userInfo?.email;
-  return email && data.org.value ? homeUserKey(email, data.org.value) : null;
-});
-// The previous visit is read once per user and org; this visit is written when the tab is left.
-const since = ref<number | null>(null);
-watch(
-  userKey,
-  (key, previous) => {
-    if (previous) writeLastVisit(previous, Date.now());
-    since.value = key ? readLastVisit(key) : null;
-  },
-  { immediate: true },
-);
-const sinceItems = computed<SinceItem[]>(() =>
-  sinceLastVisit({
-    since: since.value,
-    incidents: data.incidents.value,
-    rows: data.nowList.snapshot.value.rows,
-    threads: threads.value,
-  }),
-);
-
-// A thread this tab loaded knows its newest end first; after a reload only the server's row does.
-function threadEnd(sid: Sid, listed: SinceThreadEnd | undefined): SinceThreadEnd {
-  const turn = assistantStore?.state.sessions[sid]?.turn.state;
-  if (turn === "done" || turn === "stopped" || turn === "failed") return turn;
-  return listed ?? null;
-}
-
-function leave(): void {
-  if (userKey.value) writeLastVisit(userKey.value, Date.now());
-}
-window.addEventListener("pagehide", leave);
-onDeactivated(leave);
-onActivated(() => {
-  if (userKey.value) since.value = readLastVisit(userKey.value);
-});
-onBeforeUnmount(() => {
-  window.removeEventListener("pagehide", leave);
-  leave();
-});
+// The entrance plays once per mount; a kept-alive return re-inserts the nodes, which would replay it.
+const entering = ref(true);
+onDeactivated(() => (entering.value = false));
 
 const historyAlert = ref<{ details: unknown; id: string; type: string } | null>(null);
-
-function onPageRange(range: NonNullable<ComposerState["timeOverride"]>): void {
-  const next: HomeRange = range.period
-    ? { type: "relative", period: range.period }
-    : { type: "absolute", from: range.from * 1000, to: range.to * 1000 };
-  data.setRange(next);
-  writeUrl();
-}
 
 // The row and range ride in the URL, so a pasted link or Back to Home restores them.
 function writeUrl(): void {
@@ -381,17 +257,15 @@ function go(location: RouteLocationRaw): void {
   void router.push(withHomeReturn(location, returnState.value)).catch(() => undefined);
 }
 
+// An incident opens its page, a service its traces, and an alert or anomaly its history beside Home.
 function openRow(row: OverviewNowRow): void {
   selectRow(row);
-  if (row.kind === "incident") go(incidentLocation(row.id));
+  if (row.kind === "incident")
+    go({ name: "incidentDetail", params: { id: row.id }, query: { org_identifier: data.org.value } });
   else if (row.kind === "service") openService(row);
-  else if (row.kind === "anomaly") {
-    historyAlert.value = {
-      details: { name: row.name },
-      id: row.configId,
-      type: "anomaly_detection",
-    };
-  } else {
+  else if (row.kind === "anomaly")
+    historyAlert.value = { details: { name: row.name }, id: row.configId, type: "anomaly_detection" };
+  else {
     const item = data.alertList.value?.find((alert) => alert.alert_id === row.alertId);
     historyAlert.value = {
       details: item ?? { name: row.name },
@@ -399,6 +273,13 @@ function openRow(row: OverviewNowRow): void {
       type: item?.alert_type ?? "scheduled",
     };
   }
+}
+
+// View All is the Overview tab, named in the URL as any Home link names a tab.
+function openOverview(): void {
+  void router
+    .push({ query: { ...route.query, [HOME_TAB_QUERY_KEY]: "overview" } })
+    .catch(() => undefined);
 }
 
 function openService(row: OverviewNowRow): void {
@@ -417,54 +298,20 @@ function openService(row: OverviewNowRow): void {
   });
 }
 
-// Investigate on an incident sent its question to the Panel; the incident's own analysis tab shows the run beside it.
-function openAnalysis(row: OverviewNowRow): void {
-  if (row.kind !== "incident") return;
-  go(incidentLocation(row.id, { tab: "incidentAnalysis" }));
-}
-
-function openSource(source: BuiltFromSource): void {
-  const org = data.org.value;
-  if (source === "incidents")
-    go({ name: "incidentList", query: { status: "open", org_identifier: org } });
-  else if (source === "services")
-    go({ name: "traces", query: { ...rangeQuery(), tab: "service-graph", org_identifier: org } });
-  else if (source === "anomalies")
-    go({ name: "alertList", query: { tab: "anomalyDetection", org_identifier: org } });
-  else go({ name: "alertList", query: { org_identifier: org } });
-}
-
 function createAlert(row: OverviewNowRow): void {
   if (row.kind !== "service" || !canCreateAlert.value) return;
+  const prefill = serviceAlertPrefill(row, streamOf(row.service), datetimeOfRange());
+  requestAlertCreation(prefill, {}, () => prefill);
+}
+
+function datetimeOfRange(): PrefillTimeRange {
   const range = data.range.value;
   const window = data.window.value;
-  const prefill = serviceAlertPrefill(row, streamOf(row.service), {
+  return {
     type: range.type,
     ...(range.type === "relative" && { relativeTimePeriod: range.period }),
     startTime: window.start,
     endTime: window.end,
-  });
-  requestAlertCreation(prefill, {}, () => prefill);
-}
-
-function openSinceItem(item: SinceItem): void {
-  if (item.kind === "incident_opened" || item.kind === "incident_resolved") {
-    go(incidentLocation(item.target));
-    return;
-  }
-  if (item.kind === "alert_fired") {
-    const row = data.nowList.snapshot.value.rows.find((r) => r.key === `alert:${item.target}`);
-    if (row) openRow(row);
-    return;
-  }
-  void router.push(fullThreadLocation(item.target)).catch(() => undefined);
-}
-
-function incidentLocation(id: string, query: Record<string, string> = {}): RouteLocationRaw {
-  return {
-    name: "incidentDetail",
-    params: { id },
-    query: { ...query, org_identifier: data.org.value },
   };
 }
 

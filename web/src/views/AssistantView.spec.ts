@@ -15,7 +15,7 @@
 
 import { flushPromises, mount } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { computed } from "vue";
+import { computed, reactive } from "vue";
 
 import {
   fakeAssistant,
@@ -51,12 +51,20 @@ vi.mock("@/services/assistantAnalytics", async (importOriginal) => ({
 vi.mock("@/views/Error404.vue", () => ({
   default: { template: '<div data-test="error-404">not found</div>' },
 }));
+const wide = vi.hoisted(() => ({ value: true }));
+vi.mock("@/composables/useBreakpoint", async (importOriginal) => {
+  const { computed, reactive } = await import("vue");
+  const actual = await importOriginal<typeof import("@/composables/useBreakpoint")>();
+  const lg = reactive(wide);
+  return { default: () => ({ ...actual.default(), lgUp: computed(() => lg.value) }) };
+});
 
 async function setup(
   path = "/assistant",
   gate: GateCode = "available",
   over: Partial<AssistantCapability> = {},
   prepare?: (store: any) => void,
+  bare = false,
 ) {
   fake.current = fakeAssistant(gate, over);
   prepare?.(fake.current.store);
@@ -66,7 +74,10 @@ async function setup(
     path: "/assistant/:chatId?",
     name: "assistant",
     component: AssistantView,
-    props: (to) => ({ chatId: typeof to.params.chatId === "string" ? to.params.chatId : null }),
+    props: (to) => ({
+      chatId: typeof to.params.chatId === "string" ? to.params.chatId : null,
+      bare,
+    }),
   });
   await router.push(path);
   const wrapper = mount(
@@ -82,6 +93,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  reactive(wide).value = true;
   document.body.innerHTML = "";
 });
 
@@ -391,6 +403,61 @@ describe("AssistantView", () => {
     expect(back.attributes("aria-label")).toBe("Home");
     expect(back.get("span.max-md\\:sr-only").text()).toBe("Home");
     expect(back.classes()).toEqual(expect.arrayContaining(["max-md:min-h-11", "max-md:min-w-11"]));
+  });
+
+  it("draws its chat bar and its own rail by default", async () => {
+    const { wrapper } = await setup("/assistant");
+    await flushPromises();
+    expect(wrapper.find('[data-test="assistant-shell-chrome"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="assistant-thread-header"]').exists()).toBe(true);
+    expect(wrapper.findAll('[data-test="assistant-history"]')).toHaveLength(1);
+    expect(wrapper.get('[data-test="assistant-history"]').attributes("data-mode")).toBe("rail");
+  });
+
+  it("draws neither inside Home's layout, and New chat goes back to Home's Ask box", async () => {
+    const { wrapper, router } = await setup(`/assistant/${SID}`, "available", {}, undefined, true);
+    await flushPromises();
+    expect(wrapper.find('[data-test="assistant-shell-full"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="assistant-shell-chrome"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="assistant-thread-header"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="assistant-view-back-home"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="assistant-history"]').exists()).toBe(false);
+    await wrapper.get('[data-test="assistant-shell-not-found"] button').trigger("click");
+    await flushPromises();
+    expect(router.currentRoute.value.name).toBe("home");
+    expect(router.currentRoute.value.query.thread).toBeUndefined();
+    expect(router.currentRoute.value.query.focus).toBe("ask");
+  });
+
+  it("floats New Chat, Open As, the ⓘ and More in the chat's corner on a phone, never a Home button", async () => {
+    reactive(wide).value = false;
+    const { wrapper, router, store } = await setup("/assistant", "available", {}, undefined, true);
+    await flushPromises();
+    const sid = store.state.shell.activeSid as string;
+    store.state.sessions[sid].messages.push({ role: "user", content: "hi" });
+    await flushPromises();
+    const chrome = wrapper.get('[data-test="assistant-shell-chrome"]');
+    expect(chrome.classes()).not.toContain("border-b");
+    expect(chrome.find('[data-test="assistant-thread-title-button"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="assistant-view-back-home"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="assistant-history"]').exists()).toBe(false);
+    const ids = chrome
+      .findAll("button")
+      .map((button) => button.attributes("data-test"))
+      .filter(Boolean);
+    expect(ids).toEqual([
+      "assistant-thread-new",
+      "assistant-open-as-button",
+      "assistant-context-sees",
+      "assistant-thread-more",
+    ]);
+    expect(chrome.get('[data-test="assistant-context-sees"]').attributes("aria-label")).toBe(
+      "What the Assistant Sees",
+    );
+    await chrome.get('[data-test="assistant-thread-new"]').trigger("click");
+    await flushPromises();
+    expect(router.currentRoute.value.name).toBe("home");
+    expect(router.currentRoute.value.query.focus).toBe("ask");
   });
 
   it("focuses the hero's primary action only when the locked sidebar moved here", async () => {

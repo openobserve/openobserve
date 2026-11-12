@@ -71,10 +71,25 @@ vi.mock("@/views/AssistantView.vue", () => ({
   __esModule: true,
   default: {
     name: "AssistantView",
-    props: ["chatId"],
-    template: '<div data-test="assistant-view-stub" :data-chat="chatId" />',
+    props: { chatId: String, bare: Boolean },
+    template: '<div data-test="assistant-view-stub" :data-chat="chatId" :data-bare="bare" />',
   },
 }));
+vi.mock("@/views/home/HomeChatsRail.vue", () => ({
+  __esModule: true,
+  default: {
+    name: "HomeChatsRail",
+    props: { thread: Boolean },
+    template: '<div data-test="home-chats-rail-stub" :data-thread="thread" />',
+  },
+}));
+const wide = vi.hoisted(() => ({ value: true }));
+vi.mock("@/composables/useBreakpoint", async (importOriginal) => {
+  const { computed, reactive } = await import("vue");
+  const actual = await importOriginal<typeof import("@/composables/useBreakpoint")>();
+  const lg = reactive(wide);
+  return { default: () => ({ ...actual.default(), lgUp: computed(() => lg.value) }) };
+});
 const assistant = vi.hoisted(() => ({ userOrgKey: null as string | null }));
 const gate = vi.hoisted(() => ({ value: "available" }));
 const pinRead = vi.hoisted(() => ({ controlled: false, answered: false }));
@@ -168,6 +183,7 @@ import { useHomeDashboard } from "@/composables/useHomeDashboard";
 import { onOverviewFocusRequest } from "@/composables/goto/goToRequests";
 import { getManager, resetManager } from "@/lib/vue-shortcut-manager";
 import HomeView from "./HomeView.vue";
+import { HOME_RAIL_CLASS } from "./home/homeState";
 import { raw } from "@/types/i18n";
 
 const mountHome = () =>
@@ -901,6 +917,7 @@ describe("HomeView", () => {
 
     describe("Full density on Home", () => {
       afterEach(async () => {
+        reactive(wide).value = true;
         await router.replace({ path: "/" }).catch(() => undefined);
       });
 
@@ -930,6 +947,55 @@ describe("HomeView", () => {
         await flushPromises();
         expect(has("home-full-thread")).toBe(false);
         expect(has("assistant-home-tab-stub")).toBe(true);
+      });
+
+      it("settles a thread opened from the AI tab's page in once, and lands a thread link still", async () => {
+        const settle = "motion-safe:animate-[assistant-fade-up_0.25s_ease-out_both]";
+        flagged(true);
+        await router.replace({ name: "home", query: { tab: "ai", thread: "abc" } });
+        wrapper = mountHome();
+        await resolveKey("k1");
+        const thread = () =>
+          wrapper.get('[data-test="home-full-thread"] [data-test="assistant-view-stub"]').classes();
+        expect(thread()).not.toContain(settle);
+        await router.replace({ name: "home", query: { tab: "ai" } });
+        await flushPromises();
+        expect(has("assistant-home-tab-stub")).toBe(true);
+        await router.push({ name: "home", query: { tab: "ai", thread: "def" } });
+        await flushPromises();
+        expect(thread()).toContain(settle);
+        expect(wrapper.get('[data-test="assistant-home-chats"]').classes()).not.toContain(settle);
+      });
+
+      it("draws the thread in Home's own layout: the hero's one rail beside a bare chat", async () => {
+        flagged(true);
+        await router.replace({ name: "home", query: { tab: "ai", thread: "abc" } });
+        wrapper = mountHome();
+        await resolveKey("k1");
+        await settleAsync();
+        const rails = wrapper.findAll('[data-test="assistant-home-chats"]');
+        expect(rails).toHaveLength(1);
+        expect(rails[0].classes()).toEqual(HOME_RAIL_CLASS.split(" "));
+        expect(rails[0].get('[data-test="home-chats-rail-stub"]').attributes("data-thread")).toBe(
+          "true",
+        );
+        expect(wrapper.get('[data-test="assistant-view-stub"]').attributes("data-bare")).toBe(
+          "true",
+        );
+        expect(has("home-tab-bar")).toBe(true);
+      });
+
+      it("draws no rail beside the chat where the hero draws none", async () => {
+        flagged(true);
+        reactive(wide).value = false;
+        await router.replace({ name: "home", query: { tab: "ai", thread: "abc" } });
+        wrapper = mountHome();
+        await resolveKey("k1");
+        await settleAsync();
+        expect(has("assistant-home-chats")).toBe(false);
+        expect(wrapper.get('[data-test="assistant-view-stub"]').attributes("data-bare")).toBe(
+          "true",
+        );
       });
 
       it("drops the thread when the user leaves the AI tab", async () => {

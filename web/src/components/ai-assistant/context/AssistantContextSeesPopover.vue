@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template v-else #trigger>
       <slot name="trigger">
         <AssistantIconButton
-          :label="t('assistant.context.title')"
+          :label="label ?? t('assistant.context.title')"
           :icon="assistantGlyph.info"
           data-test="assistant-context-sees"
         />
@@ -101,6 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import type { Sid } from "@/composables/assistant";
+import type { I18nText } from "@/types/i18n";
 
 export interface AssistantContextSeesPopoverProps {
   sid: Sid | null;
@@ -110,6 +111,8 @@ export interface AssistantContextSeesPopoverProps {
   align?: "start" | "center" | "end";
   /** Home names no streams: it has no page to read them from. */
   hideStreams?: boolean;
+  /** The default trigger's name and tooltip, where a toolbar names its controls in its own case. */
+  label?: I18nText;
 }
 
 const STREAMS_ROW = "selectedStreams";
@@ -138,6 +141,7 @@ const props = withDefaults(defineProps<AssistantContextSeesPopoverProps>(), {
   placement: "top",
   align: "end",
   hideStreams: false,
+  label: undefined,
 });
 
 const emit = defineEmits<{ (e: "update:open", open: boolean): void }>();

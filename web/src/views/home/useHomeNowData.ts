@@ -25,8 +25,6 @@ import { alertHistoryQuery, alertsListQuery } from "@/services/alerts.queries";
 import anomalyService from "@/services/anomaly_detection";
 import { anomalyConfigsQuery, anomalyHistoryQuery } from "@/services/anomaly_detection.queries";
 import type { Incident } from "@/services/incidents";
-import type { OrgRcaRun } from "@/services/rca_runs_org";
-import { latestRunByIncident } from "@/services/rca_runs_org.queries";
 import { incidentsQuery } from "@/services/incidents.queries";
 import type { ServicesTrendResponse } from "@/services/service_graph";
 import { serviceTopologyQuery, servicesTrendQuery } from "@/services/service_graph.queries";
@@ -34,7 +32,6 @@ import { useI18nTyped, type I18nText } from "@/types/i18n";
 import { safeTimezone } from "@/utils/dashboard/calendarPeriods";
 import { resolveBrowserTimezone } from "@/utils/timezone";
 
-import type { BuiltFromSource } from "./HomeBuiltFrom.vue";
 import { DEFAULT_HOME_RANGE, periodToMs, type HomeRange } from "./homeUrl";
 import {
   useHomeNow,
@@ -51,21 +48,17 @@ export { DEFAULT_HOME_RANGE, periodToMs };
 export const MAX_TREND_WINDOW_US = 7 * 24 * 3_600_000_000;
 
 const NOW_LIST_LIMIT = 12;
-const INCIDENT_LIST_SIZE = 20;
-const ALERT_HISTORY_SIZE = 500;
+/** Rows read per incident status. */
+export const INCIDENT_LIST_SIZE = 20;
+/** Alert history rows read per load; a full read means the window may hold more. */
+export const ALERT_HISTORY_SIZE = 500;
 const ANOMALY_HISTORY_LIMIT = 20;
 // The per-config fallback reads at most this many history rows in all.
 const PER_CONFIG_BUDGET = 500;
 
 type SourceKey = "incidents" | "services" | "anomalies" | "recentEvents";
 
-export type IncidentLists = { open: Incident[]; acknowledged: Incident[]; resolved: Incident[] };
-
-/** What Home reads from the org's RCA runs: each incident's newest run, and the auto-runs whose newest attempt failed. */
-export interface HomeRuns {
-  byIncident: Map<string, OrgRcaRun>;
-  failedAuto: OrgRcaRun[];
-}
+export type IncidentLists = { open: Incident[]; acknowledged: Incident[] };
 
 export interface HomeNowData {
   nowList: UseHomeNow;
@@ -75,28 +68,17 @@ export interface HomeNowData {
   incidents: Ref<IncidentLists | null>;
   trend: Ref<ServicesTrendResponse | null>;
   alertList: Ref<OverviewAlertItem[] | null>;
+  /** The window's alert history rows, newest first; null when locked or failed. */
+  alertHits: Ref<OverviewAlertHit[] | null>;
   topology: Ref<OverviewTopology | null>;
-  pending: Ref<boolean>;
   failedSources: Ref<{ key: string; label: I18nText }[]>;
   deniedSources: Ref<{ key: string; label: I18nText }[]>;
-  sources: Ref<BuiltFromSource[]>;
-  trendCapped: Ref<boolean>;
   tracesLocked: Ref<boolean>;
   alertsLocked: Ref<boolean>;
-  incidentsOn: Ref<boolean>;
   timezone: Ref<string>;
   org: Ref<string>;
   load: (force?: boolean) => Promise<void>;
   setRange: (range: HomeRange) => void;
-}
-
-/** Splits the org's runs (newest first) for Home; a failure a later run of the same incident replaced no longer needs anyone. */
-export function homeRunsOf(runs: readonly OrgRcaRun[]): HomeRuns {
-  const byIncident = latestRunByIncident(runs);
-  const failedAuto = [...byIncident.values()].filter(
-    (run) => run.trigger === "auto" && (run.state === "failed" || run.state === "refused"),
-  );
-  return { byIncident, failedAuto };
 }
 
 /** The range's window in microseconds; a relative one is anchored to `nowMs`. */
@@ -121,7 +103,6 @@ export function useHomeNowData(initialRange: HomeRange | null): HomeNowData {
   const anomalies = shallowRef<OverviewAnomalyInput[] | null>(null);
   const alertHits = shallowRef<OverviewAlertHit[] | null>(null);
   const alertList = shallowRef<OverviewAlertItem[] | null>(null);
-  const loading = ref(false);
   const failure = reactive<Record<SourceKey, unknown>>({
     incidents: null,
     services: null,
@@ -154,18 +135,19 @@ export function useHomeNowData(initialRange: HomeRange | null): HomeNowData {
     }
   }
 
+  // Only active incidents: nothing Home draws reads a resolved one.
   async function loadIncidents(force: boolean): Promise<void> {
     if (!gates.incidentsOn.value) return void (incidents.value = null);
     const lists = await Promise.all(
-      (["open", "acknowledged", "resolved"] as const).map((status) =>
+      (["open", "acknowledged"] as const).map((status) =>
         read<{ incidents?: Incident[] }>(
           incidentsQuery(org.value, status, INCIDENT_LIST_SIZE, 0),
           force,
         ),
       ),
     );
-    const [open, acknowledged, resolved] = lists.map((res) => res?.incidents ?? []);
-    incidents.value = { open, acknowledged, resolved };
+    const [open, acknowledged] = lists.map((res) => res?.incidents ?? []);
+    incidents.value = { open, acknowledged };
   }
 
   async function loadTrend(force: boolean): Promise<ServicesTrendResponse | null> {
@@ -275,7 +257,6 @@ export function useHomeNowData(initialRange: HomeRange | null): HomeNowData {
   async function load(force = false): Promise<void> {
     if (!org.value) return;
     const mine = ++seq;
-    loading.value = true;
     if (range.value.type === "relative") window.value = windowOf(range.value, Date.now());
     await Promise.allSettled([
       guarded("incidents", () => loadIncidents(force)),
@@ -285,7 +266,6 @@ export function useHomeNowData(initialRange: HomeRange | null): HomeNowData {
       loadAlertList(force),
     ]);
     if (mine !== seq) return;
-    loading.value = false;
     commit();
   }
 
@@ -346,14 +326,6 @@ export function useHomeNowData(initialRange: HomeRange | null): HomeNowData {
       denied.push({ key: "recentEvents", label: t("overview.recentEvents") });
     return denied;
   });
-  const sources = computed<BuiltFromSource[]>(() => {
-    const out: BuiltFromSource[] = [];
-    if (gates.incidentsOn.value) out.push("incidents");
-    if (gates.servicesOn.value) out.push("services");
-    if (gates.anomaliesOn.value) out.push("anomalies");
-    if (!gates.alertsLocked.value) out.push("events");
-    return out;
-  });
 
   return {
     nowList,
@@ -362,15 +334,12 @@ export function useHomeNowData(initialRange: HomeRange | null): HomeNowData {
     incidents,
     trend: computed(() => (trendApplies.value ? trend.value : null)),
     alertList,
+    alertHits,
     topology,
-    pending: computed(() => !nowList.state.value && loading.value),
     failedSources,
     deniedSources,
-    sources,
-    trendCapped: computed(() => trendCapped.value && gates.servicesOn.value),
     tracesLocked: gates.tracesLocked,
     alertsLocked: gates.alertsLocked,
-    incidentsOn: gates.incidentsOn,
     timezone: computed(() => safeTimezone(resolveBrowserTimezone(store.state.timezone || "UTC"))),
     org,
     load,

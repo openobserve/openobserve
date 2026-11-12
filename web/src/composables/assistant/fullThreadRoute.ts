@@ -60,3 +60,8 @@ export function withoutThread(query: LocationQuery): LocationQuery {
   delete next[THREAD_QUERY_KEY];
   return next;
 }
+
+/** Home's AI tab back on its Ask box, focused: where a chat on Home starts over. */
+export function homeAskLocation(query: LocationQuery): RouteLocationRaw {
+  return { name: "home", query: { ...withoutThread(query), focus: "ask" } };
+}

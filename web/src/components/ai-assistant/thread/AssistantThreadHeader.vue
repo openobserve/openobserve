@@ -17,7 +17,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     ref="root"
-    class="flex min-w-0 flex-1 items-center gap-1"
+    :class="[
+      'flex min-w-0 items-center gap-1',
+      toolbar ? 'rounded-default bg-surface-base/80 p-0.5 backdrop-blur-sm' : 'flex-1',
+    ]"
     data-test="assistant-thread-header"
     :data-narrow="narrow ? '' : undefined"
     :data-view="chatsOpen ? 'chats' : 'chat'"
@@ -48,7 +51,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </template>
     <template v-else>
-      <div v-if="renaming" class="min-w-0 flex-1" data-test="assistant-thread-rename">
+      <!-- A toolbar reads New chat, Open as and ⓘ before its More menu -->
+      <div v-if="toolbar && !renaming" class="flex shrink-0 items-center gap-1">
+        <AssistantIconButton
+          v-if="newShown && newInBar"
+          :label="newLabel"
+          :icon="assistantGlyph.newChat"
+          data-test="assistant-thread-new"
+          @click="askNew"
+        />
+        <slot name="container-actions" :narrow="narrow" />
+      </div>
+      <div
+        v-if="renaming"
+        :class="toolbar ? 'w-64 max-w-full' : 'min-w-0 flex-1'"
+        data-test="assistant-thread-rename"
+      >
         <OInlineEdit
           ref="renameInput"
           v-model="draft"
@@ -59,8 +77,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @cancel="cancelRename"
         />
       </div>
-      <div v-else class="relative flex min-w-0 flex-1 items-center gap-2">
-        <h2
+      <div
+        v-else-if="!toolbar || chatActions"
+        class="relative flex min-w-0 flex-1 items-center gap-2"
+      >
+        <component
+          :is="toolbar ? 'div' : 'h2'"
           :aria-describedby="describedBy"
           :aria-busy="renamePending ? 'true' : undefined"
           :class="[
@@ -72,12 +94,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <ODropdown
             v-model:open="menuOpen"
             side="bottom"
-            align="start"
+            :align="toolbar ? 'end' : 'start'"
             privacy="mask"
             :content-class="menuWidth"
           >
             <template #trigger>
+              <AssistantIconButton
+                v-if="toolbar"
+                ref="heading"
+                :label="t('assistant.thread.toolbar.more')"
+                :icon="assistantGlyph.more"
+                :disabled="renamePending"
+                aria-haspopup="menu"
+                data-test="assistant-thread-more"
+              />
               <OButton
+                v-else
                 ref="heading"
                 variant="ghost"
                 size="xs"
@@ -123,7 +155,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <AssistantTitleMenu
               :sid="sid"
               :new-chat="newInMenu && !readonly"
-              :actions-only="placement === 'full' && chatActions"
+              :actions-only="(placement === 'full' || toolbar) && chatActions"
               @new="askNew"
               @open="openChat"
               @all="openChats"
@@ -136,7 +168,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <OText as="span" variant="meta">{{ t("assistant.thread.thisChat") }}</OText>
                     <OTag
-                      v-if="narrow && saveTag"
+                      v-if="(narrow || toolbar) && saveTag"
                       type="assistantSave"
                       :value="saveTag"
                       size="xs"
@@ -203,9 +235,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
             </AssistantTitleMenu>
           </ODropdown>
-        </h2>
+        </component>
         <OTag
-          v-if="saveTag && !narrow"
+          v-if="saveTag && !narrow && !toolbar"
           :id="saveTagId"
           type="assistantSave"
           :value="saveTag"
@@ -215,7 +247,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <slot name="title-anchor" />
       </div>
-      <div class="flex shrink-0 items-center gap-1">
+      <div v-if="!toolbar" class="flex shrink-0 items-center gap-1">
         <AssistantIconButton
           v-if="newShown && newInBar"
           :label="newLabel"
@@ -256,6 +288,8 @@ export interface AssistantThreadHeaderProps {
   narrow?: boolean;
   /** The folded Open as slot holds one move, shown as a direct item instead of a submenu. */
   layoutDirect?: boolean;
+  /** No title: icon controls only, the chat actions behind More, New chat only where no rail lists the chats. */
+  toolbar?: boolean;
 }
 
 /** What the shell lends the header: its own New, and the in-panel Chats view that replaces its body. */
@@ -385,19 +419,27 @@ const saveTag = computed(() => {
     return "not_saved";
   return null;
 });
-const describedBy = computed(() => (saveTag.value && !narrow.value ? saveTagId : undefined));
+const describedBy = computed(() =>
+  saveTag.value && !narrow.value && !props.toolbar ? saveTagId : undefined,
+);
 const chatActions = computed(() => hasMessages.value && !readonly.value && !!props.sid);
 // Nothing to leave in an empty chat, and a read-only role cannot start one.
 const newShown = computed(() => !readonly.value && (hasMessages.value || chatsOpen.value));
-const { mdUp } = useBreakpoint();
+const { mdUp, lgUp } = useBreakpoint();
 const phoneFull = computed(() => props.placement === "full" && !mdUp.value);
 // The Full page on a phone keeps the bar's room for the title; a window offers New chat in both places.
-const newInMenu = computed(() => props.placement === "window" || phoneFull.value);
-const newInBar = computed(() => !phoneFull.value);
-const newLabel = computed<I18nText>(() =>
-  object.value ? raw(object.value.newLabel) : t("assistant.thread.newChat"),
+const newInMenu = computed(
+  () => !props.toolbar && (props.placement === "window" || phoneFull.value),
 );
+// Home's rail carries New chat from lg up, so a toolbar shows it only below.
+const newInBar = computed(() => (props.toolbar ? !lgUp.value : !phoneFull.value));
+const newLabel = computed<I18nText>(() => {
+  if (object.value) return raw(object.value.newLabel);
+  return props.toolbar ? t("assistant.thread.toolbar.newChat") : t("assistant.thread.newChat");
+});
 const narrow = computed(() => {
+  // The toolbar measures only its own few buttons, which says nothing about the room for Open as.
+  if (props.toolbar) return false;
   if (props.placement === "window") return props.narrow;
   return props.narrow || props.placement === "sheet" || widthRem.value < NARROW_REM;
 });

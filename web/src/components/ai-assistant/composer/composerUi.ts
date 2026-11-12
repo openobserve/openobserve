@@ -13,7 +13,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { computed, inject, reactive, toRaw, type ComputedRef, type InjectionKey } from "vue";
+import {
+  computed,
+  inject,
+  reactive,
+  toRaw,
+  type ComputedRef,
+  type InjectionKey,
+  type Ref,
+} from "vue";
 
 import type { AssistantError, TurnState, useAssistantStore } from "@/composables/assistant";
 import type { I18nText } from "@/types/i18n";
@@ -83,6 +91,9 @@ export interface ComposerLayout {
 export const composerLayoutKey: InjectionKey<ComputedRef<ComposerLayout>> =
   Symbol("assistantComposerLayout");
 
+/** The time picker's open state: the composer's + menu opens it, the tray's time chip holds it. */
+export const composerTimeOpenKey: InjectionKey<Ref<boolean>> = Symbol("assistantComposerTimeOpen");
+
 const states = reactive(new Map<string, ComposerUi>());
 
 let seq = 0;
@@ -94,6 +105,12 @@ export function useComposerLayout(): ComputedRef<ComposerLayout> {
     computed(() => ({ narrow: false, tight: false, wide: false })),
     false,
   );
+}
+
+/** True while focus is in `box` or in a popover, which is teleported out of the box that opened it. */
+export function focusIn(box: Element | null): boolean {
+  const active = document.activeElement;
+  return !!active && (!!box?.contains(active) || !!active.closest("[data-o-popover-content]"));
 }
 
 /** One popover width on every board; 3 px a side short of a 20 rem window. */

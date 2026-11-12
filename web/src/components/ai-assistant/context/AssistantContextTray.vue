@@ -21,8 +21,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :items="shownChips"
     :hidden-count="hiddenCount"
   >
-    <template #leading>
+    <template v-if="timeShown" #leading>
       <AssistantTimePrefix
+        v-model:open="timeOpen"
         :window="context.window.value"
         :page-window="pageWindow"
         :timezone="timezone"
@@ -71,11 +72,16 @@ export { trayChipLimit } from "./AssistantChipTray.vue";
 </script>
 
 <script setup lang="ts">
-import { computed, nextTick, ref, type ComponentPublicInstance } from "vue";
+import { computed, inject, nextTick, ref, type ComponentPublicInstance } from "vue";
 import { useRoute } from "vue-router";
 import { useStore } from "vuex";
 
-import { announceComposer, useComposerLayout } from "@/components/ai-assistant/composer/composerUi";
+import { imageChipOf } from "@/components/ai-assistant/composer/composerImages";
+import {
+  announceComposer,
+  composerTimeOpenKey,
+  useComposerLayout,
+} from "@/components/ai-assistant/composer/composerUi";
 import { explorerLabel } from "@/components/ai-assistant/evidence/evidenceText";
 import {
   byteSize,
@@ -88,7 +94,6 @@ import {
 } from "@/composables/assistant";
 import { trackAssistant } from "@/services/assistantAnalytics";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
-import { formatBytes } from "@/utils/formatters";
 
 import { chipOpenQuery } from "@/composables/assistant/pure";
 import { explorerOf } from "@/utils/assistant/explorerRoutes";
@@ -112,6 +117,9 @@ const tray = ref<ComponentPublicInstance | null>(null);
 const root = computed<HTMLElement | null>(() => tray.value?.$el ?? null);
 const openId = ref<string | null>(null);
 const expanded = ref(false);
+const timeOpen = inject(composerTimeOpenKey, ref(false));
+// The page's own range shows in the ⓘ; the chip is only a range the user picked or is picking.
+const timeShown = computed(() => timeOpen.value || context.window.value.source === "custom");
 
 // Another user+org's chat is never shown or edited here (D21, F8).
 const session = computed(() => {
@@ -127,17 +135,7 @@ const pageWindow = computed(() => {
 });
 
 // Page context shows in the `i` and the placeholder; chips are only what the user added (composer §1).
-const imageChips = computed<ContextChip[]>(() =>
-  (session.value?.composer.images ?? []).map((image) => ({
-    id: image.id ?? image.filename,
-    kind: "image",
-    label: raw(image.filename),
-    secondary: raw(formatBytes(image.size)),
-    sizeBytes: image.size,
-    provenance: "attach",
-    sent: "serialized",
-  })),
-);
+const imageChips = computed(() => (session.value?.composer.images ?? []).map(imageChipOf));
 const allChips = computed(() => [
   ...context.chips.value.filter((chip) => chip.kind !== "time" && chip.provenance !== "page"),
   ...imageChips.value,

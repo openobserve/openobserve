@@ -105,13 +105,12 @@ const serviceOf = (state: OverviewNowState, name: string) =>
     Extract<OverviewNowRow, { kind: "service" }> | undefined;
 
 describe("buildOverviewNow", () => {
-  it("orders the four buckets with recovered last", () => {
+  it("orders the buckets, critical first and anomalies after degraded", () => {
     const state = buildOverviewNow(
       input({
         incidents: {
           open: [incident("p3", { severity: "P3" }), incident("p1")],
           acknowledged: [],
-          resolved: [incident("done", { status: "resolved", resolved_at: END - 100 })],
         },
         trend: trend([svc("checkout-api"), svc("search", { signal: "latency", p99_ratio: 2.4 })]),
         anomalies: [
@@ -128,7 +127,6 @@ describe("buildOverviewNow", () => {
       "degraded",
       "degraded",
       "anomaly",
-      "recovered",
     ]);
     expect(keys(state)).toEqual([
       "incident:p1",
@@ -137,25 +135,7 @@ describe("buildOverviewNow", () => {
       "service:search",
       "incident:p3",
       "anomaly:an-1",
-      "incident:done",
     ]);
-  });
-
-  it("shows a resolved incident as Recovered only inside the window", () => {
-    const state = buildOverviewNow(
-      input({
-        incidents: {
-          open: [],
-          acknowledged: [],
-          resolved: [
-            incident("in", { status: "resolved", resolved_at: START + 1 }),
-            incident("out", { status: "resolved", resolved_at: START - 1 }),
-          ],
-        },
-      }),
-      null,
-    );
-    expect(keys(state)).toEqual(["incident:in"]);
   });
 
   it("never lists normal or low-traffic services", () => {
@@ -275,7 +255,7 @@ describe("buildOverviewNow", () => {
     });
   });
 
-  it("counts +N more from the server's degraded total, not held normal rows", () => {
+  it("lists a newly degraded service above a held one", () => {
     const prev = buildOverviewNow(input({ trend: trend([svc("api")]) }), null);
     const next = buildOverviewNow(
       input({
@@ -287,7 +267,6 @@ describe("buildOverviewNow", () => {
       prev,
     );
     expect(keys(next)).toEqual(["service:b", "service:api"]);
-    expect(next.moreDegraded).toBe(4);
   });
 
   it("marks partial service rows without moving them", () => {
@@ -546,7 +525,7 @@ describe("the real snapshot through the Home context provider", () => {
     const now = useHomeNow();
     now.commit(
       input({
-        incidents: { open: [incident("inc-7")], acknowledged: [], resolved: [] },
+        incidents: { open: [incident("inc-7")], acknowledged: [] },
         trend: trend([svc("checkout-api")]),
         anomalies: [
           { configId: "an-1", name: "Orders", stream: "orders", anomalyCount: 2, at: END },

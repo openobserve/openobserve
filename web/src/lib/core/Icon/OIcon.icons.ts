@@ -193,6 +193,7 @@ import VerifiedUser from "~icons/material-symbols/verified-user-outline";
 import Webhook from "~icons/material-symbols/webhook";
 import MenuBook from "~icons/material-symbols/menu-book-outline";
 
+import PictureInPicture from "~icons/material-symbols/picture-in-picture-alt-outline";
 import OpenInBrowser from "~icons/material-symbols/open-in-browser";
 import StackedLineChart from "~icons/material-symbols/stacked-line-chart";
 import Keyboard from "~icons/material-symbols/keyboard";
@@ -746,6 +747,7 @@ export const iconRegistry = {
   // Batch 3: Synthetics / browser-check icons (2026-06-22)
   // (duplicate "person-pin-circle" from batch 2 removed — keep the first entry at line 624)
   "open-in-browser": OpenInBrowser,
+  "picture-in-picture": PictureInPicture,
   "stacked-line-chart": StackedLineChart,
   keyboard: Keyboard,
   checklist: Checklist,

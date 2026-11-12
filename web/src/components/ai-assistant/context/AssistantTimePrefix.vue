@@ -32,20 +32,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :aria-label="t('assistant.context.time.swap')"
     :content-class="`${composerPopoverClass(layout.tight)} flex flex-col gap-0.5 p-1`"
     @update:open="setOpen"
+    @pointer-down-outside="keepOnChip"
   >
-    <template #trigger>
-      <OTag
-        type="assistantContext"
-        :label="text"
-        :icon="assistantGlyph.chipTime"
-        clickable
-        :disabled="disabled"
-        :aria-label="name"
-        aria-haspopup="dialog"
-        :aria-expanded="open"
-        :class="['shrink-0 motion-safe:transition-colors', CHIP_HIT_AREA_CLASS]"
-        data-test="assistant-context-chip-time"
-      />
+    <!-- An anchor, not a trigger: a set range carries a ✕, and focus must return to the label beside it -->
+    <template #anchor>
+      <OTooltip :content="t('assistant.context.time.hint')">
+        <OTag
+          ref="chip"
+          type="assistantContext"
+          :label="text"
+          :icon="assistantGlyph.chipTime"
+          clickable
+          :disabled="disabled"
+          :removable="removable"
+          label-button
+          :remove-label="t('assistant.context.remove', { label: text })"
+          remove-data-test="assistant-context-chip-time-remove"
+          :aria-label="name"
+          aria-haspopup="dialog"
+          :aria-expanded="open"
+          :class="['shrink-0 motion-safe:transition-colors', CHIP_HIT_AREA_CLASS]"
+          data-test="assistant-context-chip-time"
+          @click="setOpen(!open)"
+          @remove="pick(null)"
+        />
+      </OTooltip>
     </template>
     <div class="flex flex-col gap-0.5" data-test="assistant-context-time-picker">
       <div
@@ -69,11 +80,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-for="period in PERIODS"
           :key="period"
           :label="periodLabel(period)"
-          :meta="
-            period === DEFAULT_PERIOD && !pageWindow
-              ? t('assistant.context.time.source.default')
-              : undefined
-          "
           :selected="isSelected(period)"
           :tabbable="tabbableId === period"
           :data-test="`assistant-context-time-${period}`"
@@ -117,6 +123,8 @@ export interface AssistantTimePrefixProps {
   disabled?: boolean;
   /** The page range is still loading, so the chip would name a window that is about to change. */
   loading?: boolean;
+  /** The chip has no ✕: the default window is always one pick away, so there is nothing to remove. */
+  fixed?: boolean;
 }
 
 export interface AssistantTimePrefixEmits {
@@ -148,7 +156,7 @@ const LETTER_OF: Record<RelativeUnit, string> = {
 </script>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, ref, type ComponentPublicInstance } from "vue";
 
 import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
 import {
@@ -166,6 +174,7 @@ import type {
   RelativeUnit,
 } from "@/lib/forms/DateTimeRange/ODateTimeRange.types";
 import OPopover from "@/lib/overlay/Popover/OPopover.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import { convertDateToTimestamp, formatTimestampInTimezone } from "@/utils/date";
 
@@ -177,17 +186,25 @@ const props = withDefaults(defineProps<AssistantTimePrefixProps>(), {
   align: "start",
   disabled: false,
   loading: false,
+  fixed: false,
 });
 
 const emit = defineEmits<AssistantTimePrefixEmits>();
 
+/** The picker; a + menu opens it from outside. */
+const open = defineModel<boolean>("open", { default: false });
+
 const { t } = useI18nTyped();
 const layout = useComposerLayout();
-const open = ref(false);
 const reversed = ref(false);
 const group = ref<HTMLElement | null>(null);
+const chip = ref<ComponentPublicInstance | null>(null);
 
 const text = computed(() => textOf(props.window));
+// Only a range the user picked can be dropped; its ✕ goes back to the page's time or the default.
+const removable = computed(
+  () => props.window.source === "custom" && !props.disabled && !props.fixed,
+);
 const name = computed(() =>
   t("assistant.context.time.name", {
     range: text.value,
@@ -240,6 +257,13 @@ function isSelected(period: string): boolean {
 function setOpen(value: boolean): void {
   open.value = value;
   reversed.value = false;
+}
+
+// A press on the chip toggles the picker itself, so it must not also count as a press outside.
+function keepOnChip(event: Event): void {
+  const el: unknown = chip.value?.$el;
+  if (el instanceof Element && event.target instanceof Node && el.contains(event.target))
+    event.preventDefault();
 }
 
 function pick(range: ComposerState["timeOverride"]): void {

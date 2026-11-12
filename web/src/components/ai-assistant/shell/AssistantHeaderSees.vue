@@ -19,6 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-if="!stripHoldsSees"
     :sid="sid"
     placement="bottom"
+    :label="label"
     data-test="assistant-shell-sees"
   />
 </template>
@@ -28,10 +29,11 @@ import { computed } from "vue";
 
 import AssistantContextSeesPopover from "@/components/ai-assistant/context/AssistantContextSeesPopover.vue";
 import { useAssistantStore, type Sid } from "@/composables/assistant";
+import type { I18nText } from "@/types/i18n";
 
 import { composerStripHoldsSees } from "./headerSees";
 
-const props = defineProps<{ sid: Sid | null }>();
+const props = defineProps<{ sid: Sid | null; label?: I18nText }>();
 
 const store = useAssistantStore();
 

@@ -24,7 +24,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :data-near="near ? '' : undefined"
       data-test="assistant-local-only-line"
     >
-      {{ line }}
+      <OTruncatedText v-if="compact">{{ line }}</OTruncatedText>
+      <template v-else>{{ line }}</template>
     </OText>
     <OPopover
       v-model:open="infoOpen"
@@ -42,7 +43,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="shrink-0 max-md:min-h-11 pointer-coarse:min-h-11"
           data-test="assistant-local-info"
         >
-          <span class="max-md:sr-only">{{ t("assistant.history.localOnly.info") }}</span>
+          <span :class="compact ? 'sr-only' : 'max-md:sr-only'">{{
+            t("assistant.history.localOnly.info")
+          }}</span>
         </OButton>
       </template>
       <OText variant="meta" as="p" data-test="assistant-local-info-help">
@@ -85,6 +88,8 @@ export interface AssistantLocalOnlyHeaderProps {
   clearOnSignOut: boolean;
   /** Lets the list describe itself by this line. */
   descriptionId?: string;
+  /** One line for a narrow rail: the line truncates and the info button shows its icon only. */
+  compact?: boolean;
 }
 
 /** From here the line warns that the oldest unpinned chat goes next; never red. */
@@ -98,12 +103,14 @@ import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
 import { SETUP_DOCS_URL } from "@/components/ai-assistant/gate/AssistantGateState.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OText from "@/lib/core/Typography/OText.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OPopover from "@/lib/overlay/Popover/OPopover.vue";
 import { useI18nTyped } from "@/types/i18n";
 
 const props = withDefaults(defineProps<AssistantLocalOnlyHeaderProps>(), {
   descriptionId: undefined,
+  compact: false,
 });
 
 const emit = defineEmits<{ "update:clearOnSignOut": [value: boolean] }>();

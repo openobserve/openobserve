@@ -96,6 +96,9 @@ const ROUNDED_FULL_FILES = [
   "components/ai-assistant/common/AssistantStatusDot.vue",
   "components/ai-assistant/composer/AssistantComposerBottomRow.vue",
   "components/ai-assistant/composer/AssistantAgentPill.vue",
+  // Home's chats rail: the pill search and view tabs, and its small row dot.
+  "components/ai-assistant/history/AssistantHistoryList.vue",
+  "components/ai-assistant/history/AssistantHistoryRow.vue",
 ];
 
 const PURE_CONSTRUCTORS = new Set(["Set", "Map"]);
@@ -251,7 +254,7 @@ describe("assistant repo guards", () => {
     expect(offenders((f) => inAssistantUi(f.path) && pattern.test(f.text))).toEqual([]);
   });
 
-  it("allows rounded-full only in the status dot and the composer's round Send and agent pill", () => {
+  it("allows rounded-full only in the status dot, the composer's round Send and agent pill, and Home's chats rail", () => {
     expect(
       offenders(
         (f) =>
