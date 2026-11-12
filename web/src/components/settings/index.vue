@@ -259,6 +259,7 @@ export default defineComponent({
       );
       const queryManagementLicense = featureState(z?.features, "query_management");
       const aiToolsetsLicense = featureState(z?.features, "ai_toolsets");
+      const aiAssistantLicense = featureState(z?.features, "ai_assistant");
       const byobLicense = featureState(z?.features, "byob");
       const oncallLicense = menuState(z?.features, "oncall", z?.oncall_enabled !== false);
       const alertsLocked = featureState(z?.features, "alerts") === "locked";
@@ -428,12 +429,15 @@ export default defineComponent({
           key: "ai_toolsets",
           label: t("aiToolset.header"),
           description: t("settings.aiToolsetsDesc"),
-          icon: "build",
+          icon: "smart-toy",
           to: { name: "aiToolsets", query: { org_identifier: org } },
-          visible: aiToolsetsLicense !== "hidden" && aiToolsetsAccess.visible,
+          visible:
+            aiToolsetsLicense !== "hidden" &&
+            aiAssistantLicense !== "hidden" &&
+            aiToolsetsAccess.visible,
           locked: !aiToolsetsAccess.allowed,
           lockedMessage: aiToolsetsAccess.message,
-          licenseLocked: aiToolsetsLicense === "locked",
+          licenseLocked: aiToolsetsLicense === "locked" || aiAssistantLicense === "locked",
           dataTest: "ai-toolsets-tab",
           group: "Integrations",
         },
