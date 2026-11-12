@@ -488,20 +488,18 @@ fn auto_uds_fields(
     if let Some(schema) = current_schema {
         fill_uds_fields(&mut uds_fields, schema, limit);
     }
-    if uds_fields.len() < limit {
-        fill_uds_fields(&mut uds_fields, final_schema, limit);
-    }
+    fill_uds_fields(&mut uds_fields, final_schema, limit);
     uds_fields
 }
 
 fn fill_uds_fields(uds_fields: &mut HashSet<String>, schema: &Schema, limit: usize) {
     for field in schema.fields() {
-        let field = field.name();
-        if is_uds_internal_column(field) {
-            continue;
-        }
-        if uds_fields.insert(field.to_string()) && uds_fields.len() >= limit {
+        if uds_fields.len() >= limit {
             break;
+        }
+        let field = field.name();
+        if !is_uds_internal_column(field) {
+            uds_fields.insert(field.to_string());
         }
     }
 }
@@ -1412,20 +1410,21 @@ mod tests {
                 .map(|name| Field::new(name, DataType::Utf8, true))
                 .to_vec(),
         );
-        let fields = |disabled| {
+        let fields = |disabled, limit| {
             let fields = auto_uds_fields(
                 StreamType::Logs,
                 &partitioned_settings(disabled),
                 &schema,
                 Some(&schema),
-                2,
+                limit,
             );
             let mut fields = fields.into_iter().collect::<Vec<_>>();
             fields.sort_unstable();
             fields
         };
-        assert_eq!(fields(false), ["a", "pk"]);
-        assert_eq!(fields(true), ["a", "b"]);
+        assert_eq!(fields(false, 2), ["a", "pk"]);
+        assert_eq!(fields(true, 2), ["a", "b"]);
+        assert_eq!(fields(false, 1), ["pk"]);
     }
 
     #[test]
