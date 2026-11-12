@@ -1,10 +1,10 @@
 // Session player coverage for openobserve#16245 (SDK v7.10+ replay Change types 11-15) and
 // openobserve#16468 (the Traces tab lists every request, with browser-timed durations and HTTP errors).
 
-const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
-const testLogger = require('../utils/test-logger.js');
-const PageManager = require('../../pages/page-manager.js');
-const { seedReplayTracesSession } = require('../utils/rum-replay-traces-seed.js');
+const { test, expect, navigateToBase } = require('../../utils/enhanced-baseFixtures.js');
+const testLogger = require('../../utils/test-logger.js');
+const PageManager = require('../../../pages/page-manager.js');
+const { seedReplayTracesSession } = require('../../utils/rum-replay-traces-seed.js');
 
 const TAGS = ['@rum', '@sessionReplay', '@rumTraces', '@P1', '@all'];
 const SEED_TIMEOUT_MS = 5 * 60 * 1000;

@@ -533,8 +533,7 @@
       "sourcemap-ui.spec.js",
       "sourcemap-upload-pretty.spec.js",
       "rum-form-validation.spec.js",
-      "app-performance.spec.js",
-      "rum-replay-v710-traces-tab.spec.js"
+      "app-performance.spec.js"
     ],
     "disabled": []
   },
