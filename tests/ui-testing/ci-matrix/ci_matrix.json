@@ -18,6 +18,7 @@
       "alerts-chart-error-state.spec.js",
       "alertsPagination.spec.js",
       "alertTemplatesPagination.spec.js",
+      "alertTemplatesToolbar.spec.js",
       "alertDestinationsPagination.spec.js",
       "alerts-destinations-usage.spec.js",
       "alerts-no-destination.spec.js",
