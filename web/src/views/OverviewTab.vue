@@ -158,12 +158,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ inc.title || t("overview.untitledIncident") }}
               <template v-if="inc.group_values && Object.keys(inc.group_values).length > 0">
                 <ODimensionChip
-                  v-for="[key, val] in sortedDimensions(inc.group_values)"
-                  :key="key"
-                  :dim-key="key"
-                  :key-label="shortDimKey(key)"
-                  :value="val"
-                  :tooltip="true"
+                  v-for="dim in incidentDimensions(inc.group_values)"
+                  :key="dim.key"
+                  :dim-key="dim.key"
+                  :key-label="dim.label"
+                  :value="dim.value"
+                  :tooltip="dim.rawTooltip"
                 />
               </template>
             </div>
