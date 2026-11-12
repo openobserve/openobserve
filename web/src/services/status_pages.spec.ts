@@ -56,7 +56,7 @@ describe("status_pages service analytics", () => {
     });
     await statusPagesService.updateNotice("org1", "n1", { state: 2 });
     await statusPagesService.addNoticeUpdate("org1", "n1", "Fixed");
-    await statusPagesService.markFalsePositive("org1", "n1");
+    await statusPagesService.markFalsePositive("org1", "n1", "Probe network fault");
     await statusPagesService.deleteNotice("org1", "n1");
     expect(analytics.track).toHaveBeenCalledWith("status_page_notice_created", {
       kind: "maintenance",

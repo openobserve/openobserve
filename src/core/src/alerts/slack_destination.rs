@@ -465,6 +465,7 @@ mod tests {
             status: NodeStatus::Online,
             metrics: Default::default(),
             version: version.into(),
+            commit: String::new(),
         }
     }
 

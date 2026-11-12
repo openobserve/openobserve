@@ -563,6 +563,7 @@ pub async fn mark_false_positive(
         &org_id,
         &nid,
         body.snooze_hours,
+        &body.reason,
         &user.user_id,
     )
     .await
@@ -572,6 +573,41 @@ pub async fn mark_false_positive(
             MetaHttpResponse::ok("marked")
         }
         Err(e) => map_err("mark_false_positive", e),
+    }
+}
+
+/// Undoes a false-alarm mark: the incident returns to the public history and its downtime counts
+/// again.
+#[utoipa::path(
+    delete,
+    path = "/{org_id}/status_pages/notices/{nid}/mark_false_positive",
+    context_path = "/api",
+    tag = "Status Pages",
+    operation_id = "UndoStatusPageNoticeFalsePositive",
+    summary = "Undo a false-alarm mark on a notice",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("nid" = String, Path, description = "Notice id"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Status Pages", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
+pub async fn undo_false_positive(
+    Path((org_id, nid)): Path<(String, String)>,
+    Headers(user): Headers<UserEmail>,
+) -> Response {
+    match openobserve_core::status_pages::undo_false_positive(&org_id, &nid).await {
+        Ok(()) => {
+            audit(&org_id, &user.user_id, "undo_false_positive", Some(&nid)).await;
+            MetaHttpResponse::ok("restored")
+        }
+        Err(e) => map_err("undo_false_positive", e),
     }
 }
 

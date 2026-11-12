@@ -16,7 +16,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- Read-only history of notices posted against a page, with a remove
      action per row. Answers "did my update actually post" and gives the
-     one place to take an update back down. -->
+     one place to take an update back down. An incident that synthetics
+     opened can also be marked as a false alarm, and the mark undone. -->
 <template>
   <ODialog
     :open="open"
@@ -49,6 +50,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OBadge :variant="noticeStateBadge(notice.state).variant" size="sm">
               {{ t(noticeStateBadge(notice.state).labelKey) }}
             </OBadge>
+            <OBadge
+              v-if="notice.false_alarm"
+              variant="default-soft"
+              size="sm"
+              :data-test="`status-page-notice-false-alarm-${notice.id}`"
+            >
+              {{ t("statusPages.notices.falseAlarm.badge") }}
+            </OBadge>
             <OTimeCell
               :value="notice.starts_at"
               unit="us"
@@ -56,15 +65,81 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="text-text-secondary text-xs"
             />
           </div>
-          <OButton
-            variant="ghost"
-            size="icon-xs"
-            icon-left="delete"
-            :data-test="`status-page-notice-delete-${notice.id}`"
-            @click="confirmDelete(notice)"
-          >
-            <OTooltip side="bottom" :content="t('common.delete')" />
-          </OButton>
+          <div class="flex items-center gap-1">
+            <OButton
+              v-if="canMarkFalseAlarm(notice)"
+              variant="ghost"
+              size="xs"
+              :data-test="`status-page-notice-mark-false-alarm-${notice.id}`"
+              @click="startFalseAlarm(notice)"
+            >
+              {{ t("statusPages.notices.falseAlarm.action") }}
+            </OButton>
+            <OButton
+              v-if="notice.false_alarm"
+              variant="ghost"
+              size="xs"
+              :loading="busyId === notice.id"
+              :data-test="`status-page-notice-undo-false-alarm-${notice.id}`"
+              @click="undoFalseAlarm(notice)"
+            >
+              {{ t("statusPages.notices.falseAlarm.undo") }}
+            </OButton>
+            <OButton
+              variant="ghost"
+              size="icon-xs"
+              icon-left="delete"
+              :data-test="`status-page-notice-delete-${notice.id}`"
+              @click="confirmDelete(notice)"
+            >
+              <OTooltip side="bottom" :content="t('common.delete')" />
+            </OButton>
+          </div>
+        </div>
+        <p
+          v-if="notice.false_alarm"
+          class="text-text-secondary text-xs"
+          :data-test="`status-page-notice-false-alarm-by-${notice.id}`"
+        >
+          {{
+            t("statusPages.notices.falseAlarm.markedBy", {
+              by: notice.false_alarm.by,
+              reason: notice.false_alarm.reason,
+            })
+          }}
+          <OTimeCell :value="notice.false_alarm.at" unit="us" mode="relative" />
+        </p>
+        <div
+          v-if="falseAlarmFor === notice.id"
+          class="bg-surface-panel rounded-default flex flex-col gap-2 p-2"
+          :data-test="`status-page-notice-false-alarm-form-${notice.id}`"
+        >
+          <p class="text-text-secondary text-xs">
+            {{ t("statusPages.notices.falseAlarm.help") }}
+          </p>
+          <OTextarea
+            v-model="falseAlarmReason"
+            :label="t('statusPages.notices.falseAlarm.reason')"
+            :rows="2"
+            :maxlength="1000"
+            autofocus
+            :data-test="`status-page-notice-false-alarm-reason-${notice.id}`"
+          />
+          <div class="flex justify-end gap-2">
+            <OButton variant="outline" size="sm-action" @click="falseAlarmFor = null">
+              {{ t("common.cancel") }}
+            </OButton>
+            <OButton
+              variant="primary"
+              size="sm-action"
+              :disabled="!falseAlarmReason.trim()"
+              :loading="busyId === notice.id"
+              :data-test="`status-page-notice-false-alarm-confirm-${notice.id}`"
+              @click="markFalseAlarm(notice)"
+            >
+              {{ t("statusPages.notices.falseAlarm.confirm") }}
+            </OButton>
+          </div>
         </div>
         <p class="text-sm font-medium">{{ raw(notice.title) }}</p>
         <div
@@ -122,7 +197,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
@@ -130,6 +205,7 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
+import OTextarea from "@/lib/forms/Input/OTextarea.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import statusPagesService, {
@@ -148,6 +224,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   "update:open": [value: boolean];
+  /** A notice was removed, or its false-alarm mark changed: the page health may have moved. */
   deleted: [];
 }>();
 
@@ -204,6 +281,66 @@ watch(
   },
   { immediate: true },
 );
+
+// ── False alarm ─────────────────────────────────────────────────────────
+// Only an incident that synthetics opened: the owner edits or deletes a manual one.
+function canMarkFalseAlarm(notice: StatusPageNotice): boolean {
+  return notice.source === 0 && notice.kind === 0 && !notice.false_alarm;
+}
+
+const falseAlarmFor = ref<string | null>(null);
+const falseAlarmReason = ref("");
+const busyId = ref<string | null>(null);
+
+function startFalseAlarm(notice: StatusPageNotice) {
+  falseAlarmFor.value = notice.id;
+  falseAlarmReason.value = "";
+}
+
+// The server's own message, shown as is.
+function apiMessage(err: any): I18nText | undefined {
+  const msg = err?.response?.data?.message || err?.response?.data?.error;
+  return msg ? raw(String(msg)) : undefined;
+}
+
+async function markFalseAlarm(notice: StatusPageNotice) {
+  const reason = falseAlarmReason.value.trim();
+  if (!reason) return;
+  busyId.value = notice.id;
+  try {
+    await statusPagesService.markFalsePositive(props.orgIdentifier, notice.id, reason);
+    falseAlarmFor.value = null;
+    toast({ variant: "success", message: t("statusPages.notices.falseAlarm.marked") });
+    emit("deleted");
+    await load();
+  } catch (err: any) {
+    toast({
+      variant: "error",
+      message: apiMessage(err) || t("statusPages.notices.falseAlarm.markFailed"),
+    });
+    console.error("[status-pages] mark false alarm failed", err);
+  } finally {
+    busyId.value = null;
+  }
+}
+
+async function undoFalseAlarm(notice: StatusPageNotice) {
+  busyId.value = notice.id;
+  try {
+    await statusPagesService.undoFalsePositive(props.orgIdentifier, notice.id);
+    toast({ variant: "success", message: t("statusPages.notices.falseAlarm.restored") });
+    emit("deleted");
+    await load();
+  } catch (err: any) {
+    toast({
+      variant: "error",
+      message: apiMessage(err) || t("statusPages.notices.falseAlarm.undoFailed"),
+    });
+    console.error("[status-pages] undo false alarm failed", err);
+  } finally {
+    busyId.value = null;
+  }
+}
 
 async function confirmDelete(notice: StatusPageNotice) {
   const ok = await confirm({

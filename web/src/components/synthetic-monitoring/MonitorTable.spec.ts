@@ -190,6 +190,23 @@ describe("MonitorTable", () => {
 
   // ── OTable prop forwarding ────────────────────────────────────────────
 
+  describe("run class badge", () => {
+    it("should say since when a check is not measured, and label the other classes", () => {
+      const since = Date.UTC(2026, 10, 3, 10, 36) * 1000;
+      wrapper = mountMonitorTable({
+        data: [
+          { ...mockMonitorList[0], id: "nm", status: "not_measured", statusSince: since },
+          { ...mockMonitorList[0], id: "pa", status: "partial" },
+          { ...mockMonitorList[0], id: "mc", status: "misconfigured" },
+        ],
+      });
+      const labels = wrapper.findAll(".obadge-stub").map((b) => b.text());
+      expect(labels).toContain("Not measured since 10:36 UTC");
+      expect(labels).toContain("Failing in some locations");
+      expect(labels).toContain("Misconfigured");
+    });
+  });
+
   describe("draft dots", () => {
     it("marks only the rows that have an unsaved editor draft", () => {
       wrapper = mountMonitorTable({ draftSavedAt: { "mon-tcp-1": Date.UTC(2026, 9, 1, 9, 30) } });
