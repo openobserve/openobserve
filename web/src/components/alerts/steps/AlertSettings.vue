@@ -48,6 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OSettingRow
               :label="t('alerts.plain.cooldown')"
               :description="t('alerts.sections.rows.cooldown')"
+              required
               fill
             >
               <div class="me-2 flex w-fit flex-col gap-1">
@@ -169,6 +170,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ref="periodFieldRef"
               :label="t('alerts.plain.lookBack')"
               :description="t('alerts.sections.rows.lookBack')"
+              required
               fill
             >
               <div class="me-2 flex w-fit flex-col gap-1">
@@ -209,6 +211,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ref="silenceFieldRef"
               :label="t('alerts.plain.cooldown')"
               :description="t('alerts.sections.rows.cooldown')"
+              required
               fill
             >
               <div class="me-2 flex w-fit flex-col gap-1">
