@@ -116,24 +116,6 @@ pub fn generate_select_star_schema(
     used_schemas
 }
 
-pub fn generate_user_defined_schema(
-    schema: &SchemaCache,
-    stream_type: StreamType,
-    defined_schema_fields: Vec<String>,
-    need_all_column: bool,
-) -> Arc<SchemaCache> {
-    let cfg = get_config();
-    let mut fields = effective_uds_fields(stream_type, &defined_schema_fields);
-    fields.remove(&cfg.common.column_all);
-    Arc::new(SchemaCache::new(project_user_defined_schema(
-        schema.schema(),
-        &fields,
-        &[],
-        (need_all_column || !cfg.search.feature_query_exclude_all)
-            .then_some(cfg.common.column_all.as_str()),
-    )))
-}
-
 pub fn generate_quick_mode_fields(
     schema: &Schema,
     columns: Option<HashSet<String>>,
@@ -337,6 +319,24 @@ mod tests {
     use hashbrown::{HashMap, HashSet};
 
     use super::*;
+
+    fn generate_user_defined_schema(
+        schema: &SchemaCache,
+        stream_type: StreamType,
+        defined_schema_fields: Vec<String>,
+        need_all_column: bool,
+    ) -> Arc<SchemaCache> {
+        let cfg = get_config();
+        let mut fields = effective_uds_fields(stream_type, &defined_schema_fields);
+        fields.remove(&cfg.common.column_all);
+        Arc::new(SchemaCache::new(project_user_defined_schema(
+            schema.schema(),
+            &fields,
+            &[],
+            (need_all_column || !cfg.search.feature_query_exclude_all)
+                .then_some(cfg.common.column_all.as_str()),
+        )))
+    }
 
     #[test]
     fn test_has_original_column_with_original() {
