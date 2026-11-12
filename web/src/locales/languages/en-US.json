@@ -26979,6 +26979,7 @@
       "groupAutoscaling": "Autoscaling",
       "subtitle": "Monitor clusters, workloads and resources",
       "clusterPickerLabel": "Cluster",
+      "clusterPickerLoading": "Loading clusters…",
       "clusterPickerTrigger": "Cluster: {name}",
       "clusterPickerSearch": "Find cluster",
       "clusterPickerEmpty": "No clusters match",
