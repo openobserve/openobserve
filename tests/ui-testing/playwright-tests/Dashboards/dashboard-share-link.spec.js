@@ -369,7 +369,7 @@ test.describe("dashboard share URL button testcases", () => {
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // The URL updates after the selection commits, and the waits above swallow their timeouts.
-    await expect.poll(() => page.url(), { timeout: 15000 }).toContain(`var-${variableName}`);
+    await expect(page).toHaveURL((url) => url.href.includes(`var-${variableName}`), { timeout: 15000 });
     testLogger.info("Current URL with variable:", { currentURL: page.url() });
 
     // Click the share button
