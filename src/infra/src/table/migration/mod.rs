@@ -247,6 +247,7 @@ mod m20261026_000003_create_workflow_http_trigger_requests;
 mod m20261027_000001_alter_query_history;
 mod m20261028_000001_add_group_label_set_to_alert_states;
 mod m20261028_000001_add_llm_dataset_item_write_version;
+mod m20261029_000001_add_budget_to_online_eval_jobs;
 mod m20261029_000001_widen_alert_dedup_fingerprint;
 mod m20261030_000001_add_suppress_repeats_to_alerts;
 mod m20261030_000001_create_org_domain_ownership_table;
@@ -862,6 +863,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20261217_000001_add_alert_incidents_unresolved_index::Migration),
             Box::new(m20261218_000001_add_security_case_to_alert_incidents::Migration),
             Box::new(m20261219_000001_add_historical_to_alert_incidents::Migration),
+            Box::new(m20261029_000001_add_budget_to_online_eval_jobs::Migration),
             Box::new(m20261103_000002_add_run_class_to_synthetics::Migration),
             Box::new(m20261103_000003_status_page_notice_false_alarm::Migration),
             Box::new(m20261103_000003_add_gap_state_to_synthetics::Migration),
@@ -989,10 +991,11 @@ mod tests {
         (147, "m20261217_000001_add_alert_incidents_unresolved_index"),
         (148, "m20261218_000001_add_security_case_to_alert_incidents"),
         (149, "m20261219_000001_add_historical_to_alert_incidents"),
-        (150, "m20261103_000002_add_run_class_to_synthetics"),
-        (151, "m20261103_000003_status_page_notice_false_alarm"),
-        (152, "m20261103_000003_add_gap_state_to_synthetics"),
-        (153, "m20261111_000001_add_false_alarm_recovery_stamp"),
+        (150, "m20261029_000001_add_budget_to_online_eval_jobs"),
+        (151, "m20261103_000002_add_run_class_to_synthetics"),
+        (152, "m20261103_000003_status_page_notice_false_alarm"),
+        (153, "m20261103_000003_add_gap_state_to_synthetics"),
+        (154, "m20261111_000001_add_false_alarm_recovery_stamp"),
     ];
 
     // Two branches that each claim the next version merge cleanly, so a reused number must fail

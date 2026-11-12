@@ -193,6 +193,20 @@ export class AlertTemplatesPage {
     }
 
     /**
+     * Bounding boxes of the list toolbar: Applies to filter, search box, and Refresh.
+     * Waits until the search box is attached, then reads all three.
+     */
+    async getToolbarBoxes() {
+        const search = this.page.locator('[data-test="template-list-search-input"]').first();
+        await search.waitFor({ state: 'attached', timeout: 30000 });
+        return {
+            filter: await this.page.locator('[data-test="template-list-applies-to-filter"]').first().boundingBox(),
+            search: await search.boundingBox(),
+            refresh: await this.page.locator('[data-test="template-list-refresh-btn"]').first().boundingBox(),
+        };
+    }
+
+    /**
      * Create a template via API first, fall back to UI if API fails
      * @param {string} templateName - Name of the template
      */

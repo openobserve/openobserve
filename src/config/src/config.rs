@@ -147,12 +147,13 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 147: index alert_incidents.last_alert_at over unresolved incidents.
 // 148: add alert_incidents.security_case, backfilled from SIEM detections and case group keys.
 // 149: add alert_incidents.historical, set on a security case only backfilled firings opened.
-// 150: add last_run_class, last_run_class_at and last_tested_at to synthetics.
-// 151: add false_alarm_by, false_alarm_at and false_alarm_reason to status_page_notices.
-// 152: add gap_since, gap_runs, gap_notified_at and gap_resumed_at to synthetics.
-// 153: add synthetics.status_recovered_at and status_streak_sig, and
+// 150: add budget to online_eval_jobs.
+// 151: add last_run_class, last_run_class_at and last_tested_at to synthetics.
+// 152: add false_alarm_by, false_alarm_at and false_alarm_reason to status_page_notices.
+// 153: add gap_since, gap_runs, gap_notified_at and gap_resumed_at to synthetics.
+// 154: add synthetics.status_recovered_at and status_streak_sig, and
 //      status_page_notices.false_alarm_recovered_at.
-pub const DB_SCHEMA_VERSION: u64 = 153;
+pub const DB_SCHEMA_VERSION: u64 = 154;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables

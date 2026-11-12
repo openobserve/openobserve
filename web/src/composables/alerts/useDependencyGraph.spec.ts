@@ -200,6 +200,85 @@ describe("useDependencyGraph.buildGraph", () => {
     expect(byName(nodes, "pager", "destination").usageCount).toBe(2);
   });
 
+  it("a template bound only to a detector, check, on-call policy, or composite is in use", () => {
+    const { nodes } = buildGraph(
+      [],
+      [],
+      [
+        {
+          name: "ops",
+          type: "http",
+          used_by: {
+            destinations: 0,
+            alerts: 0,
+            anomaly: 1,
+            synthetics: 2,
+            on_call: 1,
+            composites: 1,
+          },
+        },
+      ],
+    );
+    const ops = byName(nodes, "ops", "template");
+    expect(ops.orphan).toBe(false);
+    expect(ops.usageCount).toBe(5);
+    expect(ops.consumerCounts).toEqual({
+      anomaly_detection: 1,
+      synthetic_check: 2,
+      oncall_policy: 1,
+      composite_alert: 1,
+    });
+    expect(ops.externalCounts).toBeUndefined();
+  });
+
+  it("adds server references with no local edge once, never a local one twice", () => {
+    const { nodes } = buildGraph(
+      [{ alert_id: "a1", name: "cpu", destinations: [], template: "shared", enabled: true }],
+      [{ name: "slack", type: "http", template: "shared" }],
+      [
+        {
+          name: "shared",
+          type: "http",
+          // The default org template: 3 destinations and 2 alerts across every org.
+          used_by: {
+            destinations: 3,
+            alerts: 2,
+            anomaly: 0,
+            synthetics: 0,
+            on_call: 0,
+            composites: 0,
+          },
+        },
+      ],
+    );
+    const shared = byName(nodes, "shared", "template");
+    expect(shared.externalCounts).toEqual({ destinations: 2, alerts: 1 });
+    expect(shared.usageCount).toBe(5);
+  });
+
+  it("a template used only in other orgs is not an orphan", () => {
+    const { nodes, stats } = buildGraph(
+      [],
+      [],
+      [
+        {
+          name: "shared",
+          type: "http",
+          used_by: {
+            destinations: 1,
+            alerts: 0,
+            anomaly: 0,
+            synthetics: 0,
+            on_call: 0,
+            composites: 0,
+          },
+        },
+      ],
+    );
+    expect(byName(nodes, "shared", "template").orphan).toBe(false);
+    expect(stats.orphanTemplates).toBe(0);
+  });
+
   it("skips 'alert' entries in `uses` — the alerts list already counts them", () => {
     const { nodes } = buildGraph(
       [{ alert_id: "a1", name: "cpu", destinations: ["pager"], enabled: true }],
@@ -380,6 +459,36 @@ describe("joinWithAnd", () => {
   });
 });
 
+describe("removeNodeFromGraph keeps server usage counts", () => {
+  it("keeps a template's other-org and detector counts when an unrelated row is deleted", () => {
+    const g = buildGraph(
+      [{ alert_id: "a1", name: "cpu", destinations: ["pager"], enabled: true }],
+      [{ name: "pager", type: "http" }],
+      [
+        {
+          name: "shared",
+          type: "http",
+          used_by: {
+            destinations: 1,
+            alerts: 0,
+            anomaly: 1,
+            synthetics: 0,
+            on_call: 0,
+            composites: 0,
+          },
+        },
+        { name: "unrelated", type: "http" },
+      ],
+    );
+    const next = removeNodeFromGraph(removeNodeFromGraph(g, "template:unrelated"), "alert:a1");
+    const shared = byName(next.nodes, "shared", "template");
+    expect(shared.usageCount).toBe(2);
+    expect(shared.orphan).toBe(false);
+    expect(shared.externalCounts).toEqual({ destinations: 1, alerts: 0 });
+    expect(shared.consumerCounts).toEqual({ anomaly_detection: 1 });
+  });
+});
+
 describe("useDependencyGraph.removeNodeFromGraph", () => {
   const graph = () =>
     buildGraph(
@@ -482,6 +591,15 @@ describe("useDependencyGraph.loadGraph", () => {
   beforeEach(() => {
     invalidateDependencyGraphCache();
     Object.values(graphInputs).forEach((fn) => fn.mockClear());
+  });
+
+  it("asks the template list for usage counts", async () => {
+    const { loadGraph } = useDependencyGraph();
+    await loadGraph("org-usage");
+
+    expect(graphInputs.templates).toHaveBeenCalledWith(
+      expect.objectContaining({ org_identifier: "org-usage", include_usage: true }),
+    );
   });
 
   it("builds each input once and serves a reopen from the shared graph", async () => {
