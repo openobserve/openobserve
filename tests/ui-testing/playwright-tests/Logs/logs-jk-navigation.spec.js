@@ -109,6 +109,7 @@ async function openResults(page) {
   });
   // Stale rows stay on screen during the re-run and the app ignores J/K until the hits settle.
   expect(await logs.getResultHitsCount()).toBe(50);
+  await logs.expectResultPageCountAtLeast(2);
   await page.evaluate(
     () =>
       document.activeElement instanceof HTMLElement &&

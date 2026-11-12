@@ -134,6 +134,7 @@ async function openList(page) {
   await expect(page.locator(listRow(24))).toBeAttached({ timeout: 60000 });
   // Rows render before the search settles; J pressed while loading is dropped.
   await new PageManager(page).tracesPage.expectTraceListIdle();
+  await new PageManager(page).tracesPage.expectTraceListPageCountAtLeast(2);
   await page.evaluate(
     () =>
       document.activeElement instanceof HTMLElement &&

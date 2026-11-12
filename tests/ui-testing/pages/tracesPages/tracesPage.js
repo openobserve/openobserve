@@ -3156,6 +3156,12 @@ export class TracesPage {
       .toHaveAttribute('data-test-loading', 'false', { timeout });
   }
 
+  // The pager comes from a separate count query; until it lands J on the last row reports the end instead of crossing a page.
+  async expectTraceListPageCountAtLeast(pageNumber, timeout = 60000) {
+    await expect(this.page.locator(`[data-test="traces-search-result-pagination-page-${pageNumber}"]`))
+      .toBeVisible({ timeout });
+  }
+
   async expectTraceListPageLoaded(prevLastIndex = 24, timeout = 30000) {
     await expect(this.page.locator(`${this.searchResultList} [data-test="o2-table-row-${prevLastIndex}"]`))
       .toHaveCount(0, { timeout });

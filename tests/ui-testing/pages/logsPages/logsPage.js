@@ -6215,6 +6215,11 @@ export class LogsPage {
         }
     }
 
+    // J on a page's last row crosses only once the page-count query has given the pager its next page.
+    async expectResultPageCountAtLeast(pageNumber, timeout = 60000) {
+        await expect(this.page.locator(this.resultPaginationPageBtn(pageNumber)).first()).toBeVisible({ timeout });
+    }
+
     async setupAPICallTracking() {
         // A search the SQL or histogram toggle set off can land after the tracked shortcut and be counted as its own.
         await this.waitForRunQueryReady();
