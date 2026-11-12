@@ -30,12 +30,15 @@ $note"
 comments="$(gh api "repos/$repo/issues/$pr/comments" --paginate | jq -cs '[.[][]]')"
 existing="$(node "$(dirname "$0")/select-review-comment.mjs" "$bot_login" <<<"$comments")"
 comment_id="$(jq -r '.id // empty' <<<"$existing")"
-# Keeps the PR's review count, so the pointer does not hand an unpaired PR a fresh set of reviews.
-pass_tag="$(jq -r '.body // ""' <<<"$existing" | grep -oE '<!-- *o2-review-pass:[0-9]+ *-->' | tail -1 || true)"
-if [ -n "$pass_tag" ]; then
-  body="$body
-$pass_tag"
-fi
+# Keeps the PR's review counts, so the pointer does not hand an unpaired PR a fresh set of reviews.
+existing_body="$(jq -r '.body // ""' <<<"$existing")"
+for tag_re in '<!-- *o2-review-pass:[0-9]+ *-->' '<!-- *o2-review-manual:[0-9]+(:[^[:space:]<>]+)? *-->'; do
+  tag="$(grep -oE "$tag_re" <<<"$existing_body" | tail -1 || true)"
+  if [ -n "$tag" ]; then
+    body="$body
+$tag"
+  fi
+done
 if [ -n "$comment_id" ]; then
   gh api -X PATCH "repos/$repo/issues/comments/$comment_id" -f body="$body" > /dev/null
 else
