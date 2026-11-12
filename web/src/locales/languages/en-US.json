@@ -15072,7 +15072,9 @@
     },
     "hosts": {
       "title": "Hosts",
-      "description": "The host metrics dashboard and alerts for servers and virtual machines."
+      "description": "The host metrics dashboard and alerts for servers and virtual machines.",
+      "tileDashboard": "CPU, memory and disk for each host",
+      "tileAlerts": "High CPU load, low memory and disks filling up."
     },
     "kubernetes": {
       "title": "Kubernetes",
@@ -15086,7 +15088,10 @@
       "fieldReason": "Event reason",
       "fieldMessage": "Event message",
       "roleEvents": "Kubernetes events",
-      "flavourOtel": "OpenTelemetry"
+      "flavourOtel": "OpenTelemetry",
+      "tileDashboard": "Nodes, pods and workloads across your clusters",
+      "tileAlerts": "API server latency and cluster capacity.",
+      "tileSavedView": "One click in Logs to see Kubernetes events"
     },
     "setUp": "Set up {title} monitoring",
     "checking": "Checking what fits…",
@@ -15157,7 +15162,6 @@
     },
     "home": {
       "title": "Your {title} data is ready to monitor",
-      "notNow": "Not now",
       "hideForMe": "Hide for me",
       "hideForEveryone": "Hide for everyone",
       "hidden": "{title} pack hidden for you",
@@ -15173,7 +15177,32 @@
       "turnOn": "Turn on alerts",
       "viewPack": "View pack",
       "keepOff": "Keep off",
-      "keepOffFailed": "Couldn't save that. Try again."
+      "keepOffFailed": "Couldn't save that. Try again.",
+      "offerTitle": "Your data is arriving. Turn it into monitoring.",
+      "offerSub": "Pick a starter pack below. It creates dashboards, alerts and saved views that fit your streams.",
+      "undoNote": "Undo any setup for 24 hours",
+      "bestPlace": "Best place to start",
+      "fromClusters": "from {clusters}",
+      "moreStreams": "+{count} stream | +{count} streams",
+      "moreStreamsLabel": "More matched streams",
+      "tileAlertsSilent": "{what} Silent until you turn them on.",
+      "setUp": "Set up {title}",
+      "setUpShort": "Set up",
+      "findOther": "Find packs for other data",
+      "interrupted": "{title} setup stopped partway · {made} of {total} done",
+      "menuFits": "{count} starter pack fits your data | {count} starter packs fit your data",
+      "menuIdle": "Starter packs",
+      "menuHeader": "Packs that fit data you already send · undo any setup for 24 h",
+      "menuOfferLine": "{count} dashboard · fits {streams} | {count} dashboards · fits {streams}",
+      "setUpDone": "Set up",
+      "setUpToday": "Set up today {time}",
+      "setUpOn": "Set up {date}",
+      "setUpSilent": "{when} · {count} alert silent | {when} · {count} alerts silent",
+      "openLibrary": "Open Library",
+      "dontShow": "Don't show on Home",
+      "silentNoIncidents": "No incidents · {count} {title} alert is silent | No incidents · {count} {title} alerts are silent",
+      "silentTitle": "{count} {title} alert is silent | {count} {title} alerts are silent",
+      "silentSub": "They show what would fire but notify no one. Turn them on to get notified."
     },
     "drawer": {
       "title": "What gets created",

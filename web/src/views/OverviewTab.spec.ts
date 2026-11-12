@@ -15,7 +15,8 @@
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
-import { nextTick } from "vue";
+import { computed, nextTick, ref, shallowRef } from "vue";
+import { HOME_PACKS, type HomePacks } from "@/composables/starterPacks/useHomePacks";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import i18n from "@/locales";
@@ -2970,6 +2971,46 @@ describe("OverviewTab", () => {
       await mountWithProblems();
 
       expect(wrapper.find('[data-test^="overview-ask-ai-"]').exists()).toBe(false);
+    });
+  });
+
+  describe("starter packs handed down from Home", () => {
+    const mountWithPacks = (state: { showMenu: boolean; silent: unknown[] }) =>
+      mount(OverviewTab, {
+        global: {
+          plugins: [i18n, store, router],
+          provide: {
+            [HOME_PACKS as symbol]: shallowRef({
+              showMenu: ref(state.showMenu),
+              silent: computed(() => state.silent),
+            } as unknown as HomePacks),
+          },
+          stubs: { StarterPackHomeMenu: true, StarterPackSilentAlerts: true },
+        },
+      });
+
+    it("puts the packs button in the toolbar only once Home says a pack is set up", async () => {
+      wrapper = mountWithPacks({ showMenu: true, silent: [] });
+      await flushPromises();
+      expect(wrapper.findComponent({ name: "StarterPackHomeMenu" }).exists()).toBe(true);
+      expect(wrapper.find('[data-test="overview-pack-silent-alerts"]').exists()).toBe(false);
+      wrapper.unmount();
+      wrapper = mountWithPacks({ showMenu: false, silent: [] });
+      await flushPromises();
+      expect(wrapper.findComponent({ name: "StarterPackHomeMenu" }).exists()).toBe(false);
+    });
+
+    it("shows the silent pack alerts where incidents would be", async () => {
+      wrapper = mountWithPacks({ showMenu: true, silent: [{ pack: { id: "kubernetes" } }] });
+      await flushPromises();
+      expect(wrapper.find('[data-test="overview-pack-silent-alerts"]').exists()).toBe(true);
+    });
+
+    it("renders no pack UI when Home did not provide any", async () => {
+      wrapper = mountOverviewTab();
+      await flushPromises();
+      expect(wrapper.find('[data-test="overview-pack-silent-alerts"]').exists()).toBe(false);
+      expect(wrapper.findComponent({ name: "StarterPackHomeMenu" }).exists()).toBe(false);
     });
   });
 });
