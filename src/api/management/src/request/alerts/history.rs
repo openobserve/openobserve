@@ -52,7 +52,18 @@ const LIKE_PREDICATE_MAX_IDS: usize = 20;
 const MAX_END_TIME_MICROS: i64 = 253_402_300_799_999_999;
 
 /// Columns a stream gains only once a row carried them, so [history_columns] adds each one present.
-const OPTIONAL_HISTORY_COLUMNS: [&str; 8] = [
+const OPTIONAL_HISTORY_COLUMNS: [&str; 19] = [
+    "level",
+    "actual_value",
+    "threshold_value",
+    "threshold_operator",
+    "group_label",
+    "value_is_lower_bound",
+    "delay_in_secs",
+    "evaluation_took_in_secs",
+    "source_node",
+    "query_took",
+    "error",
     "severity",
     "downtime_id",
     "acked_by",
@@ -66,11 +77,13 @@ const OPTIONAL_HISTORY_COLUMNS: [&str; 8] = [
 /// A webhook can answer with a body of any size, and the list returns up to 1000 rows.
 const SUCCESS_RESPONSE_MAX_CHARS: usize = 500;
 
-/// Every column the data query reads but [OPTIONAL_HISTORY_COLUMNS].
-const HISTORY_COLUMNS: &str = "_timestamp, org, key, status, level, actual_value, \
-     threshold_value, threshold_operator, group_label, value_is_lower_bound, is_realtime, \
-     is_silenced, start_time, end_time, retries, delay_in_secs, evaluation_took_in_secs, \
-     source_node, query_took, error";
+/// Non-`Option` `TriggerData` fields, which every row carries since ingest drops nulls.
+const HISTORY_COLUMNS: &str =
+    "_timestamp, org, key, status, is_realtime, is_silenced, start_time, end_time, retries";
+
+/// The anomaly reads' columns a stream may lack, added by [present_columns] when present.
+const OPTIONAL_ANOMALY_COLUMNS: [&str; 3] =
+    ["evaluation_took_in_secs", "error", "success_response"];
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AlertHistoryQuery {
@@ -421,9 +434,16 @@ pub async fn get_alert_history(
             });
         }
 
+        let schema = match triggers_schema(
+            infra::schema::get(&org_id, TRIGGERS_STREAM, StreamType::Logs).await,
+        ) {
+            Ok(schema) => schema,
+            Err(response) => return response,
+        };
+        let columns = present_columns("_timestamp, status", &OPTIONAL_ANOMALY_COLUMNS, &schema);
+        let sort_column = sortable_column(sort_column, &schema);
         let data_sql = format!(
-            "SELECT _timestamp, status, evaluation_took_in_secs, error, success_response \
-             FROM \"{TRIGGERS_STREAM}\" WHERE {where_clause} \
+            "SELECT {columns} FROM \"{TRIGGERS_STREAM}\" WHERE {where_clause} \
              ORDER BY {sort_column} {sort_order} LIMIT {size} OFFSET {from}"
         );
         let data_req = SearchRequest {
@@ -845,6 +865,7 @@ pub async fn get_alert_history(
     // Step 2: Get the actual paginated results
     // Build data query with LIMIT/OFFSET for pagination
     let columns = history_columns(&triggers_schema);
+    let sort_column = sortable_column(sort_column, &triggers_schema);
     let data_sql = format!(
         "SELECT {columns} FROM \"{TRIGGERS_STREAM}\" \
          WHERE {where_clause} \
@@ -1079,16 +1100,32 @@ fn triggers_schema(read: infra::errors::Result<Schema>) -> Result<Schema, Respon
     })
 }
 
-/// [HISTORY_COLUMNS] plus each optional column the stream has; an upgraded stream learns them late.
+/// [HISTORY_COLUMNS] plus each optional column the stream has, which may lack any of them.
 fn history_columns(schema: &Schema) -> String {
-    let mut columns = HISTORY_COLUMNS.to_string();
-    for column in OPTIONAL_HISTORY_COLUMNS {
+    present_columns(HISTORY_COLUMNS, &OPTIONAL_HISTORY_COLUMNS, schema)
+}
+
+/// `required` plus the `optional` columns the schema has, as a missing column fails the query.
+fn present_columns(required: &str, optional: &[&str], schema: &Schema) -> String {
+    let mut columns = required.to_string();
+    for column in optional {
         if schema.field_with_name(column).is_ok() {
             columns.push_str(", ");
             columns.push_str(column);
         }
     }
     columns
+}
+
+/// A sort on a column the stream lacks fails the query, so it falls back to `_timestamp`.
+fn sortable_column(sort_column: &'static str, schema: &Schema) -> &'static str {
+    if OPTIONAL_HISTORY_COLUMNS.contains(&sort_column)
+        && schema.field_with_name(sort_column).is_err()
+    {
+        "_timestamp"
+    } else {
+        sort_column
+    }
 }
 
 fn capped_success_response(text: &str) -> String {
@@ -1225,9 +1262,19 @@ pub async fn get_all_anomaly_history(
     // Fetch more rows than limit*max_configs so we have headroom to fill each config bucket.
     // We cap at 5000 to avoid oversized responses.
     let fetch_size = (limit * 200).min(5000);
+    let schema =
+        match triggers_schema(infra::schema::get(&org_id, TRIGGERS_STREAM, StreamType::Logs).await)
+        {
+            Ok(schema) => schema,
+            Err(response) => return response,
+        };
+    let columns = present_columns(
+        "_timestamp, key, status",
+        &OPTIONAL_ANOMALY_COLUMNS,
+        &schema,
+    );
     let data_sql = format!(
-        "SELECT _timestamp, key, status, evaluation_took_in_secs, error, success_response \
-         FROM \"{TRIGGERS_STREAM}\" WHERE {where_clause} \
+        "SELECT {columns} FROM \"{TRIGGERS_STREAM}\" WHERE {where_clause} \
          ORDER BY _timestamp DESC LIMIT {fetch_size}"
     );
 
@@ -2225,5 +2272,96 @@ mod tests {
         assert!(history_columns(&Schema::new(fields)).ends_with(", severity"));
         let hit = serde_json::json!({"severity": "low"});
         assert_eq!(hit_text(&hit, "severity").as_deref(), Some("low"));
+    }
+
+    #[test]
+    fn a_recreated_triggers_stream_reads_only_the_columns_it_has() {
+        use arrow_schema::{DataType, Field};
+
+        let field = |name: &str| Field::new(name, DataType::Utf8, true);
+        let mut fields: Vec<Field> = HISTORY_COLUMNS.split(", ").map(field).collect();
+        for name in [
+            "module",
+            "next_run_at",
+            "level",
+            "actual_value",
+            "threshold_value",
+        ] {
+            fields.push(field(name));
+        }
+        let columns = history_columns(&Schema::new(fields));
+        let selected: Vec<&str> = columns.split(", ").collect();
+        for missing in ["value_is_lower_bound", "group_label", "error", "query_took"] {
+            assert!(!selected.contains(&missing), "{missing} in {columns}");
+        }
+        for core in [
+            "_timestamp",
+            "key",
+            "status",
+            "start_time",
+            "end_time",
+            "retries",
+        ] {
+            assert!(selected.contains(&core), "{core} not in {columns}");
+        }
+        assert!(selected.contains(&"actual_value"), "{columns}");
+    }
+
+    #[test]
+    fn a_full_triggers_stream_reads_every_history_column() {
+        use arrow_schema::{DataType, Field};
+
+        let field = |name: &str| Field::new(name, DataType::Utf8, true);
+        let fields: Vec<Field> = HISTORY_COLUMNS
+            .split(", ")
+            .chain(OPTIONAL_HISTORY_COLUMNS)
+            .map(field)
+            .collect();
+        let columns = history_columns(&Schema::new(fields));
+        let selected: Vec<&str> = columns.split(", ").collect();
+        for name in HISTORY_COLUMNS.split(", ").chain(OPTIONAL_HISTORY_COLUMNS) {
+            assert!(selected.contains(&name), "{name} not in {columns}");
+        }
+        assert!(selected.contains(&"value_is_lower_bound"), "{columns}");
+    }
+
+    #[test]
+    fn anomaly_reads_skip_the_columns_the_stream_lacks() {
+        use arrow_schema::{DataType, Field};
+
+        let field = |name: &str| Field::new(name, DataType::Utf8, true);
+        let bare = Schema::new(vec![field("_timestamp"), field("key"), field("status")]);
+        assert_eq!(
+            present_columns("_timestamp, key, status", &OPTIONAL_ANOMALY_COLUMNS, &bare),
+            "_timestamp, key, status"
+        );
+        let full = Schema::new(
+            ["_timestamp", "status"]
+                .into_iter()
+                .chain(OPTIONAL_ANOMALY_COLUMNS)
+                .map(field)
+                .collect::<Vec<_>>(),
+        );
+        assert_eq!(
+            present_columns("_timestamp, status", &OPTIONAL_ANOMALY_COLUMNS, &full),
+            "_timestamp, status, evaluation_took_in_secs, error, success_response"
+        );
+    }
+
+    #[test]
+    fn a_sort_on_a_column_the_stream_lacks_falls_back_to_timestamp() {
+        use arrow_schema::{DataType, Field};
+
+        let field = |name: &str| Field::new(name, DataType::Utf8, true);
+        let bare = Schema::new(HISTORY_COLUMNS.split(", ").map(field).collect::<Vec<_>>());
+        assert_eq!(sortable_column("query_took", &bare), "_timestamp");
+        assert_eq!(sortable_column("source_node", &bare), "_timestamp");
+        assert_eq!(sortable_column("retries", &bare), "retries");
+        assert_eq!(
+            sortable_column("(end_time - start_time)", &bare),
+            "(end_time - start_time)"
+        );
+        let with = Schema::new(vec![field("query_took")]);
+        assert_eq!(sortable_column("query_took", &with), "query_took");
     }
 }
