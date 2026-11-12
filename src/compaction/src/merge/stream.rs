@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::sync::Arc;
+
 use ::datafusion::arrow::datatypes::Schema;
 use chrono::{DateTime, TimeZone, Utc};
 use config::{
@@ -37,6 +39,14 @@ use super::{
     plan::{BatchLimits, plan_batches},
 };
 use crate::worker::{MergeBatch, MergeSender};
+
+/// What one partition's merge round left behind.
+#[derive(Default)]
+struct PartitionOutcome {
+    retired_blooms: Vec<i64>,
+    /// A closed hour only pre-merged into hash-merged files: the indexed merge is still due.
+    pre_merged: bool,
+}
 
 /// compactor run steps on a stream:
 /// 3. get a cluster lock for compactor stream
@@ -148,16 +158,18 @@ pub async fn merge_by_stream(
         partition.push(file.to_owned());
     }
 
+    let scan_schema = Arc::new(schema.clone().with_metadata(Default::default()));
     // use multiple threads to merge
-    let semaphore = std::sync::Arc::new(Semaphore::new(cfg.limit.file_merge_thread_num));
+    let semaphore = Arc::new(Semaphore::new(cfg.limit.file_merge_thread_num));
     let mut tasks = Vec::with_capacity(partition_files_with_size.len());
     for (prefix, mut files_with_size) in partition_files_with_size.into_iter() {
         let org_id = org_id.to_string();
         let stream_name = stream_name.to_string();
         let mode = mode.clone();
+        let scan_schema = scan_schema.clone();
         let permit = semaphore.clone().acquire_owned().await.unwrap();
         let worker_tx = worker_tx.clone();
-        let task: JoinHandle<Result<Vec<i64>, anyhow::Error>> = tokio::task::spawn(async move {
+        let task: JoinHandle<anyhow::Result<PartitionOutcome>> = tokio::task::spawn(async move {
             let cfg = get_config();
             // sort by file size
             let job_strategy = MergeStrategy::from(&cfg.compact.strategy);
@@ -179,27 +191,31 @@ pub async fn merge_by_stream(
                 max_group_files: cfg.compact.max_group_files,
                 is_incremental,
                 merge_max_original_size: infra_file_list::merge_max_original_size(),
+                max_merge_groups: cfg.compact.metrics_max_groups,
             };
-            let batch_groups: Vec<MergeBatch> = plan_batches(
-                files_with_size,
-                &mode,
-                &limits,
-                &format!("{org_id}/{stream_type}/{stream_name}"),
-            )
-            .into_iter()
-            .enumerate()
-            .map(|(batch_id, (files, mode))| MergeBatch {
-                batch_id,
-                org_id: org_id.clone(),
-                stream_type,
-                stream_name: stream_name.clone(),
-                prefix: prefix.clone(),
-                files,
-                mode,
-            })
-            .collect();
+            let stream = format!("{org_id}/{stream_type}/{stream_name}");
+            let planned =
+                plan_batches(files_with_size, &mode, &limits, &scan_schema, &stream).await;
+            // a closed hour plans hash-merged output only as a pre-merge for a later round
+            let pre_merged = !is_incremental
+                && planned
+                    .iter()
+                    .any(|(_, mode)| matches!(mode, MergeMode::MetricsHashMerged));
+            let batch_groups: Vec<MergeBatch> = planned
+                .into_iter()
+                .enumerate()
+                .map(|(batch_id, (files, mode))| MergeBatch {
+                    batch_id,
+                    org_id: org_id.clone(),
+                    stream_type,
+                    stream_name: stream_name.clone(),
+                    prefix: prefix.clone(),
+                    files,
+                    mode,
+                })
+                .collect();
             if batch_groups.is_empty() {
-                return Ok(vec![]); // no files need to merge
+                return Ok(PartitionOutcome::default()); // no files need to merge
             }
 
             // send to worker
@@ -219,7 +235,7 @@ pub async fn merge_by_stream(
 
             let mut last_error = None;
             let mut check_guard = HashSet::with_capacity(batch_groups.len());
-            let mut orphan_blooms = Vec::new();
+            let mut retired_blooms = Vec::new();
             for ret in worker_results {
                 let (batch_id, new_files, retire_files) = match ret {
                     Ok(v) => v,
@@ -257,10 +273,10 @@ pub async fn merge_by_stream(
                     file_data::delete::add(retire_files.iter().map(|f| f.key.clone()).collect());
                 }
 
-                // collect orphan blooms after writing file list successfully
+                // collect retired blooms after writing file list successfully
                 for file in &retire_files {
                     if file.meta.bloom_ver > 0 {
-                        orphan_blooms.push(file.meta.bloom_ver);
+                        retired_blooms.push(file.meta.bloom_ver);
                     }
                 }
             }
@@ -268,15 +284,21 @@ pub async fn merge_by_stream(
             if let Some(e) = last_error {
                 return Err(e);
             }
-            Ok(orphan_blooms)
+            Ok(PartitionOutcome {
+                retired_blooms,
+                pre_merged,
+            })
         });
         tasks.push(task);
     }
 
     // collect bloom files which need to be clean
-    let mut orphan_blooms = Vec::new();
+    let mut retired_blooms = Vec::new();
+    let mut pre_merged = false;
     for task in tasks {
-        orphan_blooms.extend(task.await??);
+        let outcome = task.await??;
+        pre_merged |= outcome.pre_merged;
+        retired_blooms.extend(outcome.retired_blooms);
     }
 
     // Build bloom filters for the current hour. Failures are non-fatal: files
@@ -287,8 +309,9 @@ pub async fn merge_by_stream(
         stream_type,
         stream_name,
         &date_start,
-        is_incremental,
-        orphan_blooms,
+        // a pre-merged hour is rewritten next round: its blooms would go unreferenced at once
+        is_incremental || pre_merged,
+        retired_blooms,
     )
     .await
     {
@@ -311,6 +334,13 @@ pub async fn merge_by_stream(
         log::warn!(
             "[COMPACTOR] merge_by_stream [{org_id}/{stream_type}/{stream_name}] hour {date_start} settled during the incremental round, job {job_id} is left for the hour-end retry"
         );
+    } else if pre_merged {
+        log::info!(
+            "[COMPACTOR] merge_by_stream [{org_id}/{stream_type}/{stream_name}] {date_start} was pre-merged into hash-merged files, job {job_id} is re-armed for the indexed merge"
+        );
+        if let Err(e) = infra_file_list::set_job_pending(&[job_id], 0, None).await {
+            log::error!("[COMPACTOR] set_job_pending failed: {e}");
+        }
     } else if let Err(e) = infra_file_list::set_job_done(&[job_id]).await {
         log::error!("[COMPACTOR] set_job_done failed: {e}");
     }
