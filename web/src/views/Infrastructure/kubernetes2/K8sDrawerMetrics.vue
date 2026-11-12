@@ -145,6 +145,10 @@ const marksOf = (pods: PodRow[]): PodMarks => {
     const out: MarkLine[] = [];
     const req = summed(pods, request);
     const lim = summed(pods, limit);
+    // Equal lines coincide and their labels overprint, so they draw as one.
+    if (req != null && req === lim) {
+      return [{ name: String(t("infra.k8s2.drawerRequestEqualsLimit")), value: req }];
+    }
     if (req != null) out.push({ name: String(t("infra.k8s2.drawerRequest")), value: req });
     if (lim != null) out.push({ name: String(t("infra.k8s2.drawerLimit")), value: lim });
     return out;
