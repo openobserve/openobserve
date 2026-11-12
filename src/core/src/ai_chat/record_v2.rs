@@ -20,7 +20,7 @@ use std::borrow::Cow;
 use config::utils::json::{Map, Value};
 use o2_enterprise::enterprise::ai::chat::batcher::DurableEvent;
 
-use super::projection::{obj, py_str, truthy};
+use super::projection::{obj, py_str, truthy, v2_error_message};
 
 pub const SESSION_CREATED: &str = "session.created.2";
 pub const SESSION_UPDATED: &str = "session.updated.2";
@@ -126,9 +126,9 @@ impl LegacyMessage {
             legacy.insert("output".into(), Value::String(output));
         }
         if status == "error"
-            && let Some(error) = state.get("error")
+            && let Some(error) = state.get("error").filter(|e| truthy(e))
         {
-            legacy.insert("error".into(), error.clone());
+            legacy.insert("error".into(), Value::String(v2_error_message(error)));
         }
         if let Some(metadata) = state.get("metadata") {
             legacy.insert("metadata".into(), metadata.clone());
@@ -156,9 +156,10 @@ impl LegacyMessage {
 }
 
 /// Whether o2-ai wrote this record from a 2.x session export.
-pub fn is_v2_record(event_type: &str) -> bool {
-    // Exact types: a stored 1.x event may carry any version suffix, `.2` included.
-    [SESSION_CREATED, SESSION_UPDATED, MESSAGE_UPDATED].contains(&event_type)
+pub fn is_v2_record(event: &DurableEvent) -> bool {
+    // A 1.x event may carry any version suffix, `.2` included: a message is 2.x by its shape.
+    record_message(event).is_some()
+        || [SESSION_CREATED, SESSION_UPDATED].contains(&event.event_type.as_str())
 }
 
 /// The 2.x message a `message.updated.2` record carries.
@@ -340,7 +341,7 @@ pub(crate) mod tests {
     #[test]
     fn a_recorded_export_reads_as_1x_messages() {
         let events = golden_events("v2_readtool.json");
-        assert!(events.iter().all(|e| is_v2_record(&e.event_type)));
+        assert!(events.iter().all(is_v2_record));
         let messages: Vec<&Map<String, Value>> = events.iter().filter_map(record_message).collect();
         assert_eq!(messages.len(), 5);
 
@@ -407,8 +408,47 @@ pub(crate) mod tests {
             .iter()
             .filter(|e| e.event_type.starts_with("message.part.updated"));
         assert_eq!(v1.iter().flat_map(event_parts).count(), parts.count());
-        assert!(v1.iter().all(|e| !is_v2_record(&e.event_type)));
-        assert!(!is_v2_record("message.part.updated.2"));
+        assert!(!v1.iter().any(is_v2_record));
+    }
+
+    /// A 1.x event may be versioned `.2`; only a `data.message` makes a `message.updated.2` 2.x.
+    #[test]
+    fn a_1x_message_event_versioned_2_projects_as_before() {
+        let v1 = golden_events("replay_session.json");
+        let mut renamed = v1.clone();
+        for event in &mut renamed {
+            if let Some(base) = event.event_type.strip_suffix(".1")
+                && base.starts_with("message.")
+            {
+                event.event_type = format!("{base}.2");
+            }
+        }
+        assert!(renamed.iter().any(|e| e.event_type == MESSAGE_UPDATED));
+        assert!(!renamed.iter().any(is_v2_record));
+        let project = crate::ai_chat::projection::project;
+        assert_eq!(project(&renamed), project(&v1));
+    }
+
+    /// The RCA thread reads a tool error as text, so a 2.x error object becomes its message.
+    #[test]
+    fn a_2x_tool_error_reads_as_its_message() {
+        let message = json!({"id": "msg_a", "type": "assistant", "content": [
+            {"type": "tool", "id": "call_1", "name": "t", "state": {
+                "status": "error", "input": {}, "error": {"type": "tool.execution"}}},
+            {"type": "tool", "id": "call_2", "name": "t", "state": {
+                "status": "error", "input": {}, "error": {"type": "x", "message": "boom"}}},
+            {"type": "tool", "id": "call_3", "name": "t", "state": {
+                "status": "error", "input": {}, "error": null}},
+            {"type": "tool", "id": "call_4", "name": "t", "state": {
+                "status": "error", "input": {}, "error": {}}},
+        ]});
+        let legacy = LegacyMessage::of(message.as_object().unwrap(), None).unwrap();
+        let errors: Vec<&Value> = legacy.parts.iter().map(|p| &p["state"]["error"]).collect();
+        let none = Value::Null;
+        assert_eq!(
+            errors,
+            [&json!("tool.execution"), &json!("boom"), &none, &none]
+        );
     }
 
     #[test]
