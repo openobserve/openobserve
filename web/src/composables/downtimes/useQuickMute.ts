@@ -15,7 +15,6 @@
 
 import { useRouter } from "vue-router";
 import { useMutation } from "@tanstack/vue-query";
-import { formatInTimeZone } from "date-fns-tz";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useOrgId } from "@/composables/query";
 import { useDefaultDowntimeFolder } from "@/composables/downtimes/useDefaultDowntimeFolder";
@@ -23,9 +22,11 @@ import { quickMuteMutation } from "@/services/downtimes.queries";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import {
   buildQuickMuteRequest,
+  endTimeText,
   selectionCount,
   type QuickMuteSelection,
 } from "@/utils/downtimes/quickMute";
+import { serverNowMs } from "@/composables/useAnnouncementBanners";
 import { useViewerTimezone } from "@/composables/downtimes/useViewerTimezone";
 
 /** Creates a quick mute and confirms it with a toast that links to the new downtime. */
@@ -51,17 +52,19 @@ export function useQuickMute() {
     }
     const zone = timezone.value;
     const count = selectionCount(selection);
-    const startsAt = Date.now() * 1000;
+    // The server clock, so a fast client clock neither delays the start nor shortens the mute.
+    const startsAt = Math.round(serverNowMs()) * 1000;
     const body = buildQuickMuteRequest(selection, startsAt, endsAtMicros, zone, reason, folderId);
     try {
       const created = await mutation.mutateAsync(body);
       defaultFolder.remember(folderId);
-      const until = formatInTimeZone(new Date(endsAtMicros / 1000), zone, "HH:mm");
+      // A mute that ends on another day names the day, and the folder shows by its name.
+      const until = endTimeText(endsAtMicros, startsAt, zone, t);
       toast({
         variant: "success",
         message: t(
           "toastMessages.downtimes.muted",
-          { count, time: `${until} ${zone}`, folder: body.folder_id },
+          { count, time: `${until} ${zone}`, folder: defaultFolder.nameOf(body.folder_id) },
           count,
         ),
         action: {
@@ -70,7 +73,7 @@ export function useQuickMute() {
             void router.push({
               name: "downtimeDetail",
               params: { id: created.id },
-              query: { org_identifier: orgId.value },
+              query: { org_identifier: orgId.value, folder: body.folder_id },
             });
           },
         },
@@ -86,7 +89,7 @@ export function useQuickMute() {
   };
 
   const muteFor = (selection: QuickMuteSelection[], seconds: number) =>
-    mute(selection, Date.now() * 1000 + seconds * 1_000_000);
+    mute(selection, Math.round(serverNowMs()) * 1000 + seconds * 1_000_000);
 
   return {
     mute,

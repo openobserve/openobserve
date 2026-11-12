@@ -14168,7 +14168,7 @@
       "filterAll": "All",
       "filterOnce": "One-time",
       "filterRecurring": "Recurring",
-      "search": "Search by name, dimension or creator",
+      "search": "Search by name, reason or creator",
       "searchAcross": "Search all folders",
       "thisFolder": "This folder",
       "allFolders": "All folders",
@@ -14454,6 +14454,7 @@
         "backToList": "Back to downtimes"
       },
       "mute": {
+        "tooMany": "Select at most {max} items per module.",
         "title": {
           "alerts": "Mute {count} alert | Mute {count} alerts",
           "anomaly_detections": "Mute {count} anomaly detection | Mute {count} anomaly detections",

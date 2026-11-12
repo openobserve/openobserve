@@ -148,8 +148,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTruncatedText class="min-w-0">
               {{ row.title || formatDimensions(row.group_values) }}
             </OTruncatedText>
+            <RouterLink
+              v-if="row.muted_by_downtime_id && mutedRoute(row.muted_by_downtime_id)"
+              :to="mutedRoute(row.muted_by_downtime_id)!"
+              class="inline-flex max-w-60 min-w-12 shrink-4"
+              data-test="incident-list-muted-link"
+              @click.stop
+            >
+              <OTag
+                type="downtimeStatus"
+                value="active"
+                class="max-w-full min-w-0"
+                data-test="incident-list-muted"
+              >
+                <span class="truncate">{{ mutedLabel(row.muted_by_downtime_id) }}</span>
+                <OTooltip :content="mutedTooltip(row.muted_by_downtime_id)" />
+              </OTag>
+            </RouterLink>
             <OTag
-              v-if="row.muted_by_downtime_id"
+              v-else-if="row.muted_by_downtime_id"
               type="downtimeStatus"
               value="active"
               class="max-w-60 min-w-12 shrink-4"
@@ -484,7 +501,11 @@ export default defineComponent({
     // reactivity hot path — the difference is very visible at a few hundred rows.
     const allIncidents = shallowRef<Incident[]>([]);
     // The downtimes list is read only to name a muted row's downtime.
-    const { nameOf, notLoaded } = useDowntimeLookup(() =>
+    const {
+      nameOf,
+      notLoaded,
+      detailRoute: mutedRoute,
+    } = useDowntimeLookup(() =>
       allIncidents.value.some((incident) => !!incident.muted_by_downtime_id),
     );
     // A downtime past the lookup's one page says so, with its id kept for the tooltip.
@@ -1143,6 +1164,7 @@ export default defineComponent({
 
     return {
       mutedLabel,
+      mutedRoute,
       mutedTooltip,
       raw,
       t,

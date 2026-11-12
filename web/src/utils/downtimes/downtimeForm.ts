@@ -32,7 +32,6 @@ import { MODULE_ORDER, type FolderNameFn } from "./targetSummary";
 import {
   durationInput,
   formatWindowTime,
-  isoWeekday,
   localToUtcMicros,
   parseDuration,
   utcMicrosToLocal,
@@ -198,7 +197,7 @@ export function defaultDowntimeValues(nowMs: number, timezone: string): Downtime
 /** A one-time row's loaded instants are not a series start, nor the reverse. */
 const LOADED_NONE = { starts_at: null, ends_at: null, starts_at_timezone: null };
 
-/** The schedule after the user picks another repeat: once on the next full hour, recurring from today, weekly on today's weekday. */
+/** The schedule after the user picks another repeat: once on the next full hour, recurring from today; a new weekly selection starts empty. */
 export function scheduleForRepeat(
   s: ScheduleFormValues,
   repeat: Repeat,
@@ -218,8 +217,8 @@ export function scheduleForRepeat(
     };
   }
   const today = utcMicrosToLocal(nowMs * 1000, timezone).date;
-  const weekdays =
-    repeat === "weekly" && s.weekdays.length === 0 ? [isoWeekday(today)] : [...s.weekdays];
+  // An added weekday the user did not click is saved silently, so only loaded weekdays carry over.
+  const weekdays = [...s.weekdays];
   return { ...s, ...(s.repeat === "none" ? LOADED_NONE : {}), repeat, start_date: today, weekdays };
 }
 

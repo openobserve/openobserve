@@ -29,7 +29,7 @@ const HOUR_SECS = 3600;
 
 const DOWNTIME_BANNER_PREFIX = "downtime:";
 
-/** "ends in 2 h 15 min", "ends in 5 minutes", "ends in less than a minute", or "ended"; minutes round down. */
+/** "ends in 2 h 15 min", "ends in 5 minutes", "ends in less than a minute", or "ended". Under an hour the minutes round to the nearest, as the list's relative time does. */
 export function countdownText(remainingSecs: number, t: TranslateFn, first = false): I18nText {
   if (remainingSecs <= 0) return t("alerts.downtimes.banner.ended");
   if (remainingSecs < MINUTE_SECS) {
@@ -37,13 +37,13 @@ export function countdownText(remainingSecs: number, t: TranslateFn, first = fal
       ? t("alerts.downtimes.banner.firstEndsInUnderMinute")
       : t("alerts.downtimes.banner.endsInUnderMinute");
   }
-  const minutes = Math.floor(remainingSecs / MINUTE_SECS);
   if (remainingSecs < HOUR_SECS) {
+    const minutes = Math.round(remainingSecs / MINUTE_SECS);
     return first
       ? t("alerts.downtimes.banner.firstEndsInMinutes", { count: minutes }, minutes)
       : t("alerts.downtimes.banner.endsInMinutes", { count: minutes }, minutes);
   }
-  const duration = formatDuration(minutes * MINUTE_SECS, t);
+  const duration = formatDuration(Math.floor(remainingSecs / MINUTE_SECS) * MINUTE_SECS, t);
   return first
     ? t("alerts.downtimes.banner.firstEndsIn", { duration })
     : t("alerts.downtimes.banner.endsIn", { duration });
@@ -55,10 +55,17 @@ export function bannerRowCount(bannerId: string): number {
   return bannerId.slice(DOWNTIME_BANNER_PREFIX.length).split(",").filter(Boolean).length;
 }
 
+/** The last whole second below `secs` where `countdownText` changes: each minute above an hour, each half minute below it, then 60 and 0. */
+const boundaryBelow = (secs: number): number => {
+  if (secs > HOUR_SECS) return (Math.ceil(secs / MINUTE_SECS) - 1) * MINUTE_SECS;
+  if (secs > 90) return (Math.ceil((secs - 30) / MINUTE_SECS) - 1) * MINUTE_SECS + 30;
+  return secs > MINUTE_SECS ? MINUTE_SECS : 0;
+};
+
 /** Milliseconds until `countdownText` reads differently, or `null` once it reads "ended". */
 export function msUntilCountdownChanges(remainingMs: number): number | null {
   if (remainingMs <= 0) return null;
-  return remainingMs % (MINUTE_SECS * 1000) || MINUTE_SECS * 1000;
+  return remainingMs - boundaryBelow(remainingMs / 1000) * 1000;
 }
 
 const isModule = (m: string): m is TargetModule =>

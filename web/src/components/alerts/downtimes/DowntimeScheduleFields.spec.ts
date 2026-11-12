@@ -32,6 +32,57 @@ const mountFields = async (timezone: string) => {
   return wrapper;
 };
 
+describe("DowntimeScheduleFields, a moved start", () => {
+  const mountOnce = async () => {
+    const values = defaultDowntimeValues(Date.parse("2026-11-12T10:00:00Z"), "UTC");
+    values.schedule = {
+      ...values.schedule,
+      start_date: "2026-11-12",
+      start_time: "02:00",
+      end_date: "2026-11-12",
+      end_time: "03:00",
+    };
+    const Host = defineComponent({
+      components: { OForm, DowntimeScheduleFields },
+      setup: () => ({ defaultValues: values }),
+      template: `<OForm :default-values="defaultValues"><DowntimeScheduleFields /></OForm>`,
+    });
+    const wrapper = mount(Host, { global: { plugins: [store] } });
+    await flushPromises();
+    const api = (wrapper.findComponent(OForm).vm as unknown as { form: any }).form;
+    return { wrapper, api };
+  };
+
+  it("moves the end by the same amount, so the window keeps its length", async () => {
+    const { wrapper, api } = await mountOnce();
+    api.setFieldValue("schedule.start_date", "2026-11-22");
+    await flushPromises();
+    expect(api.state.values.schedule.end_date).toBe("2026-11-22");
+    expect(api.state.values.schedule.end_time).toBe("03:00");
+    wrapper.unmount();
+  });
+
+  it("does not move the start when only the end changes, nor anything on a reset", async () => {
+    const { wrapper, api } = await mountOnce();
+    api.setFieldValue("schedule.end_time", "05:00");
+    await flushPromises();
+    expect(api.state.values.schedule.start_date).toBe("2026-11-12");
+    expect(api.state.values.schedule.start_time).toBe("02:00");
+    const loaded = {
+      ...api.state.values,
+      schedule: {
+        ...api.state.values.schedule,
+        start_date: "2026-12-01",
+        end_date: "2026-12-03",
+      },
+    };
+    api.reset(loaded);
+    await flushPromises();
+    expect(api.state.values.schedule.end_date).toBe("2026-12-03");
+    wrapper.unmount();
+  });
+});
+
 describe("DowntimeScheduleFields", () => {
   it("shows the next window once for a stored legacy UTC alias", async () => {
     const wrapper = await mountFields("Etc/UTC");

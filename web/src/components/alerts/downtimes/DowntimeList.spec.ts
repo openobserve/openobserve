@@ -254,6 +254,40 @@ describe("DowntimeList", () => {
     wrapper.unmount();
   });
 
+  it("counts every folder in All folders with no search, as a click on the tile lists", async () => {
+    vi.mocked(downtimes.list).mockResolvedValue(
+      page([
+        row({ id: "dt-1", status: "scheduled" }),
+        row({ id: "dt-2", folder_id: "ops", status: "scheduled" }),
+        row({ id: "dt-3", folder_id: "ops", status: "active" }),
+      ]) as never,
+    );
+    const wrapper = await mountList({ scope: "all" });
+    await vi.waitFor(() =>
+      expect(wrapper.get('[data-test="downtime-summary-scheduled"]').text()).toContain("2"),
+    );
+    expect(wrapper.get('[data-test="downtime-summary-total"]').text()).toContain("3");
+    wrapper.unmount();
+  });
+
+  it("finds a row by a word of its reason", async () => {
+    vi.mocked(downtimes.list).mockResolvedValue(
+      page([
+        row({ id: "dt-1", name: "Kafka", reason: "planned CHG-4471 failover" }),
+        row({ id: "dt-2", name: "Redis" }),
+      ]) as never,
+    );
+    const wrapper = await mountList();
+    await vi.waitFor(() =>
+      expect(wrapper.find('[data-test="downtime-list-dt-2-name"]').exists()).toBe(true),
+    );
+    await wrapper.get('[data-test="downtime-list-search"] input').setValue("chg-4471");
+    await flushPromises();
+    expect(wrapper.find('[data-test="downtime-list-dt-1-name"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="downtime-list-dt-2-name"]').exists()).toBe(false);
+    wrapper.unmount();
+  });
+
   it("shows no cut notice when one page holds the org", async () => {
     vi.mocked(downtimes.list).mockResolvedValue(page([row()]) as never);
     const wrapper = await mountList();
@@ -412,7 +446,7 @@ describe("DowntimeList", () => {
       await vi.waitFor(() =>
         expect(wrapper.find('[data-test="downtime-list-q3-name"]').exists()).toBe(true),
       );
-      expect(cell(wrapper, "q3", "when")).toMatch(/by \d{1,2}:\d{2}\s?[AP]M tomorrow/);
+      expect(cell(wrapper, "q3", "when")).toMatch(/by \d{2}:\d{2} tomorrow/);
       wrapper.unmount();
       vi.useRealTimers();
     });

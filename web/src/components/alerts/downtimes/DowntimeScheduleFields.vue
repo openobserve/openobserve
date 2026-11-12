@@ -131,7 +131,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, inject } from "vue";
+import { computed, inject, watch } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useTimezoneOptions } from "@/composables/useTimezoneOptions";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
@@ -141,8 +141,15 @@ import {
   type DowntimeFormValues,
 } from "@/utils/downtimes/downtimeForm";
 import type { Repeat } from "@/services/downtimes";
-import { ISO_WEEKDAYS, currentOrNextWindow, formatWindow } from "@/utils/downtimes/schedule";
+import {
+  ISO_WEEKDAYS,
+  currentOrNextWindow,
+  formatWindow,
+  localToUtcMicros,
+  utcMicrosToLocal,
+} from "@/utils/downtimes/schedule";
 import { canonicalTimezone } from "@/utils/timezoneAliases";
+import { getIntlLocale } from "@/locales";
 import OFormToggleGroup from "@/lib/core/ToggleGroup/OFormToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OFormDate from "@/lib/forms/Date/OFormDate.vue";
@@ -159,6 +166,30 @@ const repeat = computed(() => schedule.value?.repeat);
 
 const REPEATS: readonly Repeat[] = ["none", "daily", "weekly"];
 
+// A moved one-time start moves the end by the same amount, so the window keeps its length.
+// A loaded row or a reset changes the end too, so only a change of the start alone moves it.
+watch(
+  () => {
+    const s = schedule.value;
+    return s ? [s.repeat, s.timezone, s.start_date, s.start_time, s.end_date, s.end_time] : null;
+  },
+  (next, prev) => {
+    if (!next || !prev) return;
+    const [repeat, zone, startDate, startTime, endDate, endTime] = next;
+    const [prevRepeat, prevZone, prevDate, prevTime, prevEndDate, prevEndTime] = prev;
+    if (repeat !== "none" || prevRepeat !== "none" || zone !== prevZone) return;
+    if (startDate === prevDate && startTime === prevTime) return;
+    if (endDate !== prevEndDate || endTime !== prevEndTime) return;
+    const oldStart = localToUtcMicros(prevDate, prevTime, zone);
+    const oldEnd = localToUtcMicros(endDate, endTime, zone);
+    const newStart = localToUtcMicros(startDate, startTime, zone);
+    if (oldStart === null || oldEnd === null || newStart === null || oldEnd <= oldStart) return;
+    const end = utcMicrosToLocal(newStart + (oldEnd - oldStart), zone);
+    form.setFieldValue("schedule.end_date", end.date);
+    form.setFieldValue("schedule.end_time", end.time);
+  },
+);
+
 // Only a user pick resets the dates; a loaded row sets the repeat without passing through here.
 const onRepeatChange = (next: unknown) => {
   const picked = REPEATS.find((r) => r === next);
@@ -166,7 +197,9 @@ const onRepeatChange = (next: unknown) => {
   form.setFieldValue("schedule", scheduleForRepeat(schedule.value, picked, Date.now()));
 };
 
-const weekdayFormat = new Intl.DateTimeFormat(undefined, { weekday: "short", timeZone: "UTC" });
+// The app's language, not the browser's, as every downtime label reads.
+const locale = getIntlLocale();
+const weekdayFormat = new Intl.DateTimeFormat(locale, { weekday: "short", timeZone: "UTC" });
 // 2024-01-01 is a Monday, so ISO day n is 2024-01-0n.
 const weekdays = ISO_WEEKDAYS.map((d) => ({
   value: d,
@@ -178,8 +211,8 @@ const nextWindowText = computed(() => {
   const built = buildSchedule(schedule.value);
   const window = currentOrNextWindow(built, Date.now() * 1000);
   if (!window) return t("alerts.downtimes.scheduleForm.noWindow");
-  const inZone = formatWindow(window, built.timezone, t);
-  const inUtc = formatWindow(window, "UTC", t);
+  const inZone = formatWindow(window, built.timezone, t, locale);
+  const inUtc = formatWindow(window, "UTC", t, locale);
   // Canonical only for display, so a stored `Etc/UTC` shows the window once.
   return canonicalTimezone(built.timezone) === "UTC"
     ? t("alerts.downtimes.scheduleForm.nextWindow", { window: inZone })

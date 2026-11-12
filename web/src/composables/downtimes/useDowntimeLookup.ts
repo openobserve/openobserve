@@ -55,5 +55,17 @@ export function useDowntimeLookup(needed: MaybeRefOrGetter<boolean>) {
   const notLoaded = (id: string | null | undefined): boolean =>
     !!id && truncated.value && !downtimeOf(id);
 
-  return { downtimesEnabled, downtimeOf, nameOf, truncated, notLoaded };
+  /** The detail page of a listed downtime, in its folder; `null` when the lookup has no row. */
+  const detailRoute = (id: string | null | undefined) => {
+    const row = downtimeOf(id);
+    return row
+      ? {
+          name: "downtimeDetail",
+          params: { id: row.id },
+          query: { org_identifier: orgId.value, folder: row.folder_id },
+        }
+      : null;
+  };
+
+  return { downtimesEnabled, downtimeOf, nameOf, truncated, notLoaded, orgId, detailRoute };
 }

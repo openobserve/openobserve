@@ -20,7 +20,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="inline-flex min-w-12 shrink-4"
     :data-test="dataTest"
   >
-    <OTag type="downtimeStatus" value="active" class="max-w-full min-w-0">
+    <RouterLink
+      v-if="detailRoute"
+      :to="detailRoute"
+      class="inline-flex max-w-full min-w-0"
+      :data-test="`${dataTest}-link`"
+      @click.stop
+    >
+      <OTag type="downtimeStatus" value="active" class="max-w-full min-w-0">
+        <span class="truncate">{{ label }}</span>
+      </OTag>
+    </RouterLink>
+    <OTag v-else type="downtimeStatus" value="active" class="max-w-full min-w-0">
       <span class="truncate">{{ label }}</span>
     </OTag>
     <OTooltip :content="tooltip" />
@@ -29,6 +40,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
+import { RouterLink } from "vue-router";
+import { useDowntimeLookup } from "@/composables/downtimes/useDowntimeLookup";
 import { useI18nTyped } from "@/types/i18n";
 import type { ActiveDowntime } from "@/services/downtimes";
 import { useCountdown } from "@/composables/downtimes/useCountdown";
@@ -49,6 +62,10 @@ const props = withDefaults(
 
 const { t } = useI18nTyped();
 const viewerZone = useViewerTimezone();
+
+// The chip carries no folder, so it links only when the lookup knows the row; else it stays plain.
+const lookup = useDowntimeLookup(true);
+const detailRoute = computed(() => lookup.detailRoute(props.downtime.id));
 
 // The banner's skew-corrected clock, so chip and banner end at the same instant.
 const { remainingSecs } = useCountdown(() => props.downtime.ends_at, serverNowMs);

@@ -111,12 +111,14 @@ fn repeat_matches(repeat: Repeat, wanted: &str) -> bool {
     }
 }
 
+/// The same fields as the list page search: name, reason and creator.
 fn mentions(d: &Downtime, search: &str) -> bool {
     let needle = search.trim().to_lowercase();
     d.name.to_lowercase().contains(&needle)
         || d.reason
             .as_deref()
             .is_some_and(|r| r.to_lowercase().contains(&needle))
+        || d.created_by.to_lowercase().contains(&needle)
 }
 
 /// The send path's rule: folders, tags, ids and the condition over the alert's dimensions.
@@ -254,6 +256,8 @@ mod tests {
         );
         assert_eq!(ids(&q(|q| q.search = Some("P1 MAINT".into()))), ["p1"]);
         assert_eq!(q(|q| q.search = Some("chg-4471".into())).total, 6);
+        assert_eq!(q(|q| q.search = Some("LIN".into())).total, 6, "the creator");
+        assert_eq!(q(|q| q.search = Some("no such word".into())).total, 0);
     }
 
     #[test]

@@ -444,7 +444,7 @@ import DowntimeScheduleFields from "./DowntimeScheduleFields.vue";
 import DowntimeNotifySection from "./DowntimeNotifySection.vue";
 import DowntimePreviewPane from "./DowntimePreviewPane.vue";
 import DowntimeSummary from "./DowntimeSummary.vue";
-import { browserTimezone } from "@/utils/timezoneAliases";
+import { useViewerTimezone } from "@/composables/downtimes/useViewerTimezone";
 import { useEditorDraft } from "@/composables/useEditorDraft";
 import EditorDraftDialogs from "@/components/common/drafts/EditorDraftDialogs.vue";
 
@@ -469,7 +469,8 @@ const queryList = (value: unknown): string[] =>
     .map((v) => String(v ?? "").trim())
     .filter(Boolean);
 
-const browserZone = browserTimezone();
+// The app's chosen zone, like every other downtime view, else the browser's.
+const viewerZone = useViewerTimezone();
 const moduleLocks = useTargetModuleLocks();
 const prefillModule = MODULE_ORDER.find(
   (m) => m === route.query.module && !moduleLocks[m].locked.value,
@@ -480,7 +481,7 @@ const folderDefault = useDefaultDowntimeFolder();
 const explicitFolder = String(route.query.folder_id ?? "");
 
 const initialValues = (): DowntimeFormValues => {
-  const base = defaultDowntimeValues(Date.now(), browserZone);
+  const base = defaultDowntimeValues(Date.now(), viewerZone.value);
   const folderId = explicitFolder || folderDefault.folderId.value || "";
   return applyPrefill(
     { ...base, folder_id: folderId },
