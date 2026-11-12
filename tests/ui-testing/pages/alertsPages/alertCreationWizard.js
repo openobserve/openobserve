@@ -13,6 +13,7 @@ import MonacoEditorHelper from '../../playwright-tests/utils/MonacoEditorHelper.
 import { openOSelectDropdown } from './oselectHelpers.js';
 import { FilterBuilderDriver } from '../generalPages/filterBuilderPage.js';
 import { discardEditorDraftIfAsked } from './editorDraftHelpers.js';
+import { openAlertSectionForTab, settleIntoView } from './alertSectionHelpers.js';
 
 export class AlertCreationWizard {
     constructor(page, commonActions, locators) {
@@ -751,36 +752,8 @@ export class AlertCreationWizard {
     }
 
     async _switchToTab(tabName) {
-        // Preferred: stable data-test toggle items from AddAlert.vue
-        // (`add-alert-tab-<key>`, keys: condition = "Alert Rules", advanced = "Advanced").
-        const tabKey = tabName === 'Alert Rules' ? 'condition' : tabName.toLowerCase();
-        const dataTestTab = this.page.locator(`[data-test="add-alert-tab-${tabKey}"]`).first();
-        if (await dataTestTab.isVisible({ timeout: 3000 }).catch(() => false)) {
-            await dataTestTab.click({ force: true });
-            await this.page.waitForTimeout(500);
-            testLogger.info('Switched to tab via data-test', { tabName, tabKey });
-            return;
-        }
-
-        // Legacy v3 UI fallback: tabs are inner divs within the tab header bar
-        const tab = this.page.locator('.alert-v3-tabs > div:first-child > div').filter({ hasText: tabName }).first();
-        if (await tab.isVisible({ timeout: 3000 }).catch(() => false)) {
-            // Check if this tab is already active (has active-tab class)
-            const isActive = await tab.evaluate(el => el.classList.contains('active-tab')).catch(() => false);
-            if (isActive) {
-                testLogger.info('Tab already active, skipping click', { tabName });
-                return;
-            }
-            await tab.click({ force: true });
-            await this.page.waitForTimeout(500);
-            testLogger.info('Switched to tab', { tabName });
-            return;
-        }
-
-        // Last resort: click the tab label text (works on builds without either hook)
-        await this.page.getByText(tabName, { exact: false }).first().click({ force: true });
-        await this.page.waitForTimeout(500);
-        testLogger.info('Switched to tab via text fallback', { tabName });
+        const sectionId = await openAlertSectionForTab(this.page, tabName);
+        testLogger.info('Switched to editor section', { tabName, sectionId });
     }
 
     async _switchToAdvancedTab() {
@@ -1107,21 +1080,16 @@ export class AlertCreationWizard {
         await this.page.waitForSelector('[data-o2-drawer][data-state="open"]', { state: 'hidden', timeout: 5000 }).catch(() => {});
         testLogger.info('Closed PromQL Editor dialog');
 
-        // Fill PromQL trigger condition (in Alert Rules tab - QueryConfig.vue)
-        // In v3 UI the label is "Alert if the value is *" (NOT "Trigger if the value is")
-        const queryConfigSection = this.page.locator('.step-query-config');
-        const promqlConditionLabel = queryConfigSection.getByText('Alert if the value').first();
-        await promqlConditionLabel.waitFor({ state: 'visible', timeout: 10000 });
-        testLogger.info('PromQL trigger condition section visible in Alert Rules tab');
-
-        // The outer flex container holds both the label div and controls div as siblings
-        const promqlConditionRow = promqlConditionLabel.locator('..');
+        // PromQL condition row ("Notify me when the value is [op] [value]") in QueryConfig.vue
+        await this.page.locator('[data-test="alert-threshold-operator-select"]').first().waitFor({ state: 'visible', timeout: 10000 });
+        testLogger.info('PromQL trigger condition row visible');
 
         // Select operator — v3 UI renders this as an OSelect with a stable data-test.
         // The old `.alert-v3-select` class was removed in PR #12764; use the data-test
         // hook + popover pattern (same as the SQL threshold operator in this file).
         const promqlOperatorSelect = this.page.locator('[data-test="alert-threshold-operator-select"]').first();
         await promqlOperatorSelect.waitFor({ state: 'visible', timeout: 10000 });
+        await settleIntoView(this.page, promqlOperatorSelect);
         await promqlOperatorSelect.click();
         const promqlOperatorPopover = this.page.locator('[data-test="alert-threshold-operator-select-popover"]').first();
         await promqlOperatorPopover.waitFor({ state: 'visible', timeout: 5000 });
@@ -1144,7 +1112,7 @@ export class AlertCreationWizard {
         testLogger.info('Set PromQL condition operator', { operator });
 
         // Set value (input has debounce="300")
-        const promqlValueInput = promqlConditionRow.locator('input[type="number"]');
+        const promqlValueInput = this.page.locator('input[data-test="alert-threshold-value-input"], [data-test="alert-threshold-value-input"] input').first();
         await promqlValueInput.clear();
         await promqlValueInput.fill(String(conditionValue));
         await this.page.waitForTimeout(500);

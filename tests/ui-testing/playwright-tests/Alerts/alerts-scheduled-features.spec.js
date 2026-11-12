@@ -516,8 +516,8 @@ test.describe("Scheduled Alert Features", () => {
         const statusText = await pm.alertsPage.getEvaluationStatusText();
         testLogger.info('Evaluation status indicator visible', { text: statusText });
 
-        // Should contain either "Would Trigger" or "Would Not Trigger" (case-insensitive)
-        const hasExpectedText = /would trigger/i.test(statusText) || /would not trigger/i.test(statusText);
+        // The rail verdict is a sentence: "Right now this would alert you: ..." or "Quiet right now: ..."
+        const hasExpectedText = /would alert you|quiet right now|over the limit/i.test(statusText);
         expect(hasExpectedText).toBe(true);
         testLogger.info('Status indicator has expected text');
 

@@ -355,7 +355,11 @@ export class CompositeAlertsPage {
     const popover = this.page.locator(`[data-test="${base}-popover"]`);
     const option = this.page.locator(`[data-test="${base}-option"][data-test-value="${value}"]`);
 
-    await this.page.locator(`[data-test="${base}-trigger"]`).click();
+    const trigger = this.page.locator(`[data-test="${base}-trigger"]`);
+    // OSelect closes when its scroll container moves, so let the snapping column settle before opening.
+    await trigger.scrollIntoViewIfNeeded();
+    await this.page.waitForTimeout(600);
+    await trigger.click();
     await expect(popover).toBeVisible();
 
     if (searchText) {

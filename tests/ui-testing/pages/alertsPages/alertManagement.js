@@ -11,6 +11,7 @@
 
 import { expect } from '@playwright/test';
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
+import { openAlertSectionForTab } from './alertSectionHelpers.js';
 const { FilterBuilderDriver } = require('../generalPages/filterBuilderPage.js');
 
 export class AlertManagement {
@@ -783,13 +784,11 @@ export class AlertManagement {
     // =========================================================================
 
     /**
-     * Activate the Advanced tab in the AddAlert v3 wizard.
+     * Shows the old Advanced tab's settings: the sectioned form reveals them in "Who should hear about it?".
      */
     async openAdvancedTab() {
-        const advancedTab = this.page.locator(this.locators.addAlertTabAdvanced);
-        await expect(advancedTab).toBeVisible({ timeout: 10000 });
-        await advancedTab.click();
+        await openAlertSectionForTab(this.page, 'Advanced');
         await this.page.locator(this.locators.advancedTemplateOverrideSelect).waitFor({ state: 'visible', timeout: 10000 });
-        testLogger.info('Switched to Advanced tab');
+        testLogger.info('Advanced settings visible');
     }
 }
