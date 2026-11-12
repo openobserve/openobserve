@@ -167,6 +167,30 @@ describe("MutedChip", () => {
     );
   });
 
+  it("leaves a modifier or middle click to the browser, so it opens a new tab", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+    const router = await linkRouter();
+    const wrapper = mount(MutedChip, {
+      props: { downtime: { id: "d1", name: "Quick mute", ends_at: at(52), folder_id: "ops" } },
+      global: { plugins: [store, router] },
+    });
+    const link = wrapper.find('[data-test="muted-chip"] a');
+    for (const init of [
+      { ctrlKey: true },
+      { metaKey: true },
+      { shiftKey: true },
+      { altKey: true },
+      { button: 1 },
+    ]) {
+      const click = new MouseEvent("click", { bubbles: true, cancelable: true, ...init });
+      link.element.dispatchEvent(click);
+      await flushPromises();
+      expect(click.defaultPrevented, JSON.stringify(init)).toBe(false);
+      expect(router.currentRoute.value.name).toBe("alertList");
+    }
+  });
+
   it("stays plain text where no router is mounted", () => {
     vi.useFakeTimers();
     vi.setSystemTime(NOW);

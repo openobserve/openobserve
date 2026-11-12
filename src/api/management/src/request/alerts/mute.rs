@@ -241,6 +241,8 @@ fn error_response(e: openobserve_core::alerts::mute::MuteError) -> Response {
 #[cfg(test)]
 mod tests {
     use axum::http::StatusCode;
+    #[cfg(feature = "enterprise")]
+    use svix_ksuid::KsuidLike as _;
 
     use super::*;
 

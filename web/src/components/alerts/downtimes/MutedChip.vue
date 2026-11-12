@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="link"
       :href="link.href"
       class="focus-visible:outline-focus-ring-accent rounded-default inline-flex max-w-full min-w-0 no-underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-solid"
-      @click.stop.prevent="openDowntime"
+      @click.stop="openDowntime"
     >
       <OTag type="downtimeStatus" value="active" class="max-w-full min-w-0">
         <span class="truncate">{{ label }}</span>
@@ -74,7 +74,11 @@ const link = computed(() => {
   return { to, href: router.resolve(to).href };
 });
 
-const openDowntime = () => {
+// A modifier or middle click stays the browser's, so it can open the link in a new tab.
+const openDowntime = (event: MouseEvent) => {
+  if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey)
+    return;
+  event.preventDefault();
   if (link.value) void router?.push(link.value.to);
 };
 
