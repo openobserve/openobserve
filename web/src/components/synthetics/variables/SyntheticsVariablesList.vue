@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #toolbar-trailing>
         <OButton
           variant="outline"
-          size="icon-xs-sq"
+          size="icon-toolbar"
           icon-left="refresh"
           :loading="loading"
           data-test="synthetics-variables-refresh-btn"

@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #toolbar-trailing>
         <OButton
           variant="outline"
-          size="icon-xs-sq"
+          size="icon-toolbar"
           class="shrink-0"
           icon-left="refresh"
           data-test="running-queries-refresh-btn"
