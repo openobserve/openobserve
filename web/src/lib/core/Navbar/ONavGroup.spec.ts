@@ -385,7 +385,7 @@ describe("ONavGroup", () => {
       await openWith(twoSections, { single: 600, columns: 300 });
 
       expect(flyout().attributes("data-layout")).toBe("columns");
-      expect(flyout().findAll('[data-test="nav-group-flyout-column"]')).toHaveLength(2);
+      expect(flyout().findAll('[data-test="nav-group-column"]')).toHaveLength(2);
       expect(flyout().attributes("style")).toContain("top: 100px");
     });
 
@@ -393,7 +393,7 @@ describe("ONavGroup", () => {
       await openWith(twoSections, { single: 200, columns: 100 }, 100);
 
       expect(flyout().attributes("data-layout")).toBe("single");
-      expect(flyout().findAll('[data-test="nav-group-flyout-column"]')).toHaveLength(1);
+      expect(flyout().findAll('[data-test="nav-group-column"]')).toHaveLength(1);
     });
 
     it("keeps one column when a tall menu has only one section", async () => {

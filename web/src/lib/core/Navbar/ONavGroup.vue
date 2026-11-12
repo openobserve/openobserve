@@ -926,7 +926,7 @@ function onChildMouseenter(event: MouseEvent) {
             v-for="(column, columnIndex) in flyoutColumns"
             :key="`col-${columnIndex}`"
             role="none"
-            data-test="nav-group-flyout-column"
+            data-test="nav-group-column"
             :class="useColumns ? 'min-w-48 shrink-0' : ''"
           >
             <template v-for="(block, blockIndex) in column" :key="block.key">
