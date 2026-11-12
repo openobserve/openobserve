@@ -15159,7 +15159,7 @@
       "placeholder": "Find a setting",
       "count": "{count} setting matches | {count} settings match",
       "empty": "No setting matches “{query}”",
-      "hint": "Finds today's labels and older names too, like “dedup”. Enter jumps to the setting, even one behind “more”. Esc closes.",
+      "hint": "Finds today's labels and older names too, like “cooldown”. Enter jumps to the setting, even one behind “more”. Esc closes.",
       "labels": {
         "queryMode": "Query mode",
         "filters": "Filters",

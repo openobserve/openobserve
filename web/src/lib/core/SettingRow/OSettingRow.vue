@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Half of a 45% pair cell, so single and paired controls share one column. -->
     <div
       class="min-w-0 shrink-0 max-md:w-full max-md:pt-0"
-      :class="[inPair ? 'w-1/2' : 'w-[22.5%]', fill && 'pt-2']"
+      :class="[inPair ? 'w-1/2' : 'w-[22.5%]', fill && 'pt-2', bare && 'min-w-28']"
     >
       <div class="text-text-heading flex items-center gap-1 text-sm font-medium">
         <span

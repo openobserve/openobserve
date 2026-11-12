@@ -973,6 +973,7 @@ import AlertSampleEvents from "./AlertSampleEvents.vue";
 import AlertCheckTimeline from "./AlertCheckTimeline.vue";
 import AlertBacktest from "./AlertBacktest.vue";
 import { generateSqlQuery } from "@/utils/alerts/alertQueryBuilder";
+import { getCronIntervalDifferenceInSeconds, isAboveMinRefreshInterval } from "@/utils/queryUtils";
 import AlertOptionalHeading from "./AlertOptionalHeading.vue";
 import OCommandSearch from "@/lib/forms/CommandSearch/OCommandSearch.vue";
 import { isTieredSetting, type AlertFindId } from "./alertSettingFind";
@@ -1484,7 +1485,25 @@ export default defineComponent({
       }
     };
 
+    const submitAttempted = alertForm.form.useStore((s) => s.submissionAttempts > 0);
+    // The cron check runs in Save, not in the form schema, so its failure is counted here.
+    const cronSaveProblem = computed(() => {
+      const tc = alertForm.formData.value?.trigger_condition;
+      if (tc?.frequency_type !== "cron") return false;
+      if (!tc.cron || !tc.timezone) return true;
+      try {
+        const seconds = getCronIntervalDifferenceInSeconds(tc.cron);
+        return (
+          typeof seconds === "number" && !isAboveMinRefreshInterval(seconds, store.state?.zoConfig)
+        );
+      } catch {
+        return true;
+      }
+    });
     const { items: sectionItems } = useAlertFormSections({
+      extraErrors: computed(() => ({
+        schedule: submitAttempted.value && cronSaveProblem.value ? 1 : 0,
+      })),
       fieldMeta: alertForm.form.useStore((s) => s.fieldMeta as FieldMetaMap),
       formData: alertForm.formData,
       anomalyConfig: alertForm.anomalyConfig,
