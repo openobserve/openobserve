@@ -121,7 +121,10 @@ def main():
     since = (datetime.now(timezone.utc) - timedelta(days=DAYS)).strftime("%Y-%m-%d")
     grand = 0
     for wf, stream, suite, is_reg, prefix, build_job in TARGETS:
-        runs = gh(f"repos/{REPO}/actions/workflows/{wf}/runs?created=%3E%3D{since}&per_page=100").get("workflow_runs", [])
+        q = f"repos/{REPO}/actions/workflows/{wf}/runs?created=%3E%3D{since}&per_page=100"
+        # A regression workflow's PR runs test a subset and would push main's runs off this one page, so query main's events only.
+        events = ["&event=schedule", "&event=workflow_dispatch"] if is_reg else [""]
+        runs = [r for e in events for r in gh(q + e).get("workflow_runs", [])]
         runs = [r for r in runs if r.get("status") == "completed"]
         docs = [reconstruct(r, suite, is_reg, prefix, build_job) for r in runs]
         n = post(stream, docs); grand += n

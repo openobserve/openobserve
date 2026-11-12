@@ -1,7 +1,6 @@
 #!/usr/bin/env node
-// Usage: regression-pr-matrix.js <matrix.json> <changed-files.txt>; prints the matrix cut down to the changed RegressionSet specs.
+// Usage: regression-pr-matrix.js <matrix.json> <changed-files.txt> [ent-overlay.json ...]; prints the matrix cut down to the changed RegressionSet specs.
 const fs = require("fs");
-const path = require("path");
 
 const ROOT = "tests/ui-testing/playwright-tests/";
 const matrix = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
@@ -19,14 +18,24 @@ const add = (shard, file) => {
 for (const shard of matrix.include) {
   for (const f of shard.run_files || []) if (left.has(`${shard.actual_folder}/${f}`)) add(shard, f);
 }
-// A spec missing from the manifest still runs here, on the first shard serving its folder, so the PR proves it.
-for (const f of [...left]) {
-  const shard = matrix.include.find((s) => s.actual_folder === path.dirname(f));
-  if (shard) {
-    console.error(`::warning::${f} is in no ci_matrix_regression.json shard, so the scheduled suite will never run it`);
-    add(shard, path.basename(f));
+
+const folderOf = new Map(matrix.include.map((s) => [s.testfolder, s.actual_folder]));
+const entOnly = new Set();
+for (const p of process.argv.slice(4)) {
+  const o = JSON.parse(fs.readFileSync(p, "utf8"));
+  for (const [tf, files] of Object.entries(o.append || {})) for (const f of files) entOnly.add(`${folderOf.get(tf)}/${f}`);
+  for (const s of o.shards || []) for (const f of s.run_files || []) entOnly.add(`${s.actual_folder}/${f}`);
+  for (const [tf, entries] of Object.entries(o.disabled || {})) for (const e of entries) entOnly.add(`${folderOf.get(tf)}/${e.file}`);
+}
+// ENT-only specs fail on the OSS binary, so they are left to ENT CI; a spec in neither manifest would never run anywhere.
+let orphans = 0;
+for (const f of left) {
+  if (entOnly.has(f)) {
+    console.error(`::notice::${f} is registered only in ENT's regression overlay, so ENT CI runs it, not this OSS run`);
   } else {
-    console.error(`::warning::${f} is in a folder no regression shard serves; not run`);
+    console.error(`::error::${f} is in no regression manifest; add it to tests/ui-testing/ci-matrix/ci_matrix_regression.json, or to ENT's ci_matrix_regression.ent.json if it is ENT-only`);
+    orphans++;
   }
 }
+if (orphans) process.exit(1);
 process.stdout.write(JSON.stringify({ include: [...out.values()] }));
