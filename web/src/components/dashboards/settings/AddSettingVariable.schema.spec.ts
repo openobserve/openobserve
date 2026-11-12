@@ -148,6 +148,24 @@ describe("AddSettingVariable schema — query_values modes", () => {
     ]);
   });
 
+  it("blocks an OR group or nesting for an auto PromQL variable", () => {
+    const promqlData = { stream_type: "metrics", stream: "up", field: "job", query_type: "promql" };
+    const result = (filter_group: unknown) =>
+      schema
+        .safeParse({
+          name: "svc",
+          type: "query_values",
+          query_data: { ...promqlData, filter_group },
+        })
+        .error?.issues.map((issue) => [issue.path.join("."), issue.message]);
+    const issue = [["query_data.filter_group", "dashboard.queryVariable.promqlFiltersAndOnly"]];
+    expect(
+      result(group("AND", [condition("env", "prod", "AND"), condition("env", "dev", "OR")])),
+    ).toEqual(issue);
+    expect(result(group("AND", [group("AND", [condition("env", "prod", "AND")])]))).toEqual(issue);
+    expect(result(group("AND", [condition("env", "prod", "AND")]))).toBeUndefined();
+  });
+
   it("defaults to auto SQL and keeps the custom fields it is given", () => {
     expect(
       schema.parse({ name: "svc", type: "query_values", query_data: autoSql }).query_data,

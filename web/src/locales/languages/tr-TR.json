@@ -9388,6 +9388,7 @@
       "runPreviewFirst": "Run the preview to choose a column",
       "queryRequired": "Query is required",
       "promqlOperatorUnsupported": "Not available for PromQL",
+      "promqlFiltersAndOnly": "PromQL filters support AND only. Remove OR and groups, or switch to SQL.",
       "cappedHint": "Showing the first {count} values",
       "loadFailedReason": "Could not load values: {reason}",
       "undefinedVariables": "Not defined on this dashboard: {names}. These placeholders are sent to the query as written.",

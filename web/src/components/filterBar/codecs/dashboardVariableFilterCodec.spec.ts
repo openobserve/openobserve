@@ -126,28 +126,6 @@ describe("dashboard variable filter codec (SQL)", () => {
   });
 });
 
-describe("dashboard variable filter codec (PromQL, AND only)", () => {
-  const codec = dashboardVariableFilterCodec({ andOnly: true });
-
-  it("reads a SQL group as its AND rows and saves them flat", () => {
-    const tree = codec.parse({ filter_group: clone(orGroup) as any }, context);
-    expect(tree.items.every((item) => item.kind === "condition" && item.connector === "AND")).toBe(
-      true,
-    );
-    expect(codec.serialize(tree, context)).toEqual({
-      filter: [
-        { name: "env", operator: "=", value: "prod" },
-        { name: "level", operator: "=", value: "error" },
-      ],
-    });
-  });
-
-  it("keeps flat rows exactly as saved", () => {
-    const out = codec.serialize(codec.parse({ filter: clone(rows) }, context), context);
-    expect(JSON.stringify(out)).toBe(JSON.stringify({ filter: rows }));
-  });
-});
-
 describe("dashboard variable profiles", () => {
   it("allows AND/OR and groups for SQL, like panel filters", () => {
     const sql = FILTER_PROFILES["dashboard-variable"];
@@ -166,6 +144,16 @@ describe("dashboard variable profiles", () => {
     const issues = filterIssues(tree, promql, { t, saved: promql.codec.serialize(tree, context) });
     expect(issues.map((issue) => issue.message)).toEqual([
       "dashboard.queryVariable.promqlOperatorUnsupported",
+    ]);
+  });
+
+  it("keeps a group written under SQL for PromQL and reports it instead of rewriting it", () => {
+    const promql = FILTER_PROFILES["dashboard-variable-promql"];
+    const tree = promql.codec.parse({ filter_group: clone(orGroup) as any }, context);
+    const saved = promql.codec.serialize(tree, context);
+    expect(JSON.stringify(saved)).toBe(JSON.stringify({ filter_group: orGroup }));
+    expect(filterIssues(tree, promql, { t, saved })).toEqual([
+      { nodeId: null, message: "dashboard.queryVariable.promqlFiltersAndOnly" },
     ]);
   });
 });

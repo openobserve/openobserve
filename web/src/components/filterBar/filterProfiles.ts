@@ -39,6 +39,7 @@ import {
   dashboardVariableFilterCodec,
   downtimeCodec,
   engineCodec,
+  isFlatAnd,
   leafConditions,
   metricsLabelsCodec,
   modelPricingCodec,
@@ -456,14 +457,18 @@ const PROMQL_VARIABLE_OPERATORS: FilterOperatorId[] = [
   "is_not_null",
 ];
 
-// A filter written under SQL can hold an operator no label matcher expresses.
-const promqlVariableIssues = (tree: FilterGroup, { t }: FilterValidationContext): FilterIssue[] =>
-  leafConditions(tree)
+// A filter written under SQL can hold OR, groups or an operator no label matcher expresses; it is shown, never rewritten.
+const promqlVariableIssues = (tree: FilterGroup, { t }: FilterValidationContext): FilterIssue[] => {
+  const issues: FilterIssue[] = leafConditions(tree)
     .filter((node) => !PROMQL_VARIABLE_OPERATORS.includes(node.operator))
     .map((node) => ({
       nodeId: node.id,
       message: t("dashboard.queryVariable.promqlOperatorUnsupported"),
     }));
+  if (!isFlatAnd(tree))
+    issues.push({ nodeId: null, message: t("dashboard.queryVariable.promqlFiltersAndOnly") });
+  return issues;
+};
 
 /** Every page's filter rules, by name; a page passes the name and its own saved value. */
 export const FILTER_PROFILES: Record<FilterProfileName, FilterProfile> = {
@@ -531,7 +536,7 @@ export const FILTER_PROFILES: Record<FilterProfileName, FilterProfile> = {
     layout: "vertical",
     dialect: "promql",
     operators: forAll(PROMQL_VARIABLE_OPERATORS),
-    codec: dashboardVariableFilterCodec({ andOnly: true }),
+    codec: dashboardVariableFilterCodec(),
     validation: "requireComplete",
     validate: promqlVariableIssues,
   },

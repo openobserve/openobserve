@@ -533,7 +533,7 @@ describe("AddSettingVariable", () => {
       expect(queryData).not.toHaveProperty("filter");
     });
 
-    it("uses the AND-only profile for PromQL and saves a SQL group as its AND rows", async () => {
+    it("uses the AND-only profile for PromQL and keeps a SQL group as it is", async () => {
       wrapper.vm.form.setFieldValue("query_data.stream_type", "metrics");
       wrapper.vm.form.setFieldValue("query_data.query_type", "promql");
       await flushPromises();
@@ -543,11 +543,8 @@ describe("AddSettingVariable", () => {
         filter: [],
         filter_group: JSON.parse(JSON.stringify(orGroup)),
       });
-      expect(queryData).not.toHaveProperty("filter_group");
-      expect(queryData.filter).toEqual([
-        { name: "env", operator: "=", value: "$env" },
-        { name: "level", operator: "=", value: "error" },
-      ]);
+      expect(queryData.filter_group).toEqual(orGroup);
+      expect(queryData).not.toHaveProperty("filter");
     });
 
     it("offers the stream's fields and the visible $variables", async () => {
@@ -1397,6 +1394,52 @@ describe("AddSettingVariable", () => {
         "AND",
         "OR",
       ]);
+      saved.unmount();
+    });
+
+    it("blocks saving an OR group after switching to PromQL until the OR is removed", async () => {
+      vi.mocked(updateVariable).mockClear();
+      const saved = await mountSaved({
+        stream_type: "metrics",
+        stream: "up",
+        field: "job",
+        max_record_size: null,
+        filter: [
+          { name: "env", operator: "=", value: "prod" },
+          { name: "region", operator: "=", value: "eu" },
+        ],
+      });
+      await saved
+        .find('[data-test="dashboard-variable-filter-builder-connector-1"]')
+        .trigger("click");
+      await flushPromises();
+      expect(saved.vm.form.state.values.query_data.filter_group).toBeTruthy();
+
+      saved.vm.onQueryLanguageChange("promql");
+      await flushPromises();
+      const form = saved.vm.form;
+      await form.handleSubmit();
+      await flushPromises();
+      expect(form.state.isValid).toBe(false);
+      expect(updateVariable).not.toHaveBeenCalled();
+      expect(form.state.values.query_data.filter_group.conditions[1].logicalOperator).toBe("OR");
+      const issues = saved.find('[data-test="dashboard-variable-filter-builder-issues"]');
+      expect(issues.text()).toContain("dashboard.queryVariable.promqlFiltersAndOnly");
+
+      saved.findAllComponents({ name: "FilterBarChip" })[1].vm.$emit("remove");
+      await flushPromises();
+      expect(form.state.values.query_data.filter_group).toBeUndefined();
+      expect(form.state.values.query_data.filter).toEqual([
+        { name: "env", operator: "=", value: "prod" },
+      ]);
+      await form.handleSubmit();
+      await flushPromises();
+      expect(form.state.isValid).toBe(true);
+      expect(savedQueryData(saved)).toMatchObject({
+        query_type: "promql",
+        filter: [{ name: "env", operator: "=", value: "prod" }],
+      });
+      expect(savedQueryData(saved)).not.toHaveProperty("filter_group");
       saved.unmount();
     });
 

@@ -591,7 +591,6 @@ import QueryVariableEditor from "./QueryVariableEditor.vue";
 import FilterBuilder from "@/components/filterBar/FilterBuilder.vue";
 import type { FilterBuilderExpose } from "@/components/filterBar/FilterBuilder.types";
 import type { VariableFilterValue } from "@/components/filterBar/codecs";
-import { FILTER_PROFILES } from "@/components/filterBar/filterProfiles";
 import { requestFieldValues } from "@/composables/fieldValueStore";
 import { toFilterFieldType, type FilterField } from "@/utils/query/filterBar";
 import useNotifications from "@/composables/useNotifications";
@@ -948,10 +947,7 @@ export default defineComponent({
     const autoQueryFor = (language: QueryVariableLanguage): string => {
       const queryData = variableData.query_data as QueryVariableData | undefined;
       if (!queryData?.stream || !queryData?.field) return "";
-      if (language === "sql") return buildAutoSqlQuery(queryData);
-      const { filter, filter_group, ...rest } = queryData;
-      const filters = { filter, filter_group } as VariableFilterValue;
-      return buildAutoPromqlQuery({ ...rest, ...filterPayload("promql", filters) });
+      return language === "promql" ? buildAutoPromqlQuery(queryData) : buildAutoSqlQuery(queryData);
     };
 
     // A hand-edited text stays; an empty one or an untouched prefill follows the auto settings.
@@ -1304,17 +1300,6 @@ export default defineComponent({
       return v;
     };
 
-    // The builder writes filter_group only for OR or nesting; PromQL has no OR, so a SQL group is saved as its AND rows.
-    const filterPayload = (
-      language: QueryVariableLanguage,
-      { filter, filter_group }: VariableFilterValue,
-    ): VariableFilterValue => {
-      if (!filter_group) return { filter: filter ?? [] };
-      if (language === "sql") return { filter_group };
-      const codec = FILTER_PROFILES["dashboard-variable-promql"].codec;
-      return codec.serialize(codec.parse({ filter_group }, { fields: [] }), { fields: [] });
-    };
-
     // An auto SQL variable keeps the legacy shape; query keys are only saved for PromQL or a custom query.
     const buildQueryDataPayload = (queryData: any) => {
       const {
@@ -1328,7 +1313,8 @@ export default defineComponent({
         ...base
       } = queryData;
       const language = query_type === "promql" && base.stream_type === "metrics" ? "promql" : "sql";
-      const rest = { ...base, ...filterPayload(language, { filter, filter_group }) };
+      // The builder writes filter_group only for OR or nesting, so the two never both apply.
+      const rest = { ...base, ...(filter_group ? { filter_group } : { filter: filter ?? [] }) };
       if (!custom_query) return language === "promql" ? { ...rest, query_type: language } : rest;
       const payload: any = { ...rest, custom_query: true, query_type: language, query };
       if (language === "sql" && value_field) payload.value_field = value_field;

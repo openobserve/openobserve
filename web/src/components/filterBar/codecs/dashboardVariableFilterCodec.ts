@@ -21,15 +21,7 @@ import {
   type DashboardFilterGroup,
 } from "./dashboardFilterCodec";
 import { dashboardVariableCodec, type VariableFilter } from "./listCodecs";
-import {
-  isPlainObject,
-  isTreePristine,
-  leafConditions,
-  makeGroup,
-  rawOf,
-  stamp,
-  type FilterCodec,
-} from "./types";
+import { isPlainObject, isTreePristine, rawOf, stamp, type FilterCodec } from "./types";
 
 /** A variable's `query_data` filter keys; only one of them is ever written. */
 export interface VariableFilterValue {
@@ -60,20 +52,14 @@ const restamped = (node: FilterNode): FilterNode => {
 };
 
 /** Variable filters: the legacy flat `filter` rows while AND-only, a panel-shaped `filter_group` once OR or nesting is used. */
-export function dashboardVariableFilterCodec({
-  andOnly = false,
-} = {}): FilterCodec<VariableFilterValue> {
+export function dashboardVariableFilterCodec(): FilterCodec<VariableFilterValue> {
   const flat = dashboardVariableCodec();
   const grouped = dashboardFilterCodec();
   return {
-    parse: (saved, context) => {
-      if (!isPlainObject(saved?.filter_group)) return flat.parse(saved?.filter, context);
-      const tree = grouped.parse(saved.filter_group, context);
-      if (!andOnly) return tree;
-      // A group saved under SQL is read as its AND rows; a locked panel leaf has no row and is left out.
-      const rows = makeGroup(leafConditions(tree).map(({ meta: _meta, ...rest }) => rest));
-      return flat.parse(flat.serialize(rows, context), context);
-    },
+    parse: (saved, context) =>
+      isPlainObject(saved?.filter_group)
+        ? grouped.parse(saved.filter_group, context)
+        : flat.parse(saved?.filter, context),
     serialize: (tree, context) => {
       const fromGroup = isPlainObject(rawOf(tree));
       if (isTreePristine(tree) && fromGroup)
