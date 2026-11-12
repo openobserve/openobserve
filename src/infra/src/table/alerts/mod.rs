@@ -30,7 +30,9 @@ use config::meta::{
 use hashbrown::HashMap;
 use itertools::Itertools;
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, Condition, ConnectionTrait, DeriveIden, EntityTrait, ModelTrait, Order, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, Set, TransactionTrait, TryIntoModel, prelude::Expr, sea_query::Func,
+    ActiveModelTrait, ColumnTrait, Condition, ConnectionTrait, DeriveIden, EntityTrait, ModelTrait,
+    Order, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, Set, TransactionTrait,
+    TryIntoModel, prelude::Expr, sea_query::Func,
 };
 use svix_ksuid::{Ksuid, KsuidLike};
 

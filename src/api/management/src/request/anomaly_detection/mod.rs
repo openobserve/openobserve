@@ -93,10 +93,7 @@ pub async fn list_configs(
     if let Some(resp) = disabled_response() {
         return resp;
     }
-    let visibility = match permitted_alert_visibility(&org_id, &user_email.user_id).await {
-        Ok(visibility) => visibility,
-        Err(e) => return e.into(),
-    };
+    let visibility = permitted_alert_visibility(&org_id, &user_email.user_id).await;
     match anomaly_service::list_configs(&org_id, None, None).await {
         Ok(configs) => {
             let mut configs = visible_configs(&visibility, configs);
