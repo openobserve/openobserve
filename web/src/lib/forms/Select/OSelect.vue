@@ -2244,8 +2244,8 @@ const fieldWidthClass = computed(() => {
             'data-[side=top]:data-[state=closed]:animate-[o2-reveal-up-out_var(--duration-overlay-out)_var(--ease-overlay-out)]',
           ]"
           :style="[
-            dropdownStyle,
             { maxHeight: 'min(15rem, var(--reka-select-content-available-height, 15rem))' },
+            dropdownStyle,
           ]"
           @click.stop
           @pointerdown.stop

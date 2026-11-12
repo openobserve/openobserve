@@ -1,9 +1,10 @@
 import { expect } from '@playwright/test';
 import { confirmDraftSignOut } from '../generalPages/draftSignOut.js';
 import {
-  dateTimeButtonLocator, relative30SecondsButtonLocator, absoluteTabLocator,
+  dateTimeButtonLocator,
   Past30SecondsValue
 } from '../commonActions.js';
+import { openDateFields, pickRelativePeriod } from '../generalPages/relativePeriod.js';
 export class DashboardPage {
   constructor(page) {
     this.page = page;
@@ -104,31 +105,12 @@ export class DashboardPage {
     // Date/Time locators — wrapped to `Locator` instances so methods don't
     // need to call `page.locator(...)` inline.
     this.dateTimeButton = page.locator(dateTimeButtonLocator);
-    this.relative30SecondsButton = page.locator(relative30SecondsButtonLocator);
-    this.absoluteTab = page.locator(absoluteTabLocator);
 
     // Share / view dashboard locators
     this.copyConfirmBubble = page.locator('[data-test="copy-confirm"][data-test-variant="success"]');
     this.shareCopiedToast = page.locator('[data-test^="o-toast-"][data-test-variant="success"][data-test-message*="copied" i]');
     this.dashboardBackBtn = page.locator('[data-test="dashboard-back-btn"]');
     this.dashboardNameTitle = page.locator('[data-test="dashboard-name-title"]');
-
-    // Date-time picker — calendar cells carry `data-test="daterangecalendar-cell-<ISO>"`
-    // (e.g. `daterangecalendar-cell-2026-05-01`). Selecting any cell whose ISO
-    // suffix ends with `-01` reliably hits the first-of-month for the rendered
-    // month grid without relying on visible-text predicates.
-    this.dateTimePickerDayOne = page
-      .locator('[data-test^="daterangecalendar-cell-"][data-test$="-01"]')
-      .first();
-    // OTime exposes its trigger via `data-test="datetime-start-time"` /
-    // `data-test="datetime-end-time"` (forwarded onto the PopoverTrigger in
-    // OTime.vue and wired into DateTime.vue's two <OTime> instances).
-    this.dateTimePickerStartTime = page.locator(
-      '[data-test="datetime-start-time"]',
-    );
-    this.dateTimePickerEndTime = page.locator(
-      '[data-test="datetime-end-time"]',
-    );
 
     // Organization locators — declared before any locators that scope into
     // the dropdown so we don't read `undefined` during construction.
@@ -414,10 +396,10 @@ export class DashboardPage {
   async setTimeToPast30Seconds() {
     // Set the time filter to the last 30 seconds
     await this.dateTimeButton.click();
-    await this.relative30SecondsButton.click();
+    await pickRelativePeriod(this.page, '30', 's');
   }
   async verifyTimeSetTo30Seconds() {
-    // Verify that the time filter displays "Past 30 Seconds"
+    // Verify that the time filter displays "Last 30 seconds"
     await expect(this.dateTimeButton).toContainText(Past30SecondsValue);
   }
   async isCopyConfirmOnShareButton() {
@@ -514,22 +496,8 @@ export class DashboardPage {
   async setDateTime() {
     await expect(this.dateTimeButton).toBeVisible();
     await this.dateTimeButton.click();
-    await this.absoluteTab.click();
+    await openDateFields(this.page);
     await this.page.waitForTimeout(2000);
-  }
-  async fillTimeRange(startTime, endTime) {
-    // Day cells and OTime triggers are now selected via data-test only
-    // (`daterangecalendar-cell-*` for the calendar, `datetime-start-time` /
-    // `datetime-end-time` for the OTime triggers). The new OTime renders a
-    // clock-face popover (not a text input), so we click the trigger to
-    // open the picker — full clock-face time entry is performed by callers
-    // via the clock-face helpers when a precise time is required.
-    await this.dateTimePickerDayOne.click();
-    await this.dateTimePickerStartTime.click();
-    await this.page.keyboard.type(startTime);
-    await this.dateTimePickerDayOne.click();
-    await this.dateTimePickerEndTime.click();
-    await this.page.keyboard.type(endTime);
   }
   async verifyDateTime(startTime, endTime) {
     await expect(this.dateTimeButton).toContainText(`${startTime} - ${endTime}`);

@@ -840,6 +840,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @add:searchterm="addSearchTerm"
           @remove:searchterm="removeSearchTerm"
           @search:timeboxed="onTimeBoxed"
+          @search:aroundwindow="onSearchAroundWindow"
           @add:table="addFieldToTable"
           @close="onDetailUserClose"
           @view-trace="redirectToTraces(detailRow)"
@@ -942,7 +943,7 @@ import {
 } from "@/utils/logs/convertLogData";
 import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
 import { useRouter } from "vue-router";
-import { useSearchAround } from "@/composables/useLogs/searchAround";
+import { searchAroundPickerRange, useSearchAround } from "@/composables/useLogs/searchAround";
 import { usePagination } from "@/composables/useLogs/usePagination";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import useStreamFields from "@/composables/useLogs/useStreamFields";
@@ -1263,6 +1264,13 @@ export default defineComponent({
       this.searchObj.data.searchAround.indexTimestamp = obj.key;
       // this.$emit("search:timeboxed", obj);
       this.searchAroundData(obj);
+    },
+    onSearchAroundWindow(range: { startUs: number; endUs: number }) {
+      clearPermalink();
+      this.searchObj.meta.showDetailTab = false;
+      resetRowSelection(this.searchObj);
+      // The page's date handler calls setCustomDate, so the window lands in Recent and re-runs the search.
+      this.$emit("update:datetime", searchAroundPickerRange(range, this.store.state.timezone));
     },
     toggleErrorDetails() {
       this.disableMoreErrorDetails = !this.disableMoreErrorDetails;

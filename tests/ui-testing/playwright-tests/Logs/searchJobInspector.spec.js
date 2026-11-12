@@ -376,7 +376,7 @@ test.describe("Search Job Inspector UI Tests", { tag: ['@enterprise', '@searchJo
     await logsPage.selectStream(stream, 3, 0);
     await page.waitForLoadState('domcontentloaded');
 
-    // Set time range to Past 15 Minutes
+    // Set time range to Last 15 minutes
     await inspectorPage.selectRelative15Minutes();
 
     // Run search
@@ -387,10 +387,10 @@ test.describe("Search Job Inspector UI Tests", { tag: ['@enterprise', '@searchJo
 
     // Check if we have results
     const searchResults = await inspectorPage.parseSearchResults();
-    testLogger.info(`Past 15 Minutes - Events: ${searchResults.eventsCount}`);
+    testLogger.info(`Last 15 minutes - Events: ${searchResults.eventsCount}`);
 
     if (searchResults.eventsCount === '0' || searchResults.eventsCount === 'N/A') {
-      testLogger.warn('No data found in Past 15 Minutes - trying wider range');
+      testLogger.warn('No data found in Last 15 minutes - trying wider range');
 
       // Try a wider time range
       await inspectorPage.selectRelative1Hour();
@@ -398,7 +398,7 @@ test.describe("Search Job Inspector UI Tests", { tag: ['@enterprise', '@searchJo
       await page.waitForLoadState('domcontentloaded');
 
       const widerResults = await inspectorPage.parseSearchResults();
-      testLogger.info(`Past 1 Hour - Events: ${widerResults.eventsCount}`);
+      testLogger.info(`Last 1 hour - Events: ${widerResults.eventsCount}`);
 
       // At least wider range should have data
       expect(widerResults.eventsCount).not.toBe('N/A');

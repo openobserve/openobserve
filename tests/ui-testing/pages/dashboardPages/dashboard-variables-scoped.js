@@ -24,6 +24,7 @@ import {
   verifyFieldDropdownEmptyOrVariablesOnly as _verifyFieldDropdownEmpty,
   hasErrorNotification,
 } from "./dashboard-stream-field-utils.js";
+import { pickRelativePeriod } from "../generalPages/relativePeriod.js";
 
 export default class DashboardVariablesScoped {
   constructor(page) {
@@ -996,7 +997,7 @@ export default class DashboardVariablesScoped {
    */
   async selectTimeRange6Hours() {
     await this.page.locator(SELECTORS.DATE_TIME_BTN).click();
-    await this.page.locator(SELECTORS.DATE_TIME_RELATIVE_6H).click();
+    await pickRelativePeriod(this.page, "6", "h");
   }
 
   // ==========================================

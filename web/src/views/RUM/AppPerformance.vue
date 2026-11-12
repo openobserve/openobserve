@@ -61,14 +61,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ref="dateTimePicker"
           v-model="selectedDate"
           menu-align="end"
+          :retention-days="rumStreamLimits.retentionDays"
+          :query-range-restriction-in-hour="rumStreamLimits.queryRangeRestrictionInHour"
         />
         <AutoRefreshInterval
           v-model="refreshInterval"
           :min-refresh-interval="store.state?.zoConfig?.min_auto_refresh_interval || 5"
           trigger
           :is-compact="isMobile"
+          :range-end-us="refreshRangeEndUs"
+          :range-start-us="refreshRangeStartUs"
           class="app-performance-auto-refresh-interval"
           @trigger="refreshData"
+          @live="goLiveRange"
         />
         <OButtonGroup>
           <OTooltip
@@ -180,6 +185,8 @@ import { overviewStateOnly, stateFromQuery } from "@/utils/rum/performanceOvervi
 import { reactive } from "vue";
 import { useRoute } from "vue-router";
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
+import { fixedRangeEnd } from "@/utils/autoRefreshPause";
+import { useStreamTimeLimits } from "@/composables/useStreamTimeLimits";
 import overviewDashboard from "@/utils/rum/overview.json";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import FeatureLockExempt from "@/components/common/FeatureLockExempt.vue";
@@ -445,6 +452,21 @@ export default defineComponent({
       ),
     );
 
+    const rumStreamLimits = useStreamTimeLimits(() => [{ name: "_rumdata", type: "logs" }]);
+    const refreshRangeEndUs = computed(() =>
+      fixedRangeEnd({
+        valueType: selectedDate.value?.valueType,
+        endTime: Number(selectedDate.value?.endTime),
+      }),
+    );
+    const refreshRangeStartUs = computed(() =>
+      refreshRangeEndUs.value === null ? null : Number(selectedDate.value?.startTime) || null,
+    );
+    const goLiveRange = () =>
+      (
+        dateTimePicker.value as { dateTimePicker?: { goLive?: () => void } } | null
+      )?.dateTimePicker?.goLive?.();
+
     // holds the current time for the dashboard
     const currentTimeObj = ref({});
 
@@ -554,6 +576,10 @@ export default defineComponent({
       store,
       // date variables
       dateTimePicker,
+      rumStreamLimits,
+      refreshRangeEndUs,
+      refreshRangeStartUs,
+      goLiveRange,
       selectedDate,
       currentTimeObj,
       refreshInterval,

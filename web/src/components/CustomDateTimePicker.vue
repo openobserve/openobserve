@@ -15,7 +15,7 @@
         <template v-if="!changeStyle" #icon-left>
           <OIcon name="schedule" size="sm" />
         </template>
-        {{ changeStyle ? getTrimmedDisplayValue() : getDisplayValue() }}
+        {{ getDisplayValue() }}
         <template #icon-right>
           <OIcon
             name="arrow-drop-down"
@@ -180,15 +180,6 @@ const agoKeys: Record<PeriodKey, I18nKey> = {
   M: "dashboard.utils.monthsAgo",
 };
 
-const pastKeys: Record<PeriodKey, I18nKey> = {
-  s: "common.pastSecond",
-  m: "common.pastMinute",
-  h: "common.pastHour",
-  d: "common.pastDay",
-  w: "common.pastWeek",
-  M: "common.pastMonth",
-};
-
 const relativePeriods = computed(() =>
   props.excludeMonths ? allRelativePeriods.filter((p) => p.value !== "M") : allRelativePeriods,
 );
@@ -242,12 +233,6 @@ const updateCustomPeriod = (newPeriod: SelectModelValue | string) => {
 const getDisplayValue = () => {
   const count = picker.data.selectedDate.relative.value;
   const key = agoKeys[picker.data.selectedDate.relative.period as PeriodKey] ?? agoKeys.m;
-  return t(key, { count }, count);
-};
-
-const getTrimmedDisplayValue = () => {
-  const count = picker.data.selectedDate.relative.value;
-  const key = pastKeys[picker.data.selectedDate.relative.period as PeriodKey] ?? pastKeys.m;
   return t(key, { count }, count);
 };
 

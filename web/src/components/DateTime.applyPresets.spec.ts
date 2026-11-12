@@ -38,49 +38,37 @@ describe("DateTime applyPresets", () => {
     wrapper = null;
   });
 
-  it("applies a relative chip at once when applyPresets is set", async () => {
+  it("applies a chip at once when applyPresets is set", async () => {
     create({ applyPresets: true });
     await flushPromises();
     const before = changes();
-    wrapper!.vm.pickRelativeChip("h", 6);
+    wrapper!.vm.pickChip("4h");
     await flushPromises();
     expect(changes()).toBe(before + 1);
     const payload = (wrapper!.emitted("on:date-change") as unknown[][]).at(-1)![0] as Record<
       string,
       unknown
     >;
-    expect(payload.valueType).toBe("relative");
+    expect(payload).toMatchObject({ valueType: "relative", relativeTimePeriod: "4h" });
   });
 
-  it("keeps a relative chip pending without applyPresets or autoApply", async () => {
+  it("applies a chip at once without applyPresets or autoApply, as picking a row does", async () => {
     create({});
     await flushPromises();
     const before = changes();
-    wrapper!.vm.pickRelativeChip("h", 6);
-    await flushPromises();
-    expect(changes()).toBe(before);
-  });
-
-  it("closes the menu after a preset is applied", async () => {
-    create({ applyPresets: true });
-    await flushPromises();
-    wrapper!.vm.menuOpen = true;
-    wrapper!.vm.pickRelativeChip("h", 6);
-    await flushPromises();
-    expect(wrapper!.vm.menuOpen).toBe(false);
-  });
-
-  it("keeps a custom relative value pending until Apply", async () => {
-    create({ applyPresets: true });
-    await flushPromises();
-    const before = changes();
-    wrapper!.vm.relativeValue = 7;
-    wrapper!.vm.onCustomPeriodSelect();
-    await flushPromises();
-    expect(changes()).toBe(before);
-    wrapper!.vm.applyAndClose();
+    wrapper!.vm.pickChip("4h");
     await flushPromises();
     expect(changes()).toBe(before + 1);
+  });
+
+  it("closes the menu after a chip is applied", async () => {
+    create({ applyPresets: true });
+    await flushPromises();
+    wrapper!.vm.onMenuOpenChange(true);
+    wrapper!.vm.menuOpen = true;
+    wrapper!.vm.pickChip("4h");
+    await flushPromises();
+    expect(wrapper!.vm.menuOpen).toBe(false);
   });
 
   it("applies a parent-invoked setRelativeDate at once", async () => {

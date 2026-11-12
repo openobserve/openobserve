@@ -1,4 +1,5 @@
 import { expect } from '@playwright/test';
+import { pickRelativePeriodCode } from './relativePeriod.js';
 
 /**
  * Page object for the shared DateTime picker (web/src/components/DateTime.vue),
@@ -27,9 +28,13 @@ export class DateTimePickerPage {
         // Picker panel — an id, not a data-test, in the component source.
         this.panel = page.locator('#date-time-menu');
 
-        // Tab pair — absent when the host passes `disable-relative`.
-        this.relativeTab = page.locator('[data-test="date-time-relative-tab"]');
-        this.absoluteTab = page.locator('[data-test="date-time-absolute-tab"]');
+        // Relative and Absolute share one view; Live is enabled only while the selection is absolute.
+        this.liveBtn = page.locator('[data-test="date-time-live-btn"]');
+        this.zoomOutBtn = page.locator('[data-test="date-time-zoom-out-btn"]');
+        this.textInput = page.locator('[data-test="date-time-input-field"]');
+        this.inputError = page.locator('[data-test="date-time-input-error"]');
+        this.resolvedLine = page.locator('[data-test="date-time-resolved"]');
+        this.asUtcToggle = page.locator('[data-test="date-time-as-utc-toggle"]');
 
         // Copy / paste controls — added by PR #13374.
         this.copyBtn = page.locator('[data-test="date-time-copy-btn"]');
@@ -47,26 +52,13 @@ export class DateTimePickerPage {
         this.startTimeInput = page.locator('[data-test="datetime-start-time"] input');
         this.endTimeInput = page.locator('[data-test="datetime-end-time"] input');
 
-        // OTabPanels is used without `keep-alive`, so the inactive panel is
-        // unmounted (v-if). Presence of these is therefore a reliable signal of
-        // which tab is active — more robust than reading variant-driven classes.
-        // OTime stamps the forwarded data-test on BOTH its outer wrapper and its
-        // inner role=group element, so scope to the first to stay strict-mode safe.
-        this.absolutePanelMarker = page.locator('[data-test="datetime-start-time"]').first();
-        this.relativePanelMarker = page.locator('[data-test="date-time-relative-15-m-btn"]');
 
         // Apply button — rendered only when the host sets autoApply=false.
         this.applyBtn = page.locator('[data-test="date-time-apply-btn"]');
 
-        // Custom relative row — value input + unit select. The product DateTime.vue
-        // renders these controls WITHOUT a data-test (testability-only), so scope
-        // structurally: the custom row is the `.relative-row` that holds the native
-        // number input; the unit select is the single combobox inside that row.
-        this.customRow = page
-            .locator('#date-time-menu .relative-row')
-            .filter({ has: page.locator('input[type="number"]') });
-        this.customValueInput = this.customRow.locator('input[type="number"]');
-        this.customPeriodTrigger = this.customRow.locator('[role="combobox"]');
+        // What Enter would apply, or why it cannot, while text is typed in the bar.
+        this.previewNote = page.locator('[data-test="date-time-preview-note"]');
+        this.tooltipContent = page.locator('[data-test="o-tooltip-content"]');
 
         // ==================== Expected toast messages ====================
         // Values of common.dateRangeCopied / dateRangePasted / dateRangePasteError / dateRangePasteEmpty
@@ -84,19 +76,14 @@ export class DateTimePickerPage {
         return this.page.locator(`[data-test-message="${message}"]`);
     }
 
+    /** The chip for a "15-m" style code; only 15m 1h 4h 24h 7d 30d have one. */
     relativePeriodBtn(suffix) {
-        return this.page.locator(`[data-test="date-time-relative-${suffix}-btn"]`);
+        return this.page.locator(`[data-test="date-time-chip-${String(suffix).replace('-', '')}"]`);
     }
 
-    /**
-     * Unit option in the custom period select; unit is one of s/m/h/d/w/M.
-     * The OSelect renders each option (ListboxItem/OSelectItem) with the option
-     * value mirrored onto `data-test-value`, so the option is addressable without
-     * the (absent) parent data-test. Only one select's dropdown is open at a time,
-     * so a bare `data-test-value` match is unambiguous.
-     */
-    customPeriodOption(unit) {
-        return this.page.locator(`[data-test-value="${unit}"]`);
+    /** A calendar row of the list, e.g. "yesterday" -> date-time-list-calendar-yesterday. */
+    calendarRow(id) {
+        return this.page.locator(`[data-test="date-time-list-calendar-${id}"]`);
     }
 
     // ==================== Panel open / close ====================
@@ -117,23 +104,23 @@ export class DateTimePickerPage {
         await expect(this.panel).toBeHidden();
     }
 
-    // ==================== Tabs ====================
+    // ==================== Relative periods ====================
 
     async selectRelativePeriod(suffix) {
-        const btn = this.relativePeriodBtn(suffix);
-        await expect(btn).toBeVisible();
-        await btn.click();
+        await pickRelativePeriodCode(this.page, suffix);
         // An auto-apply picker closes on a chip pick; reopen it so the panel controls stay reachable.
         const closed = await this.panel.waitFor({ state: 'hidden', timeout: 1500 }).then(() => true, () => false);
         if (closed) await this.openPicker();
     }
 
+    /** The selection is absolute: Live can turn it back into a rolling period. */
     async expectAbsolutePanelActive() {
-        await expect(this.absolutePanelMarker).toBeVisible();
+        await expect(this.liveBtn).toBeEnabled();
     }
 
+    /** The selection is relative: Live has nothing to do. */
     async expectRelativePanelActive() {
-        await expect(this.relativePanelMarker).toBeVisible();
+        await expect(this.liveBtn).toBeDisabled();
     }
 
     // ==================== Copy / paste controls ====================
@@ -278,66 +265,53 @@ export class DateTimePickerPage {
         return (await this.triggerBtn.innerText()).trim();
     }
 
-    // ==================== Custom relative value ====================
+    // ==================== Typed input and range limits ====================
 
-    /** Fills the custom value input and blurs so the clamp commits. */
-    async setCustomValue(value) {
-        await expect(this.customValueInput).toBeVisible();
-        await this.customValueInput.fill(String(value));
-        await this.customValueInput.blur();
+    /** Types text into the bar and presses Enter, which applies a readable range. */
+    async typeAndEnter(text) {
+        await expect(this.textInput).toBeVisible();
+        await this.textInput.fill(text);
+        await this.textInput.press('Enter');
     }
 
-    /** Focuses (snapshots lastValidCustomValue), empties, then blurs to restore. */
-    async clearCustomValue() {
-        await expect(this.customValueInput).toBeVisible();
-        await this.customValueInput.fill('');
-        await this.customValueInput.blur();
+    async typeText(text) {
+        await expect(this.textInput).toBeVisible();
+        await this.textInput.fill(text);
     }
 
-    async expectCustomValue(expected) {
-        await expect(this.customValueInput).toHaveValue(String(expected));
+    /** Escape clears typed text before it closes the panel, so empty the bar first. */
+    async clearInputAndClose() {
+        await this.textInput.fill('');
+        await this.closePickerWithEscape();
     }
 
-    /** Opens the custom period select and picks a unit (s/m/h/d/w/M). */
-    async selectCustomPeriod(unit) {
-        await expect(this.customPeriodTrigger).toBeVisible();
-        await this.customPeriodTrigger.click();
-        await expect(this.customPeriodOption(unit)).toBeVisible();
-        await this.customPeriodOption(unit).click();
+    async expectInputError() {
+        await expect(this.inputError).toBeVisible();
     }
 
-    /**
-     * Opens the period select, asserts which units are offered (present) and
-     * dropped (absent), then selects `unit` — all in one popover open so the
-     * absent checks are never satisfied by a not-yet-open popover. The
-     * `toHaveCount(0)` on dropped units also acts as the deterministic settle
-     * gate while the stream's max_query_range restriction propagates.
-     */
-    async selectCustomPeriodExpectingUnits(unit, presentUnits, absentUnits) {
-        await expect(this.customPeriodTrigger).toBeVisible();
-        await this.customPeriodTrigger.click();
-        for (const u of presentUnits) {
-            await expect(this.customPeriodOption(u)).toHaveCount(1);
-        }
-        for (const u of absentUnits) {
-            await expect(this.customPeriodOption(u)).toHaveCount(0);
-        }
-        await expect(this.customPeriodOption(unit)).toBeVisible();
-        await this.customPeriodOption(unit).click();
+    async expectPreviewNote(pattern) {
+        await expect(this.previewNote).toContainText(pattern);
     }
 
     async expectPresetDisabled(suffix) {
         await expect(this.relativePeriodBtn(suffix)).toBeDisabled();
     }
 
-    /**
-     * Waits for the transient pre-load restriction to clear. Before the selected
-     * stream's fields settle, `queryRangeRestrictionInHour` is seeded at 100000,
-     * which stamps a `max` attribute onto the custom input; once it resolves to
-     * -1 (no restriction) the max is removed.
-     */
-    async waitForNoRestriction() {
-        await expect(this.customValueInput).not.toHaveAttribute('max', /[0-9]+/);
+    async expectPresetEnabled(suffix) {
+        await expect(this.relativePeriodBtn(suffix)).toBeEnabled();
+    }
+
+    /** A disabled chip explains itself only in a tooltip, bound to its wrapper (a disabled button gets no hover). */
+    async expectPresetReason(suffix, pattern) {
+        await this.relativePeriodBtn(suffix).locator('xpath=..').hover();
+        await expect(this.tooltipContent.filter({ hasText: pattern }).first()).toBeVisible();
+    }
+
+    /** An over-limit list row is disabled and carries the reason as its own visible text. */
+    async expectCalendarRowDisabledWithReason(id, pattern) {
+        const row = this.calendarRow(id);
+        await expect(row).toHaveAttribute('aria-disabled', 'true');
+        await expect(row).toContainText(pattern);
     }
 
     // ==================== Manual-apply mode ====================

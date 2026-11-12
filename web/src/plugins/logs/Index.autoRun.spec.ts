@@ -463,6 +463,129 @@ describe("Logs Index — first landing and URL loads (item 2)", { timeout: 30000
       }
     });
 
+    describe("auto-refresh pauses (S12)", () => {
+      let visibility: DocumentVisibilityState = "visible";
+      const setVisibility = (state: DocumentVisibilityState) => {
+        visibility = state;
+        document.dispatchEvent(new Event("visibilitychange"));
+      };
+      const refreshingPage = async (datetime?: Record<string, unknown>) => {
+        const { logs } = await ready();
+        const engine = wrapper.vm.autoRun.engine;
+        if (datetime) Object.assign(wrapper.vm.searchObj.data.datetime, datetime);
+        wrapper.vm.searchObj.meta.executed = {
+          generation: engine.currentGeneration("grid").id,
+          signature: wrapper.vm.autoRun.readSignature(),
+          req: {},
+          complete: true,
+        };
+        wrapper.vm.searchObj.meta.consentedScope = null;
+        const refreshes = () =>
+          logs.mock.calls.filter((call: any[]) => call[0].reason === "refresh").length;
+        return { engine, refreshes };
+      };
+
+      beforeEach(() => {
+        visibility = "visible";
+        Object.defineProperty(document, "visibilityState", {
+          configurable: true,
+          get: () => visibility,
+        });
+      });
+
+      afterEach(() => {
+        delete (document as { visibilityState?: unknown }).visibilityState;
+      });
+
+      it("a hidden tab skips ticks and runs one catch-up refresh on return", async () => {
+        const { engine, refreshes } = await refreshingPage();
+        vi.useFakeTimers();
+        try {
+          wrapper.vm.searchObj.meta.refreshInterval = 5;
+          wrapper.vm.refreshData();
+          setVisibility("hidden");
+          await vi.advanceTimersByTimeAsync(15_001);
+          expect(refreshes()).toBe(0);
+          expect(engine.hasMissedTick()).toBe(true);
+          setVisibility("visible");
+          await vi.advanceTimersByTimeAsync(1);
+          expect(refreshes()).toBe(1);
+          expect(engine.hasMissedTick()).toBe(false);
+        } finally {
+          wrapper.vm.searchObj.meta.refreshInterval = 0;
+          wrapper.vm.refreshData();
+          vi.useRealTimers();
+        }
+      });
+
+      it("an ended fixed range pauses ticks and owes no catch-up on return", async () => {
+        const endUs = (Date.now() - 60_000) * 1000;
+        // Logs keeps the last rolling period on an absolute range, so type alone marks it fixed.
+        const { engine, refreshes } = await refreshingPage({
+          type: "absolute",
+          startTime: endUs - 3_600_000_000,
+          endTime: endUs,
+          relativeTimePeriod: "15m",
+        });
+        expect(engine.isRefreshPaused()).toBe(true);
+        const setEnd = (us: number) => {
+          wrapper.vm.searchObj.data.datetime.endTime = us;
+          wrapper.vm.searchObj.meta.executed.signature = wrapper.vm.autoRun.readSignature();
+        };
+        setEnd((Date.now() + 3_600_000) * 1000);
+        expect(engine.isRefreshPaused()).toBe(false);
+        setEnd(endUs);
+        expect(engine.isRefreshPaused()).toBe(true);
+        vi.useFakeTimers();
+        try {
+          wrapper.vm.searchObj.meta.refreshInterval = 5;
+          wrapper.vm.refreshData();
+          await vi.advanceTimersByTimeAsync(10_001);
+          setVisibility("hidden");
+          setVisibility("visible");
+          await vi.advanceTimersByTimeAsync(1);
+          expect(refreshes()).toBe(0);
+        } finally {
+          wrapper.vm.searchObj.meta.refreshInterval = 0;
+          wrapper.vm.refreshData();
+          vi.useRealTimers();
+        }
+      });
+
+      it("drops its pause predicates when the page unmounts", async () => {
+        const { engine } = await refreshingPage();
+        visibility = "hidden";
+        expect(engine.isRefreshPaused()).toBe(true);
+        wrapper.unmount();
+        wrapper = null;
+        expect(engine.isRefreshPaused()).toBe(false);
+      });
+    });
+
+    it("passes the selected stream's retention to the search bar, else the org default", async () => {
+      await ready();
+      const list = wrapper.vm.searchObj.data.streamResults.list;
+      const entry = list.find((item: any) => item.name === "k8s_json");
+      entry.settings = { data_retention: 7 };
+      await flushPromises();
+      expect(wrapper.vm.logsRetentionDays).toBe(7);
+      entry.settings = {};
+      store.state.zoConfig = {
+        ...store.state.zoConfig,
+        resolved_data_retention: { logs: 30 },
+      } as any;
+      wrapper.vm.searchObj.data.streamResults.list = [...list];
+      await flushPromises();
+      expect(wrapper.vm.logsRetentionDays).toBe(30);
+    });
+
+    it("leaves retention unknown until the stream list has the stream", async () => {
+      await ready();
+      wrapper.vm.searchObj.data.streamResults.list = [];
+      await flushPromises();
+      expect(wrapper.vm.logsRetentionDays).toBeUndefined();
+    });
+
     it("only a refresh tick tags its grid query with the refresh origin", async () => {
       const setExecutors = vi.spyOn(useLogsAutoRun(), "setExecutors");
       await ready();

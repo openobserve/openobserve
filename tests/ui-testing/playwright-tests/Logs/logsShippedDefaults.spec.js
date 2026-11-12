@@ -82,7 +82,7 @@ test.describe('Logs shipped defaults: auto-run with the cost guard', () => {
     testLogger.info('The 1 h preset runs exactly once');
     const beforeTime = searches.hits().length;
     await page.locator('[data-test="date-time-btn"]').click({ force: true });
-    await page.locator('[data-test="date-time-relative-1-h-btn"]').click();
+    await page.locator('[data-test="date-time-chip-1h"]').click();
     await expect.poll(() => searches.hits().length, { timeout: 15000 }).toBe(beforeTime + 1);
 
     testLogger.info('SQL typed with an existing FROM never runs (AC4.3)');

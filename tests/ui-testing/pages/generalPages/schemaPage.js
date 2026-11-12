@@ -57,7 +57,7 @@ class SchemaPage {
         this.logsSearchBarRefreshBtn = page.locator('[data-test="logs-search-bar-refresh-btn"]');
         this.logsSearchErrorMessage = page.locator('[data-test="logs-search-error-state"]');
         this.dateTimeBtn = page.locator('[data-test="date-time-btn"]');
-        this.dateTimeRelativeTab = page.locator('[data-test="date-time-relative-tab"]');
+        this.dateTimePanel = page.locator('#date-time-menu');
         this.logTableExpandMenu = page.locator('[data-test="o2-table-expand-1"]');
 
         // IndexList / stream picker (OSelect in listbox/multiple mode)
@@ -152,7 +152,7 @@ class SchemaPage {
             explorerButton: 'Explore',
             closeButton: 'close',
             dateTimeBtn: '[data-test="date-time-btn"]',
-            dateTimeRelativeTab: '[data-test="date-time-relative-tab"]',
+            dateTimePanel: '#date-time-menu',
             logTableExpandMenu: '[data-test="o2-table-expand-1"]',
             logsUserDefinedFieldsBtn: '[data-test="logs-user-defined-fields-btn"]',
             logSearchIndexAllFieldBtn: '[data-test="log-search-index-list-interesting-_all-field-btn"]',
@@ -390,7 +390,7 @@ class SchemaPage {
     async configureDateTimeSettings() {
         testLogger.debug('Configuring date time settings');
         await this.dateTimeBtn.click();
-        await this.dateTimeRelativeTab.click();
+        await this.dateTimePanel.waitFor({ state: 'visible' });
         await this.page.waitForLoadState('domcontentloaded');
     }
 

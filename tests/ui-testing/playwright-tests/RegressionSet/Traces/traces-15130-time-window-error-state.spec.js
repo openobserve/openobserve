@@ -154,7 +154,7 @@ test.describe('Traces search window and error state (#15130, ENT#2805, ENT#2806)
 
     for (const panel of RED_PANELS) {
       expect(Math.abs(windows[panel].endTime - windows.results.endTime),
-        `${panel} must re-resolve "Past 15 Minutes" on Run query`).toBeLessThan(SAME_WINDOW_US);
+        `${panel} must re-resolve "Last 15 minutes" on Run query`).toBeLessThan(SAME_WINDOW_US);
     }
   });
 

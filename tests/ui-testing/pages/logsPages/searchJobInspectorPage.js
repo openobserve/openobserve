@@ -514,22 +514,22 @@ export class SearchJobInspectorPage {
   }
 
   /**
-   * Select relative time range - Past 15 Minutes
+   * Select relative time range - Last 15 minutes
    */
   async selectRelative15Minutes() {
     await this.page.locator('[data-test="date-time-btn"]').click();
     await this.page.waitForTimeout(500);
-    await this.page.locator('[data-test="date-time-relative-15-m-btn"]').click();
+    await this.page.locator('[data-test="date-time-chip-15m"]').click();
     await this.page.waitForTimeout(500);
   }
 
   /**
-   * Select relative time range - Past 1 Hour
+   * Select relative time range - Last 1 hour
    */
   async selectRelative1Hour() {
     await this.page.locator('[data-test="date-time-btn"]').click();
     await this.page.waitForTimeout(500);
-    await this.page.locator('[data-test="date-time-relative-1-h-btn"]').click();
+    await this.page.locator('[data-test="date-time-chip-1h"]').click();
     await this.page.waitForTimeout(500);
   }
 

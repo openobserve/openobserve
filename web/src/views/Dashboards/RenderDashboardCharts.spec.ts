@@ -943,7 +943,7 @@ describe("RenderDashboardCharts", () => {
         realPicker.vm.onMenuOpenChange(false);
         await flushPromises();
 
-        expect(realPicker.vm.getDisplayValue).toBe("Past 1 Hour");
+        expect(realPicker.vm.getDisplayValue).toBe("Last 1 hour");
         expect(wrapper.vm.getPanelTimeGate("P1").picked.value.relativeTimePeriod).toBe("1h");
         expect(panel().props("isTimeRangeWaiting")).toBe(false);
         expect(panelRefreshRequests()).toHaveLength(0);

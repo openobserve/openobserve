@@ -489,6 +489,14 @@ export const logsUtils = () => {
     else if (active.link.fp !== undefined) query["log_fp"] = active.link.fp;
   };
 
+  /** The rolling period a non-share URL would carry for the shown results, read as writeShownTime does. */
+  const shownPeriod = (): string | null => {
+    const shown = shownEntryFor(activeUrlSurface());
+    const date = searchObj.data.datetime;
+    if (!shown) return date.type === "relative" ? date.relativeTimePeriod || null : null;
+    return shown.period.type === "relative" ? shown.period.period || null : null;
+  };
+
   const generateURLQuery = (
     isShareLink: boolean = false,
     dashboardPanelData: any = null,
@@ -694,6 +702,7 @@ export const logsUtils = () => {
   };
 
   return {
+    shownPeriod,
     fnParsedSQL,
     fnUnparsedSQL,
     extractTimestamps,

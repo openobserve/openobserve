@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { pickRelativePeriod } from '../../pages/generalPages/relativePeriod.js';
+
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const {
@@ -42,8 +44,7 @@ const urlFor = (period) =>
 
 async function pickRelative(page, value, unit) {
   await page.locator('[data-test="date-time-btn"]').click({ force: true });
-  await page.locator(`[data-test="date-time-relative-${value}-${unit}-btn"]`).click();
-  await page.keyboard.press('Escape');
+  await pickRelativePeriod(page, value, unit);
 }
 
 // No run starts while the timers fire: a dispatched hits run flips the Run button to Cancel at once.

@@ -49,11 +49,11 @@ describe("LogsNoEventsState", () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date("2026-10-08T03:00:00Z"));
     const text = mountState("calendar:month:-1").text();
-    expect(text).toContain("Last month");
+    expect(text).toContain("Previous month");
     expect(text).not.toContain("NaN");
   });
 
   it("keeps the rolling wording for a rolling period", () => {
-    expect(mountState("15m").text()).toContain("Past 15 Minutes");
+    expect(mountState("15m").text()).toContain("Last 15 minutes");
   });
 });

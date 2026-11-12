@@ -495,4 +495,170 @@ describe("ShareButton", () => {
     // Check that isWebUrlNotConfigured computed property is true
     expect(wrapper.vm.isWebUrlNotConfigured).toBe(true);
   });
+
+  describe("live and fixed links", () => {
+    const FIXED = "https://example.com/logs?from=1&to=2";
+    const LIVE = "https://example.com/logs?period=15m";
+    const FIXED_LABEL = "Nov 11, 12:27 – 12:42 UTC+05:30";
+    const kindI18n = () =>
+      createI18n({
+        locale: "en",
+        messages: {
+          en: {
+            search: {
+              shareLink: "Share Link",
+              linkCopiedSuccessfully: "Link copied successfully",
+              errorCopyingLink: "Error copying link",
+              errorShorteningLink: "Error shortening link",
+              webUrlNotConfigured: "Not configured",
+            },
+            dateTime: {
+              shareCopyLive: "Copy live link",
+              shareCopyFixed: "Copy fixed link",
+              shareCopyWithRange: "Copy link and range",
+              shareLiveHint: "{name} · moves with now",
+              shareKindLive: "live",
+              shareKindFixed: "fixed",
+              shareOptions: "Share options",
+              linkCopiedFixed: "Fixed link copied · {range}",
+              linkCopiedLive: "Live link copied · {name}",
+            },
+          },
+        },
+      });
+    const mountKinds = (props: Record<string, unknown>) =>
+      mount(ShareButton, {
+        props: {
+          url: FIXED,
+          fixedLabel: FIXED_LABEL,
+          liveLabel: "Last 15 minutes",
+          ...props,
+        },
+        global: {
+          plugins: [store, kindI18n()],
+          stubs: {
+            OButton: {
+              template:
+                '<button :data-test="dataTest" :disabled="disabled" @click="$emit(\'click\')"><slot /></button>',
+              props: ["dataTest", "disabled"],
+              emits: ["click"],
+            },
+            OTooltip: { template: "<span />" },
+            ODropdown: { template: "<div><slot name='trigger' /><slot /></div>" },
+            ODropdownSeparator: { template: "<hr />" },
+            ODropdownItem: {
+              template:
+                "<div role='menuitem' @click=\"$emit('select')\"><slot /><slot name='icon-right' /></div>",
+              emits: ["select"],
+            },
+          },
+        },
+      });
+    const lastCopy = () => (copyToClipboard as any).mock.calls.at(-1);
+    const itemIds = (wrapper: ReturnType<typeof mountKinds>) =>
+      wrapper.findAll('[role="menuitem"]').map((item) => item.attributes("data-test"));
+
+    beforeEach(() => {
+      Object.defineProperty(window.navigator, "userAgent", {
+        value: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/91.0 Safari/537.36",
+        configurable: true,
+      });
+      (copyToClipboard as any).mockResolvedValue(true);
+      (shortURLService.create as any).mockResolvedValue({
+        status: 200,
+        data: { short_url: "https://short.url/abc123" },
+      });
+    });
+
+    it("copies the fixed window first by default and names it with its zone in the toast", async () => {
+      const wrapper = mountKinds({ liveUrl: LIVE });
+      await wrapper.get('[data-test="share-link-btn"]').trigger("click");
+      await flushPromises();
+      expect(shortURLService.create).toHaveBeenCalledWith("test-org", FIXED);
+      expect(lastCopy()[0]).toBe("https://short.url/abc123");
+      expect(lastCopy()[2].successMessage).toBe(`Fixed link copied · ${FIXED_LABEL}`);
+    });
+
+    it("copies the live period first when the page default is live", async () => {
+      const wrapper = mountKinds({ liveUrl: LIVE, defaultKind: "live" });
+      await wrapper.get('[data-test="share-link-btn"]').trigger("click");
+      await flushPromises();
+      expect(shortURLService.create).toHaveBeenCalledWith("test-org", LIVE);
+      expect(lastCopy()[2].successMessage).toBe("Live link copied · Last 15 minutes");
+    });
+
+    it.each(["fixed", "live"])(
+      "lists live, then fixed, then the range copy, and checks the %s default",
+      (defaultKind) => {
+        const wrapper = mountKinds({ liveUrl: LIVE, defaultKind, rangeContext: "Logs · default" });
+        expect(itemIds(wrapper)).toEqual([
+          "share-button-copy-live",
+          "share-button-copy-fixed",
+          "share-button-copy-with-range",
+        ]);
+        const checked = wrapper
+          .findAll('[role="menuitem"]')
+          .filter((item) => item.find('[data-test="share-button-default-check"]').exists());
+        expect(checked.map((item) => item.attributes("data-test"))).toEqual([
+          `share-button-copy-${defaultKind}`,
+        ]);
+        expect(wrapper.get('[data-test="share-button-copy-live"]').text()).toContain(
+          "Last 15 minutes · moves with now",
+        );
+        expect(wrapper.get('[data-test="share-button-copy-fixed"]').text()).toContain(FIXED_LABEL);
+      },
+    );
+
+    it("copies the other kind picked from the caret menu", async () => {
+      const wrapper = mountKinds({ liveUrl: LIVE });
+      await wrapper.get('[data-test="share-button-copy-live"]').trigger("click");
+      await flushPromises();
+      expect(shortURLService.create).toHaveBeenCalledWith("test-org", LIVE);
+      expect(lastCopy()[2].successMessage).toBe("Live link copied · Last 15 minutes");
+    });
+
+    it("copies the default link and a line naming page, range and kind", async () => {
+      const wrapper = mountKinds({
+        liveUrl: LIVE,
+        rangeContext: "Logs · default",
+        fixedCopyLabel: "Nov 11, 06:57 – 07:12 UTC",
+      });
+      await wrapper.get('[data-test="share-button-copy-with-range"]').trigger("click");
+      await flushPromises();
+      expect(shortURLService.create).toHaveBeenCalledWith("test-org", FIXED);
+      expect(lastCopy()[0]).toBe(
+        "https://short.url/abc123\nLogs · default · Nov 11, 06:57 – 07:12 UTC · fixed",
+      );
+    });
+
+    it("offers the fixed link and the range copy for a fixed range", async () => {
+      const wrapper = mountKinds({ liveUrl: "", defaultKind: "live", rangeContext: "Traces · t" });
+      expect(itemIds(wrapper)).toEqual(["share-button-copy-fixed", "share-button-copy-with-range"]);
+      await wrapper.get('[data-test="share-link-btn"]').trigger("click");
+      await flushPromises();
+      expect(shortURLService.create).toHaveBeenCalledWith("test-org", FIXED);
+      expect(lastCopy()[2].successMessage).toBe(`Fixed link copied · ${FIXED_LABEL}`);
+    });
+
+    it("is a plain button, copied at once, for a fixed range with no range context", () => {
+      const wrapper = mountKinds({ liveUrl: "" });
+      expect(wrapper.find('[data-test="share-link-btn-kinds"]').exists()).toBe(false);
+      expect(wrapper.findAll('[role="menuitem"]')).toHaveLength(0);
+    });
+
+    it("keeps the generic toast when the caller gives no label", async () => {
+      const wrapper = mountKinds({ fixedLabel: "", liveLabel: "" });
+      await wrapper.get('[data-test="share-link-btn"]').trigger("click");
+      await flushPromises();
+      expect(lastCopy()[2].successMessage).toBe("Link copied successfully");
+    });
+
+    it("disables the caret with the main button when the web URL is not configured", () => {
+      store.state.zoConfig.web_url = "";
+      const wrapper = mountKinds({ liveUrl: LIVE });
+      expect(
+        wrapper.get('[data-test="share-link-btn-kinds"]').attributes("disabled"),
+      ).toBeDefined();
+    });
+  });
 });

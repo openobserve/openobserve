@@ -32,6 +32,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :menu-align="menuAlign"
     :variant="variant"
     :calendar-presets="calendarPresets"
+    :preset="preset"
+    :zone-badge="zoneBadge"
     @hide="onHide"
     @show="onShow"
   >
@@ -42,6 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, defineComponent, onUnmounted, type PropType } from "vue";
 import DateTime from "@/components/DateTime.vue";
 import type { ButtonVariant } from "@/lib/core/Button/OButton.types";
+import type { TimeRangePreset } from "@/utils/timeRangeList";
 
 export default defineComponent({
   name: "DateTimePickerDashboard",
@@ -95,6 +98,16 @@ export default defineComponent({
       default: false,
       type: Boolean,
     },
+    preset: {
+      required: false,
+      default: "ops",
+      type: String as PropType<TimeRangePreset>,
+    },
+    zoneBadge: {
+      required: false,
+      default: "auto",
+      type: String as PropType<"auto" | "always">,
+    },
   },
   emits: ["update:modelValue", "hide", "show", "timezone-change"],
 
@@ -111,7 +124,8 @@ export default defineComponent({
           : "absolute",
       };
 
-      emit("update:modelValue", newValue);
+      // The second argument tells a page the picker's own corrections apart from a user's pick.
+      emit("update:modelValue", newValue, { userChanged: date.userChangedValue !== false });
     };
 
     const refresh = () => {

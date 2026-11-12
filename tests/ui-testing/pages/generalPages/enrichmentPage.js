@@ -6,6 +6,7 @@ const MonacoEditorHelper = require('../../playwright-tests/utils/MonacoEditorHel
 // The dropdown trigger intermittently drops the opening click, so it is re-tried.
 const HELP_MENU_OPEN_ATTEMPTS = 3;
 import { openNavFlyoutChild } from '../commonActions.js';
+import { openDateFields } from './relativePeriod.js';
 
 class EnrichmentPage {
     constructor(page) {
@@ -93,7 +94,7 @@ class EnrichmentPage {
         // ────────────────────────────────────────────────────────────────────
         // Date-time picker locators (used after `dateTimeBtn` opens the dropdown)
         // ────────────────────────────────────────────────────────────────────
-        this.dateTimeAbsoluteTab = page.locator('[data-test="date-time-absolute-tab"]');
+        this.dateTimeAbsoluteTab = page.locator('#date-time-menu');
         this.dateTimeStartTimeInput = page.locator('[data-test="datetime-start-time"]');
 
         // ────────────────────────────────────────────────────────────────────
@@ -477,11 +478,7 @@ class EnrichmentPage {
     }
 
     async verifyStartTimeVisible() {
-        // After clicking the date-time-btn, the ODropdown opens with a Relative
-        // tab visible by default. Click the Absolute tab to surface the
-        // start/end time fields, then assert the start-time input is visible.
-        await this.dateTimeAbsoluteTab.waitFor({ state: 'visible', timeout: 10000 });
-        await this.dateTimeAbsoluteTab.click();
+        await openDateFields(this.page);
         await expect(this.dateTimeStartTimeInput.first()).toBeVisible({ timeout: 10000 });
         // Callers click the results table next; an open picker can sit over its first row.
         await this.page.keyboard.press('Escape');

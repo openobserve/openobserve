@@ -154,7 +154,7 @@ test.describe("Reports form validation — absolute timerange with no dates fall
         await pm.reportsFormValidation.dismissTimerangePicker();
 
         // The picker never applies an absolute range with no dates, so the form keeps its relative default.
-        await expect(pm.reportsFormValidation.getTimerangeDropdownLocator()).toContainText('Past 30 Minutes');
+        await expect(pm.reportsFormValidation.getTimerangeDropdownLocator()).toContainText('Last 30 minutes');
 
         // Attempt to save
         await pm.reportsFormValidation.clickSave();

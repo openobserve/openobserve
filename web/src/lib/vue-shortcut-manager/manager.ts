@@ -1,5 +1,5 @@
 import type { RegisteredShortcut, Shortcut, ShortcutManagerOptions } from "./types";
-import { isInputFocused, isInsideDialog } from "@/utils/keyboardShortcuts";
+import { isInputFocused, isInsideDialog, isModalOpen } from "@/utils/keyboardShortcuts";
 
 // ---------------------------------------------------------------------------
 // Lazy singleton — no plugin or main.ts setup needed.
@@ -230,10 +230,17 @@ export class ShortcutManager {
 
     this.sequenceBuffer = [];
 
-    const match = this.findMatch(key);
+    const match = this.findMatch(key) ?? this.findCodeMatch(e);
     if (match) {
       this.triggerShortcut(match, e);
     }
+  }
+
+  // A bare physical key, so a symbol another layout types with AltGr still has a one-key binding.
+  private findCodeMatch(e: KeyboardEvent): RegisteredShortcut | undefined {
+    if (typeof e.code !== "string" || !e.code) return undefined;
+    if (e.ctrlKey || e.altKey || e.metaKey || e.shiftKey) return undefined;
+    return this.findMatch(`code:${e.code.toLowerCase()}`);
   }
 
   private hasSequenceStartingWith(prefix: string): boolean {
@@ -290,6 +297,10 @@ export class ShortcutManager {
       !ShortcutManager.hasModifier(shortcut.key) &&
       isInsideDialog(target)
     ) {
+      return;
+    }
+
+    if (shortcut.skipUnderModal && !ShortcutManager.hasModifier(shortcut.key) && isModalOpen()) {
       return;
     }
 

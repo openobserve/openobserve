@@ -143,15 +143,15 @@ test.describe("Date-Time Picker Forward Shift Cap testcases", () => {
   });
 
   // TC-05
-  test("forward shift is disabled when the window end is past the present", {
+  test("a pasted window ending past the present is cut to now, and Next cannot move it further", {
     tag: ['@date-time-next-shift-cap', '@all', '@P1']
   }, async ({ page }) => {
-    testLogger.info('Verifying Next is disabled for a window ending past the present');
+    testLogger.info('Verifying a pasted end past the present stops at now');
 
-    // An end exactly at now re-enables Next ~1s later (endUTC + 1s > now), so end in the future.
+    // Whole seconds, as the Start and End fields hold them.
     const { startMicros, endMicros } = await page.evaluate(() => {
-      const now = Date.now() * 1_000;
-      return { startMicros: now - 30_000_000, endMicros: now + 300_000_000 };
+      const nowSeconds = Math.floor(Date.now() / 1_000);
+      return { startMicros: (nowSeconds - 30) * 1_000_000, endMicros: (nowSeconds + 300) * 1_000_000 };
     });
 
     await pm.dateTimePickerPage.seedClipboard(`${startMicros} - ${endMicros}`);
@@ -159,9 +159,26 @@ test.describe("Date-Time Picker Forward Shift Cap testcases", () => {
     await pm.dateTimePickerPage.expectPasteSuccessToast();
     await pm.dateTimePickerPage.expectAbsolutePanelActive();
 
-    await pm.dateTimePickerPage.expectNextDisabled();
+    await pm.dateTimePickerPage.clickCopy();
+    const pasted = await pm.dateTimePickerPage.readCopiedRange();
+    const afterPaste = await page.evaluate(() => Date.now() * 1_000);
+    expect(pasted.start_date).toBe(startMicros);
+    expect(pasted.end_date).toBeLessThanOrEqual(afterPaste);
+    expect(pasted.end_date).toBeGreaterThan(startMicros);
 
-    testLogger.info('Next disabled for a window ending past the present');
+    // Next stays within the present whether or not a second has passed since the paste.
+    await pm.dateTimePickerPage.closePickerWithEscape();
+    if (await pm.dateTimePickerPage.nextShiftBtn.isEnabled()) {
+      await pm.dateTimePickerPage.clickNext();
+    }
+    await pm.dateTimePickerPage.openPicker();
+    await pm.dateTimePickerPage.clickCopy();
+    const shifted = await pm.dateTimePickerPage.readCopiedRange();
+    const afterNext = await page.evaluate(() => Date.now() * 1_000);
+    expect(shifted.end_date).toBeLessThanOrEqual(afterNext);
+    expect(shifted.end_date - shifted.start_date).toBe(pasted.end_date - pasted.start_date);
+
+    testLogger.info('Pasted end cut to now; Next never passes the present');
   });
 
   // TC-06

@@ -18,16 +18,18 @@ import {
   CALENDAR_RAIL_ITEMS,
   exceedsRangeRestriction,
   formatAbsoluteInstant,
-  formatCalendarRailHint,
+  formatCivilDay,
+  formatCivilDayPrefix,
   formatRecentDuration,
-  formatRecentRange,
   formatRecentRangeLabel,
+  formatDurationMicros,
+  formatKnownPeriod,
+  formatZoneAbbreviation,
 } from "./timeRangeRail";
+import type { TranslateFn } from "@/types/i18n";
 import { parseCalendarToken } from "./dashboard/calendarPeriods";
 
 const us = (iso: string) => Date.parse(iso) * 1000;
-const label = (start: string, end: string, zone = "UTC") =>
-  formatRecentRange(us(start), us(end), zone);
 
 describe("timeRangeRail", () => {
   describe("formatAbsoluteInstant", () => {
@@ -43,69 +45,34 @@ describe("timeRangeRail", () => {
     });
   });
 
-  describe("formatRecentRange", () => {
-    it("matches the trigger's absolute-range format exactly", () => {
-      expect(label("2026-10-26T15:45:00Z", "2026-10-26T16:20:00Z")).toBe(
-        "2026/10/26 15:45:00 - 2026/10/26 16:20:00",
-      );
-    });
-
-    it("spans multiple days the same way", () => {
-      expect(label("2026-10-19T08:00:00Z", "2026-10-21T09:00:00Z")).toBe(
-        "2026/10/19 08:00:00 - 2026/10/21 09:00:00",
-      );
-    });
-
-    it("keeps the year on both sides regardless of the current year", () => {
-      expect(label("2025-12-30T10:00:00Z", "2026-01-02T10:00:00Z")).toBe(
-        "2025/12/30 10:00:00 - 2026/01/02 10:00:00",
-      );
-    });
-
-    it("reads an end at exactly midnight as the previous day's last second", () => {
-      expect(label("2026-10-26T00:00:00Z", "2026-10-27T00:00:00Z")).toBe(
-        "2026/10/26 00:00:00 - 2026/10/26 23:59:59",
-      );
-      expect(label("2026-10-19T00:00:00Z", "2026-10-26T00:00:00Z")).toBe(
-        "2026/10/19 00:00:00 - 2026/10/25 23:59:59",
-      );
-    });
-
-    it("reads days and times in the picker timezone", () => {
-      expect(label("2026-10-26T20:00:00Z", "2026-10-26T21:00:00Z", "Asia/Calcutta")).toBe(
-        "2026/10/27 01:30:00 - 2026/10/27 02:30:00",
-      );
-      expect(label("2026-10-26T18:00:00Z", "2026-10-26T19:00:00Z", "Asia/Calcutta")).toBe(
-        "2026/10/26 23:30:00 - 2026/10/27 00:30:00",
-      );
-    });
-  });
-
   describe("formatRecentRangeLabel", () => {
     const NOW = Date.parse("2026-11-04T12:00:00Z");
     const compact = (start: string, end: string, zone = "UTC") =>
       formatRecentRangeLabel(us(start), us(end), zone, NOW);
 
     it("names the hours of a range inside one day", () => {
-      expect(compact("2026-10-02T08:00:00Z", "2026-10-02T09:00:00Z")).toBe("Oct 2 · 08:00–09:00");
+      expect(compact("2026-10-02T08:00:00Z", "2026-10-02T09:00:00Z")).toBe("Oct 2, 08:00 – 09:00");
     });
 
     it("shows a whole day as month and day only", () => {
       expect(compact("2026-10-02T00:00:00Z", "2026-10-02T23:59:59Z")).toBe("Oct 2");
     });
 
-    it("collapses a same-month range to one month name", () => {
-      expect(compact("2026-10-02T08:00:00Z", "2026-10-03T09:00:00Z")).toBe("Oct 2 – 3");
+    it("names both days and times when the range spans days", () => {
+      expect(compact("2026-11-05T03:18:00Z", "2026-11-07T03:33:00Z")).toBe(
+        "Nov 5, 03:18 – Nov 7, 03:33",
+      );
     });
 
-    it("names both months when the range crosses a month", () => {
-      expect(compact("2026-10-30T08:00:00Z", "2026-11-02T09:00:00Z")).toBe("Oct 30 – Nov 2");
+    it("collapses a range of whole days to the days alone", () => {
+      expect(compact("2026-10-02T00:00:00Z", "2026-10-03T23:59:59Z")).toBe("Oct 2 – 3");
+      expect(compact("2026-10-30T00:00:00Z", "2026-11-02T23:59:59Z")).toBe("Oct 30 – Nov 2");
     });
 
     it("adds the year only when it is not the current year", () => {
-      expect(compact("2025-10-02T08:00:00Z", "2025-10-03T09:00:00Z")).toBe("Oct 2 – 3, 2025");
+      expect(compact("2025-10-02T00:00:00Z", "2025-10-03T23:59:59Z")).toBe("Oct 2 – 3, 2025");
       expect(compact("2025-12-30T08:00:00Z", "2026-01-02T09:00:00Z")).toBe(
-        "Dec 30, 2025 – Jan 2, 2026",
+        "Dec 30, 2025, 08:00 – Jan 2, 2026, 09:00",
       );
     });
 
@@ -115,26 +82,18 @@ describe("timeRangeRail", () => {
 
     it("reads days in the picker timezone", () => {
       expect(compact("2026-10-26T20:00:00Z", "2026-10-26T21:00:00Z", "Asia/Calcutta")).toBe(
-        "Oct 27 · 01:30–02:30",
+        "Oct 27, 01:30 – 02:30",
       );
     });
   });
 
   describe("locale", () => {
-    it("keeps each locale's word order for recent labels and hints", () => {
-      const start = us("2026-10-02T08:00:00Z");
-      const end = us("2026-10-03T09:00:00Z");
+    it("keeps each locale's word order for recent labels", () => {
+      const start = us("2026-10-02T00:00:00Z");
+      const end = us("2026-10-03T23:59:59Z");
       expect(
         formatRecentRangeLabel(start, end, "UTC", Date.parse("2026-11-04T12:00:00Z"), "de-DE"),
       ).toBe("2.–3. Okt.");
-      expect(
-        formatCalendarRailHint(
-          "calendar:month:0",
-          "UTC",
-          Date.parse("2026-11-04T12:00:00Z"),
-          "fr-FR",
-        ),
-      ).toBe("nov.");
     });
   });
 
@@ -161,51 +120,69 @@ describe("timeRangeRail", () => {
       expect(dur(3600 + 9)).toBe("1h 9s");
     });
 
-    it("renders an empty span as 0s", () => {
-      expect(dur(0)).toBe("0s");
+    it("renders an empty span in microseconds, never 0s", () => {
+      expect(dur(0)).toBe("0 µs");
     });
   });
 
-  describe("formatCalendarRailHint", () => {
-    const NOW = Date.parse("2026-11-04T12:00:00Z");
-    const hint = (token: string, zone = "UTC", now = NOW) =>
-      formatCalendarRailHint(token, zone, now);
+  describe("formatDurationMicros", () => {
+    it("reads an exact span without the inclusive-minute rule", () => {
+      expect(formatDurationMicros(15 * 60_000_000)).toBe("15m");
+      expect(formatDurationMicros(90 * 60_000_000)).toBe("1h 30m");
+      expect(formatDurationMicros(0)).toBe("0 µs");
+      expect(formatDurationMicros(1_000)).toBe("1 ms");
+    });
+  });
 
-    it("shows the date for days", () => {
-      expect(hint("calendar:day:0")).toBe("Nov 4");
-      expect(hint("calendar:day:-1")).toBe("Nov 3");
+  describe("formatCivilDay", () => {
+    const NOW_MS = Date.parse("2026-11-09T03:33:00Z");
+
+    it.each([
+      ["en-US", "2026/11/01", "Nov 1"],
+      ["en-US", "1999/01/01", "Jan 1, 1999"],
+      ["de-DE", "2026/11/01", "1. Nov."],
+      ["en-US", "not a day", ""],
+    ])("%s reads %s as %j", (locale, date, expected) => {
+      expect(formatCivilDay(date, "UTC", NOW_MS, locale)).toBe(expected);
+    });
+  });
+
+  describe("formatCivilDayPrefix", () => {
+    const NOW_MS = Date.parse("2026-11-09T03:33:00Z");
+
+    it.each([
+      ["en-US", "2026/11/06", "Nov 6,"],
+      ["en-US", "2025/11/06", "Nov 6, 2025,"],
+      ["de-DE", "2026/11/06", "6. Nov.,"],
+      ["ja-JP", "2026/11/06", "11月6日"],
+      ["zh-CN", "2026/11/06", "11月6日"],
+    ])("%s reads %s as %j, with no trailing space", (locale, date, expected) => {
+      expect(formatCivilDayPrefix(date, "UTC", NOW_MS, locale)).toBe(expected);
     });
 
-    it("shows the whole Monday-to-Sunday week, not the elapsed part", () => {
-      expect(hint("calendar:week:0")).toBe("Nov 2 – 8");
-      expect(hint("calendar:week:-1")).toBe("Oct 26 – Nov 1");
+    it("falls back to the bare day where the locale puts the time first", () => {
+      expect(formatCivilDayPrefix("2026/11/06", "UTC", NOW_MS, "vi-VN")).toBe("6 thg 11");
     });
 
-    it("shows the month name and the quarter number", () => {
-      expect(hint("calendar:month:0")).toBe("Nov");
-      expect(hint("calendar:month:-1")).toBe("Oct");
-      expect(hint("calendar:quarter:0")).toBe("Q4");
-      expect(hint("calendar:quarter:-1")).toBe("Q3");
+    it("judges the current year in the picker zone", () => {
+      const newYearUtc = Date.parse("2026-12-31T20:00:00Z");
+      expect(formatCivilDayPrefix("2026/12/31", "UTC", newYearUtc)).toBe("Dec 31,");
+      expect(formatCivilDayPrefix("2026/12/31", "Asia/Tokyo", newYearUtc)).toBe("Dec 31, 2026,");
     });
 
-    it("adds the year only for a period outside the current year", () => {
-      const jan = Date.parse("2026-01-07T12:00:00Z");
-      expect(hint("calendar:day:-1", "UTC", jan)).toBe("Jan 6");
-      expect(hint("calendar:week:-1", "UTC", Date.parse("2026-01-05T12:00:00Z"))).toBe(
-        "Dec 29, 2025 – Jan 4, 2026",
+    it("is empty for an unreadable date", () => {
+      expect(formatCivilDayPrefix("", "UTC", NOW_MS)).toBe("");
+      expect(formatCivilDayPrefix("2026/00/06", "UTC", NOW_MS)).toBe("");
+      expect(formatCivilDayPrefix("2026/13/06", "UTC", NOW_MS)).toBe("");
+    });
+  });
+
+  describe("formatZoneAbbreviation", () => {
+    it("names UTC and a DST zone by their short names", () => {
+      expect(formatZoneAbbreviation("UTC", Date.parse("2026-01-01T00:00:00Z"))).toBe("UTC");
+      expect(formatZoneAbbreviation("America/New_York", Date.parse("2026-01-01T00:00:00Z"))).toBe(
+        "EST",
       );
-      expect(hint("calendar:month:-1", "UTC", jan)).toBe("Dec 2025");
-      expect(hint("calendar:quarter:-1", "UTC", jan)).toBe("Q4 2025");
-    });
-
-    it("reads today in the picker timezone", () => {
-      expect(hint("calendar:day:0", "Asia/Calcutta", Date.parse("2026-11-04T20:00:00Z"))).toBe(
-        "Nov 5",
-      );
-    });
-
-    it("returns null for a bad token", () => {
-      expect(formatCalendarRailHint("nope", "UTC", NOW)).toBeNull();
     });
   });
 
@@ -218,16 +195,8 @@ describe("timeRangeRail", () => {
     });
   });
 
-  it("lists the eight calendar ranges as valid tokens, with so far on the current ones", () => {
-    expect(CALENDAR_RAIL_ITEMS).toHaveLength(8);
-    for (const item of CALENDAR_RAIL_ITEMS) {
-      const period = parseCalendarToken(item.token);
-      expect(period).not.toBeNull();
-      expect(item.soFar).toBe(period?.offset === 0);
-    }
-  });
-
-  it("orders the calendar rows current period first, then the one before it", () => {
+  it("lists the ten calendar ranges as valid tokens, in list order", () => {
+    for (const item of CALENDAR_RAIL_ITEMS) expect(parseCalendarToken(item.token)).not.toBeNull();
     expect(CALENDAR_RAIL_ITEMS.map((item) => item.id)).toEqual([
       "today",
       "yesterday",
@@ -237,11 +206,25 @@ describe("timeRangeRail", () => {
       "last-month",
       "this-quarter",
       "last-quarter",
+      "year",
+      "previous-year",
     ]);
   });
 
-  it("has no year chip, even though the resolver still accepts a calendar:year token", () => {
-    expect(CALENDAR_RAIL_ITEMS.some((item) => item.token.startsWith("calendar:year:"))).toBe(false);
-    expect(parseCalendarToken("calendar:year:-1")).not.toBeNull();
+  it("labels whole years of months in years, in the unit they were typed [#56]", () => {
+    const t = ((key: string, named?: { count: number }) =>
+      `${key}:${named?.count ?? ""}`) as unknown as TranslateFn;
+    expect(formatKnownPeriod("60M", "UTC", t)).toBe("common.pastYear:5");
+    expect(formatKnownPeriod("12M", "UTC", t)).toBe("common.pastYear:1");
+    expect(formatKnownPeriod("18M", "UTC", t)).toBe("common.pastMonth:18");
+    expect(formatKnownPeriod("1w", "UTC", t)).toBe("common.pastWeek:1");
+  });
+
+  it("offers This year and Previous year rows [#29, #35]", () => {
+    const years = CALENDAR_RAIL_ITEMS.filter((item) => item.token.startsWith("calendar:year:"));
+    expect(years.map((item) => [item.token, item.labelKey])).toEqual([
+      ["calendar:year:0", "common.thisYear"],
+      ["calendar:year:-1", "dateTime.previousYear"],
+    ]);
   });
 });

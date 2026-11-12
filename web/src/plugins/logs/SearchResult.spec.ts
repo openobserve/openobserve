@@ -16,6 +16,7 @@
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { nextTick } from "vue";
+import { searchAroundPickerRange } from "@/composables/useLogs/searchAround";
 import SearchResult from "@/plugins/logs/SearchResult.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -247,6 +248,19 @@ describe("SearchResult Component", () => {
 
       expect(wrapper.vm.searchObj.meta.showDetailTab).toBe(false);
       expect(wrapper.vm.searchObj.data.searchAround.indexTimestamp).toBe("2023-01-01T00:00:00Z");
+    });
+
+    it("hands a search-around time window to the picker as a date update", async () => {
+      const startUs = 1_700_000_000_000_000;
+      const endUs = startUs + 600_000_000;
+      wrapper.vm.store.state.timezone = "UTC";
+      wrapper.vm.searchObj.meta.showDetailTab = true;
+
+      await wrapper.vm.onSearchAroundWindow({ startUs, endUs });
+
+      expect(wrapper.vm.searchObj.meta.showDetailTab).toBe(false);
+      const [[range]] = wrapper.emitted()["update:datetime"] as any[];
+      expect(range).toEqual(searchAroundPickerRange({ startUs, endUs }, "UTC"));
     });
   });
 

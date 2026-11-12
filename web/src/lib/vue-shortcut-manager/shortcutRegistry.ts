@@ -1,6 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 
 import type { I18nKey } from "@/types/i18n";
+import { isMacOS } from "@/utils/keyboardShortcuts";
 /**
  * Single source of truth for every keyboard shortcut in the app.
  *
@@ -46,6 +47,10 @@ export interface ShortcutEntry {
   skipInInput?: boolean;
   /** Fire even while focus is inside a dialog or drawer (see `Shortcut.allowInDialog`). */
   allowInDialog?: boolean;
+  /** Never fire while a modal layer is open (see `Shortcut.skipUnderModal`). */
+  skipUnderModal?: boolean;
+  /** Physical key (`KeyboardEvent.code`) that also fires it, so layouts that need AltGr for the symbol still reach it. */
+  code?: string;
   /** Hide this entry in the cheatsheet unless the edition/config exposes it. */
   visible?: (caps: ShortcutCapabilities) => boolean;
 }
@@ -106,6 +111,7 @@ const cloudMetaAdmin = (c: ShortcutCapabilities) => c.isCloud && c.isMetaOrg;
  */
 export const SHORTCUT_MODULES: ShortcutModule[] = [
   { titleKey: "shortcuts.modules.global", pages: ["shortcuts.pages.global"] },
+  { titleKey: "shortcuts.modules.timeRange", pages: ["shortcuts.pages.timeRange"] },
   {
     titleKey: "shortcuts.modules.logs",
     pages: [
@@ -245,6 +251,52 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
         keyForMac: "meta+b",
         descriptionKey: "shortcuts.actions.aiChatToggle",
         visible: aiChat,
+      },
+    ],
+  },
+
+  // Global so page scopes keep working; the toolbar picker on screen binds them while it is the active one.
+  {
+    pageKey: "shortcuts.pages.timeRange",
+    shortcuts: [
+      {
+        id: "timeRangeOpen",
+        key: "t",
+        skipUnderModal: true,
+        descriptionKey: "shortcuts.actions.timeRangeOpen",
+      },
+      {
+        id: "timeRangePrevious",
+        key: "[",
+        code: "BracketLeft",
+        skipUnderModal: true,
+        descriptionKey: "shortcuts.actions.timeRangePrevious",
+      },
+      {
+        id: "timeRangeNext",
+        key: "]",
+        code: "BracketRight",
+        skipUnderModal: true,
+        descriptionKey: "shortcuts.actions.timeRangeNext",
+      },
+      {
+        id: "timeRangeZoomOut",
+        key: "-",
+        skipUnderModal: true,
+        descriptionKey: "shortcuts.actions.timeRangeZoomOut",
+      },
+      {
+        id: "timeRangeUndo",
+        key: "z",
+        skipUnderModal: true,
+        descriptionKey: "shortcuts.actions.timeRangeUndo",
+      },
+      // Ctrl+Shift+C is the browsers' inspect-element key off macOS.
+      {
+        id: "timeRangeCopy",
+        keyForWindows: "alt+shift+c",
+        keyForMac: "meta+shift+c",
+        descriptionKey: "shortcuts.actions.timeRangeCopy",
       },
     ],
   },
@@ -1295,6 +1347,8 @@ export interface ShortcutDef {
   allowInInput?: boolean;
   skipInInput?: boolean;
   allowInDialog?: boolean;
+  skipUnderModal?: boolean;
+  code?: string;
 }
 
 function isRegisterable(e: ShortcutEntry): boolean {
@@ -1320,6 +1374,8 @@ const DEFS: Map<string, ShortcutDef> = (() => {
         allowInInput: e.allowInInput,
         skipInInput: e.skipInInput,
         allowInDialog: e.allowInDialog,
+        skipUnderModal: e.skipUnderModal,
+        code: e.code,
       });
     }
   }
@@ -1353,7 +1409,7 @@ const ENTRIES: Map<string, ShortcutEntry> = (() => {
 export function getShortcutDisplay(id: string): string | string[] | undefined {
   const e = ENTRIES.get(id);
   if (!e) return undefined;
-  if (e.keyForWindows) return e.keyForWindows;
+  if (e.keyForWindows) return isMacOS() && e.keyForMac ? e.keyForMac : e.keyForWindows;
   if (e.key) return e.key;
   if (e.keys?.length) return e.keys;
   if (e.display) return e.display.split(" / ")[0].trim();

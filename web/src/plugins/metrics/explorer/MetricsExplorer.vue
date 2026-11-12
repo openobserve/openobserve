@@ -137,6 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <DateTimePickerDashboard
           ref="dateTimePickerRef"
           v-model="selectedDate"
+          shortcuts
           data-test="metrics-date-picker"
           class="h-8.5!"
           :auto-apply-dashboard="mode === 'visualize'"
@@ -148,7 +149,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           trigger
           data-test="metrics-auto-refresh"
           :is-compact="isMobile"
+          :range-end-us="refreshRangeEndUs"
+          :range-start-us="refreshRangeStartUs"
           @trigger="onRefreshTick"
+          @live="goLiveRange"
         />
         <!-- Only an explicit Run writes query history; Refresh does not. -->
         <template v-if="mode === 'visualize'">
@@ -871,6 +875,7 @@ import { isEqual, debounce } from "lodash-es";
 
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
+import { fixedRangeEnd } from "@/utils/autoRefreshPause";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OPageHeaderStatus from "@/lib/core/PageHeader/OPageHeaderStatus.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -2486,6 +2491,16 @@ export default defineComponent({
 
     /** The auto-refresh timer. Keeps the no-data set; see onRefresh. */
     const onRefreshTick = () => onRefresh({ manual: false });
+    const refreshRangeEndUs = computed(() =>
+      fixedRangeEnd({
+        valueType: selectedDate.value?.valueType,
+        endTime: Number(selectedDate.value?.endTime),
+      }),
+    );
+    const refreshRangeStartUs = computed(() =>
+      refreshRangeEndUs.value === null ? null : Number(selectedDate.value?.startTime) || null,
+    );
+    const goLiveRange = () => dateTimePickerRef.value?.dateTimePicker?.goLive?.();
 
     /** An explicit Run in Visualize — the only Visualize run that writes history. */
     const onVisualizeRun = () => visualizeRef.value?.onUserRun?.(selectedDate.value);
@@ -2666,6 +2681,9 @@ export default defineComponent({
       dateTimePickerRef,
       selectedDate,
       refreshInterval,
+      refreshRangeEndUs,
+      refreshRangeStartUs,
+      goLiveRange,
       isGrid,
       columns,
       rowsOfCards,

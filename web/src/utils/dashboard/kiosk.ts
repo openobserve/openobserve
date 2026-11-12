@@ -15,9 +15,9 @@
 
 import type { LocationQuery, LocationQueryValue } from "vue-router";
 import { generateDurationLabel, parseDuration } from "@/utils/date";
-import { formatCalendarLabel } from "@/utils/dashboard/calendarPeriods";
+import { formatKnownPeriod } from "@/utils/timeRangeRail";
 import { getIntlLocale } from "@/locales";
-import type { I18nKey, I18nText, TranslateFn } from "@/types/i18n";
+import type { I18nText, TranslateFn } from "@/types/i18n";
 
 export type KioskTheme = "light" | "dark";
 export type KioskThemeChoice = "current" | KioskTheme;
@@ -43,15 +43,6 @@ const RETRY_BASE_MS = 5000;
 const RETRY_CAP_MS = 60000;
 const HUNG_FLOOR_MS = 30000;
 const MIN_FIT_CELL_PX = 4;
-
-const PAST_PERIOD_KEYS: Record<string, I18nKey> = {
-  s: "common.pastSecond",
-  m: "common.pastMinute",
-  h: "common.pastHour",
-  d: "common.pastDay",
-  w: "common.pastWeek",
-  M: "common.pastMonth",
-};
 
 const first = (value: QueryValue): LocationQueryValue | undefined =>
   Array.isArray(value) ? value[0] : value;
@@ -173,15 +164,9 @@ export const formatAge = (elapsedMs: number, t: TranslateFn): I18nText => {
   return t("refreshButton.hoursAgo", { h: Math.floor(min / 60) });
 };
 
-/** "Past 15 Minutes" for `15m`, "Last month" for a calendar token, or null when it is neither. */
-export const formatRelativePeriod = (period: string | null | undefined, t: TranslateFn) => {
-  const calendarLabel = formatCalendarLabel(period, null, t, getIntlLocale());
-  if (calendarLabel) return calendarLabel;
-  const match = /^(\d+)([smhdwM])$/.exec(period ?? "");
-  if (!match) return null;
-  const count = Number(match[1]);
-  return t(PAST_PERIOD_KEYS[match[2]], { count }, count);
-};
+/** "Last 15 minutes" for `15m`, "Previous month" for a calendar token, or null when it is neither. */
+export const formatRelativePeriod = (period: string | null | undefined, t: TranslateFn) =>
+  formatKnownPeriod(period, null, t, getIntlLocale());
 
 /** First meaningful line of a panel error, without the transport prefixes a TV viewer cannot act on. */
 export const summarizePanelError = (error: string): string => {

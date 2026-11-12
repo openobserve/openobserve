@@ -119,7 +119,7 @@ export class ServiceGraphPage {
    * Sets the stream filter in localStorage before navigating to ensure the correct stream is shown.
    * @param {string} streamName - Stream to filter by (default: 'default')
    * @param {string} [period='6h'] - Relative time window passed via the `period` URL param.
-   *   Defaults to a WIDE 6h window (not the page default "Past 15 Minutes") so the
+   *   Defaults to a WIDE 6h window (not the page default "Last 15 minutes") so the
    *   daemon-processed topology reliably falls inside the query window and the chart renders.
    */
   async navigateToServiceGraphUrl(streamName = 'default', period = '6h') {
@@ -130,11 +130,11 @@ export class ServiceGraphPage {
 
     const org = process.env['ORGNAME'] || 'default';
     const baseUrl = (process.env['ZO_BASE_URL'] || '').replace(/\/+$/, '');
-    // Query a WIDE window (default 6h), not the page default of "Past 15 Minutes". The service
+    // Query a WIDE window (default 6h), not the page default of "Last 15 minutes". The service
     // graph is derived by a backend daemon that runs on a delay after trace ingestion, so with
     // the 15m default the just-ingested topology often falls outside the window and the chart
     // renders "No service graph data" (no chart element) — the alpha1 failure mode. The route
-    // honours the `period` URL param (verified: label shows "Past 6 Hours").
+    // honours the `period` URL param (verified: label shows "Last 6 hours").
     const url = `${baseUrl}/web/traces/service-graph?org_identifier=${org}&period=${period}`;
     await this.page.goto(url);
     await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});

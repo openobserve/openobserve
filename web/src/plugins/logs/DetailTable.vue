@@ -599,20 +599,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           class="flex items-center gap-2 max-md:order-last max-md:basis-full max-md:justify-center"
         >
-          <label class="font-bold whitespace-nowrap">{{ t("common.noOfRecords") }}</label>
           <OSelect
-            v-model="selectedRelativeValue"
-            :options="recordSizeOptions"
-            size="md"
+            :model-value="searchAroundChoice"
+            :options="searchAroundOptions"
+            size="sm"
             class="select-noof-records"
+            data-test="logs-detail-table-search-around-window"
+            :dropdown-style="SEARCH_AROUND_MENU_STYLE"
+            :aria-label="t('dateTime.searchAroundWindow')"
             :disabled="pageLoading"
-          />
+            @update:model-value="setSearchAroundChoice"
+          >
+            <OSelectItem
+              v-for="option in searchAroundTimeOptions"
+              :key="option.value"
+              :value="option.value"
+              :label="option.label"
+            />
+            <OSeparator class="my-1" />
+            <OSelectItem
+              v-for="option in searchAroundRecordOptions"
+              :key="option.value"
+              :value="option.value"
+              :label="option.label"
+            />
+          </OSelect>
           <OButton
             data-test="logs-detail-table-search-around-btn"
             variant="outline"
-            size="sm-action"
+            size="sm"
             :disabled="pageLoading"
-            @click="searchTimeBoxed(rowData, selectedRelativeValue)"
+            @click="searchAround(rowData)"
             >{{ t("common.searchAround") }}</OButton
           >
         </div>
@@ -681,6 +698,7 @@ import { crossLinkQueryText } from "@/composables/useLogs/freeTextSearch";
 import useViewTraceAction from "@/composables/useLogs/useViewTraceAction";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OSelectItem from "@/lib/forms/Select/OSelectItem.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
@@ -709,6 +727,16 @@ import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import { isSafeNavigableUrl } from "@/utils/safeUrl";
 import { isFilterableLogField, STREAM_NAME_FIELD } from "@/utils/logs/streamNameColumn";
 import { scopeHighlightQuery } from "@/composables/useTextHighlighter";
+import {
+  parseSearchAroundChoice,
+  readSearchAroundChoice,
+  searchAroundWindow,
+  SEARCH_AROUND_RECORDS,
+  SEARCH_AROUND_SECONDS,
+  searchAroundTimeChoice,
+  writeSearchAroundChoice,
+  type SearchAroundChoice,
+} from "@/utils/searchAroundWindow";
 const SEVERITY_BORDER_CLASSES: Record<KnownLogSeverityLevel, string> = {
   emergency: "border-log-severity-emergency-indicator",
   alert: "border-log-severity-alert-indicator",
@@ -749,6 +777,7 @@ export default defineComponent({
     CorrelationServiceHeader,
     OButton,
     OSelect,
+    OSelectItem,
     ODropdown,
     ODropdownItem,
     ODropdownSeparator,
@@ -769,6 +798,7 @@ export default defineComponent({
     "add:searchterm",
     "remove:searchterm",
     "search:timeboxed",
+    "search:aroundwindow",
     "add:table",
     "view-trace",
     "sendToAiChat",
@@ -871,10 +901,18 @@ export default defineComponent({
     ) {
       this.$emit("add:searchterm", field, field_value, action);
     },
-    searchTimeBoxed(rowData: any, size: number) {
+    searchAround(rowData: any) {
+      const key = rowData[this.store.state.zoConfig.timestamp_column];
+      const choice = parseSearchAroundChoice(this.searchAroundChoice);
+      if (choice?.kind === "time") {
+        const timestampUs = Number(key);
+        if (!Number.isFinite(timestampUs)) return;
+        this.$emit("search:aroundwindow", searchAroundWindow(timestampUs, choice.seconds));
+        return;
+      }
       this.$emit("search:timeboxed", {
-        key: rowData[this.store.state.zoConfig.timestamp_column],
-        size: size,
+        key,
+        size: choice?.kind === "records" ? choice.count : SEARCH_AROUND_RECORDS[0],
         body: rowData,
       });
     },
@@ -932,16 +970,36 @@ export default defineComponent({
       }),
     });
 
-    const selectedRelativeValue = ref<number>(10);
-    const recordSizeOptions = ref<Array<{ label: I18nText; value: number }>>([
-      { label: raw("10"), value: 10 },
-      { label: raw("20"), value: 20 },
-      { label: raw("50"), value: 50 },
-      { label: raw("100"), value: 100 },
-      { label: raw("200"), value: 200 },
-      { label: raw("500"), value: 500 },
-      { label: raw("1000"), value: 1000 },
+    const searchAroundUser = () => String(store.state.userInfo?.email ?? "");
+    const searchAroundChoice = ref<SearchAroundChoice>(readSearchAroundChoice(searchAroundUser()));
+    // All nine choices fit without scrolling where the viewport allows it.
+    const SEARCH_AROUND_MENU_STYLE = {
+      maxHeight: "min(23rem, var(--reka-select-content-available-height, 23rem))",
+    };
+    const searchAroundTimeOptions = computed(() =>
+      SEARCH_AROUND_SECONDS.map((seconds) => ({
+        label:
+          seconds < 60
+            ? t("dateTime.aroundSeconds", { n: seconds })
+            : t("dateTime.aroundMinutes", { n: seconds / 60 }),
+        value: searchAroundTimeChoice(seconds),
+      })),
+    );
+    const searchAroundRecordOptions = computed(() =>
+      SEARCH_AROUND_RECORDS.map((count) => ({
+        label: t("dateTime.recordsCount", { count }),
+        value: `r${count}` as SearchAroundChoice,
+      })),
+    );
+    const searchAroundOptions = computed(() => [
+      ...searchAroundTimeOptions.value,
+      ...searchAroundRecordOptions.value,
     ]);
+    const setSearchAroundChoice = (value: unknown) => {
+      if (!parseSearchAroundChoice(value)) return;
+      searchAroundChoice.value = value as SearchAroundChoice;
+      writeSearchAroundChoice(searchAroundUser(), searchAroundChoice.value);
+    };
     const shouldWrapValues: any = ref(true);
     const { searchObj } = searchState();
     const { lineLinkState, copyLineLink } = useLogLineLink();
@@ -1479,6 +1537,7 @@ export default defineComponent({
     };
 
     return {
+      SEARCH_AROUND_MENU_STYLE,
       t,
       raw,
       store,
@@ -1494,8 +1553,11 @@ export default defineComponent({
       prevTooltip,
       nextTooltip,
       flattenJSONObject,
-      selectedRelativeValue,
-      recordSizeOptions,
+      searchAroundChoice,
+      searchAroundTimeOptions,
+      searchAroundRecordOptions,
+      searchAroundOptions,
+      setSearchAroundChoice,
       getImageURL,
       tableDropdownOpenMap,
       isFilterableLogField,
@@ -1564,14 +1626,9 @@ export default defineComponent({
   width: 85vw;
 }
 
-/* keep(lib-override:oselect): reaches into the OSelect-rendered button to size
-   the records-per-page control. */
+/* Fits the longest option, "100 records", beside the chevron. */
 .select-noof-records {
-  width: 5rem;
-}
-
-.select-noof-records :deep(button[type="button"]) {
-  height: 2.25rem;
+  width: 8.5rem;
 }
 
 /* keep(lib-override:otable): reaches into the OTable-rendered th/td DOM to

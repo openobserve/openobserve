@@ -2,6 +2,7 @@
 
 import { expect } from '@playwright/test';
 import { openNavFlyoutChild } from '../commonActions.js';
+import { openDateFields } from '../generalPages/relativePeriod.js';
 
 export class ReportsFormValidationPage {
     /**
@@ -43,7 +44,7 @@ export class ReportsFormValidationPage {
         // DateTime component uses dataTestName prop defaulting to "date-time-btn".
         // CreateReport passes data-test attr (not the dataTestName prop), so the actual button is date-time-btn.
         this.timerangeDropdown = '[data-test="add-report-timerange-select"] [data-test="date-time-btn"]';
-        this.dateTimeAbsoluteTab = '[data-test="date-time-absolute-tab"]';
+        this.dateTimeAbsoluteTab = '#date-time-menu';
         // DateTime.vue renders OTime with data-test="datetime-start-time" / "datetime-end-time"
         this.dateTimeAbsoluteStartField = '[data-test="datetime-start-time"]';
         this.dateTimeAbsoluteEndField = '[data-test="datetime-end-time"]';
@@ -238,9 +239,7 @@ export class ReportsFormValidationPage {
     }
 
     async switchToAbsoluteTimerange() {
-        const tab = this.page.locator(this.dateTimeAbsoluteTab);
-        await tab.waitFor({ state: 'visible', timeout: 6000 });
-        await tab.click();
+        await openDateFields(this.page, 6000);
     }
 
     async clearAbsoluteTimerangeFields() {
