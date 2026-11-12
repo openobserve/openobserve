@@ -44,6 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 name="name"
                 data-test="add-template-name-input"
                 :label="t('alerts.name')"
+                :maxlength="256"
                 :placeholder="t('alert_templates.namePlaceholder')"
                 required
                 :readonly="isUpdatingTemplate"
