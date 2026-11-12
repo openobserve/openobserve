@@ -118,6 +118,14 @@ export interface SubnavChild {
   licenseLocked?: boolean;
 }
 
+/** A flyout category shown as one row whose links open in a side panel, instead of under a heading. */
+export interface NestedCategory {
+  /** The `categoryKey` its children share; also the row's label. */
+  categoryKey: I18nKey;
+  /** OIcon registry name for the row. */
+  icon: string;
+}
+
 /** Context for evaluating subnav `gate` predicates (see navGroups.ts). */
 export interface NavGateContext {
   isEnterprise: boolean;
@@ -158,7 +166,13 @@ export interface NavGateContext {
  */
 export type RailEntry =
   | { type: "link"; item: NavItem }
-  | { type: "linkGroup"; item: NavItem; children: SubnavChild[]; filtered?: SubnavChild[] }
+  | {
+      type: "linkGroup";
+      item: NavItem;
+      children: SubnavChild[];
+      filtered?: SubnavChild[];
+      nested?: NestedCategory[];
+    }
   | {
       type: "group";
       key: string;

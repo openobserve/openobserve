@@ -82,6 +82,7 @@ export class OnCallMinePage {
       phoneCodeSentText: '[data-test="oncall-phone-code-sent-text"]',
 
       navReliability: '[data-test="nav-group-reliability"]',
+      navOnCallRow: '[data-test="nav-group-nested-menu-onCall"]',
       navMyOnCall: '[data-test="nav-group-item-onCallMine"]',
       tooltip: '[data-test="o-tooltip-content"]',
     };
@@ -176,9 +177,12 @@ export class OnCallMinePage {
     await expect(this.page.locator(this.locators.navReliability)).toBeVisible({ timeout: 30000 });
   }
 
-  /** The flyout opens on hover, after a delay, and is teleported to the body. */
+  /** The flyout opens on hover, after a delay, and is teleported to the body; My on-call sits in the On-Call row's side panel. */
   async openFromOnCallMenu() {
     await this.page.locator(this.locators.navReliability).hover();
+    const row = this.page.locator(this.locators.navOnCallRow);
+    await row.waitFor({ state: 'visible', timeout: 15000 });
+    await row.click();
     const item = this.page.locator(this.locators.navMyOnCall);
     await item.waitFor({ state: 'visible', timeout: 15000 });
     await item.click();

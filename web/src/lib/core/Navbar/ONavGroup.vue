@@ -52,12 +52,14 @@ import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import MenuLink from "@/components/MenuLink.vue";
 import BetaBadge from "@/components/common/BetaBadge.vue";
+import ONavFlyoutItem from "./ONavFlyoutItem.vue";
 import { isGateOpen, useNavGateContext } from "./useNavGateContext";
-import { RailNavigationMarkKey, type SubnavChild } from "./ONavbar.types";
+import { RailNavigationMarkKey, type NestedCategory, type SubnavChild } from "./ONavbar.types";
 import {
   AIM_IDLE,
   REST_TOLERANCE,
   aim,
+  isAimingAt,
   isAimingAtOpenFlyout,
   releasePointerTracking,
   retainPointerTracking,
@@ -84,6 +86,8 @@ const props = defineProps<{
   filteredChildren?: SubnavChild[];
   /** When set, the tile navigates here on click and the flyout is hover-only. */
   parentItem?: { link: string; title: string; icon: string; name: string };
+  /** Categories that open in a side panel from one row of the desktop flyout. */
+  nested?: NestedCategory[];
 }>();
 
 const store = useStore();
@@ -107,6 +111,7 @@ const flyoutIconClass = flyoutTextClass;
 
 const wrapperRef = ref<HTMLElement | null>(null);
 const flyoutRef = ref<HTMLElement | null>(null);
+const subpanelRef = ref<HTMLElement | null>(null);
 
 const isOpen = ref(false);
 const isPinned = ref(false);
@@ -182,20 +187,52 @@ const tileLockedLabel = computed<I18nText | undefined>(() => {
  */
 type Block =
   | { kind: "group"; key: string; labelId: string; labelKey: I18nKey; children: SubnavChild[] }
-  | { kind: "item"; key: string; child: SubnavChild; spaced: boolean };
+  | { kind: "item"; key: string; child: SubnavChild; spaced: boolean }
+  | {
+      kind: "nested";
+      key: string;
+      rowId: string;
+      panelId: string;
+      testKey: string;
+      labelKey: I18nKey;
+      icon: string;
+      children: SubnavChild[];
+      spaced: boolean;
+    };
+type NestedBlock = Extract<Block, { kind: "nested" }>;
+
+// One link behind a row would cost the user a hover for nothing, so it keeps its heading instead.
+const NESTED_MIN_CHILDREN = 2;
 
 const childKey = (child: SubnavChild) => `${child.name}-${child.tab ?? ""}`;
 
-const flyoutBlocks = computed<Block[]>(() => {
-  const blocks: Block[] = [];
+function toNested(block: Block, nested: NestedCategory[]): Block {
+  if (block.kind !== "group" || block.children.length < NESTED_MIN_CHILDREN) return block;
+  const def = nested.find((n) => n.categoryKey === block.labelKey);
+  if (!def) return block;
+  return {
+    kind: "nested",
+    key: block.key,
+    rowId: `${block.labelId}-row`,
+    panelId: `${block.labelId}-panel`,
+    testKey: block.labelKey.replace(/\./g, "-"),
+    labelKey: block.labelKey,
+    icon: def.icon,
+    children: block.children,
+    spaced: false,
+  };
+}
+
+function buildBlocks(children: SubnavChild[], nested: NestedCategory[]): Block[] {
+  const runs: Block[] = [];
   let open: Extract<Block, { kind: "group" }> | null = null;
 
-  for (const child of visibleChildren.value) {
+  for (const child of children) {
     if (child.categoryKey) {
       if (!open || open.labelKey !== child.categoryKey) {
         // Indexed, so two non-adjacent runs sharing a key cannot collide on
         // the same `:key` within one v-for.
-        const key: string = `h-${child.categoryKey}-${blocks.length}`;
+        const key: string = `h-${child.categoryKey}-${runs.length}`;
         open = {
           kind: "group",
           key,
@@ -203,25 +240,37 @@ const flyoutBlocks = computed<Block[]>(() => {
           labelKey: child.categoryKey,
           children: [],
         };
-        blocks.push(open);
+        runs.push(open);
       }
       open.children.push(child);
       continue;
     }
-    // An item that LEAVES a headed run needs a gap, or it reads as the last
-    // member of that run: a header owns everything below it until something
-    // says otherwise, and at the same indent nothing else does.
-    blocks.push({ kind: "item", key: `i-${childKey(child)}`, child, spaced: open !== null });
+    runs.push({ kind: "item", key: `i-${childKey(child)}`, child, spaced: false });
     open = null;
   }
-  return blocks;
-});
+  const blocks = runs.map((block) => toNested(block, nested));
+  // A row that LEAVES a headed run needs a gap, or it reads as the last member of that run.
+  return blocks.map((block, i) =>
+    block.kind === "group" ? block : { ...block, spaced: blocks[i - 1]?.kind === "group" },
+  );
+}
+
+const flyoutBlocks = computed(() => buildBlocks(visibleChildren.value, props.nested ?? []));
+// The drawer has no room beside it for a side panel, so every category keeps its heading there.
+const inlineBlocks = computed(() => buildBlocks(visibleChildren.value, []));
+const nestedBlocks = computed(() =>
+  flyoutBlocks.value.filter((b): b is NestedBlock => b.kind === "nested"),
+);
 
 // Hover open/close are debounced so brushing past the tile or crossing the
 // (zero-width) seam between tile and flyout doesn't flicker it.
 const OPEN_DELAY = 120;
 const CLOSE_DELAY = 220;
 const VIEWPORT_MARGIN = 8;
+const FLYOUT_GAP = 4;
+const ITEM_SELECTOR = "a[data-test^='nav-group-item-']";
+const NESTED_ROW_SELECTOR = "button[aria-haspopup='menu']";
+const ROW_SELECTOR = `${ITEM_SELECTOR}, ${NESTED_ROW_SELECTOR}`;
 let openTimer: ReturnType<typeof setTimeout> | null = null;
 let closeTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -304,6 +353,7 @@ function isChildActive(child: SubnavChild): boolean {
   return activeChild.value !== null && childKey(activeChild.value) === childKey(child);
 }
 const isGroupActive = computed(() => activeChild.value !== null);
+const isNestedActive = (block: NestedBlock) => block.children.some(isChildActive);
 
 const orgIdentifier = computed(() => store.state.selectedOrganization?.identifier);
 
@@ -369,6 +419,20 @@ function childLockedLabel(child: SubnavChild): I18nText {
   return t("featureLock.headerLocked", { feature: raw(feature) });
 }
 
+function itemProps(child: SubnavChild) {
+  return {
+    child,
+    to: childTo(child),
+    label: childLabel(child),
+    active: isChildActive(child),
+    paywalled: isChildPaywalled(child),
+    descriptionId: itemDescriptionId(child),
+    lockTestId: `${childDataTest(child)}-lock`,
+    lockedLabel: childLockedLabel(child),
+    textClass: flyoutTextClass.value,
+  };
+}
+
 function tileElement(): HTMLElement | null {
   return wrapperRef.value?.querySelector<HTMLElement>("a, button") ?? null;
 }
@@ -377,33 +441,46 @@ function focusTile() {
   tileElement()?.focus();
 }
 
+function isRtl(): boolean {
+  return document.documentElement.dir === "rtl";
+}
+
 // ── Open / close ──────────────────────────────────────────────────────────
+// Shared by the flyout and its side panel: a menu taller than the viewport is capped and scrolls inside it.
+function menuMaxHeight(): string {
+  return `${window.innerHeight - VIEWPORT_MARGIN * 2}px`;
+}
+
+// A menu that fits moves up just enough to clear the bottom margin, never above the top one.
+function clampMenuTop(top: number, menuHeight: number): number {
+  return Math.max(
+    VIEWPORT_MARGIN,
+    Math.min(top, window.innerHeight - menuHeight - VIEWPORT_MARGIN),
+  );
+}
+
+function revealCurrentRow(menu: HTMLElement | null) {
+  menu?.querySelector("[aria-current]")?.scrollIntoView?.({ block: "nearest" });
+}
+
 async function positionFlyout() {
   const wrapper = wrapperRef.value;
   if (!wrapper) return;
   const rect = wrapper.getBoundingClientRect();
-  // Small breathing gap between the rail and the flyout so they don't touch.
-  const GAP = 4;
-  const isRtl = document.documentElement.dir === "rtl";
-  const horizontalPosition: Record<string, string> = isRtl
-    ? { right: `${document.documentElement.clientWidth - rect.left + GAP}px` }
-    : { left: `${rect.right + GAP}px` };
-  const maxHeight = window.innerHeight - VIEWPORT_MARGIN * 2;
+  const horizontalPosition: Record<string, string> = isRtl()
+    ? { right: `${document.documentElement.clientWidth - rect.left + FLYOUT_GAP}px` }
+    : { left: `${rect.right + FLYOUT_GAP}px` };
   flyoutStyle.value = {
     position: "fixed",
     ...horizontalPosition,
     top: `${rect.top}px`,
-    maxHeight: `${maxHeight}px`,
+    maxHeight: menuMaxHeight(),
     zIndex: "6000",
   };
   await nextTick();
-  const flyoutH = flyoutRef.value?.offsetHeight ?? 0;
-  const maxTop = window.innerHeight - flyoutH - VIEWPORT_MARGIN;
-  flyoutStyle.value = {
-    ...flyoutStyle.value,
-    top: `${Math.max(VIEWPORT_MARGIN, Math.min(rect.top, maxTop))}px`,
-  };
-  flyoutRef.value?.querySelector("[aria-current]")?.scrollIntoView?.({ block: "nearest" });
+  const top = clampMenuTop(rect.top, flyoutRef.value?.offsetHeight ?? 0);
+  flyoutStyle.value = { ...flyoutStyle.value, top: `${top}px` };
+  revealCurrentRow(flyoutRef.value);
 }
 
 /**
@@ -438,6 +515,7 @@ async function open() {
 
 function close() {
   clearTimers();
+  closeSubpanel();
   isOpen.value = false;
   isPinned.value = false;
   if (openGroupKey.value === props.groupKey) openGroupKey.value = null;
@@ -491,6 +569,108 @@ function scheduleClose(event?: MouseEvent) {
   closeTimer = setTimeout(tryClose, CLOSE_DELAY);
 }
 
+// ── Side panel of a nested category ───────────────────────────────────────
+const openSubKey = ref<string | null>(null);
+const subpanelStyle = ref<Record<string, string>>({});
+const openSub = computed(() => nestedBlocks.value.find((b) => b.key === openSubKey.value) ?? null);
+let subTimer: ReturnType<typeof setTimeout> | null = null;
+// Where the pointer left the open row, and which side the panel opened on: the aim triangle's apex and direction.
+let subExit: Point | null = null;
+let subLeftward = false;
+// A hover-opened panel survives the click that usually follows; a clicked one closes on the next click.
+let subByHover = false;
+
+function clearSubTimer() {
+  if (subTimer) {
+    clearTimeout(subTimer);
+    subTimer = null;
+  }
+}
+
+function closeSubpanel() {
+  clearSubTimer();
+  openSubKey.value = null;
+  subExit = null;
+}
+
+// Opens towards the reading direction, flips when that side has no room, and clamps when neither has.
+async function positionSubpanel() {
+  await nextTick();
+  const row = openSub.value ? document.getElementById(openSub.value.rowId) : null;
+  const flyout = flyoutRef.value?.getBoundingClientRect();
+  const panel = subpanelRef.value;
+  if (!row || !flyout || !panel) return;
+  const viewportWidth = document.documentElement.clientWidth;
+  const after = flyout.right + FLYOUT_GAP;
+  const before = flyout.left - FLYOUT_GAP - panel.offsetWidth;
+  const fitsAfter = after + panel.offsetWidth <= viewportWidth - VIEWPORT_MARGIN;
+  const fitsBefore = before >= VIEWPORT_MARGIN;
+  subLeftward = isRtl() ? fitsBefore || !fitsAfter : !fitsAfter && fitsBefore;
+  const maxLeft = viewportWidth - panel.offsetWidth - VIEWPORT_MARGIN;
+  const left = Math.max(VIEWPORT_MARGIN, Math.min(subLeftward ? before : after, maxLeft));
+  const top = clampMenuTop(row.getBoundingClientRect().top, panel.offsetHeight);
+  subpanelStyle.value = { ...subpanelStyle.value, left: `${left}px`, top: `${top}px` };
+  revealCurrentRow(panel);
+}
+
+async function showSubpanel(key: string, byHover: boolean) {
+  clearSubTimer();
+  subByHover = byHover;
+  if (openSubKey.value === key) return;
+  openSubKey.value = key;
+  // Fixed at the origin first, so the panel is measured at its own width rather than the body's.
+  subpanelStyle.value = {
+    position: "fixed",
+    left: "0",
+    top: "0",
+    maxHeight: menuMaxHeight(),
+    zIndex: "6000",
+  };
+  await positionSubpanel();
+}
+
+// Rows the pointer crosses on its way into the open panel do not take it over.
+function scheduleSubpanel(key: string | null) {
+  clearSubTimer();
+  if (key === openSubKey.value) return;
+  const apply = () => {
+    if (openSubKey.value && isAimingAt(subExit, subpanelRef.value, subLeftward)) {
+      subTimer = setTimeout(apply, AIM_IDLE);
+      return;
+    }
+    if (key) showSubpanel(key, true);
+    else closeSubpanel();
+  };
+  subTimer = setTimeout(apply, OPEN_DELAY);
+}
+
+function onRowMouseenter(event: MouseEvent, block: NestedBlock | null) {
+  onChildMouseenter(event);
+  scheduleSubpanel(block?.key ?? null);
+}
+
+function onNestedMouseleave(event: MouseEvent) {
+  subExit = { x: event.clientX, y: event.clientY };
+}
+
+function onNestedClick(block: NestedBlock) {
+  if (openSubKey.value === block.key && !subByHover) {
+    closeSubpanel();
+    return;
+  }
+  showSubpanel(block.key, false);
+}
+
+function onSubpanelMouseenter() {
+  clearTimers();
+  clearSubTimer();
+}
+
+async function openSubpanelAndFocus(block: NestedBlock) {
+  await showSubpanel(block.key, false);
+  subpanelRef.value?.querySelector<HTMLElement>(ITEM_SELECTOR)?.focus();
+}
+
 function onTriggerClick() {
   if (isPinned.value) {
     close();
@@ -509,13 +689,9 @@ function onLinkClick(event?: MouseEvent) {
   open();
 }
 
-function isRtl(): boolean {
-  return document.documentElement.dir === "rtl";
-}
-
 function focusFirstItem() {
   nextTick(() => {
-    flyoutRef.value?.querySelector<HTMLElement>("a[data-test^='nav-group-item-']")?.focus();
+    flyoutRef.value?.querySelector<HTMLElement>(ROW_SELECTOR)?.focus();
   });
 }
 
@@ -540,9 +716,8 @@ watch(openGroupKey, (key) => {
 
 function onDocumentPointerDown(event: PointerEvent) {
   const target = event.target as Node;
-  if (wrapperRef.value?.contains(target) || flyoutRef.value?.contains(target)) {
-    return;
-  }
+  const inside = [wrapperRef.value, flyoutRef.value, subpanelRef.value];
+  if (inside.some((el) => el?.contains(target))) return;
   close();
 }
 
@@ -554,6 +729,8 @@ function onScrollOrResize() {
 function onScroll(event: Event) {
   if (isMobile.value) return;
   const target = event.target;
+  // The side panel is anchored to a row, which a scroll of the flyout moves away from it.
+  if (target === flyoutRef.value) closeSubpanel();
   if (target instanceof Node && target !== document && !target.contains(wrapperRef.value)) return;
   onScrollOrResize();
 }
@@ -589,6 +766,7 @@ watch(isOpen, (open) => {
 
 onBeforeUnmount(() => {
   clearTimers();
+  clearSubTimer();
   removeOpenListeners();
   if (openGroupKey.value === props.groupKey) openGroupKey.value = null;
 });
@@ -604,17 +782,46 @@ function onFlyoutTab(event: KeyboardEvent) {
   (findContentFocusTarget() ?? tileElement())?.focus();
 }
 
+// Links do not activate on Space natively; route it through click so detail stays 0.
+function activateWithSpace(event: KeyboardEvent) {
+  event.preventDefault();
+  (event.target as HTMLElement | null)?.closest<HTMLElement>(ITEM_SELECTOR)?.click();
+}
+
+function cycleFocus(container: HTMLElement | null, selector: string, key: string) {
+  const items = Array.from(container?.querySelectorAll<HTMLElement>(selector) ?? []);
+  if (items.length === 0) return;
+  const idx = items.indexOf(document.activeElement as HTMLElement);
+  const next = key === "ArrowDown" ? (idx + 1) % items.length : (idx <= 0 ? items.length : idx) - 1;
+  items[next]?.focus();
+}
+
+// The arrow towards the panel, Enter and Space open a nested row and move into it.
+function onNestedRowKeydown(event: KeyboardEvent): boolean {
+  const openKey = isRtl() ? "ArrowLeft" : "ArrowRight";
+  if (event.key !== openKey && event.key !== "Enter" && event.key !== " ") return false;
+  const rowId = (event.target as HTMLElement | null)?.closest(NESTED_ROW_SELECTOR)?.id;
+  const block = nestedBlocks.value.find((b) => b.rowId === rowId);
+  if (!block) return false;
+  event.preventDefault();
+  openSubpanelAndFocus(block);
+  return true;
+}
+
 function onFlyoutKeydown(event: KeyboardEvent) {
   if (event.key === "Tab") {
     onFlyoutTab(event);
     return;
   }
-  // Links do not activate on Space natively; route it through click so detail stays 0.
+  if (onNestedRowKeydown(event)) return;
   if (event.key === " ") {
+    activateWithSpace(event);
+    return;
+  }
+  // Escape closes the innermost open menu: the side panel first, then the flyout.
+  if (event.key === "Escape" && openSubKey.value) {
     event.preventDefault();
-    (event.target as HTMLElement | null)
-      ?.closest<HTMLElement>("a[data-test^='nav-group-item-']")
-      ?.click();
+    closeSubpanel();
     return;
   }
   const closeKey = isRtl() ? "ArrowRight" : "ArrowLeft";
@@ -626,20 +833,30 @@ function onFlyoutKeydown(event: KeyboardEvent) {
   }
   if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
   event.preventDefault();
-  const items = Array.from(
-    flyoutRef.value?.querySelectorAll<HTMLElement>("a[data-test^='nav-group-item-']") ?? [],
-  );
-  if (items.length === 0) return;
-  const idx = items.indexOf(document.activeElement as HTMLElement);
-  const nextIdx =
-    event.key === "ArrowDown"
-      ? idx + 1 >= items.length
-        ? 0
-        : idx + 1
-      : idx - 1 < 0
-        ? items.length - 1
-        : idx - 1;
-  items[nextIdx]?.focus();
+  closeSubpanel();
+  cycleFocus(flyoutRef.value, ROW_SELECTOR, event.key);
+}
+
+function onSubpanelKeydown(event: KeyboardEvent) {
+  if (event.key === "Tab") {
+    onFlyoutTab(event);
+    return;
+  }
+  if (event.key === " ") {
+    activateWithSpace(event);
+    return;
+  }
+  const closeKey = isRtl() ? "ArrowRight" : "ArrowLeft";
+  if (event.key === "Escape" || event.key === closeKey) {
+    event.preventDefault();
+    const rowId = openSub.value?.rowId;
+    closeSubpanel();
+    if (rowId) document.getElementById(rowId)?.focus();
+    return;
+  }
+  if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+  event.preventDefault();
+  cycleFocus(subpanelRef.value, ITEM_SELECTOR, event.key);
 }
 
 // The flyout is teleported, so the rail's capture listener never sees this click.
@@ -727,7 +944,7 @@ function onChildMouseenter(event: MouseEvent) {
       >
         {{ t("menu.trialFlyoutNote") }}
       </div>
-      <template v-for="block in flyoutBlocks" :key="`inline-${block.key}`">
+      <template v-for="block in inlineBlocks" :key="`inline-${block.key}`">
         <div
           v-if="block.kind === 'group'"
           role="group"
@@ -791,7 +1008,7 @@ function onChildMouseenter(event: MouseEvent) {
           </template>
         </div>
 
-        <template v-else>
+        <template v-else-if="block.kind === 'item'">
           <component
             :is="block.child.locked ? 'div' : 'router-link'"
             :data-test="childRowTestId(block.child)"
@@ -904,122 +1121,85 @@ function onChildMouseenter(event: MouseEvent) {
             >
               {{ t(block.labelKey) }}
             </div>
-            <template v-for="(child, childIndex) in block.children" :key="childKey(child)">
-              <!-- `div` when locked, never `router-link` — see the comment on
-                   the mobile block above (RouterLink's own click handler runs
-                   before onChildClick's preventDefault). -->
-              <component
-                :is="child.locked ? 'div' : 'router-link'"
-                :data-test="childRowTestId(child)"
-                role="menuitem"
-                :to="child.locked ? undefined : childTo(child)"
-                :tabindex="child.locked ? 0 : undefined"
-                class="nav-group-item rounded-default focus-visible:ring-accent flex cursor-pointer items-center gap-2.5 px-3 py-1.5 text-sm transition-colors duration-150 outline-none select-none [text-decoration:none]! focus-visible:ring-2 focus-visible:ring-inset"
-                :class="[
-                  flyoutTextClass,
-                  childIndex > 0 ? 'mt-0.5' : '',
-                  isChildActive(child)
-                    ? 'bg-select-item-selected-bg font-medium'
-                    : 'hover:bg-dropdown-item-hover-bg',
-                ]"
-                :aria-current="isChildActive(child) ? 'page' : undefined"
-                :data-paywalled="isChildPaywalled(child) ? 'true' : undefined"
-                :aria-describedby="isChildPaywalled(child) ? itemDescriptionId(child) : undefined"
-                @click="onChildClick($event, child)"
-                @mouseenter="onChildMouseenter"
-              >
-                <!-- Icon color is locked to the text color so it never picks up a
-                     primary tint via currentColor inheritance. -->
-                <OIcon
-                  :name="child.icon"
-                  size="sm"
-                  class="shrink-0"
-                  :class="isChildPaywalled(child) ? 'text-text-secondary!' : flyoutIconClass"
-                />
-                <span class="leading-none">{{ childLabel(child) }}</span>
-                <BetaBadge v-if="child.beta" size="xs" />
-                <OIcon
-                  v-if="isChildPaywalled(child) || child.locked || child.licenseLocked"
-                  name="lock"
-                  size="xs"
-                  class="ms-auto shrink-0"
-                  :class="child.locked || child.licenseLocked ? 'lock-chip' : 'text-text-secondary'"
-                  :data-test="`${childDataTest(child)}-lock`"
-                  aria-hidden="true"
-                />
-                <span v-if="child.licenseLocked" class="sr-only">{{
-                  childLockedLabel(child)
-                }}</span>
-                <span
-                  v-if="isChildPaywalled(child)"
-                  :id="itemDescriptionId(child)"
-                  class="sr-only"
-                  >{{ t("menu.trialPageNeedsPlan", { page: childLabel(child) }) }}</span
-                >
-              </component>
-            </template>
+            <ONavFlyoutItem
+              v-for="(child, childIndex) in block.children"
+              :key="childKey(child)"
+              v-bind="itemProps(child)"
+              :data-test="childRowTestId(child)"
+              :class="childIndex > 0 ? 'mt-0.5' : ''"
+              @click="onChildClick($event, child)"
+              @mouseenter="onRowMouseenter($event, null)"
+            />
           </div>
 
-          <template v-else>
-            <component
-              :is="block.child.locked ? 'div' : 'router-link'"
-              :data-test="childRowTestId(block.child)"
-              role="menuitem"
-              :to="block.child.locked ? undefined : childTo(block.child)"
-              :tabindex="block.child.locked ? 0 : undefined"
-              class="nav-group-item rounded-default focus-visible:ring-accent flex cursor-pointer items-center gap-2.5 px-3 py-1.5 text-sm transition-colors duration-150 outline-none select-none [text-decoration:none]! focus-visible:ring-2 focus-visible:ring-inset"
-              :class="[
-                flyoutTextClass,
-                // Matches the pt-4 a header gets, so leaving a run and starting
-                // one look like the same size of break.
-                block.spaced ? 'mt-3' : '',
-                isChildActive(block.child)
-                  ? 'bg-select-item-selected-bg font-medium'
+          <button
+            v-else-if="block.kind === 'nested'"
+            :id="block.rowId"
+            type="button"
+            role="menuitem"
+            aria-haspopup="menu"
+            :aria-expanded="openSubKey === block.key"
+            :aria-controls="openSubKey === block.key ? block.panelId : undefined"
+            :data-test="`nav-group-nested-${block.testKey}`"
+            :data-active="isNestedActive(block) ? 'true' : undefined"
+            class="nav-group-item rounded-default focus-visible:ring-accent flex w-full cursor-pointer items-center gap-2.5 px-3 py-1.5 text-start text-sm transition-colors duration-150 outline-none select-none focus-visible:ring-2 focus-visible:ring-inset"
+            :class="[
+              flyoutTextClass,
+              block.spaced ? 'mt-3' : '',
+              isNestedActive(block)
+                ? 'bg-select-item-selected-bg font-medium'
+                : openSubKey === block.key
+                  ? 'bg-dropdown-item-hover-bg'
                   : 'hover:bg-dropdown-item-hover-bg',
-              ]"
-              :aria-current="isChildActive(block.child) ? 'page' : undefined"
-              :data-paywalled="isChildPaywalled(block.child) ? 'true' : undefined"
-              :aria-describedby="
-                isChildPaywalled(block.child) ? itemDescriptionId(block.child) : undefined
-              "
-              @click="onChildClick($event, block.child)"
-              @mouseenter="onChildMouseenter"
-            >
-              <OIcon
-                :name="block.child.icon"
-                size="sm"
-                class="shrink-0"
-                :class="isChildPaywalled(block.child) ? 'text-text-secondary!' : flyoutIconClass"
-              />
-              <span class="leading-none">{{ childLabel(block.child) }}</span>
-              <BetaBadge v-if="block.child.beta" size="xs" />
-              <OIcon
-                v-if="
-                  isChildPaywalled(block.child) || block.child.locked || block.child.licenseLocked
-                "
-                name="lock"
-                size="xs"
-                class="ms-auto shrink-0"
-                :class="
-                  block.child.locked || block.child.licenseLocked
-                    ? 'lock-chip'
-                    : 'text-text-secondary'
-                "
-                :data-test="`${childDataTest(block.child)}-lock`"
-                aria-hidden="true"
-              />
-              <span v-if="block.child.licenseLocked" class="sr-only">{{
-                childLockedLabel(block.child)
-              }}</span>
-              <span
-                v-if="isChildPaywalled(block.child)"
-                :id="itemDescriptionId(block.child)"
-                class="sr-only"
-                >{{ t("menu.trialPageNeedsPlan", { page: childLabel(block.child) }) }}</span
-              >
-            </component>
-          </template>
+            ]"
+            @click="onNestedClick(block)"
+            @mouseenter="onRowMouseenter($event, block)"
+            @mouseleave="onNestedMouseleave"
+          >
+            <OIcon :name="block.icon" size="sm" class="shrink-0" :class="flyoutIconClass" />
+            <span class="leading-none">{{ t(block.labelKey) }}</span>
+            <OIcon
+              name="chevron-right"
+              size="xs"
+              class="ms-auto shrink-0 rtl:rotate-180"
+              :class="flyoutIconClass"
+              aria-hidden="true"
+            />
+          </button>
+
+          <ONavFlyoutItem
+            v-else
+            v-bind="itemProps(block.child)"
+            :data-test="childRowTestId(block.child)"
+            :class="block.spaced ? 'mt-3' : ''"
+            @click="onChildClick($event, block.child)"
+            @mouseenter="onRowMouseenter($event, null)"
+          />
         </template>
+      </div>
+
+      <div
+        v-if="isOpen && !isMobile && openSub"
+        :id="openSub.panelId"
+        ref="subpanelRef"
+        :data-test="`nav-group-subpanel-${openSub.testKey}`"
+        role="menu"
+        :aria-labelledby="openSub.rowId"
+        class="nav-group-subpanel rounded-default bg-dropdown-bg shadow-overlay min-w-52 overflow-y-auto overscroll-contain border border-transparent p-1"
+        :style="subpanelStyle"
+        @mouseenter="onSubpanelMouseenter"
+        @mouseleave="scheduleClose"
+        @keydown="onSubpanelKeydown"
+      >
+        <ONavFlyoutItem
+          v-for="(child, childIndex) in openSub.children"
+          :key="childKey(child)"
+          v-bind="itemProps(child)"
+          :data-test="childRowTestId(child)"
+          :class="childIndex > 0 ? 'mt-0.5' : ''"
+          @click="onChildClick($event, child)"
+          @mouseenter="onChildMouseenter"
+        />
       </div>
     </Teleport>
   </div>
@@ -1032,7 +1212,8 @@ function onChildMouseenter(event: MouseEvent) {
    keyframe name and the animation shorthand together only when both live in the
    same scoped block — moving either out (e.g. to a template `[animation:…]`
    arbitrary value) would break the rename and the animation would not resolve. */
-.nav-group-flyout {
+.nav-group-flyout,
+.nav-group-subpanel {
   animation: nav-group-flyout-in 140ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 @keyframes nav-group-flyout-in {

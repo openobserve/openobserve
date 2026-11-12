@@ -20,13 +20,14 @@ test.describe('nav rail keyboard', () => {
     await page.keyboard.press('ArrowRight');
     await page.waitForTimeout(300);
     expect(await rail.openFlyoutKeys()).toEqual(['reliability']);
+    // Alerts is a nested row: its links live in a side panel, so the row itself takes first focus.
     let active = await rail.activeElementDataTest();
-    expect(active?.dataTest).toMatch(/^nav-group-item-/);
+    expect(active?.dataTest).toBe('nav-group-nested-menu-alerts');
     const firstItem = active.dataTest;
 
     await page.keyboard.press('ArrowDown');
     active = await rail.activeElementDataTest();
-    expect(active?.dataTest).toMatch(/^nav-group-item-/);
+    expect(active?.dataTest).toMatch(/^nav-group-(item|nested)-/);
     expect(active.dataTest).not.toBe(firstItem);
 
     // Shift+Tab: closes and focuses the owning tile.
@@ -46,10 +47,13 @@ test.describe('nav rail keyboard', () => {
     expect(active?.tag).not.toBe('BODY');
     expect(active?.inContent).toBe(true);
 
-    // Enter on an item: navigates, closes, focus back on the owning tile.
+    // Enter on an item in the Alerts side panel: navigates, closes, focus back on the owning tile.
     await tile.focus();
     await page.keyboard.press('ArrowRight');
     await page.waitForTimeout(300);
+    await page.keyboard.press('ArrowRight');
+    await expect(page.locator('[data-test="nav-group-subpanel-menu-alerts"]')).toBeVisible();
+    expect((await rail.activeElementDataTest())?.dataTest).toBe('nav-group-item-alertList');
     await page.keyboard.press('ArrowDown');
     const chosen = await page.evaluate(() => document.activeElement.getAttribute('href'));
     await page.keyboard.press('Enter');
@@ -65,6 +69,7 @@ test.describe('nav rail keyboard', () => {
     // Space on an item behaves like Enter.
     await page.keyboard.press('ArrowRight');
     await page.waitForTimeout(300);
+    await page.keyboard.press('ArrowRight');
     await page.keyboard.press('ArrowDown');
     await page.keyboard.press('ArrowDown');
     const chosen2 = await page.evaluate(() => document.activeElement.getAttribute('href'));
