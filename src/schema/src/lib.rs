@@ -298,18 +298,11 @@ async fn persist_stream_settings(
 
     normalize_stream_settings(&mut settings);
 
-    let required_fields = required_uds_fields(stream_type);
     if !settings.defined_schema_fields.is_empty() {
         settings.defined_schema_fields = uds_fields_to_save(stream_type, &settings, &schema_fields);
     }
 
-    // required columns are product-mandated, so they never occupy user field slots
-    let uds_user_fields = settings
-        .defined_schema_fields
-        .iter()
-        .filter(|field| !is_uds_internal_column(field) && !required_fields.contains(*field))
-        .count();
-    if uds_user_fields > cfg.limit.user_defined_schema_max_fields {
+    if uds_user_field_count(stream_type, &settings) > cfg.limit.user_defined_schema_max_fields {
         return Err(StreamSettingsError::BadRequest(format!(
             "user defined schema fields count exceeds the limit: {}",
             cfg.limit.user_defined_schema_max_fields
@@ -459,6 +452,21 @@ fn uds_fields_to_save(
         .collect::<Vec<_>>();
     fields.sort_unstable();
     fields
+}
+
+/// Required columns and enabled partition keys are added by the save, so they skip the limit.
+fn uds_user_field_count(stream_type: StreamType, settings: &StreamSettings) -> usize {
+    let required_fields = required_uds_fields(stream_type);
+    let partition_fields = enabled_partition_fields(settings).collect::<HashSet<_>>();
+    settings
+        .defined_schema_fields
+        .iter()
+        .filter(|field| {
+            !is_uds_internal_column(field)
+                && !required_fields.contains(*field)
+                && !partition_fields.contains(field)
+        })
+        .count()
 }
 
 /// The fields an auto-enabled UDS keeps: the keep fields, then current and new schema fields.
@@ -1425,6 +1433,15 @@ mod tests {
         assert_eq!(fields(false, 2), ["a", "pk"]);
         assert_eq!(fields(true, 2), ["a", "b"]);
         assert_eq!(fields(false, 1), ["pk"]);
+    }
+
+    #[test]
+    fn test_uds_user_field_count_skips_enabled_partition_keys() {
+        let mut settings = partitioned_settings(false);
+        settings.defined_schema_fields = ["_timestamp", "a", "pk"].map(String::from).to_vec();
+        assert_eq!(uds_user_field_count(StreamType::Logs, &settings), 1);
+        settings.partition_keys[0].disabled = true;
+        assert_eq!(uds_user_field_count(StreamType::Logs, &settings), 2);
     }
 
     #[test]
