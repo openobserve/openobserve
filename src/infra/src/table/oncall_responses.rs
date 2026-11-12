@@ -1244,6 +1244,43 @@ fn cause_columns(
     columns
 }
 
+/// [add_event] and, with a `close` note, the close, only while the incident is in `episode`.
+pub async fn recover_in_episode(
+    org_id: &str,
+    id: &str,
+    event: &ResponseEvent,
+    close: Option<&str>,
+    incident_id: &str,
+    episode: &super::alert_incidents::Episode,
+) -> Result<Option<(Response, bool)>, errors::Error> {
+    let db = get_orm_client_rw().await;
+    let held = super::alert_incidents::hold_episode(db, org_id, incident_id, episode).await?;
+    let Some(txn) = held else {
+        return Ok(None);
+    };
+    add_event_in(&txn, id, event).await?;
+    let mut closed = false;
+    if let Some(note) = close {
+        let now = now_micros();
+        let mut query = oncall_responses::Entity::update_many()
+            .col_expr(oncall_responses::Column::UpdatedAt, next_revision(now))
+            .col_expr(
+                oncall_responses::Column::State,
+                Expr::value(ResponseState::Resolved.to_i32()),
+            )
+            .col_expr(oncall_responses::Column::ClosedAt, Expr::value(now))
+            .filter(oncall_responses::Column::Id.eq(id))
+            .filter(oncall_responses::Column::OrgId.eq(org_id))
+            .filter(oncall_responses::Column::ClosedAt.is_null());
+        for (column, value) in cause_columns(None, Some(note.trim())) {
+            query = query.col_expr(column, value);
+        }
+        closed = query.exec(&txn).await?.rows_affected > 0;
+    }
+    txn.commit().await?;
+    Ok(get(org_id, id).await?.map(|page| (page, closed)))
+}
+
 pub async fn attach_incident(
     org_id: &str,
     id: &str,

@@ -41,7 +41,7 @@ use tonic_tracing_opentelemetry::middleware::server::OtelGrpcLayer;
 
 use crate::{
     handler::grpc::{
-        auth::{check_auth, check_internal_auth, check_otlp_auth},
+        auth::{check_auth, check_ingest_auth, check_internal_auth, check_otlp_auth},
         flight::FlightServiceImpl,
         request::{
             event::Eventer,
@@ -187,7 +187,7 @@ fn common_routes() -> Routes {
     let profiles_svc = otlp_authenticated(profiles_svc);
     let logs_svc = otlp_authenticated(logs_svc);
     let query_cache_svc = internal_authenticated(query_cache_svc);
-    let ingest_svc = internal_authenticated(ingest_svc);
+    let ingest_svc = ingest_authenticated(ingest_svc);
     let streams_svc = authenticated(streams_svc);
     let flight_svc = internal_authenticated(flight_svc);
     let node_svc = internal_authenticated(node_svc);
@@ -283,6 +283,10 @@ fn otlp_authenticated<S>(service: S) -> InterceptedService<S, AuthInterceptor> {
 
 fn internal_authenticated<S>(service: S) -> InterceptedService<S, AuthInterceptor> {
     InterceptedService::new(service, check_internal_auth)
+}
+
+fn ingest_authenticated<S>(service: S) -> InterceptedService<S, AuthInterceptor> {
+    InterceptedService::new(service, check_ingest_auth)
 }
 
 async fn bind_listener(

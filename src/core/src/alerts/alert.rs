@@ -990,9 +990,8 @@ async fn prepare_alert(
         .validate_threshold_operator()
         .and_then(|_| alert.query_condition.validate_threshold_operators())
         .map_err(AlertError::InvalidCondition)?;
-    // A realtime alert sees every ingested row, so one on chat history would exfiltrate it.
-    // Case-insensitive, so no spelling of the chat stream slips through.
-    if config::meta::self_reporting::ai_chat::is_protected_ai_chat_stream(
+    // A realtime alert sees every ingested row; lowercased, so no spelling slips through.
+    if config::meta::self_reporting::protected_streams::is_read_protected_stream(
         &alert.stream_name.trim().to_lowercase(),
     ) {
         return Err(AlertError::ProtectedStream(alert.stream_name.clone()));
@@ -1267,6 +1266,13 @@ async fn prepare_alert(
                     return Err(AlertError::ResolveStreamNameError(e));
                 }
             };
+
+            // The check on the alert's own stream misses a digest read through a join or subquery.
+            if config::meta::self_reporting::protected_streams::sql_reads_digest(sql) {
+                return Err(AlertError::ProtectedStream(
+                    config::meta::alerts::alert_calibration::DIGEST_STREAM.to_string(),
+                ));
+            }
 
             // SQL may contain multiple stream names, check for each stream
             // if the alert period is greater than the max query range
@@ -1580,8 +1586,21 @@ pub async fn update<C: ConnectionTrait + TransactionTrait>(
     conn: &C,
     org_id: &str,
     folder_id: Option<(&str, &str)>,
-    mut alert: Alert,
+    alert: Alert,
 ) -> Result<Alert, AlertError> {
+    update_where(conn, org_id, folder_id, alert, None)
+        .await?
+        .ok_or(AlertError::AlertNotFound)
+}
+
+/// With `guard`, saves only while it holds, as one transaction; None when it did not.
+pub async fn update_where<C: ConnectionTrait + TransactionTrait>(
+    conn: &C,
+    org_id: &str,
+    folder_id: Option<(&str, &str)>,
+    mut alert: Alert,
+    guard: Option<infra::table::alerts::WriteGuard>,
+) -> Result<Option<Alert>, AlertError> {
     let mut dst_folder_id_info = None;
     let _folder_info = if let Some((curr_folder_id, dst_folder_id)) = folder_id {
         // Ensure that the destination folder exists.
@@ -1611,8 +1630,11 @@ pub async fn update<C: ConnectionTrait + TransactionTrait>(
         None => None,
     };
 
+    // A guarded patch never edits workflows, and its snapshot can miss one attached since.
     #[cfg(feature = "enterprise")]
-    if let Some(ref id) = alert.id {
+    if let Some(ref id) = alert.id
+        && guard.is_none()
+    {
         let (_, old_alert) = get_by_id(conn, org_id, id.to_owned()).await?;
         let old_workflows = old_alert.workflows;
 
@@ -1671,7 +1693,10 @@ pub async fn update<C: ConnectionTrait + TransactionTrait>(
     {
         reset_run_state(org_id, &id.to_string(), db::scheduler::TriggerModule::Alert).await?;
     }
-    let alert = db::alerts::alert::update(conn, org_id, dst_folder_id_info, alert).await?;
+    let saved = db::alerts::alert::update_where(conn, org_id, dst_folder_id_info, alert, guard);
+    let Some(alert) = saved.await? else {
+        return Ok(None);
+    };
     slo_effect.apply().await;
     clean_up_opted_out_groups(&alert).await;
     if let Some(id) = alert.id
@@ -1706,7 +1731,7 @@ pub async fn update<C: ConnectionTrait + TransactionTrait>(
         )
         .await;
     }
-    Ok(alert)
+    Ok(Some(alert))
 }
 
 /// Gets the alert by its KSUID primary key.
@@ -1906,6 +1931,15 @@ pub(crate) async fn delete_by_id<C: ConnectionTrait>(
             if let Err(e) = infra::table::alert_eval_intervals::delete_by_alert(&alert_id_str).await
             {
                 log::warn!("failed to delete alert eval ledger for {alert_id_str}: {e}");
+            }
+            #[cfg(feature = "enterprise")]
+            if let Err(e) = crate::alerts::alert_calibration::dismissals::delete_for_alert(
+                org_id,
+                &alert_id_str,
+            )
+            .await
+            {
+                log::warn!("failed to delete alert calibration dismissals for {alert_id_str}: {e}");
             }
             Ok(())
         }
@@ -2466,7 +2500,7 @@ mod slo_source_guard_tests {
                 "update",
                 "pub async fn update<C: ConnectionTrait + TransactionTrait>(",
                 "\n/// Gets the alert by its KSUID primary key.",
-                "db::alerts::alert::update(conn, org_id, dst_folder_id_info, alert)",
+                "db::alerts::alert::update_where(conn, org_id, dst_folder_id_info, alert, guard)",
             ),
         ] {
             let body = body_of(from, to);
@@ -2481,6 +2515,22 @@ mod slo_source_guard_tests {
                 "{label} applies the SLO effect before the alert is written"
             );
         }
+    }
+
+    /// A guarded patch writes over a snapshot that can predate a workflow attached since.
+    #[test]
+    fn a_guarded_save_leaves_workflow_associations_alone() {
+        let body = body_of(
+            "pub async fn update_where<C: ConnectionTrait + TransactionTrait>(",
+            "\n/// Gets the alert by its KSUID primary key.",
+        );
+        let gate = body
+            .find("&& guard.is_none()")
+            .expect("the workflow sync must skip a guarded save");
+        let sync = body
+            .find("delete_workflow_association(")
+            .expect("update_where still syncs workflow associations");
+        assert!(gate < sync, "the gate must come before the sync");
     }
 
     #[test]
@@ -6102,6 +6152,94 @@ mod tests {
         );
     }
 
+    #[tokio::test]
+    async fn no_alert_can_watch_the_calibration_digest_stream() {
+        let mut realtime = Alert::default();
+        realtime.name = "copy-findings".into();
+        realtime.is_real_time = true;
+        let err = prepare_alert(
+            "ops",
+            "_o2_alert_calibration_digests",
+            "",
+            &mut realtime,
+            true,
+            false,
+        )
+        .await
+        .unwrap_err();
+        assert!(
+            matches!(err, AlertError::ProtectedStream(ref s) if s == "_o2_alert_calibration_digests")
+        );
+        let mut scheduled = Alert::default();
+        scheduled.name = "copy-findings-upper".into();
+        let err = prepare_alert(
+            "ops",
+            " _O2_ALERT_CALIBRATION_DIGESTS",
+            "",
+            &mut scheduled,
+            true,
+            false,
+        )
+        .await
+        .unwrap_err();
+        assert!(matches!(err, AlertError::ProtectedStream(_)));
+        assert_eq!(
+            axum::response::Response::from(err).status(),
+            axum::http::StatusCode::BAD_REQUEST
+        );
+    }
+
+    #[tokio::test]
+    async fn a_scheduled_alert_on_another_stream_cannot_read_the_digest_in_its_sql() {
+        use infra::schema::{STREAM_SCHEMAS_LATEST, SchemaCache};
+
+        let org_id = "test_org_alert_save_digest_sql";
+        let key = format!("{org_id}/{}/default", StreamType::Logs);
+        STREAM_SCHEMAS_LATEST.write().await.insert(
+            key.clone(),
+            SchemaCache::new(arrow_schema::Schema::new(vec![arrow_schema::Field::new(
+                "x",
+                DataType::Utf8,
+                true,
+            )])),
+        );
+        let mut results = Vec::new();
+        for sql in [
+            r#"SELECT count(*) AS n FROM "_o2_alert_calibration_digests""#,
+            r#"SELECT count(*) AS n FROM "default" WHERE x IN (SELECT alert_id FROM "_o2_alert_calibration_digests")"#,
+            r#"SELECT count(*) AS n FROM "default""#,
+            r#"SELECT count(*) AS n FROM "default" WHERE x IN (SELECT id FROM "_o2_ai_chat_events")"#,
+        ] {
+            let mut alert = Alert::default();
+            alert.trigger_condition.frequency = 60;
+            alert.trigger_condition.period = 60;
+            alert.query_condition.query_type = QueryType::SQL;
+            alert.query_condition.sql = Some(sql.to_string());
+            let res = prepare_alert(
+                org_id,
+                "default",
+                "watch_digest_sql",
+                &mut alert,
+                true,
+                false,
+            )
+            .await;
+            results.push((sql, res));
+        }
+        STREAM_SCHEMAS_LATEST.write().await.remove(&key);
+
+        for (sql, res) in &results[..2] {
+            assert!(
+                matches!(res, Err(AlertError::ProtectedStream(s)) if s == "_o2_alert_calibration_digests"),
+                "{sql}: {res:?}"
+            );
+        }
+        // The chat stream keeps its save-time behaviour: only the alert's own stream is checked.
+        for (sql, res) in &results[2..] {
+            assert!(res.is_ok(), "{sql}: {res:?}");
+        }
+    }
+
     /// Calls the production predicate, not a copy of it: a resolve updates the record the firing
     /// opened, so the firing body must have somewhere to carry the correlation key.
     #[test]
@@ -9507,6 +9645,56 @@ mod tests {
         })
         .await;
         assert!(!matches!(err, AlertError::InvalidCondition(_)), "{err:?}");
+    }
+
+    #[tokio::test]
+    async fn prepare_alert_passes_both_autoobserve_draft_shapes_through_the_operator_checks() {
+        use config::meta::alerts::{Condition, QueryType};
+
+        let err = prepare_schedule(|a| {
+            a.trigger_condition.frequency = 60;
+            a.trigger_condition.operator = Operator::GreaterThanEquals;
+            a.trigger_condition.threshold = 1;
+        })
+        .await;
+        assert!(reached_the_schema_lookup(&err), "{err:?}");
+        let err = prepare_schedule(|a| {
+            a.trigger_condition.frequency = 60;
+            a.query_condition.query_type = QueryType::PromQL;
+            a.query_condition.promql = Some("rate(http_requests_total[5m])".into());
+            a.query_condition.promql_condition = Some(Condition {
+                column: "value".to_string(),
+                operator: Operator::GreaterThan,
+                value: serde_json::json!(10),
+                ignore_case: false,
+                case_insensitive: None,
+            });
+            a.query_condition.promql_multi_alert = true;
+        })
+        .await;
+        assert!(!matches!(err, AlertError::InvalidCondition(_)), "{err:?}");
+    }
+
+    #[tokio::test]
+    async fn an_alert_on_the_digest_stream_with_an_accepted_in_condition_is_still_refused() {
+        let mut alert = Alert::default();
+        alert.name = "copy-findings".into();
+        alert.trigger_condition.frequency = 60;
+        with_condition_operator(&mut alert, "in");
+        let err = prepare_alert(
+            "ops",
+            "_o2_alert_calibration_digests",
+            "",
+            &mut alert,
+            true,
+            false,
+        )
+        .await
+        .unwrap_err();
+        assert!(
+            matches!(err, AlertError::ProtectedStream(ref s) if s == "_o2_alert_calibration_digests"),
+            "{err:?}"
+        );
     }
 
     #[tokio::test]

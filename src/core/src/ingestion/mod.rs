@@ -70,6 +70,7 @@ use crate::{
 };
 
 pub mod columnar;
+pub mod feature_writer;
 pub mod grpc;
 pub mod ingestion_service;
 pub mod realtime_mute;

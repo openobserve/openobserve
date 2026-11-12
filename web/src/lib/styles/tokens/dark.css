@@ -484,6 +484,7 @@
   --color-datepicker-border: var(--color-border-strong);
   --color-datepicker-disabled-bg: var(--color-surface-subtle);
   --color-datepicker-disabled-border: var(--color-border-default);
+  --color-datepicker-error-text: var(--color-error-400);
   --color-datepicker-error-border: var(--color-error-400);
   --color-datepicker-segment-focus-bg: var(--color-primary-500);
   --color-datepicker-segment-focus-text: var(--color-white);

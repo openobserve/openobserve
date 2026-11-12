@@ -688,7 +688,7 @@ export interface IncidentAlert {
   incident_id: string;
   alert_id: string;
   alert_name: string;
-  alert_kind?: "internal" | "external";
+  alert_kind?: "internal" | "external" | "autoobserve";
   alert_fired_at: number;
   correlation_reason: "service_discovery" | "primary_match" | "secondary_match" | "alert_id";
   created_at: number;

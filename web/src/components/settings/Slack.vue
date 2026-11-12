@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, nextTick, ref, watch } from "vue";
 import { useQuery } from "@tanstack/vue-query";
 import { useStore } from "vuex";
 import config from "@/aws-exports";
@@ -26,22 +26,34 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import useIsMetaOrg from "@/composables/useIsMetaOrg";
-import { slackInstallationsQuery } from "@/services/slack.queries";
+import { slackInsightsSettingsQuery, slackInstallationsQuery } from "@/services/slack.queries";
 import { raw, useI18nTyped } from "@/types/i18n";
 import type { InstallationView, SlackInstallConfirmation as Confirmation } from "@/types/slack";
+import { statusOf } from "@/utils/slackLink";
 import { orderInstallations, readSlackOrgConfig } from "@/utils/slackSettings";
 import SlackChannelDefaults from "./SlackChannelDefaults.vue";
 import SlackConnectEmpty from "./SlackConnectEmpty.vue";
+import SlackInsightsSection from "./SlackInsightsSection.vue";
 import SlackInstallConfirmation from "./SlackInstallConfirmation.vue";
 import SlackLinkingSection from "./SlackLinkingSection.vue";
 import SlackOncallUnlinked from "./SlackOncallUnlinked.vue";
 import SlackOrgAccess from "./SlackOrgAccess.vue";
+import SlackPageSection from "./SlackPageSection.vue";
+import SlackSectionBar from "./SlackSectionBar.vue";
 import SlackSelfHostedWizard from "./SlackSelfHostedWizard.vue";
 import SlackSwitchAllCard from "./SlackSwitchAllCard.vue";
 import SlackUninstallDialog from "./SlackUninstallDialog.vue";
 import SlackWorkspaceCard from "./SlackWorkspaceCard.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { provideSlackReadOnly } from "./slackReadOnly";
 
 type DialogMode = "disconnect" | "uninstall";
+
+// A server with AutoObserve insights off answers the settings route like a disabled deployment.
+const INSIGHTS_OFF_STATUSES = new Set([404, 501]);
+// Document order puts the unreadable-credentials banner's Reinstall before the card's own.
+const REINSTALL_BUTTONS =
+  '[data-test="slack-credentials-reinstall"], [data-test="slack-reinstall"]';
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -71,6 +83,29 @@ const selectedTab = computed<string>({
 });
 const pendingId = computed(() => ordered.value.find((i) => i.status === "pending")?.id ?? null);
 const showOrgAccess = computed(() => isMetaOrg.value && current.value?.scope === "instance");
+
+const insightsEdition = config.isEnterprise == "true" || config.isCloud == "true";
+const insightsWanted = computed(
+  () => insightsEdition && slackState.value.enabled && !!org.value && ordered.value.length > 0,
+);
+const insights = useQuery(() =>
+  Object.assign(slackInsightsSettingsQuery(org.value), { enabled: insightsWanted.value }),
+);
+// Waiting for the answer keeps the bar and headings from pushing today's page down when they arrive.
+const insightsSettling = computed(() => insightsWanted.value && insights.isPending.value);
+const showInsights = computed(
+  () =>
+    insightsWanted.value &&
+    !insights.isPending.value &&
+    !INSIGHTS_OFF_STATUSES.has(statusOf(insights.error.value) ?? 0),
+);
+// Only an explicit refusal limits the page; a server that does not say keeps every control.
+const readOnly = computed(() => insights.data.value?.can_edit === false);
+provideSlackReadOnly(readOnly);
+const sectionLinks = computed(() => [
+  { id: "general", label: t("slackApp.sections.general") },
+  { id: "autoobserve", label: t("slackApp.sections.autoobserve") },
+]);
 
 const wizardActive = ref(false);
 const wizardInstallationId = ref<string | null>(null);
@@ -102,6 +137,10 @@ watch(
   { immediate: true },
 );
 const showWizard = computed(() => !isCloud.value && wizardActive.value);
+// Only the workspace page shows insights; unmounting the wizard or confirmation would reset them.
+const pageSettling = computed(
+  () => insightsSettling.value && !confirmation.value && !showWizard.value,
+);
 // Pinned by id so the wizard keeps its installation after it stops being pending.
 const wizardInstallation = computed(
   () => ordered.value.find((i) => i.id === wizardInstallationId.value) ?? null,
@@ -119,6 +158,16 @@ const showConfirmation = (value: Confirmation): void => {
   confirmation.value = value;
 };
 
+const page = ref<HTMLElement | null>(null);
+
+const goToReinstall = async (installationId: string): Promise<void> => {
+  selectedId.value = installationId;
+  await nextTick();
+  const button = page.value?.querySelector<HTMLElement>(REINSTALL_BUTTONS);
+  button?.scrollIntoView({ block: "center" });
+  button?.focus();
+};
+
 const openDialog = (mode: DialogMode): void => {
   if (!current.value) return;
   dialogMode.value = mode;
@@ -128,16 +177,17 @@ const openDialog = (mode: DialogMode): void => {
 </script>
 
 <template>
-  <div class="flex flex-col gap-6 pb-6" data-test="slack-settings">
+  <div ref="page" class="flex flex-col gap-6 pb-6" data-test="slack-settings">
     <!-- Keyed by org: every step, ticket and popup below belongs to the org it started in. -->
     <div v-if="slackState.enabled" :key="org" class="flex flex-col gap-6">
-      <div v-if="installations.isPending.value" class="flex justify-center py-16">
+      <div v-if="installations.isPending.value || pageSettling" class="flex justify-center py-16">
         <OSpinner size="md" />
       </div>
       <OEmptyState
         v-else-if="forbidden"
         size="hero"
         preset="no-access"
+        :description="t('slackApp.workspaces.noAccess')"
         data-test="slack-no-access"
       />
       <OEmptyState
@@ -159,59 +209,82 @@ const openDialog = (mode: DialogMode): void => {
         @cancel="closeWizard(false)"
       />
       <template v-else-if="current && !adding">
-        <div
-          class="flex items-end justify-between gap-3"
-          :class="ordered.length > 1 ? 'border-border-default border-b' : ''"
+        <SlackSectionBar v-if="showInsights" :sections="sectionLinks" />
+        <SlackPageSection
+          section-id="general"
+          :title="showInsights ? t('slackApp.sections.general') : undefined"
+          :description="showInsights ? t('slackApp.sections.generalDescription') : undefined"
         >
-          <OTabs
-            v-if="ordered.length > 1"
-            v-model="selectedTab"
-            class="min-w-0"
-            data-test="slack-workspace-tabs"
+          <div
+            class="flex items-end justify-between gap-3"
+            :class="ordered.length > 1 ? 'border-border-default border-b' : ''"
           >
-            <OTab
-              v-for="inst in ordered"
-              :key="inst.id"
-              :name="inst.id"
-              data-test="slack-workspace-tab"
+            <OTabs
+              v-if="ordered.length > 1"
+              v-model="selectedTab"
+              class="min-w-0"
+              data-test="slack-workspace-tabs"
             >
-              <span class="inline-flex items-center gap-2">
-                {{ raw(inst.team_name) }}
-                <OTag
-                  v-if="inst.scope === 'instance'"
-                  variant="primary-soft"
-                  size="sm"
-                  :label="t('slackApp.card.instanceTag')"
-                />
-              </span>
-            </OTab>
-          </OTabs>
-          <OButton
-            variant="outline"
-            size="sm-action"
-            icon-left="add"
-            class="ms-auto"
-            data-test="slack-add-workspace"
-            @click="adding = true"
+              <OTab
+                v-for="inst in ordered"
+                :key="inst.id"
+                :name="inst.id"
+                data-test="slack-workspace-tab"
+              >
+                <span class="inline-flex items-center gap-2">
+                  {{ raw(inst.team_name) }}
+                  <OTag
+                    v-if="inst.scope === 'instance'"
+                    variant="primary-soft"
+                    size="sm"
+                    :label="t('slackApp.card.instanceTag')"
+                  />
+                </span>
+              </OTab>
+            </OTabs>
+            <OButton
+              variant="outline"
+              size="sm-action"
+              icon-left="add"
+              class="ms-auto"
+              :disabled="readOnly"
+              data-test="slack-add-workspace"
+              @click="adding = true"
+            >
+              {{ t("slackApp.workspaces.addAnother") }}
+              <OTooltip
+                v-if="readOnly"
+                side="bottom"
+                :content="t('slackApp.connect.permissionHint')"
+              />
+            </OButton>
+          </div>
+          <SlackSwitchAllCard :key="`switch-${current.id}`" :installation="current" />
+          <SlackWorkspaceCard
+            :key="current.id"
+            :installation="current"
+            :is-cloud="isCloud"
+            :read-only="readOnly"
+            @disconnect="openDialog('disconnect')"
+            @uninstall="openDialog('uninstall')"
           >
-            {{ t("slackApp.workspaces.addAnother") }}
-          </OButton>
-        </div>
-        <SlackSwitchAllCard :key="`switch-${current.id}`" :installation="current" />
-        <SlackWorkspaceCard
-          :key="current.id"
-          :installation="current"
-          :is-cloud="isCloud"
-          @disconnect="openDialog('disconnect')"
-          @uninstall="openDialog('uninstall')"
+            <template #oncall>
+              <SlackOncallUnlinked :installation="current" />
+            </template>
+            <SlackOrgAccess v-if="showOrgAccess" :installation="current" />
+            <SlackChannelDefaults :installation-id="current.id" />
+            <SlackLinkingSection :installation="current" />
+          </SlackWorkspaceCard>
+        </SlackPageSection>
+        <SlackPageSection
+          v-if="showInsights"
+          section-id="autoobserve"
+          class="border-border-default border-t pt-6"
+          :title="t('slackApp.sections.autoobserve')"
+          :description="t('slackApp.sections.autoobserveDescription')"
         >
-          <template #oncall>
-            <SlackOncallUnlinked :installation="current" />
-          </template>
-          <SlackOrgAccess v-if="showOrgAccess" :installation="current" />
-          <SlackChannelDefaults :installation-id="current.id" />
-          <SlackLinkingSection :installation="current" />
-        </SlackWorkspaceCard>
+          <SlackInsightsSection :installations="ordered" @reinstall="goToReinstall" />
+        </SlackPageSection>
       </template>
       <template v-else>
         <div v-if="adding" class="flex justify-end">

@@ -34,10 +34,13 @@ import {
 } from "@/services/slack.queries";
 import { useI18nTyped } from "@/types/i18n";
 import type { InstallationView } from "@/types/slack";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import SlackLinkedPeople from "./SlackLinkedPeople.vue";
+import { useSlackReadOnly } from "./slackReadOnly";
 import { makeLinkingSchema, type LinkingForm } from "./SlackSettings.schema";
 
 const props = defineProps<{ installation: InstallationView }>();
+const readOnly = useSlackReadOnly();
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -194,16 +197,22 @@ const runLinkAll = async (): Promise<void> => {
               variant="outline"
               size="sm"
               icon-left="edit"
+              :disabled="readOnly"
               data-test="slack-linking-edit"
               @click="editing = true"
             >
               {{ t("slackApp.linking.editDomains") }}
+              <OTooltip
+                v-if="readOnly"
+                side="bottom"
+                :content="t('slackApp.connect.permissionHint')"
+              />
             </OButton>
             <OSwitch
               :model-value="view.enabled"
               :label="view.enabled ? t('slackApp.linking.on') : t('slackApp.linking.off')"
               label-position="left"
-              :disabled="managed || update.isPending.value"
+              :disabled="managed || readOnly || update.isPending.value"
               data-test="slack-linking-switch"
               @update:model-value="toggle"
             />
@@ -254,6 +263,7 @@ const runLinkAll = async (): Promise<void> => {
           size="sm-action"
           icon-left="link"
           :loading="linkAll.isPending.value"
+          :disabled="readOnly"
           @click="runLinkAll"
         >
           {{ t("slackApp.linking.linkAllMatches", { count: matches }) }}
