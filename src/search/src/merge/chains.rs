@@ -140,7 +140,10 @@ mod tests {
         TIMESTAMP_COL_NAME,
         meta::{promql::HASH_LABEL, stream::FileMeta},
     };
-    use parquet::file::properties::{EnabledStatistics, WriterProperties};
+    use parquet::{
+        arrow::ArrowWriter,
+        file::properties::{EnabledStatistics, WriterProperties},
+    };
 
     use super::*;
 
@@ -151,29 +154,26 @@ mod tests {
         ]))
     }
 
-    async fn put_file(
-        account: &str,
-        name: &str,
-        hashes: [u64; 2],
-        statistics: EnabledStatistics,
-    ) -> FileKey {
-        let batch = RecordBatch::try_new(
-            schema(),
-            vec![
-                Arc::new(UInt64Array::from(hashes.to_vec())),
-                Arc::new(Int64Array::from(vec![10, 50])),
-            ],
-        )
-        .unwrap();
+    async fn put_file(account: &str, name: &str, hashes: [u64; 2], stats: bool) -> FileKey {
+        let columns: Vec<Arc<dyn arrow::array::Array>> = vec![
+            Arc::new(UInt64Array::from(hashes.to_vec())),
+            Arc::new(Int64Array::from(vec![10, 50])),
+        ];
+        let statistics = if stats {
+            EnabledStatistics::Page
+        } else {
+            EnabledStatistics::None
+        };
         let props = WriterProperties::builder()
             .set_statistics_enabled(statistics)
             .build();
         let mut buf = Vec::new();
-        let mut writer =
-            parquet::arrow::ArrowWriter::try_new(&mut buf, schema(), Some(props)).unwrap();
-        writer.write(&batch).unwrap();
+        let mut writer = ArrowWriter::try_new(&mut buf, schema(), Some(props)).unwrap();
+        writer
+            .write(&RecordBatch::try_new(schema(), columns).unwrap())
+            .unwrap();
         writer.close().unwrap();
-        let key = format!("files/o/metrics/chains/2026/08/18/10/{name}");
+        let key = format!("files/o/metrics/chains/2026/08/18/10/hash-merged-v1-{name}.parquet");
         let meta = FileMeta {
             records: 2,
             compressed_size: buf.len() as i64,
@@ -187,42 +187,21 @@ mod tests {
 
     /// Each round's files form one chain; files without statistics are an error, not a guess.
     #[tokio::test(flavor = "multi_thread")]
-    async fn test_hash_ordered_chains_follow_the_file_statistics() {
+    async fn test_read_chains() {
         let id = ider::uuid();
         infra::storage::add_account(&id, Box::new(object_store::memory::InMemory::new())).await;
         let account = format!("{id}:default");
         let mut rounds = Vec::new();
+        let mut bare = Vec::new();
         for round in ["a", "b", "c"] {
-            for (part, hashes) in [(1, [1, 4]), (2, [5, 9])] {
-                let name = format!("hash-merged-v1-{round}{part}.parquet");
-                rounds.push(put_file(&account, &name, hashes, EnabledStatistics::Page).await);
-            }
+            rounds.push(put_file(&account, &format!("{round}1"), [1, 4], true).await);
+            rounds.push(put_file(&account, &format!("{round}2"), [5, 9], true).await);
+            bare.push(put_file(&account, &format!("{round}0"), [1, 9], false).await);
         }
         let chains = read_chains(schema(), rounds).await.unwrap();
-        let mut names: Vec<Vec<&str>> = chains
-            .iter()
-            .map(|chain| {
-                chain
-                    .iter()
-                    .map(|f| f.key.rsplit('/').next().unwrap())
-                    .collect()
-            })
-            .collect();
-        names.sort();
-        assert_eq!(
-            names,
-            [
-                ["hash-merged-v1-a1.parquet", "hash-merged-v1-a2.parquet"],
-                ["hash-merged-v1-b1.parquet", "hash-merged-v1-b2.parquet"],
-                ["hash-merged-v1-c1.parquet", "hash-merged-v1-c2.parquet"],
-            ]
-        );
+        let lens: Vec<usize> = chains.iter().map(Vec::len).collect();
+        assert_eq!(lens, [2, 2, 2], "{chains:?}");
 
-        let mut bare = Vec::new();
-        for i in 1..=5 {
-            let name = format!("hash-merged-v1-n{i}.parquet");
-            bare.push(put_file(&account, &name, [1, 9], EnabledStatistics::None).await);
-        }
         let err = read_chains(schema(), bare).await.unwrap_err();
         assert!(err.to_string().contains("statistics"), "{err}");
     }

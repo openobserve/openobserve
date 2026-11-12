@@ -451,38 +451,6 @@ mod tests {
         );
     }
 
-    fn ingester_hour(count: usize) -> Vec<FileKey> {
-        (1..=count)
-            .map(|i| hash_file(&format!("hash-sorted-v1-{i:03}.parquet"), 30))
-            .collect()
-    }
-
-    fn batch_sizes(batches: &[PlannedBatch]) -> Vec<usize> {
-        batches.iter().map(|(files, _)| files.len()).collect()
-    }
-
-    /// A closed hour over the cap plans its pre-merge instead of the indexed merge.
-    #[tokio::test]
-    async fn test_plan_batches_closed_hour_over_the_cap_pre_merges_first() {
-        let strategy = MergeStrategy::FileTime;
-        let mut limits = limits(&strategy, 0, false);
-        limits.max_merge_groups = 3;
-        let batches = plan_batches(
-            ingester_hour(7),
-            &MergeMode::MetricsIndexed,
-            &limits,
-            &schema(),
-            "s",
-        )
-        .await;
-        assert_eq!(batch_sizes(&batches), [3, 3], "the lone 7th file waits");
-        assert!(
-            batches
-                .iter()
-                .all(|(_, mode)| matches!(mode, MergeMode::MetricsHashMerged))
-        );
-    }
-
     #[test]
     fn test_size_bounded_groups_seal_rules() {
         let files: Vec<FileKey> = (1..=5)

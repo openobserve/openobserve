@@ -206,63 +206,37 @@ mod tests {
         );
     }
 
-    fn hash_file(name: &str, compressed_size: i64) -> FileKey {
-        let mut file = file_key(name, compressed_size * 40);
-        file.meta.compressed_size = compressed_size;
-        file
-    }
-
-    fn ingester_hour(count: usize) -> Vec<FileKey> {
-        (1..=count)
-            .map(|i| hash_file(&format!("hash-sorted-v1-{i:03}.parquet"), 30))
-            .collect()
-    }
-
-    fn names(files: &[FileKey]) -> Vec<&str> {
-        files
-            .iter()
-            .map(|f| f.key.rsplit('/').next().unwrap())
-            .collect()
-    }
-
-    /// Over the cap the smallest groups merge first; indexed files count as two and stay out.
+    /// Over the cap the smallest groups merge first and a lone trailing group waits.
     #[test]
-    fn test_pre_merge_batches_group_smallest_first_over_the_cap() {
+    fn test_split_into_pre_merge_groups() {
+        let file = |name: &str, compressed_size| {
+            let mut file = file_key(name, 0);
+            file.meta.compressed_size = compressed_size;
+            file
+        };
+        let ingester = vec![
+            file("hash-sorted-v1-1.parquet", 30),
+            file("hash-sorted-v1-2.parquet", 30),
+        ];
         let chains = vec![
-            vec![
-                hash_file("hash-merged-v1-a.parquet", 400),
-                hash_file("hash-merged-v1-b.parquet", 400),
-            ],
-            vec![hash_file("hash-merged-v1-c.parquet", 10)],
+            vec![file("hash-merged-v1-a.parquet", 400)],
+            vec![file("hash-merged-v1-b.parquet", 10)],
         ];
         let groups = |indexed_groups, max_groups| {
             split_into_pre_merge_groups(
-                ingester_hour(3),
+                ingester.clone(),
                 Some(chains.clone()),
                 indexed_groups,
                 max_groups,
             )
         };
-        assert!(groups(2, 7).is_empty());
-        assert!(
-            groups(0, 5).is_empty(),
-            "five groups without indexed files fit a cap of five"
-        );
-        assert_eq!(groups(2, 6).len(), 1);
-        let batches = groups(2, 4);
-        assert_eq!(
-            batches.len(),
-            1,
-            "the lone largest chain waits: {batches:?}"
-        );
-        assert_eq!(
-            names(&batches[0]),
-            [
-                "hash-merged-v1-c.parquet",
-                "hash-sorted-v1-001.parquet",
-                "hash-sorted-v1-002.parquet",
-                "hash-sorted-v1-003.parquet"
-            ]
-        );
+        assert!(groups(0, 4).is_empty(), "four groups fit a cap of four");
+        assert_eq!(groups(2, 4).len(), 1, "indexed files add two groups");
+        let batches = groups(0, 3);
+        let sizes: Vec<Vec<i64>> = batches
+            .iter()
+            .map(|batch| batch.iter().map(|f| f.meta.compressed_size).collect())
+            .collect();
+        assert_eq!(sizes, [[10, 30, 30]], "the largest group waits alone");
     }
 }
