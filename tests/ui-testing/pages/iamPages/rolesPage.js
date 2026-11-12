@@ -121,6 +121,18 @@ export class RolesPage {
         // ---------- tabs ----------
         this.tabs = page.locator('[data-test="edit-role-tabs"]');
 
+        // ---------- member tabs (Users / Service Accounts) ----------
+        // Scoped by table: both member lists stay mounted under v-show and share `edit-role-users-section`.
+        this.userMemberRows = page.locator(
+            '[data-test="iam-users-selection-table"] [data-test^="iam-users-selection-table-body-row-"][data-test$="-checkbox"]',
+        );
+        this.serviceAccountMemberRows = page.locator(
+            '[data-test="iam-service-accounts-selection-table"] [data-test^="iam-service-accounts-selection-table-body-row-"][data-test$="-checkbox"]',
+        );
+        this.serviceAccountMembersEmpty = page.locator(
+            '[data-test="iam-service-accounts-selection-table"] [data-test="o2-empty-state"]',
+        );
+
         // ---------- leaving with unsaved changes ----------
         // ConfirmDialog renders inside ODialog, so the buttons carry the dialog's slugs.
         // The shared unsaved-changes dialog: Discard drops the changes, closing it stays on the editor.
@@ -376,6 +388,56 @@ export class RolesPage {
 
     roleRow(name) {
         return this.page.locator(`[data-test="iam-roles-edit-${name}-role-icon"]`);
+    }
+
+    /** The clickable member count on a roles-list row; `kind` is `users` or `service-accounts`. */
+    roleMemberCount(name, kind) {
+        return this.page.locator(`[data-test="iam-roles-${name}-${kind}-link"]`);
+    }
+
+    /** Filters the roles list down to one role and waits for its row. */
+    async filterRoleList(name) {
+        await this.listSearch.fill(name);
+        await this.roleRow(name).waitFor({ state: 'visible', timeout: 15000 });
+    }
+
+    /** An editor tab is an OToggleGroupItem, so the active one is `data-state="on"`, not `active`. */
+    async expectTabActive(value) {
+        await expect(this.tab(value)).toHaveAttribute('data-state', 'on', { timeout: 15000 });
+    }
+
+    /** Sorted emails of the rows the Users tab shows, read from their checkbox slugs. */
+    async userMemberEmails() {
+        return this.emailsFromRowSlugs(this.userMemberRows, 'iam-users-selection-table-body-row-');
+    }
+
+    /** Sorted emails of the rows the Service Accounts tab shows. */
+    async serviceAccountMemberEmails() {
+        return this.emailsFromRowSlugs(
+            this.serviceAccountMemberRows,
+            'iam-service-accounts-selection-table-body-row-',
+        );
+    }
+
+    async emailsFromRowSlugs(rows, slugPrefix) {
+        const slugs = await rows.evaluateAll((els) => els.map((e) => e.getAttribute('data-test')));
+        return slugs.map((s) => s.slice(slugPrefix.length, -'-checkbox'.length)).sort();
+    }
+
+    serviceAccountShowToggle(value) {
+        return this.page.locator(`[data-test="iam-service-accounts-selection-show-${value}-btn"]`);
+    }
+
+    serviceAccountMemberCheckbox(email) {
+        return this.page.locator(
+            `[data-test="iam-service-accounts-selection-table-body-row-${email}-checkbox"] [role="checkbox"]`,
+        );
+    }
+
+    userMemberCheckbox(email) {
+        return this.page.locator(
+            `[data-test="iam-users-selection-table-body-row-${email}-checkbox"] [role="checkbox"]`,
+        );
     }
 
     async openRole(name) {

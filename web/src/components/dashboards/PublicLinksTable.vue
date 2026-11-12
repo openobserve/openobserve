@@ -673,7 +673,7 @@ async function runRowAction(
 }
 
 function onStatSelect(key: string) {
-  statusFilter.value = key as StatusFilter;
+  statusFilter.value = key === "all" || key === statusFilter.value ? "all" : (key as StatusFilter);
 }
 
 function onEmptyAction(id?: string) {

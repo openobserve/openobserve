@@ -98,6 +98,8 @@ import { RumPerformancePage } from "./rumPages/rumPerformancePage.js";
 import { RumIngestionPage } from "./rumPages/rumIngestionPage.js";
 import { RumSourcemapsPage } from "./rumPages/rumSourcemapsPage.js";
 import { RumProductAnalyticsPage } from "./rumPages/rumProductAnalyticsPage.js";
+import { RumReplayPlayerPage } from "./rumPages/rumReplayPlayerPage.js";
+import { RumSessionTracesTabPage } from "./rumPages/rumSessionTracesTabPage.js";
 import { ReportsPage } from "./reportsPages/reportsPage.js";
 import { ReportFoldersPage } from "./reportsPages/reportFoldersPage.js";
 import { ReportsFormValidationPage } from "./reportsPages/reportsFormValidationPage.js";
@@ -143,6 +145,7 @@ import { PasswordPolicyPage } from "./generalPages/passwordPolicyPage.js";
 import { AiToolsetsFormValidationPage } from "./generalPages/aiToolsetsFormValidationPage.js";
 import { AiAssistantCreditsPage } from "./generalPages/aiAssistantCreditsPage.js";
 import { RumFormValidationPage } from "./generalPages/rumFormValidationPage.js";
+import { QuickFilterCardsPage } from "./generalPages/quickFilterCardsPage.js";
 const SchemaPage = require("./generalPages/schemaPage.js");
 const SchemaLoadPage = require("./generalPages/schemaLoadPage.js");
 const APICleanup = require("./apiCleanup.js");
@@ -231,6 +234,7 @@ class PageManager {
 
     // ===== EXISTING ALERTS PAGE OBJECT =====
     this.alertsPage = new AlertsPage(page);
+    this.quickFilterCardsPage = new QuickFilterCardsPage(page);
     this.createAlertFromSourceDialog = new CreateAlertFromSourceDialogPage(page);
     this.alertLibraryPage = new AlertLibraryPage(page);
     this.alertHistoryPage = new AlertHistoryPage(page);
@@ -394,6 +398,8 @@ class PageManager {
     this.rumIngestionPage = new RumIngestionPage(page);
     this.rumSourcemapsPage = new RumSourcemapsPage(page);
     this.rumProductAnalyticsPage = new RumProductAnalyticsPage(page);
+    this.rumReplayPlayerPage = new RumReplayPlayerPage(page);
+    this.rumSessionTracesTabPage = new RumSessionTracesTabPage(page);
   }
 }
 
