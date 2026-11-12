@@ -2065,6 +2065,7 @@
     "slos": "SLOs",
     "reliability": "Reliability",
     "onCall": "On-Call",
+    "response": "Response",
     "toggleNavigation": "Toggle navigation",
     "ingestionText": "Ingestion",
     "navigationLink": "Navigation link",
@@ -5362,6 +5363,8 @@
       "reasonExpired": "never ran · queued over 1 h",
       "reasonWorkerLost": "worker lost · not re-run",
       "reasonWorkflowDisabled": "workflow was disabled",
+      "reasonEndpointDisabled": "never ran · HTTP endpoint was turned off",
+      "reasonCredentialRevoked": "never ran · its credential was revoked",
       "reasonRunTimeout": "timed out after 15 min",
       "allTriggers": "All triggers",
       "triggerFilter": "Trigger",
@@ -14503,6 +14506,9 @@
         "muteGroup": "Mute this group",
         "endNow": "End mute now",
         "endMute": "End mute",
+        "endNowGroups": "End mute ({count} group) | End mute ({count} groups)",
+        "mutedBy": "Muted by {name}",
+        "rowActions": "Mute actions",
         "mutedUntilClear": "Muted until it clears · 24 h at most",
         "mutedUntilClearGroups": "Muted until it clears · {count} group | Muted until it clears · {count} groups",
         "mutedGroups": "Muted · {count} group · ends in {duration} | Muted · {count} groups · ends in {duration}",
@@ -24436,7 +24442,9 @@
       "pageNotSnoozed": "{team} page not snoozed: {why}",
       "teamlessPageNotSnoozed": "page not snoozed: {why}",
       "timeTomorrow": "{time} tomorrow",
-      "notQuickMute": "This mute was set on the Downtimes page. Change it there."
+      "notQuickMute": "This mute was set on the Downtimes page. Change it there.",
+      "muteChangedOpen": "This mute changed. Open the downtime.",
+      "noPermissionToEnd": "You do not have permission to end this mute."
     }
   },
   "cipherKeys": {
@@ -26971,6 +26979,7 @@
       "groupAutoscaling": "Autoscaling",
       "subtitle": "Monitor clusters, workloads and resources",
       "clusterPickerLabel": "Cluster",
+      "clusterPickerLoading": "Loading clusters…",
       "clusterPickerTrigger": "Cluster: {name}",
       "clusterPickerSearch": "Find cluster",
       "clusterPickerEmpty": "No clusters match",

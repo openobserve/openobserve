@@ -296,11 +296,17 @@ describe("ONavGroup", () => {
       expect(style).toContain("top: 8px");
     });
 
-    it("moves a flyout that fits up just enough to clear the bottom margin", async () => {
+    it("centres a flyout that does not fit below its tile in the window", async () => {
       const style = await openWithFlyoutHeight(300);
 
       expect(style).toContain("max-height: 484px");
-      expect(style).toContain("top: 192px");
+      expect(style).toContain("top: 100px");
+    });
+
+    it("keeps a flyout that just fits below its tile at the tile's top", async () => {
+      const style = await openWithFlyoutHeight(192);
+
+      expect(style).toContain("top: 300px");
     });
 
     it("keeps a flyout that fits comfortably at the tile's top", async () => {
@@ -317,6 +323,147 @@ describe("ONavGroup", () => {
       await flyout().find("a[data-test^='nav-group-item-']").trigger("mouseenter");
 
       expect(focus).toHaveBeenCalledWith({ preventScroll: true });
+    });
+  });
+
+  describe("flyout column layout", () => {
+    const spies: Array<{ mockRestore: () => void }> = [];
+    const section = (key: string, names: string[]) =>
+      names.map((name) => ({ titleKey: "menu.streams", icon: "table", name, categoryKey: key }));
+
+    // Heights per layout: the mock reads the layout the component has chosen.
+    async function openWith(
+      kids: unknown[],
+      heights: { single: number; columns: number },
+      tileTop = 300,
+      columnsWidth = 0,
+      tileLeft = 10,
+    ) {
+      spies.push(vi.spyOn(window, "innerHeight", "get").mockReturnValue(500));
+      wrapper = mountGroup();
+      await wrapper.setProps({ children: kids });
+      spies.push(
+        vi.spyOn(wrapper.element, "getBoundingClientRect").mockReturnValue({
+          left: tileLeft,
+          right: tileLeft + 88,
+          top: tileTop,
+          bottom: tileTop + 60,
+          width: 88,
+          height: 60,
+          x: tileLeft,
+          y: tileTop,
+          toJSON: () => ({}),
+        }),
+        vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockImplementation(function (
+          this: HTMLElement,
+        ) {
+          return this.getAttribute("data-layout") === "columns" ? heights.columns : heights.single;
+        }),
+        vi.spyOn(HTMLElement.prototype, "offsetWidth", "get").mockImplementation(function (
+          this: HTMLElement,
+        ) {
+          return this.getAttribute("data-layout") === "columns" ? columnsWidth : 0;
+        }),
+      );
+      await hoverOpen();
+    }
+
+    const twoSections = [
+      ...section("menu.alerts", ["logstreams", "pipelines"]),
+      ...section("menu.onCall", ["home"]),
+    ];
+
+    beforeEach(() => {
+      spies.push(vi.spyOn(document.documentElement, "clientWidth", "get").mockReturnValue(1024));
+    });
+
+    afterEach(() => {
+      spies.splice(0).forEach((spy) => spy.mockRestore());
+    });
+
+    it("lays sections out as columns when one column is taller than the window", async () => {
+      await openWith(twoSections, { single: 600, columns: 300 });
+
+      expect(flyout().attributes("data-layout")).toBe("columns");
+      expect(flyout().findAll('[data-test="nav-group-column"]')).toHaveLength(2);
+      expect(flyout().attributes("style")).toContain("top: 100px");
+    });
+
+    it("keeps one column for a short menu", async () => {
+      await openWith(twoSections, { single: 200, columns: 100 }, 100);
+
+      expect(flyout().attributes("data-layout")).toBe("single");
+      expect(flyout().findAll('[data-test="nav-group-column"]')).toHaveLength(1);
+    });
+
+    it("keeps one column when a tall menu has only one section", async () => {
+      await openWith(section("menu.alerts", ["logstreams", "pipelines"]), {
+        single: 600,
+        columns: 300,
+      });
+
+      expect(flyout().attributes("data-layout")).toBe("single");
+    });
+
+    it("falls back to one scrolling column when columns do not fit either", async () => {
+      await openWith(twoSections, { single: 700, columns: 600 });
+
+      expect(flyout().attributes("data-layout")).toBe("single");
+      expect(flyout().attributes("style")).toContain("max-height: 484px");
+      expect(flyout().attributes("style")).toContain("top: 8px");
+      expect(flyout().classes()).toEqual(
+        expect.arrayContaining(["overflow-y-auto", "overscroll-contain"]),
+      );
+    });
+
+    it("falls back to one column when the columns are wider than the space beside the rail", async () => {
+      spies.push(vi.spyOn(document.documentElement, "clientWidth", "get").mockReturnValue(800));
+      await openWith(twoSections, { single: 600, columns: 300 }, 300, 760);
+
+      expect(flyout().attributes("data-layout")).toBe("single");
+    });
+
+    it("keeps columns when they fit the space beside the rail", async () => {
+      spies.push(vi.spyOn(document.documentElement, "clientWidth", "get").mockReturnValue(800));
+      await openWith(twoSections, { single: 600, columns: 300 }, 300, 600);
+
+      expect(flyout().attributes("data-layout")).toBe("columns");
+    });
+
+    it("uses the space before the rail in RTL, so columns that fit there stay", async () => {
+      document.documentElement.dir = "rtl";
+      spies.push(vi.spyOn(document.documentElement, "clientWidth", "get").mockReturnValue(1000));
+      await openWith(twoSections, { single: 600, columns: 300 }, 300, 500, 600);
+
+      expect(flyout().attributes("data-layout")).toBe("columns");
+    });
+
+    it("falls back to one column in RTL when the columns are wider than the space before the rail", async () => {
+      document.documentElement.dir = "rtl";
+      spies.push(vi.spyOn(document.documentElement, "clientWidth", "get").mockReturnValue(1000));
+      await openWith(twoSections, { single: 600, columns: 300 }, 300, 700, 600);
+
+      expect(flyout().attributes("data-layout")).toBe("single");
+    });
+
+    it("uses columns when the menu fits the window but not below its tile", async () => {
+      await openWith(twoSections, { single: 300, columns: 150 }, 300);
+
+      expect(flyout().attributes("data-layout")).toBe("columns");
+    });
+
+    it("keeps menu items in reading order across columns", async () => {
+      await openWith(twoSections, { single: 600, columns: 300 });
+
+      const names = flyout()
+        .findAll("a[data-test^='nav-group-item-']")
+        .map((a) => a.attributes("data-test"));
+      expect(names).toEqual([
+        "nav-group-item-logstreams",
+        "nav-group-item-pipelines",
+        "nav-group-item-home",
+      ]);
+      expect(flyout().findAll('[role="group"]')).toHaveLength(2);
     });
   });
 

@@ -842,11 +842,17 @@ fn still_active(
         .iter()
         .find(|row| row.id == downtime_id && row.cancelled_at.is_none())?;
     let window = o2_enterprise::enterprise::downtimes::schedule::window_at(&row.schedule, now)?;
+    // The recorded row is not judged against this row, so the chip only links to it.
     Some(config::meta::downtimes::ActiveDowntime {
         id: row.id.clone(),
         name: row.name.clone(),
         ends_at: window.end,
         incident_mode: Default::default(),
+        version: row.version,
+        alert_groups: row.alert_groups.clone(),
+        source: row.source,
+        folder_id: row.folder_id.clone(),
+        end_here: false,
         ..Default::default()
     })
 }
@@ -1440,5 +1446,32 @@ mod anomaly_priority_tag_tests {
             matches(target, downtime.condition.as_ref(), &row),
             "{dims:?}"
         );
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn a_recorded_downtime_keeps_its_version_folder_groups_and_source_but_never_ends_here() {
+        use config::meta::downtimes::{Downtime, MuteSource};
+
+        let row: Downtime = serde_json::from_value(serde_json::json!({
+            "id": "dt-1", "org": "default", "folder_id": "ops", "name": "quick mute",
+            "targets": [{ "module": "alerts", "folders": { "kind": "all" }, "ids": ["a1"] }],
+            "alert_groups": [{ "alert_id": "a1", "group_key": "k1" }],
+            "source": "slack",
+            "schedule": {
+                "repeat": "none", "starts_at": 0, "ends_at": 60_000_000, "timezone": "UTC",
+                "duration_secs": 60
+            },
+            "version": 4,
+            "created_by": "lin", "created_at": 0, "updated_by": "lin", "updated_at": 0
+        }))
+        .unwrap();
+        let chip = still_active(std::slice::from_ref(&row), "dt-1", 1_000_000).expect("live");
+        assert_eq!(chip.version, 4);
+        assert_eq!(chip.folder_id, "ops");
+        assert_eq!(chip.source, Some(MuteSource::Slack));
+        assert_eq!(chip.alert_groups, row.alert_groups);
+        assert_eq!(chip.ends_at, 60_000_000);
+        assert!(!chip.end_here);
     }
 }

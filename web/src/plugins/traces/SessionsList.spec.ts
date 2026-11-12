@@ -99,7 +99,7 @@ vi.mock("vue-router", () => ({
     push: mockRouterPush,
     replace: mockRouterReplace,
   })),
-  useRoute: vi.fn(() => ({ query: mockRouteQuery })),
+  useRoute: vi.fn(() => ({ name: "aiSessions", query: mockRouteQuery })),
 }));
 
 vi.mock("vuex", () => ({

@@ -433,18 +433,84 @@ describe("useAlertActions", () => {
     );
   });
 
-  it("ends a quick mute, and points elsewhere for a downtime it does not own", async () => {
+  it("ends a quick mute at the version it showed, and points elsewhere for one it does not own", async () => {
     const api = mountActions();
     vi.mocked(alerts.cancelAlertMute).mockResolvedValueOnce({ data: {} } as any);
-    expect(await api.endMute(target, "d1")).toBe(true);
-    expect(alerts.cancelAlertMute).toHaveBeenCalledWith("acme", "a1", "d1", "ops");
+    expect(await api.endMute(target, { id: "d1", ends_at: 1, version: 4 })).toBe("ok");
+    expect(alerts.cancelAlertMute).toHaveBeenCalledWith("acme", "a1", "d1", "ops", 4);
     expect(lastToast()?.message).toBe("Mute ended. Notifications resume.");
 
     vi.mocked(alerts.cancelAlertMute).mockRejectedValueOnce(
       httpError(409, { code: "not_a_quick_mute" }),
     );
-    expect(await api.endMute(target, "d2")).toBe(false);
+    expect(await api.endMute(target, { id: "d2", ends_at: 1 })).toBe("conflict");
     expect(lastToast()?.message).toEqual(expect.stringContaining("Downtimes page"));
+  });
+
+  it("refuses a stale End with the changed-mute message, and tells a refusal from no answer", async () => {
+    const api = mountActions();
+    const mute = { id: "d1", ends_at: 1, version: 4 };
+    vi.mocked(alerts.cancelAlertMute).mockRejectedValueOnce(
+      httpError(409, { code: "version_changed", version: 5, ends_at: 9 }),
+    );
+    expect(await api.endMute(target, mute)).toBe("conflict");
+    expect(lastToast()?.message).toBe("This mute changed. Open the downtime.");
+
+    vi.mocked(alerts.cancelAlertMute).mockRejectedValueOnce(httpError(403, {}));
+    expect(await api.endMute(target, mute)).toBe("conflict");
+    expect(lastToast()?.message).toBe("You do not have permission to end this mute.");
+
+    vi.mocked(alerts.cancelAlertMute).mockRejectedValueOnce(httpError(404, {}));
+    expect(await api.endMute(target, mute)).toBe("conflict");
+
+    vi.mocked(alerts.cancelAlertMute).mockRejectedValueOnce(new Error("Network Error"));
+    expect(await api.endMute(target, mute)).toBe("failed");
+  });
+
+  it("drops a changed-mute refusal that answers after an org switch", async () => {
+    let refuse: (e: unknown) => void = () => {};
+    vi.mocked(alerts.cancelAlertMute).mockImplementation(
+      () => new Promise((_resolve, reject) => (refuse = reject)) as any,
+    );
+    const api = mountActions();
+    const ending = api.endMute(target, { id: "d1", ends_at: 1, version: 4 });
+    await Promise.resolve();
+    store.state.selectedOrganization = { identifier: "other" };
+    try {
+      refuse(httpError(409, { code: "version_changed", version: 5, ends_at: 9 }));
+      expect(await ending).toBe("conflict");
+      expect(toast).not.toHaveBeenCalled();
+    } finally {
+      store.state.selectedOrganization = { identifier: "acme" };
+    }
+  });
+
+  it("replaces the changed-mute toast, so View downtime opens the latest mute", async () => {
+    const dismiss = vi.fn();
+    vi.mocked(toast).mockReturnValue(dismiss as any);
+    vi.mocked(alerts.cancelAlertMute).mockRejectedValue(
+      httpError(409, { code: "version_changed", version: 5, ends_at: 9 }),
+    );
+    const api = mountActions();
+    await api.endMute(target, { id: "d1", ends_at: 1, version: 4 });
+    expect(dismiss).not.toHaveBeenCalled();
+    await api.endMute(target, { id: "d2", ends_at: 1, version: 4 });
+    expect(dismiss).toHaveBeenCalledTimes(1);
+  });
+
+  it("answers Extend with ok, conflict or failed", async () => {
+    const api = mountActions();
+    const mute = { id: "d1", ends_at: 1, version: 3 };
+    vi.mocked(alerts.extendAlertMute).mockResolvedValueOnce({
+      data: { version: 4, ends_at: 1_786_586_400_000_000 },
+    } as any);
+    expect(await api.extend(target, mute, { minutes: 30 })).toBe("ok");
+    vi.mocked(alerts.extendAlertMute).mockRejectedValueOnce(
+      httpError(409, { code: "version_changed", version: 9, ends_at: 1_786_586_400_000_000 }),
+    );
+    expect(await api.extend(target, mute, { minutes: 30 })).toBe("conflict");
+    vi.mocked(alerts.extendAlertMute).mockRejectedValueOnce(new Error("Network Error"));
+    expect(await api.extend(target, mute, { minutes: 30 })).toBe("failed");
   });
 
   it("knows the signed-in user, for hiding Take over on one's own ack", () => {

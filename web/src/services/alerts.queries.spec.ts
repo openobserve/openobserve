@@ -302,8 +302,9 @@ describe("ack and mute queries", () => {
     await (cancel.mutationFn as (v: unknown) => Promise<unknown>)({
       alertId: "a1",
       downtimeId: "d1",
+      version: 4,
     });
-    expect(alerts.cancelAlertMute).toHaveBeenCalledWith(ORG, "a1", "d1", undefined);
+    expect(alerts.cancelAlertMute).toHaveBeenCalledWith(ORG, "a1", "d1", undefined, 4);
     expect(cancel.meta?.invalidates).toEqual(withBanner);
   });
 });

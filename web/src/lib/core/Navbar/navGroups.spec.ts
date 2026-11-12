@@ -297,10 +297,10 @@ describe("groupNavLinks", () => {
       "alertDestinations",
       "alertTemplates",
       "alertLibrary",
+      "alertSources",
       "sloList",
       "incidentList",
       "alertCalibration",
-      "alertSources",
     ]);
   });
 
@@ -325,7 +325,7 @@ describe("groupNavLinks", () => {
     expect(alerting?.every((c) => c.categoryKey === "menu.alerts")).toBe(true);
   });
 
-  it("leaves SLOs, Incidents and Sources outside the Alerts header", () => {
+  it("heads SLOs, Incidents and Calibration under Response, not Alerts", () => {
     // They are Reliability's other concerns, not alerting configuration —
     // filing them under an "Alerts" heading would misfile them.
     const entries = groupNavLinks([
@@ -338,8 +338,11 @@ describe("groupNavLinks", () => {
       (e): e is Extract<RailEntry, { type: "linkGroup" }> =>
         e.type === "linkGroup" && e.item.name === "reliability",
     );
-    const outside = reliability?.children.filter((c) => !c.categoryKey).map((c) => c.name);
-    expect(outside).toEqual(["sloList", "incidentList", "alertCalibration", "alertSources"]);
+    const response = reliability?.children
+      .filter((c) => c.categoryKey === "menu.response")
+      .map((c) => c.name);
+    expect(response).toEqual(["sloList", "incidentList", "alertCalibration"]);
+    expect(reliability?.children.filter((c) => !c.categoryKey)).toEqual([]);
   });
 
   it("drops Incidents from Reliability on OSS (no incidents route)", () => {
@@ -393,9 +396,9 @@ describe("groupNavLinks", () => {
         e.type === "linkGroup" && e.item.name === "reliability",
     );
     expect(reliability?.children.map((c) => c.name)).toEqual([
+      "alertSources",
       "sloList",
       "incidentList",
-      "alertSources",
     ]);
   });
 
@@ -435,7 +438,7 @@ describe("groupNavLinks", () => {
       (e): e is Extract<RailEntry, { type: "linkGroup" }> =>
         e.type === "linkGroup" && e.item.name === "reliability",
     );
-    expect(reliability?.children.map((c) => c.name)).toEqual(["incidentList", "alertSources"]);
+    expect(reliability?.children.map((c) => c.name)).toEqual(["alertSources", "incidentList"]);
   });
 
   it("moves Reports under the Dashboards group", () => {
@@ -843,6 +846,7 @@ describe("ship guards (AC-15, AC-22, D-27)", () => {
       "alertDestinations",
       "alertTemplates",
       "alertLibrary",
+      "alertSources",
       "sloList",
       "incidentList",
       "downtimes",
@@ -851,7 +855,6 @@ describe("ship guards (AC-15, AC-22, D-27)", () => {
       "onCallTeams",
       "onCallRouting",
       "onCallMine",
-      "alertSources",
     ]);
   });
 
@@ -875,10 +878,10 @@ describe("ship guards (AC-15, AC-22, D-27)", () => {
         e.type === "linkGroup" && e.item.name === "reliability",
     );
     expect(reliability?.filtered?.map((c) => c.name)).toEqual([
+      "alertSources",
       "sloList",
       "incidentList",
       "downtimes",
-      "alertSources",
     ]);
     expect(reliability?.children.some((c) => c.name === "alertSources")).toBe(false);
   });

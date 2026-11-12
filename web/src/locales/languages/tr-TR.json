@@ -1965,6 +1965,7 @@
     "slos": "SLO'lar",
     "reliability": "Güvenilirlik",
     "onCall": "Nöbet",
+    "response": "Yanıt",
     "toggleNavigation": "Gezinmeyi aç/kapat",
     "ingestionText": "Veri Alımı",
     "navigationLink": "Gezinme bağlantısı",

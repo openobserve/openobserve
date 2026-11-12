@@ -257,6 +257,12 @@ export interface ActiveDowntime {
   ends_at: number;
   end_on_clear?: EndOnClear | null;
   alert_groups?: AlertGroupRef[] | null;
+  /** The version an End or Extend sends back; absent from an older node. */
+  version?: number;
+  /** The downtime's own folder, which its routes check access on. */
+  folder_id?: string;
+  /** Ending it unmutes this row and no other; absent from an older node, which reads as shared. */
+  end_here?: boolean;
 }
 
 export interface CorrectionRef {
@@ -283,6 +289,10 @@ const one = (org: string, id: string) => `${base(org)}/${encodeURIComponent(id)}
 // The route permission check reads the downtime folder from `?folder=`, so every call names it.
 const inFolder = (folder?: string) => (folder ? { params: { folder } } : {});
 
+// A cancel at a stale version is a 409 that ends nothing.
+const atVersion = (folder?: string, version?: number) =>
+  version === undefined ? inFolder(folder) : { params: { ...(folder ? { folder } : {}), version } };
+
 const downtimes = {
   list: (org: string, params: DowntimeListParams = {}, options: AxiosRequestConfig = {}) =>
     http().get<DowntimeListResponse>(base(org), { ...options, params }),
@@ -307,9 +317,9 @@ const downtimes = {
         analytics.track("downtime_updated", { repeat: body.schedule.repeat });
         return res;
       }),
-  cancel: (org: string, id: string, folder?: string) =>
+  cancel: (org: string, id: string, folder?: string, version?: number) =>
     http()
-      .post(`${one(org, id)}/cancel`, undefined, inFolder(folder))
+      .post(`${one(org, id)}/cancel`, undefined, atVersion(folder, version))
       .then((res) => {
         analytics.track("downtime_cancelled");
         return res;

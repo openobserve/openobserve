@@ -18,6 +18,8 @@ Two fixes landed, and this suite pins the outer one:
 - openobserve#15054 then moved the whole service behind
   `internal_authenticated`, so `check_internal_auth` admits only the internal
   or super-cluster token and *no* user credential reaches the handler at all.
+- openobserve#16690 moved it to `ingest_authenticated`, whose `check_ingest_auth`
+  also admits a feature writer's own org token, and still no user credential.
 
 With #15054 in place `destination_org`'s branches are unreachable over the
 wire, so they are covered by the Rust unit tests beside it in
@@ -47,8 +49,8 @@ ROWS = json.dumps([{"injected_by": "grpc_org_binding_test", "n": 1}]).encode()
 # `_meta` as the second tenant: orgs have no DELETE route, so creating one leaks a tenant per run.
 OTHER_ORG = "_meta"
 
-# Which guard refused, by its marker: [6] is check_internal_auth, [1] is a missing token header.
-INTERNAL_AUTH_MARKER = "token[6]"
+# Which guard refused, by its marker: [7] is check_ingest_auth, [1] is a missing token header.
+INGEST_AUTH_MARKER = "token[7]"
 MISSING_TOKEN_MARKER = "token[1]"
 
 # Every pair of orgs a caller can name, including the cross-org shape that was #2821.
@@ -108,7 +110,7 @@ def stream_name(client: OpenObserveClient) -> Generator[str, None, None]:
         client.delete(f"streams/{name}?type=logs", org=org, raise_for_status=False)
 
 
-def _assert_refused(result, what: str, marker: str = INTERNAL_AUTH_MARKER) -> None:
+def _assert_refused(result, what: str, marker: str = INGEST_AUTH_MARKER) -> None:
     """Assert the call was refused, and by the guard `marker` names.
 
     The status code alone is not enough: `check_auth` also answers
@@ -126,8 +128,8 @@ def _assert_refused(result, what: str, marker: str = INTERNAL_AUTH_MARKER) -> No
     )
     assert marker in result.details, (
         f"{what} was refused, but not by the expected guard: {result.details!r} does not carry "
-        f"{marker!r}. For {INTERNAL_AUTH_MARKER!r}, a refusal from check_auth instead means the "
-        "service is no longer behind internal_authenticated (openobserve#15054)."
+        f"{marker!r}. For {INGEST_AUTH_MARKER!r}, a refusal from check_auth instead means the "
+        "service is no longer behind ingest_authenticated (openobserve#15054, openobserve#16690)."
     )
 
 

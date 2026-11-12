@@ -155,7 +155,11 @@ async fn revoke_expired_in<C: TransactionTrait>(
                 credentials::Column::State,
                 Expr::value(CredentialState::Revoked.as_str()),
             )
-            .col_expr(credentials::Column::RevokedAt, Expr::value(now_us))
+            // `revoked_at = expires_at` marks natural expiry apart from an explicit revoke.
+            .col_expr(
+                credentials::Column::RevokedAt,
+                Expr::col(credentials::Column::ExpiresAt).into(),
+            )
             .col_expr(credentials::Column::UpdatedAt, Expr::value(now_us))
             .col_expr(
                 credentials::Column::SecretRef,
@@ -480,8 +484,14 @@ mod tests {
                 old.updated_at,
                 old.secret_ref
             ),
-            ("revoked", Some(NOW), NOW, None)
+            ("revoked", Some(NOW - 1), NOW, None),
+            "a natural expiry is stored at the credential's own expires_at"
         );
+        assert!(!super::super::worker::revoked_explicitly(
+            CredentialState::Revoked,
+            old.expires_at,
+            old.revoked_at
+        ));
         assert_eq!(secrets_of(&db, "c-old").await, 0);
         assert_eq!(
             credential_of(&db, "c-live").await.unwrap().state,

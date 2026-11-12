@@ -170,6 +170,9 @@ async fn shutdown_signal() {
         }
     }
 
+    // Before going offline: a peer takes the hook worker lock once this node leaves the node list.
+    #[cfg(feature = "enterprise")]
+    crate::service::workflows::http_trigger::worker::drain_on_shutdown().await;
     if let Err(e) = common::infra::cluster::set_offline().await {
         log::error!("set offline failed: {e}");
     }

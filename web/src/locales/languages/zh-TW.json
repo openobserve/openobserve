@@ -1965,6 +1965,7 @@
     "slos": "SLOs",
     "reliability": "可靠性",
     "onCall": "值班",
+    "response": "回應",
     "toggleNavigation": "切換導覽",
     "ingestionText": "資料擷取",
     "navigationLink": "導覽連結",
