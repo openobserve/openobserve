@@ -40,6 +40,13 @@ const CLOCK_TICK_MS = 60_000;
 
 export type PackPreviewState = "idle" | "loading" | "ready" | "error";
 
+/** What the user changed in the plan before setup. */
+export interface PackInstallChoice {
+  /** Item ids the user unticked, on top of the ones the preview leaves out. */
+  exclude?: string[];
+  enableAlerts?: boolean;
+}
+
 const countsAsItem = (item: PackRecordItem) => item.kind !== "folder";
 const notSkipped = (item: PackRecordItem) => item.status !== "skipped";
 
@@ -85,6 +92,7 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
   const removal = shallowRef<PackRemovalResult | null>(null);
   const removalFailed = ref(false);
   const alertsOn = ref(0);
+  const enabledAlertIds = shallowRef<Set<string>>(new Set());
   let previewRun = 0;
   const choices = ref<PackChoices>({ streams: {}, fields: {} });
   const nowUs = ref(Date.now() * 1000);
@@ -125,7 +133,8 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
 
   const readAlertsOn = async () => {
     const rows = await readQuery(alertsByTagsQuery(org, [`pack:${pack.id}`]), true);
-    alertsOn.value = rows.filter((row) => row.enabled).length;
+    enabledAlertIds.value = new Set(rows.filter((row) => row.enabled).map((row) => row.alert_id));
+    alertsOn.value = enabledAlertIds.value.size;
   };
 
   /** The address a colleague opens, so it must survive leaving this browser. */
@@ -232,14 +241,26 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
     await router.push({ name: "viewDashboard", query }).catch(() => {});
   };
 
-  const install = async (folderName?: string): Promise<boolean> => {
+  // Alerts made enabled are on without a re-read, so Home never calls them silent.
+  const trackEnabled = (next: PackInstallRecord) => {
+    const ids = next.items
+      .filter(({ kind, status, id }) => kind === "alert" && status === "created" && id)
+      .map(({ id }) => id!);
+    enabledAlertIds.value = new Set([...enabledAlertIds.value, ...ids]);
+    alertsOn.value = enabledAlertIds.value.size;
+  };
+
+  const install = async (
+    folderName?: string,
+    { exclude: unticked = [], enableAlerts = false }: PackInstallChoice = {},
+  ): Promise<boolean> => {
     if (running.value) return false;
     running.value = true;
     installFailed.value = false;
     forbidden.value = false;
     try {
       const plan = preview.value ?? (await previewPack(pack, choices.value));
-      const exclude = leftOutIds(plan);
+      const exclude = [...new Set([...leftOutIds(plan), ...unticked])];
       const done = await installPack(pack, {
         exclude,
         repairs: plan.repairs,
@@ -247,9 +268,14 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
         flavours: plan.flavours,
         copies: plan.copies,
         folderName,
-        onProgress: (next) => (record.value = { ...next, items: [...next.items] }),
+        enableAlerts,
+        onProgress: (next) => {
+          record.value = { ...next, items: [...next.items] };
+          if (enableAlerts) trackEnabled(next);
+        },
       });
       record.value = { ...done, items: [...done.items] };
+      if (enableAlerts) trackEnabled(done);
       return done.status === "complete";
     } catch (error) {
       if (error instanceof StarterPackPermissionError) forbidden.value = true;
@@ -298,6 +324,7 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
     chooseField,
     chooseStream,
     dashboardCount,
+    enabledAlertIds,
     failed,
     forbidden,
     install,

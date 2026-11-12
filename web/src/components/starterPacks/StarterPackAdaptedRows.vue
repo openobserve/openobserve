@@ -16,11 +16,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import type { PackBinding, PackQuestion } from "@/composables/starterPacks/types";
+import { useAdaptedData } from "@/composables/starterPacks/useAdaptedData";
 import type { StarterPackFlow } from "@/composables/starterPacks/useStarterPackFlow";
 import { raw, useI18nTyped, type I18nKey } from "@/types/i18n";
 import StarterPackRepairDialog from "./StarterPackRepairDialog.vue";
@@ -30,37 +31,22 @@ const VISIBLE_FIELDS = 3;
 const props = defineProps<{ flow: StarterPackFlow; readonly?: boolean }>();
 
 const { t } = useI18nTyped();
+const { answered, open, bindings, flavours } = useAdaptedData(props.flow);
 
 const preview = computed(() => props.flow.preview.value);
-const questions = computed(() => preview.value?.questions ?? []);
-const answered = computed(() => questions.value.filter(({ answer }) => answer));
-const open = computed(() => questions.value.filter(({ answer }) => !answer));
-const bindings = computed(() => {
-  const rows = new Map(
-    (preview.value?.bindings ?? []).map((row) => [`${row.from}/${row.to}`, row]),
-  );
-  return [...rows.values()];
-});
-const flavours = computed(() => {
-  const ids = new Set(Object.values(preview.value?.flavours ?? {}));
-  return (props.flow.pack.flavours ?? []).filter(({ id }) => ids.has(id));
-});
 const fieldsOpen = ref(false);
 const shownBindings = computed(() =>
   fieldsOpen.value ? bindings.value : bindings.value.slice(0, VISIBLE_FIELDS),
 );
 const moreFields = computed(() => bindings.value.length - shownBindings.value.length);
-const hasRows = computed(
-  () => answered.value.length + bindings.value.length + flavours.value.length > 0,
-);
 
 const dialogOpen = ref(false);
 const activeQuestion = ref<PackQuestion>();
 const activeBinding = ref<PackBinding>();
 const activeWhat = ref("");
 
-const whatOf = (question: PackQuestion) =>
-  question.titleKey ? t(question.titleKey) : t("starterPacks.adapted.someData");
+const needOf = (question: PackQuestion) =>
+  question.titleKey ? t(question.titleKey) : raw(question.want);
 
 const fieldName = ({ group }: PackBinding) => {
   const titleKey: I18nKey | undefined = group ? props.flow.pack.aliasTitles?.[group] : undefined;
@@ -69,47 +55,26 @@ const fieldName = ({ group }: PackBinding) => {
   return titleKey ? t(titleKey) : t("starterPacks.adapted.someField");
 };
 
-const questionRow = (question: PackQuestion) => {
-  const { answer, titleKey } = question;
-  if (!answer) return "";
-  const what = whatOf(question);
-  const stream = raw(answer.to);
-  if (answer.filter) {
-    const { field, value } = answer.filter;
-    return t("starterPacks.adapted.readsFiltered", {
-      what,
-      stream,
-      field: raw(field),
-      value: raw(value),
-    });
-  }
-  if (answer.also?.length) {
-    const streams = [answer.to, ...answer.also];
-    return t("starterPacks.adapted.readsAll", {
-      what,
-      count: streams.length,
-      streams: raw(streams.join(", ")),
-    });
-  }
-  return titleKey
-    ? t("starterPacks.adapted.readsRole", { what, stream })
-    : t("starterPacks.adapted.readsMetric", { stream });
-};
+const allStreams = (question: PackQuestion) =>
+  question.answer ? [question.answer.to, ...(question.answer.also ?? [])] : [];
 
 const askRow = (question: PackQuestion) => {
-  const what = whatOf(question);
-  if (question.kind === "none") return t("starterPacks.adapted.notFound", { what });
+  const what = needOf(question);
+  if (question.kind === "none") return t("starterPacks.adapted.noneFound", { what });
   if (question.kind === "shared") return t("starterPacks.adapted.sharedAsk", { what });
-  const [first] = question.candidates;
-  return question.candidates.length === 1
-    ? t("starterPacks.adapted.oneMatch", { what, stream: raw(first.stream) })
-    : t("starterPacks.adapted.severalMatch", { what, count: question.candidates.length });
+  return t("starterPacks.adapted.whichStream", { what });
+};
+
+const askHint = (question: PackQuestion) => {
+  const count = question.candidates.length;
+  if (question.kind !== "confirm" || !count) return "";
+  return t("starterPacks.adapted.lookRight", { count }, count);
 };
 
 const changeQuestion = (question: PackQuestion) => {
   activeBinding.value = undefined;
   activeQuestion.value = question;
-  activeWhat.value = whatOf(question);
+  activeWhat.value = needOf(question);
   dialogOpen.value = true;
 };
 
@@ -122,93 +87,170 @@ const changeBinding = (binding: PackBinding) => {
 </script>
 
 <template>
-  <div class="flex flex-col gap-2" data-test="starter-pack-adapted">
-    <OBanner
-      v-for="question in open"
-      :key="question.want"
-      :variant="question.kind === 'none' ? 'default' : 'warning'"
-      dense
-      :content="askRow(question)"
-      data-test="starter-pack-adapted-question"
-    >
-      <template #actions>
-        <OButton
-          v-if="!readonly"
-          variant="outline"
-          size="sm-action"
-          data-test="starter-pack-adapted-choose-btn"
-          @click="changeQuestion(question)"
+  <div class="flex flex-col text-sm" data-test="starter-pack-adapted">
+    <template v-if="open.length || answered.length">
+      <OText variant="label" class="text-text-label pt-2 pb-0.5">{{
+        t("starterPacks.adapted.streams")
+      }}</OText>
+      <div class="divide-border-default flex flex-col divide-y">
+        <div
+          v-for="question in open"
+          :key="question.want"
+          :class="[
+            'flex min-h-9 items-center gap-3',
+            question.kind !== 'none' && 'bg-status-warning-bg',
+          ]"
+          data-test="starter-pack-adapted-question"
         >
-          {{ t("starterPacks.adapted.choose") }}
-        </OButton>
-      </template>
-    </OBanner>
-    <div v-if="hasRows" class="flex flex-col">
-      <div
-        v-for="question in answered"
-        :key="question.want"
-        class="border-border-default flex items-center justify-between gap-3 border-b py-1"
-        data-test="starter-pack-adapted-stream"
-      >
-        <div class="flex min-w-0 items-center gap-2">
-          <OIcon name="swap-horiz" size="sm" class="text-text-secondary shrink-0" />
-          <span class="min-w-0 truncate" :title="String(questionRow(question))">{{
-            questionRow(question)
-          }}</span>
+          <span class="flex min-w-0 flex-1 items-center gap-2">
+            <span
+              :class="[
+                'size-1.5 shrink-0 rounded-full',
+                question.kind === 'none' ? 'bg-border-strong' : 'bg-status-warning-text',
+              ]"
+            />
+            <span class="text-text-heading min-w-0 truncate" :title="String(askRow(question))">{{
+              askRow(question)
+            }}</span>
+            <OText v-if="askHint(question)" variant="meta" class="shrink-0">{{
+              askHint(question)
+            }}</OText>
+          </span>
+          <OButton
+            v-if="!readonly"
+            variant="outline"
+            size="sm-action"
+            data-test="starter-pack-adapted-choose-btn"
+            @click="changeQuestion(question)"
+          >
+            {{ t("starterPacks.adapted.choose") }}
+          </OButton>
         </div>
-        <OButton
-          v-if="!readonly"
-          variant="ghost-primary"
-          size="sm-action"
-          data-test="starter-pack-adapted-change-btn"
-          @click="changeQuestion(question)"
+        <div
+          v-for="question in answered"
+          :key="question.want"
+          class="flex min-h-9 items-center gap-3"
+          data-test="starter-pack-adapted-stream"
         >
-          {{ t("starterPacks.adapted.change") }}
-        </OButton>
+          <span
+            :class="[
+              'w-36 shrink-0 truncate',
+              !question.titleKey && 'text-text-secondary font-mono text-xs',
+            ]"
+            :title="String(needOf(question))"
+            >{{ needOf(question) }}</span
+          >
+          <span class="flex min-w-0 flex-1 items-center gap-1.5 py-1.5">
+            <OIcon name="arrow-forward" size="sm" class="text-text-label shrink-0" />
+            <OBadge
+              variant="default-soft"
+              shape="rounded"
+              size="xs"
+              class="max-w-44 shrink-0 font-mono"
+              :title="question.answer?.to"
+              data-test="starter-pack-adapted-stream-chip"
+              ><span class="truncate">{{ question.answer?.to }}</span></OBadge
+            >
+            <OBadge
+              v-if="question.answer?.filter"
+              variant="default-outline"
+              size="xs"
+              icon="filter-alt"
+              class="min-w-0"
+              :title="`${question.answer.filter.field} = ${question.answer.filter.value}`"
+              data-test="starter-pack-adapted-filter-chip"
+              ><span class="truncate font-mono"
+                >{{ question.answer.filter.field }} = {{ question.answer.filter.value }}</span
+              ></OBadge
+            >
+            <OBadge
+              v-else-if="question.answer?.also?.length"
+              variant="default-outline"
+              size="xs"
+              icon="layers"
+              class="min-w-0"
+              :title="allStreams(question).join(', ')"
+              data-test="starter-pack-adapted-all-chip"
+              ><span class="truncate">{{
+                t(
+                  "starterPacks.adapted.streamCount",
+                  { count: allStreams(question).length },
+                  allStreams(question).length,
+                )
+              }}</span></OBadge
+            >
+          </span>
+          <OButton
+            v-if="!readonly"
+            variant="ghost-primary"
+            size="sm-action"
+            data-test="starter-pack-adapted-change-btn"
+            @click="changeQuestion(question)"
+          >
+            {{ t("starterPacks.adapted.change") }}
+          </OButton>
+        </div>
       </div>
-      <div
-        v-for="binding in shownBindings"
-        :key="`${binding.stream}/${binding.from}`"
-        class="border-border-default flex items-center justify-between gap-3 border-b py-1"
-        data-test="starter-pack-adapted-field"
-      >
-        <span class="min-w-0 truncate">{{
-          t("starterPacks.adapted.fieldRead", {
-            what: fieldName(binding),
-            field: raw(binding.to),
-          })
-        }}</span>
-        <OButton
-          v-if="!readonly"
-          variant="ghost-primary"
-          size="sm-action"
-          data-test="starter-pack-adapted-field-change-btn"
-          @click="changeBinding(binding)"
+    </template>
+    <template v-if="bindings.length">
+      <OText variant="label" class="text-text-label pt-2 pb-0.5">{{
+        t("starterPacks.adapted.fields")
+      }}</OText>
+      <div class="divide-border-default flex flex-col divide-y">
+        <div
+          v-for="binding in shownBindings"
+          :key="`${binding.stream}/${binding.from}`"
+          class="flex min-h-9 items-center gap-3"
+          data-test="starter-pack-adapted-field"
         >
-          {{ t("starterPacks.adapted.change") }}
-        </OButton>
+          <span class="w-36 shrink-0 truncate" :title="String(fieldName(binding))">{{
+            fieldName(binding)
+          }}</span>
+          <span class="flex min-w-0 flex-1 items-center gap-1.5 py-1.5">
+            <OIcon name="arrow-forward" size="sm" class="text-text-label shrink-0" />
+            <OBadge
+              variant="default-soft"
+              shape="rounded"
+              size="xs"
+              class="max-w-44 shrink-0 font-mono"
+              :title="binding.to"
+              ><span class="truncate">{{ binding.to }}</span></OBadge
+            >
+          </span>
+          <OButton
+            v-if="!readonly"
+            variant="ghost-primary"
+            size="sm-action"
+            data-test="starter-pack-adapted-field-change-btn"
+            @click="changeBinding(binding)"
+          >
+            {{ t("starterPacks.adapted.change") }}
+          </OButton>
+        </div>
       </div>
-      <div v-if="moreFields > 0" class="flex items-center gap-2 py-1">
-        <OText variant="meta">{{
-          t("starterPacks.adapted.fieldsMore", { count: moreFields })
-        }}</OText>
+      <div v-if="moreFields > 0" class="py-0.5">
         <OButton
           variant="ghost-primary"
           size="sm-action"
+          icon-left="expand-more"
           data-test="starter-pack-adapted-fields-show-btn"
           @click="fieldsOpen = true"
         >
-          {{ t("starterPacks.adapted.show") }}
+          {{ t("starterPacks.adapted.showMore", { count: moreFields }) }}
         </OButton>
       </div>
-      <OText
-        v-for="flavour in flavours"
-        :key="flavour.id"
-        variant="meta"
-        class="py-1"
-        data-test="starter-pack-adapted-flavour"
-        >{{ t("starterPacks.adapted.flavour", { name: t(flavour.titleKey) }) }}</OText
-      >
+    </template>
+    <div
+      v-for="flavour in flavours"
+      :key="flavour.id"
+      class="border-border-default mt-1 flex min-h-9 items-center gap-3 border-t"
+      data-test="starter-pack-adapted-flavour"
+    >
+      <span class="w-36 shrink-0 truncate">{{ t("starterPacks.adapted.version") }}</span>
+      <span class="flex min-w-0 flex-1 items-center gap-1.5">
+        <OIcon name="arrow-forward" size="sm" class="text-text-label shrink-0" />
+        <span class="text-text-heading truncate font-medium">{{ t(flavour.titleKey) }}</span>
+      </span>
     </div>
     <StarterPackRepairDialog
       v-model:open="dialogOpen"

@@ -62,7 +62,10 @@ const subTitle = computed(() => {
   }
   if (flow.running.value) return t("starterPacks.installDialog.subtitleRunning", counts);
   if (total.value > 0 && made.value === total.value) {
-    return t("starterPacks.installDialog.subtitleDone", counts);
+    if (flow.alertsOff.value > 0) return t("starterPacks.installDialog.subtitleDone", counts);
+    if (flow.alertsTotal.value > 0) {
+      return t("starterPacks.installDialog.subtitleDoneStarted", counts);
+    }
   }
   return t("starterPacks.progress.summary", counts);
 });
@@ -178,9 +181,18 @@ const openLabel = computed(() =>
             ]"
           />
           <span class="min-w-0 flex-1">{{ row.label }}</span>
-          <OText v-if="row.kind === 'alert' && row.state === 'created'" variant="meta">{{
-            t("starterPacks.progress.alertsOff")
-          }}</OText>
+          <OText
+            v-if="row.kind === 'alert' && row.state === 'created'"
+            variant="meta"
+            data-test="starter-pack-progress-alerts-note"
+            >{{
+              t(
+                flow.alertsOff.value > 0
+                  ? "starterPacks.progress.alertsOff"
+                  : "starterPacks.progress.alertsStarted",
+              )
+            }}</OText
+          >
         </li>
       </ul>
     </div>
