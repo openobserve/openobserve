@@ -1,11 +1,11 @@
 <script setup lang="ts">
 // Copyright 2026 OpenObserve Inc.
 
-import { inject } from "vue";
+import { inject, ref } from "vue";
 import OTime from "./OTime.vue";
 import { FORM_CONTEXT_KEY } from "../Form/OForm.types";
 import { firstFieldError } from "../Form/fieldError";
-import { raw } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import type { FormTimeProps } from "./OFormTime.types";
 
 defineOptions({ inheritAttrs: false });
@@ -13,14 +13,30 @@ defineOptions({ inheritAttrs: false });
 const props = defineProps<FormTimeProps>();
 
 const form = inject(FORM_CONTEXT_KEY, null);
+const { t } = useI18nTyped();
 
 if (import.meta.env.DEV && !form) {
   console.warn("[OFormTime] must be rendered inside <OForm>. No form context found.");
 }
+
+// While the field shows a refused entry, the form's value is the old time, so the field fails instead.
+const typedInvalid = ref(false);
+const validators = {
+  onChange: () =>
+    typedInvalid.value
+      ? t("components.time.invalid", { format: raw(props.withSeconds ? "HH:MM:SS" : "HH:MM") })
+      : undefined,
+};
+
+function onInvalid(field: any, invalid: boolean) {
+  typedInvalid.value = invalid;
+  if (invalid) field.setMeta((meta: any) => ({ ...meta, isTouched: true }));
+  void field.validate("change");
+}
 </script>
 
 <template>
-  <component v-if="form" :is="form.Field" :name="props.name">
+  <component v-if="form" :is="form.Field" :name="props.name" :validators="validators">
     <template #default="{ field }">
       <OTime
         v-bind="$attrs"
@@ -48,6 +64,7 @@ if (import.meta.env.DEV && !form) {
         "
         @update:model-value="field.handleChange"
         @blur="field.handleBlur"
+        @invalid="onInvalid(field, $event)"
       >
         <template v-if="$slots.label" #label>
           <slot name="label" />

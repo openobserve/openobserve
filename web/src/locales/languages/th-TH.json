@@ -1965,6 +1965,7 @@
     "slos": "SLOs",
     "reliability": "ความเสถียร (Reliability)",
     "onCall": "เวรประจำการ (On-Call)",
+    "response": "การตอบสนอง",
     "toggleNavigation": "สลับการแสดงแถบนำทาง",
     "ingestionText": "การนำเข้าข้อมูล",
     "navigationLink": "ลิงก์นำทาง",
@@ -4814,7 +4815,7 @@
       "uploadingRules": "Please wait while uploading rules...",
       "errorUploadingRules": "Error while uploading rules",
       "errorParsingJson": "Error parsing JSON from file {name}",
-      "someValuesEmpty": "some values are empty please check",
+      "someValuesEmpty": "Some values are empty. Please check them.",
       "saveBeforeSwitchingTimeUnits": "Please save or cancel your changes before switching time units"
     },
     "addRolePage": {
@@ -11307,12 +11308,11 @@
     "SearchSQLCancelled": "Error: Search SQL was cancelled."
   },
   "alertCalibration": {
-    "title": "Alert Calibration",
+    "title": "Alert calibration",
     "subtitle": "How your alerts behave, measured from their own run history",
     "configure": "Configure",
     "runNow": "Run now",
     "runNowHint": "Asks for a run now instead of waiting for the next one. If a run is already due or in progress, it answers the request instead.",
-    "runRequested": "Run requested. Findings are written to the {stream} stream when it finishes.",
     "runFailed": "The run could not be requested: {message}",
     "runNeedsConfig": "Turn alert calibration on in its settings to run it.",
     "refresh": "รีเฟรช",
@@ -11422,7 +11422,7 @@
       "scopeAll": "All runs",
       "scopeFindings": "With findings",
       "scopeGaps": "Coverage gaps",
-      "searchPlaceholder": "Search runs by alert name",
+      "searchPlaceholder": "Search by alert name",
       "colRun": "Run",
       "colFindings": "Findings",
       "colCoverage": "Coverage",
@@ -11433,7 +11433,6 @@
       "emptyDescription": "Alert calibration writes a digest every time it runs. Run it now to see what it finds.",
       "filteredTitle": "No runs match this filter",
       "filteredDescription": "Widen the filter, or clear the search.",
-      "errorTitle": "Runs unavailable",
       "runsCapped": "The runs search stopped at its latest {count} rows, so older runs are not listed.",
       "searchCapped": "The alert name search stopped at {count} matching runs, so other matching runs are not shown."
     },
@@ -11445,7 +11444,6 @@
       "viewInLogs": "View in Logs",
       "viewInLogsHint": "Opens this run's records in Logs",
       "unavailableTitle": "Digest unavailable",
-      "noRecords": "The {stream} stream has no records for this run.",
       "loadFailed": "The digest could not be loaded: {message}",
       "backToDigests": "Back to digests",
       "partialCoverage": "Partial coverage",
@@ -11453,7 +11451,7 @@
       "statFindings": "Findings",
       "statAlertsInScope": "Alerts in scope",
       "statDeclined": "Declined",
-      "statDeclinedSub": "Declined, not cleared",
+      "statDeclinedSub": "Not cleared",
       "statDeclinedTooltip": "Rule and alert pairs a rule would not judge, because the alert had too little history or too few samples for it. A gate, not a clearance; the per-alert reasons are not written to the stream.",
       "statWindow": "Window",
       "findingsHeading": "Findings",
@@ -11520,7 +11518,6 @@
       "loadFailed": "The settings could not be loaded: {message}",
       "lastSaved": "Last saved {time}",
       "runNowHeading": "Run now",
-      "findingsDesc": "Findings are written to the {stream} stream of this organization and kept for that stream's retention. Alert calibration sends no notifications.",
       "frequencyRange": "Choose a cadence between 1 hour and 30 days.",
       "windowRange": "Choose a window between 1 minute and 90 days."
     }
@@ -12898,7 +12895,8 @@
       "suppressRepeats": "ระงับการแจ้งซ้ำ",
       "suppressRepeatsTooltip": "แจ้งเตือนเพียงครั้งเดียวเมื่อการแจ้งเตือนเข้าสู่สถานะกำลังแจ้งเตือนหรือเปลี่ยนระดับ ไม่ใช่ทุกครั้งที่มีการประเมิน หากปิดไว้จะยังได้รับการเตือนซ้ำหลังช่วงปิดเสียงแจ้งเตือนแต่ละครั้ง",
       "keepFiringForInvalid": "Enter 0 or more seconds",
-      "keepFiringForTooLong": "Enter at most 86400 seconds (24 hours)"
+      "keepFiringForTooLong": "Enter at most 86400 seconds (24 hours)",
+      "targetRequiredNote": "Required. With no destination, this alert reaches no one."
     },
     "advanced": {
       "addVariable": "Add Variable",
@@ -15765,7 +15763,7 @@
       "contractRevokedSuccess": "External contract revoked successfully.",
       "revokeContractError": "Failed to revoke external contract.",
       "enableByobTitle": "Enable BYOB",
-      "enablingStorage": "enabling storage settings...",
+      "enablingStorage": "Enabling storage settings...",
       "storageEnabledSuccess": "Storage settings enabled successfully.",
       "enableStorageError": "Failed to enable storage settings.",
       "processingTrialExtension": "Please wait while processing trial period extension request...",
@@ -23622,9 +23620,9 @@
       "pipelinesExportedSuccessfully": "{count} pipeline exported successfully | {count} pipelines exported successfully",
       "functionsNotBundled": "{count} function could not be included in the export file: {names} | {count} functions could not be included in the export file: {names}",
       "pipelineDeletedSuccessfully": "Pipeline deleted successfully",
-      "deletingPipeline": "deleting pipeline...",
+      "deletingPipeline": "Deleting pipeline...",
       "pipelineCreatedSuccessfully": "Pipeline created successfully",
-      "savingPipeline": "saving pipeline...",
+      "savingPipeline": "Saving pipeline...",
       "stateResumed": "{name} state resumed successfully",
       "statePaused": "{name} state paused successfully"
     },
@@ -29637,7 +29635,7 @@
       "waitingForOk": "Waiting for your OK",
       "proposedFix": "Proposed fix",
       "unfoldTab": "How it unfolded",
-      "seeEvidence": "See the evidence ({count}) →"
+      "seeEvidence": "ดูทั้งหมด"
     },
     "unfold": {
       "hint": "Read left to right: what changed, the signals it set off, then what reached your team. Select a card for its firings.",
@@ -29774,7 +29772,7 @@
       "rangeLabel": "Time range",
       "logPatternsValue": "{known} known · {fresh} new today",
       "drawerSubtitle": "{stream} · {detectors} · {library}",
-      "badgeNotWatched": "Not watched",
+      "badgeNotWatched": "Coverage gap",
       "signalsWatched": "Signals watched",
       "chipAria": "{signal}: {state}",
       "deltaUp": "Up {change} since the start of the range",
@@ -30584,15 +30582,15 @@
       "intro": "Here's what I do, in five steps.",
       "gotIt": "Got it",
       "s1Title": "I find your services",
-      "s1": "I look through the data you already send and find every service in it. When a new one appears, I start watching it the same day; you don't need to ask.",
-      "s2Title": "I watch them",
-      "s2": "I learn what normal looks like for each service: its errors, slowness and traffic for each hour of the day, with weekly patterns sharpening over time. Until I know, I use basic safety checks.",
-      "s3Title": "I stay quiet unless it's real",
-      "s3": "Most odd moments aren't problems. I page your team when something hurts customers, send a message that won't wake anyone for smaller issues, and keep minor things for the Friday summary.",
-      "s4Title": "I explain every page",
-      "s4": "Every message says what broke, since when, and my best read on why, with how sure I am.",
-      "s5Title": "I fix what you've allowed",
-      "s5": "I only fix things you've said I may. A fix that works earns a little trust, and one that doesn't help counts against me. If I keep needing the same fix, that's a bug I report to your team, not a habit I automate."
+      "s1": "I look through the data you already send and find the services in it. A new service shows up after my next check; you don't need to add it.",
+      "s2Title": "I learn what normal looks like",
+      "s2": "I learn how much data each stream normally sends from 14 days of its history. Until a stream has that history, I say it is still learning and don't judge it.",
+      "s3Title": "I page only when a stream stops",
+      "s3": "When a stream stops sending data, I open an incident and, if paging is on, page the on-call team that owns the service. Sharp drops and rises show as findings and never page. Smaller things wait for the daily digest.",
+      "s4Title": "I say what happened",
+      "s4": "Every incident says what stopped and since when. With AI analysis on, it also carries a best read on why.",
+      "s5Title": "You decide what changes",
+      "s5": "I suggest alerts for what nothing watches and fixes for alerts that can't fire. Nothing changes until you review and apply it, and you can undo what you applied."
     },
     "topbar": {
       "brand": "AutoObserve",
@@ -30609,9 +30607,9 @@
     },
     "view": {
       "standard": "Standard",
-      "nerd": "Nerd",
+      "nerd": "Detailed",
       "standardTooltip": "Standard view gives the short read: what needs you and what happened in the last 7 days",
-      "nerdTooltip": "Nerd view shows every detector, loop and setting in full",
+      "nerdTooltip": "The detailed view shows every detector, loop and setting in full",
       "label": "ดู"
     },
     "rail": {
@@ -32541,5 +32539,97 @@
     "recentRow": "การค้นหาล่าสุด",
     "deletedQuery": "ลบ {query} แล้ว",
     "undo": "เลิกทำ"
+  },
+  "autoobserveLive": {
+    "paging": {
+      "title": "Paging",
+      "label": "Page on-call when a stream stops",
+      "description": "Pages go to the on-call team that owns the service, else the organization's default team. Drops and rises show on the AutoObserve home as findings and never page.",
+      "routing": "On-call routing",
+      "unavailable": "Paging is turned off for this deployment.",
+      "denied": "{denied} {askAdmin}",
+      "loadFailed": "Couldn't load the paging setting. Refresh to try again.",
+      "later": "Who else AutoObserve notifies, and how far it acts on its own, will be set here once those controls exist."
+    },
+    "incidents": {
+      "subtitleWho": "Findings that opened an incident, who was paged, and its analysis.",
+      "routing": "Set up on-call routing"
+    },
+    "learning": {
+      "line": "Learning {count} stream. It is ready on {date}; AutoObserve needs {days} days of history to judge a stream. | Learning {count} streams. The first is ready on {date}; AutoObserve needs {days} days of history to judge a stream.",
+      "lineNoDate": "Learning {count} stream; AutoObserve needs {days} days of history to judge a stream. | Learning {count} streams; AutoObserve needs {days} days of history to judge a stream.",
+      "emptyTitle": "Learning your streams",
+      "emptyDesc": "AutoObserve needs {days} days of history to judge a stream. The stream is ready on {date}. | AutoObserve needs {days} days of history to judge a stream. The first of {count} streams is ready on {date}.",
+      "emptyDescNoDate": "AutoObserve needs {days} days of history to judge a stream. It is learning {count} stream now. | AutoObserve needs {days} days of history to judge a stream. It is learning {count} streams now.",
+      "until": "Learning until {date} · {streams}",
+      "streams": "Learning {count} stream | Learning {count} streams",
+      "streamUntil": "until {date}"
+    }
+  },
+  "insight": {
+    "kind": {
+      "paged": {
+        "page": {
+          "paged": "Paged {team}",
+          "pagedTeam": "Paged the on-call team",
+          "unrouted": "Nobody was paged: when it stopped, no on-call team owned this service and the org had no default team.",
+          "failed": "Paging failed: the on-call service did not accept the page. Open the incident to page someone by hand."
+        },
+        "nextRouting": "Set up on-call routing so the next stop pages someone.",
+        "stream_silence": {
+          "headline": "{count} streams stopped sending data",
+          "why": "No data has arrived on {stream} ({type}) since {time}.",
+          "whyMany": "{streams} have sent no data since {time}.",
+          "next": "Check the sender or collector that writes it. The incident resolves once data arrives again.",
+          "nextMany": "One cause is likely, such as a shared collector."
+        },
+        "stream_drop": {
+          "headline": "{count} streams dropped sharply",
+          "why": "{stream} ({type}) has received much less data than usual since {time}.",
+          "whyMany": "{streams} have received much less data than usual since {time}.",
+          "next": "Check whether a sender stopped or a filter changed.",
+          "nextMany": "One cause is likely, such as a shared collector or filter."
+        },
+        "stream_rise": {
+          "headline": "{count} streams rose sharply",
+          "why": "{stream} ({type}) has received much more data than usual since {time}.",
+          "whyMany": "{streams} have received much more data than usual since {time}.",
+          "next": "Check for a retry loop or a new sender writing to it.",
+          "nextMany": "One cause is likely, such as a shared sender retrying."
+        }
+      }
+    },
+    "bulk": {},
+    "decisions": {
+      "saved": {
+        "applied": "Applied to {title}.",
+        "appliedEditor": "Saved and recorded for {title}.",
+        "notRecorded": "Saved. This change was not recorded, so it can't be undone from AutoObserve."
+      },
+      "apply": {
+        "edit": "Edit in alert editor",
+        "button": "Apply",
+        "where": "Folder {folder} · notifies {destinations}",
+        "whereTeam": "Folder {folder} · team {team} · notifies {destinations}",
+        "acknowledged": "{count} of the {of} acknowledged firings would no longer alert. Check it before applying.",
+        "note": "Only the settings above change; the rest of the alert stays as it is. You can undo it while nobody else has changed the alert.",
+        "changed": "This alert changed. Open it to review.",
+        "loading": "Checking what this changes…",
+        "loadFailed": "Couldn't check what this changes, so it can't be applied here. Edit it in the alert editor instead.",
+        "offline": "Apply isn't available here yet. Edit it in the alert editor; nothing changes until you save.",
+        "cardNote": "Shows what changes before anything is saved.",
+        "gone": "This suggestion is no longer available. Open the alert to review it."
+      },
+      "applied": {
+        "title": "Applied changes",
+        "by": "by {actor} at {when}",
+        "undone": "Undone",
+        "you": "you"
+      },
+      "undone": {
+        "applyOne": "Undone: {title} is back to how it was.",
+        "applyMany": "Undone: {count} change is back to how it was. | Undone: {count} changes are back to how they were."
+      }
+    }
   }
 }

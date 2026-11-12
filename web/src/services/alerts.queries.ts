@@ -49,23 +49,27 @@ export const alertsListQuery = (
   folderId: string,
   query?: string,
   alertType?: string,
+  options?: { silentForbidden?: boolean },
 ) =>
   queryOptions({
     queryKey: alertKeys.list(org, folderId, query, alertType),
-    queryFn: async (): Promise<any[]> =>
-      (
-        await alerts.listByFolderId(
-          1,
-          1000,
-          "name",
-          false,
-          "",
-          org,
-          folderId,
-          query ?? "",
-          alertType ?? "",
-        )
-      ).data?.list ?? [],
+    queryFn: async (): Promise<any[]> => {
+      const args = [
+        1,
+        1000,
+        "name",
+        false,
+        "",
+        org,
+        folderId,
+        query ?? "",
+        alertType ?? "",
+      ] as const;
+      const res = await (options
+        ? alerts.listByFolderId(...args, undefined, options)
+        : alerts.listByFolderId(...args));
+      return res.data?.list ?? [];
+    },
     staleTime: LIVE_STALE_TIME,
   });
 
@@ -105,10 +109,20 @@ export const firingAlertsQuery = (org: string) =>
     staleTime: LIVE_STALE_TIME,
   });
 
-export const alertDetailQuery = (org: string, id: string, folderId?: string) =>
+export const alertDetailQuery = (
+  org: string,
+  id: string,
+  folderId?: string,
+  options?: { silentForbidden?: boolean },
+) =>
   queryOptions({
     queryKey: [...alertKeys.detail(org, id), ...(folderId ? [folderId] : [])],
-    queryFn: async () => (await alerts.get_by_alert_id(org, id, folderId)).data,
+    queryFn: async () =>
+      (
+        await (options
+          ? alerts.get_by_alert_id(org, id, folderId, options)
+          : alerts.get_by_alert_id(org, id, folderId))
+      ).data,
     staleTime: LIVE_STALE_TIME,
   });
 
@@ -308,8 +322,12 @@ export const extendAlertMuteMutation = (org: string) =>
 
 export const cancelAlertMuteMutation = (org: string) =>
   mutationOptions({
-    mutationFn: (vars: { alertId: string; downtimeId: string; folderId?: string }) =>
-      alerts.cancelAlertMute(org, vars.alertId, vars.downtimeId, vars.folderId),
+    mutationFn: (vars: {
+      alertId: string;
+      downtimeId: string;
+      folderId?: string;
+      version?: number;
+    }) => alerts.cancelAlertMute(org, vars.alertId, vars.downtimeId, vars.folderId, vars.version),
     meta: {
       invalidates: [alertKeys.all(org), downtimeKeys.all(org), announcementKeys.all(org)],
       silentError: true,

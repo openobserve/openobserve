@@ -126,6 +126,20 @@ describe("MainLayout — sendToAiChat", () => {
       });
     });
 
+    it("passes a prefilled request through with the chip", async () => {
+      await open(true);
+
+      send({ ...HANDOFF, prompt: "What should I check first?" });
+      await flushPromises();
+
+      expect(seenPayloads[0].payload).toMatchObject({
+        text: HANDOFF.query,
+        chipName: HANDOFF.chipName,
+        prompt: "What should I check first?",
+        autoSend: false,
+      });
+    });
+
     it("does not pulse the legacy input context, so no generic chip appears too", async () => {
       await open(true);
 

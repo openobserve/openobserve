@@ -1965,6 +1965,7 @@
     "slos": "SLO",
     "reliability": "Độ tin cậy",
     "onCall": "Trực",
+    "response": "Phản hồi",
     "toggleNavigation": "Bật/tắt điều hướng",
     "ingestionText": "Tiếp nhận dữ liệu",
     "navigationLink": "Liên kết điều hướng",
@@ -11315,7 +11316,6 @@
     "configure": "Cấu hình",
     "runNow": "Chạy ngay",
     "runNowHint": "Yêu cầu chạy ngay thay vì chờ lần chạy tiếp theo. Nếu đã đến lúc chạy hoặc đang chạy, nó sẽ đáp ứng yêu cầu thay vào đó.",
-    "runRequested": "Đã yêu cầu chạy. Kết quả sẽ được ghi vào stream {stream} khi hoàn tất.",
     "runFailed": "Không thể yêu cầu chạy: {message}",
     "runNeedsConfig": "Bật hiệu chỉnh cảnh báo trong phần cài đặt của nó để chạy.",
     "refresh": "Làm mới",
@@ -11436,7 +11436,6 @@
       "emptyDescription": "Hiệu chuẩn cảnh báo ghi một bản tóm tắt mỗi lần chạy. Chạy ngay bây giờ để xem nó phát hiện được gì.",
       "filteredTitle": "Không có lần chạy nào khớp với bộ lọc này",
       "filteredDescription": "Mở rộng bộ lọc hoặc xóa tìm kiếm.",
-      "errorTitle": "Lượt chạy không khả dụng",
       "runsCapped": "Tìm kiếm lượt chạy đã dừng ở {count} hàng mới nhất, nên các lượt chạy cũ hơn không được liệt kê.",
       "searchCapped": "Tìm kiếm tên cảnh báo đã dừng ở {count} lượt chạy khớp, nên các lượt chạy khớp khác không được hiển thị."
     },
@@ -11448,7 +11447,6 @@
       "viewInLogs": "Xem trong Nhật ký",
       "viewInLogsHint": "Mở bản ghi của lượt chạy này trong Nhật ký",
       "unavailableTitle": "Bản tổng hợp không khả dụng",
-      "noRecords": "Stream {stream} không có bản ghi nào cho lượt chạy này.",
       "loadFailed": "Không thể tải bản tổng hợp: {message}",
       "backToDigests": "Quay lại bản tổng hợp",
       "partialCoverage": "Bao phủ một phần",
@@ -11523,7 +11521,6 @@
       "loadFailed": "Không thể tải cài đặt: {message}",
       "lastSaved": "Lưu lần cuối {time}",
       "runNowHeading": "Chạy ngay",
-      "findingsDesc": "Các phát hiện được ghi vào stream {stream} của tổ chức này và được lưu theo thời gian lưu trữ của stream đó. Hiệu chỉnh cảnh báo không gửi thông báo nào.",
       "frequencyRange": "Chọn tần suất từ 1 giờ đến 30 ngày.",
       "windowRange": "Chọn cửa sổ từ 1 phút đến 90 ngày."
     }
@@ -12901,7 +12898,8 @@
       "suppressRepeats": "Chặn thông báo lặp lại",
       "suppressRepeatsTooltip": "Chỉ thông báo một lần khi cảnh báo bắt đầu kích hoạt hoặc thay đổi mức độ, không phải ở mỗi lần đánh giá. Giữ tùy chọn này ở trạng thái tắt để tiếp tục nhận nhắc nhở sau mỗi khoảng thời gian im lặng.",
       "keepFiringForInvalid": "Nhập 0 giây hoặc nhiều hơn",
-      "keepFiringForTooLong": "Nhập tối đa 86400 giây (24 giờ)"
+      "keepFiringForTooLong": "Nhập tối đa 86400 giây (24 giờ)",
+      "targetRequiredNote": "Required. With no destination, this alert reaches no one."
     },
     "advanced": {
       "addVariable": "Thêm biến",
@@ -29640,7 +29638,7 @@
       "waitingForOk": "Đang chờ bạn xác nhận",
       "proposedFix": "Bản sửa đề xuất",
       "unfoldTab": "Diễn biến sự việc",
-      "seeEvidence": "Xem bằng chứng ({count}) →"
+      "seeEvidence": "Xem tất cả"
     },
     "unfold": {
       "hint": "Đọc từ trái sang phải: những gì đã thay đổi, các tín hiệu mà nó kích hoạt, rồi những gì đã đến với nhóm của bạn. Chọn một thẻ để xem các lần kích hoạt của thẻ đó.",
@@ -30612,7 +30610,7 @@
     },
     "view": {
       "standard": "Tiêu chuẩn",
-      "nerd": "Nerd",
+      "nerd": "Detailed",
       "standardTooltip": "Chế độ xem Tiêu chuẩn cung cấp thông tin ngắn gọn: những gì cần bạn và những gì đã xảy ra trong 7 ngày qua",
       "nerdTooltip": "Chế độ xem Nerd hiển thị đầy đủ mọi detector, vòng lặp và cài đặt",
       "label": "Chế độ xem"
@@ -32549,6 +32547,98 @@
     "validation": {
       "regexLength": "Giữ mẫu trong tối đa {max} ký tự.",
       "regexInvalid": "Mẫu này không hợp lệ hoặc không được hỗ trợ. Không thể dùng lookahead, lookbehind và tham chiếu ngược."
+    }
+  },
+  "autoobserveLive": {
+    "paging": {
+      "title": "Paging",
+      "label": "Page on-call when a stream stops",
+      "description": "Pages go to the on-call team that owns the service, else the organization's default team. Drops and rises show on the AutoObserve home as findings and never page.",
+      "routing": "On-call routing",
+      "unavailable": "Paging is turned off for this deployment.",
+      "denied": "{denied} {askAdmin}",
+      "loadFailed": "Couldn't load the paging setting. Refresh to try again.",
+      "later": "Who else AutoObserve notifies, and how far it acts on its own, will be set here once those controls exist."
+    },
+    "incidents": {
+      "subtitleWho": "Findings that opened an incident, who was paged, and its analysis.",
+      "routing": "Set up on-call routing"
+    },
+    "learning": {
+      "line": "Learning {count} stream. It is ready on {date}; AutoObserve needs {days} days of history to judge a stream. | Learning {count} streams. The first is ready on {date}; AutoObserve needs {days} days of history to judge a stream.",
+      "lineNoDate": "Learning {count} stream; AutoObserve needs {days} days of history to judge a stream. | Learning {count} streams; AutoObserve needs {days} days of history to judge a stream.",
+      "emptyTitle": "Learning your streams",
+      "emptyDesc": "AutoObserve needs {days} days of history to judge a stream. The stream is ready on {date}. | AutoObserve needs {days} days of history to judge a stream. The first of {count} streams is ready on {date}.",
+      "emptyDescNoDate": "AutoObserve needs {days} days of history to judge a stream. It is learning {count} stream now. | AutoObserve needs {days} days of history to judge a stream. It is learning {count} streams now.",
+      "until": "Learning until {date} · {streams}",
+      "streams": "Learning {count} stream | Learning {count} streams",
+      "streamUntil": "until {date}"
+    }
+  },
+  "insight": {
+    "kind": {
+      "paged": {
+        "page": {
+          "paged": "Paged {team}",
+          "pagedTeam": "Paged the on-call team",
+          "unrouted": "Nobody was paged: when it stopped, no on-call team owned this service and the org had no default team.",
+          "failed": "Paging failed: the on-call service did not accept the page. Open the incident to page someone by hand."
+        },
+        "nextRouting": "Set up on-call routing so the next stop pages someone.",
+        "stream_silence": {
+          "headline": "{count} streams stopped sending data",
+          "why": "No data has arrived on {stream} ({type}) since {time}.",
+          "whyMany": "{streams} have sent no data since {time}.",
+          "next": "Check the sender or collector that writes it. The incident resolves once data arrives again.",
+          "nextMany": "One cause is likely, such as a shared collector."
+        },
+        "stream_drop": {
+          "headline": "{count} streams dropped sharply",
+          "why": "{stream} ({type}) has received much less data than usual since {time}.",
+          "whyMany": "{streams} have received much less data than usual since {time}.",
+          "next": "Check whether a sender stopped or a filter changed.",
+          "nextMany": "One cause is likely, such as a shared collector or filter."
+        },
+        "stream_rise": {
+          "headline": "{count} streams rose sharply",
+          "why": "{stream} ({type}) has received much more data than usual since {time}.",
+          "whyMany": "{streams} have received much more data than usual since {time}.",
+          "next": "Check for a retry loop or a new sender writing to it.",
+          "nextMany": "One cause is likely, such as a shared sender retrying."
+        }
+      }
+    },
+    "bulk": {},
+    "decisions": {
+      "saved": {
+        "applied": "Applied to {title}.",
+        "appliedEditor": "Saved and recorded for {title}.",
+        "notRecorded": "Saved. This change was not recorded, so it can't be undone from AutoObserve."
+      },
+      "apply": {
+        "edit": "Edit in alert editor",
+        "button": "Apply",
+        "where": "Folder {folder} · notifies {destinations}",
+        "whereTeam": "Folder {folder} · team {team} · notifies {destinations}",
+        "acknowledged": "{count} of the {of} acknowledged firings would no longer alert. Check it before applying.",
+        "note": "Only the settings above change; the rest of the alert stays as it is. You can undo it while nobody else has changed the alert.",
+        "changed": "This alert changed. Open it to review.",
+        "loading": "Checking what this changes…",
+        "loadFailed": "Couldn't check what this changes, so it can't be applied here. Edit it in the alert editor instead.",
+        "offline": "Apply isn't available here yet. Edit it in the alert editor; nothing changes until you save.",
+        "cardNote": "Shows what changes before anything is saved.",
+        "gone": "This suggestion is no longer available. Open the alert to review it."
+      },
+      "applied": {
+        "title": "Applied changes",
+        "by": "by {actor} at {when}",
+        "undone": "Undone",
+        "you": "you"
+      },
+      "undone": {
+        "applyOne": "Undone: {title} is back to how it was.",
+        "applyMany": "Undone: {count} change is back to how it was. | Undone: {count} changes are back to how they were."
+      }
     }
   }
 }

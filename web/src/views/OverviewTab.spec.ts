@@ -131,6 +131,7 @@ import streamService from "@/services/stream";
 import config from "@/aws-exports";
 import OverviewTab from "./OverviewTab.vue";
 import analytics from "@/services/product_analytics";
+import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
 import { queryClient } from "@/composables/query/queryClient";
 import { streamProbeQuery } from "@/services/stream.queries";
 import { useSampleDataSession } from "@/composables/sampleData/useSampleDataSession";
@@ -1071,6 +1072,87 @@ describe("OverviewTab", () => {
       await flushPromises();
 
       expect(wrapper.findComponent({ name: "ServiceGraphNodeSidePanel" }).exists()).toBe(false);
+    });
+
+    it("a finding's chips read what, name, type everywhere, and another incident's stay alphabetical", async () => {
+      const list = mockOverview.buildIncidentList();
+      list.incidents = [
+        {
+          ...list.incidents[0],
+          id: "incident-0",
+          title: "checkout (logs) stopped sending data",
+          group_values: {
+            env: "prod",
+            stream_type: "logs",
+            stream_name: "checkout",
+            autoobserve_finding: "stream_silence",
+          } as never,
+        },
+        {
+          ...list.incidents[0],
+          id: "incident-1",
+          title: "payments errors",
+          group_values: { service: "api", env: "prod", cluster: "eu" } as never,
+        },
+      ];
+      vi.mocked(incidentsService.list).mockResolvedValue({ data: list } as never);
+
+      wrapper = mountOverviewTab();
+      await flushPromises();
+
+      const keys = wrapper
+        .find(INCIDENTS)
+        .findAllComponents(ODimensionChip)
+        .map((c) => c.props("dimKey"));
+      expect(keys).toEqual([
+        "autoobserve_finding",
+        "stream_name",
+        "stream_type",
+        "env",
+        "cluster",
+        "env",
+        "service",
+      ]);
+    });
+
+    it("the home incidents rows show a finding's chips in words", async () => {
+      const list = mockOverview.buildIncidentList();
+      list.incidents.unshift({
+        ...list.incidents[0],
+        id: "incident-0",
+        title: "checkout (logs) stopped sending data",
+        group_values: {
+          autoobserve_finding: "stream_silence",
+          stream_type: "logs",
+          stream_name: "checkout",
+        } as never,
+      });
+      vi.mocked(incidentsService.list).mockResolvedValue({ data: list } as never);
+
+      wrapper = mountOverviewTab();
+      await flushPromises();
+
+      const chips = wrapper.find(INCIDENTS).findAllComponents(ODimensionChip);
+      const finding = chips.slice(0, 3);
+      expect(finding.map((c) => c.props("keyLabel"))).toEqual([
+        "Finding",
+        "Stream Name",
+        "Stream Type",
+      ]);
+      expect(finding.map((c) => c.props("value"))).toEqual([
+        "Stopped sending data",
+        "checkout",
+        "logs",
+      ]);
+      expect(finding.map((c) => c.props("tooltip"))).toEqual([false, false, false]);
+      expect(finding.map((c) => c.html()).join(" ")).not.toMatch(
+        /autoobserve_finding|stream_name|stream_type|stream_silence/,
+      );
+
+      const k8s = chips[3];
+      expect(k8s.props("dimKey")).toBe("k8s-namespace");
+      expect(k8s.props("keyLabel")).toBe("namespace");
+      expect(k8s.props("tooltip")).toBe(true);
     });
 
     it("should render only the incidents skeleton when the incident list alone is in flight", async () => {

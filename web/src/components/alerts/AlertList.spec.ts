@@ -95,8 +95,10 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import AlertService from "@/services/alerts";
+import DowntimeService from "@/services/downtimes";
 import { queryClient } from "@/composables/query/queryClient";
 import { alertKeys } from "@/services/alerts.querykeys";
+import { fenceAlertWrite } from "@/services/alerts.readFence";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { setMutationNotifier } from "@/composables/query/queryClient";
 import { announcePolite } from "@/lib/feedback/RegionStatus/announcer";
@@ -1209,6 +1211,42 @@ describe("AlertList - router query behaviors", () => {
     expect(pushedQuery.alert_id).toBeUndefined();
   });
 
+  it("a folder read answered after an AutoObserve Apply or Undo does not refill the rows with the old alert (F2)", async () => {
+    const wrapper: any = await mountAlertList();
+    await flushPromises();
+    const org = store.state.selectedOrganization.identifier;
+    let answerLate: (value: any) => void = () => {};
+    (alertsSvc.listByFolderId as any)
+      .mockReturnValueOnce(new Promise((resolve) => (answerLate = resolve)))
+      .mockResolvedValue({ data: { list: [{ ...alertsDB[0], name: "After apply" }] } });
+    const read = wrapper.vm.getAlertsFn(store, "default", "", true, "", true);
+    await flushPromises();
+    await fenceAlertWrite(queryClient, org, async () => "applied");
+    answerLate({ data: { list: [{ ...alertsDB[0], name: "Before apply" }] } });
+    await read;
+    await flushPromises();
+    const rows = store.state.organizationData.allAlertsListByFolderId.default;
+    expect(rows.map((r: any) => r.name)).toEqual(["After apply"]);
+  });
+
+  it("an editor opened from the list during an AutoObserve Apply gets the applied alert (F2)", async () => {
+    const wrapper: any = await mountAlertList();
+    await flushPromises();
+    const org = store.state.selectedOrganization.identifier;
+    let answerLate: (value: any) => void = () => {};
+    (alertsSvc.get_by_alert_id as any)
+      .mockReturnValueOnce(new Promise((resolve) => (answerLate = resolve)))
+      .mockResolvedValue({ data: { ...alertsDB[0], alert_id: "a9", name: "After apply" } });
+    wrapper.vm.router.currentRoute.value.query = { action: "update", alert_id: "a9" };
+    const open = wrapper.vm.handleActionQuery("update");
+    await flushPromises();
+    await fenceAlertWrite(queryClient, org, async () => "applied");
+    answerLate({ data: { ...alertsDB[0], alert_id: "a9", name: "Before apply" } });
+    await open;
+    await flushPromises();
+    expect(wrapper.vm.formData?.name).toBe("After apply");
+  });
+
   // The editor opens an alert from its detail cache (getAlertById), and a save
   // reaches the list through update:list → refreshList.
   it("refreshList marks cached alert copies stale so reopening the editor shows the save", async () => {
@@ -1696,6 +1734,38 @@ describe("AlertList - row actions keep the view", () => {
     expect(wrapper.find('[data-test="alert-list-Alert 6-left-filter"]').exists()).toBe(true);
     expect(wrapper.vm.filteredResults.find((r: any) => r.name === "Alert 6").enabled).toBe(false);
 
+    await wrapper.vm.refreshAlerts();
+    await flushPromises();
+    expect(names(wrapper)).not.toContain("Alert 6");
+  });
+
+  it("keeps a row paused when an AutoObserve Apply makes a refresh in flight read again and the re-read lags", async () => {
+    const wrapper = await mountOnPageTwo();
+    const org = store.state.selectedOrganization.identifier;
+    const read = deferred<any>();
+    const stale = alertsDB.map((a) => ({ ...a }));
+    alertsSvc.listByFolderId.mockImplementationOnce(() => read.promise);
+    const refresh = wrapper.vm.refreshAlerts();
+    await flushPromises();
+
+    await toggleBtn(wrapper, "Alert 6").trigger("click");
+    await flushPromises();
+    const lagging = stale.map((a) =>
+      a.name === "Alert 8" ? { ...a, name: "Alert 8 applied" } : a,
+    );
+    alertsSvc.listByFolderId.mockImplementation(async () => ({ data: { list: lagging } }));
+    await fenceAlertWrite(queryClient, org, async () => "applied");
+    read.resolve({ data: { list: stale } });
+    await refresh;
+    await flushPromises();
+
+    expect(names(wrapper)).toContain("Alert 8 applied");
+    expect(names(wrapper)).toContain("Alert 6");
+    expect(wrapper.find('[data-test="alert-list-Alert 6-left-filter"]').exists()).toBe(true);
+    expect(wrapper.vm.filteredResults.find((r: any) => r.name === "Alert 6").enabled).toBe(false);
+    expect(errorToasts()).toEqual([]);
+
+    alertsSvc.listByFolderId.mockImplementation(async () => ({ data: { list: alertsDB } }));
     await wrapper.vm.refreshAlerts();
     await flushPromises();
     expect(names(wrapper)).not.toContain("Alert 6");
@@ -3722,7 +3792,127 @@ describe("AlertList — Acknowledge and alert-scoped Mute (MK-3)", () => {
       "alert-4",
       "d1",
       "default",
+      2,
     );
+  });
+
+  const anomalyRow = (downtime: Record<string, unknown> = {}) => ({
+    type: "anomaly",
+    alert_id: "an-1",
+    name: "ut-demo-anomaly",
+    folder_name: { id: "default" },
+    active_downtime: {
+      id: "d7",
+      name: "Quick mute · ut-demo-anomaly",
+      ends_at: 4_102_444_800_000_000,
+      version: 5,
+      folder_id: "ops",
+      end_here: true,
+      ...downtime,
+    },
+  });
+
+  it("ends an anomaly row's mute at its version through the downtime route, then refreshes", async () => {
+    const cancel = vi.spyOn(DowntimeService, "cancel").mockResolvedValue({ data: {} } as any);
+    const { wrapper } = await loadAckRows();
+    const loads = alertsSvc.listByFolderId.mock.calls.length;
+    expect(await wrapper.vm.endRowMute(anomalyRow())).toBe("ok");
+    expect(cancel).toHaveBeenLastCalledWith("default", "d7", "ops", 5);
+    expect(alertsSvc.cancelAlertMute).not.toHaveBeenCalledWith(
+      expect.anything(),
+      "an-1",
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+    );
+    expect(alertsSvc.listByFolderId.mock.calls.length).toBeGreaterThan(loads);
+    cancel.mockRestore();
+  });
+
+  it("extends an anomaly row's mute by a preset at its version", async () => {
+    const extend = vi
+      .spyOn(DowntimeService, "extend")
+      .mockResolvedValue({ data: { id: "d7", schedule: { ends_at: 1 } } } as any);
+    const { wrapper } = await loadAckRows();
+    expect(await wrapper.vm.extendRow(anomalyRow(), { minutes: 60 })).toBe("ok");
+    expect(extend).toHaveBeenLastCalledWith("default", "d7", { by_secs: 3600, version: 5 }, "ops");
+    extend.mockRestore();
+  });
+
+  it.each([403, 404, 409])("refreshes the list after a %s on End mute", async (status) => {
+    const cancel = vi
+      .spyOn(DowntimeService, "cancel")
+      .mockRejectedValue({ response: { status, data: {} } });
+    const { wrapper } = await loadAckRows();
+    const loads = alertsSvc.listByFolderId.mock.calls.length;
+    expect(await wrapper.vm.endRowMute(anomalyRow())).toBe("conflict");
+    expect(alertsSvc.listByFolderId.mock.calls.length).toBeGreaterThan(loads);
+    alertsSvc.cancelAlertMute.mockRejectedValue({ response: { status, data: {} } });
+    const before = alertsSvc.listByFolderId.mock.calls.length;
+    expect(await wrapper.vm.endRowMute({ ...anomalyRow(), type: undefined })).toBe("conflict");
+    expect(alertsSvc.listByFolderId.mock.calls.length).toBeGreaterThan(before);
+    cancel.mockRestore();
+  });
+
+  it("refreshes the list when Extend until cannot read a refused mute, not when no answer came", async () => {
+    const get = vi
+      .spyOn(DowntimeService, "get")
+      .mockRejectedValueOnce({ response: { status: 404, data: {} } })
+      .mockRejectedValueOnce(new Error("Network"));
+    const { wrapper } = await loadAckRows();
+    const loads = alertsSvc.listByFolderId.mock.calls.length;
+    await wrapper.vm.openExtendUntil(anomalyRow());
+    const afterRefusal = alertsSvc.listByFolderId.mock.calls.length;
+    expect(afterRefusal).toBeGreaterThan(loads);
+    await wrapper.vm.openExtendUntil(anomalyRow());
+    expect(alertsSvc.listByFolderId.mock.calls.length).toBe(afterRefusal);
+    get.mockRestore();
+  });
+
+  it("keeps the list as it is when End mute got no answer", async () => {
+    const cancel = vi.spyOn(DowntimeService, "cancel").mockRejectedValue(new Error("Network"));
+    const { wrapper } = await loadAckRows();
+    const loads = alertsSvc.listByFolderId.mock.calls.length;
+    expect(await wrapper.vm.endRowMute(anomalyRow())).toBe("failed");
+    expect(alertsSvc.listByFolderId.mock.calls.length).toBe(loads);
+    cancel.mockRestore();
+  });
+
+  it("ends from the parent row exactly the downtime naming its two groups (D3)", async () => {
+    alertsSvc.cancelAlertMute.mockResolvedValue({ data: {} });
+    const { wrapper, row } = await loadAckRows();
+    const twoGroups = {
+      ...row("muted-firing"),
+      active_downtime: {
+        id: "d1",
+        name: "Quick mute",
+        ends_at: 4_102_444_800_000_000,
+        version: 2,
+        end_here: true,
+        alert_groups: [
+          { alert_id: "alert-4", group_key: "k1" },
+          { alert_id: "alert-4", group_key: "k2" },
+        ],
+      },
+    };
+    expect(await wrapper.vm.endRowMute(twoGroups)).toBe("ok");
+    expect(alertsSvc.cancelAlertMute).toHaveBeenCalledTimes(1);
+    expect(alertsSvc.cancelAlertMute).toHaveBeenLastCalledWith(
+      "default",
+      "alert-4",
+      "d1",
+      "default",
+      2,
+    );
+  });
+
+  it("links the Firing · muted tag to the downtime in its own folder", async () => {
+    const { wrapper } = await loadAckRows();
+    expect(wrapper.vm.downtimeLinkOf(anomalyRow())).toEqual({
+      name: "downtimeDetail",
+      params: { id: "d7" },
+      query: { org_identifier: "default", folder: "ops" },
+    });
   });
 }, 15000);
 

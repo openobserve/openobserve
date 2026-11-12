@@ -409,7 +409,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <template v-if="downtimesEnabled">
             <ODropdownSeparator />
+            <RowMuteMenu
+              v-if="(row as any).active_downtime"
+              :downtime="(row as any).active_downtime"
+              :extend-test-prefix="`${dataTest}-${(row as any).id}-extend`"
+              :end-test="`${dataTest}-${(row as any).id}-end-mute`"
+              :muted-by-test="`${dataTest}-${(row as any).id}-muted-by`"
+              @preset="(secs) => rowMuteActions.extendBy((row as any).active_downtime, secs)"
+              @until="rowMuteActions.openExtendUntil((row as any).active_downtime)"
+              @end="rowMuteActions.end((row as any).active_downtime)"
+            />
             <MuteMenuItems
+              v-else
               :data-test-prefix="`${dataTest}-mute`"
               @preset="(secs) => muteRows([row], secs)"
               @until="openMuteDialog([row])"
@@ -535,6 +546,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-model:open="muteDialogOpen"
     :selection="muteSelection"
   />
+  <ExtendDowntimeDialog
+    v-if="downtimesEnabled"
+    v-model:open="rowMuteActions.extendUntilOpen.value"
+    :downtime="rowMuteActions.extendUntilRow.value"
+    :submit="rowMuteActions.extendUntil"
+  />
 
   <!-- Spark bar detail tooltip -->
   <Teleport to="body">
@@ -609,8 +626,11 @@ import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import type { ForbiddenState } from "@/utils/featureGate";
 import MutedChip from "@/components/alerts/downtimes/MutedChip.vue";
 import MuteMenuItems from "@/components/alerts/downtimes/MuteMenuItems.vue";
+import RowMuteMenu from "@/components/alerts/downtimes/RowMuteMenu.vue";
+import ExtendDowntimeDialog from "@/components/alerts/downtimes/ExtendDowntimeDialog.vue";
 import QuickMuteDialog from "@/components/alerts/downtimes/QuickMuteDialog.vue";
 import { useRowMute } from "@/composables/downtimes/useRowMute";
+import { useDowntimeRowActions } from "@/composables/downtimes/useDowntimeRowActions";
 import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import FitItems from "@/components/common/FitItems.vue";
@@ -748,6 +768,9 @@ const { downtimesEnabled, muteDialogOpen, muteSelection, muteRows, openMuteDialo
     () => "synthetics",
     (row) => String(row.id),
   );
+
+// The list is a query, so a write's invalidation and a refused write's refetch both reload it.
+const rowMuteActions = useDowntimeRowActions();
 
 const selectedRows = computed(() =>
   props.data.filter((row: any) => localSelectedIds.value.includes(String(row.id))),

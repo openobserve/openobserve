@@ -60,6 +60,12 @@ if (import.meta.env.DEV && !form) {
         <template v-if="$slots.empty" #empty>
           <slot name="empty" />
         </template>
+        <template v-if="$slots['before-options']" #before-options>
+          <slot name="before-options" />
+        </template>
+        <template v-if="$slots['after-options']" #after-options>
+          <slot name="after-options" />
+        </template>
         <template v-if="$slots.tooltip" #tooltip>
           <slot name="tooltip" />
         </template>

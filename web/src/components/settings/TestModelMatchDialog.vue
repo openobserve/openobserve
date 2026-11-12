@@ -8,7 +8,7 @@
     :sub-title="t('modelPricing.testMatchSubtitle')"
     :secondary-button-label="t('modelPricing.close')"
     :primary-button-label="t('modelPricing.testMatch')"
-    :primary-button-disabled="!testModelName"
+    :primary-button-disabled="!testModelName || testAtTimeRefused"
     :primary-button-loading="testing"
     @click:secondary="internalValue = false"
     @click:primary="runTest"
@@ -47,6 +47,7 @@
             format24
             clearable
             data-test="test-match-time-input"
+            @invalid="testAtTimeRefused = $event"
           />
           <OText v-if="testAtTimeLocalHint" variant="meta" data-test="test-match-time-local-hint">
             {{ t("modelPricing.localTimeHint", { range: testAtTimeLocalHint }) }}
@@ -374,6 +375,8 @@ const testModelName = ref("");
 // Optional `HH:MM` UTC time-of-day to test at; empty = "right now". Lets a
 // peak / off-peak tier be exercised without waiting for its window.
 const testAtTime = ref("");
+// A refused typed time leaves the previous one in testAtTime, so no test runs at a time not on screen.
+const testAtTimeRefused = ref(false);
 // Blank keys are not sent, so a half-typed row never changes the result.
 const testAttributes = ref<Array<{ key: string; value: string }>>([]);
 
@@ -402,6 +405,7 @@ watch(internalValue, (val) => {
     hasRun.value = false;
     testModelName.value = "";
     testAtTime.value = "";
+    testAtTimeRefused.value = false;
     testAttributes.value = [];
   }
 });
@@ -454,7 +458,7 @@ async function callTestApi() {
 const testing = ref(false);
 
 async function runTest() {
-  if (!testModelName.value) return;
+  if (!testModelName.value || testAtTimeRefused.value) return;
   testing.value = true;
   hasRun.value = true;
   await callTestApi();

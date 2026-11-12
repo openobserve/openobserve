@@ -136,6 +136,8 @@ pub struct RunUpdate {
     /// When the answer deadline closed; the write loses once it closed.
     pub deadline_closed_at: Option<i64>,
     pub now_us: i64,
+    /// The incident's status episode the write belongs to; it loses once the incident left it.
+    pub episode: Option<crate::table::alert_incidents::Episode>,
 }
 
 /// Changes to the incident's `rca_summary`.
@@ -655,12 +657,16 @@ pub async fn update_run_with<C: TransactionTrait>(
 
     // The incident and its summary after `upd`, while the incident still names this run.
     let incident = if subject_type == RunSubjectType::Incident.as_str() {
+        let named = alert_incidents::Entity::find_by_id(subject_id.as_str())
+            .filter(alert_incidents::Column::OrgId.eq(org_id))
+            .filter(alert_incidents::Column::RcaRunId.eq(run_id));
+        let held = match upd.episode.as_ref() {
+            Some(episode) => episode.held(named),
+            None => named,
+        };
         let Some(stored) = locked(
             &txn,
-            alert_incidents::Entity::find_by_id(subject_id.as_str())
-                .filter(alert_incidents::Column::OrgId.eq(org_id))
-                .filter(alert_incidents::Column::RcaRunId.eq(run_id))
-                .select_only()
+            held.select_only()
                 .column(alert_incidents::Column::RcaSummary),
         )
         .into_tuple::<Option<String>>()
@@ -3042,5 +3048,71 @@ mod tests {
         assert_eq!(replaced(&a1), None);
         let a2 = start_at(RunSubjectType::Alert, "alert-1", T0 + 99_999 * SEC).await;
         assert_eq!(replaced(&a2), None);
+    }
+
+    /// SQLite, and a fresh Postgres schema when `ZO_META_POSTGRES_DSN` is set.
+    async fn stores() -> Vec<(DatabaseConnection, Option<String>)> {
+        let mut out = vec![(db().await, None)];
+        let dsn = std::env::var("ZO_META_POSTGRES_DSN").unwrap_or_default();
+        if dsn.trim().is_empty() {
+            return out;
+        }
+        let schema = format!("rca_test_{}", config::ider::generate().to_ascii_lowercase());
+        let admin = Database::connect(&dsn).await.unwrap();
+        admin
+            .execute_unprepared(&format!(r#"CREATE SCHEMA "{schema}""#))
+            .await
+            .unwrap();
+        let mut options = ConnectOptions::new(dsn);
+        options
+            .max_connections(1)
+            .set_schema_search_path(schema.clone());
+        let pg = Database::connect(options).await.unwrap();
+        create_tables(&pg).await;
+        out.push((pg, Some(schema)));
+        out
+    }
+
+    #[tokio::test]
+    async fn a_write_for_an_incident_episode_that_ended_is_refused() {
+        use crate::table::alert_incidents::{Episode, update_status_with};
+
+        for (db, schema) in stores().await {
+            incident(&db, "inc-episode").await;
+            let run_id = start(&db, "inc-episode", T0).await;
+            let resolved = update_status_with(&db, ORG, "inc-episode", "resolved").await;
+            let resolved = Episode::of(&resolved.unwrap());
+            update_status_with(&db, ORG, "inc-episode", "open")
+                .await
+                .unwrap();
+            let cancel = |episode| RunUpdate {
+                episode: Some(episode),
+                ..finish_update(RunState::Cancelled, T0 + SEC)
+            };
+            let late = update_run_with(&db, ORG, &run_id, cancel(resolved)).await;
+            assert!(!late.unwrap(), "the resolution it names ended");
+            let still = run(&db, &run_id).await.unwrap().state;
+            assert_eq!(still, RunState::Running.as_str());
+            assert!(
+                !event_types(&db, "inc-episode")
+                    .await
+                    .iter()
+                    .any(|t| matches!(t, IncidentEventType::AIAnalysisCancelled { .. }))
+            );
+
+            let reopened = Episode::of(&inc(&db, "inc-episode").await);
+            let now = update_run_with(&db, ORG, &run_id, cancel(reopened)).await;
+            assert!(now.unwrap(), "the episode it names still holds");
+            if let Some(schema) = schema {
+                let dsn = std::env::var("ZO_META_POSTGRES_DSN").unwrap();
+                Database::connect(&dsn)
+                    .await
+                    .unwrap()
+                    .execute_unprepared(&format!(r#"DROP SCHEMA "{schema}" CASCADE"#))
+                    .await
+                    .unwrap();
+                println!("postgres arm ran");
+            }
+        }
     }
 }

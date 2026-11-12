@@ -175,7 +175,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            Shown here rather than only in the confirm dialog because most
            surfaces now skip that dialog and come straight to this form; without
            this the transforms would be silent. -->
-      <div v-if="prefillWarnings.length" class="flex shrink-0 flex-col gap-2 px-3 pt-2">
+      <div
+        v-if="prefillWarnings.length || calibrationHandoff.reserved.value"
+        class="flex shrink-0 flex-col gap-2 px-3 pt-2"
+      >
+        <!-- Invisible until the handoff is read, so the slot keeps its height from first paint. -->
+        <div
+          v-if="calibrationHandoff.reserved.value"
+          :class="calibrationBanner ? '' : 'invisible'"
+          :data-severity="calibrationBanner?.variant ?? ''"
+          data-test="add-alert-calibration-banner"
+        >
+          <OBanner dense inline-actions :variant="calibrationBanner?.variant ?? 'info'">
+            <OTruncatedText>{{ calibrationBanner?.text ?? "" }}</OTruncatedText>
+          </OBanner>
+        </div>
         <OBanner
           v-for="(warning, index) in prefillWarnings"
           :key="`${warning.key}-${index}`"
@@ -386,6 +400,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :formattedDestinations="getFormattedDestinations"
                     :destinationObjects="destinations"
                     :workflows="formData.workflows"
+                    :destinationRequired="destinationRequired"
                     @update:trigger="updateTriggerCondition"
                     @update:aggregation="updateAggregation"
                     @update:isAggregationEnabled="(val) => (isAggregationEnabled = val)"
@@ -467,6 +482,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             class="bg-card-glass-bg border-border-default flex shrink-0 items-center justify-end gap-2 border-t px-3 py-2.5"
           >
+            <p
+              v-if="silentAutoObserveDraft"
+              class="text-status-error-text me-auto flex min-w-0 items-start gap-1.5 text-xs"
+              data-test="add-alert-no-destination"
+            >
+              <OIcon name="error" size="xs" class="mt-0.5 shrink-0" />
+              <span
+                >{{ unreachableLine(t, reachGap, 1) }}
+                <OButton
+                  v-if="reachGap === 'noTeam'"
+                  variant="ghost-primary"
+                  size="xs"
+                  icon-right="arrow-forward"
+                  data-test="add-alert-setup-oncall"
+                  @click="openOncallSetup()"
+                  >{{ t("alerts.reach.setUpOncall") }}</OButton
+                >
+                <OButton
+                  v-if="reachGap === 'noTeam'"
+                  variant="ghost-primary"
+                  size="xs"
+                  :loading="checkingReach"
+                  data-test="add-alert-check-oncall"
+                  @click="checkOncallAgain()"
+                  >{{ t("alerts.reach.checkAgain") }}</OButton
+                ></span
+              >
+            </p>
+            <p
+              v-else-if="viaIncidentDraft"
+              class="text-text-secondary me-auto min-w-0 text-xs"
+              data-test="add-alert-via-incident"
+            >
+              {{ viaIncidentLine(t, 1) }}
+            </p>
             <OButton
               data-test="add-alert-cancel-btn"
               variant="outline"
@@ -675,6 +725,7 @@ import AnomalyAlerting from "@/components/anomaly_detection/steps/AnomalyAlertin
 import AnomalySummary from "@/components/anomaly_detection/AnomalySummary.vue";
 import { useAlertForm, defaultAlertValue, type AlertFormEmit } from "@/composables/useAlertForm";
 import { useAlertEditorDraft } from "@/composables/alerts/useAlertEditorDraft";
+import { useCalibrationHandoff } from "@/composables/alerts/useCalibrationHandoff";
 import EditorDraftDialogs from "@/components/common/drafts/EditorDraftDialogs.vue";
 import {
   anomalyNoticeBadgeKeys,
@@ -696,6 +747,8 @@ import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import CompositeAlertForm from "./composite/CompositeAlertForm.vue";
 import alertsService from "@/services/alerts";
+import { unreachableLine, viaIncidentLine } from "@/utils/alerts/deliveryTarget";
+import { useOnCallSetup } from "@/composables/useOnCallSetup";
 import { useLicenseLock } from "@/composables/useFeatureLock";
 
 export default defineComponent({
@@ -771,8 +824,20 @@ export default defineComponent({
       modelValue: () => props.modelValue,
       onSaved: (folderId, options) => emit("update:list", folderId, options),
     });
-    onFormSaved = alertEditorDraft.handleSaved;
-    onMounted(() => alertEditorDraft.start());
+    const calibrationHandoff = useCalibrationHandoff({
+      form: alertForm,
+      editorDraft: alertEditorDraft,
+      modelValue: () => props.modelValue,
+    });
+    onFormSaved = (folderId) => {
+      void calibrationHandoff.recordSaved();
+      alertEditorDraft.handleSaved(folderId);
+    };
+    // The handoff waits for the restore choice, so a draft decides before any patch lands.
+    onMounted(async () => {
+      await alertEditorDraft.start();
+      await calibrationHandoff.run();
+    });
 
     const cancelEditor = async () => {
       if (await alertEditorDraft.draft.confirmLeave()) emit("cancel:hideform");
@@ -858,8 +923,11 @@ export default defineComponent({
     // form reports a valid expression the Save button stays disabled (the schema
     // blocks a bad expression on submit too — this is the visible affordance).
     const compositeValidation = ref<{ valid: boolean }>({ valid: false });
+    const { silentAutoObserveDraft, destinationRequired, viaIncidentDraft, reachGap } = alertForm;
     const compositeSaveDisabled = computed(
-      () => isCompositeMode.value && compositeValidation.value.valid !== true,
+      () =>
+        (isCompositeMode.value && compositeValidation.value.valid !== true) ||
+        silentAutoObserveDraft.value,
     );
     const onCompositeValidation = (value: { valid: boolean }) => {
       compositeValidation.value = value;
@@ -977,6 +1045,12 @@ export default defineComponent({
       });
     };
 
+    const {
+      openSetup: openOncallSetup,
+      checkAgain: checkOncallAgain,
+      checking: checkingReach,
+    } = useOnCallSetup();
+
     // Stream-type change: write the value into the ONE form explicitly (so the
     // synchronous form store is current before updateStreams reads it — not
     // relying on the OFormSelect field-change flush order), then refresh streams
@@ -1072,6 +1146,8 @@ export default defineComponent({
       raw,
       ...alertForm,
       alertDraft: alertEditorDraft.draft,
+      calibrationHandoff,
+      calibrationBanner: calibrationHandoff.banner,
       draftFormKey: alertEditorDraft.formKey,
       cancelEditor,
       alertAutoName,
@@ -1097,6 +1173,15 @@ export default defineComponent({
       availableCompositeChildren,
       updateCompositeDraft,
       compositeSaveDisabled,
+      silentAutoObserveDraft,
+      destinationRequired,
+      viaIncidentDraft,
+      reachGap,
+      openOncallSetup,
+      checkOncallAgain,
+      checkingReach,
+      unreachableLine,
+      viaIncidentLine,
       onCompositeValidation,
       handleSqlSchemaUpdated,
     };

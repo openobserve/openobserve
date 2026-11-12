@@ -37,6 +37,7 @@ const props = defineProps<{
   nodes: NodeSummary | null;
   clusters?: PickerCluster[];
   cluster?: string | null;
+  clustersLoading?: boolean;
 }>();
 const emit = defineEmits<{ select: [view: View]; cluster: [name: string] }>();
 
@@ -92,13 +93,14 @@ const setOpen = (id: string, open: boolean) => {
     data-test="k8s2-tree"
   >
     <div
-      v-if="clusters?.length"
+      v-if="clusters?.length || clustersLoading"
       class="border-border-default shrink-0 border-b p-3"
       data-test="k8s2-tree-cluster"
     >
       <K8sClusterPicker
-        :clusters="clusters"
+        :clusters="clusters ?? []"
         :active="cluster ?? null"
+        :loading="clustersLoading"
         @select="(name: string) => emit('cluster', name)"
       />
     </div>

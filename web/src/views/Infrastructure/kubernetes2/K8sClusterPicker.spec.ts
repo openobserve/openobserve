@@ -130,4 +130,24 @@ describe("K8sClusterPicker", () => {
     await flushPromises();
     expect(wrapper.emitted("select")).toBeUndefined();
   });
+
+  it("shows loading text and is disabled while the first clusters load", () => {
+    const wrapper = mount(K8sClusterPicker, {
+      props: { clusters: [], active: null, loading: true },
+      global: { plugins: [i18n] },
+      attachTo: document.body,
+    });
+    expect(wrapper.text()).toContain("Loading clusters");
+    expect(wrapper.find(TRIGGER).attributes("disabled")).toBeDefined();
+  });
+
+  it("keeps the active cluster name while the page is still loading", () => {
+    const wrapper = mount(K8sClusterPicker, {
+      props: { clusters, active: "prod-east", loading: true },
+      global: { plugins: [i18n] },
+      attachTo: document.body,
+    });
+    expect(wrapper.text()).toContain("prod-east");
+    expect(wrapper.text()).not.toContain("Loading clusters");
+  });
 });

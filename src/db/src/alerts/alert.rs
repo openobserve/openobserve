@@ -252,58 +252,21 @@ pub async fn update<C: ConnectionTrait + TransactionTrait>(
     alert: Alert,
 ) -> Result<Alert, infra::errors::Error> {
     let alert = table::update(conn, org_id, folder_id, alert).await?;
-    let schedule_key = scheduler_key(alert.id);
+    announce_update(org_id, folder_id, alert).await
+}
 
-    infra::coordinator::alerts::emit_put_event(org_id, &alert, folder_id.map(|id| id.to_string()))
-        .await?;
-    #[cfg(feature = "enterprise")]
-    super_cluster::emit_update_event(org_id, folder_id, alert.clone()).await?;
-
-    let next_run_at = if alert.trigger_condition.frequency_type == FrequencyType::Cron {
-        match alert
-            .trigger_condition
-            .get_next_trigger_time(true, alert.tz_offset, false, None)
-        {
-            Ok(t) => t,
-            Err(e) => {
-                log::error!(
-                    "Failed to compute next trigger time for alert {schedule_key}: org_id: {org_id}, error: {e}"
-                );
-                now_micros()
-            }
-        }
-    } else {
-        now_micros()
-    };
-    let mut trigger = db::scheduler::Trigger {
-        org: org_id.to_string(),
-        module_key: schedule_key.clone(),
-        next_run_at,
-        is_realtime: alert.is_real_time,
-        is_silenced: false,
-        ..Default::default()
-    };
-
-    if let Ok(job) =
-        db::scheduler::get(org_id, db::scheduler::TriggerModule::Alert, &schedule_key).await
-    {
-        trigger.data = job.data;
-        trigger.start_time = job.start_time;
-        let _ = db::scheduler::update_trigger(trigger, false, "")
-            .await
-            .map_err(|e| {
-                log::error!("Failed to update trigger for alert {schedule_key}: org_id: {org_id}, error: {e}");
-            });
-    } else {
-        let _ = db::scheduler::push(trigger).await.map_err(|e| {
-            log::error!(
-                "Failed to save trigger for alert {schedule_key}: org_id: {org_id}, error: {e}"
-            );
-            e
-        });
+/// `table::update_where` and then the same announcements; None when the guard refused the write.
+pub async fn update_where<C: ConnectionTrait + TransactionTrait>(
+    conn: &C,
+    org_id: &str,
+    folder_id: Option<&str>,
+    alert: Alert,
+    guard: Option<table::WriteGuard>,
+) -> Result<Option<Alert>, infra::errors::Error> {
+    match table::update_where(conn, org_id, folder_id, alert, guard).await? {
+        Some(alert) => Ok(Some(announce_update(org_id, folder_id, alert).await?)),
+        None => Ok(None),
     }
-
-    Ok(alert)
 }
 
 pub async fn delete_by_id<C: ConnectionTrait>(
@@ -643,6 +606,65 @@ pub fn cache_alert_key(org: &str, alert_id: &str) -> String {
 /// Returns the key used to schedule a trigger for the alert.
 pub fn scheduler_key(alert_id: Option<Ksuid>) -> String {
     alert_id.map_or_else(|| DEFAULT_FOLDER.to_string(), |id| id.to_string())
+}
+
+async fn announce_update(
+    org_id: &str,
+    folder_id: Option<&str>,
+    alert: Alert,
+) -> Result<Alert, infra::errors::Error> {
+    let schedule_key = scheduler_key(alert.id);
+
+    infra::coordinator::alerts::emit_put_event(org_id, &alert, folder_id.map(|id| id.to_string()))
+        .await?;
+    #[cfg(feature = "enterprise")]
+    super_cluster::emit_update_event(org_id, folder_id, alert.clone()).await?;
+
+    let next_run_at = if alert.trigger_condition.frequency_type == FrequencyType::Cron {
+        match alert
+            .trigger_condition
+            .get_next_trigger_time(true, alert.tz_offset, false, None)
+        {
+            Ok(t) => t,
+            Err(e) => {
+                log::error!(
+                    "Failed to compute next trigger time for alert {schedule_key}: org_id: {org_id}, error: {e}"
+                );
+                now_micros()
+            }
+        }
+    } else {
+        now_micros()
+    };
+    let mut trigger = db::scheduler::Trigger {
+        org: org_id.to_string(),
+        module_key: schedule_key.clone(),
+        next_run_at,
+        is_realtime: alert.is_real_time,
+        is_silenced: false,
+        ..Default::default()
+    };
+
+    if let Ok(job) =
+        db::scheduler::get(org_id, db::scheduler::TriggerModule::Alert, &schedule_key).await
+    {
+        trigger.data = job.data;
+        trigger.start_time = job.start_time;
+        let _ = db::scheduler::update_trigger(trigger, false, "")
+            .await
+            .map_err(|e| {
+                log::error!("Failed to update trigger for alert {schedule_key}: org_id: {org_id}, error: {e}");
+            });
+    } else {
+        let _ = db::scheduler::push(trigger).await.map_err(|e| {
+            log::error!(
+                "Failed to save trigger for alert {schedule_key}: org_id: {org_id}, error: {e}"
+            );
+            e
+        });
+    }
+
+    Ok(alert)
 }
 
 #[cfg(test)]

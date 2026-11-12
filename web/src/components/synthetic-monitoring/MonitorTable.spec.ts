@@ -13,13 +13,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { flushPromises, mount, VueWrapper } from "@vue/test-utils";
 import i18n from "@/locales";
 import MonitorTable from "./MonitorTable.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { mockMonitorList } from "@/test/unit/mockData/synthetics";
 import store from "@/test/unit/helpers/store";
+import config from "@/aws-exports";
+import downtimes from "@/services/downtimes";
 
 // ── Stubs ───────────────────────────────────────────────────────────────
 
@@ -373,6 +375,60 @@ describe("MonitorTable", () => {
       // Each row should have edit, duplicate, and more buttons
       const editBtns = wrapper.findAll('[data-test="monitor-table-edit-btn"]');
       expect(editBtns.length).toBe(4);
+    });
+  });
+
+  describe("a muted row", () => {
+    const original = { enterprise: (config as any).isEnterprise };
+    const mute = {
+      id: "d3",
+      name: "Quick mute · checkout",
+      ends_at: 4_102_444_800_000_000,
+      version: 4,
+      folder_id: "ops",
+      end_here: true,
+    };
+    const mutedRow = (downtime: Record<string, unknown>) =>
+      mountMonitorTable({
+        data: [{ ...mockMonitorList[0], active_downtime: downtime }, ...mockMonitorList.slice(1)],
+      });
+    const id = mockMonitorList[0].id;
+
+    beforeEach(() => {
+      (config as any).isEnterprise = "true";
+      (store.state as any).zoConfig.downtimes_enabled = true;
+    });
+    afterEach(() => {
+      (config as any).isEnterprise = original.enterprise;
+      delete (store.state as any).zoConfig.downtimes_enabled;
+      vi.restoreAllMocks();
+    });
+
+    it("ends its own mute through the downtime route at the row's version", async () => {
+      const cancel = vi.spyOn(downtimes, "cancel").mockResolvedValue({ data: {} } as any);
+      wrapper = mutedRow(mute);
+      await flushPromises();
+      await wrapper.find(`[data-test="monitor-table-${id}-end-mute"]`).trigger("click");
+      await flushPromises();
+      expect(cancel).toHaveBeenCalledWith("default", "d3", "ops", 4);
+    });
+
+    it("extends its own mute by a preset", async () => {
+      const extend = vi
+        .spyOn(downtimes, "extend")
+        .mockResolvedValue({ data: { id: "d3", schedule: { ends_at: 1 } } } as any);
+      wrapper = mutedRow(mute);
+      await flushPromises();
+      await wrapper.find(`[data-test="monitor-table-${id}-extend-1h"]`).trigger("click");
+      await flushPromises();
+      expect(extend).toHaveBeenCalledWith("default", "d3", { by_secs: 3600, version: 4 }, "ops");
+    });
+
+    it("offers only Muted by for a shared downtime, and no fresh Mute", async () => {
+      wrapper = mutedRow({ ...mute, end_here: false });
+      await flushPromises();
+      expect(wrapper.find(`[data-test="monitor-table-${id}-end-mute"]`).exists()).toBe(false);
+      expect(wrapper.find(`[data-test="monitor-table-${id}-muted-by"]`).exists()).toBe(true);
     });
   });
 

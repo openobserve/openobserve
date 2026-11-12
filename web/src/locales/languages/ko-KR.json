@@ -1965,6 +1965,7 @@
     "slos": "SLO",
     "reliability": "신뢰성",
     "onCall": "온콜",
+    "response": "대응",
     "toggleNavigation": "탐색 토글",
     "ingestionText": "수집",
     "navigationLink": "탐색 링크",
@@ -11315,7 +11316,6 @@
     "configure": "구성",
     "runNow": "지금 실행",
     "runNowHint": "다음 실행을 기다리지 않고 지금 실행을 요청합니다. 이미 실행 예정이거나 진행 중인 경우에는 해당 요청에 응답합니다.",
-    "runRequested": "실행이 요청되었습니다. 완료되면 결과가 {stream} 스트림에 기록됩니다.",
     "runFailed": "실행을 요청할 수 없습니다: {message}",
     "runNeedsConfig": "실행하려면 설정에서 알림 캘리브레이션을 켜세요.",
     "refresh": "새로 고침",
@@ -11436,7 +11436,6 @@
       "emptyDescription": "알림 캘리브레이션은 실행될 때마다 다이제스트를 기록합니다. 지금 실행하여 무엇을 발견하는지 확인하세요.",
       "filteredTitle": "이 필터와 일치하는 실행이 없습니다",
       "filteredDescription": "필터를 넓히거나 검색을 지우세요.",
-      "errorTitle": "실행을 사용할 수 없음",
       "runsCapped": "실행 검색이 최신 {count}개 행에서 중단되어 이전 실행은 표시되지 않습니다.",
       "searchCapped": "알림 이름 검색이 일치하는 실행 {count}개에서 중단되어 다른 일치 실행은 표시되지 않습니다."
     },
@@ -11448,7 +11447,6 @@
       "viewInLogs": "로그에서 보기",
       "viewInLogsHint": "이 실행의 레코드를 로그에서 엽니다",
       "unavailableTitle": "다이제스트를 사용할 수 없음",
-      "noRecords": "{stream} 스트림에 이 실행에 대한 레코드가 없습니다.",
       "loadFailed": "다이제스트를 불러올 수 없습니다: {message}",
       "backToDigests": "다이제스트로 돌아가기",
       "partialCoverage": "부분 커버리지",
@@ -11523,7 +11521,6 @@
       "loadFailed": "설정을 불러올 수 없습니다: {message}",
       "lastSaved": "마지막 저장 {time}",
       "runNowHeading": "지금 실행",
-      "findingsDesc": "발견 사항은 이 조직의 {stream} 스트림에 기록되며 해당 스트림의 보존 기간 동안 유지됩니다. 알림 캘리브레이션은 알림을 전송하지 않습니다.",
       "frequencyRange": "1시간에서 30일 사이의 주기를 선택하세요.",
       "windowRange": "1분에서 90일 사이의 기간을 선택하세요."
     }
@@ -12901,7 +12898,8 @@
       "suppressRepeats": "반복 억제",
       "suppressRepeatsTooltip": "알림이 발생하기 시작하거나 레벨이 변경될 때 한 번만 알림을 보내고, 매 평가마다 보내지 않습니다. 각 무음 기간 이후에도 계속 알림을 받으려면 꺼 두세요.",
       "keepFiringForInvalid": "0초 이상 입력하세요",
-      "keepFiringForTooLong": "최대 86400초(24시간)까지 입력하세요"
+      "keepFiringForTooLong": "최대 86400초(24시간)까지 입력하세요",
+      "targetRequiredNote": "Required. With no destination, this alert reaches no one."
     },
     "advanced": {
       "addVariable": "변수 추가",
@@ -29640,7 +29638,7 @@
       "waitingForOk": "승인 대기 중",
       "proposedFix": "제안된 수정",
       "unfoldTab": "전개 과정",
-      "seeEvidence": "증거 보기 ({count}) →"
+      "seeEvidence": "모두 보기"
     },
     "unfold": {
       "hint": "왼쪽에서 오른쪽으로 읽으세요: 무엇이 변경되었는지, 그것이 촉발한 신호, 그다음 팀에 도달한 내용입니다. 카드를 선택하면 해당 발생 내역을 볼 수 있습니다.",
@@ -32549,6 +32547,98 @@
     "validation": {
       "regexLength": "패턴은 {max}자 이하로 입력하세요.",
       "regexInvalid": "이 패턴은 잘못되었거나 지원되지 않습니다. 전방 탐색, 후방 탐색, 역참조는 사용할 수 없습니다."
+    }
+  },
+  "autoobserveLive": {
+    "paging": {
+      "title": "Paging",
+      "label": "Page on-call when a stream stops",
+      "description": "Pages go to the on-call team that owns the service, else the organization's default team. Drops and rises show on the AutoObserve home as findings and never page.",
+      "routing": "On-call routing",
+      "unavailable": "Paging is turned off for this deployment.",
+      "denied": "{denied} {askAdmin}",
+      "loadFailed": "Couldn't load the paging setting. Refresh to try again.",
+      "later": "Who else AutoObserve notifies, and how far it acts on its own, will be set here once those controls exist."
+    },
+    "incidents": {
+      "subtitleWho": "Findings that opened an incident, who was paged, and its analysis.",
+      "routing": "Set up on-call routing"
+    },
+    "learning": {
+      "line": "Learning {count} stream. It is ready on {date}; AutoObserve needs {days} days of history to judge a stream. | Learning {count} streams. The first is ready on {date}; AutoObserve needs {days} days of history to judge a stream.",
+      "lineNoDate": "Learning {count} stream; AutoObserve needs {days} days of history to judge a stream. | Learning {count} streams; AutoObserve needs {days} days of history to judge a stream.",
+      "emptyTitle": "Learning your streams",
+      "emptyDesc": "AutoObserve needs {days} days of history to judge a stream. The stream is ready on {date}. | AutoObserve needs {days} days of history to judge a stream. The first of {count} streams is ready on {date}.",
+      "emptyDescNoDate": "AutoObserve needs {days} days of history to judge a stream. It is learning {count} stream now. | AutoObserve needs {days} days of history to judge a stream. It is learning {count} streams now.",
+      "until": "Learning until {date} · {streams}",
+      "streams": "Learning {count} stream | Learning {count} streams",
+      "streamUntil": "until {date}"
+    }
+  },
+  "insight": {
+    "kind": {
+      "paged": {
+        "page": {
+          "paged": "Paged {team}",
+          "pagedTeam": "Paged the on-call team",
+          "unrouted": "Nobody was paged: when it stopped, no on-call team owned this service and the org had no default team.",
+          "failed": "Paging failed: the on-call service did not accept the page. Open the incident to page someone by hand."
+        },
+        "nextRouting": "Set up on-call routing so the next stop pages someone.",
+        "stream_silence": {
+          "headline": "{count} streams stopped sending data",
+          "why": "No data has arrived on {stream} ({type}) since {time}.",
+          "whyMany": "{streams} have sent no data since {time}.",
+          "next": "Check the sender or collector that writes it. The incident resolves once data arrives again.",
+          "nextMany": "One cause is likely, such as a shared collector."
+        },
+        "stream_drop": {
+          "headline": "{count} streams dropped sharply",
+          "why": "{stream} ({type}) has received much less data than usual since {time}.",
+          "whyMany": "{streams} have received much less data than usual since {time}.",
+          "next": "Check whether a sender stopped or a filter changed.",
+          "nextMany": "One cause is likely, such as a shared collector or filter."
+        },
+        "stream_rise": {
+          "headline": "{count} streams rose sharply",
+          "why": "{stream} ({type}) has received much more data than usual since {time}.",
+          "whyMany": "{streams} have received much more data than usual since {time}.",
+          "next": "Check for a retry loop or a new sender writing to it.",
+          "nextMany": "One cause is likely, such as a shared sender retrying."
+        }
+      }
+    },
+    "bulk": {},
+    "decisions": {
+      "saved": {
+        "applied": "Applied to {title}.",
+        "appliedEditor": "Saved and recorded for {title}.",
+        "notRecorded": "Saved. This change was not recorded, so it can't be undone from AutoObserve."
+      },
+      "apply": {
+        "edit": "Edit in alert editor",
+        "button": "Apply",
+        "where": "Folder {folder} · notifies {destinations}",
+        "whereTeam": "Folder {folder} · team {team} · notifies {destinations}",
+        "acknowledged": "{count} of the {of} acknowledged firings would no longer alert. Check it before applying.",
+        "note": "Only the settings above change; the rest of the alert stays as it is. You can undo it while nobody else has changed the alert.",
+        "changed": "This alert changed. Open it to review.",
+        "loading": "Checking what this changes…",
+        "loadFailed": "Couldn't check what this changes, so it can't be applied here. Edit it in the alert editor instead.",
+        "offline": "Apply isn't available here yet. Edit it in the alert editor; nothing changes until you save.",
+        "cardNote": "Shows what changes before anything is saved.",
+        "gone": "This suggestion is no longer available. Open the alert to review it."
+      },
+      "applied": {
+        "title": "Applied changes",
+        "by": "by {actor} at {when}",
+        "undone": "Undone",
+        "you": "you"
+      },
+      "undone": {
+        "applyOne": "Undone: {title} is back to how it was.",
+        "applyMany": "Undone: {count} change is back to how it was. | Undone: {count} changes are back to how they were."
+      }
     }
   }
 }

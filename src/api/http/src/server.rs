@@ -27,6 +27,10 @@ use crate::handler::http::router::create_app_router;
 /// web crate does not depend on `config` either.
 pub async fn run(ui_routes: fn(&str) -> axum::Router) -> Result<(), anyhow::Error> {
     let cfg = config::get_config();
+    #[cfg(feature = "enterprise")]
+    o2_enterprise::enterprise::slack::insights::feed::register(
+        openobserve_api_management::request::autoobserve::slack_feed::hooks(),
+    );
     let haddr = server_addr()?;
     log::info!(
         "Starting {} server at: {haddr}",
@@ -166,6 +170,9 @@ async fn shutdown_signal() {
         }
     }
 
+    // Before going offline: a peer takes the hook worker lock once this node leaves the node list.
+    #[cfg(feature = "enterprise")]
+    crate::service::workflows::http_trigger::worker::drain_on_shutdown().await;
     if let Err(e) = common::infra::cluster::set_offline().await {
         log::error!("set offline failed: {e}");
     }

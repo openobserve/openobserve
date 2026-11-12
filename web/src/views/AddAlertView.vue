@@ -33,6 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { alertDetailQuery } from "@/services/alerts.queries";
 import { alertKeys } from "@/services/alerts.querykeys";
+import { fetchAlertRead } from "@/services/alerts.readFence";
 import { destinationKeys } from "@/services/alert_destination.querykeys";
 import { destinationsQuery } from "@/services/alert_destination.queries";
 import { templatesQuery } from "@/services/alert_templates.queries";
@@ -89,9 +90,8 @@ export default defineComponent({
 
       isLoadingAlert.value = true;
       try {
-        editedAlert.value = await queryClient.fetchQuery(
-          alertDetailQuery(store.state.selectedOrganization.identifier, alertId),
-        );
+        const org = store.state.selectedOrganization.identifier;
+        editedAlert.value = await fetchAlertRead(queryClient, org, alertDetailQuery(org, alertId));
         isUpdated.value = true;
       } catch (error) {
         loadFailed.value = true;

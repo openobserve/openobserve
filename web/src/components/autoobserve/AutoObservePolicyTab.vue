@@ -135,6 +135,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :title="t('autoobserve.policy.paging')"
                 data-test="autoobserve-policy-paging"
               >
+                <div
+                  v-if="!paging.missing.value && !paging.loading.value"
+                  class="border-border-default border-b px-3 py-3"
+                >
+                  <PagingSetting />
+                </div>
                 <p class="text-text-secondary py-1 text-xs">
                   {{ t("autoobserve.policy.pagingHint") }}
                 </p>
@@ -194,6 +200,8 @@ import { CHANNELS, actionClassesFor, type PolicyMode } from "./fixtures";
 import { useAutonomy, useCompletedFixes } from "./v2/useDecisions";
 import { recordFor, say } from "./v2/fixtures";
 import { AUTONOMY } from "./data/facts";
+import PagingSetting from "./live/PagingSetting.vue";
+import { usePagingSetting } from "./live/usePagingSetting";
 
 const { t } = useI18nTyped();
 const route = useRoute();
@@ -241,6 +249,7 @@ const MODE_VARIANT: Record<PolicyMode, BadgeVariant> = {
   suggest: "warning-soft",
   auto: "blue-soft",
 };
+const paging = usePagingSetting();
 const autonomy = useAutonomy();
 const completedFixes = useCompletedFixes();
 const classes = computed(() => actionClassesFor(autonomy));
