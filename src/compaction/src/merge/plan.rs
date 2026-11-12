@@ -23,7 +23,8 @@ use config::meta::stream::{FileKey, MergeStrategy};
 use metrics_index::MetricsFileLayout;
 use search::merge::MergeMode;
 
-use super::metrics::{closed_hour_batches, open_hour_batches};
+use super::metrics::{MetricsIndexMergeScope, metrics_index_merge_scope, pre_merge_batches};
+use crate::incremental::OPEN_HOUR_MERGE_FILES;
 
 /// One planned merge: the files and the mode they merge in.
 pub(super) type PlannedBatch = (Vec<FileKey>, MergeMode);
@@ -58,12 +59,23 @@ pub(super) async fn plan_batches(
         .map(|group| (group, MergeMode::Classic))
         .collect();
 
+    let mode_files = indexed_hour_scope(mode_files, mode, limits.max_file_size, stream);
+    // the open-hour round is a whole batch too, but only of the pending ingester files
     if mode.merges_open_hour_pending() {
-        batches.extend(open_hour_batches(&mode_files, limits.max_merge_groups));
-    } else if matches!(mode, MergeMode::MetricsIndexed) {
-        batches.extend(closed_hour_batches(mode_files, limits, schema, stream).await);
+        batches.extend(
+            ingester_batches(&mode_files, OPEN_HOUR_MERGE_FILES, limits.max_merge_groups)
+                .into_iter()
+                .map(|pending| (pending, mode.clone())),
+        );
     } else if mode.merges_whole_batch() {
-        if !mode_files.is_empty() {
+        let pre_merge = if matches!(mode, MergeMode::MetricsIndexed) {
+            pre_merge_batches(&mode_files, limits.max_merge_groups, schema, stream).await
+        } else {
+            Vec::new()
+        };
+        if !pre_merge.is_empty() {
+            batches.extend(pre_merge);
+        } else if !mode_files.is_empty() {
             batches.push((mode_files, mode.clone()));
         }
     } else {
@@ -85,6 +97,61 @@ fn split_legacy_metrics(files: Vec<FileKey>, mode: &MergeMode) -> (Vec<FileKey>,
     files
         .into_iter()
         .partition(|f| MetricsFileLayout::is_hash_ordered(&f.key))
+}
+
+/// What a closed indexed metrics hour merges, see [`MetricsIndexMergeScope`].
+fn indexed_hour_scope(
+    mut files: Vec<FileKey>,
+    mode: &MergeMode,
+    max_file_size: usize,
+    stream: &str,
+) -> Vec<FileKey> {
+    if mode.metrics_file_layout() != Some(MetricsFileLayout::Indexed) {
+        return files;
+    }
+    match metrics_index_merge_scope(&files, max_file_size) {
+        MetricsIndexMergeScope::Skip => Vec::new(),
+        MetricsIndexMergeScope::LateFilesOnly => {
+            files.retain(|f| MetricsFileLayout::of(&f.key) != Some(MetricsFileLayout::Indexed));
+            log::debug!(
+                "[COMPACTOR] merge_by_stream [{stream}] metrics_indexed late merge of {} files, indexed files untouched",
+                files.len()
+            );
+            files
+        }
+        MetricsIndexMergeScope::WholeHour => {
+            log::debug!(
+                "[COMPACTOR] merge_by_stream [{stream}] metrics_indexed fragmentation cap hit, full rewrite of {} files",
+                files.len()
+            );
+            files
+        }
+    }
+}
+
+/// The hash-sorted files, once `min_files` piled up, in batches of at most `max_groups`.
+pub(super) fn ingester_batches(
+    files: &[FileKey],
+    min_files: usize,
+    max_groups: usize,
+) -> Vec<Vec<FileKey>> {
+    let pending: Vec<FileKey> = files
+        .iter()
+        .filter(|f| MetricsFileLayout::of(&f.key) == Some(MetricsFileLayout::HashSorted))
+        .cloned()
+        .collect();
+    if pending.len() < min_files {
+        return Vec::new();
+    }
+    if max_groups == 0 {
+        return vec![pending];
+    }
+    // a lone trailing file has nothing to merge with and waits for the next round
+    pending
+        .chunks(max_groups)
+        .filter(|chunk| chunk.len() > 1)
+        .map(<[FileKey]>::to_vec)
+        .collect()
 }
 
 /// Size-bounded merge groups in the planner's file order.
@@ -129,7 +196,6 @@ mod tests {
     use config::meta::stream::FileMeta;
 
     use super::*;
-    use crate::incremental::OPEN_HOUR_MERGE_FILES;
 
     fn create_file_key(key: &str, min_ts: i64, max_ts: i64, original_size: i64) -> FileKey {
         FileKey {
