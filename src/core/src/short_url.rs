@@ -17,6 +17,7 @@ use anyhow::anyhow;
 use chrono::Utc;
 use config::{get_config, utils::md5};
 use infra::table::short_urls::ShortUrlRecord;
+use url::{Position, Url};
 
 use crate::db;
 
@@ -58,8 +59,31 @@ fn generate_short_id(original_url: &str, timestamp: Option<i64>) -> String {
     }
 }
 
+/// Reduces `original_url` to a same-origin path, rejecting non-http(s) and off-origin values.
+fn normalize_original_url(original_url: &str) -> Result<String, anyhow::Error> {
+    let invalid = || anyhow!("original_url must be an http(s) URL or a path starting with '/'");
+    // joining onto a placeholder origin exposes `//host` and `/\host` as off-origin, as browsers do
+    let base = Url::parse("http://short-url.invalid/").expect("static base url");
+    let url = if original_url.starts_with('/') {
+        let url = base.join(original_url).map_err(|_| invalid())?;
+        if url.origin() != base.origin() {
+            return Err(invalid());
+        }
+        url
+    } else {
+        let url = Url::parse(original_url).map_err(|_| invalid())?;
+        if !matches!(url.scheme(), "http" | "https") {
+            return Err(invalid());
+        }
+        url
+    };
+    Ok(url[Position::BeforePath..].to_string())
+}
+
 /// Shortens the given original URL and stores it in the database
 pub async fn shorten(org_id: &str, original_url: &str) -> Result<String, anyhow::Error> {
+    let normalized = normalize_original_url(original_url)?;
+    let original_url = normalized.as_str();
     let short_id = generate_short_id(original_url, None);
 
     // fast path for already-shortened urls: cache only, no db read
@@ -182,6 +206,61 @@ mod tests {
         assert_ne!(short_id, short_id2);
     }
 
+    #[test]
+    fn test_normalize_keeps_same_origin_paths() {
+        for path in [
+            "/web/logs?stream=default&org_identifier=default#row",
+            "/base/web/dashboards/view?dashboard=abc",
+            "/",
+        ] {
+            assert_eq!(normalize_original_url(path).unwrap(), path);
+        }
+    }
+
+    #[test]
+    fn test_normalize_drops_origin_of_http_urls() {
+        let cases = [
+            (
+                "http://localhost:5080/web/logs?stream=default#row",
+                "/web/logs?stream=default#row",
+            ),
+            (
+                "https://user:pass@evil.example:8443/web/metrics?q=up",
+                "/web/metrics?q=up",
+            ),
+            ("HTTPS://EVIL.EXAMPLE", "/"),
+        ];
+        for (input, expected) in cases {
+            assert_eq!(normalize_original_url(input).unwrap(), expected, "{input}");
+        }
+    }
+
+    #[test]
+    fn test_normalize_rejects_non_http_and_off_origin_values() {
+        for input in [
+            "javascript:alert(document.domain)",
+            " JaVaScRiPt:alert(1)",
+            "data:text/html,<script>alert(1)</script>",
+            "vbscript:msgbox(1)",
+            "ftp://evil.example/x",
+            "//evil.example/x",
+            "/\\evil.example/x",
+            "\\\\evil.example/x",
+            "logs?stream=default",
+            "",
+        ] {
+            assert!(normalize_original_url(input).is_err(), "{input:?} accepted");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_shorten_rejects_javascript_url_before_storing() {
+        let err = shorten("default", "javascript:alert(document.domain)")
+            .await
+            .unwrap_err();
+        assert!(err.to_string().contains("original_url"), "{err}");
+    }
+
     #[tokio::test]
     #[ignore]
     async fn test_shorten_and_retrieve() {
@@ -192,7 +271,7 @@ mod tests {
         let retrieved_url = retrieve("default", &short_id)
             .await
             .expect("Failed to retrieve URL");
-        assert_eq!(retrieved_url, original_url);
+        assert_eq!(retrieved_url, "/some/long/url");
 
         let short_id = get_short_id_from_url("default", &short_url).unwrap();
         assert_eq!(short_id.len(), 16);
