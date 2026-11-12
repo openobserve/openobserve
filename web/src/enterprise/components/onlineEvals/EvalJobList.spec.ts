@@ -55,3 +55,27 @@ describe("EvalJobList columns", () => {
     expect(name.minSize).toBe(160);
   });
 });
+
+describe("EvalJobList budget banner", () => {
+  it("offers Keep paused next to Resume, and Keep paused pauses the job", async () => {
+    const row = {
+      id: "job-1",
+      name: "qa",
+      status: "paused",
+      budget: { dailyUsd: 5, onReach: "pause", pausedAt: Date.now() * 1000, pausedSpendUsd: 6 },
+    };
+    const wrapper = mount(EvalJobList, {
+      props: { rows: [row], search: "", pendingStatusId: null },
+      global: {
+        stubs: {
+          OTable: { template: "<div><slot name='subheader' /></div>" },
+          EvalListShell: { template: "<div><slot name='table' /></div>" },
+        },
+      },
+    });
+    expect(wrapper.find('[data-test="eval-job-budget-resume-qa"]').exists()).toBe(true);
+    await wrapper.find('[data-test="eval-job-budget-keep-paused-qa"]').trigger("click");
+    expect(wrapper.emitted("pause")).toEqual([[row]]);
+    expect(wrapper.emitted("activate")).toBeUndefined();
+  });
+});

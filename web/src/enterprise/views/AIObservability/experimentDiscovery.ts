@@ -13,24 +13,41 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import type { LlmExperiment } from "@/services/llm-experiments.service";
+import type {
+  ExperimentClientScoreSummary,
+  LlmExperiment,
+} from "@/services/llm-experiments.service";
 import { raw, type I18nText, type TranslateFn } from "@/types/i18n";
 
-export type ExperimentScoreSummary =
-  | { name: string; kind: "numeric"; value: number; sampleCount: number }
-  | {
-      name: string;
-      kind: "boolean";
-      trueCount: number;
-      falseCount: number;
-      sampleCount: number;
-    }
-  | {
-      name: string;
-      kind: "categorical";
-      values: Array<{ value: string; count: number }>;
-      sampleCount: number;
-    };
+/** `key` identifies a column across runs: Score Config name, or (config, client key) for client dimensions. */
+export type ExperimentScoreSummary = {
+  key: string;
+  name: string;
+  scoreConfigId: string | null;
+  clientScorerKey: string | null;
+  sampleCount: number;
+  errorCount: number;
+  pendingCount: number;
+} & (
+  | { kind: "numeric"; value: number }
+  | { kind: "boolean"; trueCount: number; falseCount: number }
+  | { kind: "categorical"; values: Array<{ value: string; count: number }> }
+);
+
+/** A client dimension's column identity. Two client keys under one Score Config stay two columns. */
+export function clientScoreKey(scoreConfigId: string, clientScorerKey: string): string {
+  return `client:${scoreConfigId}:${clientScorerKey}`;
+}
+
+/** A score column's header. A client dimension says its scores came from the customer's own code. */
+export function scoreColumnLabel(
+  column: Pick<ExperimentScoreSummary, "name" | "clientScorerKey">,
+  t: TranslateFn,
+): I18nText {
+  return column.clientScorerKey === null
+    ? raw(column.name)
+    : t("experimentsAtScale.clientScore", { score: column.name });
+}
 
 export interface ExperimentEvidence {
   completedSlots: number;
@@ -88,42 +105,80 @@ export interface ExperimentDatasetGroup {
   experiments: LlmExperiment[];
 }
 
-/**
- * The row's own `includeSummary` fields already carry the type-aware
- * aggregate per scorer, so this only reshapes it for the browse table's
- * per-scorer column — it never needs raw execution/score records.
- */
-export function experimentEvidence(experiment: LlmExperiment): ExperimentEvidence {
-  const scores: ExperimentScoreSummary[] = [];
-  for (const summary of experiment.scoreSummaries ?? []) {
-    const aggregate = summary.value as Record<string, unknown> | null;
-    if (!aggregate) continue;
-    const name = summary.scoreConfigName || summary.name;
-    if (aggregate.kind === "numeric") {
-      scores.push({
-        name,
-        kind: "numeric",
-        value: Number(aggregate.mean ?? 0),
-        sampleCount: summary.sampleCount,
-      });
-    } else if (aggregate.kind === "boolean") {
-      scores.push({
-        name,
-        kind: "boolean",
-        trueCount: Number(aggregate.trueCount ?? aggregate.true_count ?? 0),
-        falseCount: Number(aggregate.falseCount ?? aggregate.false_count ?? 0),
-        sampleCount: summary.sampleCount,
-      });
-    } else if (aggregate.kind === "categorical") {
-      const counts = (aggregate.counts ?? {}) as Record<string, number>;
-      scores.push({
-        name,
-        kind: "categorical",
-        values: Object.entries(counts).map(([value, count]) => ({ value, count: Number(count) })),
-        sampleCount: summary.sampleCount,
-      });
-    }
+type ScoreIdentity = Pick<
+  ExperimentScoreSummary,
+  | "key"
+  | "name"
+  | "scoreConfigId"
+  | "clientScorerKey"
+  | "sampleCount"
+  | "errorCount"
+  | "pendingCount"
+>;
+
+/** The browse table's shape of one type-aware aggregate; null when there is none yet. */
+function scoreSummary(
+  identity: ScoreIdentity,
+  aggregate: Record<string, unknown> | null,
+): ExperimentScoreSummary | null {
+  if (aggregate?.kind === "numeric") {
+    return { ...identity, kind: "numeric", value: Number(aggregate.mean ?? 0) };
   }
+  if (aggregate?.kind === "boolean") {
+    return {
+      ...identity,
+      kind: "boolean",
+      trueCount: Number(aggregate.trueCount ?? aggregate.true_count ?? 0),
+      falseCount: Number(aggregate.falseCount ?? aggregate.false_count ?? 0),
+    };
+  }
+  if (aggregate?.kind === "categorical") {
+    const counts = (aggregate.counts ?? {}) as Record<string, number>;
+    return {
+      ...identity,
+      kind: "categorical",
+      values: Object.entries(counts).map(([value, count]) => ({ value, count: Number(count) })),
+    };
+  }
+  return null;
+}
+
+function clientScoreSummary(summary: ExperimentClientScoreSummary): ExperimentScoreSummary | null {
+  return scoreSummary(
+    {
+      key: clientScoreKey(summary.scoreConfigId, summary.clientScorerKey),
+      name: summary.scoreConfigName || summary.clientScorerKey,
+      scoreConfigId: summary.scoreConfigId || null,
+      clientScorerKey: summary.clientScorerKey,
+      sampleCount: summary.sampleCount,
+      errorCount: 0,
+      pendingCount: 0,
+    },
+    summary.value,
+  );
+}
+
+/** The row's `includeSummary` fields already carry the per-scorer aggregate; this only reshapes. */
+export function experimentEvidence(experiment: LlmExperiment): ExperimentEvidence {
+  const platform = (experiment.scoreSummaries ?? []).map((summary) => {
+    const name = summary.scoreConfigName || summary.name;
+    return scoreSummary(
+      {
+        key: name,
+        name,
+        scoreConfigId: summary.scoreConfigId,
+        clientScorerKey: null,
+        sampleCount: summary.sampleCount,
+        errorCount: summary.errorCount,
+        pendingCount: summary.pendingCount,
+      },
+      summary.value,
+    );
+  });
+  const client = (experiment.clientScoreSummaries ?? []).map(clientScoreSummary);
+  const scores = [...platform, ...client].filter(
+    (score): score is ExperimentScoreSummary => score !== null,
+  );
 
   return {
     completedSlots: experiment.executionProgress?.completed ?? 0,

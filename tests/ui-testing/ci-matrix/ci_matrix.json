@@ -18,6 +18,7 @@
       "alerts-chart-error-state.spec.js",
       "alertsPagination.spec.js",
       "alertTemplatesPagination.spec.js",
+      "alertTemplatesToolbar.spec.js",
       "alertDestinationsPagination.spec.js",
       "alerts-destinations-usage.spec.js",
       "alerts-no-destination.spec.js",
@@ -624,7 +625,8 @@
       "slo-crud.spec.js",
       "slo-form-validation.spec.js",
       "slo-required-fields.spec.js",
-      "slo-alert-sli.spec.js"
+      "slo-alert-sli.spec.js",
+      "slo-import.spec.js"
     ],
     "disabled": []
   },

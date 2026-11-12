@@ -1003,6 +1003,28 @@ describe("AddAlert (OForm owner)", () => {
       expect(payload.anomaly_config.alert_budget_per_day).toBeNull();
     });
 
+    // B5: with notifications off the picker is hidden, so the stored override is cleared.
+    it("sends a null template when notifications are off", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      const form = wrapper.vm.form;
+      form.setFieldValue("is_real_time", "anomaly");
+      await flushPromises();
+      form.setFieldValue("name", "anom_alert");
+      form.setFieldValue("stream_type", "logs");
+      form.setFieldValue("stream_name", "_rundata");
+      await flushPromises();
+      wrapper.vm.anomalyConfig.alert_enabled = false;
+      wrapper.vm.anomalyConfig.query_mode = "filters";
+      wrapper.vm.anomalyConfig.template = "ops-card";
+
+      await wrapper.vm.handleSave();
+      await flushPromises();
+
+      const [, payload] = (anomalyDetectionService.create as any).mock.calls[0];
+      expect(payload.anomaly_config.template).toBeNull();
+    });
+
     it.each([3.25, 4.234, "", "invalid", "Infinity", 0.5, 10.5])(
       "validates a real sensitivity draft %j before saving its payload",
       async (draft) => {

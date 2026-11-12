@@ -14,25 +14,40 @@ describe("buildJobMatchedTargetsTimeRange", () => {
 
 describe("buildJobMatchedTargetsSql", () => {
   it("counts matching rows for span scope", () => {
-    expect(buildJobMatchedTargetsSql("default", "", "span")).toBe(
+    expect(buildJobMatchedTargetsSql("default", "", "span", [])).toBe(
       'SELECT COUNT(*) AS cnt\nFROM "default"',
     );
   });
 
   it("counts distinct trace targets after applying the span filter", () => {
-    expect(buildJobMatchedTargetsSql("default", "\"service_name\" = 'checkout'", "trace")).toBe(
+    expect(buildJobMatchedTargetsSql("default", "\"service_name\" = 'checkout'", "trace", [])).toBe(
       'SELECT COUNT(DISTINCT "trace_id") AS cnt\nFROM "default"\nWHERE "service_name" = \'checkout\'',
     );
   });
 
-  it("counts distinct session targets", () => {
-    expect(buildJobMatchedTargetsSql("trace-stream", "", "session")).toBe(
-      'SELECT COUNT(DISTINCT "session_id") AS cnt\nFROM "trace-stream"',
+  it("counts distinct sessions by the session column the stream has", () => {
+    expect(buildJobMatchedTargetsSql("s", "", "session", ["trace_id", "session_id"])).toBe(
+      'SELECT COUNT(DISTINCT NULLIF("session_id", \'\')) AS cnt\nFROM "s"',
+    );
+    expect(buildJobMatchedTargetsSql("s", "", "session", ["gen_ai_conversation_id"])).toContain(
+      "COUNT(DISTINCT NULLIF(\"gen_ai_conversation_id\", ''))",
     );
   });
 
+  it("reads a session id the way the scheduler does when several columns exist", () => {
+    expect(
+      buildJobMatchedTargetsSql("s", "", "session", ["gen_ai_conversation_id", "session_id"]),
+    ).toContain(
+      "COUNT(DISTINCT COALESCE(NULLIF(\"session_id\", ''), NULLIF(\"gen_ai_conversation_id\", '')))",
+    );
+  });
+
+  it("cannot count sessions on a stream without a session column", () => {
+    expect(buildJobMatchedTargetsSql("s", "", "session", ["trace_id"])).toBeNull();
+  });
+
   it("quotes unusual stream identifiers", () => {
-    expect(buildJobMatchedTargetsSql('trace"stream', "", "trace")).toContain(
+    expect(buildJobMatchedTargetsSql('trace"stream', "", "trace", [])).toContain(
       'FROM "trace""stream"',
     );
   });

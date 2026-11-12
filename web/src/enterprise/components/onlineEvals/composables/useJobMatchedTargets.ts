@@ -18,31 +18,47 @@ export function buildJobMatchedTargetsTimeRange(nowMs = Date.now()) {
 }
 
 /** Double-quote a SQL identifier so unusual stream names remain valid. */
-function quoteIdent(name: string): string {
+export function quoteIdent(name: string): string {
   return `"${name.replace(/"/g, '""')}"`;
 }
 
-function countExpression(targetScope: EvalTargetScope): string {
-  if (targetScope === "trace") {
-    return `COUNT(DISTINCT ${quoteIdent("trace_id")})`;
-  }
-  if (targetScope === "session") {
-    return `COUNT(DISTINCT ${quoteIdent("session_id")})`;
-  }
-  return "COUNT(*)";
+/** The columns the eval scheduler reads a span's session id from, in its order. */
+export const SESSION_ID_COLUMNS = ["session_id", "gen_ai_conversation_id", "llm_session_id"];
+
+/** A target's id at `scope` as SQL; null when session scope has no session column. */
+export function targetIdExpression(
+  targetScope: EvalTargetScope,
+  fields: readonly string[],
+): string | null {
+  if (targetScope === "span") return quoteIdent("span_id");
+  if (targetScope === "trace") return quoteIdent("trace_id");
+  const cols = SESSION_ID_COLUMNS.filter((c) => fields.includes(c)).map(
+    (c) => `NULLIF(${quoteIdent(c)}, '')`,
+  );
+  if (!cols.length) return null;
+  return cols.length === 1 ? cols[0] : `COALESCE(${cols.join(", ")})`;
+}
+
+/** Matched targets at `scope`; null when the stream cannot be counted at it. */
+export function countExpression(
+  targetScope: EvalTargetScope,
+  fields: readonly string[],
+): string | null {
+  if (targetScope === "span") return "COUNT(*)";
+  const id = targetIdExpression(targetScope, fields);
+  return id && `COUNT(DISTINCT ${id})`;
 }
 
 export function buildJobMatchedTargetsSql(
   stream: string,
   whereClause: string,
   targetScope: EvalTargetScope,
-): string {
+  fields: readonly string[],
+): string | null {
+  const count = countExpression(targetScope, fields);
+  if (!count) return null;
   const where = whereClause.trim();
-  return [
-    `SELECT ${countExpression(targetScope)} AS cnt`,
-    `FROM ${quoteIdent(stream)}`,
-    where ? `WHERE ${where}` : "",
-  ]
+  return [`SELECT ${count} AS cnt`, `FROM ${quoteIdent(stream)}`, where ? `WHERE ${where}` : ""]
     .filter(Boolean)
     .join("\n");
 }
@@ -54,16 +70,21 @@ export function useJobMatchedTargets(
   /** Gate while a partially configured condition would produce invalid SQL. */
   ready: Ref<boolean>,
   targetScope: Ref<EvalTargetScope>,
+  /** Field names of the stream's schema; null while it loads. */
+  fields: Ref<readonly string[] | null>,
 ) {
   const { executeQuery } = useLLMStreamQuery();
   const count = ref<number | null>(null);
   const isLoading = ref(false);
   const error = ref(false);
+  /** Session scope on a stream without a session column. */
+  const noSessionColumn = ref(false);
 
   let timer: ReturnType<typeof setTimeout> | null = null;
 
   async function run() {
     error.value = false;
+    noSessionColumn.value = false;
     if (!stream.value) {
       count.value = null;
       isLoading.value = false;
@@ -74,7 +95,24 @@ export function useJobMatchedTargets(
       return;
     }
 
-    const sql = buildJobMatchedTargetsSql(stream.value, whereClause.value, targetScope.value);
+    // A session count waits for the schema that names its column.
+    if (targetScope.value === "session" && !fields.value) {
+      count.value = null;
+      isLoading.value = true;
+      return;
+    }
+    const sql = buildJobMatchedTargetsSql(
+      stream.value,
+      whereClause.value,
+      targetScope.value,
+      fields.value ?? [],
+    );
+    if (!sql) {
+      noSessionColumn.value = true;
+      count.value = null;
+      isLoading.value = false;
+      return;
+    }
     const { startUs, endUs } = buildJobMatchedTargetsTimeRange();
     isLoading.value = true;
     try {
@@ -96,7 +134,7 @@ export function useJobMatchedTargets(
     timer = setTimeout(() => void run(), DEBOUNCE_MS);
   }
 
-  watch([stream, whereClause, ready, targetScope], schedule, {
+  watch([stream, whereClause, ready, targetScope, fields], schedule, {
     immediate: true,
   });
 
@@ -104,5 +142,5 @@ export function useJobMatchedTargets(
     if (timer) clearTimeout(timer);
   });
 
-  return { count, isLoading, error };
+  return { count, isLoading, error, noSessionColumn };
 }

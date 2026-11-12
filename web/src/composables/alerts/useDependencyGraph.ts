@@ -94,6 +94,8 @@ export interface DepNode {
   usageCount: number;
   /** Destination-only: per-kind breakdown behind `usageCount`, from its `uses`. */
   consumerCounts?: Partial<Record<DepConsumerKind, number>>;
+  /** Template-only: server references with no edge here (e.g. other orgs); kept through pruning. */
+  externalCounts?: { destinations: number; alerts: number };
   /** Destination-only: the rows behind `consumerCounts`, for the dialog's per-kind sections. */
   consumerUses?: Partial<Record<DepConsumerKind, UsageRow[]>>;
   /** A destination with no alerts, or a template referenced by nothing. */
@@ -160,9 +162,20 @@ export interface DestinationRow {
   /** Present when the list was read with `include_usage=true`. */
   uses?: UsageRow[];
 }
+/** `GET templates?include_usage=true` counts, the same as GET template's `used_by`. */
+export interface TemplateUsedBy {
+  destinations: number;
+  alerts: number;
+  anomaly: number;
+  synthetics: number;
+  on_call: number;
+  composites: number;
+}
+
 export interface TemplateRow {
   name: string;
   type?: string;
+  used_by?: TemplateUsedBy;
 }
 
 // Resolve one entity's dependency chain from the full graph, traversed
@@ -372,7 +385,9 @@ export function removeNodeFromGraph(graph: DepGraph, nodeId: string): DepGraph {
     referenced.add(e.target);
   }
   const otherConsumerCount = (n: DepNode) =>
-    Object.values(n.consumerCounts ?? {}).reduce((a, b) => a + b, 0);
+    Object.values(n.consumerCounts ?? {}).reduce((a, b) => a + b, 0) +
+    (n.externalCounts?.destinations ?? 0) +
+    (n.externalCounts?.alerts ?? 0);
   for (const n of graph.nodes) if (otherConsumerCount(n)) referenced.add(n.id);
 
   // A dangling node exists only because something pointed at it, so it leaves with
@@ -565,6 +580,40 @@ export function useDependencyGraph() {
       }
     }
 
+    // Consumers with no list here become badges; references with no local edge become external
+    // counts, so a reference with a local edge is counted only once.
+    const localRefs = new Map<string, { destinations: number; alerts: number }>();
+    for (const e of edges) {
+      if (e.relation === "usage") continue;
+      const refs = localRefs.get(e.source) ?? { destinations: 0, alerts: 0 };
+      if (e.relation === "template") refs.destinations += 1;
+      else refs.alerts += 1;
+      localRefs.set(e.source, refs);
+    }
+    for (const tpl of templates) {
+      const used = tpl.used_by;
+      if (!used) continue;
+      const node = templateNode(tpl.name);
+      const local = localRefs.get(node.id) ?? { destinations: 0, alerts: 0 };
+      const external = {
+        destinations: Math.max(0, (used.destinations ?? 0) - local.destinations),
+        alerts: Math.max(0, (used.alerts ?? 0) - local.alerts),
+      };
+      if (external.destinations || external.alerts) {
+        node.externalCounts = external;
+        node.usageCount += external.destinations + external.alerts;
+      }
+      const counts: Partial<Record<DepConsumerKind, number>> = {};
+      if (used.anomaly) counts.anomaly_detection = used.anomaly;
+      if (used.synthetics) counts.synthetic_check = used.synthetics;
+      if (used.on_call) counts.oncall_policy = used.on_call;
+      if (used.composites) counts.composite_alert = used.composites;
+      if (Object.keys(counts).length) {
+        node.consumerCounts = counts;
+        node.usageCount += Object.values(counts).reduce((a, b) => a + b, 0);
+      }
+    }
+
     // Derive the flag states now that every reference has been counted.
     let orphanDestinations = 0;
     let danglingReferences = 0;
@@ -611,13 +660,12 @@ export function useDependencyGraph() {
     loading.value = true;
     error.value = null;
     try {
-      // All three reads go through the query cache. `includeUsage: true` keys the
-      // destinations read separately from a plain picker fetch (see destinationKeys.list),
-      // so the two never collide even though both cover the same org + module.
+      // `includeUsage: true` keys the destinations and templates reads apart from the plain
+      // picker fetches (see destinationKeys.list), so the cache entries never collide.
       const inputs = {
         alerts: alertDependenciesQuery(org),
         destinations: destinationsQuery(org, "alert", true),
-        templates: templatesQuery(org),
+        templates: templatesQuery(org, true),
       };
       for (const name of refetch) {
         await queryClient.invalidateQueries({

@@ -8,6 +8,7 @@ export class LogsQueryPage {
     this.dateTimeButton = '[data-test="date-time-btn"]';
     this.relative15MinButton = '[data-test="date-time-relative-15-m-btn"]';
     this.refreshButton = '[data-test="logs-search-bar-refresh-btn"]';
+    this.streamSwitchSkeleton = '[data-test="logs-search-result-loading-skeleton"]';
     this.errorMessage = '[data-test="logs-search-error-state"]';
     this.utilitiesMenuButton = '[data-test="logs-search-bar-utilities-menu-btn"]';
     this.resetFiltersButton = '[data-test="logs-search-bar-reset-filters-btn"]';
@@ -46,6 +47,8 @@ export class LogsQueryPage {
     // Wait for the run-mode variant to be visible AND idle before clicking.
     const btn = this.page.locator(this.refreshButton);
     await btn.waitFor({ state: 'visible', timeout: 15000 });
+    // A stream pick starts its auto-run only after the schema fetch this skeleton covers, so the button reads idle until then.
+    await this.page.locator(this.streamSwitchSkeleton).waitFor({ state: 'hidden', timeout: 30000 });
     await this.page.waitForFunction((selector) => {
       const el = document.querySelector(selector);
       if (!el) return false;
@@ -57,7 +60,8 @@ export class LogsQueryPage {
       const isCancel = text.includes('Cancel') || title.toLowerCase().includes('cancel');
       return !disabled && !isCancel;
     }, this.refreshButton, { timeout: 30000 });
-    await btn.click();
+    // Re-resolved at click time, because a run can still swap in the Cancel variant after the check above.
+    await btn.filter({ hasNotText: /cancel/i }).click();
   }
 
   async clickErrorMessage() {

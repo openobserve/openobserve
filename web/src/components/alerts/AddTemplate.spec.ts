@@ -1188,12 +1188,13 @@ describe("AddTemplate - playground Kind drives the variables", () => {
     (w.vm as any).variableGuideOpen = true;
     await flushPromises();
     expect(shownGroups(w)).toEqual(["common", "alert"]);
-    expect(chips(w)).toEqual(["alert_name", "status_dot", "alert_level"]);
+    // The kind's own variables lead the chips so they are not behind "+N more".
+    expect(chips(w)).toEqual(["alert_level", "alert_name", "status_dot"]);
 
     await kindSelect(w).vm.$emit("update:modelValue", "downtime");
     await flushPromises();
     expect(shownGroups(w)).toEqual(["common", "downtime"]);
-    expect(chips(w)).toEqual(["alert_name", "status_dot", "downtime_window", "downtime_targets"]);
+    expect(chips(w)).toEqual(["downtime_window", "downtime_targets", "alert_name", "status_dot"]);
   });
 
   it("a cloned custom template lists every kind's group and its Kind narrows the guide", async () => {
@@ -1267,5 +1268,92 @@ describe("AddTemplate - playground Kind drives the variables", () => {
     await panel(w).vm.$emit("variable-groups", groups);
     await selectCustomMode(w);
     expect(shownGroups(w)).toEqual(["common", "alert", "anomaly", "downtime"]);
+  });
+});
+
+describe("AddTemplate - forms QA (B1, B25, B27, B31)", () => {
+  const appliesTo = (w: any) =>
+    w.find('[data-test="add-template-applies-to-select"]').findComponent({ name: "OSelect" });
+  const mode = (w: any) => w.find('[data-test="add-template-applies-to-mode"]').text();
+  const prebuilt = {
+    name: "prebuilt_slack",
+    body: '{"text":"{alert_name}"}',
+    type: "http",
+    title: "",
+    kind: "custom",
+    applies_to: [],
+    isPrebuilt: true,
+  };
+
+  beforeEach(() => vi.clearAllMocks());
+
+  it("B1: marks Applies to in error so the server reason shows", async () => {
+    vi.mocked(templateService.create).mockRejectedValueOnce({
+      response: {
+        status: 400,
+        data: { message: "template is used for anomaly by: anomaly config 'cpu'" },
+      },
+    });
+    const w = await mountComp();
+    await selectCustomMode(w);
+    getForm(w).setFieldValue("name", "ops-card");
+    await w.findComponent({ name: "QueryEditor" }).vm.$emit("update:query", '{"text":"x"}');
+    await submit(w);
+    expect(appliesTo(w).props("error")).toBe(true);
+    expect(String(appliesTo(w).props("errorMessage"))).toContain("anomaly config 'cpu'");
+  });
+
+  it("B25: clicking the ticked All kinds keeps inference on", async () => {
+    const w = await mountComp();
+    await appliesTo(w).vm.$emit("update:modelValue", []);
+    await flushPromises();
+    expect(mode(w)).toBe("Inferred from the variables in the body");
+    expect(w.find('[data-test="add-template-applies-to-all-hint"]').exists()).toBe(false);
+  });
+
+  it("B25: unticking the only kind says the template now applies to all kinds", async () => {
+    const w = await mountComp();
+    await appliesTo(w).vm.$emit("update:modelValue", ["anomaly"]);
+    await appliesTo(w).vm.$emit("update:modelValue", []);
+    await flushPromises();
+    expect(appliesTo(w).props("modelValue")).toEqual(["all_kinds"]);
+    expect(mode(w)).toBe("Chosen by you");
+    expect(w.find('[data-test="add-template-applies-to-all-hint"]').exists()).toBe(true);
+
+    // Ticking a kind from All kinds still narrows to that kind.
+    await appliesTo(w).vm.$emit("update:modelValue", ["all_kinds", "incident"]);
+    await flushPromises();
+    expect(appliesTo(w).props("modelValue")).toEqual(["incident"]);
+  });
+
+  it("B27: disables Save on a prebuilt row and the leave-dialog Save does not save it", async () => {
+    const w = await mountComp({ template: prebuilt });
+    expect(w.find('[data-test="add-template-submit-btn"]').attributes("disabled")).toBeDefined();
+    const saved = await draftOptions.last.save();
+    await submit(w);
+    expect(saved).toBe(false);
+    expect(templateService.update).not.toHaveBeenCalled();
+    expect(templateService.create).not.toHaveBeenCalled();
+  });
+
+  it("B27: a clone of a prebuilt row still saves", async () => {
+    const w = await mountComp({ template: { ...prebuilt, name: "my_slack" }, isClone: true });
+    expect(w.find('[data-test="add-template-submit-btn"]').attributes("disabled")).toBeUndefined();
+    await submit(w);
+    expect(templateService.create).toHaveBeenCalledTimes(1);
+  });
+
+  it("B31: drops group.<label> from the chips and keeps the episode_id and rows notes", async () => {
+    const w = await mountComp();
+    await w.findComponent({ name: "TemplatePreviewPanel" }).vm.$emit("variable-groups", [
+      { name: "common", variables: ["alert_name", "group.<label>"] },
+      { name: "alert", variables: ["alert_level"] },
+    ]);
+    (w.vm as any).variableGuideOpen = true;
+    await flushPromises();
+    const chips = w.findComponent({ name: "ContentTemplateForm" }).props("variables");
+    expect(chips).toEqual(["alert_level", "alert_name"]);
+    expect(w.find('[data-test="add-template-variable-episode-id"]').exists()).toBe(true);
+    expect(w.find('[data-test="add-template-variable-rows"]').exists()).toBe(true);
   });
 });

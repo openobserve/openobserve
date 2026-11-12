@@ -21,7 +21,7 @@ use axum::{
     extract::{Path, Query},
     response::Response,
 };
-use config::meta::gen_ai::GenAiAgentMappingConfig;
+use config::meta::gen_ai::{GenAiAgentMappingConfig, HarnessStripRequest, HarnessStripResponse};
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::llm_evaluations::agents;
 #[cfg(feature = "enterprise")]
@@ -217,6 +217,60 @@ pub async fn save_agent_mapping(
     {
         let _ = (&org_id, &user_email, &body);
         MetaHttpResponse::not_found("Gen-AI agent mapping is an enterprise feature")
+    }
+}
+
+/// Hide harness text in messages with the same code the Sessions list uses.
+#[utoipa::path(
+    post,
+    path = "/{org_id}/settings/gen_ai/harness_strip",
+    context_path = "/api",
+    tag = "GenAI Settings",
+    operation_id = "StripGenAiHarnessText",
+    params(("org_id" = String, Path, description = "Organization ID")),
+    request_body(content = HarnessStripRequest, description = "Harness patterns and the messages to hide them in"),
+    responses(
+        (status = 200, description = "Each message with its harness text hidden", body = HarnessStripResponse),
+        (status = 400, description = "Invalid pattern or too many messages"),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Forbidden")
+    ),
+    security(("Authorization" = [])),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false})),
+        ("x-o2-ratelimit" = json!({"module": "GenAI Settings", "operation": "get"}))
+    )
+)]
+pub async fn strip_harness_text(
+    Path(org_id): Path<String>,
+    Headers(user_email): Headers<UserEmail>,
+    Json(body): Json<HarnessStripRequest>,
+) -> Response {
+    // Reading the saved patterns needs settings read access; trying them needs the same.
+    #[cfg(feature = "enterprise")]
+    {
+        if !check_permissions(
+            &org_id,
+            &org_id,
+            &user_email.user_id,
+            "settings",
+            "GET",
+            None,
+            true,
+            false,
+            false,
+        )
+        .await
+        {
+            return MetaHttpResponse::forbidden("Unauthorized Access");
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    let _ = (&org_id, &user_email);
+
+    match body.strip() {
+        Ok(response) => MetaHttpResponse::json(response),
+        Err(e) => MetaHttpResponse::bad_request(e),
     }
 }
 
