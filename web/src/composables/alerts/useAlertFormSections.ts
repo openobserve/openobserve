@@ -34,7 +34,7 @@ export type FieldMetaMap = Record<string, { errors?: readonly unknown[] } | unde
 export interface AlertSectionsFormData extends Omit<ReadBackAlert, "is_real_time"> {
   is_real_time?: string | boolean;
   name?: string;
-  children?: unknown[];
+  children?: { alert_id?: string }[];
   composite_condition?: { expression?: string } | null;
 }
 
@@ -60,6 +60,8 @@ export interface AlertFormSectionsInput {
   changedSections?: Ref<ReadonlySet<AlertSectionId>>;
   /** Sections the user has moved past; until then a section reports no progress or problem. */
   visited?: Ref<ReadonlySet<AlertSectionId>>;
+  /** Problems a save found outside the form's field meta, counted per section. */
+  extraErrors?: Readonly<Ref<Partial<Record<AlertSectionId, number>>>>;
   t: TranslateFn;
 }
 
@@ -77,6 +79,17 @@ export function checkEveryLabel(formData: AlertSectionsFormData, t: TranslateFn)
 }
 
 /** Status, a one-line phrase and the title of each section, for the section list. */
+// The stored expression names child alerts by id; the editor labels them A, B, … in list order.
+const lettersForAlertIds = (expression: string, childIds: string[]): string => {
+  const letters = new Map(
+    childIds.map((id, index) => [`{${id}}`, String.fromCharCode(65 + index)]),
+  );
+  return expression.replace(/\{[^}]+\}/g, (token) => {
+    if (!letters.has(token)) letters.set(token, String.fromCharCode(65 + letters.size));
+    return letters.get(token)!;
+  });
+};
+
 export function useAlertFormSections(input: AlertFormSectionsInput): {
   items: ComputedRef<SectionNavItem[]>;
   errorCounts: ComputedRef<Record<AlertSectionId, number>>;
@@ -99,6 +112,9 @@ export function useAlertFormSections(input: AlertFormSectionsInput): {
         counts[sectionOfField(name)] += 1;
       }
     }
+    for (const [id, extra] of Object.entries(input.extraErrors?.value ?? {})) {
+      counts[id as AlertSectionId] += extra ?? 0;
+    }
     return counts;
   });
 
@@ -107,7 +123,14 @@ export function useAlertFormSections(input: AlertFormSectionsInput): {
     if (mode.value === "anomaly") return t("alerts.sections.condition.anomaly");
     if (mode.value === "composite") {
       const expression = fd.composite_condition?.expression;
-      return hasValue(expression) ? raw(expression) : t("alerts.sections.condition.composite");
+      return typeof expression === "string" && hasValue(expression)
+        ? raw(
+            lettersForAlertIds(
+              expression,
+              (fd.children ?? []).map((child) => child.alert_id ?? ""),
+            ),
+          )
+        : t("alerts.sections.condition.composite");
     }
     const qc = fd.query_condition ?? {};
     if (qc.type === "promql" || (qc.aggregation && input.isAggregationEnabled.value)) {

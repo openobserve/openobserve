@@ -28,7 +28,7 @@ export interface AlertFieldChange {
 }
 
 // Display-only form state; the fields it mirrors are compared instead.
-const IGNORED_ROOTS = new Set(["_ui", "_meta", "uuid"]);
+const IGNORED_ROOTS = new Set(["_ui", "_meta", "uuid", "last_triggered_at", "lastTriggeredAt"]);
 
 // A filter tree or a window list is one setting to a person, however many leaves it has.
 const ATOMIC_PATHS = new Set([

@@ -93,9 +93,12 @@ provide(SETTING_ROW_BARE_KEY, true);
         <OTooltip side="left" :content="t('alerts.sections.back', { title: t(previous.navKey) })" />
       </OButton>
     </header>
-    <div class="flex flex-1 flex-col px-5 pb-4 max-md:px-4">
+    <div class="flex flex-1 flex-col px-5 pb-4 max-md:px-4 xl:pe-16">
       <slot />
-      <div v-if="next" class="sticky bottom-4 mt-auto flex justify-end pt-4 max-md:hidden">
+      <div
+        v-if="next"
+        class="mt-auto flex justify-end pt-4 max-md:hidden xl:sticky xl:bottom-4 xl:-me-11"
+      >
         <OButton
           variant="primary"
           size="icon-circle-lg"
