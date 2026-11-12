@@ -120,6 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <p
               class="text-sm"
               :class="NOTICE_INK[notice.tone]"
+              :data-tone="notice.tone"
               data-test="autoobserve-live-issue-page"
             >
               {{ notice.text }}

@@ -85,7 +85,7 @@ const rail = (items: AutoObserveSuggestion[]): RailSource => ({
   total: items.length,
 });
 
-describe("alert_not_working cards (P5b test 27)", () => {
+describe("alert_not_working cards", () => {
   it("say each pattern and class with the shared sentences, and anything else generically", () => {
     const cases: [Record<string, unknown>, string][] = [
       [

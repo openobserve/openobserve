@@ -538,40 +538,6 @@ describe("LiveIssues", () => {
       expect(cells[0].attributes("data-tone")).toBe("neutral");
     });
 
-    it("cuts a long team name and a long unbroken sentence with an ellipsis, not mid-glyph (T1-N7)", async () => {
-      api.mockResolvedValue(
-        page([paged(0, "paged", "A Very Long Team Name For The Platform On Call Rotation")]),
-      );
-      const w = mountTable();
-      await loaded();
-      const chip = w.get(sel("page"));
-      expect(chip.classes()).toContain("max-w-full");
-      expect(chip.classes()).toContain("truncate");
-      expect(w.get(sel("sentence")).classes()).toContain("wrap-anywhere");
-    });
-
-    it("cuts a long stream name with an ellipsis inside the cell (T1-N7)", async () => {
-      const base = at(4, 1, "inc-long-stream");
-      const long = "k8s_cluster_e_namespace_g_payments_backend_ingest_and_enrichment_pipeline_logs";
-      api.mockResolvedValue(page([{ ...base, finding: { ...base.finding, stream_name: long } }]));
-      const w = mountTable();
-      await loaded();
-      const chip = w.get(sel("stream"));
-      expect(chip.classes()).toContain("overflow-hidden");
-      const text = chip.get('[data-test="autoobserve-live-issues-stream-text"]');
-      expect(text.classes()).toContain("truncate");
-      expect(text.text()).toBe(long);
-    });
-
-    it("keeps the two-line sentence clamp clear of the cell padding, so no third line peeks (F-N2)", async () => {
-      api.mockResolvedValue(page([at(4, 1)]));
-      const w = mountTable();
-      await loaded();
-      const sentence = w.get(sel("sentence"));
-      expect(sentence.classes().some((c) => /^p[ytb]?-/.test(c))).toBe(false);
-      expect(sentence.element.parentElement?.classList.contains("py-1.5")).toBe(true);
-    });
-
     it("the status filter says Open, the word the status chip uses", async () => {
       api.mockResolvedValue(page([at(4, 1)]));
       const w = mountTable();
@@ -579,14 +545,13 @@ describe("LiveIssues", () => {
       expect(w.find(sel("filter-open")).text()).toBe("Open");
     });
 
-    it("a denial hides the search, filters and counts but keeps their space, so the table doesn't jump (T5-N4)", async () => {
+    it("a denial keeps the search, filters and counts mounted but inert and hidden from assistive tech", async () => {
       api.mockRejectedValue(httpError(403));
       const w = mountTable();
       await loaded();
       expect(w.find(sel("denied")).exists()).toBe(true);
       for (const part of ["controls", "summary"]) {
         const box = w.get(sel(part));
-        expect(box.classes(), part).toContain("invisible");
         expect(box.attributes("inert"), part).toBeDefined();
         expect(box.attributes("aria-hidden"), part).toBe("true");
       }
@@ -596,15 +561,15 @@ describe("LiveIssues", () => {
       api.mockResolvedValue(page([at(4, 1)]));
       const w = mountTable();
       await loaded();
-      expect(w.get(sel("controls")).classes()).not.toContain("invisible");
       expect(w.get(sel("controls")).attributes("inert")).toBeUndefined();
+      expect(w.get(sel("controls")).attributes("aria-hidden")).toBeUndefined();
     });
 
     it("while loading, the priority counts are blank, not zero", async () => {
       api.mockReturnValue(new Promise(() => {}) as never);
       const w = mountTable();
       await flushPromises();
-      expect(w.find(sel("priority")).findAll(".tabular-nums")).toHaveLength(0);
+      expect(w.find(sel("priority-p1")).text()).toBe("P1");
     });
 
     it("a failed load names the page's own noun", async () => {

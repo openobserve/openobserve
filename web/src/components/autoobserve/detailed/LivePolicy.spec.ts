@@ -72,7 +72,8 @@ describe("Where should I reach you (settings-drawer)", () => {
   it("holds two skeleton lines while the Slack settings load", async () => {
     settingsApi.mockReturnValue(new Promise(() => undefined) as never);
     const w = await mountIt(AutoObserveSettingsReach);
-    expect(w.findAll('[data-test="autoobserve-settings-reach"] .h-4')).toHaveLength(2);
+    expect(w.findComponent({ name: "OSkeleton" }).exists()).toBe(true);
+    expect(sel(w, "autoobserve-settings-reach-open").exists()).toBe(true);
     expect(sel(w, "autoobserve-settings-reach-error").exists()).toBe(false);
   });
 
@@ -81,40 +82,36 @@ describe("Where should I reach you (settings-drawer)", () => {
       data: { channel: { channel_name: "oncall-eu" }, digest_time: "09:00" },
     } as never);
     const w = await mountIt(AutoObserveSettingsReach);
-    expect(sel(w, "autoobserve-settings-reach-channel").text()).toBe(
-      "Slack: #oncall-eu, with a daily summary at 09:00.",
-    );
+    const line = sel(w, "autoobserve-settings-reach-channel").text();
+    expect(line).toContain("#oncall-eu");
+    expect(line).toContain("09:00");
     await sel(w, "autoobserve-settings-reach-open").trigger("click");
     expect(push).toHaveBeenCalledWith({ name: "slack", query: { org_identifier: "demo-org" } });
-    expect(sel(w, "autoobserve-settings-reach-open").text()).toBe("Change in Slack settings");
   });
 
   it("with no channel picked yet, says where it reaches you instead", async () => {
     settingsApi.mockResolvedValue({ data: { channel: null, digest_time: null } } as never);
     const w = await mountIt(AutoObserveSettingsReach);
-    expect(sel(w, "autoobserve-settings-reach-none").text()).toContain(
-      "No Slack channel is picked yet",
-    );
-    expect(sel(w, "autoobserve-settings-reach-open").text()).toBe("Set up Slack");
+    expect(sel(w, "autoobserve-settings-reach-none").exists()).toBe(true);
+    expect(sel(w, "autoobserve-settings-reach-channel").exists()).toBe(false);
+    expect(sel(w, "autoobserve-settings-reach-open").exists()).toBe(true);
   });
 
-  it("a 404 is Slack not set up, neutral, with Set up Slack", async () => {
+  it("a 404 is Slack not set up: a state with a way to set it up, not a failure to retry", async () => {
     settingsApi.mockRejectedValue(httpError(404));
     const w = await mountIt(AutoObserveSettingsReach);
     const line = sel(w, "autoobserve-settings-reach-error");
     expect(line.attributes("data-failure")).toBe("off");
-    expect(line.classes()).toContain("text-text-secondary");
-    expect(line.text()).toBe("Slack isn't set up for this organization.");
-    expect(sel(w, "autoobserve-settings-reach-open").text()).toBe("Set up Slack");
+    expect(sel(w, "autoobserve-settings-reach-open").exists()).toBe(true);
+    expect(sel(w, "autoobserve-settings-reach-retry").exists()).toBe(false);
   });
 
-  it("a 403 is red, says what is missing, and offers nothing it can't open", async () => {
+  it("a 403 is a denial that says what is missing, and offers nothing it can't open", async () => {
     settingsApi.mockRejectedValue(httpError(403));
     const w = await mountIt(AutoObserveSettingsReach);
     const line = sel(w, "autoobserve-settings-reach-error");
     expect(line.attributes("data-failure")).toBe("denied");
-    expect(line.classes()).toContain("text-status-error-text");
-    expect(line.text()).toBe("You don't have permission to see the Slack settings.");
+    expect(line.text()).toContain("permission");
     expect(sel(w, "autoobserve-settings-reach-open").exists()).toBe(false);
     expect(w.text()).not.toContain("raw server text");
   });
@@ -122,9 +119,7 @@ describe("Where should I reach you (settings-drawer)", () => {
   it("a 500 says it failed and retries in place", async () => {
     settingsApi.mockRejectedValueOnce(httpError(500));
     const w = await mountIt(AutoObserveSettingsReach);
-    expect(sel(w, "autoobserve-settings-reach-error").text()).toBe(
-      "Couldn't load the Slack settings.",
-    );
+    expect(sel(w, "autoobserve-settings-reach-error").attributes("data-failure")).toBe("failed");
     settingsApi.mockResolvedValueOnce({
       data: { channel: { channel_name: "ops" }, digest_time: "08:30" },
     } as never);

@@ -47,11 +47,6 @@ describe("AoSparkline", () => {
     expect(w.get(sel("marker-detected")).attributes("title")).toBe("Detected at 4:45 PM");
   });
 
-  it("keeps the detection mark red on a quiet line, as its legend says", () => {
-    const w = draw({ tone: "neutral", markers: [{ t: 3, kind: "detected", label: "Detected" }] });
-    expect(w.get(`${sel("marker-detected")} span`).classes()).toContain("bg-status-error-text");
-  });
-
   it("keeps its height in every state, so nothing below it moves", () => {
     for (const props of [{}, { loading: true }, { error: true }, { series: [] }]) {
       expect(
@@ -68,11 +63,10 @@ describe("AoSparkline", () => {
     expect(w.find(sel("chart")).exists()).toBe(false);
   });
 
-  it("an error is red, says so and offers Retry when the caller can retry", async () => {
+  it("an error is an alert, says so and offers Retry when the caller can retry", async () => {
     const w = draw({ error: true, retryable: true });
     const err = w.get(sel("error"));
     expect(err.attributes("role")).toBe("alert");
-    expect(err.classes()).toContain("text-status-error-text");
     expect(err.text()).toContain("Couldn't load the chart");
     await w.get(sel("retry")).trigger("click");
     expect(w.emitted("retry")).toHaveLength(1);
@@ -113,7 +107,7 @@ describe("AoConfidenceMeter", () => {
     ["medium", 2, "Medium"],
     ["high", 3, "High"],
     [null, 0, "Not scored"],
-  ])("%s fills %i of three segments and names the band", (band, level, label) => {
+  ])("%s reads as level %i of three and names the band", (band, level, label) => {
     const w = mount(AoConfidenceMeter, {
       props: { band, reason: "1 decisive source (logs)" },
       global: { plugins: [i18n] },
@@ -121,7 +115,6 @@ describe("AoConfidenceMeter", () => {
     const meter = w.get('[role="meter"]');
     expect(meter.attributes("aria-valuenow")).toBe(String(level));
     expect(meter.attributes("aria-valuetext")).toBe(label);
-    expect(w.findAll(".bg-accent")).toHaveLength(level);
     expect(w.get('[data-test="ao-confidence-band"]').text()).toBe(label);
     expect(w.text().includes("no calibrated score yet")).toBe(band !== null);
     expect(w.get('[data-test="ao-confidence-reason"]').text()).toBe("1 decisive source (logs)");

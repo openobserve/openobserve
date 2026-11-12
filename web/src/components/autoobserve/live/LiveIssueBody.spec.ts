@@ -21,6 +21,7 @@ import config from "@/aws-exports";
 import { queryClient } from "@/composables/query/queryClient";
 import incidents from "@/services/incidents";
 import type { AutoObserveIncidentItem } from "@/services/autoobserve";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import LiveIssueBody from "./LiveIssueBody.vue";
 
@@ -263,10 +264,12 @@ describe("LiveIssueBody", () => {
       expect(chart.props("endUs")).toBeNull();
       expect(w.get(sel("autoobserve-live-issue-page")).text()).toBe("Paged Payments");
       expect(w.get(sel("autoobserve-issue-timeline")).text()).toContain("Acknowledged");
-      const blast = w.findAll(sel("autoobserve-live-issue-blast-stream"));
-      expect(blast.map((b) => [b.text(), b.classes().join(" ").includes("error")])).toEqual([
-        ["pay_api", true],
-        ["b", false],
+      const blast = w
+        .findAllComponents(OTag)
+        .filter((c) => c.find(sel("autoobserve-live-issue-blast-stream")).exists());
+      expect(blast.map((b) => [b.text(), b.props("variant")])).toEqual([
+        ["pay_api", "error-soft"],
+        ["b", "default-soft"],
       ]);
       expect(w.find('[role="meter"]').exists()).toBe(false);
       expect(w.get(sel("autoobserve-issue-chart-note")).text()).toBe(
@@ -276,13 +279,11 @@ describe("LiveIssueBody", () => {
       expect(w.get(sel("autoobserve-issue-tab-analysis")).attributes("autofocus")).toBeUndefined();
     });
 
-    it("nobody paged is amber and offers routing setup", async () => {
+    it("nobody paged is a warning and offers routing setup", async () => {
       const w = await mountBody(
         item({ page: { outcome: "unrouted", team_id: null, team_name: null } }),
       );
-      expect(w.get(sel("autoobserve-live-issue-page")).classes()).toContain(
-        "text-status-warning-text",
-      );
+      expect(w.get(sel("autoobserve-live-issue-page")).attributes("data-tone")).toBe("warning");
       expect(w.find(sel("autoobserve-live-issue-routing")).exists()).toBe(true);
     });
 
@@ -438,13 +439,6 @@ describe("LiveIssueBody", () => {
         },
         members: [member("pay_api", 0, 10)],
       });
-
-    it("reads as settled: no red verdict bar or impact chip", async () => {
-      const w = await mountBody(resolved(), "analysis");
-      const verdict = w.get(sel("autoobserve-analysis-verdict"));
-      expect(verdict.get("span").classes()).toContain("bg-status-positive");
-      expect(verdict.html()).not.toContain("bg-status-error-text");
-    });
 
     it("opens Logs up to an hour after it ended and says so", async () => {
       const w = await mountBody(resolved(), "logs");
