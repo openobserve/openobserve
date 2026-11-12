@@ -169,9 +169,7 @@ describe("StarterPackPage", () => {
     expect(has(wrapper, "starter-pack-page-group-dashboard")).toBe(true);
     expect(has(wrapper, "starter-pack-page-group-alert")).toBe(true);
     expect(has(wrapper, "starter-pack-page-item-failed")).toBe(true);
-    expect(wrapper.find('[data-test="starter-pack-page-tile-installed"]').text()).toContain(
-      "1 of 2",
-    );
+    expect(wrapper.find('[data-test="starter-pack-page-views-meta"]').text()).toContain("1 of 2");
   });
 
   it("warns only when a pack alert fired and notifies nobody", async () => {

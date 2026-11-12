@@ -26,9 +26,12 @@ import StarterPackRepairChip from "@/components/starterPacks/StarterPackRepairCh
 import StarterPackUpdateDrawer from "@/components/starterPacks/StarterPackUpdateDrawer.vue";
 import StarterPackUndoDialog from "@/components/starterPacks/StarterPackUndoDialog.vue";
 import TurnOnAlertsDrawer from "@/components/starterPacks/TurnOnAlertsDrawer.vue";
+import StarterPackAdaptedRows from "@/components/starterPacks/StarterPackAdaptedRows.vue";
 import QuickMuteDialog from "@/components/alerts/downtimes/QuickMuteDialog.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OCard from "@/lib/core/Card/OCard.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
@@ -75,6 +78,7 @@ const turnOnOpen = ref(false);
 const setupOpen = ref(false);
 const removeOpen = ref(false);
 const updateOpen = ref(false);
+const updateLater = ref(false);
 const muteRow = ref<TurnOnRow | null>(null);
 const editRow = ref<TurnOnRow | null>(null);
 const thresholdDraft = ref<string | number>("");
@@ -123,6 +127,22 @@ const silentFiredTimes = computed(() =>
   silentFired.value.reduce((sum, { id }) => sum + (fired.value[id] ?? 0), 0),
 );
 const packVersion = computed(() => flow.record.value?.version ?? pack.version);
+const subtitle = computed(() =>
+  flow.record.value
+    ? flow.record.value.installedBy
+      ? t("starterPacks.page.subtitle", {
+          who: raw(flow.record.value.installedBy),
+          date: raw(installedOn.value),
+          version: raw(packVersion.value),
+          folder: raw(folderLabel.value),
+        })
+      : t("starterPacks.page.subtitleUnknown", {
+          date: raw(installedOn.value),
+          version: raw(packVersion.value),
+          folder: raw(folderLabel.value),
+        })
+    : t("starterPacks.page.breadcrumb", { pack: title, version: raw(packVersion.value) }),
+);
 const showAsk = computed(() => flow.forbidden.value || turn.forbidden.value);
 const pageState = computed(() => {
   if (!flow.loaded.value) return "loading";
@@ -234,9 +254,7 @@ const muteContext = computed(() =>
     bleed
     :title="t('starterPacks.page.title', { title: t(pack.titleKey) })"
     icon="hub"
-    :subtitle="
-      t('starterPacks.page.breadcrumb', { pack: t(pack.titleKey), version: raw(packVersion) })
-    "
+    :subtitle="subtitle"
     title-data-test="starter-pack-page-title"
   >
     <template #actions>
@@ -249,12 +267,13 @@ const muteContext = computed(() =>
       />
       <template v-if="pageState === 'installed' && flow.canManage.value">
         <OButton
-          variant="ghost-destructive"
+          v-if="offCount"
+          variant="primary"
           size="sm-action"
-          data-test="starter-pack-page-remove-btn"
-          @click="removeOpen = true"
+          data-test="starter-pack-page-turn-on-btn"
+          @click="turnOnOpen = true"
         >
-          {{ t("starterPacks.landing.remove") }}
+          {{ t("starterPacks.turnOn.submit", { count: offCount }, offCount) }}
         </OButton>
         <OButton
           v-if="onRows.length"
@@ -266,20 +285,19 @@ const muteContext = computed(() =>
           {{ t("starterPacks.page.turnOffAll") }}
         </OButton>
         <OButton
-          v-if="offCount"
-          variant="primary"
+          variant="ghost-destructive"
           size="sm-action"
-          data-test="starter-pack-page-turn-on-btn"
-          @click="turnOnOpen = true"
+          data-test="starter-pack-page-remove-btn"
+          @click="removeOpen = true"
         >
-          {{ t("starterPacks.turnOn.submit", { count: offCount }, offCount) }}
+          {{ t("starterPacks.landing.remove") }}
         </OButton>
       </template>
     </template>
 
     <div class="flex min-h-0 flex-1 flex-col gap-3 overflow-auto p-3 text-sm">
       <OBanner v-if="showAsk" variant="default" dense inline-actions icon="lock">
-        {{ t("starterPacks.page.askAdmin", { folder: raw(folderLabel) }) }}
+        {{ t("starterPacks.page.viewOnly") }}
         <template #actions>
           <OButton
             variant="outline"
@@ -345,7 +363,8 @@ const muteContext = computed(() =>
       <template v-else>
         <OBanner
           v-if="silentFired.length"
-          variant="error-soft"
+          variant="warning"
+          icon="notifications-paused"
           dense
           data-test="starter-pack-page-silent-banner"
         >
@@ -358,96 +377,25 @@ const muteContext = computed(() =>
           }}
         </OBanner>
         <StarterPackHealthLine :org="org" :pack="pack" />
-        <div class="grid grid-cols-3 gap-3 max-md:grid-cols-1" data-test="starter-pack-page-tiles">
-          <div
-            class="border-border-default rounded-default flex flex-col gap-1 border p-3"
-            data-test="starter-pack-page-tile-installed"
-          >
-            <OText variant="meta">{{ t("starterPacks.page.tileInstalled") }}</OText>
-            <strong class="text-lg">{{
-              t("starterPacks.page.installedOf", {
-                made: flow.made.value.length,
-                total: flow.items.value.length,
-              })
-            }}</strong>
-          </div>
-          <div
-            class="border-border-default rounded-default flex flex-col gap-1 border p-3"
-            data-test="starter-pack-page-tile-data"
-          >
-            <OText variant="meta">{{ t("starterPacks.page.tileData") }}</OText>
-            <strong class="text-lg">{{
-              t("starterPacks.page.streamCount", { count: streams.length }, streams.length)
-            }}</strong>
-          </div>
-          <div
-            class="border-border-default rounded-default flex flex-col gap-1 border p-3"
-            data-test="starter-pack-page-tile-version"
-          >
-            <OText variant="meta">{{ t("starterPacks.page.tileVersion") }}</OText>
-            <strong class="text-lg">{{ packVersion }}</strong>
-          </div>
-        </div>
-        <div
-          class="border-border-default rounded-default flex flex-col border"
-          data-test="starter-pack-page-items"
-        >
-          <div class="flex items-center justify-between px-3 py-2">
-            <strong>{{ t("starterPacks.page.items") }}</strong>
-            <OButton
-              variant="ghost-primary"
-              size="sm-action"
-              data-test="starter-pack-page-open-btn"
-              @click="openView"
-            >
-              {{ t("starterPacks.page.open") }}
-            </OButton>
-          </div>
-          <template v-for="group in itemGroups" :key="group.kind">
-            <OText
-              variant="meta"
-              class="bg-surface-subtle px-3 py-1"
-              :data-test="`starter-pack-page-group-${group.kind}`"
-              >{{
-                t(`starterPacks.page.group.${group.kind}`, { count: group.items.length })
-              }}</OText
-            >
-            <div
-              v-for="item in group.items"
-              :key="item.itemId"
-              class="border-border-default flex items-center justify-between gap-2 border-t px-3 py-1.5"
-              :class="{ 'bg-banner-error-bg': item.status === 'failed' }"
-              :data-test="`starter-pack-page-item-${item.status}`"
-            >
-              <span class="min-w-0 truncate">{{ flow.nameOf(item.itemId) }}</span>
-              <OBadge
-                v-if="item.status === 'failed' || item.status === 'skipped'"
-                :variant="item.status === 'failed' ? 'error-outline' : 'default-outline'"
-              >
-                {{ t(`starterPacks.page.status.${item.status}`) }}
-              </OBadge>
-            </div>
-          </template>
-          <OText
-            v-for="repair in flow.record.value?.repairs ?? []"
-            :key="repair.from"
-            variant="meta"
-            class="border-border-default border-t px-3 py-1.5"
-            data-test="starter-pack-page-repair"
-          >
-            {{ t("starterPacks.page.repair", { from: raw(repair.from), to: raw(repair.to) }) }}
-          </OText>
-        </div>
         <template v-if="packsEnabled && flow.canManage.value">
           <OBanner
-            v-if="updates.available.value"
-            variant="info"
+            v-if="updates.available.value && !updateLater"
+            variant="default"
+            icon="update"
             dense
             inline-actions
             data-test="starter-pack-page-update"
           >
             {{ t("starterPacks.update.available") }}
             <template #actions>
+              <OButton
+                variant="ghost"
+                size="sm-action"
+                data-test="starter-pack-page-update-later-btn"
+                @click="updateLater = true"
+              >
+                {{ t("starterPacks.page.later") }}
+              </OButton>
               <OButton
                 variant="outline"
                 size="sm-action"
@@ -460,7 +408,8 @@ const muteContext = computed(() =>
           </OBanner>
           <OBanner
             v-if="updates.needsDashboard.value"
-            variant="info"
+            variant="default"
+            icon="info"
             dense
             inline-actions
             data-test="starter-pack-page-add-dashboard"
@@ -481,13 +430,37 @@ const muteContext = computed(() =>
         </template>
         <OBanner
           v-if="!onRows.length && offCount"
-          variant="info"
+          variant="warning"
+          icon="notifications-paused"
           dense
           data-test="starter-pack-page-off"
         >
           {{ t("starterPacks.home.reminder", { count: offCount, title }, offCount) }}
         </OBanner>
-        <div class="grid min-h-0 grid-cols-[minmax(0,1fr)_20rem] gap-3 max-lg:grid-cols-1">
+        <OCard
+          variant="outlined"
+          class="rounded-surface flex flex-col"
+          data-test="starter-pack-page-section-alerts"
+        >
+          <div class="flex flex-wrap items-center gap-2 px-3 py-2">
+            <div class="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2">
+              <OText variant="card-title">{{ t("starterPacks.page.sectionAlerts") }}</OText>
+              <OText variant="meta" data-test="starter-pack-page-alerts-meta">{{
+                t("starterPacks.page.alertsMeta", { on: onRows.length, silent: offCount })
+              }}</OText>
+            </div>
+            <OButton
+              v-if="packsEnabled && flow.canManage.value && updates.canRevert.value"
+              class="self-start"
+              variant="ghost-primary"
+              size="sm-action"
+              :loading="updates.state.value === 'applying'"
+              data-test="starter-pack-page-revert-btn"
+              @click="updates.revert()"
+            >
+              {{ t("starterPacks.update.revert") }}
+            </OButton>
+          </div>
           <div class="min-h-80" data-test="starter-pack-page-alerts-table">
             <OTable
               :data="rows"
@@ -499,9 +472,7 @@ const muteContext = computed(() =>
                 <span class="flex min-w-0 flex-col items-start gap-0.5">
                   <span class="flex items-center gap-2">
                     {{ row.name }}
-                    <OBadge
-                      :variant="row.severity === 'critical' ? 'error-outline' : 'warning-outline'"
-                    >
+                    <OBadge :variant="row.severity === 'critical' ? 'error-soft' : 'warning-soft'">
                       {{ t(`starterPacks.severity.${row.severity as "critical" | "warning"}`) }}
                     </OBadge>
                   </span>
@@ -533,8 +504,10 @@ const muteContext = computed(() =>
                 >
                   {{ t("starterPacks.turnOn.noData") }}
                 </OBadge>
-                <OBadge v-else :variant="row.enabled ? 'success-outline' : 'default-outline'">
-                  {{ t(row.enabled ? "starterPacks.page.watching" : "starterPacks.page.off") }}
+                <OBadge v-else :variant="row.enabled ? 'success-soft' : 'default-soft'">
+                  {{
+                    t(row.enabled ? "starterPacks.page.statusOn" : "starterPacks.page.statusSilent")
+                  }}
                 </OBadge>
               </template>
               <template #cell-fired="{ row }">
@@ -582,55 +555,149 @@ const muteContext = computed(() =>
               </template>
             </OTable>
           </div>
-          <div class="flex flex-col gap-3">
-            <div
-              class="border-border-default rounded-default flex flex-col gap-1 border p-3"
-              data-test="starter-pack-page-about"
-            >
-              <strong>{{ t("starterPacks.page.about") }}</strong>
-              <span>{{
-                t("starterPacks.page.setUpBy", { who: raw(flow.record.value?.installedBy ?? "") })
-              }}</span>
-              <span>{{ t("starterPacks.page.date", { date: raw(installedOn) }) }}</span>
-              <span>{{ t("starterPacks.page.queries", { count: perDay.toLocaleString() }) }}</span>
-              <OText variant="meta">{{ t("starterPacks.page.scanNote") }}</OText>
-              <OButton
-                v-if="packsEnabled && flow.canManage.value && updates.canRevert.value"
-                class="self-start"
-                variant="ghost-primary"
-                size="sm-action"
-                :loading="updates.state.value === 'applying'"
-                data-test="starter-pack-page-revert-btn"
-                @click="updates.revert()"
-              >
-                {{ t("starterPacks.update.revert") }}
-              </OButton>
+        </OCard>
+        <OCard
+          variant="outlined"
+          class="rounded-surface flex flex-col"
+          data-test="starter-pack-page-section-views"
+        >
+          <div class="flex flex-wrap items-center gap-2 px-3 py-2">
+            <div class="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2">
+              <OText variant="card-title">{{ t("starterPacks.page.sectionViews") }}</OText>
+              <OText variant="meta" data-test="starter-pack-page-views-meta">{{
+                t("starterPacks.page.installedOf", {
+                  made: flow.made.value.length,
+                  total: flow.items.value.length,
+                })
+              }}</OText>
             </div>
-            <div
-              class="border-border-default rounded-default flex flex-col gap-1 border p-3"
-              data-test="starter-pack-page-reach"
+            <OButton
+              variant="ghost-primary"
+              size="sm-action"
+              data-test="starter-pack-page-open-btn"
+              @click="openView"
             >
-              <strong>{{ t("starterPacks.page.reads") }}</strong>
-              <span>{{ packScopeValue(t, matcher.clusters.value) }}</span>
-              <span>{{ t("starterPacks.page.streams", { count: streams.length }) }}</span>
-            </div>
-            <div
-              class="border-border-default rounded-default flex flex-col items-start gap-1 border p-3"
-              data-test="starter-pack-page-access"
-            >
-              <strong>{{ t("starterPacks.page.whoCanSee") }}</strong>
-              <span>{{ t("starterPacks.page.folderAccess", { folder: raw(folderLabel) }) }}</span>
-              <OButton
-                variant="ghost-primary"
-                size="sm-action"
-                data-test="starter-pack-page-access-btn"
-                @click="manageAccess"
+              {{ t("starterPacks.page.open") }}
+            </OButton>
+          </div>
+          <div class="flex flex-col" data-test="starter-pack-page-items">
+            <template v-for="group in itemGroups" :key="group.kind">
+              <OText
+                variant="meta"
+                class="bg-surface-subtle px-3 py-1"
+                :data-test="`starter-pack-page-group-${group.kind}`"
+                >{{
+                  t(`starterPacks.page.group.${group.kind}`, { count: group.items.length })
+                }}</OText
               >
-                {{ t("starterPacks.page.manageAccess") }}
-              </OButton>
+              <div
+                v-for="item in group.items"
+                :key="item.itemId"
+                class="border-border-default flex items-center justify-between gap-2 border-t px-3 py-1.5"
+                :class="{ 'bg-banner-error-bg': item.status === 'failed' }"
+                :data-test="`starter-pack-page-item-${item.status}`"
+              >
+                <span class="min-w-0 truncate">{{ flow.nameOf(item.itemId) }}</span>
+                <OBadge
+                  v-if="item.status === 'failed' || item.status === 'skipped'"
+                  :variant="item.status === 'failed' ? 'error-soft' : 'default-soft'"
+                >
+                  {{ t(`starterPacks.page.status.${item.status}`) }}
+                </OBadge>
+              </div>
+            </template>
+            <OText
+              v-for="repair in flow.record.value?.repairs ?? []"
+              :key="repair.from"
+              variant="meta"
+              class="border-border-default border-t px-3 py-1.5"
+              data-test="starter-pack-page-repair"
+            >
+              {{ t("starterPacks.page.repair", { from: raw(repair.from), to: raw(repair.to) }) }}
+            </OText>
+          </div>
+        </OCard>
+        <OCard
+          variant="outlined"
+          class="rounded-surface flex flex-col"
+          data-test="starter-pack-page-section-watches"
+        >
+          <div class="flex flex-wrap items-center gap-2 px-3 py-2">
+            <div class="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2">
+              <OText variant="card-title">{{ t("starterPacks.page.sectionWatches") }}</OText>
+              <OText variant="meta">{{
+                t("starterPacks.page.streamCount", { count: streams.length }, streams.length)
+              }}</OText>
             </div>
           </div>
-        </div>
+          <div
+            class="border-border-default flex flex-col gap-1 border-t px-3 py-2"
+            data-test="starter-pack-page-reach"
+          >
+            <span>{{ packScopeValue(t, matcher.clusters.value) }}</span>
+            <span>{{ t("starterPacks.page.streams", { count: streams.length }) }}</span>
+          </div>
+        </OCard>
+        <OCard
+          variant="outlined"
+          class="rounded-surface flex flex-col"
+          data-test="starter-pack-page-section-adapted"
+        >
+          <div class="flex flex-wrap items-center gap-2 px-3 py-2">
+            <div class="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2">
+              <OText variant="card-title">{{ t("starterPacks.page.sectionAdapted") }}</OText>
+            </div>
+          </div>
+          <div class="border-border-default border-t px-3 py-2">
+            <StarterPackAdaptedRows :flow="flow" readonly />
+          </div>
+        </OCard>
+        <OCard
+          variant="outlined"
+          class="rounded-surface flex flex-col"
+          data-test="starter-pack-page-section-access"
+        >
+          <div class="flex flex-wrap items-center gap-2 px-3 py-2">
+            <div class="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2">
+              <OText variant="card-title">{{ t("starterPacks.page.sectionAccess") }}</OText>
+            </div>
+          </div>
+          <div
+            class="border-border-default flex flex-wrap items-center gap-2 border-t px-3 py-2"
+            data-test="starter-pack-page-access"
+          >
+            <OIcon name="lock" size="sm" class="text-text-secondary" />
+            <span class="min-w-0 flex-1">{{
+              t("starterPacks.page.folderAccess", { folder: raw(folderLabel) })
+            }}</span>
+            <OButton
+              variant="ghost-primary"
+              size="sm-action"
+              data-test="starter-pack-page-access-btn"
+              @click="manageAccess"
+            >
+              {{ t("starterPacks.page.manageAccess") }}
+            </OButton>
+          </div>
+        </OCard>
+        <OCard
+          variant="outlined"
+          class="rounded-surface flex flex-col"
+          data-test="starter-pack-page-section-cost"
+        >
+          <div class="flex flex-wrap items-center gap-2 px-3 py-2">
+            <div class="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2">
+              <OText variant="card-title">{{ t("starterPacks.page.sectionCost") }}</OText>
+            </div>
+          </div>
+          <div
+            class="border-border-default flex flex-col gap-1 border-t px-3 py-2"
+            data-test="starter-pack-page-about"
+          >
+            <span>{{ t("starterPacks.page.queries", { count: perDay.toLocaleString() }) }}</span>
+            <OText variant="meta">{{ t("starterPacks.page.scanNote") }}</OText>
+          </div>
+        </OCard>
       </template>
     </div>
 

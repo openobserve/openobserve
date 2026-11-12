@@ -178,9 +178,11 @@ describe("StarterPackHomeCard", () => {
 
   it("shows the counts, the matched streams and Install N items without a Library link", async () => {
     const wrapper = await render();
-    expect(wrapper.get('[data-test="home-pack-card-counts"]').text()).toContain(
-      "1 dashboard2 alerts1 saved search",
+    expect(wrapper.get('[data-test="home-pack-card-row-dashboard"]').text()).toContain(
+      "1 dashboard",
     );
+    expect(wrapper.get('[data-test="home-pack-card-row-alert"]').text()).toContain("2 alerts");
+    expect(has(wrapper, "home-pack-card-row-savedView")).toBe(true);
     expect(wrapper.get('[data-test="home-pack-card-sub"]').text()).toContain(
       "Matched to 1 stream you are already sending.",
     );

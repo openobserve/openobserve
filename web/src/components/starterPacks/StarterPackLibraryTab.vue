@@ -18,6 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
+import OCard from "@/lib/core/Card/OCard.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -132,12 +133,29 @@ const madeCount = (record: PackInstallRecord) =>
   packItems(record).filter(({ status }) => status === "created" || status === "existing").length;
 const failedCount = (record: PackInstallRecord) =>
   packItems(record).filter(({ status }) => status === "failed").length;
-const plannedCount = (packId: string) => {
-  const flow = flows.get(packId);
-  if (!flow) return 0;
-  return flow.dashboardCount.value + flow.alertCount.value + flow.viewCount.value;
+const stateBadge = (record: PackInstallRecord) => {
+  const failed = failedCount(record);
+  if (failed > 0) {
+    return {
+      variant: "error-soft" as const,
+      icon: "error",
+      label: t("starterPacks.libraryTabs.stateFailed", { count: failed }, failed),
+    };
+  }
+  if (record.status !== "complete") {
+    return {
+      variant: "warning-soft" as const,
+      icon: undefined,
+      label: t("starterPacks.libraryTabs.stateSettingUp"),
+    };
+  }
+  return {
+    variant: "success-soft" as const,
+    icon: undefined,
+    label: t("starterPacks.libraryTabs.statInstalled"),
+  };
 };
-
+const packTitles = computed(() => rows.value.map(({ title }) => title).join(", "));
 const openDashboard = (packId: string) => void flows.get(packId)?.land();
 const seeIncluded = (packId: string) => {
   drawerPackId.value = packId;
@@ -305,9 +323,6 @@ onMounted(() => void load());
       data-test="library-tab-error"
       @action="load"
     />
-    <div v-else-if="state === 'loading'" class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-      <OSkeleton v-for="index in 3" :key="index" type="rect" class="rounded-surface h-32 w-full" />
-    </div>
     <template v-else>
       <div class="flex flex-wrap items-center gap-2">
         <OSearchInput
@@ -332,179 +347,198 @@ onMounted(() => void load());
           </OToggleGroupItem>
         </OToggleGroup>
       </div>
-      <OBanner
-        v-for="notice in unrepaired"
-        :key="notice.stream"
-        variant="default"
-        dense
-        inline-actions
-        :content="t('starterPacks.libraryTabs.rawLogs', { stream: raw(notice.stream) })"
-        :data-test="`library-tab-raw-log-${notice.stream}`"
+      <div
+        v-if="state === 'loading'"
+        class="grid gap-3 md:grid-cols-2 xl:grid-cols-3"
+        data-test="library-tab-loading"
       >
-        <template v-if="isAdmin" #actions>
-          <OButton
-            variant="outline"
-            size="sm"
-            :data-test="`library-tab-parse-${notice.stream}`"
-            @click="openParse(notice)"
-          >
-            {{ t("starterPacks.libraryTabs.parse") }}
-          </OButton>
-        </template>
-      </OBanner>
-      <OBanner
-        v-for="record in repairs"
-        :key="record.installId"
-        :variant="record.status === 'complete' ? 'default' : 'warning'"
-        dense
-        inline-actions
-        :content="
-          t(
-            record.status === 'complete'
-              ? 'starterPacks.libraryTabs.parsing'
-              : 'starterPacks.libraryTabs.parsingIncomplete',
-            { stream: raw(repairStream(record)) },
-          )
-        "
-        :data-test="`library-tab-parsing-${repairStream(record)}`"
-      >
-        <template v-if="isAdmin" #actions>
-          <OButton
-            variant="outline"
-            size="sm"
-            :data-test="`library-tab-parse-undo-${repairStream(record)}`"
-            @click="openUndo(record)"
-          >
-            {{ t("starterPacks.parse.undo") }}
-          </OButton>
-        </template>
-      </OBanner>
-      <OEmptyState
-        v-if="visibleRows.length === 0"
-        size="block"
-        class="py-8"
-        illustration="no-results"
-        variant="no-results"
-        :title="t('starterPacks.libraryTabs.emptyTitle')"
-        :description="
-          facet === 'installed'
-            ? t('starterPacks.libraryTabs.emptyInstalled')
-            : t('starterPacks.libraryTabs.emptyFilter')
-        "
-        data-test="library-tab-empty"
-      />
-      <section
-        v-for="section in sections"
-        :key="section.key"
-        class="flex flex-col gap-2"
-        :data-test="`library-tab-section-${section.key}`"
-      >
-        <OText class="text-text-heading font-medium">{{ section.title }}</OText>
-        <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          <div
-            v-for="row in section.rows"
-            :key="row.id"
-            class="border-border-default rounded-surface flex flex-col gap-2 border p-3"
-            :data-test="`library-tab-row-${row.id}`"
-          >
-            <div class="flex items-center justify-between gap-2">
-              <span class="flex min-w-0 items-center gap-2">
-                <OIcon name="hub" size="sm" />
-                <OText class="text-text-heading truncate font-medium">{{ row.title }}</OText>
-              </span>
-              <OBadge
-                v-if="row.record"
-                variant="success-soft"
-                :data-test="`library-tab-state-${row.id}`"
-              >
-                {{ t("starterPacks.libraryTabs.statInstalled") }}
-              </OBadge>
-            </div>
-            <OText class="text-text-secondary text-sm">{{ row.description }}</OText>
-            <OText
-              v-if="row.record && view === 'packs'"
-              class="text-text-secondary text-xs"
-              :data-test="`library-tab-items-${row.id}`"
+        <OCard
+          v-for="index in 3"
+          :key="index"
+          variant="outlined"
+          class="rounded-surface flex flex-col gap-2 p-3"
+        >
+          <OSkeleton type="text" class="w-1/2" />
+          <OSkeleton type="text" class="w-3/4" />
+          <OSkeleton type="text" class="w-2/3" />
+        </OCard>
+      </div>
+      <template v-else>
+        <OBanner
+          v-for="notice in unrepaired"
+          :key="notice.stream"
+          variant="default"
+          dense
+          inline-actions
+          :content="t('starterPacks.libraryTabs.rawLogs', { stream: raw(notice.stream) })"
+          :data-test="`library-tab-raw-log-${notice.stream}`"
+        >
+          <template v-if="isAdmin" #actions>
+            <OButton
+              variant="outline"
+              size="sm"
+              :data-test="`library-tab-parse-${notice.stream}`"
+              @click="openParse(notice)"
             >
-              {{
-                t("starterPacks.libraryTabs.itemsInstalled", {
-                  made: madeCount(row.record),
-                  total: packItems(row.record).length,
-                })
-              }}
-              <template v-if="failedCount(row.record)">
-                {{ raw(" · ")
-                }}{{
-                  t(
-                    "starterPacks.libraryTabs.itemsFailed",
-                    { count: failedCount(row.record) },
-                    failedCount(row.record),
-                  )
-                }}
-              </template>
-            </OText>
-            <OText
-              v-if="row.record"
-              class="text-text-secondary text-xs"
-              :data-test="`library-tab-installed-${row.id}`"
+              {{ t("starterPacks.libraryTabs.parse") }}
+            </OButton>
+          </template>
+        </OBanner>
+        <OBanner
+          v-for="record in repairs"
+          :key="record.installId"
+          :variant="record.status === 'complete' ? 'default' : 'warning'"
+          dense
+          inline-actions
+          :content="
+            t(
+              record.status === 'complete'
+                ? 'starterPacks.libraryTabs.parsing'
+                : 'starterPacks.libraryTabs.parsingIncomplete',
+              { stream: raw(repairStream(record)) },
+            )
+          "
+          :data-test="`library-tab-parsing-${repairStream(record)}`"
+        >
+          <template v-if="isAdmin" #actions>
+            <OButton
+              variant="outline"
+              size="sm"
+              :data-test="`library-tab-parse-undo-${repairStream(record)}`"
+              @click="openUndo(record)"
             >
-              {{ installedLine(row.record) }}
-              <template v-if="row.record.status !== 'complete'">
-                &middot; {{ t("starterPacks.libraryTabs.statusIncomplete") }}
-              </template>
-            </OText>
-            <div class="mt-auto flex flex-wrap items-center gap-2">
-              <template v-if="view === 'dashboards' || row.record">
-                <OButton
-                  variant="outline"
-                  size="sm"
-                  :data-test="`library-tab-open-${row.id}`"
-                  @click="openPack(row.packId)"
+              {{ t("starterPacks.parse.undo") }}
+            </OButton>
+          </template>
+        </OBanner>
+        <OEmptyState
+          v-if="visibleRows.length === 0 && search.trim()"
+          size="block"
+          class="py-8"
+          illustration="no-results"
+          variant="no-results"
+          :title="t('starterPacks.libraryTabs.noMatchTitle', { search: raw(search.trim()) })"
+          :description="t('starterPacks.libraryTabs.noMatchBody', { packs: raw(packTitles) })"
+          :action-label="t('starterPacks.libraryTabs.clearSearch')"
+          action-icon="close"
+          data-test="library-tab-empty"
+          @action="search = ''"
+        />
+        <OEmptyState
+          v-else-if="visibleRows.length === 0"
+          size="block"
+          class="py-8"
+          illustration="no-results"
+          variant="no-results"
+          :title="t('starterPacks.libraryTabs.emptyTitle')"
+          :description="
+            facet === 'installed'
+              ? t('starterPacks.libraryTabs.emptyInstalled')
+              : t('starterPacks.libraryTabs.emptyFilter')
+          "
+          data-test="library-tab-empty"
+        />
+        <section
+          v-for="section in sections"
+          :key="section.key"
+          class="flex flex-col gap-2"
+          :data-test="`library-tab-section-${section.key}`"
+        >
+          <OText class="text-text-heading font-medium">{{ section.title }}</OText>
+          <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            <OCard
+              v-for="row in section.rows"
+              :key="row.id"
+              variant="outlined"
+              class="rounded-surface flex flex-col gap-2 p-3"
+              :data-test="`library-tab-row-${row.id}`"
+            >
+              <div class="flex items-center justify-between gap-2">
+                <span class="flex min-w-0 items-center gap-2">
+                  <OIcon name="hub" size="sm" class="text-text-secondary" />
+                  <OText class="text-text-heading truncate font-medium">{{ row.title }}</OText>
+                </span>
+                <OBadge
+                  v-if="row.record"
+                  :variant="stateBadge(row.record).variant"
+                  :icon="stateBadge(row.record).icon"
+                  :data-test="`library-tab-state-${row.id}`"
                 >
-                  {{
-                    view === "packs"
-                      ? t("starterPacks.libraryTabs.manage")
-                      : t("starterPacks.libraryTabs.open")
-                  }}
-                </OButton>
-                <OButton
-                  v-if="view === 'packs'"
-                  variant="ghost-primary"
-                  size="sm"
-                  :data-test="`library-tab-open-dashboard-${row.id}`"
-                  @click="openDashboard(row.packId)"
+                  {{ stateBadge(row.record).label }}
+                </OBadge>
+              </div>
+              <OText class="text-text-body text-sm">{{ row.description }}</OText>
+              <OText v-if="row.record" variant="meta">
+                <span v-if="view === 'packs'" :data-test="`library-tab-items-${row.id}`"
+                  >{{
+                    t("starterPacks.libraryTabs.itemsInstalled", {
+                      made: madeCount(row.record),
+                      total: packItems(row.record).length,
+                    })
+                  }}<template v-if="failedCount(row.record)"
+                    >{{ raw(" · ")
+                    }}{{
+                      t(
+                        "starterPacks.libraryTabs.itemsFailed",
+                        { count: failedCount(row.record) },
+                        failedCount(row.record),
+                      )
+                    }}</template
+                  >{{ raw(" · ") }}</span
+                ><span :data-test="`library-tab-installed-${row.id}`"
+                  >{{ installedLine(row.record)
+                  }}<template v-if="row.record.status !== 'complete'"
+                    >{{ raw(" · ") }}{{ t("starterPacks.libraryTabs.statusIncomplete") }}</template
+                  ></span
                 >
-                  {{ t("starterPacks.libraryTabs.openDashboard") }}
-                </OButton>
-              </template>
-              <template v-else>
-                <OButton
-                  variant="primary"
-                  size="sm"
-                  :data-test="`library-tab-install-${row.id}`"
-                  @click="install(row.packId)"
-                >
-                  {{
-                    t(
-                      "starterPacks.card.install",
-                      { count: plannedCount(row.packId) },
-                      plannedCount(row.packId),
-                    )
-                  }}
-                </OButton>
-                <OButton
-                  variant="ghost-primary"
-                  size="sm"
-                  :data-test="`library-tab-see-${row.id}`"
-                  @click="seeIncluded(row.packId)"
-                >
-                  {{ t("starterPacks.card.seeIncluded") }}
-                </OButton>
-              </template>
-            </div>
+              </OText>
+              <div class="mt-auto flex flex-wrap items-center gap-2">
+                <template v-if="view === 'dashboards' || row.record">
+                  <OButton
+                    variant="outline"
+                    size="sm"
+                    :data-test="`library-tab-open-${row.id}`"
+                    @click="openPack(row.packId)"
+                  >
+                    {{
+                      view === "packs"
+                        ? t("starterPacks.libraryTabs.openPack")
+                        : t("starterPacks.libraryTabs.open")
+                    }}
+                  </OButton>
+                  <OButton
+                    v-if="view === 'packs'"
+                    variant="ghost-primary"
+                    size="sm"
+                    :data-test="`library-tab-open-dashboard-${row.id}`"
+                    @click="openDashboard(row.packId)"
+                  >
+                    {{ t("starterPacks.libraryTabs.openDashboard") }}
+                  </OButton>
+                </template>
+                <template v-else>
+                  <OButton
+                    variant="primary"
+                    size="sm"
+                    :data-test="`library-tab-install-${row.id}`"
+                    @click="install(row.packId)"
+                  >
+                    {{ t("starterPacks.libraryTabs.setUpPack", { title: raw(row.title) }) }}
+                  </OButton>
+                  <OButton
+                    variant="ghost-primary"
+                    size="sm"
+                    :data-test="`library-tab-see-${row.id}`"
+                    @click="seeIncluded(row.packId)"
+                  >
+                    {{ t("starterPacks.libraryTabs.whatGetsCreated") }}
+                  </OButton>
+                </template>
+              </div>
+            </OCard>
           </div>
-        </div>
-      </section>
+        </section>
+      </template>
     </template>
     <StarterPackDrawer
       v-if="drawerFlow"

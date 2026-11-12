@@ -30,7 +30,7 @@ import { usePackDismissal, usePackHiddenForOrg } from "@/composables/starterPack
 import { useStarterPackFlow } from "@/composables/starterPacks/useStarterPackFlow";
 import { useStarterPackMatcher } from "@/composables/starterPacks/useStarterPackMatcher";
 import StarterPackDrawer from "./StarterPackDrawer.vue";
-import StarterPackInstallCard from "./StarterPackInstallCard.vue";
+import StarterPackInstallCard, { type StarterPackCardStatus } from "./StarterPackInstallCard.vue";
 import StarterPackHealthLine from "./StarterPackHealthLine.vue";
 import TurnOnAlertsDrawer from "./TurnOnAlertsDrawer.vue";
 
@@ -116,6 +116,15 @@ const view = computed<CardView>(() => {
 watch(view, (next) => emit("offered", next !== "empty" && next !== "hidden"), {
   immediate: true,
 });
+const cardStatus = computed<StarterPackCardStatus>(() => {
+  if (view.value === "interrupted" || view.value === "forbidden") return view.value;
+  if (flow.running.value) return "running";
+  return flow.failed.value.length ? "failed" : "ready";
+});
+const onPrimary = () => {
+  if (view.value === "interrupted") drawerOpen.value = true;
+  else void startSetup();
+};
 const startSetup = async () => {
   drawerOpen.value = true;
   if (await flow.install()) {
@@ -152,7 +161,7 @@ const copyLink = () => copyToClipboard(flow.packLink(), t);
   >
     <div
       v-if="view === 'loading'"
-      class="border-border-default rounded-default flex flex-col gap-2 border p-3"
+      class="border-border-default rounded-surface flex flex-col gap-2 border p-4"
       :data-test="testId('home-pack-card-skeleton')"
     >
       <OSkeleton class="h-6 w-1/2" />
@@ -192,25 +201,6 @@ const copyLink = () => copyToClipboard(flow.packLink(), t);
           @click="library"
         >
           {{ t("starterPacks.library") }}
-        </OButton>
-      </template>
-    </OBanner>
-
-    <OBanner v-else-if="view === 'interrupted'" variant="warning" dense inline-actions>
-      {{
-        t("starterPacks.progress.interrupted", {
-          made: flow.made.value.length,
-          total: flow.toCreate.value.length,
-        })
-      }}
-      <template #actions>
-        <OButton
-          variant="primary"
-          size="sm-action"
-          :data-test="testId('home-pack-interrupted-btn')"
-          @click="drawerOpen = true"
-        >
-          {{ t("starterPacks.progress.finish") }}
         </OButton>
       </template>
     </OBanner>
@@ -295,9 +285,21 @@ const copyLink = () => copyToClipboard(flow.packLink(), t);
       </template>
     </OBanner>
 
-    <OBanner v-else-if="view === 'forbidden'" variant="default" dense inline-actions icon="lock">
-      {{ t("starterPacks.askAdmin") }}
-      <template #actions>
+    <StarterPackInstallCard
+      v-else-if="view === 'offer' || view === 'interrupted' || view === 'forbidden'"
+      :flow="flow"
+      :status="cardStatus"
+      :stream-count="matcher.streams.value.length"
+      :title="title"
+      :test-id="testId('home-pack-card')"
+      :primary-label="view === 'interrupted' ? t('starterPacks.progress.finish') : undefined"
+      :primary-test-id="view === 'interrupted' ? testId('home-pack-interrupted-btn') : undefined"
+      :dismissible="view === 'offer'"
+      @install="onPrimary"
+      @details="drawerOpen = true"
+      @dismiss="dismiss"
+    >
+      <template v-if="view === 'forbidden'" #actions>
         <OButton
           variant="outline"
           size="sm-action"
@@ -308,20 +310,7 @@ const copyLink = () => copyToClipboard(flow.packLink(), t);
           {{ t("starterPacks.copyLink") }}
         </OButton>
       </template>
-    </OBanner>
-
-    <StarterPackInstallCard
-      v-else-if="view === 'offer'"
-      :flow="flow"
-      :stream-count="matcher.streams.value.length"
-      :title="title"
-      :test-id="testId('home-pack-card')"
-      dismissible
-      @install="startSetup"
-      @details="drawerOpen = true"
-      @dismiss="dismiss"
-    >
-      <template v-if="canHideForAll" #actions>
+      <template v-else-if="view === 'offer' && canHideForAll" #actions>
         <OButton
           variant="ghost"
           size="sm-action"
