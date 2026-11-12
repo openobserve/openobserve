@@ -24,7 +24,7 @@ use super::metrics::{MetricsIndexMergeScope, metrics_index_merge_scope};
 use crate::incremental::OPEN_HOUR_MERGE_FILES;
 
 /// One planned merge: the files and the mode they merge in.
-pub(super) type PlannedBatch = (Vec<FileKey>, MergeMode);
+type PlannedBatch = (Vec<FileKey>, MergeMode);
 
 /// The size rules one merge round batches files under.
 pub(super) struct BatchLimits<'a> {
@@ -45,6 +45,7 @@ pub(super) fn plan_batches(
     files: Vec<FileKey>,
     mode: &MergeMode,
     limits: &BatchLimits<'_>,
+    hash_merged_chains: Option<Vec<Vec<FileKey>>>,
     stream: &str,
 ) -> Vec<PlannedBatch> {
     let (mode_files, mut legacy_files) = split_legacy_metrics(files, mode);
@@ -64,7 +65,24 @@ pub(super) fn plan_batches(
                 .map(|pending| (pending, mode.clone())),
         );
     } else if mode.merges_whole_batch() {
-        if !mode_files.is_empty() {
+        let pre_merge = if exceeds_merge_groups(mode_files.len(), mode, limits) {
+            pre_merge_batches(&mode_files, hash_merged_chains, limits.max_merge_groups)
+        } else {
+            Vec::new()
+        };
+        if !pre_merge.is_empty() {
+            log::info!(
+                "[COMPACTOR] merge_by_stream [{stream}] {mode} merge of {} files exceeds {} merge groups, pre-merging in {} hash-merged batches first",
+                mode_files.len(),
+                limits.max_merge_groups,
+                pre_merge.len()
+            );
+            batches.extend(
+                pre_merge
+                    .into_iter()
+                    .map(|group| (group, MergeMode::MetricsHashMerged)),
+            );
+        } else if !mode_files.is_empty() {
             batches.push((mode_files, mode.clone()));
         }
     } else {
@@ -118,8 +136,19 @@ fn indexed_hour_scope(
     }
 }
 
+/// Whether a closed indexed hour of `file_num` files can hold more merge groups than the cap.
+pub(super) fn exceeds_merge_groups(
+    file_num: usize,
+    mode: &MergeMode,
+    limits: &BatchLimits,
+) -> bool {
+    limits.max_merge_groups > 0
+        && matches!(mode, MergeMode::MetricsIndexed)
+        && file_num > limits.max_merge_groups
+}
+
 /// Hash-merged batches a closed hour runs first when it holds more merge groups than `max_groups`.
-pub(super) fn pre_merge_batches(
+fn pre_merge_batches(
     files: &[FileKey],
     hash_merged_chains: Option<Vec<Vec<FileKey>>>,
     max_groups: usize,
@@ -283,6 +312,7 @@ mod tests {
             files,
             &MergeMode::MetricsIndexed,
             &limits(&MergeStrategy::FileSize, 0, false),
+            None,
             "test",
         );
         assert_eq!(batches.len(), 2, "{batches:?}");
@@ -311,6 +341,7 @@ mod tests {
             files,
             &MergeMode::MetricsHashMerged,
             &limits(&MergeStrategy::FileTime, 0, true),
+            None,
             "test",
         );
         assert_eq!(batches.len(), 1, "{batches:?}");
@@ -332,6 +363,7 @@ mod tests {
             files,
             &MergeMode::MetricsIndexed,
             &limits(&MergeStrategy::FileTime, 0, false),
+            None,
             "test",
         );
         assert_eq!(batches.len(), 1, "{batches:?}");
@@ -352,6 +384,7 @@ mod tests {
             files,
             &MergeMode::MetricsIndexed,
             &limits(&MergeStrategy::FileSize, 0, false),
+            None,
             "test",
         );
         // the indexed files are left alone; the legacy pair still merges classic
@@ -370,6 +403,7 @@ mod tests {
             files,
             &MergeMode::MetricsIndexed,
             &limits(&MergeStrategy::FileSize, 0, false),
+            None,
             "test",
         );
         assert_eq!(batches.len(), 1);
@@ -394,7 +428,13 @@ mod tests {
         files.push(metrics_file("legacy.parquet", 100));
         let strategy = MergeStrategy::FileTime;
         let limits = limits(&strategy, 0, true);
-        let batches = plan_batches(files.clone(), &MergeMode::MetricsHashMerged, &limits, "s");
+        let batches = plan_batches(
+            files.clone(),
+            &MergeMode::MetricsHashMerged,
+            &limits,
+            None,
+            "s",
+        );
         assert_eq!(batches.len(), 1, "{batches:?}");
         assert!(
             matches!(batches[0].1, MergeMode::MetricsHashMerged),
@@ -410,7 +450,7 @@ mod tests {
         );
         files.retain(|f| !f.key.ends_with("hash-sorted-v1-01.parquet"));
         assert!(
-            plan_batches(files, &MergeMode::MetricsHashMerged, &limits, "s").is_empty(),
+            plan_batches(files, &MergeMode::MetricsHashMerged, &limits, None, "s").is_empty(),
             "fewer pending files than the minimum wait for more"
         );
     }
@@ -425,7 +465,7 @@ mod tests {
         ];
         let strategy = MergeStrategy::FileTime;
         let limits = limits(&strategy, 0, false);
-        let batches = plan_batches(files, &MergeMode::MetricsIndexed, &limits, "s");
+        let batches = plan_batches(files, &MergeMode::MetricsIndexed, &limits, None, "s");
         assert_eq!(batches.len(), 1, "{batches:?}");
         assert!(matches!(batches[0].1, MergeMode::MetricsIndexed));
         assert_eq!(
@@ -458,6 +498,7 @@ mod tests {
             ingester_hour(25),
             &MergeMode::MetricsHashMerged,
             &limits,
+            None,
             "s",
         );
         assert_eq!(batch_sizes(&batches), [12, 12], "the lone 25th file waits");
@@ -466,6 +507,7 @@ mod tests {
             ingester_hour(25),
             &MergeMode::MetricsHashMerged,
             &limits,
+            None,
             "s",
         );
         assert_eq!(batch_sizes(&batches), [25]);

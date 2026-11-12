@@ -27,10 +27,8 @@ use hashbrown::{HashMap, HashSet};
 use infra::{
     cache::file_data,
     file_list as infra_file_list,
-    runtime::DATAFUSION_RUNTIME,
     schema::{get_partition_time_level_at, get_settings},
 };
-use metrics_index::MetricsFileLayout;
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::downsampling::get_largest_downsampling_rule;
 use search::merge::MergeMode;
@@ -42,7 +40,7 @@ use tokio::{
 
 use super::{
     job::{job_range_end, job_time_level, scheduling_level},
-    plan::{BatchLimits, PlannedBatch, plan_batches, pre_merge_batches},
+    plan::{BatchLimits, exceeds_merge_groups, plan_batches},
 };
 use crate::{
     bloom::compact::OrphanBlooms,
@@ -218,10 +216,13 @@ pub async fn merge_by_stream(
                 max_merge_groups: cfg.compact.metrics_max_groups,
             };
             let stream = format!("{org_id}/{stream_type}/{stream_name}");
-            let planned = plan_batches(files_with_size, &mode, &limits, &stream);
-            let planned =
-                limit_indexed_merge_groups(planned, &scan_schema, limits.max_merge_groups, &stream)
-                    .await;
+            // footers are read only for an hour that could exceed the cap
+            let chains = if exceeds_merge_groups(files_with_size.len(), &mode, &limits) {
+                search::merge::hash_merged_chains(scan_schema, &files_with_size, &stream).await
+            } else {
+                None
+            };
+            let planned = plan_batches(files_with_size, &mode, &limits, chains, &stream);
             // a closed hour plans hash-merged output only as a pre-merge for a later round
             let pre_merged = !is_incremental
                 && planned
@@ -390,77 +391,6 @@ pub async fn merge_by_stream(
         .inc_by(time);
 
     Ok(())
-}
-
-/// Swaps a closed metrics hour of more merge groups than the cap for its pre-merge batches.
-async fn limit_indexed_merge_groups(
-    batches: Vec<PlannedBatch>,
-    schema: &Arc<Schema>,
-    max_groups: usize,
-    stream: &str,
-) -> Vec<PlannedBatch> {
-    let mut limited = Vec::with_capacity(batches.len());
-    for (files, mode) in batches {
-        // fewer files than the cap cannot form more groups than it
-        if max_groups == 0
-            || files.len() <= max_groups
-            || !matches!(mode, MergeMode::MetricsIndexed)
-        {
-            limited.push((files, mode));
-            continue;
-        }
-        let pre_merge = pre_merge_batches(
-            &files,
-            hash_merged_chains(&files, schema, stream).await,
-            max_groups,
-        );
-        if pre_merge.is_empty() {
-            limited.push((files, mode));
-            continue;
-        }
-        log::info!(
-            "[COMPACTOR] merge_by_stream [{stream}] metrics_indexed merge of {} files exceeds {max_groups} merge groups, pre-merging in {} hash-merged batches first",
-            files.len(),
-            pre_merge.len()
-        );
-        limited.extend(
-            pre_merge
-                .into_iter()
-                .map(|files| (files, MergeMode::MetricsHashMerged)),
-        );
-    }
-    limited
-}
-
-/// The sorted chains of the hash-merged files among `files`; `None` when they cannot be read.
-async fn hash_merged_chains(
-    files: &[FileKey],
-    schema: &Arc<Schema>,
-    stream: &str,
-) -> Option<Vec<Vec<FileKey>>> {
-    let merged: Vec<FileKey> = files
-        .iter()
-        .filter(|f| MetricsFileLayout::of(&f.key) == Some(MetricsFileLayout::HashMerged))
-        .cloned()
-        .collect();
-    if merged.is_empty() {
-        return Some(Vec::new());
-    }
-    let merged_num = merged.len();
-    let chains = DATAFUSION_RUNTIME
-        .spawn(search::merge::hash_ordered_chains(schema.clone(), merged))
-        .await
-        .map_err(|e| e.to_string())
-        .and_then(|chains| chains.map_err(|e| e.to_string()));
-    match chains {
-        Ok(chains) => Some(chains),
-        Err(e) => {
-            log::warn!(
-                "[COMPACTOR] merge_by_stream [{stream}] chaining {merged_num} hash-merged files by statistics failed: {e}, only ingester files can be pre-merged"
-            );
-            None
-        }
-    }
 }
 
 fn has_downsampling_rule(_stream_name: &str, _max_ts: i64) -> bool {
