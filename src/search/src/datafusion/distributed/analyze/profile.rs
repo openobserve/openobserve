@@ -13,22 +13,27 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::fmt;
+use std::{fmt, sync::Arc, time::Duration};
 
 use config::{
     meta::{cluster::NodeInfo, search::ScanStats},
     utils::time::now_micros,
 };
 use datafusion::physical_plan::{
-    DisplayFormatType, ExecutionPlan, ExecutionPlanProperties,
+    DisplayFormatType, ExecutionPlan, ExecutionPlanProperties, SendableRecordBatchStream,
     metrics::{MetricValue, MetricsSet},
+    stream::RecordBatchStreamAdapter,
 };
 use flight::{
     common::{Metrics, NodeProfiles, RemoteScanMetrics},
     profile::{MetricKind, ProfileInputs, ProfileMetric, ProfileNode, RemoteNodeProfile},
 };
+use futures::StreamExt;
 
 use crate::datafusion::distributed::remote_scan::remote_scan_exec::RemoteScanExec;
+
+/// How long a caller waits for its remote calls to deliver their profiles.
+pub const REMOTE_PROFILE_TIMEOUT: Duration = Duration::from_secs(10);
 
 /// One remote node as the leader sees it, published to its scan on drop; the default records
 /// nothing.
@@ -46,6 +51,7 @@ impl NodeProfileRecorder {
             (false, true) => "ingester",
             (false, false) => "",
         };
+        profiles.start_call();
         Self {
             profiles: Some(profiles),
             profile: RemoteNodeProfile {
@@ -85,8 +91,7 @@ impl Drop for NodeProfileRecorder {
     fn drop(&mut self) {
         if let Some(profiles) = self.profiles.take() {
             self.profile.end_us = now_micros();
-            let profile = std::mem::take(&mut self.profile);
-            profiles.lock().insert(profile.partition, profile);
+            profiles.publish(std::mem::take(&mut self.profile));
         }
     }
 }
@@ -129,6 +134,29 @@ pub fn build_profile(plan: &dyn ExecutionPlan) -> ProfileNode {
             .unwrap_or_default(),
         inputs,
     }
+}
+
+/// Waits until every remote call in `plan` has published its profile, or `timeout` passes.
+pub async fn wait_remote_profiles(plan: &dyn ExecutionPlan, timeout: Duration) {
+    let mut scans = Vec::new();
+    collect_remote_scans(plan, &mut scans);
+    let published = scans
+        .iter()
+        .map(|scan| scan.state.node_profiles.all_published());
+    let _ = tokio::time::timeout(timeout, futures::future::join_all(published)).await;
+}
+
+/// Ends `stream` only once the remote calls of `plan` have published, so a profile built at its
+/// end includes them.
+pub fn end_after_remote_profiles(
+    stream: SendableRecordBatchStream,
+    plan: Arc<dyn ExecutionPlan>,
+) -> SendableRecordBatchStream {
+    let schema = stream.schema();
+    // Half the caller's wait, so that this node's own profile still reaches its caller.
+    let wait = async move { wait_remote_profiles(plan.as_ref(), REMOTE_PROFILE_TIMEOUT / 2).await };
+    let tail = futures::stream::once(wait).filter_map(|()| futures::future::ready(None));
+    Box::pin(RecordBatchStreamAdapter::new(schema, stream.chain(tail)))
 }
 
 /// Aggregates and orders the metrics the same way the text plan does, so `display` matches it.
@@ -186,6 +214,18 @@ fn metric_value(value: &MetricValue) -> (MetricKind, u64, Option<u64>) {
         MetricValue::Custom { .. }
         | MetricValue::StartTimestamp(_)
         | MetricValue::EndTimestamp(_) => (MetricKind::Other, as_u64(value.as_usize()), None),
+    }
+}
+
+/// Remote scans that ran in `plan`; the inputs below them are only templates sent to the nodes.
+fn collect_remote_scans<'a>(plan: &'a dyn ExecutionPlan, scans: &mut Vec<&'a RemoteScanExec>) {
+    match plan.downcast_ref::<RemoteScanExec>() {
+        Some(remote) => scans.push(remote),
+        None => {
+            for child in plan.children() {
+                collect_remote_scans(child.as_ref(), scans);
+            }
+        }
     }
 }
 

@@ -36,7 +36,8 @@ use flight::profile::{ProfileInputs, ProfileNode, QueryProfile, RemoteNodeProfil
 use futures::StreamExt;
 
 use crate::datafusion::distributed::analyze::{
-    display::DisplayableExecutionPlan, profile::build_profile,
+    display::DisplayableExecutionPlan,
+    profile::{REMOTE_PROFILE_TIMEOUT, build_profile, wait_remote_profiles},
 };
 
 /// EXPLAIN ANALYZE across nodes: one text row per node that ran a plan, phase = its depth.
@@ -220,8 +221,9 @@ impl ExecutionPlan for DistributeAnalyzeExec {
             while let Some(batch) = stream.next().await.transpose()? {
                 total_rows += batch.num_rows();
             }
-            // remote nodes publish their profiles when their streams are dropped
+            // A remote stream cut short is read to its end in the background before it publishes.
             drop(stream);
+            wait_remote_profiles(exec.input.as_ref(), REMOTE_PROFILE_TIMEOUT).await;
 
             let duration = std::time::Instant::now() - start;
             let profile = QueryProfile {

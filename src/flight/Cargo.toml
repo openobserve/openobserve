@@ -20,3 +20,4 @@ serde.workspace = true
 serde_json.workspace = true
 flatbuffers = "25.2.10"
 parking_lot.workspace = true
+tokio.workspace = true

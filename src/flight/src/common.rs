@@ -35,8 +35,9 @@ use datafusion::{
         metrics::{self, ExecutionPlanMetricsSet, MetricBuilder, MetricValue},
     },
 };
-use parking_lot::Mutex;
+use parking_lot::{Mutex, MutexGuard};
 use serde::{Deserialize, Serialize};
+use tokio::sync::watch;
 
 use crate::profile::{ProfileNode, RemoteNodeProfile};
 
@@ -193,7 +194,44 @@ pub enum NodeRole {
 }
 
 /// Per-partition profiles of one remote scan, keyed by partition.
-pub type NodeProfiles = Arc<Mutex<BTreeMap<usize, RemoteNodeProfile>>>;
+pub type NodeProfiles = Arc<ScanProfiles>;
+
+/// The profiles of the calls one remote scan made, each published when its call ends.
+#[derive(Debug)]
+pub struct ScanProfiles {
+    profiles: Mutex<BTreeMap<usize, RemoteNodeProfile>>,
+    /// Calls that have started and not published yet.
+    running: watch::Sender<usize>,
+}
+
+impl Default for ScanProfiles {
+    fn default() -> Self {
+        Self {
+            profiles: Mutex::default(),
+            running: watch::channel(0).0,
+        }
+    }
+}
+
+impl ScanProfiles {
+    pub fn lock(&self) -> MutexGuard<'_, BTreeMap<usize, RemoteNodeProfile>> {
+        self.profiles.lock()
+    }
+
+    pub fn start_call(&self) {
+        self.running.send_modify(|n| *n += 1);
+    }
+
+    pub fn publish(&self, profile: RemoteNodeProfile) {
+        self.profiles.lock().insert(profile.partition, profile);
+        self.running.send_modify(|n| *n -= 1);
+    }
+
+    /// Resolves once every started call has published, which may be after its caller dropped it.
+    pub async fn all_published(&self) {
+        let _ = self.running.subscribe().wait_for(|n| *n == 0).await;
+    }
+}
 
 /// What a remote scan collects from the nodes it calls, shared by every copy of the scan.
 #[derive(Debug, Clone, Default)]

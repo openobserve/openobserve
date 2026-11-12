@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{fmt::Debug, pin::Pin, sync::atomic::Ordering, task::Poll};
+use std::{fmt::Debug, pin::Pin, sync::atomic::Ordering, task::Poll, time::Duration};
 
 use arrow::array::RecordBatch;
 use arrow_flight::{FlightData, error::Result};
@@ -84,6 +84,22 @@ impl FlightDecoderStream {
                         guard.push_str(&err);
                     }
                 }
+            }
+        }
+    }
+}
+
+impl FlightDecoderStream {
+    /// Reads the rest of the stream for its messages; the batches nobody asked for are dropped.
+    async fn drain(mut self) {
+        log::info!(
+            "[trace_id {}] flight->search: explain analyze reads the rest of the stream from node: {}",
+            self.query_context.trace_id,
+            self.query_context.node.get_name(),
+        );
+        while let Some(Ok(message)) = self.inner.next().await {
+            if let FlightMessage::CustomMessage(message) = message {
+                self.process_custom_message(message);
             }
         }
     }
@@ -244,6 +260,48 @@ impl Drop for FlightDecoderStream {
                     .build(),
             )
         )
+    }
+}
+
+/// Under EXPLAIN ANALYZE, reads to its end a stream its consumer dropped early, so the node's
+/// last messages, its profile among them, still arrive.
+pub struct DrainOnDrop {
+    stream: Option<FlightDecoderStream>,
+    drain: Option<Duration>,
+}
+
+impl DrainOnDrop {
+    pub fn new(stream: FlightDecoderStream, drain: Option<Duration>) -> Self {
+        Self {
+            stream: Some(stream),
+            drain,
+        }
+    }
+}
+
+impl Stream for DrainOnDrop {
+    type Item = Result<RecordBatch>;
+
+    fn poll_next(
+        mut self: Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> Poll<Option<Result<RecordBatch>>> {
+        let Some(stream) = self.stream.as_mut() else {
+            return Poll::Ready(None);
+        };
+        let poll = stream.poll_next_unpin(cx);
+        if matches!(poll, Poll::Ready(None)) {
+            self.stream = None;
+        }
+        poll
+    }
+}
+
+impl Drop for DrainOnDrop {
+    fn drop(&mut self) {
+        if let (Some(stream), Some(timeout)) = (self.stream.take(), self.drain) {
+            tokio::spawn(tokio::time::timeout(timeout, stream.drain()));
+        }
     }
 }
 
