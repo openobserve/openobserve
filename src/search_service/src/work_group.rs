@@ -38,8 +38,6 @@ pub struct DeferredLock {
     #[cfg(feature = "enterprise")]
     pub work_group: Option<WorkGroup>,
     pub work_group_str: String,
-    #[cfg(feature = "enterprise")]
-    _slot: AsyncDefer,
     _guard: AsyncDefer,
 }
 
@@ -214,6 +212,8 @@ pub async fn check_work_group(
 
     let org_id_owned = org_id.to_string();
     let guard = AsyncDefer::new(async move {
+        // Dropping the slot deletes this search's queue row.
+        drop(slot);
         metrics::QUERY_RUNNING_NUMS
             .with_label_values(&[&org_id_owned])
             .dec();
@@ -223,7 +223,6 @@ pub async fn check_work_group(
         took_wait,
         work_group: Some(work_group),
         work_group_str,
-        _slot: slot,
         _guard: guard,
     })
 }
