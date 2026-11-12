@@ -21,6 +21,8 @@ import type { BrowserCheck } from "@/types/synthetics";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import AlertDestinationsField from "@/components/alerts/AlertDestinationsField.vue";
 import TemplateOverridePicker from "@/components/alerts/TemplateOverridePicker.vue";
+import PrefillNote from "../prefill/PrefillNote.vue";
+import { useSyntheticPrefillView } from "../prefill/useSyntheticPrefill";
 
 const props = defineProps<{
   check: BrowserCheck;
@@ -34,6 +36,8 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18nTyped();
+const prefill = useSyntheticPrefillView();
+const prefillView = computed(() => prefill?.value ?? null);
 
 // ─── destinations ─────────────────────────────────────────────────────────────
 
@@ -93,6 +97,20 @@ const silenceMinutes = computed({
         @update:destinations="localDestinations = $event"
         @refresh="emit('refresh:destinations')"
       />
+      <PrefillNote
+        v-if="prefillView?.notes.destinations"
+        chip
+        :text="prefillView.notes.destinations"
+        class="-mt-3"
+        data-test="synthetics-prefill-note-destinations"
+      />
+      <p
+        v-if="prefillView?.unconfirmed.destinations"
+        class="text-status-warning-text -mt-3 text-xs"
+        data-test="synthetics-prefill-unconfirmed-destinations"
+      >
+        {{ prefillView.unconfirmed.destinations }}
+      </p>
 
       <div
         v-if="localDestinations.length"
@@ -130,6 +148,13 @@ const silenceMinutes = computed({
           t("synthetics.scheduleAlert.alertedIfFailsSuffix")
         }}</span>
       </div>
+      <p
+        v-if="prefillView"
+        class="text-text-secondary -mt-3 text-xs"
+        data-test="synthetics-prefill-alert-line"
+      >
+        {{ prefillView.alertLine }}
+      </p>
 
       <!-- ── Cooldown Period ────────────────────────────────────────────── -->
       <div class="flex items-center gap-2">

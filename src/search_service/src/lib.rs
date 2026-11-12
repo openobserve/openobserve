@@ -172,7 +172,7 @@ pub async fn search(
     request.set_use_index(in_req.use_index);
     request.set_analyze_profile(in_req.query.analyze_profile);
     // Before the query is planned again in spawned tasks (cluster::http).
-    request.mark_chat_history_reader();
+    request.mark_protected_reader();
     let meta = Sql::new_from_req(&request, &query).await?;
 
     // callers may share one trace_id across concurrent requests, e.g. Grafana via traceparent

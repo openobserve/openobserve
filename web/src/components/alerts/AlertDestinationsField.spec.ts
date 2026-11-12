@@ -132,6 +132,24 @@ describe("AlertDestinationsField status line", () => {
     expect(wrapper.find(STATUS).exists()).toBe(false);
   });
 
+  it("says a target is required, not optional, when the caller requires one", () => {
+    const wrapper = mountField({ notifiesNobody: true, showStatus: true, targetRequired: true });
+    expect(wrapper.find(NOTE).text()).toBe(
+      "Required. With no destination, this alert reaches no one.",
+    );
+  });
+
+  it("a required field that already sends somewhere names its targets as before", () => {
+    const wrapper = mountField({
+      destinations: ["ops-slack"],
+      showStatus: true,
+      targetRequired: true,
+    });
+    expect(wrapper.find(STATUS).text()).toBe(
+      t("alerts.alertSettings.sendsToStatus", { targets: "ops-slack" }),
+    );
+  });
+
   it("names a single destination", () => {
     const wrapper = mountField({ destinations: ["ops-slack"], showStatus: true });
     expect(wrapper.find(STATUS).text()).toBe(

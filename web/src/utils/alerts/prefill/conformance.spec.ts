@@ -23,7 +23,10 @@
  * being re-litigated in each adapter's own spec.
  */
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
+
+vi.mock("@/aws-exports", () => ({ default: { isEnterprise: "true", isCloud: "false" } }));
+
 import { MAX_PERIOD_MINUTES, isPrefillBlocked, normalizePrefill } from "../alertPrefill";
 import { ALERT_PREFILL_VERSION, type AlertPrefill } from "@/ts/interfaces/alertPrefill";
 import { buildPrefillFromPanel } from "./fromPanel";
@@ -36,6 +39,14 @@ import { buildDbmLockPrefill } from "./fromDbmLocks";
 import { buildPrefillFromRumFunnel } from "./fromRumFunnel";
 import { buildPrefillFromTraces } from "./fromTraces";
 import { buildAiPrefill } from "./fromAi";
+import { noDataAlert, type AutoObserveAlertOptions } from "./fromAutoObserve";
+import { raw } from "@/types/i18n";
+
+const autoObserveOptions: AutoObserveAlertOptions = {
+  team: { name: "ops", folderId: "ops", folderName: "ops", source: "folder", reason: raw("") },
+  notify: { destinations: [], reason: "none" },
+  now: 1_793_966_400_000_000,
+};
 
 interface AdapterCase {
   /** Registered source id. */
@@ -230,6 +241,25 @@ const ADAPTERS: AdapterCase[] = [
         { streamName: "", filter: "", view: "spans", metric: "matches" },
         null,
       ),
+  },
+  {
+    name: "autoobserve",
+    healthy: () =>
+      noDataAlert(
+        {
+          service: "svc-a",
+          cluster: "cluster-k",
+          namespace: "ns-b",
+          stream: { type: "logs", name: "app_logs" },
+          schema: ["service_name", "k8s_cluster", "k8s_namespace_name"],
+        },
+        autoObserveOptions,
+      )!,
+    degenerate: () =>
+      noDataAlert(
+        { service: "", cluster: null, namespace: null, stream: { type: "", name: "" } },
+        autoObserveOptions,
+      )!,
   },
 ];
 

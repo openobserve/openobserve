@@ -102,6 +102,8 @@ all POST /api/{org_id}/slack/connectivity | the handler returns an o2-enterprise
 all POST /api/{org_id}/slack/install/exchange | the handler returns an o2-enterprise slack type; OSS publishes this op too and cannot name it
 all POST /api/{org_id}/slack/install/start | the handler returns an o2-enterprise slack type; OSS publishes this op too and cannot name it
 all GET /api/{org_id}/slack/installations | the handler returns an o2-enterprise slack type; OSS publishes this op too and cannot name it
+ent GET /api/{org_id}/slack/insights-settings | the handler returns the o2-enterprise SettingsView, which derives no schema
+ent PUT /api/{org_id}/slack/insights-settings | the handler returns the o2-enterprise SettingsView, which derives no schema
 all POST /api/{org_id}/slack/installations | the handler returns an o2-enterprise slack type; OSS publishes this op too and cannot name it
 all DELETE /api/{org_id}/slack/installations/{installation_id} | the handler returns an o2-enterprise slack type; OSS publishes this op too and cannot name it
 all GET /api/{org_id}/slack/installations/{installation_id}/channel-defaults | the handler returns an o2-enterprise slack type; OSS publishes this op too and cannot name it
@@ -146,3 +148,22 @@ all GET /api/{org_id}/users/roles/all | o2_openfga role lookups, an enterprise t
 all GET /api/{org_id}/{stream_name}/traces/{trace_id}/dag | the handler builds a HashMap<&str, serde_json::Value>
 all GET /api/{org_id}/overview | core::overview::Overview nests a generic Section<T> over four section types that derive no schema
 all DELETE /api/{org_id}/service_streams/_reset | the handler answers serde_json::json!({deleted_count, message, note}) built in place
+ent GET /api/v2/{org_id}/alert_calibration/dismissals | the handler answers o2-enterprise DismissalPage, which derives no schema
+ent POST /api/v2/{org_id}/alert_calibration/dismissals/{id}/reopen | the handler answers o2-enterprise DismissalView, which derives no schema
+ent POST /api/v2/{org_id}/alert_calibration/findings/{finding_id}/dismiss | the handler answers o2-enterprise DismissalView, which derives no schema
+ent GET /api/v2/{org_id}/autoobserve/coverage | the handler answers the o2-enterprise AutoObserve engine's response, which derives no schema
+ent GET /api/v2/{org_id}/autoobserve/coverage/history | the handler answers the o2-enterprise AutoObserve engine's response, which derives no schema
+ent GET /api/v2/{org_id}/autoobserve/decisions | the handler answers o2-enterprise DecisionList, which derives no schema
+ent POST /api/v2/{org_id}/autoobserve/decisions | the handler answers o2-enterprise DecisionResult or BatchResult, which derive no schema
+ent GET /api/v2/{org_id}/autoobserve/decisions/preview | the handler answers o2-enterprise Preview, which derives no schema
+ent POST /api/v2/{org_id}/autoobserve/decisions/{decision_id}/undo | the handler answers o2-enterprise DecisionResult, which derives no schema
+ent GET /api/v2/{org_id}/autoobserve/entity_types | the handler answers the o2-enterprise AutoObserve engine's response, which derives no schema
+ent GET /api/v2/{org_id}/autoobserve/incidents | the handler answers openobserve-core AutoObserveIncidents, which derives no schema
+ent GET /api/v2/{org_id}/autoobserve/marks | the handler answers the o2-enterprise AutoObserve engine's response, which derives no schema
+ent DELETE /api/v2/{org_id}/autoobserve/marks/{mark}/{entity_type}/{entity_id} | the handler answers the o2-enterprise AutoObserve engine's response, which derives no schema
+ent PUT /api/v2/{org_id}/autoobserve/marks/{mark}/{entity_type}/{entity_id} | the handler answers the o2-enterprise AutoObserve engine's response, which derives no schema
+ent GET /api/v2/{org_id}/autoobserve/review | the handler answers the o2-enterprise AutoObserve engine's response, which derives no schema
+ent PUT /api/v2/{org_id}/autoobserve/review/{decision_kind}/{cohort_id} | the handler answers the o2-enterprise AutoObserve engine's response, which derives no schema
+ent GET /api/v2/{org_id}/autoobserve/settings/paging | the handler answers o2-enterprise PagingView, which derives no schema
+ent PUT /api/v2/{org_id}/autoobserve/settings/paging | the handler answers o2-enterprise PagingView, which derives no schema
+ent GET /api/v2/{org_id}/autoobserve/suggestions | the handler answers the o2-enterprise AutoObserve engine's response, which derives no schema

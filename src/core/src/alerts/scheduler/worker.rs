@@ -496,6 +496,12 @@ impl Scheduler {
         }
     }
 
+    /// Only the lanes of a region whose global jobs another region runs; None when it has none.
+    pub fn region_local(config: SchedulerConfig) -> Option<Self> {
+        let lanes = region_local_module_configs(&config);
+        (!lanes.is_empty()).then(|| Self::new_with_modules(config, lanes))
+    }
+
     /// Build the scheduler from an explicit set of per-module configs. An empty `module_configs`
     /// yields the single shared (legacy) lane; otherwise one lane per module and no shared lane.
     /// Kept separate from [`Scheduler::new`] so both paths are unit-testable without env mutation.
@@ -509,10 +515,7 @@ impl Scheduler {
 
     /// Build the shared (legacy) lane and a dedicated lane for each of `module_configs`.
     ///
-    /// The shared lane still pulls every module, so a module named here is pulled by two lanes.
-    /// That is safe: `pull` claims rows inside one transaction under a per-module advisory lock
-    /// and flips their status in the same statement, so exactly one lane ever gets a given row.
-    /// What the dedicated lane buys is a channel and a worker pool nothing else can fill.
+    /// `pull` claims each row under a per-module lock, so a module both lanes pull runs once.
     pub fn new_with_shared_and_modules(
         config: SchedulerConfig,
         module_configs: Vec<ModuleSchedulerConfig>,
@@ -623,6 +626,7 @@ fn keep_alive_lifetime_secs(
     match module {
         TriggerModule::AlertCalibration => super::calibration::claim_lifetime_secs(),
         TriggerModule::Alert => ALERT_CLAIM_LIFETIME_SECS,
+        TriggerModule::AutoObserve => autoobserve_claim_lifetime_secs(alert_timeout),
         _ => std::cmp::max(alert_timeout, report_timeout) * 3,
     }
 }
@@ -632,7 +636,7 @@ fn keep_alive_lifetime_secs(
 /// (`ZO_ALERT_SCHEDULE_CONCURRENCY`) and the alert pull frequency (`ZO_ALERT_SCHEDULE_INTERVAL`)
 /// respectively. Each non-alert module has its own concurrency AND cadence env var so its puller
 /// can poll at its own rate; the alert lane simply reuses those two base vars (no duplicates).
-/// Every `TriggerModule` variant gets a lane so no module's rows are ever left unclaimed.
+/// Every `TriggerModule` variant gets a lane, AutoObserve only where the engine is on.
 fn resolve_module_configs(
     cfg: &config::Config,
     base: &SchedulerConfig,
@@ -642,7 +646,7 @@ fn resolve_module_configs(
     let pick_concurrency = |v: i64| if v > 0 { v } else { default_concurrency };
     let pick_interval = |v: i64| if v > 0 { v as u64 } else { default_interval };
 
-    vec![
+    let mut configs = vec![
         ModuleSchedulerConfig {
             module: TriggerModule::Alert,
             // Alert is the base module: its budget and cadence ARE the shared defaults
@@ -719,7 +723,12 @@ fn resolve_module_configs(
             poll_interval_secs: pick_interval(cfg.limit.scheduler_alert_calibration_interval),
             lease_timeout_secs: None,
         },
-    ]
+    ];
+    // A node with the engine off must never claim the region's row.
+    if autoobserve_lane_wanted() {
+        configs.push(autoobserve_module_config(base));
+    }
+    configs
 }
 
 /// The lanes that exist even when `ZO_SCHEDULER_PER_MODULE_PULLERS` is off.
@@ -730,21 +739,42 @@ fn resolve_module_configs(
 /// evaluations does not. So this one is not behind the flag — a deployment nobody has tuned is
 /// precisely where the promise still has to hold.
 ///
-/// Nothing else joins it. Widening the list would flip the default lane topology for modules
-/// whose owners chose the shared lane.
+/// Only AutoObserve joins, because the shared lane never pulls its row; others chose that lane.
 fn always_on_module_configs(
     cfg: &config::Config,
     base: &SchedulerConfig,
 ) -> Vec<ModuleSchedulerConfig> {
+    let mut lanes = Vec::new();
+    // No escalation rows exist while the feature is off.
     if oncall_lane_wanted() {
-        vec![
-            oncall_module_config(cfg, base),
-            slack_sync_module_config(cfg, base),
-        ]
+        lanes.push(oncall_module_config(cfg, base));
+        lanes.push(slack_sync_module_config(cfg, base));
+    }
+    if autoobserve_lane_wanted() {
+        lanes.push(autoobserve_module_config(base));
+    }
+    lanes
+}
+
+/// Each region has its own AutoObserve row, so a region the job election passed over still runs it.
+fn region_local_module_configs(base: &SchedulerConfig) -> Vec<ModuleSchedulerConfig> {
+    if autoobserve_lane_wanted() {
+        vec![autoobserve_module_config(base)]
     } else {
-        // Nothing pushes an escalation trigger when the feature is off, so a puller for it would
-        // be a query per interval per node against rows that cannot exist.
         Vec::new()
+    }
+}
+
+/// The AutoObserve lane: its region has one engine row, so one worker is all it can use.
+fn autoobserve_module_config(base: &SchedulerConfig) -> ModuleSchedulerConfig {
+    ModuleSchedulerConfig {
+        module: TriggerModule::AutoObserve,
+        concurrency: 1,
+        poll_interval_secs: first_positive(&[
+            autoobserve_lane_interval_secs(),
+            base.poll_interval_secs as i64,
+        ]) as u64,
+        lease_timeout_secs: None,
     }
 }
 
@@ -836,6 +866,38 @@ fn oncall_escalation_timeout_secs() -> i64 {
 #[cfg(not(feature = "enterprise"))]
 fn oncall_escalation_timeout_secs() -> i64 {
     0
+}
+
+#[cfg(feature = "enterprise")]
+fn autoobserve_lane_wanted() -> bool {
+    o2_enterprise::enterprise::autoobserve::is_enabled()
+}
+
+#[cfg(not(feature = "enterprise"))]
+fn autoobserve_lane_wanted() -> bool {
+    false
+}
+
+#[cfg(feature = "enterprise")]
+fn autoobserve_lane_interval_secs() -> i64 {
+    o2_enterprise::enterprise::common::config::get_config()
+        .autoobserve
+        .lane_interval_secs
+}
+
+#[cfg(not(feature = "enterprise"))]
+fn autoobserve_lane_interval_secs() -> i64 {
+    0
+}
+
+#[cfg(feature = "enterprise")]
+fn autoobserve_claim_lifetime_secs(_alert_timeout: i64) -> i64 {
+    o2_enterprise::enterprise::autoobserve::job::claim_lifetime_secs()
+}
+
+#[cfg(not(feature = "enterprise"))]
+fn autoobserve_claim_lifetime_secs(alert_timeout: i64) -> i64 {
+    alert_timeout
 }
 
 #[cfg(test)]
@@ -1003,7 +1065,7 @@ mod tests {
         // never be pulled once per-module pullers are enabled.
         let cfg = config::Config::default();
         let configs = resolve_module_configs(&cfg, &make_config());
-        let all = [
+        let mut all = vec![
             TriggerModule::Alert,
             TriggerModule::CompositeAlert,
             TriggerModule::Report,
@@ -1017,7 +1079,9 @@ mod tests {
             TriggerModule::AlertCalibration,
             TriggerModule::FleetRollout,
             TriggerModule::OncallSlackSync,
+            TriggerModule::AutoObserve,
         ];
+        all.retain(|m| *m != TriggerModule::AutoObserve || autoobserve_lane_wanted());
         assert_eq!(configs.len(), all.len());
         let modules: std::collections::HashSet<_> =
             configs.iter().map(|c| c.module.clone()).collect();
@@ -1319,19 +1383,27 @@ mod tests {
         let cfg = config::Config::default();
         let base = make_config();
         if !oncall_lane_wanted() {
-            assert!(always_on_module_configs(&cfg, &base).is_empty());
+            let lanes = always_on_module_configs(&cfg, &base);
+            assert!(
+                lanes
+                    .iter()
+                    .all(|l| l.module != TriggerModule::OncallEscalation)
+            );
         } else {
             let modules: Vec<_> = always_on_module_configs(&cfg, &base)
                 .into_iter()
                 .map(|l| l.module)
                 .collect();
+            let mut expected = vec![
+                TriggerModule::OncallEscalation,
+                TriggerModule::OncallSlackSync,
+            ];
+            if autoobserve_lane_wanted() {
+                expected.push(TriggerModule::AutoObserve);
+            }
             assert_eq!(
-                modules,
-                [
-                    TriggerModule::OncallEscalation,
-                    TriggerModule::OncallSlackSync
-                ],
-                "on-call gets its lanes, and only on-call"
+                modules, expected,
+                "on-call gets its lanes, AutoObserve its own"
             );
         }
     }
@@ -1374,6 +1446,50 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn test_autoobserve_lane_is_one_worker_on_its_own_puller() {
+        let lane = autoobserve_module_config(&make_config());
+        assert_eq!(lane.module, TriggerModule::AutoObserve);
+        assert_eq!(lane.concurrency, 1);
+        assert_eq!(lane.poll_interval_secs, 10);
+        let lanes = always_on_module_configs(&config::Config::default(), &make_config());
+        assert_eq!(
+            lanes.iter().any(|l| l.module == TriggerModule::AutoObserve),
+            autoobserve_lane_wanted()
+        );
+        assert!(TriggerModule::AutoObserve.completes_by_claim());
+    }
+
+    #[test]
+    fn test_a_node_with_the_engine_off_has_no_lane_for_its_row() {
+        let cfg = config::Config::default();
+        let base = make_config();
+        let has_lane = |lanes: Vec<ModuleSchedulerConfig>| {
+            lanes.iter().any(|l| l.module == TriggerModule::AutoObserve)
+        };
+        let wanted = autoobserve_lane_wanted();
+        assert_eq!(has_lane(resolve_module_configs(&cfg, &base)), wanted);
+        assert_eq!(has_lane(always_on_module_configs(&cfg, &base)), wanted);
+        assert!(TriggerModule::AutoObserve.hidden_from_older_pullers());
+    }
+
+    #[test]
+    fn test_a_region_outside_the_job_election_runs_only_its_autoobserve_lane() {
+        let wanted = autoobserve_lane_wanted();
+        let modules: Vec<TriggerModule> = region_local_module_configs(&make_config())
+            .into_iter()
+            .map(|l| l.module)
+            .collect();
+        let own = if wanted {
+            vec![TriggerModule::AutoObserve]
+        } else {
+            vec![]
+        };
+        assert_eq!(modules, own);
+        let lanes = Scheduler::region_local(make_config()).map(|s| s.lanes.len());
+        assert_eq!(lanes, wanted.then_some(1), "no shared lane");
     }
 
     #[test]

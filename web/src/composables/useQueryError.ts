@@ -36,7 +36,9 @@ import DOMPurify from "dompurify";
 import { computed, ref, type ComputedRef, type Ref, type MaybeRefOrGetter, toValue } from "vue";
 import { useI18nTyped, raw } from "@/types/i18n";
 import type { I18nKey } from "@/types/i18n";
+import type { IllustrationName } from "@/lib/core/EmptyState/illustrations/index";
 import { explainQueryError, type QueryErrorExplanation } from "@/utils/query/queryErrorExplain";
+import { useAlertCalibrationEnabled } from "@/composables/alertCalibration/useAlertCalibrationEnabled";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -85,6 +87,12 @@ export interface QueryErrorResult {
   defaultDescription: ComputedRef<string>;
   /** One plain sentence for a recognised error, or "" when the error is not recognised. */
   explanation: ComputedRef<string>;
+  /** The hero illustration this code calls for, when it differs from the default. */
+  illustration: ComputedRef<IllustrationName | undefined>;
+  /** "error" when the code is a refusal, which the hero title shows in the error colour. */
+  tone: ComputedRef<"error" | undefined>;
+  /** Whether a protected-stream refusal may point at the Alert Calibration page. */
+  calibrationEnabled: ComputedRef<boolean>;
   /** UI toggle for the expandable detail section. */
   showDetail: Ref<boolean>;
   /** Copy all error detail to the clipboard. */
@@ -97,7 +105,10 @@ export interface QueryErrorResult {
 export const QUERY_ERROR_CODES = new Set([20001, 20004, 20005, 20007, 20008]);
 
 /** Per-code i18n keys. Falls back to generic keys for unknown codes. */
-const ERROR_META: Record<number, { titleKey: I18nKey; descKey: I18nKey }> = {
+const ERROR_META: Record<
+  number,
+  { titleKey: I18nKey; descKey: I18nKey; illustration?: IllustrationName; tone?: "error" }
+> = {
   20001: {
     titleKey: "queryError.sqlError",
     descKey: "queryError.sqlErrorDesc",
@@ -130,10 +141,25 @@ const ERROR_META: Record<number, { titleKey: I18nKey; descKey: I18nKey }> = {
     titleKey: "queryError.executionError",
     descKey: "queryError.executionErrorDesc",
   },
+  // Search refuses the calibration digest stream to everyone; its records are read on their own page.
+  20014: {
+    titleKey: "queryError.protectedStream",
+    descKey: "queryError.protectedStreamDesc",
+    illustration: "lock",
+    tone: "error",
+  },
   10001: {
     titleKey: "queryError.serverError",
     descKey: "queryError.serverErrorDesc",
   },
+};
+
+// Without Alert Calibration (an OSS build, or turned off) the refusal names no feature the user lacks.
+const PROTECTED_INTERNAL: (typeof ERROR_META)[number] = {
+  titleKey: "queryError.protectedStreamInternal",
+  descKey: "queryError.protectedStreamInternalDesc",
+  illustration: "lock",
+  tone: "error",
 };
 
 // ── Composable ─────────────────────────────────────────────────────────────
@@ -222,13 +248,18 @@ export function useQueryError(input: QueryErrorInput): QueryErrorResult {
 
   // ── Title / description ────────────────────────────────────────────────
 
-  const meta = computed(
-    () =>
+  const calibrationEnabled = useAlertCalibrationEnabled();
+  const meta = computed<(typeof ERROR_META)[number]>(() => {
+    if (errorCode.value === 20014 && !calibrationEnabled.value) return PROTECTED_INTERNAL;
+    return (
       ERROR_META[errorCode.value] ?? {
         titleKey: "queryError.generic",
         descKey: "queryError.genericDesc",
-      },
-  );
+      }
+    );
+  });
+  const illustration = computed(() => meta.value.illustration);
+  const tone = computed(() => meta.value.tone);
 
   const defaultTitle = computed(() => t(explained.value?.titleKey ?? meta.value.titleKey));
   const defaultDescription = computed(() => t(meta.value.descKey));
@@ -260,6 +291,9 @@ export function useQueryError(input: QueryErrorInput): QueryErrorResult {
     defaultTitle,
     defaultDescription,
     explanation,
+    illustration,
+    tone,
+    calibrationEnabled,
     showDetail,
     copyErrorDetails,
   };

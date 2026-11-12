@@ -16,6 +16,8 @@
 //! Slack app install and settings handlers: enterprise only, 403 "Not Supported" in the OSS build.
 
 pub mod inbound;
+#[cfg(feature = "enterprise")]
+pub mod insights;
 pub mod installations;
 pub mod links;
 pub mod settings;

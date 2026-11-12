@@ -45,6 +45,7 @@ vi.mock("@/utils/clipboard", () => ({ copyToClipboard: vi.fn() }));
 
 import organizationsService from "@/services/organizations";
 import analytics from "@/services/product_analytics";
+import { queryClient } from "@/composables/query/queryClient";
 
 // ODialog stub: renders the default slot so the REAL OForm mounts; exposes the
 // form-id (the footer Save submits via it in the app).
@@ -284,6 +285,157 @@ describe("IngestionTokens — analytics", () => {
     await (wrapper.vm as any).toggleEnabled("edge-forwarder", false);
 
     expect(analytics.track).toHaveBeenCalledWith("ingestion_token_disabled");
+  });
+});
+
+// Renders each row's name, credential and action cells, so the per-row templates are exercised.
+const OTableRowsStub = {
+  name: "OTable",
+  props: ["data"],
+  template: `<div><div v-for="row in data" :key="row.name" :data-test="'row-' + row.name"><slot name="cell-name" :row="row" /><slot name="cell-token" :row="row" /><slot name="cell-actions" :row="row" /></div></div>`,
+};
+
+function mountRows(rows: Record<string, unknown>[]) {
+  vi.mocked(organizationsService.list_org_ingestion_tokens).mockResolvedValue({
+    data: { data: rows },
+  } as any);
+  return mount(IngestionTokens, {
+    global: {
+      plugins: [store, i18n],
+      stubs: {
+        ODialog: ODialogStub,
+        OTable: OTableRowsStub,
+        OSearchInput: true,
+        OTooltip: true,
+        OEmptyState: true,
+        OButton: true,
+        OIcon: true,
+      },
+    },
+  });
+}
+
+describe("IngestionTokens — system tokens", () => {
+  const USER = {
+    name: "ci-collector",
+    token: "o2oi_ci",
+    enabled: true,
+    created_by: "admin@demo-org",
+  };
+  const SYSTEM = {
+    name: "_o2_alert_calibration",
+    token: "o2oi_sys",
+    enabled: true,
+    created_by: "system",
+  };
+  const LEGACY = {
+    name: "_o2_old",
+    token: "o2oi_old",
+    enabled: true,
+    created_by: "admin@demo-org",
+  };
+
+  const rowOf = (wrapper: ReturnType<typeof mountRows>, name: string) =>
+    wrapper.find(`[data-test="row-${name}"]`);
+  const tagOf = (wrapper: ReturnType<typeof mountRows>, name: string) =>
+    rowOf(wrapper, name).find(`[data-test="ingestion-token-${name}-system"]`);
+  const hasButton = (wrapper: ReturnType<typeof mountRows>, name: string, kind: string) =>
+    rowOf(wrapper, name).find(`[data-test="ingestion-token-${name}-${kind}"]`).exists();
+
+  // earlier suites leave a dispatch spy on the shared store, which would swallow setOrgTokens
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    queryClient.clear();
+  });
+
+  afterEach(() => {
+    store.state.organizationData.orgTokens = [];
+  });
+
+  it("a system token shows the System tag, no credential and no Splunk action, and keeps its toggle", async () => {
+    const wrapper = mountRows([USER, SYSTEM, LEGACY]);
+    await flushPromises();
+    expect(tagOf(wrapper, SYSTEM.name).text()).toBe("System");
+    expect(rowOf(wrapper, SYSTEM.name).text()).not.toContain("Basic ");
+    expect(hasButton(wrapper, SYSTEM.name, "splunk")).toBe(false);
+    expect(hasButton(wrapper, SYSTEM.name, "toggle")).toBe(true);
+    wrapper.unmount();
+  });
+
+  it("a user-made _o2_ token gets no System tag, no credential and no Splunk action, and keeps its toggle", async () => {
+    const wrapper = mountRows([USER, SYSTEM, LEGACY]);
+    await flushPromises();
+    expect(tagOf(wrapper, LEGACY.name).exists()).toBe(false);
+    expect(rowOf(wrapper, LEGACY.name).text()).not.toContain("Basic ");
+    expect(hasButton(wrapper, LEGACY.name, "splunk")).toBe(false);
+    expect(hasButton(wrapper, LEGACY.name, "toggle")).toBe(true);
+    wrapper.unmount();
+  });
+
+  it("renders a user token next to system tokens exactly as it does alone", async () => {
+    const alone = mountRows([USER]);
+    await flushPromises();
+    const aloneHtml = rowOf(alone, USER.name).html();
+    alone.unmount();
+
+    const mixed = mountRows([USER, SYSTEM, LEGACY]);
+    await flushPromises();
+    expect(rowOf(mixed, USER.name).html()).toBe(aloneHtml);
+    mixed.unmount();
+  });
+
+  it("shows no System tag for an org with no system token", async () => {
+    const wrapper = mountRows([USER]);
+    await flushPromises();
+    expect(wrapper.findAll('[data-test$="-system"]')).toHaveLength(0);
+    expect(rowOf(wrapper, USER.name).element.firstElementChild?.outerHTML).toBe(
+      '<span class="font-medium">ci-collector</span>',
+    );
+    expect(rowOf(wrapper, USER.name).text()).toContain("Basic ");
+    expect(hasButton(wrapper, USER.name, "splunk")).toBe(true);
+    expect(hasButton(wrapper, USER.name, "toggle")).toBe(true);
+    wrapper.unmount();
+  });
+
+  it("leaves twelve ordinary tokens, the server-made default among them, unchanged", async () => {
+    const rows = [
+      { name: "default", token: "o2oi_def", enabled: true, created_by: "system" },
+      ...Array.from({ length: 11 }, (_, i) => ({ ...USER, name: `collector-${i}` })),
+    ];
+    const wrapper = mountRows(rows);
+    await flushPromises();
+    expect(wrapper.findAll('[data-test$="-system"]')).toHaveLength(0);
+    for (const row of rows) {
+      expect(rowOf(wrapper, row.name).text()).toContain("Basic ");
+      expect(hasButton(wrapper, row.name, "splunk")).toBe(true);
+      expect(hasButton(wrapper, row.name, "toggle")).toBe(true);
+    }
+    wrapper.unmount();
+  });
+
+  it("publishes no _o2_ token to the snippet picker after a token is disabled", async () => {
+    vi.mocked(organizationsService.enable_disable_org_ingestion_token).mockResolvedValue({
+      data: {},
+    } as any);
+    const wrapper = mountRows([USER, SYSTEM, LEGACY]);
+    await flushPromises();
+    await (wrapper.vm as any).toggleEnabled(USER.name, false);
+    await flushPromises();
+    const names = (store.state.organizationData.orgTokens as { name: string }[]).map((t) => t.name);
+    expect(names).toEqual([USER.name]);
+    wrapper.unmount();
+  });
+
+  it("publishes no _o2_ token to the snippet picker after a token is created", async () => {
+    vi.mocked(organizationsService.create_org_ingestion_token).mockResolvedValue({
+      data: { data: { token: "o2oi_new" } },
+    } as any);
+    const wrapper = mountRows([USER, SYSTEM, LEGACY]);
+    await flushPromises();
+    await (wrapper.vm as any).createToken({ name: "new-one", description: "" });
+    await flushPromises();
+    const names = (store.state.organizationData.orgTokens as { name: string }[]).map((t) => t.name);
+    expect(names).toEqual([USER.name]);
     wrapper.unmount();
   });
 });
