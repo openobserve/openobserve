@@ -15,6 +15,7 @@
 
 use sea_orm::{
     ColumnTrait, ConnectionTrait, EntityTrait, Order, QueryFilter, QueryOrder, Schema, Set,
+    TransactionTrait, sea_query::Expr,
 };
 use serde::{Deserialize, Serialize};
 
@@ -115,6 +116,13 @@ pub async fn create_table() -> Result<(), errors::Error> {
 }
 
 pub async fn add(config: &ScoreConfig) -> Result<(), errors::Error> {
+    add_with(get_orm_client_rw().await, config).await
+}
+
+pub async fn add_with<C: ConnectionTrait>(
+    conn: &C,
+    config: &ScoreConfig,
+) -> Result<(), errors::Error> {
     let record = ActiveModel {
         id: Set(config.id.clone()),
         org_id: Set(config.org_id.clone()),
@@ -131,8 +139,7 @@ pub async fn add(config: &ScoreConfig) -> Result<(), errors::Error> {
         updated_at: Set(config.updated_at),
     };
 
-    let client = get_orm_client_rw().await;
-    Entity::insert(record).exec(client).await?;
+    Entity::insert(record).exec(conn).await?;
 
     Ok(())
 }
@@ -176,14 +183,20 @@ pub async fn get_by_entity_id(
     org_id: &str,
     entity_id: &str,
 ) -> Result<Option<ScoreConfig>, errors::Error> {
-    let client = get_orm_client_ro().await;
+    get_by_entity_id_with(get_orm_client_ro().await, org_id, entity_id).await
+}
 
+pub async fn get_by_entity_id_with<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    entity_id: &str,
+) -> Result<Option<ScoreConfig>, errors::Error> {
     let record = Entity::find()
         .filter(Column::OrgId.eq(org_id))
         .filter(Column::EntityId.eq(entity_id))
         .filter(Column::IsActive.eq(true))
         .order_by(Column::Version, Order::Desc)
-        .one(client)
+        .one(conn)
         .await?
         .map(ScoreConfig::from);
 
@@ -212,14 +225,21 @@ pub async fn get_by_active_name(
     org_id: &str,
     name: &str,
 ) -> Result<Option<ScoreConfig>, errors::Error> {
-    let client = get_orm_client_ro().await;
+    get_by_active_name_with(get_orm_client_ro().await, org_id, name).await
+}
 
+/// [`get_by_active_name`] on a given connection; pass the primary to see a just-committed write.
+pub async fn get_by_active_name_with<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    name: &str,
+) -> Result<Option<ScoreConfig>, errors::Error> {
     let record = Entity::find()
         .filter(Column::OrgId.eq(org_id))
         .filter(Column::Name.eq(name))
         .filter(Column::IsActive.eq(true))
         .order_by(Column::Version, Order::Desc)
-        .one(client)
+        .one(conn)
         .await?
         .map(ScoreConfig::from);
 
@@ -268,22 +288,34 @@ pub async fn get_all_by_org(org_id: &str) -> Result<Vec<ScoreConfig>, errors::Er
 }
 
 pub async fn delete(entity_id: &str, org_id: &str) -> Result<(), errors::Error> {
-    let client = get_orm_client_rw().await;
-    // Deactivate all versions
-    let records = Entity::find()
+    delete_with(get_orm_client_rw().await, entity_id, org_id).await
+}
+
+/// Deactivates every version of the entity in one statement.
+pub async fn delete_with<C: ConnectionTrait>(
+    conn: &C,
+    entity_id: &str,
+    org_id: &str,
+) -> Result<(), errors::Error> {
+    Entity::update_many()
+        .col_expr(Column::IsActive, Expr::value(false))
         .filter(Column::OrgId.eq(org_id))
         .filter(Column::EntityId.eq(entity_id))
-        .all(client)
+        .exec(conn)
         .await?;
 
-    for model in records {
-        let update = ActiveModel {
-            id: Set(model.id.clone()),
-            is_active: Set(false),
-            ..model.into()
-        };
-        Entity::update(update).exec(client).await?;
-    }
+    Ok(())
+}
+
+/// Atomically makes `config` the only active version of its entity.
+pub async fn replace_active_version_with<C: TransactionTrait>(
+    conn: &C,
+    config: &ScoreConfig,
+) -> Result<(), errors::Error> {
+    let txn = conn.begin().await?;
+    delete_with(&txn, &config.entity_id, &config.org_id).await?;
+    add_with(&txn, config).await?;
+    txn.commit().await?;
 
     Ok(())
 }
@@ -307,13 +339,19 @@ pub async fn exists(id: &str) -> Result<bool, errors::Error> {
 
 /// Returns the latest version number for a given entity, or 0 if none exist.
 pub async fn get_latest_version(org_id: &str, entity_id: &str) -> Result<i32, errors::Error> {
-    let client = get_orm_client_ro().await;
+    get_latest_version_with(get_orm_client_ro().await, org_id, entity_id).await
+}
 
+pub async fn get_latest_version_with<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    entity_id: &str,
+) -> Result<i32, errors::Error> {
     let model = Entity::find()
         .filter(Column::OrgId.eq(org_id))
         .filter(Column::EntityId.eq(entity_id))
         .order_by(Column::Version, Order::Desc)
-        .one(client)
+        .one(conn)
         .await?
         .map(|m| m.version)
         .unwrap_or(0);
@@ -380,5 +418,51 @@ mod tests {
         let sc = ScoreConfig::from(model);
         assert_eq!(sc.data_type, ScoreConfigDataType::Boolean);
         assert!(sc.numeric_range.is_none());
+    }
+
+    #[tokio::test]
+    async fn replacing_a_version_leaves_one_active_row_and_never_none() {
+        let db = sea_orm::Database::connect("sqlite::memory:").await.unwrap();
+        let backend = db.get_database_backend();
+        let table = Schema::new(backend).create_table_from_entity(Entity);
+        db.execute(backend.build(&table)).await.unwrap();
+
+        let mut config = ScoreConfig::from(make_model());
+        config.version = 1;
+        add_with(&db, &config).await.unwrap();
+
+        // The pool has one connection, so each writer await lets a waiting read interleave.
+        let writer = async {
+            for version in 2..=20 {
+                config.id = format!("sc-{version}");
+                config.version = version;
+                replace_active_version_with(&db, &config).await.unwrap();
+            }
+        };
+        let reader = async {
+            let mut misses = 0;
+            for _ in 0..200 {
+                if get_by_active_name_with(&db, "myorg", "faithfulness")
+                    .await
+                    .unwrap()
+                    .is_none()
+                {
+                    misses += 1;
+                }
+                tokio::task::yield_now().await;
+            }
+            misses
+        };
+        let ((), misses) = tokio::join!(writer, reader);
+        assert_eq!(misses, 0);
+
+        let active: Vec<Model> = Entity::find()
+            .filter(Column::EntityId.eq("scfg-entity-1"))
+            .filter(Column::IsActive.eq(true))
+            .all(&db)
+            .await
+            .unwrap();
+        assert_eq!(active.len(), 1);
+        assert_eq!(active[0].version, 20);
     }
 }

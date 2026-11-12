@@ -58,6 +58,47 @@
               @select="onStatSelect"
             />
           </div>
+          <!-- Keep paused makes the pause the user's, so 00:00 UTC does not resume it. -->
+          <div
+            v-for="row in budgetPausedRows"
+            :key="row.id"
+            class="px-page-edge pt-2"
+            :data-test="`eval-job-budget-banner-${row.name}`"
+          >
+            <OBanner variant="warning" icon="pause" inline-actions dense>
+              {{ budgetPausedText(row) }}
+              <template #actions>
+                <OButton
+                  variant="outline"
+                  size="sm"
+                  :loading="pendingStatusId === row.id"
+                  :disabled="pendingStatusId !== null && pendingStatusId !== row.id"
+                  :data-test="`eval-job-budget-resume-${row.name}`"
+                  @click="$emit('activate', row)"
+                >
+                  {{ t("evalSpend.list.resumeToday") }}
+                </OButton>
+                <OButton
+                  variant="outline"
+                  size="sm"
+                  :title="t('evalSpend.list.keepPausedHint')"
+                  :disabled="pendingStatusId !== null"
+                  :data-test="`eval-job-budget-keep-paused-${row.name}`"
+                  @click="$emit('pause', row)"
+                >
+                  {{ t("evalSpend.list.keepPaused") }}
+                </OButton>
+                <OButton
+                  variant="ghost"
+                  size="sm"
+                  :data-test="`eval-job-budget-edit-${row.name}`"
+                  @click="$emit('edit', row, 'budget')"
+                >
+                  {{ t("evalSpend.list.editBudget") }}
+                </OButton>
+              </template>
+            </OBanner>
+          </div>
         </template>
 
         <template #empty>
@@ -98,7 +139,13 @@
         </template>
 
         <template #cell-status="{ row }">
-          <OTag type="evalStatus" :value="statusOf(row)" :label="statusLabel(statusOf(row))" />
+          <OTag
+            type="evalStatus"
+            :value="statusOf(row)"
+            :label="
+              isBudgetPaused(row) ? t('evalSpend.list.pausedBudget') : statusLabel(statusOf(row))
+            "
+          />
         </template>
 
         <template #cell-health="{ row }">
@@ -121,6 +168,69 @@
             <span class="truncate">{{ lastErrorKind(row) }}</span>
             <span class="text-text-secondary shrink-0">{{ lastErrorAgo(row) }}</span>
             <OTooltip :content="lastErrorMessage(row)" max-width="30rem" hoverable />
+          </span>
+        </template>
+
+        <template #cell-spendToday="{ row }">
+          <span v-if="spendOf(row) == null" class="text-text-secondary">—</span>
+          <span
+            v-else-if="spendOf(row) === 'forbidden' || spendOf(row) === 'failed'"
+            class="text-text-secondary"
+            :data-test="`eval-job-list-${row.name}-spend`"
+          >
+            {{
+              spendOf(row) === "forbidden"
+                ? t("evalSpend.list.spendNoAccess")
+                : t("evalSpend.list.spendUnknown")
+            }}
+            <OTooltip
+              :content="
+                spendOf(row) === 'forbidden'
+                  ? t('evalSpend.list.spendNoAccessHint')
+                  : t('evalSpend.list.spendUnknownHint')
+              "
+            />
+          </span>
+          <span v-else-if="unpricedCalls(row)" class="inline-flex items-center gap-1.5">
+            <router-link
+              :to="pricingRoute"
+              class="font-semibold no-underline hover:underline"
+              :class="overBudget(row) ? 'text-status-error-text' : 'text-accent'"
+              :data-test="`eval-job-list-${row.name}-spend`"
+              @click.stop
+            >
+              {{
+                t(
+                  "evalSpend.list.unpriced",
+                  { spent: spendText(row), n: unpricedCalls(row) },
+                  unpricedCalls(row),
+                )
+              }}
+              <OTooltip :content="t('evalSpend.list.unpricedHint')" />
+            </router-link>
+            <span
+              v-if="budgetLifted(row)"
+              class="text-text-secondary"
+              :data-test="`eval-job-list-${row.name}-budget-lifted`"
+            >
+              {{ t("evalSpend.list.liftedUntil") }}
+            </span>
+          </span>
+          <span v-else class="inline-flex items-center gap-1.5">
+            <span
+              class="tabular-nums"
+              :class="{ 'text-status-error-text': overBudget(row) }"
+              :data-test="`eval-job-list-${row.name}-spend`"
+            >
+              {{ spendText(row) }}
+            </span>
+            <span
+              v-if="budgetLifted(row)"
+              class="text-text-secondary"
+              :data-test="`eval-job-list-${row.name}-budget-lifted`"
+            >
+              {{ t("evalSpend.list.liftedUntil") }}
+            </span>
           </span>
         </template>
 
@@ -147,7 +257,11 @@
               :data-test="`eval-job-list-${row.name}-activate-btn`"
               variant="ghost-success"
               size="icon-sm"
-              :title="t('onlineEvals.actions.activate')"
+              :title="
+                isBudgetPaused(row)
+                  ? t('evalSpend.list.resumeToday')
+                  : t('onlineEvals.actions.activate')
+              "
               icon-left="play-arrow"
               :loading="pendingStatusId === row.id"
               :disabled="pendingStatusId !== null && pendingStatusId !== row.id"
@@ -244,6 +358,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
+import { useStore } from "vuex";
 import { useI18nTyped, raw, type I18nKey, type I18nText } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
@@ -266,7 +381,7 @@ import type {
   EvalJobStatus,
 } from "@/services/online-evals.service";
 import { statusOf, targetScopeOf, valueOf } from "./utils/evalEntity";
-import { relativeTime } from "./utils/evalFormat";
+import { errorKindLabel, relativeTime } from "./utils/evalFormat";
 import { formatDate } from "@/utils/date";
 import type { ForbiddenState } from "@/utils/featureGate";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -275,6 +390,19 @@ import { useNumberedRows } from "./composables/useNumberedRows";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
 import { useEditorDraftIds } from "@/composables/useEditorDraft";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import { useLLMStreamQuery } from "@/plugins/traces/composables/useLLMStreamQuery";
+import { pricingGapsRoute } from "@/plugins/traces/llmDataTrust.utils";
+import {
+  budgetPauseFacts,
+  evaluatorFields,
+  formatUsd,
+  isBudgetLifted,
+  isBudgetPaused,
+  loadSpendToday,
+  type JobSpend,
+} from "./utils/evalSpend";
+import type { SpendError } from "@/utils/alerts/aiBudgets";
 
 const props = defineProps<{
   rows: EvalJob[];
@@ -294,7 +422,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: "update:search", value: string): void;
   (e: "create"): void;
-  (e: "edit", row: EvalJob): void;
+  /** `section` scrolls the form to it: the banner's Edit budget opens at the budget. */
+  (e: "edit", row: EvalJob, section?: "budget"): void;
   (e: "view", row: EvalJob): void;
   (e: "delete", row: EvalJob): void;
   (e: "activate", row: EvalJob): void;
@@ -361,7 +490,36 @@ const columns = computed(() =>
       header: t("onlineEvals.job.columns.status"),
       accessorFn: (row: EvalJob) => statusOf(row),
       sortable: true,
-      size: COL.status,
+      // Wide enough for "Paused · budget".
+      size: COL.dateAbsolute,
+      meta: { align: "left" },
+    },
+    {
+      id: "health",
+      header: t("onlineEvals.job.columns.health"),
+      // Sorts worst-first when descending: waiting > degraded > healthy > idle.
+      accessorFn: (row: EvalJob) => HEALTH_SEVERITY[healthOf(row)?.state ?? "none"],
+      sortable: true,
+      size: 190,
+      meta: { align: "left" },
+    },
+    {
+      id: "spendToday",
+      header: t("evalSpend.list.spendToday"),
+      accessorFn: (row: EvalJob) => {
+        const spend = spendOf(row);
+        return spend && typeof spend !== "string" ? spend.usd : -1;
+      },
+      sortable: true,
+      size: 150,
+      meta: { align: "left" },
+    },
+    {
+      id: "lastError",
+      header: t("onlineEvals.job.columns.lastError"),
+      accessorFn: (row: EvalJob) => healthOf(row)?.lastError?.at ?? 0,
+      sortable: true,
+      size: 200,
       meta: { align: "left" },
     },
     {
@@ -387,23 +545,6 @@ const columns = computed(() =>
       sortable: true,
       size: COL.count,
       meta: { align: "right" },
-    },
-    {
-      id: "health",
-      header: t("onlineEvals.job.columns.health"),
-      // Sorts worst-first when descending: waiting > degraded > healthy > idle.
-      accessorFn: (row: EvalJob) => HEALTH_SEVERITY[healthOf(row)?.state ?? "none"],
-      sortable: true,
-      size: 190,
-      meta: { align: "left" },
-    },
-    {
-      id: "lastError",
-      header: t("onlineEvals.job.columns.lastError"),
-      accessorFn: (row: EvalJob) => healthOf(row)?.lastError?.at ?? 0,
-      sortable: true,
-      size: 200,
-      meta: { align: "left" },
     },
     {
       id: "created",
@@ -587,17 +728,6 @@ const HEALTH_LABELS: Record<EvalJobHealthState, I18nKey> = {
   no_recent_runs: "onlineEvals.job.health.noRecentRuns",
 };
 
-const ERROR_KIND_LABELS: Record<string, I18nKey> = {
-  provider_auth: "onlineEvals.job.errorKinds.providerAuth",
-  rate_limited: "onlineEvals.job.errorKinds.rateLimited",
-  timeout: "onlineEvals.job.errorKinds.timeout",
-  provider_5xx: "onlineEvals.job.errorKinds.provider5xx",
-  parse_error: "onlineEvals.job.errorKinds.parseError",
-  mapping_error: "onlineEvals.job.errorKinds.mappingError",
-  scorer_missing: "onlineEvals.job.errorKinds.scorerMissing",
-  execution_error: "onlineEvals.job.errorKinds.executionError",
-};
-
 function healthOf(row: EvalJob): EvalJobHealth | undefined {
   return row.health ?? undefined;
 }
@@ -638,11 +768,8 @@ function microsAgo(micros: number | null | undefined): string {
   return micros ? relativeTime(micros / 1000, t) : "—";
 }
 
-/** Known kinds get a translated label; a kind from a newer server shows as-is. */
 function lastErrorKind(row: EvalJob): I18nText {
-  const kind = lastErrorOf(row)?.kind ?? "";
-  const key = ERROR_KIND_LABELS[kind];
-  return key ? t(key) : raw(kind);
+  return errorKindLabel(lastErrorOf(row)?.kind ?? "", t);
 }
 
 function lastErrorAgo(row: EvalJob): string {
@@ -659,6 +786,65 @@ function lastErrorMessage(row: EvalJob): I18nText {
 function formatDateShort(value: number) {
   if (!value) return "—";
   return formatDate(value, "YYYY-MM-DD HH:mm:ss");
+}
+
+// Unpriced calls or a failed/forbidden read make spend unknown, never $0.
+const store = useStore();
+const org = () => store.state.selectedOrganization?.identifier ?? "";
+const { executeQueryOnce } = useLLMStreamQuery();
+const pricingRoute = computed(() => pricingGapsRoute("_evaluator", org()));
+// Null until read: a job shows "—" until its spend is read, never a placeholder $0.
+const spendById = ref<Record<string, JobSpend> | SpendError | null>(null);
+const spentIds = computed(() =>
+  props.rows
+    .filter((row) => statusOf(row) === "active" || statusOf(row) === "paused")
+    .map((row) => row.id),
+);
+async function loadSpend(ids: string[]) {
+  spendById.value = await loadSpendToday(ids, {
+    fields: () => evaluatorFields(org()),
+    query: (sql, startUs, endUs) => executeQueryOnce(sql, startUs, endUs),
+  });
+}
+// Every list read (including Refresh) hands over new rows, so spend refreshes with them.
+watch(
+  () => props.rows,
+  () => void loadSpend(spentIds.value),
+  { immediate: true },
+);
+
+/** Today's spend of an active or paused job (null for the rest and until read), or why it could not be read. */
+function spendOf(row: EvalJob): JobSpend | SpendError | null {
+  if (!spentIds.value.includes(row.id) || !spendById.value) return null;
+  if (typeof spendById.value === "string") return spendById.value;
+  return spendById.value[row.id] ?? null;
+}
+
+function unpricedCalls(row: EvalJob): number {
+  const spend = spendOf(row);
+  return spend && typeof spend !== "string" ? spend.unpricedCalls : 0;
+}
+
+function overBudget(row: EvalJob): boolean {
+  const budget = row.budget?.dailyUsd;
+  const spend = spendOf(row);
+  return budget != null && !!spend && typeof spend !== "string" && spend.usd >= budget;
+}
+
+function spendText(row: EvalJob): string {
+  const spend = spendOf(row);
+  const spent = formatUsd(spend && typeof spend !== "string" ? spend.usd : 0);
+  return row.budget ? `${spent} / ${formatUsd(row.budget.dailyUsd)}` : spent;
+}
+
+const budgetPausedRows = computed(() => props.rows.filter(isBudgetPaused));
+
+function budgetPausedText(row: EvalJob): I18nText {
+  return t("evalSpend.list.banner", { name: row.name, ...budgetPauseFacts(row, Date.now()) });
+}
+
+function budgetLifted(row: EvalJob): boolean {
+  return isBudgetLifted(row, Date.now());
 }
 
 useShortcuts([

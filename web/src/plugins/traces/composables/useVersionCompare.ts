@@ -276,14 +276,15 @@ export function useVersionCompare() {
       orgId,
       {
         agent_name: va.name,
-        env: va.env ?? null,
+        // "" = the env-less variant; null would mean any env.
+        env: va.env ?? "",
         version: va.version ?? null,
         start_time: queryA.start,
         end_time: queryA.end,
       },
       {
         agent_name: vb.name,
-        env: vb.env ?? null,
+        env: vb.env ?? "",
         version: vb.version ?? null,
         start_time: queryB.start,
         end_time: queryB.end,

@@ -39,7 +39,14 @@ export interface SegmentedBarSegment {
   /** Share of the track, 0 to 100 */
   pct: number;
   variant?: SegmentedBarVariant;
+  /** Dashboard series slot, 1 to 12, for a segment that is an entity rather than a state; wins over `variant` */
+  series?: number;
 }
+
+/** Inline fill for a series slot; legends reuse it so their dots match the bar */
+export const seriesSwatch = (series: number) => ({
+  backgroundColor: `var(--color-chart-series-${series})`,
+});
 
 export interface SegmentedBarMarker {
   id: string;

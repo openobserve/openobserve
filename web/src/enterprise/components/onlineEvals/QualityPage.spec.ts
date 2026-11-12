@@ -40,12 +40,18 @@ vi.mock("vue-router", () => ({
   }),
 }));
 
+// Desktop: the header's overflow actions render inline.
+vi.mock("@/composables/useBreakpoint", async () => {
+  const { ref } = await import("vue");
+  return { default: () => ({ isMobile: ref(false), lgUp: ref(true) }) };
+});
+
 import QualityPage from "./QualityPage.vue";
 
 const TableStub = defineComponent({
   name: "QualityConfigsTable",
-  props: ["rows", "tiles", "search"],
-  emits: ["open", "update:search"],
+  props: ["rows", "tiles", "search", "forbidden", "agent"],
+  emits: ["open", "update:search", "one-click"],
   template: `<div data-test="table-stub">{{ rows.length }} rows</div>`,
 });
 const DetailStub = defineComponent({
@@ -53,6 +59,13 @@ const DetailStub = defineComponent({
   props: ["configId", "row", "scope", "only", "initialPage", "initialScoreId"],
   emits: ["back", "position"],
   template: `<div data-test="detail-stub">{{ configId }} {{ row?.name }} {{ scope }} {{ only }}</div>`,
+});
+
+const DialogStub = defineComponent({
+  name: "OneClickEvalDialog",
+  props: ["open", "agent", "stream"],
+  emits: ["update:open", "created"],
+  template: `<div data-test="one-click-stub" :data-open="String(open)" />`,
 });
 
 const LIST: QualityConfigSummary[] = [
@@ -95,6 +108,7 @@ const TOX_CONFIG = {
 function mountPage(
   dateWindow = { startUs: 1_000_000_000, endUs: 2_000_000_000 },
   scoreConfigs: any[] = [],
+  extra: Record<string, unknown> = {},
 ) {
   return mount(QualityPage, {
     props: {
@@ -103,10 +117,15 @@ function mountPage(
       dateWindow,
       agentParams: {},
       enabled: true,
+      ...extra,
     },
     global: {
       plugins: [store],
-      stubs: { QualityConfigsTable: TableStub, QualityConfigDetail: DetailStub },
+      stubs: {
+        QualityConfigsTable: TableStub,
+        QualityConfigDetail: DetailStub,
+        OneClickEvalDialog: DialogStub,
+      },
     },
     slots: {
       "header-actions": '<span data-test="header-actions-slot" />',
@@ -129,6 +148,23 @@ describe("QualityPage", () => {
     await flushPromises();
     expect(wrapper.find('[data-test="table-stub"]').text()).toBe("2 rows");
     expect(wrapper.find('[data-test="detail-stub"]').exists()).toBe(false);
+  });
+
+  it("shows no access, not 'no score configs yet', when the config list is denied and nothing is shared", async () => {
+    list.mockResolvedValue([]);
+    const wrapper = mountPage();
+    await flushPromises();
+    expect(wrapper.findComponent(TableStub).props("forbidden")).toBe(false);
+    await wrapper.setProps({ configsForbidden: true });
+    expect(wrapper.findComponent(TableStub).props("forbidden")).toBe(true);
+  });
+
+  it("still lists the configs shared with a user whose config list is denied", async () => {
+    const wrapper = mountPage();
+    await wrapper.setProps({ configsForbidden: true });
+    await flushPromises();
+    expect(wrapper.findComponent(TableStub).props("forbidden")).toBe(false);
+    expect(wrapper.find('[data-test="table-stub"]').text()).toBe("2 rows");
   });
 
   it("keeps the config search across a visit to a config's detail", async () => {
@@ -343,5 +379,69 @@ describe("QualityPage", () => {
     };
     expect(status.fetching).toBe(false);
     expect(status.updatedAt).toBeGreaterThan(0);
+  });
+
+  describe("one-click from the header", () => {
+    const button = (w: ReturnType<typeof mountPage>) =>
+      w.find('[data-test="quality-one-click-btn"]');
+    const dialog = (w: ReturnType<typeof mountPage>) => w.findComponent(DialogStub);
+
+    it("shows on the list with configs and names the selected agent", async () => {
+      const wrapper = mountPage(undefined, [TOX_CONFIG]);
+      await flushPromises();
+      expect(button(wrapper).text()).toBe("Evaluate an agent");
+      await wrapper.setProps({ agent: "support-bot" });
+      expect(button(wrapper).text()).toBe("Evaluate support-bot");
+    });
+
+    it("opens one shared dialog scoped to the agent and its stream, from the header or the empty state", async () => {
+      const wrapper = mountPage(undefined, [TOX_CONFIG], {
+        agent: "support-bot",
+        agentStream: "llm_traces",
+      });
+      await flushPromises();
+      expect(wrapper.findAllComponents(DialogStub)).toHaveLength(1);
+      expect(dialog(wrapper).props("open")).toBe(false);
+      await button(wrapper).trigger("click");
+      expect(dialog(wrapper).props()).toMatchObject({
+        open: true,
+        agent: "support-bot",
+        stream: "llm_traces",
+      });
+      dialog(wrapper).vm.$emit("update:open", false);
+      await flushPromises();
+      expect(dialog(wrapper).props("open")).toBe(false);
+      wrapper.findComponent(TableStub).vm.$emit("one-click");
+      await flushPromises();
+      expect(dialog(wrapper).props("open")).toBe(true);
+      dialog(wrapper).vm.$emit("created", "cfg-1");
+      expect(wrapper.emitted("created")).toHaveLength(1);
+    });
+
+    it("hides on a config's detail, without create permission, and when the list is denied", async () => {
+      route.query = { config: "tox" };
+      const detail = mountPage(undefined, [TOX_CONFIG]);
+      await flushPromises();
+      expect(button(detail).exists()).toBe(false);
+
+      route.query = {};
+      const denied = mountPage(undefined, [TOX_CONFIG], { createForbidden: true });
+      await flushPromises();
+      expect(button(denied).exists()).toBe(false);
+
+      queryClient.clear();
+      list.mockResolvedValue([]);
+      const forbidden = mountPage(undefined, [], { configsForbidden: true });
+      await flushPromises();
+      expect(button(forbidden).exists()).toBe(false);
+    });
+
+    it("reopens once on return from adding a provider", async () => {
+      route.query = { one_click: "1" };
+      const wrapper = mountPage();
+      await flushPromises();
+      expect(dialog(wrapper).props("open")).toBe(true);
+      expect(replace).toHaveBeenCalledWith({ query: {} });
+    });
   });
 });
