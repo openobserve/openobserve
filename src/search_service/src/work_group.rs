@@ -39,7 +39,7 @@ pub struct DeferredLock {
     pub work_group: Option<WorkGroup>,
     pub work_group_str: String,
     #[cfg(feature = "enterprise")]
-    _row: AsyncDefer,
+    _slot: AsyncDefer,
     _guard: AsyncDefer,
 }
 
@@ -52,11 +52,9 @@ trait Admission {
     async fn lock(&self, secs: u64) -> Result<Self::Lock>;
     async fn unlock(&self, lock: Self::Lock) -> Result<()>;
     async fn need_wait(&self) -> Result<(bool, ConcurrencyStatus)>;
-    /// Inserts this search's queue row under `key`; owned so the insert can outlive a dropped
-    /// admission.
-    fn process(&self, key: &str) -> impl Future<Output = Result<()>> + Send + 'static;
-    /// Deletes the queue row stored under `key`; owned so a drop guard can run it.
-    fn release(&self, key: &str) -> impl Future<Output = Result<()>> + Send + 'static;
+    async fn process(&self) -> Result<()>;
+    /// Deletes this search's queue row; owned so a drop guard can run it.
+    fn release(&self) -> impl Future<Output = Result<()>> + Send + 'static;
 }
 
 #[cfg(feature = "enterprise")]
@@ -98,25 +96,24 @@ impl Admission for QueueAdmission<'_> {
             .map_err(|e| Error::Message(e.to_string()))
     }
 
-    fn process(&self, key: &str) -> impl Future<Output = Result<()>> + Send + 'static {
-        let (work_group, key) = (self.work_group.clone(), key.to_string());
-        let org_id = self.org_id.to_string();
-        let (user_id, search_type) = (self.user_id.map(str::to_string), self.search_type);
-        async move {
-            work_group
-                .process(&key, Some(&org_id), user_id.as_deref(), search_type)
-                .await
-                .map_err(|e| Error::Message(e.to_string()))
-        }
+    async fn process(&self) -> Result<()> {
+        self.work_group
+            .process(
+                self.trace_id,
+                Some(self.org_id),
+                self.user_id,
+                self.search_type,
+            )
+            .await
+            .map_err(|e| Error::Message(e.to_string()))
     }
 
-    fn release(&self, key: &str) -> impl Future<Output = Result<()>> + Send + 'static {
-        let (work_group, key) = (self.work_group.clone(), key.to_string());
-        let org_id = self.org_id.to_string();
-        let user_id = self.user_id.map(str::to_string);
+    fn release(&self) -> impl Future<Output = Result<()>> + Send + 'static {
+        let (work_group, trace_id) = (self.work_group.clone(), self.trace_id.to_string());
+        let (org_id, user_id) = (self.org_id.to_string(), self.user_id.map(str::to_string));
         async move {
             work_group
-                .done(&key, Some(&org_id), user_id.as_deref())
+                .done(&trace_id, Some(&org_id), user_id.as_deref())
                 .await
                 .map_err(|e| Error::Message(e.to_string()))
         }
@@ -199,7 +196,7 @@ pub async fn check_work_group(
     let locker_key = format!("/search/cluster_queue/{work_group_str}");
 
     // Check all three concurrency levels (global, org, user) and add to the workgroup queue
-    let row = work_group_checking(
+    let slot = work_group_checking(
         query_tracker,
         stop_watch,
         org_id,
@@ -226,7 +223,7 @@ pub async fn check_work_group(
         took_wait,
         work_group: Some(work_group),
         work_group_str,
-        _row: row,
+        _slot: slot,
         _guard: guard,
     })
 }
@@ -354,7 +351,7 @@ pub async fn acquire_work_group_lock(
     .await
 }
 
-/// Admits the search, then releases the slot again when a cancel arrived during the attempt.
+/// Admits the search and returns its slot, which deletes the queue row when dropped.
 #[cfg(feature = "enterprise")]
 async fn admit<A: Admission>(
     adm: &A,
@@ -366,7 +363,7 @@ async fn admit<A: Admission>(
     caller: &str,
 ) -> Result<AsyncDefer> {
     let deadline_ms = timeout * 1000;
-    let row = if adm.in_order() {
+    let slot = if adm.in_order() {
         admit_in_order(
             adm,
             trace_id,
@@ -389,11 +386,11 @@ async fn admit<A: Admission>(
         )
         .await?
     };
-    // A cancel during the attempt would otherwise run the search; returning drops `row`.
+    // A cancel during the attempt would otherwise run the search; returning drops `slot`.
     if !matches!(abort.try_recv(), Err(oneshot::error::TryRecvError::Empty)) {
         return Err(canceled_in_queue(trace_id));
     }
-    Ok(row)
+    Ok(slot)
 }
 
 /// Holds the admission lock across the wait, as on main, so searches queued on it admit in order.
@@ -430,7 +427,7 @@ async fn admit_in_order<A: Admission>(
                         "[trace_id {trace_id}] {caller}: approved in work_group: {status:?}"
                     );
                 }
-                break insert_row(adm, trace_id).await;
+                break insert(adm, trace_id, caller).await;
             }
             Ok((true, status)) if !waited => {
                 log::info!("[trace_id {trace_id}] {caller}: waiting in work_group: {status:?}");
@@ -446,7 +443,7 @@ async fn admit_in_order<A: Admission>(
     };
     match adm.unlock(lock).await {
         Ok(()) => admitted,
-        // Dropping the admitted row frees its slot.
+        // Dropping the admitted slot frees it.
         Err(e) if admitted.is_ok() => Err(e),
         Err(e) => {
             log::warn!("[trace_id {trace_id}] search: unlock failed after a refused attempt: {e}");
@@ -475,7 +472,7 @@ async fn admit_polling<A: Admission>(
         let (wait, status) = adm.need_wait().await?;
         if !wait {
             let lock_secs = (deadline_ms - elapsed).div_ceil(1000);
-            if let Some(row) = try_admit(
+            if let Some(slot) = try_admit(
                 adm,
                 lock_secs,
                 trace_id,
@@ -491,7 +488,7 @@ async fn admit_polling<A: Admission>(
                         "[trace_id {trace_id}] {caller}: approved in work_group: {status:?}"
                     );
                 }
-                return Ok(row);
+                return Ok(slot);
             }
         } else if !waited {
             log::info!("[trace_id {trace_id}] {caller}: waiting in work_group: {status:?}");
@@ -524,13 +521,13 @@ async fn try_admit<A: Admission>(
         Err(e) => return Err(e),
     };
     let admitted = match adm.need_wait().await {
-        Ok((false, _)) => insert_row(adm, trace_id).await.map(Some),
+        Ok((false, _)) => insert(adm, trace_id, caller).await.map(Some),
         Ok((true, _)) => Ok(None),
         Err(e) => Err(e),
     };
     match adm.unlock(lock).await {
         Ok(()) => admitted,
-        // Dropping the admitted row frees its slot.
+        // Dropping the admitted slot frees it.
         Err(e) if matches!(admitted, Ok(Some(_))) => Err(e),
         Err(e) => {
             log::warn!("[trace_id {trace_id}] search: unlock failed after a refused attempt: {e}");
@@ -539,45 +536,20 @@ async fn try_admit<A: Admission>(
     }
 }
 
-/// Inserts the queue row in its own task, returning a guard that deletes it once the insert ends.
+/// Inserts the queue row with its release guard armed first, so a search dropped after the insert
+/// still frees its slot.
 #[cfg(feature = "enterprise")]
-async fn insert_row<A: Admission>(adm: &A, trace_id: &str) -> Result<AsyncDefer> {
-    let key = row_key(trace_id);
-    let (process, release) = (adm.process(&key), adm.release(&key));
-    let (reply, outcome) = oneshot::channel();
-    // A dropped admission must not abandon an insert that can still commit after it.
-    let insert = tokio::spawn(async move {
-        let _ = reply.send(process.await);
-    });
-    let trace_id_owned = trace_id.to_string();
-    let row = AsyncDefer::new(async move {
-        // Deletes only after the insert ends, and even on error: it may still have committed.
-        let _ = insert.await;
+async fn insert<A: Admission>(adm: &A, trace_id: &str, caller: &str) -> Result<AsyncDefer> {
+    let (release, trace_id, caller) = (adm.release(), trace_id.to_string(), caller.to_string());
+    let slot = AsyncDefer::new(async move {
         if let Err(e) = release.await {
             log::error!(
-                "[trace_id {trace_id_owned}] search: failed to release the work group slot: {e:?}"
+                "[trace_id {trace_id}] {caller}->search: failed to release the work group slot: {e:?}"
             );
         }
     });
-    match outcome.await {
-        Ok(res) => res.map(|_| row),
-        Err(_) => Err(Error::Message(format!(
-            "[trace_id {trace_id}] search: the work group insert task ended without a result"
-        ))),
-    }
-}
-
-/// A queue row key unique to one insert, so its cleanup cannot delete a row of a search reusing the
-/// trace id.
-#[cfg(feature = "enterprise")]
-fn row_key(trace_id: &str) -> String {
-    let id = config::ider::generate();
-    // The `trace_id` column holds at most 64 characters.
-    let prefix: String = trace_id
-        .chars()
-        .take(63usize.saturating_sub(id.len()))
-        .collect();
-    format!("{prefix}#{id}")
+    adm.process().await?;
+    Ok(slot)
 }
 
 #[cfg(feature = "enterprise")]
@@ -603,7 +575,7 @@ mod tests {
     use std::{
         sync::{
             Arc, Mutex,
-            atomic::{AtomicBool, AtomicUsize, Ordering},
+            atomic::{AtomicUsize, Ordering},
         },
         time::Duration,
     };
@@ -622,7 +594,6 @@ mod tests {
         user: String,
         search_type: Option<SearchEventType>,
         trace: String,
-        key: String,
     }
 
     /// One work group's queue with an injectable admission lock; `None` lock means queue off.
@@ -636,15 +607,9 @@ mod tests {
         lock_error_after: Option<Duration>,
         on_lock: Mutex<Option<Row>>,
         on_process: Mutex<Option<oneshot::Sender<()>>>,
-        hold_reply: Mutex<Option<Arc<Notify>>>,
-        late_commit: Mutex<Option<Arc<Notify>>>,
-        fail_process: AtomicBool,
-        fail_after_commit: AtomicBool,
-        processing: AtomicUsize,
-        commits: AtomicUsize,
+        hold_unlock: Mutex<Option<Arc<Notify>>>,
         admitted: Mutex<Vec<String>>,
-        releases: AtomicUsize,
-        running: Mutex<Vec<AsyncDefer>>,
+        slots: Mutex<Vec<AsyncDefer>>,
     }
 
     impl Queue {
@@ -684,55 +649,12 @@ mod tests {
             user: format!("user-of-{org}"),
             search_type,
             trace: trace.to_string(),
-            key: trace.to_string(),
         }
     }
 
     struct Fake {
         queue: Arc<Queue>,
         me: Row,
-    }
-
-    impl Fake {
-        async fn insert(queue: Arc<Queue>, me: Row) -> Result<()> {
-            queue.processing.fetch_add(1, Ordering::SeqCst);
-            if queue.fail_process.load(Ordering::SeqCst) {
-                return Err(Error::Message("insert failed".to_string()));
-            }
-            let late_commit = queue.late_commit.lock().unwrap().take();
-            match late_commit {
-                // The database commits the insert even when the caller stops waiting for it.
-                Some(commit) => {
-                    let (db, row) = (queue.clone(), me.clone());
-                    let (committed, reply) = oneshot::channel();
-                    tokio::spawn(async move {
-                        commit.notified().await;
-                        db.rows.lock().unwrap().push(row);
-                        db.commits.fetch_add(1, Ordering::SeqCst);
-                        let _ = committed.send(());
-                    });
-                    let _ = reply.await;
-                }
-                None => {
-                    queue.rows.lock().unwrap().push(me.clone());
-                    queue.commits.fetch_add(1, Ordering::SeqCst);
-                }
-            }
-            // The insert committed, but its acknowledgement was lost.
-            if queue.fail_after_commit.load(Ordering::SeqCst) {
-                return Err(Error::Message("connection lost".to_string()));
-            }
-            queue.admitted.lock().unwrap().push(me.trace.clone());
-            if let Some(abort) = queue.on_process.lock().unwrap().take() {
-                abort.send(()).unwrap();
-            }
-            // The insert committed but its response has not come back yet.
-            let hold_reply = queue.hold_reply.lock().unwrap().clone();
-            if let Some(reply) = hold_reply {
-                reply.notified().await;
-            }
-            Ok(())
-        }
     }
 
     impl Admission for Fake {
@@ -760,6 +682,10 @@ mod tests {
 
         async fn unlock(&self, lock: Self::Lock) -> Result<()> {
             drop(lock);
+            let hold = self.queue.hold_unlock.lock().unwrap().clone();
+            if let Some(hold) = hold {
+                hold.notified().await;
+            }
             let failures = &self.queue.unlock_failures;
             if failures.load(Ordering::SeqCst) > 0 {
                 failures.fetch_sub(1, Ordering::SeqCst);
@@ -794,19 +720,23 @@ mod tests {
             ))
         }
 
-        fn process(&self, key: &str) -> impl Future<Output = Result<()>> + Send + 'static {
-            let me = Row {
-                key: key.to_string(),
-                ..self.me.clone()
-            };
-            Self::insert(self.queue.clone(), me)
+        async fn process(&self) -> Result<()> {
+            self.queue.rows.lock().unwrap().push(self.me.clone());
+            let trace = self.me.trace.clone();
+            self.queue.admitted.lock().unwrap().push(trace);
+            if let Some(abort) = self.queue.on_process.lock().unwrap().take() {
+                abort.send(()).unwrap();
+            }
+            Ok(())
         }
 
-        fn release(&self, key: &str) -> impl Future<Output = Result<()>> + Send + 'static {
-            let (queue, key) = (self.queue.clone(), key.to_string());
+        fn release(&self) -> impl Future<Output = Result<()>> + Send + 'static {
+            // Weak: the queue holds the slots that run this release.
+            let (queue, trace) = (Arc::downgrade(&self.queue), self.me.trace.clone());
             async move {
-                queue.releases.fetch_add(1, Ordering::SeqCst);
-                queue.rows.lock().unwrap().retain(|r| r.key != key);
+                if let Some(queue) = queue.upgrade() {
+                    queue.remove(&trace);
+                }
                 Ok(())
             }
         }
@@ -835,9 +765,9 @@ mod tests {
             me: row(org, search_type, trace),
         };
         let watch = TookWatcher::new();
-        let row = admit(&fake, trace, org, &watch, timeout, abort, "test").await?;
-        // The admitted search keeps running, so its row stays until a test removes it.
-        queue.running.lock().unwrap().push(row);
+        let slot = admit(&fake, trace, org, &watch, timeout, abort, "test").await?;
+        // The admitted search keeps running until a test drops its slot.
+        queue.slots.lock().unwrap().push(slot);
         Ok(())
     }
 
@@ -868,17 +798,6 @@ mod tests {
         })
         .await
         .unwrap_or_else(|_| panic!("queue never reached {len} rows"));
-    }
-
-    /// Waits until `done` holds, failing after two seconds.
-    async fn until(what: &str, done: impl Fn() -> bool) {
-        tokio::time::timeout(Duration::from_secs(2), async {
-            while !done() {
-                tokio::time::sleep(Duration::from_millis(5)).await;
-            }
-        })
-        .await
-        .unwrap_or_else(|_| panic!("{what} never happened"));
     }
 
     fn timeouts(org: &str) -> u64 {
@@ -939,7 +858,6 @@ mod tests {
             "{err}"
         );
         until_len(&queue, 0).await;
-        assert_eq!(queue.releases.load(Ordering::SeqCst), 1);
         assert!(queue.lock.as_ref().unwrap().try_lock().is_ok());
     }
 
@@ -966,134 +884,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn a_search_dropped_while_its_row_is_written_releases_the_slot() {
-        for (search_type, org) in [(None, "d1-in-order"), (PUBLIC, "d1-polling")] {
-            let queue = Queue::new(true);
-            let reply = Arc::new(Notify::new());
-            *queue.hold_reply.lock().unwrap() = Some(reply.clone());
-            let task = spawn_as(&queue, org, search_type, "me");
-            until_len(&queue, 1).await;
-            task.abort();
-            reply.notify_one();
-            until_len(&queue, 0).await;
-            assert_eq!(queue.releases.load(Ordering::SeqCst), 1);
-        }
-    }
-
-    #[tokio::test]
-    async fn an_insert_that_commits_after_the_search_is_dropped_is_released() {
-        for (search_type, org) in [(None, "r2-in-order"), (PUBLIC, "r2-polling")] {
-            let queue = Queue::new(true);
-            let commit = Arc::new(Notify::new());
-            *queue.late_commit.lock().unwrap() = Some(commit.clone());
-            let task = spawn_as(&queue, org, search_type, "me");
-            until("the insert", || {
-                queue.processing.load(Ordering::SeqCst) == 1
-            })
-            .await;
-            task.abort();
-            tokio::time::sleep(Duration::from_millis(100)).await;
-
-            commit.notify_one();
-            until("the commit", || queue.commits.load(Ordering::SeqCst) == 1).await;
-            until_len(&queue, 0).await;
-            assert_eq!(queue.releases.load(Ordering::SeqCst), 1);
-        }
-    }
-
-    #[tokio::test]
-    async fn a_late_insert_of_a_dropped_search_keeps_the_row_of_its_retry() {
-        for (search_type, org) in [(None, "r3-in-order"), (PUBLIC, "r3-polling")] {
-            let queue = Queue::new(true);
-            let commit = Arc::new(Notify::new());
-            *queue.late_commit.lock().unwrap() = Some(commit.clone());
-            let dropped = spawn_as(&queue, org, search_type, "shared");
-            until("the first insert", || {
-                queue.processing.load(Ordering::SeqCst) == 1
-            })
-            .await;
-            dropped.abort();
-            let (_abort, rx) = oneshot::channel();
-            run_as(&queue, org, search_type, "shared", 10, rx)
-                .await
-                .unwrap();
-
-            commit.notify_one();
-            until("the late insert's cleanup", || {
-                queue.releases.load(Ordering::SeqCst) == 1
-            })
-            .await;
-            tokio::time::sleep(Duration::from_millis(100)).await;
-            assert_eq!(queue.traces("shared"), 1, "the retry's row stays");
-        }
-    }
-
-    #[test]
-    fn a_row_key_is_unique_per_insert_and_fits_the_trace_id_column() {
-        let long = "t".repeat(100);
-        let (a, b) = (row_key(&long), row_key(&long));
-        assert_ne!(a, b);
-        assert!(a.chars().count() <= 64, "{a}");
-        assert!(row_key("abc").starts_with("abc#"));
-    }
-
-    #[tokio::test]
-    async fn a_failed_insert_keeps_the_row_of_a_search_sharing_its_trace() {
-        for (search_type, org) in [(None, "r1-in-order"), (PUBLIC, "r1-polling")] {
-            let queue = Queue::new(true);
-            queue.push(org, search_type, "shared");
-            queue.fail_process.store(true, Ordering::SeqCst);
-            let (_abort, rx) = oneshot::channel();
-            let err = run_as(&queue, org, search_type, "shared", 10, rx)
-                .await
-                .unwrap_err();
-            assert!(err.to_string().contains("insert failed"), "{err}");
-            until("the release", || queue.releases.load(Ordering::SeqCst) == 1).await;
-            tokio::time::sleep(Duration::from_millis(100)).await;
-            assert_eq!(queue.traces("shared"), 1, "the other search's row stays");
-        }
-    }
-
-    #[tokio::test]
-    async fn an_insert_that_commits_and_then_fails_leaves_no_row() {
-        for (search_type, org) in [(None, "r4-in-order"), (PUBLIC, "r4-polling")] {
-            let queue = Queue::new(true);
-            queue.fail_after_commit.store(true, Ordering::SeqCst);
-            let (_abort, rx) = oneshot::channel();
-            let err = run_as(&queue, org, search_type, "me", 10, rx)
-                .await
-                .unwrap_err();
-            assert!(err.to_string().contains("connection lost"), "{err}");
-            until_len(&queue, 0).await;
-            assert_eq!(queue.releases.load(Ordering::SeqCst), 1);
-        }
-    }
-
-    #[tokio::test]
-    async fn a_finished_search_releases_its_row_once() {
-        for (search_type, org) in [(None, "n1-in-order"), (PUBLIC, "n1-polling")] {
-            let queue = Queue::new(true);
-            let fake = Fake {
-                queue: queue.clone(),
-                me: row(org, search_type, "me"),
-            };
-            let (_abort, rx) = oneshot::channel();
-            let watch = TookWatcher::new();
-            let slot = admit(&fake, "me", org, &watch, 10, rx, "test")
-                .await
-                .unwrap();
-            tokio::time::sleep(Duration::from_millis(100)).await;
-            assert_eq!(queue.traces("me"), 1, "the row lives while the search runs");
-            assert_eq!(queue.releases.load(Ordering::SeqCst), 0);
-
-            drop(slot);
-            until_len(&queue, 0).await;
-            tokio::time::sleep(Duration::from_millis(100)).await;
-            assert_eq!(queue.releases.load(Ordering::SeqCst), 1);
-        }
-    }
-
-    #[tokio::test]
     async fn an_unlock_failure_after_admitting_releases_the_slot() {
         let queue = Queue::new(true);
         queue.unlock_failures.store(1, Ordering::SeqCst);
@@ -1101,7 +891,18 @@ mod tests {
         let err = run(&queue, "w5", "me", 10, rx).await.unwrap_err();
         assert!(err.to_string().contains("nats unlock failed"), "{err}");
         until_len(&queue, 0).await;
-        assert_eq!(queue.releases.load(Ordering::SeqCst), 1);
+    }
+
+    #[tokio::test]
+    async fn a_search_dropped_after_its_insert_releases_the_slot() {
+        for (search_type, org) in [(None, "d1-in-order"), (PUBLIC, "d1-polling")] {
+            let queue = Queue::new(true);
+            *queue.hold_unlock.lock().unwrap() = Some(Arc::new(Notify::new()));
+            let search = spawn_as(&queue, org, search_type, "me");
+            until_len(&queue, 1).await;
+            search.abort();
+            until_len(&queue, 0).await;
+        }
     }
 
     #[tokio::test]
