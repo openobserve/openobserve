@@ -35,6 +35,31 @@ const setup = (formData: Record<string, unknown>, meta: FieldMetaMap = {}, editi
 const byId = (items: { id: string }[], id: string) => items.find((i) => i.id === id)!;
 
 describe("useAlertFormSections", () => {
+  it("names a composite's child alerts by letter, not by id", () => {
+    const { items } = setup({
+      ...scheduled(),
+      is_real_time: "composite",
+      composite_condition: { expression: "({id-b} && {id-a}) || !{id-b}" },
+      children: [{ alert_id: "id-a" }, { alert_id: "id-b" }],
+    });
+    expect(byId(items.value, "condition").summary).toBe("(B && A) || !B");
+  });
+
+  it("counts a problem the save found outside the form against its section", () => {
+    const { items, errorCounts } = useAlertFormSections({
+      fieldMeta: ref({}),
+      formData: ref(scheduled()),
+      anomalyConfig: ref({}),
+      isAnomalyMode: ref(false),
+      isAggregationEnabled: ref(false),
+      isEditing: ref(false),
+      extraErrors: ref({ schedule: 1 }),
+      t,
+    });
+    expect(errorCounts.value.schedule).toBe(1);
+    expect(byId(items.value, "schedule").state).toBe("error");
+  });
+
   it("lists the five sections with their questions in order", () => {
     const { items } = setup(scheduled());
     expect(items.value.map((i) => i.id)).toEqual([

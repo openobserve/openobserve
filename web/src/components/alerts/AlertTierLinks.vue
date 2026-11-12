@@ -18,6 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 import { useI18nTyped, type I18nKey } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OSettingRow from "@/lib/core/SettingRow/OSettingRow.vue";
 import type { AlertSectionId } from "./alertFormSections";
 import {
@@ -97,6 +98,7 @@ const moreLabel = computed(() =>
     </OSettingRow>
     <div v-if="showToggle" class="py-1">
       <OButton
+        class="max-w-full"
         variant="ghost-primary"
         size="sm"
         :icon-left="view.expanded ? 'expand-less' : 'expand-more'"
@@ -104,7 +106,9 @@ const moreLabel = computed(() =>
         :data-test="`add-alert-section-${section}-more`"
         @click="emit('toggle')"
       >
-        {{ view.expanded ? t("alerts.tiers.showFewer") : moreLabel }}
+        <OTruncatedText>{{
+          view.expanded ? t("alerts.tiers.showFewer") : moreLabel
+        }}</OTruncatedText>
       </OButton>
     </div>
   </div>
