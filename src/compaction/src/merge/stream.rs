@@ -411,7 +411,7 @@ async fn limit_indexed_merge_groups(
         }
         let pre_merge = pre_merge_batches(
             &files,
-            merged_file_chains(&files, schema, stream).await,
+            hash_merged_chains(&files, schema, stream).await,
             max_groups,
         );
         if pre_merge.is_empty() {
@@ -432,15 +432,15 @@ async fn limit_indexed_merge_groups(
     limited
 }
 
-/// The sorted chains of the already merged files among `files`; `None` when they cannot be read.
-async fn merged_file_chains(
+/// The sorted chains of the hash-merged files among `files`; `None` when they cannot be read.
+async fn hash_merged_chains(
     files: &[FileKey],
     schema: &Arc<Schema>,
     stream: &str,
 ) -> Option<Vec<Vec<FileKey>>> {
     let merged: Vec<FileKey> = files
         .iter()
-        .filter(|f| MetricsFileLayout::of(&f.key) != Some(MetricsFileLayout::HashSorted))
+        .filter(|f| MetricsFileLayout::of(&f.key) == Some(MetricsFileLayout::HashMerged))
         .cloned()
         .collect();
     if merged.is_empty() {
@@ -456,7 +456,7 @@ async fn merged_file_chains(
         Ok(chains) => Some(chains),
         Err(e) => {
             log::warn!(
-                "[COMPACTOR] merge_by_stream [{stream}] chaining {merged_num} merged files by statistics failed: {e}, only ingester files can be pre-merged"
+                "[COMPACTOR] merge_by_stream [{stream}] chaining {merged_num} hash-merged files by statistics failed: {e}, only ingester files can be pre-merged"
             );
             None
         }
