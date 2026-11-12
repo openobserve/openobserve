@@ -467,6 +467,31 @@ pub async fn cached_references(
     (destinations, alerts)
 }
 
+/// `cached_references` counted for every template name at once, in one pass over each cache.
+pub async fn cached_reference_counts(
+    org_id: &str,
+) -> (HashMap<String, usize>, HashMap<String, usize>) {
+    let mut destinations: HashMap<String, usize> = HashMap::new();
+    for dest in DESTINATIONS.iter() {
+        if let Module::Alert {
+            template: Some(t), ..
+        } = &dest.module
+            && references_from(org_id, dest.key())
+        {
+            *destinations.entry(t.clone()).or_default() += 1;
+        }
+    }
+    let mut alerts: HashMap<String, usize> = HashMap::new();
+    for (key, (_, alert)) in ALERTS.read().await.iter() {
+        if let Some(t) = alert.template.as_deref()
+            && references_from(org_id, key)
+        {
+            *alerts.entry(t.to_string()).or_default() += 1;
+        }
+    }
+    (destinations, alerts)
+}
+
 /// Moves user rows out of the reserved prefix and tells every node's cache.
 pub async fn rename_reserved_collisions()
 -> Result<Vec<table::templates::ReservedRename>, TemplateError> {
