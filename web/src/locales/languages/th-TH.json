@@ -15022,6 +15022,7 @@
       "contractSyncLegacyKept": "ไม่มีสัญญาที่ใช้งานอยู่ สัญญาเดิมจะคงอยู่จนกว่าจะสิ้นสุด",
       "contractSyncNothing": "องค์กรนี้ไม่มีสัญญาที่ใช้งานอยู่",
       "contractSyncBlocked": "ไม่ได้ใช้สัญญา: {reason}",
+      "contractSyncIncomplete": "บางสัญญาไม่สามารถบันทึกได้หรือถูกข้าม องค์กรนี้จึงอาจยังใช้สัญญาเดิมอยู่ โปรดตรวจสอบบันทึกของเซิร์ฟเวอร์ แล้วซิงค์อีกครั้ง",
       "lastContractSync": "ซิงค์สัญญาล่าสุด: {time}",
       "contractsNeverSynced": "ยังไม่ได้ซิงค์สัญญา",
       "lastContractSyncError": "การซิงค์สัญญาล่าสุดล้มเหลวเมื่อ {time}: {error}",

@@ -15024,6 +15024,7 @@
       "contractSyncLegacyKept": "Geen actief contract; het bestaande contract blijft tot het afloopt.",
       "contractSyncNothing": "Deze organisatie heeft geen actief contract.",
       "contractSyncBlocked": "Contract niet toegepast: {reason}",
+      "contractSyncIncomplete": "Sommige contracten konden niet worden opgeslagen of zijn overgeslagen, dus deze organisatie heeft mogelijk nog het oude contract. Controleer de serverlogs en synchroniseer opnieuw.",
       "lastContractSync": "Laatste contractsynchronisatie: {time}",
       "contractsNeverSynced": "Contracten zijn nog niet gesynchroniseerd.",
       "lastContractSyncError": "Laatste contractsynchronisatie mislukt om {time}: {error}",

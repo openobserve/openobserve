@@ -15024,6 +15024,7 @@
       "contractSyncLegacyKept": "لا يوجد عقد نشط؛ يبقى العقد الحالي حتى انتهائه.",
       "contractSyncNothing": "لا يوجد عقد نشط لهذه المؤسسة.",
       "contractSyncBlocked": "لم يُطبَّق العقد: {reason}",
+      "contractSyncIncomplete": "تعذّر حفظ بعض العقود أو تم تخطيها، لذا قد تظل هذه المؤسسة على عقدها السابق. تحقق من سجلات الخادم، ثم أعد المزامنة.",
       "lastContractSync": "آخر مزامنة للعقود: {time}",
       "contractsNeverSynced": "لم تتم مزامنة العقود بعد.",
       "lastContractSyncError": "فشلت آخر مزامنة للعقود في {time}: {error}",

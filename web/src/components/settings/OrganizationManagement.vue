@@ -1191,10 +1191,13 @@ export default defineComponent({
           row.identifier,
         );
         const result = res.data;
+        // a contract that wasn't stored leaves reconcile reading the old one, so the outcome may be stale
+        const incomplete = result.store_failures > 0 || result.skipped > 0;
         toast({
-          variant: result.outcome === "blocked" ? "warning" : "success",
-          message:
-            result.outcome === "blocked"
+          variant: incomplete || result.outcome === "blocked" ? "warning" : "success",
+          message: incomplete
+            ? t("settings.organizationManagementPage.contractSyncIncomplete")
+            : result.outcome === "blocked"
               ? t("settings.organizationManagementPage.contractSyncBlocked", {
                   reason: result.blocked_reason,
                 })

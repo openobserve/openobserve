@@ -15024,6 +15024,7 @@
       "contractSyncLegacyKept": "Sin contrato activo; el contrato existente se mantiene hasta que finalice.",
       "contractSyncNothing": "Esta organización no tiene un contrato activo.",
       "contractSyncBlocked": "Contrato no aplicado: {reason}",
+      "contractSyncIncomplete": "Algunos contratos no se pudieron guardar o se omitieron, así que esta organización puede seguir con su contrato anterior. Revisa los registros del servidor y vuelve a sincronizar.",
       "lastContractSync": "Última sincronización de contratos: {time}",
       "contractsNeverSynced": "Los contratos aún no se han sincronizado.",
       "lastContractSyncError": "La última sincronización de contratos falló a las {time}: {error}",

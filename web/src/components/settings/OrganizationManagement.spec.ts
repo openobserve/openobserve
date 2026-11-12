@@ -940,6 +940,25 @@ describe("OrganizationManagement.vue", () => {
         expect(statusService()).toHaveBeenCalled();
       });
 
+      it("warns instead of reporting the outcome when a contract wasn't stored", async () => {
+        await mounted(syncOn);
+        for (const counts of [
+          { store_failures: 1, skipped: 0 },
+          { store_failures: 0, skipped: 1 },
+        ]) {
+          syncService().mockResolvedValue({ data: { outcome: "unchanged", ...counts } });
+          mockToastFn.mockClear();
+          await wrapper.vm.syncContract({ identifier: "test-org" });
+          await flushPromises();
+          expect(mockToastFn).toHaveBeenCalledWith(
+            expect.objectContaining({
+              variant: "warning",
+              message: expect.stringContaining("couldn't be stored"),
+            }),
+          );
+        }
+      });
+
       it("still reloads the status when a sync fails", async () => {
         await mounted(syncOn);
         syncService().mockRejectedValue({ response: { data: { message: "boom" } } });

@@ -15024,6 +15024,7 @@
       "contractSyncLegacyKept": "Brak aktywnej umowy; istniejąca umowa obowiązuje do jej zakończenia.",
       "contractSyncNothing": "Ta organizacja nie ma aktywnej umowy.",
       "contractSyncBlocked": "Umowa nie została zastosowana: {reason}",
+      "contractSyncIncomplete": "Niektórych umów nie udało się zapisać lub zostały pominięte, więc ta organizacja może nadal mieć poprzednią umowę. Sprawdź logi serwera, a następnie zsynchronizuj ponownie.",
       "lastContractSync": "Ostatnia synchronizacja umów: {time}",
       "contractsNeverSynced": "Umowy nie zostały jeszcze zsynchronizowane.",
       "lastContractSyncError": "Ostatnia synchronizacja umów nie powiodła się o {time}: {error}",

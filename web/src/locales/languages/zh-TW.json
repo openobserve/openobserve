@@ -15019,6 +15019,7 @@
       "contractSyncLegacyKept": "沒有生效的合約;現有合約將保留至結束。",
       "contractSyncNothing": "此組織沒有生效的合約。",
       "contractSyncBlocked": "合約未套用:{reason}",
+      "contractSyncIncomplete": "部分合約無法儲存或已被略過，因此此組織可能仍在使用舊合約。請檢查伺服器記錄，然後重新同步。",
       "lastContractSync": "上次合約同步:{time}",
       "contractsNeverSynced": "合約尚未同步。",
       "lastContractSyncError": "上次合約同步於 {time} 失敗:{error}",

@@ -15022,6 +15022,7 @@
       "contractSyncLegacyKept": "No active contract; the existing contract stays until it ends.",
       "contractSyncNothing": "This organization has no active contract.",
       "contractSyncBlocked": "Contract not applied: {reason}",
+      "contractSyncIncomplete": "Some contracts couldn't be stored or were skipped, so this organization may still be on its old contract. Check the server logs, then sync again.",
       "lastContractSync": "Last contract sync: {time}",
       "contractsNeverSynced": "Contracts have not synced yet.",
       "lastContractSyncError": "Last contract sync failed at {time}: {error}",

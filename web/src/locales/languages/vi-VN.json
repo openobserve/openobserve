@@ -15024,6 +15024,7 @@
       "contractSyncLegacyKept": "Không có hợp đồng đang hoạt động; hợp đồng hiện tại được giữ đến khi kết thúc.",
       "contractSyncNothing": "Tổ chức này không có hợp đồng đang hoạt động.",
       "contractSyncBlocked": "Hợp đồng chưa được áp dụng: {reason}",
+      "contractSyncIncomplete": "Một số hợp đồng không thể lưu hoặc đã bị bỏ qua, nên tổ chức này có thể vẫn đang dùng hợp đồng cũ. Hãy kiểm tra nhật ký máy chủ rồi đồng bộ lại.",
       "lastContractSync": "Lần đồng bộ hợp đồng gần nhất: {time}",
       "contractsNeverSynced": "Hợp đồng chưa được đồng bộ.",
       "lastContractSyncError": "Lần đồng bộ hợp đồng gần nhất thất bại lúc {time}: {error}",

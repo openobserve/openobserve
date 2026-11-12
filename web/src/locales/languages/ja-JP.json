@@ -15024,6 +15024,7 @@
       "contractSyncLegacyKept": "有効な契約はありません。既存の契約は終了するまで維持されます。",
       "contractSyncNothing": "この組織に有効な契約はありません。",
       "contractSyncBlocked": "契約は適用されませんでした: {reason}",
+      "contractSyncIncomplete": "一部の契約を保存できなかったか、スキップされたため、この組織にはまだ以前の契約が適用されている可能性があります。サーバーログを確認してから、もう一度同期してください。",
       "lastContractSync": "最終契約同期: {time}",
       "contractsNeverSynced": "契約はまだ同期されていません。",
       "lastContractSyncError": "{time} の契約同期に失敗しました: {error}",

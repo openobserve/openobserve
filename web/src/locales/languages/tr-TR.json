@@ -15024,6 +15024,7 @@
       "contractSyncLegacyKept": "Etkin sözleşme yok; mevcut sözleşme sona erene kadar kalır.",
       "contractSyncNothing": "Bu kuruluşun etkin sözleşmesi yok.",
       "contractSyncBlocked": "Sözleşme uygulanmadı: {reason}",
+      "contractSyncIncomplete": "Bazı sözleşmeler kaydedilemedi veya atlandı, bu nedenle bu kuruluş hâlâ eski sözleşmesinde olabilir. Sunucu günlüklerini kontrol edin ve yeniden eşitleyin.",
       "lastContractSync": "Son sözleşme eşitlemesi: {time}",
       "contractsNeverSynced": "Sözleşmeler henüz eşitlenmedi.",
       "lastContractSyncError": "Son sözleşme eşitlemesi {time} tarihinde başarısız oldu: {error}",
