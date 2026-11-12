@@ -5363,6 +5363,8 @@
       "reasonExpired": "never ran · queued over 1 h",
       "reasonWorkerLost": "worker lost · not re-run",
       "reasonWorkflowDisabled": "workflow was disabled",
+      "reasonEndpointDisabled": "never ran · HTTP endpoint was turned off",
+      "reasonCredentialRevoked": "never ran · its credential was revoked",
       "reasonRunTimeout": "timed out after 15 min",
       "allTriggers": "All triggers",
       "triggerFilter": "Trigger",

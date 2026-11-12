@@ -698,6 +698,11 @@ async fn apply_locked<C: ConnectionTrait>(
     if !snapshot.supersedes(local.as_ref()) {
         return Ok(ApplyOutcome::Stale);
     }
+    // A revive keeps the id, so keys from before the tombstone must not replay into it.
+    if local.as_ref().is_some_and(|l| l.deleted_at.is_some()) && !snapshot.deleted {
+        workflow_http_trigger_requests::free_idem_keys_for_trigger(txn, &snapshot.trigger.id)
+            .await?;
+    }
     let rival = triggers::Entity::find()
         .filter(triggers::Column::WorkflowId.eq(&snapshot.trigger.workflow_id))
         .filter(triggers::Column::Id.ne(&snapshot.trigger.id))
@@ -839,6 +844,7 @@ async fn write_snapshot<C: ConnectionTrait>(
     }
     if deleted {
         workflow_http_trigger_requests::delete_queued_for_trigger(txn, &replicated.id).await?;
+        workflow_http_trigger_requests::free_idem_keys_for_trigger(txn, &replicated.id).await?;
     }
     Ok(())
 }
@@ -865,7 +871,7 @@ async fn lose_in<C: ConnectionTrait>(
     Ok(())
 }
 
-/// Revokes every credential of the trigger, deletes their local secrets and its queued runs.
+/// Revokes the trigger's credentials, deletes their secrets and its queued runs, frees its keys.
 async fn retire_in<C: ConnectionTrait>(
     txn: &C,
     trigger: &triggers::Model,
@@ -894,6 +900,7 @@ async fn retire_in<C: ConnectionTrait>(
         .exec(txn)
         .await?;
     workflow_http_trigger_requests::delete_queued_for_trigger(txn, &trigger.id).await?;
+    workflow_http_trigger_requests::free_idem_keys_for_trigger(txn, &trigger.id).await?;
     Ok(())
 }
 
@@ -1567,6 +1574,39 @@ mod tests {
         assert_eq!(
             workflow_run_data::Entity::find().count(&db).await.unwrap(),
             0
+        );
+    }
+
+    #[tokio::test]
+    async fn a_revived_snapshot_frees_the_keys_its_tombstone_still_held() {
+        let db = db().await;
+        let mut remote = trigger("t1", "wf-1");
+        remote.deleted_at = Some(NOW);
+        apply_snapshot_in(&db, snapshot(&remote, &[], &[]), Vec::new())
+            .await
+            .unwrap();
+        let mut old = hook_request("t1", "run-old");
+        old.idem_key = Some("k1".to_string());
+        ledger::enqueue(&db, old, "{}".to_string()).await.unwrap();
+
+        remote.version = 2;
+        remote.deleted_at = None;
+        let live = credential("c1", "t1", CredentialKind::SigningSecret);
+        let revived = snapshot(&remote, &[live], &[("c1", "whsec_x")]);
+        let outcome = apply_snapshot_in(&db, revived, prepared("acme", "c1")).await;
+        assert_eq!(outcome.unwrap(), ApplyOutcome::Applied);
+
+        assert_eq!(get(&db, "t1").await.unwrap().unwrap().deleted_at, None);
+        let kept = ledger::get_run(&db, "t1", "run-old")
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(kept.idem_key, None, "the old run stays without its key");
+        assert!(
+            ledger::find_by_idem_key(&db, "t1", "k1")
+                .await
+                .unwrap()
+                .is_none()
         );
     }
 

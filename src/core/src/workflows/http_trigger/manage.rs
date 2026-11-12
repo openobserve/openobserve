@@ -725,6 +725,9 @@ async fn change_locked<C: ConnectionTrait>(
     row.version = Set(locked.version + 1);
     row.origin_cluster = Set(writer.local_cluster.to_string());
     if revived {
+        // Also covers endpoints tombstoned before the delete started freeing their keys.
+        infra::table::workflow_http_trigger_requests::free_idem_keys_for_trigger(txn, &locked.id)
+            .await?;
         row.created_by = Set(writer.user_id.to_string());
         row.created_at = Set(writer.now);
         row.deleted_at = Set(None);
@@ -1700,6 +1703,29 @@ mod tests {
                 .await
                 .unwrap_err(),
             ManageError::InvalidOverlap
+        );
+    }
+
+    #[tokio::test]
+    async fn revoking_a_retiring_credential_after_its_expiry_reads_as_explicit() {
+        let db = db().await;
+        let stored = Stored::default();
+        let written = create(&db, AuthMode::Token, &stored).await;
+        let old_id = credentials_of(&db, &written.trigger_id).await[0].id.clone();
+        rotate_in(&db, &at(NOW + 1), 3600, preparer(stored))
+            .await
+            .unwrap();
+        let after_expiry = NOW + 1 + 3600 * 1_000_000 + 1;
+        revoke_in(&db, &at(after_expiry), &old_id).await.unwrap();
+        let rows = credentials_of(&db, &written.trigger_id).await;
+        let old = rows.iter().find(|c| c.id == old_id).unwrap();
+        let state = CredentialState::parse(&old.state).unwrap();
+        assert_eq!(state, CredentialState::Revoked);
+        assert!(
+            super::super::worker::revoked_explicitly(state, old.expires_at, old.revoked_at),
+            "expires_at {:?}, revoked_at {:?}",
+            old.expires_at,
+            old.revoked_at
         );
     }
 
