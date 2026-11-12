@@ -19,7 +19,7 @@ use axum::{
     Extension,
     body::Bytes,
     extract::{Multipart, Path},
-    http::StatusCode,
+    http::{StatusCode, header},
     response::{IntoResponse, Response},
 };
 use config::utils::json;
@@ -48,6 +48,12 @@ pub struct SegmentEvent {
     #[schema(value_type = String, format = Binary)]
     pub event: Vec<u8>,
 }
+
+/// Binary image body of a replay resource download
+#[derive(ToSchema)]
+#[schema(value_type = String, format = Binary)]
+#[allow(dead_code)]
+pub struct ResourceImageBytes(Vec<u8>);
 
 #[derive(Serialize, Deserialize)]
 pub struct SegmentEventSerde {
@@ -223,6 +229,25 @@ pub async fn log(
 const MAX_SEGMENTS: usize = 200;
 /// Maximum decompressed size of a single replay segment. Bounds a decompression bomb.
 const MAX_DECOMPRESSED_SEGMENT_BYTES: usize = 16 * 1024 * 1024; // 16 MB per segment
+/// Maximum size of a single replay resource image.
+const MAX_RESOURCE_IMAGE_BYTES: usize = 5 * 1024 * 1024;
+/// Maximum number of `image` parts accepted in a single replay resource upload.
+const MAX_RESOURCE_IMAGES: usize = 64;
+/// Object-store account replay resources live in, matching the synthetics artifact reads.
+const REPLAY_RESOURCE_ACCOUNT: &str = "default";
+/// Object-store key prefix of every replay resource; org deletion removes `{prefix}/{org}/`.
+pub const REPLAY_RESOURCE_PREFIX: &str = "rum_replay_resources";
+
+/// Replay resource images collected from one multipart upload, as (resource id, bytes).
+type ResourceImages = Vec<(String, Bytes)>;
+
+/// The parts of a replay multipart upload this handler routes on.
+#[derive(Default)]
+struct ReplayUpload {
+    segments: Vec<Vec<u8>>,
+    images: ResourceImages,
+    event: Option<Vec<u8>>,
+}
 
 /// Parses the `event` part of a session-replay upload.
 ///
@@ -291,6 +316,160 @@ fn build_replay_rows(segments: &[Vec<u8>], events: &[Event]) -> Result<Vec<u8>, 
     Ok(body_lines)
 }
 
+/// Returns the app id of a `{"type":"resource"}` event, or `None` for any other event shape.
+fn parse_resource_event(event_bytes: &[u8]) -> Result<Option<String>, &'static str> {
+    let Ok(value) = json::from_slice::<json::Value>(event_bytes) else {
+        return Ok(None);
+    };
+    if value.get("type").and_then(|t| t.as_str()) != Some("resource") {
+        return Ok(None);
+    }
+    let app_id = value
+        .get("application")
+        .and_then(|a| a.get("id"))
+        .and_then(|id| id.as_str())
+        .unwrap_or_default();
+    validate_app_id(app_id)?;
+    Ok(Some(app_id.to_string()))
+}
+
+/// An app id becomes an object-store path segment, so only a plain segment is allowed.
+fn validate_app_id(app_id: &str) -> Result<(), &'static str> {
+    let safe = !app_id.is_empty()
+        && app_id.len() <= 128
+        && app_id != "."
+        && app_id != ".."
+        && app_id
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'_' | b'.' | b'-'));
+    if safe {
+        Ok(())
+    } else {
+        Err("Invalid application id in replay resource upload")
+    }
+}
+
+/// A resource id is the 32-hex MD5 of the image.
+fn validate_resource_id(resource_id: &str) -> Result<(), &'static str> {
+    if resource_id.len() == 32 && resource_id.bytes().all(|b| b.is_ascii_hexdigit()) {
+        Ok(())
+    } else {
+        Err("Invalid resource id: expected 32 hex characters")
+    }
+}
+
+/// Detects the image type from leading magic bytes only; the client-sent type is never trusted.
+fn detect_image_type(data: &[u8]) -> Option<&'static str> {
+    if data.starts_with(&[0x89, b'P', b'N', b'G', 0x0D, 0x0A, 0x1A, 0x0A]) {
+        Some("image/png")
+    } else if data.starts_with(&[0xFF, 0xD8, 0xFF]) {
+        Some("image/jpeg")
+    } else if data.starts_with(b"GIF87a") || data.starts_with(b"GIF89a") {
+        Some("image/gif")
+    } else if data.len() >= 12 && &data[0..4] == b"RIFF" && &data[8..12] == b"WEBP" {
+        Some("image/webp")
+    } else {
+        None
+    }
+}
+
+/// Validates a whole resource upload; any bad image rejects the request.
+fn validate_resource_images(images: &[(String, Bytes)]) -> Result<(), &'static str> {
+    if images.is_empty() {
+        return Err("Missing 'image' field in replay resource upload");
+    }
+    if images.len() > MAX_RESOURCE_IMAGES {
+        return Err("Too many image parts in replay resource upload");
+    }
+    for (resource_id, data) in images {
+        validate_resource_id(resource_id)?;
+        if data.len() > MAX_RESOURCE_IMAGE_BYTES {
+            return Err("Replay resource image exceeds the maximum size");
+        }
+        if detect_image_type(data).is_none() {
+            return Err("Replay resource image type is not allowed");
+        }
+    }
+    Ok(())
+}
+
+fn replay_resource_key(org_id: &str, app_id: &str, resource_id: &str) -> String {
+    format!("{REPLAY_RESOURCE_PREFIX}/{org_id}/{app_id}/{resource_id}")
+}
+
+/// Reads the `segment`, `image` and `event` parts; any other part is ignored.
+async fn read_replay_upload(payload: &mut Multipart) -> Result<ReplayUpload, Response> {
+    let mut upload = ReplayUpload::default();
+    while let Ok(Some(field)) = payload.next_field().await {
+        let name = field.name().map(|s| s.to_string());
+        match name.as_deref() {
+            Some("segment") => {
+                if upload.segments.len() >= MAX_SEGMENTS {
+                    return Err(MetaHttpResponse::bad_request(
+                        "Too many segment parts in replay upload",
+                    ));
+                }
+                match field.bytes().await {
+                    Ok(data) => upload.segments.push(data.to_vec()),
+                    // Surface the read failure rather than dropping the part, which would
+                    // otherwise resurface later as a confusing segment/event count mismatch.
+                    Err(_) => {
+                        return Err(MetaHttpResponse::bad_request(
+                            "Failed to read 'segment' field",
+                        ));
+                    }
+                }
+            }
+            Some("image") => {
+                if upload.images.len() >= MAX_RESOURCE_IMAGES {
+                    return Err(MetaHttpResponse::bad_request(
+                        "Too many image parts in replay resource upload",
+                    ));
+                }
+                // The part filename is the image's resource id.
+                let resource_id = field.file_name().unwrap_or_default().to_string();
+                match field.bytes().await {
+                    Ok(data) => upload.images.push((resource_id, data)),
+                    Err(_) => {
+                        return Err(MetaHttpResponse::bad_request(
+                            "Failed to read 'image' field",
+                        ));
+                    }
+                }
+            }
+            Some("event") => match field.bytes().await {
+                Ok(data) => upload.event = Some(data.to_vec()),
+                Err(_) => {
+                    return Err(MetaHttpResponse::bad_request(
+                        "Failed to read 'event' field",
+                    ));
+                }
+            },
+            _ => {}
+        }
+    }
+    Ok(upload)
+}
+
+/// Validates and stores a replay resource upload. Keys are content-addressed, so a re-upload
+/// just overwrites.
+async fn store_resource_upload(org_id: &str, app_id: &str, upload: ReplayUpload) -> Response {
+    if !upload.segments.is_empty() {
+        return MetaHttpResponse::bad_request("Replay resource upload must not carry segments");
+    }
+    if let Err(e) = validate_resource_images(&upload.images) {
+        return MetaHttpResponse::bad_request(e);
+    }
+    for (resource_id, data) in upload.images {
+        let key = replay_resource_key(org_id, app_id, &resource_id);
+        if let Err(e) = infra::storage::put(REPLAY_RESOURCE_ACCOUNT, &key, data).await {
+            log::error!("[RUM] replay resource store failed for {key}: {e}");
+            return MetaHttpResponse::internal_error("Failed to store replay resource");
+        }
+    }
+    StatusCode::ACCEPTED.into_response()
+}
+
 /// Rewrites a single JSON array body (mobile SDK batches) into NDJSON.
 fn normalize_logs_body(body: Bytes) -> Result<Bytes, Error> {
     if body.trim_ascii_start().first() != Some(&b'[') {
@@ -353,39 +532,28 @@ pub async fn sessionreplay(
     // Session replay uploads differ by SDK:
     //   - browser: one `segment` part + one `event` object
     //   - mobile:  N `segment` parts + one `event` JSON ARRAY (one entry per segment)
-    // In both cases the multipart field *name* is always `segment`; the mobile SDK only varies
-    // the per-part `filename` (file0..fileN), which is not used for routing here.
+    //   - mobile resources: N `image` parts + one `event` object `{"type":"resource"}`
+    // The mobile SDK only varies the per-part `filename`; for segments it is not used for routing.
     // The gzip `content-encoding` of the mobile body is already handled by
     // RequestDecompressionLayer.
-    let mut segments: Vec<Vec<u8>> = Vec::new();
-    let mut event_data: Option<Vec<u8>> = None;
+    let upload = match read_replay_upload(&mut payload).await {
+        Ok(upload) => upload,
+        Err(resp) => return resp,
+    };
 
-    while let Ok(Some(field)) = payload.next_field().await {
-        let name = field.name().map(|s| s.to_string());
-        match name.as_deref() {
-            Some("segment") => {
-                if segments.len() >= MAX_SEGMENTS {
-                    return MetaHttpResponse::bad_request(
-                        "Too many segment parts in replay upload",
-                    );
-                }
-                match field.bytes().await {
-                    Ok(data) => segments.push(data.to_vec()),
-                    // Surface the read failure rather than dropping the part, which would
-                    // otherwise resurface later as a confusing segment/event count mismatch.
-                    Err(_) => {
-                        return MetaHttpResponse::bad_request("Failed to read 'segment' field");
-                    }
-                }
-            }
-            Some("event") => match field.bytes().await {
-                Ok(data) => event_data = Some(data.to_vec()),
-                Err(_) => return MetaHttpResponse::bad_request("Failed to read 'event' field"),
-            },
-            _ => {}
+    if let Some(event_bytes) = &upload.event {
+        match parse_resource_event(event_bytes) {
+            Ok(Some(app_id)) => return store_resource_upload(&org_id, &app_id, upload).await,
+            Ok(None) => {}
+            Err(e) => return MetaHttpResponse::bad_request(e),
         }
     }
 
+    let ReplayUpload {
+        segments,
+        event: event_data,
+        ..
+    } = upload;
     if segments.is_empty() {
         return MetaHttpResponse::bad_request("Missing 'segment' field in multipart form");
     }
@@ -424,6 +592,63 @@ pub async fn sessionreplay(
         // browser the internal stream names and counts.
         Ok(_) => StatusCode::ACCEPTED.into_response(),
         Err(e) => MetaHttpResponse::bad_request(e),
+    }
+}
+
+/// Replay resource image download
+#[utoipa::path(
+    get,
+    path = "/{org_id}/rum/replay_resources/{app_id}/{resource_id}",
+    context_path = "/api",
+    tag = "Rum",
+    operation_id = "GetReplayResource",
+    summary = "Download a session replay resource image",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("app_id" = String, Path, description = "RUM application id"),
+        ("resource_id" = String, Path, description = "Resource id, the 32-hex MD5 of the image"),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
+    ),
+    responses(
+        (status = 200, description = "Image bytes", content((inline(ResourceImageBytes) = "image/png"), (inline(ResourceImageBytes) = "image/jpeg"), (inline(ResourceImageBytes) = "image/gif"), (inline(ResourceImageBytes) = "image/webp"))),
+        (status = 400, description = "Invalid application or resource id", content_type = "application/json", body = Object),
+        (status = 404, description = "Resource not found", content_type = "application/json", body = Object),
+    )
+)]
+pub async fn get_replay_resource(
+    Path((org_id, app_id, resource_id)): Path<(String, String, String)>,
+) -> Response {
+    if let Err(e) = validate_app_id(&app_id).and_then(|_| validate_resource_id(&resource_id)) {
+        return MetaHttpResponse::bad_request(e);
+    }
+    let key = replay_resource_key(&org_id, &app_id, &resource_id);
+    match infra::storage::get_bytes(REPLAY_RESOURCE_ACCOUNT, &key).await {
+        Ok(bytes) => match detect_image_type(&bytes) {
+            Some(content_type) => (
+                StatusCode::OK,
+                [
+                    (header::CONTENT_TYPE, content_type),
+                    (header::X_CONTENT_TYPE_OPTIONS, "nosniff"),
+                    (
+                        header::CACHE_CONTROL,
+                        "private, max-age=31536000, immutable",
+                    ),
+                ],
+                bytes,
+            )
+                .into_response(),
+            None => MetaHttpResponse::not_found("Replay resource not found"),
+        },
+        Err(object_store::Error::NotFound { .. }) => {
+            MetaHttpResponse::not_found("Replay resource not found")
+        }
+        Err(e) => {
+            log::error!("[RUM] replay resource read failed for {key}: {e}");
+            MetaHttpResponse::internal_error("Failed to read replay resource")
+        }
     }
 }
 
@@ -845,5 +1070,155 @@ mod tests {
     fn logs_body_with_bom_is_not_treated_as_an_array() {
         let body = "\u{feff}[{\"a\":1}]";
         assert_eq!(norm(body).unwrap(), body);
+    }
+
+    // ----- replay resources -----
+
+    const PNG: &[u8] = &[0x89, b'P', b'N', b'G', 0x0D, 0x0A, 0x1A, 0x0A, 0, 0];
+    const HEX32: &str = "0123456789abcdef0123456789ABCDEF";
+
+    fn image(id: &str, data: &[u8]) -> (String, Bytes) {
+        (id.to_string(), Bytes::copy_from_slice(data))
+    }
+
+    #[test]
+    fn parses_the_android_resource_event() {
+        let event = br#"{"application":{"id":"app-1"},"type":"resource"}"#;
+        assert_eq!(parse_resource_event(event), Ok(Some("app-1".to_string())));
+    }
+
+    #[test]
+    fn segment_events_are_not_resource_events() {
+        assert_eq!(parse_resource_event(br#"[{"source":"android"}]"#), Ok(None));
+        assert_eq!(parse_resource_event(br#"{"source":"browser"}"#), Ok(None));
+        assert_eq!(parse_resource_event(b"not json"), Ok(None));
+    }
+
+    #[test]
+    fn resource_event_with_an_unsafe_or_missing_app_id_is_rejected() {
+        assert!(parse_resource_event(br#"{"type":"resource"}"#).is_err());
+        let traversal = br#"{"application":{"id":"../x"},"type":"resource"}"#;
+        assert!(parse_resource_event(traversal).is_err());
+    }
+
+    #[test]
+    fn resource_id_must_be_32_hex_chars() {
+        assert!(validate_resource_id(HEX32).is_ok());
+        for bad in [
+            "",
+            "abc",
+            &HEX32[..31],
+            "g123456789abcdef0123456789abcdef",
+            &format!("{HEX32}0"),
+            "../../etc/passwd",
+        ] {
+            assert!(validate_resource_id(bad).is_err(), "{bad}");
+        }
+    }
+
+    #[test]
+    fn app_id_must_be_a_safe_path_segment() {
+        for ok in ["app", "App_1.2-x", &"a".repeat(128)] {
+            assert!(validate_app_id(ok).is_ok(), "{ok}");
+        }
+        for bad in [
+            "",
+            ".",
+            "..",
+            "a/b",
+            "a\\b",
+            "a b",
+            "a%2fb",
+            &"a".repeat(129),
+        ] {
+            assert!(validate_app_id(bad).is_err(), "{bad}");
+        }
+    }
+
+    #[test]
+    fn image_type_comes_only_from_magic_bytes() {
+        assert_eq!(detect_image_type(PNG), Some("image/png"));
+        assert_eq!(
+            detect_image_type(&[0xFF, 0xD8, 0xFF, 0xE0]),
+            Some("image/jpeg")
+        );
+        assert_eq!(detect_image_type(b"GIF89a.."), Some("image/gif"));
+        assert_eq!(detect_image_type(b"GIF87a.."), Some("image/gif"));
+        assert_eq!(
+            detect_image_type(b"RIFF\0\0\0\0WEBPVP8 "),
+            Some("image/webp")
+        );
+        assert_eq!(detect_image_type(b"RIFF\0\0\0\0WAVEfmt "), None);
+        assert_eq!(
+            detect_image_type(b"<svg xmlns='http://www.w3.org/2000/svg'/>"),
+            None
+        );
+        assert_eq!(detect_image_type(b"<html><script>1</script>"), None);
+        assert_eq!(detect_image_type(b""), None);
+    }
+
+    #[test]
+    fn valid_resource_images_pass_validation() {
+        assert!(validate_resource_images(&[image(HEX32, PNG)]).is_ok());
+    }
+
+    #[test]
+    fn resource_validation_rejects_empty_bad_id_bad_type_and_caps() {
+        assert!(validate_resource_images(&[]).is_err());
+        assert!(validate_resource_images(&[image("short", PNG)]).is_err());
+        assert!(validate_resource_images(&[image(HEX32, b"<svg/>")]).is_err());
+        let mut big = PNG.to_vec();
+        big.resize(MAX_RESOURCE_IMAGE_BYTES + 1, 0);
+        assert!(validate_resource_images(&[image(HEX32, &big)]).is_err());
+        big.truncate(MAX_RESOURCE_IMAGE_BYTES);
+        assert!(validate_resource_images(&[image(HEX32, &big)]).is_ok());
+        let many: Vec<_> = (0..=MAX_RESOURCE_IMAGES)
+            .map(|_| image(HEX32, PNG))
+            .collect();
+        assert!(validate_resource_images(&many).is_err());
+        assert!(validate_resource_images(&many[..MAX_RESOURCE_IMAGES]).is_ok());
+    }
+
+    #[test]
+    fn one_bad_image_rejects_the_whole_upload() {
+        let images = [image(HEX32, PNG), image(HEX32, b"not an image")];
+        assert!(validate_resource_images(&images).is_err());
+    }
+
+    #[test]
+    fn resource_key_is_namespaced_by_org_and_app() {
+        assert_eq!(
+            replay_resource_key("o", "a", HEX32),
+            format!("rum_replay_resources/o/a/{HEX32}")
+        );
+    }
+
+    #[tokio::test]
+    async fn resource_upload_with_segments_is_refused_before_storage() {
+        let upload = ReplayUpload {
+            segments: vec![vec![1]],
+            images: vec![image(HEX32, PNG)],
+            event: None,
+        };
+        let resp = store_resource_upload("o", "a", upload).await;
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn resource_upload_with_a_bad_image_is_refused_before_storage() {
+        let upload = ReplayUpload {
+            images: vec![image(HEX32, b"<svg/>")],
+            ..Default::default()
+        };
+        let resp = store_resource_upload("o", "a", upload).await;
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn get_replay_resource_rejects_invalid_ids() {
+        let resp = get_replay_resource(Path(("o".into(), "..".into(), HEX32.into()))).await;
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+        let resp = get_replay_resource(Path(("o".into(), "a".into(), "nothex".into()))).await;
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
     }
 }

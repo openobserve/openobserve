@@ -107,6 +107,7 @@ use crate::{
         rum::ingest::log,
         rum::ingest::data,
         rum::ingest::sessionreplay,
+        rum::ingest::get_replay_resource,
         openobserve_api_management::request::ingest_rejections::recent_rejections,
         openobserve_api_management::request::security::get_security_access,
         openobserve_api_search::search::search,

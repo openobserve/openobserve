@@ -8180,6 +8180,7 @@ dependencies = [
  "ingestion-common",
  "log",
  "o2_enterprise",
+ "object_store",
  "openobserve-api-common",
  "openobserve-core",
  "opentelemetry-proto",
