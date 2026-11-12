@@ -59,7 +59,7 @@ pub(super) async fn plan_batches(
         .map(|group| (group, MergeMode::Classic))
         .collect();
 
-    batches.extend(match mode {
+    let planned = match mode {
         MergeMode::MetricsHashMerged => open_hour_batches(&mode_files, limits),
         MergeMode::MetricsIndexed => closed_hour_batches(mode_files, limits, schema, stream).await,
         #[cfg(feature = "enterprise")]
@@ -71,7 +71,9 @@ pub(super) async fn plan_batches(
             .into_iter()
             .map(|group| (group, mode.clone()))
             .collect(),
-    });
+    };
+    // a branch may plan a batch of no files: nothing to merge
+    batches.extend(planned.into_iter().filter(|(files, _)| !files.is_empty()));
     batches
 }
 
@@ -103,13 +105,11 @@ async fn closed_hour_batches(
 ) -> Vec<PlannedBatch> {
     let files = indexed_hour_scope(files, limits.max_file_size, stream);
     let pre_merge = pre_merge_batches(&files, limits.max_merge_groups, schema, stream).await;
-    if !pre_merge.is_empty() {
-        return pre_merge;
+    if pre_merge.is_empty() {
+        vec![(files, MergeMode::MetricsIndexed)]
+    } else {
+        pre_merge
     }
-    if files.is_empty() {
-        return Vec::new();
-    }
-    vec![(files, MergeMode::MetricsIndexed)]
 }
 
 /// What a closed indexed metrics hour merges, see [`MetricsIndexMergeScope`].
