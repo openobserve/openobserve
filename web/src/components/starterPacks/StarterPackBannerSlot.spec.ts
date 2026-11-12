@@ -50,7 +50,8 @@ describe("StarterPackBannerSlot", () => {
   it("holds the button at final width and disabled while checking", async () => {
     fake.matcher.state.value = "checking";
     const wrapper = await render();
-    const button = action("first-event-status-pack-checking") as HTMLButtonElement;
+    const button = wrapper.get('[data-test="first-event-status-pack-checking"]')
+      .element as HTMLButtonElement;
     expect(button.disabled).toBe(true);
     expect(button.className).toContain("w-68");
     expect(wrapper.emitted("offered")?.at(-1)).toEqual([true]);
@@ -59,7 +60,7 @@ describe("StarterPackBannerSlot", () => {
   it("keeps checking while logs arrive, then offers the partial setup after the wait", async () => {
     fake.matcher.state.value = "waiting";
     const wrapper = await render();
-    expect(action("first-event-status-pack-checking")).not.toBeNull();
+    expect(has(wrapper, "first-event-status-pack-checking")).toBe(true);
     fake.matcher.waitedLong.value = true;
     await nextTick();
     expect(wrapper.get('[data-test="first-event-status-pack-partial-btn"]').text()).toBe(
@@ -102,11 +103,12 @@ describe("StarterPackBannerSlot", () => {
     expect(fake.matcher.retry).toHaveBeenCalled();
   });
 
-  it("shows the admin link instead of the card when setup was refused", async () => {
+  it("shows the admin link in the card instead of the counts when setup was refused", async () => {
     fake.flow.forbidden.value = true;
     const wrapper = await render();
-    expect(action("first-event-status-pack-copy-link-btn")).not.toBeNull();
+    expect(has(wrapper, "first-event-status-pack-copy-link-btn")).toBe(true);
     expect(has(wrapper, "first-event-status-pack-card-counts")).toBe(false);
+    expect(target.children.length).toBe(0);
   });
 
   it("offers nothing once the pack is installed", async () => {
