@@ -32,6 +32,10 @@ export const autoobserveKeys = {
     orgKey(org, "autoobserve", "incidents", limit, offset),
   incidentsPages: (org: string, range: string, pageSize: number, cap: number) =>
     orgKey(org, "autoobserve", "incidents", "pages", range, pageSize, cap),
+  issueSeries: (org: string, type: string, stream: string, startMs: number, endMs: number) =>
+    orgKey(org, "autoobserve", "issueSeries", type, stream, startMs, endMs),
+  volumeSeries: (org: string, ids: string, startMs: number, endMs: number) =>
+    orgKey(org, "autoobserve", "volumeSeries", ids, startMs, endMs),
   pagingSettings: (org: string) => orgKey(org, "autoobserve", "settings", "paging"),
   decisionsEnabled: (org: string) => orgKey(org, "autoobserve", "decisions", "enabled"),
   decisionsPages: (org: string) => orgKey(org, "autoobserve", "decisions", "page"),

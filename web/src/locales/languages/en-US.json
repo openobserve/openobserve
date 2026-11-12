@@ -11555,7 +11555,8 @@
       "reopenGone": "This dismissal no longer exists, or you can no longer see its alert. The list was refreshed.",
       "reopenFailed": "Nothing was undone. Try again.",
       "stat": "Dismissed",
-      "statSub": "Hidden when this run was made"
+      "statSub": "Hidden when this run was made",
+      "statSubShort": "At this run"
     },
     "tabs": {
       "runs": "Runs",
@@ -11810,6 +11811,7 @@
       "definitionChecksUnavailable": "Alert definition checks need AutoObserve, which is off. The other checks ran.",
       "definitionChecksNotYet": "AutoObserve has not checked alert definitions in the last day, so they were not judged.",
       "definitionChecksFailed": "Alert definition checks could not be read, so they were not judged.",
+      "definitionsNotChecked": "AutoObserve did not check {count} alert definition, so it was not judged. | AutoObserve did not check {count} alert definitions, so they were not judged.",
       "definitionChecksTruncated": "Alert definition check results were truncated, so alerts past the cut were not judged.",
       "errorClassesUnassessed": "Error types were not read for {count} alert, so its card shows counts only. | Error types were not read for {count} alerts, so their cards show counts only."
     },
@@ -30494,20 +30496,179 @@
     "modeUnknown": "Unknown"
   },
   "autoobserve": {
+    "policyLive": {
+      "nav": "Policy sections",
+      "sections": {
+        "coverage": "Coverage",
+        "alerts": "Alert changes",
+        "investigation": "Investigation and paging",
+        "channels": "Channels"
+      },
+      "leads": {
+        "coverage": "What AutoObserve does when a service has no alert for a signal it should watch.",
+        "alerts": "What AutoObserve does when an alert's settings make it noisy or silent.",
+        "investigation": "Who is paged when a watched stream stops, and how incidents are analyzed.",
+        "channels": "Where AutoObserve tells you what it found."
+      },
+      "modes": {
+        "suggest": "Suggest",
+        "auto": "Auto",
+        "locked": "AutoObserve always suggests and waits for your OK. Letting it act on its own needs a setting the server doesn't offer yet."
+      },
+      "actions": {
+        "addAlert": {
+          "title": "Add an alert for a coverage gap",
+          "detail": "Drafts the alert from your own stream and asks you to add it."
+        },
+        "destinations": {
+          "title": "Give an alert a destination",
+          "detail": "For an alert that fires but notifies no one."
+        },
+        "pending": {
+          "title": "Change how long an alert waits before firing",
+          "detail": "For an alert that fires on short blips."
+        },
+        "keepFiring": {
+          "title": "Change how long an alert keeps firing",
+          "detail": "For an alert that flaps on and off."
+        },
+        "silence": {
+          "title": "Change how long an alert stays silent after firing",
+          "detail": "For an alert that repeats while nothing changes."
+        }
+      },
+      "rcaOn": "AI analysis runs on new incidents in this deployment.",
+      "rcaOff": "AI analysis is off in this deployment, so incidents show AutoObserve's own evidence only."
+    },
+    "settingsLive": {
+      "retry": "Try again",
+      "how": "How AutoObserve works",
+      "reach": {
+        "channel": "Slack: {channel}, with a daily summary at {time}.",
+        "none": "No Slack channel is picked yet, so AutoObserve reaches you here and through on-call paging.",
+        "inbox": "Everything AutoObserve finds also appears on this page.",
+        "change": "Change in Slack settings",
+        "setUp": "Set up Slack",
+        "off": "Slack isn't set up for this organization.",
+        "denied": "You don't have permission to see the Slack settings.",
+        "failed": "Couldn't load the Slack settings."
+      },
+      "page": {
+        "title": "When I page you"
+      },
+      "own": {
+        "title": "How much I do on my own",
+        "asks": "AutoObserve changes nothing on its own. Every change waits for a person's OK, and you can undo it from What I've changed.",
+        "slackOn": "People can approve changes from Slack.",
+        "slackOff": "Changes are approved here only, not from Slack."
+      }
+    },
+    "activityLive": {
+      "headline": "Changed {alert}",
+      "by": "Changed by {actor} · {when}",
+      "undoneBy": "Undone by {actor} · {when}",
+      "ledgerHint": "Every change AutoObserve made or proposed, newest first. Undo puts the alert back the way it was.",
+      "approvals": "Needs your approval",
+      "changes": "Changes",
+      "waiting": "Waiting",
+      "proposedBy": "AutoObserve",
+      "needsOk": "Needs your approval",
+      "reject": "Reject",
+      "reviewEdit": "Review and approve",
+      "stats": {
+        "inForce": "In force"
+      },
+      "filters": {
+        "inForce": "In force",
+        "undone": "Undone",
+        "pending": "Needs your approval"
+      },
+      "status": {
+        "inForce": "In force"
+      },
+      "days": {
+        "today": "Today",
+        "yesterday": "Yesterday"
+      },
+      "columns": {
+        "when": "When",
+        "change": "Change",
+        "on": "On alert",
+        "who": "Who",
+        "state": "State",
+        "actions": "Actions"
+      },
+      "details": {
+        "who": "Who",
+        "noFields": "This change named no setting AutoObserve can show.",
+        "undoNote": "Undo puts the alert's settings back the way they were.",
+        "undoneNote": "This change was undone; the alert is back the way it was."
+      },
+      "historyFilter": "Show",
+      "history": {
+        "incident": "Problems",
+        "change": "Changes",
+        "decision": "Decisions",
+        "filterEmpty": "Nothing of this kind in the newest entries.",
+        "opened": "I opened an incident: {title}.",
+        "paged": "I paged {team} about {title}.",
+        "pagedOnCall": "I paged on-call about {title}.",
+        "dismissed": "{actor} dismissed my suggestion: {title}.",
+        "accepted": "{actor} marked my report on {title} as intended.",
+        "applied": "{actor} applied my change to {title}.",
+        "undid": "{actor} undid an earlier decision on {title}.",
+        "you": "You",
+        "reason": "Reason: {reason}",
+        "seeChange": "See the change",
+        "openIssue": "Open issue"
+      },
+      "showMore": "Show {count} more change | Show {count} more changes",
+      "whoUndone": "Undone by {actor}",
+      "headlineOne": "Changed {setting} on {alert}",
+      "headlineMany": "Changed {count} setting on {alert} | Changed {count} settings on {alert}"
+    },
+    "coverageLive": {
+      "learning": {
+        "found": "{count} stream has {found} of {needed} days of history and is ready on {date}. | {count} streams have up to {found} of {needed} days of history; the first is ready on {date}.",
+        "retention": "{count} stream keeps less than {needed} days of data, so AutoObserve can't learn its usual level. | {count} streams keep less than {needed} days of data, so AutoObserve can't learn their usual level.",
+        "noUsage": "{count} stream needs usage reporting before AutoObserve can learn it. | {count} streams need usage reporting before AutoObserve can learn them.",
+        "learned": "Learned from {days} days of history.",
+        "streamFound": "{found} of {needed} days found, ready on {date}",
+        "streamRetention": "Keeps less than {needed} days of data",
+        "streamNoUsage": "Needs usage reporting",
+        "until": "{count} stream is gathering history and is ready on {date}. | {count} streams are gathering history; the first is ready on {date}.",
+        "gathering": "{count} stream is gathering history. | {count} streams are gathering history.",
+        "noUsageAll": "AutoObserve learns each stream's usual level from usage reporting, which is off, so it can't learn your streams yet.",
+        "noUsageTitle": "AutoObserve can't learn your streams yet",
+        "noUsageDesc": "It learns each stream's usual level from usage reporting, which is off in this installation. Ask your administrator to turn on usage reporting.",
+        "one": "{reason} · {stream}"
+      },
+      "statePartial": "Partly watched",
+      "stateLearning": "Learning",
+      "sentence": {
+        "fully": "I'm fully watching {watched} of your {total} service. | I'm fully watching {watched} of your {total} services.",
+        "partly": "{count} is partly watched: some of its checks have no alert. | {count} are partly watched: some of their checks have no alert.",
+        "gaps": "{count} has a coverage gap. | {count} have a coverage gap.",
+        "learning": "{count} is still learning. | {count} are still learning."
+      },
+      "gapChip": "Gap",
+      "checksWatched": "{count} of {total} checks watched"
+    },
+    "homeLive": {
+      "andMore": "{count} more",
+      "cantSee": "AutoObserve can't watch {count} service yet: {names}. | AutoObserve can't watch {count} services yet: {names}.",
+      "cantSeeAction": "See coverage gaps",
+      "allClearTitle": "No problems {within}",
+      "allClearDesc": "AutoObserve watches {count} service and nothing needed you. | AutoObserve watches {count} services and nothing needed you.",
+      "allClearNone": "Nothing needed you."
+    },
     "title": "AutoObserve",
     "subtitle": "Send your data. OpenObserve finds the problems and tells you, with its best read on the cause. When it's quiet, it shows you what it checked and what it can't see.",
-    "phase2": "Phase 2",
     "tabs": {
       "issues": "Issues",
       "coverage": "Coverage",
       "activity": "Activity",
       "policy": "Policy"
-    },
-    "loops": {
-      "coverage": "Coverage",
-      "calibration": "Calibration",
-      "investigation": "Investigation",
-      "action": "Action"
     },
     "signals": {
       "requests": "Requests",
@@ -30517,72 +30678,25 @@
       "logPatterns": "Log patterns",
       "dependencies": "Dependencies"
     },
-    "ledgerStatus": {
-      "autoApplied": "Auto-applied",
-      "awaiting": "Awaiting approval",
-      "approved": "Approved",
-      "rejected": "Rejected",
-      "rolledBack": "Rolled back",
-      "kept": "Kept — checks passed"
-    },
     "issues": {
-      "subtitle": "Incidents grouped and investigated by the SRE agent. One notification per problem; the cause is attached, or follows in the same thread if triage times out or fails.",
-      "open": "Open incident",
       "recent": "Resolved",
       "all": "All",
-      "heldForDigest": "Held for Friday's summary",
-      "colId": "Incident",
-      "colTitle": "Problem",
-      "colSeverity": "Severity",
-      "colServices": "Affected services",
-      "colStarted": "Started",
-      "colStatus": "Status",
-      "colCause": "Cause",
       "emptyTitle": "Nothing here",
       "emptyDescription": "No problems match this filter.",
-      "subsetNote": "{shown} shown. This demo shows a selection of this week's {total} incidents.",
       "searchLabel": "Search issues",
-      "searchPlaceholder": "Search issues, services, causes or INC-…",
       "noMatch": "No issues match “{query}”",
       "clearSearch": "Clear search",
       "matchCount": "No issues match | 1 issue matches | {count} issues match",
-      "colSignal": "Signal",
       "span": "{start} → {end}",
-      "spanOpen": "{start} → now",
-      "minutes": "{count} min",
-      "grouped": "{count} alert → 1 incident | {count} alerts → 1 incident",
-      "confidence": "{level} confidence",
-      "proposed": "Proposed",
-      "reversible": "reversible",
-      "proposalFor": "Proposed fix for {title}"
+      "spanOpen": "{start} → now"
     },
     "drawer": {
       "rca": "Root cause",
-      "rcaSummary": "Summary",
       "likelyCause": "Likely cause",
-      "confidence": "Confidence",
-      "confidenceValue": "Confidence: {value} (no calibrated score yet)",
-      "nextStep": "Suggested next step",
-      "evidence": "Evidence",
       "blastRadius": "Blast radius",
-      "upstream": "Upstream callers",
-      "affected": "Affected",
-      "downstream": "Downstream dependencies",
-      "none": "None",
       "timeline": "Timeline",
       "notification": "Notification sent",
-      "notSent": "No page: this low-severity problem was held for the Friday summary. Recorded in the in-product inbox.",
-      "sender": "AutoObserve",
-      "threadReply": "replied in thread",
-      "p1Note": "P1 pages immediately, before the investigation lands. The cause follows in the same thread.",
-      "gateNote": "P2 and P3 notifications wait up to 2 minutes for the investigation, so the first message usually carries the cause. If triage times out or fails, the message says the investigation is still running or failed, and the cause follows in the same thread. P4 problems don't notify anyone; they go into the Friday summary.",
-      "caughtEarlier": "What would have caught this earlier",
-      "analyzedAt": "Investigation landed at {time}.",
-      "triggersSample": "Showing {shown} of {total} firings",
-      "waitingForOk": "Waiting for your OK",
-      "proposedFix": "Proposed fix",
-      "unfoldTab": "How it unfolded",
-      "seeEvidence": "See all"
+      "unfoldTab": "How it unfolded"
     },
     "unfold": {
       "hint": "Read left to right: what changed, the signals it set off, then what reached your team. Select a card for its firings.",
@@ -30595,7 +30709,6 @@
         "change": "Change"
       },
       "likelyCause": "Likely cause",
-      "linesUpWith": "Lines up with",
       "times": "×{count}",
       "sameMinute": "same minute",
       "plusMinutes": "+{count} min",
@@ -30615,26 +30728,13 @@
       "later": "Later →",
       "outcome": {
         "paged": "Paged on-call",
-        "asked": "Asked for an OK",
-        "notified": "Message sent, no page",
-        "held": "Held for Friday's summary",
-        "fixFailed": "Fix didn't help",
-        "fixed": "Fixed",
-        "resolved": "Resolved",
         "open": "Still open"
       },
       "legendMore": "+{count}"
     },
     "coverage": {
       "showing": "Showing {shown} of {total} services",
-      "watched": "Watched",
-      "learning": "Learning",
-      "gap": "Gap",
-      "na": "Not applicable",
-      "anomaly": "Anomaly",
-      "threshold": "Threshold",
       "service": "Service",
-      "lastScanned": "Last scanned",
       "detector": "Detector",
       "methodAnomaly": "Anomaly detector, learned baseline",
       "methodThreshold": "Static threshold from the library",
@@ -30646,59 +30746,28 @@
       "history": "{days} of {total} days of history",
       "notScanned": "First scan in progress — unknown, not covered until it finishes",
       "guardrails": "Guardrails active while learning: error-ratio ceiling · freshness check (fires if the stream stops)",
-      "alsoWatchedBy": "Also watched by",
       "searchLabel": "Search services",
-      "searchPlaceholder": "Search service or stream",
       "matchCount": "No services match | 1 service matches | {count} services match",
-      "noMatch": "No service or stream matches “{query}”",
       "clearSearch": "Clear search",
       "filterLabel": "Filter services by coverage",
       "all": "All",
-      "gaps": "Gaps",
-      "cantWatch": "Can't watch",
       "detectorCount": "1 detector | {count} detectors",
-      "stream": "Stream",
-      "coverage": "Coverage",
-      "coverageCount": "{watched}/{total}",
-      "coverageLabel": "{watched} of {total} applicable signals watched",
       "legendLabel": "Legend",
-      "gapChip": "GAP",
-      "daysShort": "{days}/{total}d",
-      "tipAnomaly": "{signal}: anomaly detector, learned baseline",
-      "tipThreshold": "{signal}: static threshold from the library",
-      "tipLearning": "{signal}: learning, {days} of {total} days of history",
-      "tipGap": "{signal}: gap, can't be watched yet",
-      "tipNa": "{signal}: not applicable",
       "config": "Detector config",
       "lastFired": "Last fired",
-      "never": "Never",
-      "hoursAgo": "1 hour ago | {count} hours ago",
-      "daysAgo": "1 day ago | {count} days ago",
       "viewLabel": "Coverage view",
       "viewMap": "Map",
       "viewTable": "Table",
       "fillBy": "Fill by",
       "fillState": "Coverage state",
-      "fillLearning": "Learning progress",
       "fillDetectors": "Detector count",
       "fillScanned": "Last scanned age",
-      "summaryWatched": "{watched} of {total} fully watched · {pct}%",
       "addedThisWeek": "1 new service this week | {count} new services this week",
-      "splitLabel": "{watched} fully watched, {learning} learning, {gaps} can't be watched yet",
       "stateWatched": "Fully watched",
-      "stateLearning": "Learning · {days} of {total} days",
       "stateGap": "Can't be watched yet",
       "hexName": "{service}, {state}, {stream}, {detectors}",
       "legendOf": "Legend for {fill}, select to highlight",
       "mapLabel": "Coverage map, 1 service filled by {fill} | Coverage map, {count} services filled by {fill}",
-      "bucketLearned": "Learned",
-      "bucketDays67": "6–7 days",
-      "bucketDays35": "3–5 days",
-      "bucketDays02": "0–2 days",
-      "bucketNoData": "No data",
-      "bucketSix": "6 detectors",
-      "bucketFive": "5 detectors",
-      "bucketFewer": "1–4 detectors",
       "bucketNone": "None",
       "bucketFresh": "Under 5 min",
       "bucketRecent": "5–15 min",
@@ -30720,7 +30789,6 @@
       "openCatalog": "Service Catalog",
       "openLogs": "Open in Logs",
       "rangeLabel": "Time range",
-      "logPatternsValue": "{known} known · {fresh} new today",
       "drawerSubtitle": "{stream} · {detectors} · {library}",
       "badgeNotWatched": "Coverage gap",
       "signalsWatched": "Signals watched",
@@ -30732,7 +30800,6 @@
       "badgeAnomaly": "Anomaly · learned",
       "badgeThreshold": "Threshold > {threshold}",
       "now": "Now",
-      "bandLearning": "Learning the baseline · {days} of {total} days · normal range ready {day}",
       "metric": {
         "requests": "Requests",
         "errors": "Errors",
@@ -30753,149 +30820,9 @@
       }
     },
     "activity": {
-      "allLoops": "All loops",
-      "allStatuses": "All statuses",
-      "ledgerHint": "Every change AutoObserve proposes or makes is recorded here.",
-      "userBuilt": "User-built alert",
-      "confidence": "Confidence: {value}",
-      "evidence": "Evidence:",
       "before": "Before",
       "after": "After",
-      "neverAutoRetire": "Retiring an alert is never automatic.",
-      "neverSilent": "User-built alerts are never changed silently.",
-      "undo": "Undo",
-      "approve": "Approve",
-      "edit": "Edit",
-      "reject": "Reject",
-      "saveApprove": "Save and approve",
-      "undoneNote": "Undone by you — prior state restored from snapshot",
-      "undoneToast": "Undone. Marked rolled back in this demo's ledger.",
-      "approvedToast": "Approved. Marked approved in this demo's ledger.",
-      "rejectedNote": "Rejected by you",
-      "rejectedToast": "Rejected. Recorded against this action class.",
-      "emptyTitle": "No entries",
-      "emptyDescription": "Nothing in the ledger matches these filters.",
-      "reviewWindow": "In review for {window} — kept automatically if its checks pass, rolled back if they fail. The prior configuration keeps being evaluated silently, so anything this change would have hidden still shows up. Undo restores the prior state now.",
-      "approvedNote": "Approved by you at {time}.",
-      "applyingNote": "Approved by you at {time}; applying it now.",
-      "appliedNote": "Approved by you at {time} and applied.",
-      "declinedNote": "Declined by you.",
-      "needsApproval": "Needs your approval",
-      "awaiting": "Awaiting",
-      "auto": "Auto",
-      "outcomeFilter": "Filter by outcome",
-      "loopFilter": "Filter by loop",
-      "columns": {
-        "time": "When",
-        "loop": "Loop",
-        "action": "Action",
-        "target": "Target",
-        "change": "Change",
-        "confidence": "Confidence",
-        "decision": "Decision",
-        "outcome": "Outcome",
-        "actions": "Actions"
-      },
-      "showDetails": "Show details for {action} on {target}",
-      "hideDetails": "Hide details for {action} on {target}",
-      "approveFor": "Approve {action} on {target}",
-      "rejectFor": "Reject {action} on {target}",
-      "editFor": "Edit {action} on {target}",
-      "undoFor": "Undo {action} on {target}",
-      "openIncident": "Open incident {id}",
-      "confidenceHint": "{value} — no calibrated score yet",
-      "diff": "Proposed change, removed and added lines",
-      "daysLeft": "{count} day left | {count} days left",
-      "reviewProgress": "Review window elapsed",
-      "entryId": "Entry",
-      "logged": "Logged"
-    },
-    "policy": {
-      "gateHint": "Among changes to existing alerts, only turning on suppress repeats applies on its own, with a prior-state snapshot and a review window: kept if its checks pass, rolled back if they fail. Everything else waits for one-click approval.",
-      "off": "Off",
-      "suggest": "Suggest",
-      "auto": "Auto",
-      "phase2Title": "Action — remediation",
-      "phase2Hint": "Production fixes. Each class earns its level from its measured track record and never acts above it.",
-      "investigation": "Investigation",
-      "outcomesTitle": "Outcomes",
-      "outcomesBody": "AutoObserve measures what each action did: did the error rate recover, did the page stop, was it undone. A class that keeps landing well earns more autonomy, one class at a time; a miss counts against it, and a fix that keeps being needed is reported as a bug instead of automated.",
-      "outcomesExample": "ScaleQueueWorkers moved to Auto after 7 approved scale-outs worked. Its one miss, on 2 October, added a pre-check, and a second miss moves it back to Suggest. AbortRollout waits for your OK; RollbackDeploy stays Off until it has a track record.",
-      "triage": {
-        "parallel": "Parallel",
-        "gate": "Gate",
-        "p2p4": "P2–P3",
-        "p1Short": "P1",
-        "p1Desc": "Pages at once and investigates alongside; the cause follows in the same thread. Gate is not allowed for P1.",
-        "gateDesc": "Hold the page until the investigation lands, for up to 2 minutes. Fails open: if triage times out or fails, it pages anyway, says the investigation is still running or failed, and the cause follows in the thread."
-      },
-      "classes": {
-        "EnableDeduplication": "Turn on suppress repeats for an alert that notifies on every evaluation.",
-        "CreateDetector": "Create an anomaly detector on a service's requests, errors or latency.",
-        "RaiseThreshold": "Raise a threshold that fires on healthy days.",
-        "LengthenEvaluationWindow": "Lengthen the window of an alert that flaps.",
-        "FixAlertQuery": "Correct an alert query that measures the wrong thing or can never match.",
-        "AttachDestination": "Attach a destination to a detector that fires into nowhere.",
-        "AddLibraryAlert": "Add a scheduled alert from the library where its predicate matches.",
-        "MoveToIncidentDelivery": "Deliver a user-built alert through its incident instead of its own route.",
-        "ReviewForDeletion": "Propose retiring an alert nobody acts on.",
-        "RollbackDeploy": "Roll back the deploy that caused a problem.",
-        "ScaleService": "Scale a saturated service out.",
-        "RestartPod": "Restart a pod that stopped serving while its replicas are healthy; a repeat opens a bug instead.",
-        "ToggleFeatureFlag": "Turn off the feature flag behind a problem.",
-        "RunRunbookStep": "Run a step from the service's runbook.",
-        "LowerThreshold": "Lower a threshold that fired too late to warn before an incident.",
-        "RevertConfigChange": "Put back a recent setting change a problem started with, when the replicas without it are healthy.",
-        "EvictLeakedConnections": "Close connections a service checked out and never returned (found by leak detection), leaving queries in flight alone. Each one is linked to the leak's bug.",
-        "AbortRollout": "Send traffic back to the previous version when only the new version's pods fail mid-rollout. Resumable in one click.",
-        "ScaleQueueWorkers": "Add workers to a backed-up queue, up to a cap; scale back on its own if the drain rate doesn't improve."
-      },
-      "triageHint": "L0 triage per severity. Fixed in phase 1.",
-      "channels": "Channels",
-      "channelInbox": "In-product inbox",
-      "channelEmailAdmins": "Email to org admins",
-      "channelDefault": "Default for every org. Always on.",
-      "alwaysOn": "Always on",
-      "channelSlack": "Slack {channel}",
-      "channelConnectedDesc": "Connected. Optional; the inbox and email work without it.",
-      "connected": "Connected",
-      "defaultsNote": "Phase 1 ships fixed product defaults. Per-org overrides come later.",
-      "groupCoverage": "Coverage — creates detectors automatically",
-      "groupCoverageHint": "Every new service gets anomaly detectors and the matching library alerts as soon as it appears, with basic safety checks while it learns. Each creation is recorded, can be undone, and goes through a review window.",
-      "groupCalibration": "Calibration — changes to existing alerts",
-      "channelEmail": "Email {address}",
-      "paging": "Paging",
-      "pagingHint": "Severity decides how a problem reaches people.",
-      "routing": {
-        "p1p2": "P1 and P2",
-        "p1p2Desc": "Hurts customers. Pages on-call at any hour.",
-        "page": "Page",
-        "p3": "P3",
-        "p3Desc": "A Slack message sent as soon as it's ready. Never pages anyone.",
-        "message": "Message",
-        "p4": "P4",
-        "p4Desc": "Goes into the Friday summary.",
-        "summary": "Friday summary"
-      },
-      "nav": {
-        "coverage": "Coverage",
-        "alerts": "Alert changes",
-        "fixes": "Fixes",
-        "investigation": "Investigation & paging",
-        "channels": "Channels"
-      },
-      "summary": {
-        "count": "{count} {mode}",
-        "row": "{label} {mode}",
-        "channels": "{count} connected"
-      }
-    },
-    "notInDemo": "Not available in this demo",
-    "confidence": {
-      "high": "High",
-      "medium": "Medium",
-      "low": "Low",
-      "uncalibrated": "no calibrated score yet"
+      "outcomeFilter": "Filter by outcome"
     },
     "analysis": {
       "verdict": "Verdict",
@@ -30919,6 +30846,143 @@
       "nextStep": "Next step",
       "fullReport": "Full report",
       "fullReportHint": "Everything above as one document, ready to copy or download"
+    },
+    "issueLive": {
+      "openIncident": "Open incident",
+      "columns": {
+        "id": "Incident",
+        "signal": "Signal",
+        "streams": "Affected streams",
+        "cause": "Cause"
+      },
+      "grouped": "{count} stream → 1 incident | {count} streams → 1 incident",
+      "nextResolved": "Nothing to do now: every stream is sending data again.",
+      "streamType": "{type} stream",
+      "whatToCheck": "What to check",
+      "seeAnalysis": "See the analysis",
+      "pageNote": "On-call responses, acknowledging and comments stay on the incident page.",
+      "affectedStreams": "Affected streams",
+      "blastNote": "Red streams are still out; grey ones are sending again.",
+      "stillOut": "Still not sending data",
+      "back": "Sending data again",
+      "andMore": "and {count} more | and {count} more",
+      "eventsFailed": "Couldn't load the incident's events, so the timeline shows only what AutoObserve saw.",
+      "timelineMore": "and {count} more in Activity | and {count} more in Activity",
+      "triggersFailed": "Couldn't load this incident's alert triggers.",
+      "triggersCount": "No firings | 1 firing | {count} firings",
+      "logsTab": "Logs",
+      "notice": {
+        "none": "No page recorded",
+        "noneText": "AutoObserve recorded no page for this incident."
+      },
+      "page": {
+        "unrouted": "Nobody was paged",
+        "failed": "Paging failed",
+        "pending": "Page not confirmed yet"
+      },
+      "logs": {
+        "title": "See {stream}'s rows in Logs",
+        "titleMany": "See {stream} and {count} more streams in Logs",
+        "descOpen": "Opens Logs from an hour before the incident started up to now. Correlated logs need an alert, and AutoObserve opened this incident from the stream itself.",
+        "descEnded": "Opens Logs from an hour before the incident started to an hour after it ended. Correlated logs need an alert, and AutoObserve opened this incident from the stream itself."
+      },
+      "confidence": {
+        "label": "Confidence",
+        "high": "High",
+        "medium": "Medium",
+        "low": "Low",
+        "uncalibrated": "no calibrated score yet",
+        "none": "Not scored",
+        "unscored": "No analysis has scored this incident yet."
+      },
+      "spark": {
+        "title": "Rows per 15 minutes in {stream}",
+        "yAxis": "Peak {peak} rows",
+        "caption": "Rows per 15 min · peak {peak}",
+        "label": "Rows per 15 minutes in {stream}: {usual} on average before it started, {since} since",
+        "labelNoBefore": "Rows per 15 minutes in {stream}: {since} on average since it started",
+        "legend": "Chart marks",
+        "detected": "Detected at {time}",
+        "recovered": "Sending again at {time}",
+        "live": "Still open",
+        "empty": "No rows in this window",
+        "failed": "Couldn't load the chart",
+        "denied": "You don't have permission to read {stream}. Ask an admin for read access to it.",
+        "retry": "Retry",
+        "noBefore": "No rows were stored for {stream} before this incident started, so the line starts there.",
+        "leadNote": "Charting {stream}, the stream that opened this incident. How it unfolded charts the other one. | Charting {stream}, the stream that opened this incident. How it unfolded charts the other {count}."
+      },
+      "compare": {
+        "metric": "Rows per 15 minutes, average",
+        "before": "{stream}, before",
+        "since": "{stream}, since it started",
+        "more": "and {count} more stream not compared | and {count} more streams not compared",
+        "empty": "No rows to compare in this window.",
+        "failed": "Couldn't load the stream volumes.",
+        "during": "{stream}, while it was out",
+        "after": "{stream}, after the incident ended",
+        "legendHealthy": "Healthy: usual level, before it started or after it ended",
+        "legendAffected": "Affected: while it was out",
+        "noBefore": "No rows were stored for {streams} before this incident started, so it has no before bar. | No rows were stored for {streams} before this incident started, so they have no before bar.",
+        "usual": "{stream}, usual level",
+        "partialFailed": "Couldn't load {streams}, so it has no bars. | Couldn't load {streams}, so they have no bars.",
+        "partialDenied": "You don't have permission to read {streams}, so it has no bars. | You don't have permission to read {streams}, so they have no bars.",
+        "usualFailed": "Couldn't load the usual level, so the healthy bars use the rows before it started or after it ended."
+      },
+      "timeline": {
+        "detected": "AutoObserve noticed it",
+        "alsoStopped": "Also affected: {stream}",
+        "alsoStoppedMany": "{count} more streams affected | {count} more streams affected",
+        "back": "Sending again: {stream}",
+        "backMany": "{count} streams sending again | {count} streams sending again",
+        "opened": "Incident opened",
+        "acknowledged": "Acknowledged",
+        "resolved": "Resolved",
+        "reopened": "Reopened",
+        "analyzed": "Analysis finished",
+        "analysisFailed": "Analysis stopped",
+        "by": "by {user}",
+        "now": "Now"
+      },
+      "unfold": {
+        "back": "Sending data again",
+        "suspected": "Suspected change from the analysis",
+        "more": "and {count} more stream not drawn; Blast radius on Overview lists it | and {count} more streams not drawn; Blast radius on Overview lists them",
+        "outcome": {
+          "paged": "Paged",
+          "asked": "Asked you",
+          "notified": "Notified",
+          "held": "Held",
+          "fixFailed": "Fix failed",
+          "fixed": "Fixed",
+          "resolved": "Back or resolved",
+          "open": "Opened"
+        },
+        "hint": "Read left to right: when each stream stopped and came back, then what reached your team. Select a card for its details.",
+        "hintChange": "Read left to right: the suspected change, the streams it touched, then what reached your team. Select a card for its details.",
+        "plusHours": "+{hours}h {minutes}m"
+      },
+      "analyzeOff": "AI analysis isn't turned on for this server. An admin can turn it on.",
+      "systemActor": "AutoObserve",
+      "triggersGrouped": "Grouped by AutoObserve",
+      "whatHappened": "What happened",
+      "noCause": "No cause found yet.",
+      "noCauseOff": "No cause yet: AI analysis isn't turned on for this server, so nothing looked for one.",
+      "noCauseRunning": "No cause yet: the analysis is still running.",
+      "triggersNote": "AutoObserve raised these firings from the streams themselves, so they have no alert rule to open.",
+      "usual": {
+        "line": "Usual level",
+        "band": "Usual range",
+        "outside": "Outside the usual range",
+        "unavailable": "The usual level isn't available on this server.",
+        "failed": "Couldn't load the usual level.",
+        "denied": "You don't have permission to read {stream}'s usual level.",
+        "presenceOnly": "AutoObserve watches only whether {stream} sends data, so it has no usual level.",
+        "warmup": "AutoObserve is still learning {stream}'s usual level.",
+        "irregular": "{stream} is too irregular for a usual level.",
+        "noData": "AutoObserve has no history for {stream} yet, so it has no usual level.",
+        "approximate": "The usual level is approximate: some of its history is missing."
+      }
     }
   },
   "autoobserveLive": {
@@ -31337,15 +31401,6 @@
     }
   },
   "autoobserve2": {
-    "demoTag": "Demo",
-    "scenarioLabel": "Demo scenario",
-    "scenarios": {
-      "demo": "Demo week",
-      "allClear": "All clear",
-      "incident": "Active incident",
-      "cantSee": "Can't see",
-      "noBaseline": "No baseline"
-    },
     "nav": {
       "history": "History",
       "settings": "Settings",
@@ -31370,295 +31425,29 @@
         "weeksAgo": "{count} weeks ago"
       },
       "all": "All",
-      "none": "No {priority} problems {within}.",
       "allIssues": "All issues",
-      "priorityLabel": "Priority",
-      "showing": "{count} problem shown | {count} problems shown"
+      "priorityLabel": "Priority"
     },
-    "noProblems": "No problems {within}. I checked {count} service around the clock. | No problems {within}. I checked {count} services around the clock.",
-    "entryLabel": "{when} · {service}",
-    "when": "{day}, {time}",
     "showMore": "Show {count} more",
     "showFewer": "Show fewer",
-    "days": {
-      "today": "Today",
-      "monday": "Monday",
-      "tuesday": "Tuesday",
-      "wednesday": "Wednesday",
-      "thursday": "Thursday",
-      "friday": "Friday",
-      "jul18": "18 July",
-      "jul30": "30 July",
-      "aug13": "13 August",
-      "aug26": "26 August",
-      "sep4": "4 September",
-      "sep12": "12 September",
-      "sep24": "24 September",
-      "sep30": "30 September",
-      "oct1": "1 October",
-      "oct2": "2 October",
-      "sep23": "23 September"
-    },
-    "problems": {
-      "ordersDisk": {
-        "title": "orders-db will run out of disk in about 3 days",
-        "summary": "Its disk is filling about 18 GB a day since Thursday's orders release turned up audit logging, so it fills around Wednesday morning. When it does, checkout, orders and refunds will start failing. Nothing is broken yet, so I sent your team a heads-up instead of paging.",
-        "notify1": "orders-db will run out of disk in about 3 days, around Wednesday 11:00.",
-        "notify2": "Cause: since orders 3.8.0 went out on Thursday, audit logging writes about 18 GB a day. Before that the disk grew about 6 GB a day.",
-        "notify3": "Turn audit logging back down or add disk space before Wednesday. When it fills, checkout, orders and refunds will fail. Nothing is broken yet, so this is a heads-up, not a page.",
-        "chartCaption": "disk · full ~Wed 11:00",
-        "chartLabel": "Disk use grew from 334 to 445 GB of 500 over 14 days, faster since Thursday, and is forecast to be full around Wednesday 11:00"
-      },
-      "search": {
-        "title": "Search is slow and search-2 keeps crashing",
-        "titleFixed": "Search was slow while search-2 kept crashing",
-        "summary": "About 1 in 5 searches take over 3 seconds, since 10:27. A setting changed on search-2 at 10:16 makes it run out of memory. I've paged on-call, and it's still happening.",
-        "notify1": "Search is slow: about 1 in 5 searches take over 3 seconds, since 10:27.",
-        "notify2": "Cause: a setting changed on search-2 at 10:16 fills its memory. It has crashed about 10 times since 10:20. The other 4 nodes don't have the change and are fine.",
-        "notify3": "Putting the old setting back should fix it, and I can undo it. Reply \"revert\" and I'll do it. Whoever made the change should check why.",
-        "summaryFixed": "It started at 10:27, because a setting changed on search-2 filled its memory. You approved putting the old setting back, so I did, and searches are back to normal.",
-        "summaryFixing": "It started at 10:27, because a setting changed on search-2 fills its memory. You approved putting the old setting back, so I'm doing that now.",
-        "chartCaption": "p95 latency · 3.4 s peak",
-        "chartLabel": "p95 latency rose from 0.38 s to 3.4 s at 10:27 and is still high",
-        "chartLabelFixed": "p95 latency rose from 0.38 s to 3.4 s at 10:27 and fell back to normal once the setting was put back"
-      },
-      "checkout": {
-        "title": "1 in 12 payments failed after a deploy",
-        "summary": "payments-api 2.3.1 asked the payments database for more connections than it allows. Rolling back fixed it 18 minutes after the failures began.",
-        "notify1": "Checkout is failing about 1 in 12 payments, since 14:02.",
-        "notify2": "Likely cause: payments-api 2.3.1 went out at 14:01 and raised its connection pool from 20 to 50 per server. 6 servers × 50 is more than the 200 the payments database allows.",
-        "notify3": "Rolling back to 2.3.0 is the quickest fix.",
-        "chartCaption": "failed payments · 1 in 12 peak",
-        "chartLabel": "Failed payments jumped from 0.1% to 1 in 12 at 14:02 and were back to normal 18 minutes later, after the rollback"
-      },
-      "pool": {
-        "title": "Checkout ran out of database connections",
-        "summary": "Leaked connections used up all the free ones, and payments started timing out. You approved clearing them, so I did. Payments recovered 2 minutes later.",
-        "notify1": "Checkout has run out of database connections, and about 1 in 9 payments are timing out, since 11:18.",
-        "notify2": "Cause: 48 of 50 connections are held by refund exports that never returned them. It's the CHK-482 leak, third time in two weeks.",
-        "notify3": "Closing only the leaked connections should clear it; payments in progress aren't touched. Reply \"yes\" and I'll do it.",
-        "chartCaption": "timeouts · 1 in 9 peak",
-        "chartLabel": "Payment timeouts rose to about 1 in 9 at 11:18 and recovered 2 minutes after the fix at 11:21"
-      },
-      "email": {
-        "title": "Order emails ran up to 9 minutes late",
-        "summary": "All the mail workers were replaced at once overnight, and the queue caught up by itself within about 20 minutes. This was minor, so it went into Friday's summary.",
-        "chartCaption": "email delay · 9 min peak",
-        "chartLabel": "Email delay rose to 9 minutes from 03:15 and recovered by itself by 03:36"
-      },
-      "recs": {
-        "title": "Recommendations got slower for 15 minutes",
-        "summary": "They went from a quarter of a second to almost a second. The nightly cache rebuild had been started by hand during the afternoon, and it finished by itself. I held it for Friday's summary.",
-        "chartCaption": "p95 latency · 0.94 s peak",
-        "chartLabel": "p95 latency rose from 0.26 s to 0.94 s at 16:40 and recovered by itself 15 minutes later"
-      },
-      "login": {
-        "title": "Sign-in was slow for about 25 minutes",
-        "summary": "1 in 8 people waited more than 5 seconds. The session cache ran out of space after a traffic spike and signed some people out. Your team added space and it recovered.",
-        "notify1": "Sign-in is slow: about 1 in 8 people wait over 5 seconds, since 10:12.",
-        "notify2": "Cause: the session cache is full after traffic doubled at 10:05.",
-        "notify3": "Adding space to the cache should fix it.",
-        "chartCaption": "p95 sign-in · 5.8 s peak",
-        "chartLabel": "p95 sign-in time rose from 0.6 s to 5.8 s at 10:12 and recovered after cache space was added at 10:31"
-      },
-      "queue": {
-        "title": "Orders backed up in the queue",
-        "summary": "About 4,000 were waiting at the worst. I added workers as you've allowed, but it didn't help, so I put them back and paged on-call. The real cause was a database index that a migration left broken; your team fixed it 40 minutes after it began.",
-        "notify1": "Orders are backing up: about 4,000 waiting, since 21:30.",
-        "notify2": "I added workers at 21:33, as you've allowed, but it didn't help, so I've put them back.",
-        "notify3": "Order lookups are about 40 times slower since the 21:20 database migration. Check the orders_by_status index first.",
-        "chartCaption": "backlog · 4,120 peak",
-        "chartLabel": "Orders waiting climbed to 4,120 from 21:30, kept climbing after workers were added, and drained once the index was rebuilt at 21:52"
-      },
-      "uploads": {
-        "title": "Image uploads failed for 1 in 40 people",
-        "summary": "It lasted 10 minutes, because a certificate expired before one server had loaded its replacement. It sorted itself out, so I held it for Friday's summary.",
-        "chartCaption": "failed uploads · 1 in 40 peak",
-        "chartLabel": "Failed uploads rose to about 1 in 40 at 07:05 and recovered by itself 10 minutes later"
-      },
-      "push": {
-        "title": "Push notifications arrived 2 minutes late",
-        "summary": "It lasted half an hour, while the provider that delivers them was slow. Minor, so it waited for Friday's summary.",
-        "chartCaption": "delivery delay · 2 min peak",
-        "chartLabel": "Delivery delay rose from 4 s to about 2 minutes at 13:50 and recovered by itself 30 minutes later"
-      },
-      "checkoutNow": {
-        "title": "Checkout is failing 1 in 6 payments",
-        "titleFixed": "Checkout failed 1 in 6 payments",
-        "summary": "It started at 10:43, and I'm still looking into why. So far it lines up with version 2.4.0 going out at 10:41, and I've paged on-call.",
-        "notify1": "Checkout is failing about 1 in 6 payments, since 10:43.",
-        "notify2": "I'm still looking into why. So far it lines up with checkout 2.4.0 going out at 10:41.",
-        "notify3": "Only the servers on 2.4.0 are failing. Reply \"stop\" and I'll send traffic back to the old version; the old servers have room for it. I can't see payments-db directly, so I haven't ruled it out.",
-        "summaryFixing": "It started at 10:43, right after version 2.4.0 went out. You approved stopping the rollout, so I'm sending traffic back to the old version now.",
-        "summaryFixed": "It started at 10:43, after version 2.4.0 went out. You approved stopping the rollout, and failures stopped once traffic went back to the old version. Why 2.4.0 fails is still for your team to find.",
-        "chartCaption": "failed payments · 1 in 6 peak",
-        "chartLabel": "Failed payments jumped from 0.1% to about 1 in 6 at 10:43 and are still failing",
-        "chartLabelFixed": "Failed payments jumped from 0.1% to about 1 in 6 at 10:43 and fell back to normal once the rollout was stopped"
-      },
-      "gateway": {
-        "title": "The API rejected 1 in 30 requests",
-        "summary": "It started after a config change. Your team reverted it, and it was back to normal 13 minutes after it began.",
-        "notify1": "The API is rejecting about 1 in 30 requests, since 15:22.",
-        "notify2": "Likely cause: a config change at 15:20 shortened how long sign-in tokens last.",
-        "notify3": "Reverting that change should fix it.",
-        "chartCaption": "rejected · 1 in 30 peak",
-        "chartLabel": "Rejected requests rose to 1 in 30 at 15:22 and fell back to normal when the config change was reverted at 15:34"
-      },
-      "poolSep": {
-        "title": "Checkout ran out of database connections",
-        "summary": "Leaked connections used up all the free ones, and payments started timing out. I traced the leak to refund exports, and you approved clearing the leaked connections. Payments recovered 2 minutes later.",
-        "notify1": "Checkout has run out of database connections, and about 1 in 9 payments are timing out, since 15:42.",
-        "notify2": "Cause: 47 of 50 connections are held by refund exports that never returned them. It looks like a leak in the refund export code.",
-        "notify3": "Closing only the leaked connections should clear it; payments in progress aren't touched. Reply \"yes\" and I'll do it.",
-        "chartCaption": "timeouts · 1 in 9 peak",
-        "chartLabel": "Payment timeouts rose to about 1 in 9 at 15:42 and recovered 2 minutes after the fix at 15:45"
-      },
-      "poolOct": {
-        "title": "Checkout ran out of database connections again",
-        "summary": "It was the same refund-export leak (CHK-482). You approved clearing the leaked connections, and payments recovered 2 minutes later.",
-        "notify1": "Checkout has run out of database connections, and about 1 in 9 payments are timing out, since 10:05.",
-        "notify2": "Cause: 46 of 50 connections are held by refund exports. It's the CHK-482 leak again, second time in 8 days.",
-        "notify3": "Closing only the leaked connections should clear it; payments in progress aren't touched. Reply \"yes\" and I'll do it.",
-        "chartCaption": "timeouts · 1 in 9 peak",
-        "chartLabel": "Payment timeouts rose to about 1 in 9 at 10:05 and recovered 2 minutes after the fix at 10:08"
-      },
-      "lagSep": {
-        "title": "New products took up to 40 minutes to show up in search",
-        "summary": "search-indexer fell behind on catalog updates after version 1.12.0 shortened how long it may take per batch. Your team rolled it back and it caught up 40 minutes after it began.",
-        "notify1": "New and changed products are missing from search: search-indexer is about 48,000 catalog updates behind, since 14:06.",
-        "notify2": "Cause: search-indexer 1.12.0 went out at 13:58 and cut the Kafka poll interval to 30 s. Large batches take about 45 s, so the consumer keeps getting removed from its group.",
-        "notify3": "Rolling back to 1.11.4 should let it catch up. Search itself still works; it just shows older products.",
-        "chartCaption": "consumer lag · 48,000 peak",
-        "chartLabel": "Consumer lag rose from about 200 to 48,000 messages from 14:06 and drained after the rollback at 14:39"
-      },
-      "poolAug": {
-        "title": "Checkout ran out of database connections during the refund export",
-        "summary": "The nightly refund export held almost all of checkout's database connections, and about 1 in 12 payments timed out. It cleared when the export finished, 13 minutes after it began.",
-        "notify1": "Checkout has run out of database connections, and about 1 in 12 payments are timing out, since 02:04.",
-        "notify2": "Cause: 44 of 50 connections are held by the nightly refund export, which is about 3 times its usual size after the end-of-month sale.",
-        "notify3": "It should clear when the export finishes. If it doesn't, stopping the export will free the connections.",
-        "chartCaption": "timeouts · 1 in 12 peak",
-        "chartLabel": "Payment timeouts rose to about 1 in 12 at 02:04 and recovered by themselves when the export finished at 02:17"
-      },
-      "throttleAug": {
-        "title": "Fraud checks were slow for 35 minutes",
-        "summary": "A batch job landed on the same servers and took their spare CPU, so fraud checks took up to 1.4 seconds. Checkout still worked, just slower, and it recovered when the job finished, so I held it for Friday's summary.",
-        "chartCaption": "p95 fraud check · 1.4 s peak",
-        "chartLabel": "p95 fraud check time rose from 0.18 s to 1.4 s at 11:20 and recovered by itself when the batch job finished at 11:55"
-      },
-      "tlsJul": {
-        "title": "Invoices stopped sending for 43 minutes",
-        "summary": "invoice-service's certificate for billing-api expired, so every invoice failed to send. Your team renewed it, and the queued invoices all went out.",
-        "notify1": "No invoices are going out: every send from invoice-service is failing, since 09:01.",
-        "notify2": "Cause: invoice-service's client certificate for billing-api expired at 09:00, and billing-api rejects every connection from it.",
-        "notify3": "Renewing the certificate should fix it. Invoices are queuing, not lost.",
-        "chartCaption": "failed sends · all of them",
-        "chartLabel": "Failed invoice sends jumped from 0.2% to 100% at 09:01 and fell back to normal after the certificate was renewed at 09:41"
-      },
-      "dnsJul": {
-        "title": "Cart prices went missing for 1 in 4 people",
-        "summary": "A DNS change stopped half the cluster's DNS servers answering for internal names, so cart couldn't reach currency. Your team reverted it 31 minutes after it began.",
-        "notify1": "About 1 in 4 cart loads show no prices, since 16:22.",
-        "notify2": "Cause: a DNS config change at 16:20 dropped the internal zone from 2 of the 4 cluster DNS servers, so cart can't find currency.internal on those lookups.",
-        "notify3": "Reverting the DNS change should fix it. Orders still go through at checkout.",
-        "chartCaption": "missing prices · 1 in 4 peak",
-        "chartLabel": "Cart loads without prices rose from 0.1% to about 1 in 4 at 16:22 and fell back to normal when the DNS change was reverted at 16:51"
-      }
-    },
-    "drawer": {
-      "worked": "Worked",
-      "didntHelp": "Didn't help",
-      "now": "Now"
-    },
     "needs": {
-      "more": "More",
-      "less": "Less",
-      "canUndo": "You can undo it",
-      "undo": "Undo",
-      "undone": "Undone. This is waiting for your answer again.",
-      "shiftTo": "to",
-      "retune": {
-        "body": "The \"{alert}\" alert on {host} went off {fired} times this month, and nobody needed to act. The disk climbs to about 85% during nightly cleanup and is back near 70% by morning. Even on its busiest day, it would take more than 3 days to fill from 90%. I'd like to raise it to {to}%. I'll still warn you if the disk is ever on track to fill within a day.",
-        "yes": "Yes, change it",
-        "no": "Leave it",
-        "doneYes": "Done. I raised it to {to}%. The fill warning stays on.",
-        "doneNo": "Okay, I'll leave it at {from}%.",
-        "headline": "Raise the 'disk 80%' alert on ingest-3 to 90%?",
-        "why": "It went off 41 times this month and nobody needed to act.",
-        "cost": "Fill warning stays on"
-      },
-      "fixNow": {
-        "search": {
-          "body": "Search is slow because a setting changed on node search-2 at 10:16 fills its memory, so it keeps crashing. The other 4 nodes still have the old setting and are fine. May I put it back? I can undo this.",
-          "yes": "Put it back",
-          "no": "I'll handle it",
-          "doneYes": "Done. Putting it back now.",
-          "doneNo": "Okay, it's yours. I'll keep watching.",
-          "doneSettled": "Done. search-2 is back and searches are normal.",
-          "headline": "Put search-2's cache setting back to 10%?",
-          "why": "A 10:16 change fills its memory, so it keeps crashing.",
-          "cost": "One restart of search-2"
-        },
-        "checkoutNow": {
-          "body": "Checkout is failing about 1 in 6 payments, and only the servers on 2.4.0 are failing. The 6 servers on the old version have room for all the traffic. May I stop the rollout and send traffic back to them? 2.4.0 stays deployed for your team to look at.",
-          "yes": "Stop the rollout",
-          "no": "I'll handle it",
-          "doneYes": "Done. Stopping the rollout now.",
-          "doneNo": "Okay, it's yours. I'll keep watching.",
-          "doneSettled": "Done. Payments are back to normal.",
-          "headline": "Stop checkout's 2.4.0 rollout?",
-          "why": "About 1 in 6 payments fail, all on 2.4.0. The old version can take all the traffic.",
-          "cost": "2.4.0 stays deployed"
-        }
-      },
-      "fromNowOn": {
-        "body": "{done} times now, a new version made only its own servers fail while it was rolling out. Each time I asked to send traffic back to the old version, and the failures stopped within 2 minutes. May I do that on my own during a rollout from now on? I'll leave the new version in place for your team, and tell them straight away.",
-        "yes": "Yes, on its own",
-        "no": "Keep asking me",
-        "doneYes": "Done. I'll stop bad rollouts on my own and tell you each time.",
-        "doneNo": "Okay, I'll keep asking you first.",
-        "headline": "Stop bad rollouts on my own from now on?",
-        "why": "All 6 times you said yes, the failures stopped within 2 minutes.",
-        "cost": "Only during a rollout"
-      },
-      "labels": {
-        "fixNow": "Fix now",
-        "fromNowOn": "Let me handle this",
-        "retune": "Quieter alert"
-      },
-      "needsOk": "Needs your OK"
+      "shiftTo": "to"
     },
     "footer": {
-      "text": "I check myself too: if I stop working, you'll hear about it.",
       "seeAll": "See everything I watch",
       "seeChanges": "See everything I've changed"
     },
     "coverageDrawer": {
-      "ago": {
-        "minutes": "1 minute ago | {count} minutes ago",
-        "stale": "No new data for 1 minute (since {since}) | No new data for {count} minutes (since {since})"
-      },
-      "summaryWatching": "I'm watching {watched} of your {total} services.",
-      "summaryAll": "I'm watching all {total} of your services.",
-      "summaryWithClauses": "{head} {clauses}.",
-      "clauseLearning": "{count} is still learning | {count} are still learning",
-      "clauseUnseen": "there's one I can't see | there are {count} I can't see",
       "legend": {
-        "watching": "Fully watched",
-        "learning": "Learning",
-        "unseen": "Can't see"
-      },
-      "legendAria": "{label}: {count}",
-      "summaryAllLearning": "I'm watching all {total} of your services, and I'm still learning what normal looks like for each of them."
+        "learning": "Learning"
+      }
     },
     "coveragePage": {
-      "title": "Everything I watch",
-      "back": "Back"
+      "title": "Everything I watch"
     },
     "issuesPage": {
       "title": "All issues",
       "sentence": "Every problem I opened {within}. Pick one to see what happened and what I did about it.",
-      "back": "Back",
       "ranges": {
         "week": "Last 7 days",
         "month": "Last 30 days",
@@ -31673,25 +31462,13 @@
     "activityPage": {
       "title": "What I've changed",
       "stats": {
-        "window": "Last 7 days",
         "made": "Change | Changes",
-        "worked": "Worked",
-        "review": "In review",
         "undone": "Undone"
       },
       "filters": {
-        "all": "All",
-        "fixes": "Fixes",
-        "watching": "Watching",
-        "tuning": "Alert tuning"
+        "all": "All"
       },
       "status": {
-        "applying": "Applying now",
-        "worked": "Worked",
-        "done": "Done",
-        "review": "In review",
-        "reviewDays": "In review · {count} day left | In review · {count} days left",
-        "didntHelp": "Didn't help",
         "undone": "Undone"
       },
       "actions": {
@@ -31701,246 +31478,18 @@
       },
       "details": {
         "name": "Change",
-        "target": "On",
-        "confidence": "Confidence",
-        "saw": "What I saw",
-        "recurring": "This fix keeps being needed for the same leak ({bug}), so I'll always ask first until it's fixed.",
-        "undoDecided": "Undo takes this back, and I'll ask you again."
-      },
-      "toast": {
-        "undone": "Undone. It's back the way it was.",
-        "undoDecided": "Undone. I'll ask you again."
+        "target": "On"
       },
       "empty": {
-        "filter": "Nothing here right now.",
-        "scenario": "I haven't changed anything yet. When I make a change, you'll see it here."
-      },
-      "entries": {
-        "L-313": {
-          "done": "Stopped checkout's 2.4.0 rollout",
-          "why": "Only the 6 servers on 2.4.0 are failing; the 6 on the old version can take all the traffic.",
-          "from": "6 of 12 pods",
-          "to": "no traffic",
-          "on": "checkout 2.4.0"
-        },
-        "L-308": {
-          "done": "Put search-2's cache setting back to 10%",
-          "why": "It went up to 60% at 10:16, and search-2 has been running out of memory since.",
-          "from": "60%",
-          "to": "10%",
-          "on": "cache size · search-2"
-        },
-        "L-309": {
-          "done": "Raised the 'disk 80%' alert on ingest-3 to 90%",
-          "why": "It went off 41 times this month and nobody needed to act. The fill warning stays on.",
-          "from": "80%",
-          "to": "90%",
-          "on": "disk alert · ingest-3"
-        },
-        "L-310": {
-          "done": "Started watching returns, exchanges and gift-cards",
-          "why": "Found them this morning. Learning what's normal for them over 7 days.",
-          "from": "not watched",
-          "to": "watched",
-          "on": "3 services"
-        },
-        "L-314": {
-          "done": "Started watching 6 services I found this morning",
-          "why": "They showed up in your traces today. Learning what's normal for them over 7 days.",
-          "from": "not watched",
-          "to": "watched",
-          "on": "6 services"
-        },
-        "L-311": {
-          "done": "Got your OK to stop bad rollouts on my own",
-          "why": "I stopped 6 with your approval in 60 days; errors were back to normal within 2 minutes each time.",
-          "from": "ask first",
-          "to": "on my own",
-          "on": "stopping rollouts"
-        },
-        "L-304": {
-          "done": "Cleared checkout's 48 leaked database connections",
-          "why": "Payments were timing out. They were back to normal 2 minutes later.",
-          "from": "50 of 50 in use",
-          "to": "2 in use",
-          "on": "checkout pool"
-        },
-        "L-299": {
-          "done": "Cleared checkout's 46 leaked database connections",
-          "why": "The same leak as 23 September. Payments were back to normal 2 minutes later.",
-          "from": "50 of 50 in use",
-          "to": "4 in use",
-          "on": "checkout pool"
-        },
-        "L-296": {
-          "done": "Cleared checkout's 47 leaked database connections",
-          "why": "A new leak, so I filed it with the checkout team as CHK-482 afterwards.",
-          "from": "50 of 50 in use",
-          "to": "3 in use",
-          "on": "checkout pool"
-        },
-        "L-301": {
-          "done": "Started watching billing-api, billing-worker and invoice-service",
-          "why": "Found them in your traces. Still learning what's normal for them.",
-          "from": "not watched",
-          "to": "watched",
-          "on": "3 services"
-        },
-        "L-307": {
-          "done": "Fixed the payments-api connection alert so it counts all servers",
-          "why": "It checked each server on its own, so it never went off during Tuesday's outage.",
-          "from": "each pod over 95%",
-          "to": "all pods over 85%",
-          "on": "connection alert"
-        },
-        "L-302": {
-          "done": "Turned on suppress repeats for the 3 checkout latency alerts",
-          "why": "They notified on every evaluation while they stayed firing, so one slowdown paged you 120 times.",
-          "from": "Every evaluation",
-          "to": "Once per change",
-          "on": "checkout latency"
-        },
-        "L-303": {
-          "done": "Raised the 'disk 80%' alert on ingest-1 to 90%",
-          "why": "It went off 29 times in 30 days and nobody needed to act. The fill warning stays on.",
-          "from": "80%",
-          "to": "90%",
-          "on": "disk alert · ingest-1"
-        },
-        "L-305": {
-          "done": "Added 4 orders-consumer workers to clear a backlog",
-          "why": "It didn't help, so I scaled back to 4 and paged on-call 3 minutes later.",
-          "from": "4 workers",
-          "to": "8 workers",
-          "on": "orders-consumer"
-        },
-        "L-306": {
-          "done": "Got your OK to add queue workers on my own",
-          "why": "You approved it 7 times during traffic bursts, and the backlog cleared every time.",
-          "from": "ask first",
-          "to": "on my own",
-          "on": "adding queue workers"
-        },
-        "L-312": {
-          "done": "Started watching the 18 services I found when you connected",
-          "why": "Learning what's normal for each one. Their alerts start once that's ready.",
-          "from": "not watched",
-          "to": "watched",
-          "on": "18 services"
-        }
+        "filter": "Nothing here right now."
       }
     },
     "historyDrawer": {
-      "title": "History",
-      "seeChange": "See the change",
-      "filters": {
-        "all": "All",
-        "problems": "Problems",
-        "changes": "Changes",
-        "fixes": "Fixes",
-        "decisions": "Your decisions"
-      },
-      "empty": "Nothing here yet.",
-      "entries": {
-        "checkoutNowPaged": "I paged on-call about checkout failing payments.",
-        "searchPaged": "I paged on-call about search being slow.",
-        "searchAsked": "I asked whether I may put search-2's cache setting back.",
-        "euStopped": "Nothing has arrived from the {cluster} cluster since this time. I told you here and in Slack.",
-        "fridaySummary": "I sent Friday's summary with {count} minor problem. | I sent Friday's summary with {count} minor problems.",
-        "emailHeld": "I held a minor problem with order emails for Friday's summary.",
-        "poolFixed": "I closed checkout's leaked database connections. Payments recovered 2 minutes later.",
-        "poolApproved": "You approved closing checkout's leaked database connections.",
-        "billingWatch": "I started watching billing-api, billing-worker and invoice-service.",
-        "checkoutPaged": "I paged on-call about checkout failing payments.",
-        "recsHeld": "I held a minor problem with recommendations for Friday's summary.",
-        "diskApproved": "You approved raising the disk alert on ingest-1 to {to}%.",
-        "latencyGrouped": "I turned on suppress repeats for the three checkout slowness alerts, so a single slowdown pages once.",
-        "queueFixed": "I added orders queue workers, but the queue kept growing, so I put them back and paged on-call.",
-        "loginPaged": "I paged on-call about slow sign-in.",
-        "queuePermission": "You allowed me to add queue workers on my own, up to 8.",
-        "gatewayPaged": "I paged on-call about the API rejecting requests.",
-        "found18": "I found {count} services and started learning what normal looks like for them.",
-        "connected": "You connected me to your data.",
-        "thresholdApproved": "You approved making the payments-api connection alert count all servers against the database's limit of 200.",
-        "decision": {
-          "fixNow": {
-            "search": {
-              "yes": "You approved putting search-2's setting back.",
-              "no": "You said you'd handle search-2 yourself.",
-              "undoYes": "You undid putting search-2's setting back. I re-applied 60%, so search-2 will start running out of memory again; I've told on-call.",
-              "cancel": "You cancelled putting search-2's setting back before I applied it. search-2 is still running out of memory; I've told on-call.",
-              "undoNo": "You took back saying you'd handle search-2 yourself."
-            },
-            "checkoutNow": {
-              "yes": "You approved stopping the checkout 2.4.0 rollout.",
-              "no": "You said you'd handle the checkout rollout yourself.",
-              "undoYes": "You undid stopping the 2.4.0 rollout. Traffic is going to 2.4.0 again, so payments may start failing again; I've told on-call and I'm watching.",
-              "cancel": "You cancelled stopping the 2.4.0 rollout before I did it. Payments are still failing; I've told on-call.",
-              "undoNo": "You took back saying you'd handle the checkout rollout yourself."
-            }
-          },
-          "retune": {
-            "yes": "You approved raising the disk alert on ingest-3 to 90%.",
-            "no": "You said not now to raising the disk alert on ingest-3.",
-            "undoYes": "You undid raising the disk alert on ingest-3. It's back at 80%, so it will start going off on healthy nights again.",
-            "undoNo": "You took back your not-now on the disk alert on ingest-3."
-          },
-          "fromNowOn": {
-            "yes": "You approved letting me stop bad rollouts on my own.",
-            "no": "You said not now to letting me stop bad rollouts on my own.",
-            "undoYes": "You took back letting me stop bad rollouts on my own.",
-            "undoNo": "You took back your not-now on letting me stop bad rollouts on my own."
-          }
-        },
-        "fixedNow": {
-          "search": "I put search-2's setting back. Searches are back to normal.",
-          "checkoutNow": "I sent traffic back to the old version, and failures stopped. Why 2.4.0 fails is still for your team to find; I've kept it deployed for them."
-        },
-        "checkoutNowAsked": "I asked whether I may stop the checkout 2.4.0 rollout.",
-        "newWatch": "I found {count} new services this morning (returns, exchanges and gift-cards) and started watching them right away.",
-        "foundWatch": "I found {count} new services this morning and started watching them right away."
-      }
+      "title": "History"
     },
     "settingsDrawer": {
       "title": "Settings",
-      "reach": "Where should I reach you?",
-      "destSlack": "Slack: {channel}",
-      "destEmail": "Email: {address}",
-      "autonomy": "How much should I do on my own?",
-      "tell": "Tell me",
-      "ask": "Ask me first",
-      "fix": "Fix it, then tell me",
-      "tellHint": "I'll tell you what I would do, and leave the doing to you.",
-      "askHint": "I'll ask before each fix, and do it when you say yes.",
-      "fixHint": "For kinds of fix with a solid track record, I'll go ahead within the limits you set, and tell you straight after.",
-      "advanced": "Advanced",
-      "perKind": "Each kind of fix",
-      "digestDay": "Summary day",
-      "excluded": "Services I should ignore",
-      "excludedNone": "None",
-      "kinds": {
-        "pool": "Close leaked database connections",
-        "queueWorker": "Add queue workers during a backlog",
-        "retune": "Raise a noisy alert's threshold",
-        "rollback": "Roll back a deploy",
-        "record": "Done {done} times, worked {worked} times.",
-        "keptRecord": "Done {done} times, kept {worked} times.",
-        "noRecord": "Never done yet, so I won't do it on my own until it has a track record.",
-        "revertConfig": "Undo a recent setting change",
-        "abortRollout": "Stop a bad rollout",
-        "recurringRecord": "Done {done} times, all for the same leak ({bug}). I'll keep asking until it's fixed."
-      },
-      "weekdays": {
-        "monday": "Monday",
-        "tuesday": "Tuesday",
-        "wednesday": "Wednesday",
-        "thursday": "Thursday",
-        "friday": "Friday"
-      },
-      "saved": "Saved",
-      "noDestination": "I won't be able to reach anyone.",
-      "routing": "When I page you",
-      "routingNote": "I page for anything that hurts customers. Smaller things get a message that won't wake anyone, and the smallest go into Friday's summary."
+      "reach": "Where should I reach you?"
     },
     "howItWorks": {
       "title": "How it works",
@@ -31957,10 +31506,6 @@
       "s5Title": "You decide what changes",
       "s5": "I suggest alerts for what nothing watches and fixes for alerts that can't fire. Nothing changes until you review and apply it, and you can undo what you applied."
     },
-    "topbar": {
-      "brand": "AutoObserve",
-      "checked": "Checked 1 minute ago | Checked {count} minutes ago"
-    },
     "outcome": {
       "active": "Happening now",
       "fixed": "Fixed by AutoObserve",
@@ -31976,9 +31521,6 @@
       "standardTooltip": "Standard view gives the short read: what needs you and what happened in the last 7 days",
       "nerdTooltip": "The detailed view shows every detector, loop and setting in full",
       "label": "View"
-    },
-    "rail": {
-      "more": "More below"
     },
     "suggestions": {
       "title": "Suggestions",
@@ -34727,7 +34269,7 @@
         "failed": "Not created",
         "exists": "Already added"
       },
-      "partial": "{failed} of {total} alerts wasn't created. | {failed} of {total} alerts weren't created.",
+      "partial": "{failed} alert out of {total} wasn't created. | {failed} alerts out of {total} weren't created.",
       "createdIn": "{count} was created in {where}. | {count} were created in {where}.",
       "failure": "{service}: {reason}.",
       "reason": {
@@ -34811,13 +34353,15 @@
       "undoError": {
         "changed": "This changed since it was saved, so nothing was undone. Refresh and try again.",
         "gone": "This is no longer dismissed, so there is nothing to undo.",
+        "alertDeleted": "This alert was deleted, so its change can't be undone.",
         "failed": "Nothing was undone. Try again.",
         "already": "Already undone. Nothing changed."
       },
       "undoPartial": {
         "summary": "{done} of {total} undone. Not undone: {names}.",
         "changed": "It changed since it was saved; refresh to see it. | They changed since they were saved; refresh to see them.",
-        "gone": "It is no longer dismissed. | They are no longer dismissed."
+        "gone": "It is no longer dismissed. | They are no longer dismissed.",
+        "alertDeleted": "Its alert was deleted. | Their alerts were deleted."
       },
       "mark": {
         "action": "Mark as intended report",
@@ -34863,6 +34407,7 @@
         "whereNoOne": "Folder {folder} · notifies no one",
         "whereTeamNoOne": "Folder {folder} · team {team} · notifies no one",
         "acknowledged": "{count} of the {of} acknowledged firings would no longer alert. Check it before applying.",
+        "acknowledgedFirst": "{count} of the {of} acknowledged firings would no longer alert, the first on {first}. Check it before applying.",
         "note": "Only the settings above change; the rest of the alert stays as it is. You can undo it while nobody else has changed the alert.",
         "changed": "This alert changed. Open it to review.",
         "loading": "Checking what this changes…",

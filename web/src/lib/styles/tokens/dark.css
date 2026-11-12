@@ -535,7 +535,7 @@
   /* Timeline */
   --color-timeline-dot-primary: var(--color-primary-500);
   --color-timeline-dot-destructive: var(--color-error-500);
-  --color-timeline-dot-info: var(--color-primary-400);
+  --color-timeline-dot-info: var(--color-primary-600);
   --color-timeline-dot-muted: var(--color-grey-500);
 
   /* Stepper */

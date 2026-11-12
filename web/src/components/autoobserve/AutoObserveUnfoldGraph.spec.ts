@@ -417,3 +417,90 @@ describe("AutoObserveUnfoldGraph options for incidents", () => {
     wrapper.unmount();
   });
 });
+
+const liveCard = (over: Partial<UnfoldCard> & Pick<UnfoldCard, "id">): UnfoldCard => ({
+  kind: "log",
+  lane: "a",
+  at: "4:45 PM",
+  minute: 0,
+  title: raw("Stopped sending data"),
+  detail: raw("logs stream"),
+  tone: "danger",
+  ...over,
+});
+
+const liveCards: UnfoldCard[] = [
+  liveCard({ id: "stream:a" }),
+  liveCard({ id: "stream:b", lane: "b" }),
+  liveCard({
+    id: "page",
+    kind: "outcome",
+    outcome: "paged",
+    lane: null,
+    minute: 20,
+    after: "stream:a",
+  }),
+  liveCard({
+    id: "back:a",
+    kind: "outcome",
+    outcome: "resolved",
+    minute: 75,
+    title: raw("Sending data again"),
+    tone: "success",
+    after: "stream:a",
+  }),
+  liveCard({
+    id: "ack",
+    kind: "outcome",
+    outcome: "resolved",
+    lane: null,
+    minute: 90,
+    after: "stream:b",
+  }),
+];
+
+const draw = () => mountGraph({ cards: liveCards, liveIssue: true });
+const sel = (id: string) => `[data-test="autoobserve-unfold-card-${id}"]`;
+
+describe("AutoObserveUnfoldGraph on a live AutoObserve issue", () => {
+  it("stacks same-minute cards of different lanes in one column", () => {
+    const w = draw();
+    const left = (id: string) =>
+      w
+        .get(sel(id))
+        .attributes("style")
+        ?.match(/left: ([\d.]+)rem/)?.[1];
+    expect(left("stream:a")).toBe(left("stream:b"));
+    expect(Number(left("back:a"))).toBeGreaterThan(Number(left("stream:a")));
+    // Cards that happened together are not a sequence, so nothing links them.
+    expect(w.find('[data-test="autoobserve-unfold-edge-stream:a>stream:b"]').exists()).toBe(false);
+  });
+
+  it("routes a link between lanes through the column gaps, never under a card", () => {
+    const w = draw();
+    const d = w.get('[data-test="autoobserve-unfold-edge-stream:b>ack"]').attributes("d") ?? "";
+    expect(d).not.toContain("C");
+    const lefts = w
+      .findAll('[data-test^="autoobserve-unfold-card-"]')
+      .map((c) => Number(c.attributes("style")?.match(/left: ([\d.]+)rem/)?.[1]));
+    const verticals = [...d.matchAll(/H([\d.]+) V/g)].map((m) => Number(m[1]));
+    expect(verticals.length).toBeGreaterThan(0);
+    for (const x of verticals) expect(lefts.some((l) => x > l && x < l + 11)).toBe(false);
+  });
+
+  it("labels only links inside one lane, on one line", () => {
+    const w = draw();
+    const labels = w.findAll("span.whitespace-nowrap.rounded-full");
+    expect(labels.map((l) => l.text())).toEqual(["+1h 15m"]);
+  });
+
+  it("gives a card that came back its stream line, and keys outcomes in the legend", () => {
+    const w = draw();
+    expect(w.get(sel("back:a")).text()).toContain("a");
+    expect(w.get(sel("back:a")).text()).toContain("logs stream");
+    const legend = w.get('[aria-label="Card types"]').text();
+    expect(legend).toContain("Log");
+    expect(legend).toContain("Paged");
+    expect(legend).toContain("Back or resolved");
+  });
+});
