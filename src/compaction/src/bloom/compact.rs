@@ -18,9 +18,8 @@
 //! One public entry point, [`build_for_stream`], called once per hour bucket
 //! at the end of a compaction merge round. It does two things in order:
 //!
-//! 1. **Retired bloom cleanup.** Given the `bloom_ver` values of the files this merge round just
-//!    deleted, [`cleanup_retired_blooms`] retires any `.bf` no longer referenced by a live row in
-//!    the bucket.
+//! 1. **Retired bloom cleanup.** Given the `bloom_ver`s of the files this merge round deleted,
+//!    [`cleanup_retired_blooms`] retires any `.bf` no live row in the bucket still references.
 //! 2. **Build.** It queries the bucket itself (`query_for_bloom` → rows with `index_size > 0` and
 //!    `bloom_ver = 0`) and builds `.bf` coverage for those files. The caller does not pass a file
 //!    list; this module owns both the "which files" and the "how to bloom" decisions.

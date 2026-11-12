@@ -76,8 +76,19 @@ pub(super) async fn pre_merge_batches(
         return Vec::new();
     }
     let chains = hash_merged_chains(schema.clone(), files, stream).await;
+    let group_num = chains
+        .as_deref()
+        .map(|chains| merge_group_count(files, chains));
     let groups = pre_merge_groups(files, chains, max_groups);
-    if !groups.is_empty() {
+    if groups.is_empty() {
+        // unreadable chains were already warned about where they were read
+        if let Some(group_num) = group_num.filter(|num| *num > max_groups) {
+            log::warn!(
+                "[COMPACTOR] merge_by_stream [{stream}] metrics_indexed merge of {} files is {group_num} merge groups, over the cap of {max_groups}, but nothing can be pre-merged",
+                files.len()
+            );
+        }
+    } else {
         log::info!(
             "[COMPACTOR] merge_by_stream [{stream}] metrics_indexed merge of {} files exceeds {max_groups} merge groups, pre-merging in {} hash-merged batches first",
             files.len(),
@@ -105,15 +116,11 @@ fn pre_merge_groups(
         .filter(|f| MetricsFileLayout::of(&f.key) == Some(MetricsFileLayout::HashSorted))
         .map(|f| vec![f.clone()])
         .collect();
-    groups.extend(chains);
-    let has_indexed = files
-        .iter()
-        .any(|f| MetricsFileLayout::of(&f.key) == Some(MetricsFileLayout::Indexed));
-    // indexed files are never pre-merged; the scan spreads even one chain over two groups
-    let indexed_groups = if has_indexed { 2 } else { 0 };
-    if groups.len() + indexed_groups <= max_groups {
+    if merge_group_count(files, &chains) <= max_groups {
         return Vec::new();
     }
+    // indexed files are final: they count as groups but are never pre-merged
+    groups.extend(chains);
     // smallest first: the most groups collapse for the fewest bytes rewritten
     groups.sort_by_key(|group| group.iter().map(|f| f.meta.compressed_size).sum::<i64>());
     groups
@@ -121,6 +128,23 @@ fn pre_merge_groups(
         .filter(|chunk| chunk.len() > 1)
         .map(|chunk| chunk.concat())
         .collect()
+}
+
+/// How many sorted inputs a merge of `files` opens, given the chains of its hash-merged files.
+fn merge_group_count(files: &[FileKey], hash_merged_chains: &[Vec<FileKey>]) -> usize {
+    let layout_count = |layout| {
+        files
+            .iter()
+            .filter(|f| MetricsFileLayout::of(&f.key) == Some(layout))
+            .count()
+    };
+    // the scan spreads even one chain of indexed files over two groups
+    let indexed_groups = if layout_count(MetricsFileLayout::Indexed) > 0 {
+        2
+    } else {
+        0
+    };
+    layout_count(MetricsFileLayout::HashSorted) + hash_merged_chains.len() + indexed_groups
 }
 
 #[cfg(test)]
@@ -215,8 +239,7 @@ mod tests {
             .collect()
     }
 
-    /// Over the cap, ingester files and hash-merged chains merge smallest first in groups of
-    /// the cap; the indexed files count as two groups and stay out of every batch.
+    /// Over the cap the smallest groups merge first; indexed files count as two and stay out.
     #[test]
     fn test_pre_merge_batches_group_smallest_first_over_the_cap() {
         let mut files = ingester_hour(3);

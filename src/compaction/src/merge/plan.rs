@@ -38,7 +38,7 @@ pub(super) struct BatchLimits<'a> {
     pub is_incremental: bool,
     /// The classic merge query's cap: larger files are at their target size.
     pub merge_max_original_size: i64,
-    /// Most ingester files one metrics merge may open; 0 is no cap.
+    /// Most sorted inputs (merge groups) one metrics merge may open; 0 is no cap.
     pub max_merge_groups: usize,
 }
 
@@ -485,6 +485,28 @@ mod tests {
         )
         .await;
         assert_eq!(batch_sizes(&batches), [25]);
+    }
+
+    /// A closed hour over the cap plans its pre-merge instead of the indexed merge.
+    #[tokio::test]
+    async fn test_plan_batches_closed_hour_over_the_cap_pre_merges_first() {
+        let strategy = MergeStrategy::FileTime;
+        let mut limits = limits(&strategy, 0, false);
+        limits.max_merge_groups = 3;
+        let batches = plan_batches(
+            ingester_hour(7),
+            &MergeMode::MetricsIndexed,
+            &limits,
+            &schema(),
+            "s",
+        )
+        .await;
+        assert_eq!(batch_sizes(&batches), [3, 3], "the lone 7th file waits");
+        assert!(
+            batches
+                .iter()
+                .all(|(_, mode)| matches!(mode, MergeMode::MetricsHashMerged))
+        );
     }
 
     #[test]

@@ -337,8 +337,7 @@ pub async fn merge_by_stream(
         stream_type,
         stream_name,
         &date_start,
-        // a pre-merged hour is rewritten by the re-armed round: blooms built now would go
-        // unreferenced at once
+        // a pre-merged hour is rewritten next round: its blooms would go unreferenced at once
         is_incremental || pre_merged,
         retired_blooms,
     )

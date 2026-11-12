@@ -136,6 +136,14 @@ async fn run_merge_query(
     let (ctx, physical_plan) = plan_merge_query(sql, sort_order, schema, tables).await?;
     let schema = physical_plan.schema();
 
+    // print the physical plan
+    if get_config().common.print_key_sql {
+        log::info!(
+            "{}",
+            config::meta::plan::generate_plan_string("merge_parquet_files", physical_plan.as_ref())
+        );
+    }
+
     let mut batch_stream = execute_stream(physical_plan, ctx.task_ctx())?;
     let (tx, rx) = tokio::sync::mpsc::channel::<RecordBatch>(2);
     let read_task = tokio::task::spawn(async move {
@@ -180,14 +188,6 @@ pub(super) async fn plan_merge_query(
 
     let plan = ctx.state().create_logical_plan(sql).await?;
     let physical_plan = ctx.state().create_physical_plan(&plan).await?;
-
-    // print the physical plan
-    if cfg.common.print_key_sql {
-        log::info!(
-            "{}",
-            config::meta::plan::generate_plan_string("merge_parquet_files", physical_plan.as_ref())
-        );
-    }
     Ok((ctx, physical_plan))
 }
 

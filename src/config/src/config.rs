@@ -3540,7 +3540,7 @@ pub struct Compact {
     #[env_config(
         name = "ZO_COMPACT_METRICS_MAX_GROUPS",
         default = 100,
-        help = "Max ingester files one metrics merge opens at once; an hour holding more is first pre-merged into hash-merged files. 0 disables the cap, other values below 10 are raised to 10"
+        help = "Max sorted inputs (ingester files plus chains of already merged files) one metrics merge opens at once; a closed hour holding more is first pre-merged into hash-merged files. 0 disables the cap, other values below 10 are raised to 10"
     )]
     pub metrics_max_groups: usize,
     #[env_config(
