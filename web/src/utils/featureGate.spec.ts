@@ -150,6 +150,14 @@ describe("lockedByContract", () => {
     expect(lockedByContract(locks, [])).toBe(false);
     expect(lockedByContract(undefined, ["oncall"])).toBe(false);
   });
+
+  it("lets a denial seen since the config loaded override the config", () => {
+    const locks = { oncall: "license" } as const;
+    expect(lockedByContract(locks, ["oncall"], new Map([["oncall", "contract"]]))).toBe(true);
+    expect(
+      lockedByContract({ oncall: "contract" }, ["oncall"], new Map([["oncall", "license"]])),
+    ).toBe(false);
+  });
 });
 
 describe("denialCopyKeys", () => {

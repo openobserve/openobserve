@@ -67,6 +67,9 @@ const CONTRACT_LIFECYCLE_LOCK: &str = "/cloud/contract_lifecycle";
 /// How often a node checks whether it should sync contracts, so failover is noticed soon.
 const CONTRACT_SYNC_TICK: u64 = 60;
 
+/// How long the holder waits before retrying a sync that didn't finish.
+const CONTRACT_SYNC_RETRY_MICROS: i64 = 5 * 60 * 1_000_000;
+
 /// Stored contracts are kept this long after they end or are revoked, above the fetch's 60 days.
 const CONTRACT_RETENTION_DAYS: i64 = 90;
 
@@ -105,6 +108,13 @@ macro_rules! calculate_subcost {
         }
         $total += base;
     };
+}
+
+#[derive(Debug, PartialEq, Eq)]
+enum ContractRowAction {
+    DeleteExpired,
+    LeaveToReconcile,
+    Warn { days_remaining: i64 },
 }
 
 #[derive(serde::Deserialize)]
@@ -549,6 +559,7 @@ async fn run_contract_sync() {
     let sync_interval = cfg.cloud.contract_sync_interval_sec as i64 * 1_000_000;
     let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(CONTRACT_SYNC_TICK));
     let mut was_holder = false;
+    let mut last_attempt = None;
     let mut last_housekeeping = None;
     loop {
         interval.tick().await;
@@ -564,7 +575,8 @@ async fn run_contract_sync() {
             }
         };
         let now = now_micros();
-        if contract_sync_due(was_holder, last, now, sync_interval) {
+        if contract_sync_due(was_holder, last, last_attempt, now, sync_interval) {
+            last_attempt = Some(now);
             sync_contracts().await;
         }
         was_holder = true;
@@ -576,8 +588,22 @@ async fn run_contract_sync() {
 }
 
 /// A new holder always syncs, which covers startup and failover.
-fn contract_sync_due(was_holder: bool, last_success: Option<i64>, now: i64, interval: i64) -> bool {
-    !was_holder || last_success.is_none_or(|last| now - last >= interval)
+fn contract_sync_due(
+    was_holder: bool,
+    last_success: Option<i64>,
+    last_attempt: Option<i64>,
+    now: i64,
+    interval: i64,
+) -> bool {
+    if !was_holder {
+        return true;
+    }
+    let stale = last_success.is_none_or(|last| now - last >= interval);
+    // an attempt older than the last success succeeded, so only a failed one waits to retry
+    let retry_ok = last_attempt.is_none_or(|at| {
+        now - at >= CONTRACT_SYNC_RETRY_MICROS || last_success.is_some_and(|last| last >= at)
+    });
+    stale && retry_ok
 }
 
 async fn sync_contracts() {
@@ -692,13 +718,6 @@ async fn is_stored_contract_row(
         return Ok(false);
     };
     Ok(org_contracts_synced::get(contract_id).await?.is_some())
-}
-
-#[derive(Debug, PartialEq, Eq)]
-enum ContractRowAction {
-    DeleteExpired,
-    LeaveToReconcile,
-    Warn { days_remaining: i64 },
 }
 
 /// Reconcile removes stored-contract rows itself, so a back-to-back renewal isn't dropped first.
@@ -1192,16 +1211,57 @@ mod tests {
 
     #[test]
     fn test_contract_sync_due_for_a_new_holder_whatever_the_last_sync() {
-        assert!(contract_sync_due(false, None, NOW, DAY));
-        assert!(contract_sync_due(false, Some(NOW - 1), NOW, DAY));
+        assert!(contract_sync_due(false, None, None, NOW, DAY));
+        assert!(contract_sync_due(
+            false,
+            Some(NOW - 1),
+            Some(NOW - 1),
+            NOW,
+            DAY
+        ));
+    }
+
+    #[test]
+    fn test_contract_sync_due_retries_a_failed_sync_every_five_minutes() {
+        let retry = CONTRACT_SYNC_RETRY_MICROS;
+        // the last attempt failed: last_success is older than it
+        assert!(!contract_sync_due(
+            true,
+            None,
+            Some(NOW - retry + 1),
+            NOW,
+            DAY
+        ));
+        assert!(contract_sync_due(true, None, Some(NOW - retry), NOW, DAY));
+        assert!(!contract_sync_due(
+            true,
+            Some(NOW - 2 * DAY),
+            Some(NOW - 1),
+            NOW,
+            DAY
+        ));
+        // the last attempt succeeded, so only the interval decides
+        assert!(contract_sync_due(
+            true,
+            Some(NOW - DAY),
+            Some(NOW - DAY),
+            NOW,
+            DAY
+        ));
     }
 
     #[test]
     fn test_contract_sync_due_only_after_the_interval_for_a_holder() {
-        assert!(!contract_sync_due(true, Some(NOW - 1), NOW, DAY));
-        assert!(!contract_sync_due(true, Some(NOW - DAY + 1), NOW, DAY));
-        assert!(contract_sync_due(true, Some(NOW - DAY), NOW, DAY));
-        assert!(contract_sync_due(true, None, NOW, DAY));
+        assert!(!contract_sync_due(true, Some(NOW - 1), None, NOW, DAY));
+        assert!(!contract_sync_due(
+            true,
+            Some(NOW - DAY + 1),
+            None,
+            NOW,
+            DAY
+        ));
+        assert!(contract_sync_due(true, Some(NOW - DAY), None, NOW, DAY));
+        assert!(contract_sync_due(true, None, None, NOW, DAY));
     }
 
     #[test]

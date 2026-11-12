@@ -108,11 +108,13 @@ export const deniedByContract = (error: unknown): boolean => {
   return response?.status === 403 && response.data?.code === CONTRACT_FEATURE_NOT_ENTITLED;
 };
 
-/** True when the org's contract, not the license, locks every one of these keys. */
+/** True when the org's contract, not the license, locks every one of these keys; a denial seen since the config loaded wins. */
 export const lockedByContract = (
   locks: FeatureLocks | undefined,
   keys: readonly string[],
-): boolean => keys.length > 0 && keys.every((key) => locks?.[key] === "contract");
+  denials?: ReadonlyMap<string, "license" | "contract">,
+): boolean =>
+  keys.length > 0 && keys.every((key) => (denials?.get(key) ?? locks?.[key]) === "contract");
 
 /** Locale keys of a denial's title and message, worded for what refused it. */
 export const denialCopyKeys = (byContract: boolean) =>

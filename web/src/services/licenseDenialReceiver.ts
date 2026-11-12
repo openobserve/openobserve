@@ -15,7 +15,7 @@
 
 import store from "../stores";
 import { addLicenseDeniedError } from "@/composables/useLicenseDenials";
-import { markLicenseDenial } from "@/composables/useFeatureLock";
+import { markLicenseDenial, recordDenial } from "@/composables/useFeatureLock";
 import { deniedByContract, licenseDeniedFeatures } from "@/utils/featureGate";
 
 /** Sends a license or contract denial to the top bar; true when the error was one. */
@@ -23,7 +23,9 @@ export const receiveLicenseDenial = (error: unknown, requestStartedAt?: number):
   const features = licenseDeniedFeatures(error);
   if (!features) return false;
   markLicenseDenial(error);
-  addLicenseDeniedError(features, requestStartedAt, deniedByContract(error));
+  const byContract = deniedByContract(error);
+  recordDenial(features, byContract);
+  addLicenseDeniedError(features, requestStartedAt, byContract);
   return true;
 };
 
