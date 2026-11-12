@@ -811,6 +811,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
+import { checkFeatureAccess, buildFeatureGateContext } from "@/utils/enterpriseFeatures";
 import { useLockedAffordance } from "@/composables/useLockedAffordance";
 import useTraces from "@/composables/useTraces";
 import { useSqlEditorDiagnostics } from "@/composables/useSqlEditorDiagnostics";
@@ -1108,8 +1109,16 @@ export default defineComponent({
         isDark.value ? "images/common/ai_icon_dark.svg" : "images/common/ai_icon_gradient.svg",
       ),
     );
-    const openAiFromBuilder = () =>
-      (queryEditorRef.value as { openAiMode?: () => void } | null)?.openAiMode?.();
+    const aiAccess = computed(() =>
+      checkFeatureAccess("aiAssistant", buildFeatureGateContext(store.state.zoConfig)),
+    );
+    // The query editor loads async, so a click that beats it opens AI mode through the v-model the editor reads.
+    const openAiFromBuilder = () => {
+      const editor = queryEditorRef.value as { openAiMode?: () => void } | null;
+      if (editor?.openAiMode) editor.openAiMode();
+      else if (!aiAccess.value.allowed) openUpgradeDialog();
+      else nlpMode.value = true;
+    };
     const filterBuilderFields = computed(() =>
       toFilterFields(searchObj.data.stream.selectedStreamFields ?? []),
     );

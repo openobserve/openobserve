@@ -1935,6 +1935,29 @@ describe("SearchBar", () => {
         localStorage.removeItem("o2.traces.queryInput");
       }
     });
+
+    it("opens AI mode when the builder's AI button is clicked before the query editor has loaded", async () => {
+      store.state.zoConfig.ai_enabled = true;
+      searchObjInstance.meta.showQuery = true;
+      searchObjInstance.meta.sqlMode = false;
+      localStorage.setItem("o2.traces.queryInput", "builder");
+      try {
+        wrapper = mountSearchBar();
+        await flushPromises();
+        (wrapper.vm as any).queryEditorRef = null;
+        await flushPromises();
+        await wrapper
+          .find('[data-test="traces-search-bar-filter-builder-ai-btn"]')
+          .trigger("click");
+        expect((wrapper.vm as any).nlpMode).toBe(true);
+        await flushPromises();
+        expect(wrapper.find('[data-test="traces-search-bar-filter-builder-ai-btn"]').exists()).toBe(
+          false,
+        );
+      } finally {
+        localStorage.removeItem("o2.traces.queryInput");
+      }
+    });
   });
 
   // -------------------------------------------------------------------------
