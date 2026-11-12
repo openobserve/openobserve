@@ -368,8 +368,7 @@ pub async fn auth_middleware(request: Request, next: Next) -> Response {
         Err(e) => return maybe_add_mcp_www_authenticate(&uri, e.into_response()),
     };
 
-    // Outside oo_validator so the gate holds with OpenFGA off and on bypass routes.
-    // The routed org, because auth_info.org_id is empty on bypass routes.
+    // Outside oo_validator so OpenFGA-off and bypass routes, with no auth_info.org_id, are gated.
     let org_id = routed_org.as_deref().unwrap_or_default();
     if let Some(denied) = auth_info
         .feature
