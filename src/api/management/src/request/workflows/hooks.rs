@@ -34,7 +34,7 @@ use infra::{
         workflow_http_triggers::{AuthMode, CredentialKind},
     },
 };
-use o2_enterprise::enterprise::license::check_features;
+use o2_enterprise::enterprise::license::{Denial, org_denial};
 use openobserve_core::workflows::http_trigger::{
     HARD_BODY_CAP, HookReason,
     cache::{self, CachedTrigger},
@@ -176,16 +176,16 @@ async fn admit(
     let shape = AuthShape::of(&parts.headers);
     let auth = authenticate(call, &parts.headers, body, shape).await;
     drop(permits);
-    let auth = license_checked(auth, check_features(&[Feature::Workflows]))?;
+    let auth = license_checked(auth, org_denial(&call.org_id, &[Feature::Workflows]))?;
     Ok((auth, parts.headers))
 }
 
 /// Only a verified caller learns the license state; a failed credential keeps its uniform 401.
-fn license_checked<T>(auth: Result<T, HookReason>, entitled: bool) -> Result<T, Response> {
-    match auth {
-        Err(reason) => Err(reject(reason, None)),
-        Ok(_) if !entitled => Err(not_entitled()),
-        Ok(auth) => Ok(auth),
+fn license_checked<T>(auth: Result<T, HookReason>, denial: Option<Denial>) -> Result<T, Response> {
+    match (auth, denial) {
+        (Err(reason), _) => Err(reject(reason, None)),
+        (Ok(_), Some(denial)) => Err(not_entitled(denial)),
+        (Ok(auth), None) => Ok(auth),
     }
 }
 
@@ -657,8 +657,12 @@ fn unauthorized() -> Response {
         .into_response()
 }
 
-fn not_entitled() -> Response {
-    let err = ErrorCodes::LicenseFeatureNotEntitled(<&str>::from(Feature::Workflows).to_owned());
+fn not_entitled(denial: Denial) -> Response {
+    let feature = <&str>::from(Feature::Workflows).to_owned();
+    let err = match denial {
+        Denial::License(_) => ErrorCodes::LicenseFeatureNotEntitled(feature),
+        Denial::Contract(_) => ErrorCodes::ContractFeatureNotEntitled(feature),
+    };
     (
         StatusCode::FORBIDDEN,
         Json(MetaHttpResponse::error_code(err)),
@@ -688,6 +692,10 @@ mod tests {
     use axum::http::{StatusCode, header};
 
     use super::*;
+
+    fn locked() -> Option<Denial> {
+        Some(Denial::License(vec![Feature::Workflows]))
+    }
 
     async fn body_of(resp: Response) -> String {
         let bytes = axum::body::to_bytes(resp.into_body(), 4096).await.unwrap();
@@ -750,14 +758,14 @@ mod tests {
             HookReason::InvalidSignature,
             HookReason::StaleTimestamp,
         ] {
-            let resp = license_checked::<()>(Err(reason), false).unwrap_err();
+            let resp = license_checked::<()>(Err(reason), locked()).unwrap_err();
             assert_eq!(resp.status(), StatusCode::UNAUTHORIZED, "{reason:?}");
             assert!(resp.headers().contains_key(header::WWW_AUTHENTICATE));
             assert_eq!(body_of(resp).await, expected, "{reason:?}");
         }
         for reason in [HookReason::InternalError, HookReason::PayloadTooLarge] {
-            let locked = license_checked::<()>(Err(reason), false).unwrap_err();
-            let unlocked = license_checked::<()>(Err(reason), true).unwrap_err();
+            let locked = license_checked::<()>(Err(reason), locked()).unwrap_err();
+            let unlocked = license_checked::<()>(Err(reason), None).unwrap_err();
             assert_eq!(locked.status(), unlocked.status(), "{reason:?}");
             assert_eq!(body_of(locked).await, body_of(unlocked).await, "{reason:?}");
         }
@@ -765,7 +773,7 @@ mod tests {
 
     #[tokio::test]
     async fn a_verified_caller_on_a_locked_license_gets_the_license_denial() {
-        let resp = license_checked(Ok(()), false).unwrap_err();
+        let resp = license_checked(Ok(()), locked()).unwrap_err();
         assert_eq!(resp.status(), StatusCode::FORBIDDEN);
         let json: serde_json::Value = serde_json::from_str(&body_of(resp).await).unwrap();
         assert_eq!(json["code"], 40001);
@@ -774,7 +782,14 @@ mod tests {
             json["message"],
             "Features not included in your license: Workflows"
         );
-        assert!(license_checked(Ok(()), true).is_ok());
+        assert!(license_checked(Ok(()), None).is_ok());
+
+        let uncontracted = Some(Denial::Contract(vec![Feature::Workflows]));
+        let resp = license_checked(Ok(()), uncontracted).unwrap_err();
+        assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+        let json: serde_json::Value = serde_json::from_str(&body_of(resp).await).unwrap();
+        assert_eq!(json["code"], 40002);
+        assert_eq!(json["error_detail"], "workflows");
     }
 
     /// No test can lock a license, so the source pins that both routes check it after the token.
@@ -798,7 +813,7 @@ mod tests {
             .find("authenticate(call,")
             .expect("admit must authenticate the caller");
         let license = admit
-            .find("check_features(&[Feature::Workflows])")
+            .find("org_denial(&call.org_id, &[Feature::Workflows])")
             .expect("admit must check the Workflows license");
         assert!(
             authenticated < license,
