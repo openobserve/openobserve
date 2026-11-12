@@ -27,7 +27,7 @@ export class RumPerformancePage {
         this.dashboardPanels = page.locator('[data-test="dashboard-panel-container"]');
         this.browserOverviewEmpty = page.locator('[data-test="rum-overview-page-empty"]');
         this.browserOverviewKpis = page.locator(
-            '[data-test="rum-overview-kpis"]:not([aria-busy="true"]):not(:has([data-test="rum-overview-kpis-error"]))',
+            '[data-test="rum-overview-kpis"]:not([aria-busy="true"]):not(:has([data-test="rum-overview-kpis-error"])):not(:has([data-test="rum-overview-kpis-forbidden"]))',
         );
         this.errorsDashboard = page.locator('[data-test="performance-error-dashboard"]');
         this.errorsSchemaLoading = page.locator('[data-test="errors-dashboard-schema-loading"]');
