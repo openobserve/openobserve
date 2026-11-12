@@ -357,6 +357,7 @@ import {
   useRoute,
   useRouter,
   type LocationQueryRaw,
+  type RouteLocationNormalized,
 } from "vue-router";
 import { useStore } from "vuex";
 import { useLicenseLock } from "@/composables/useFeatureLock";
@@ -655,9 +656,17 @@ export default defineComponent({
     let routeQueryParamsOnMount: any = {};
 
     // Even a duplicate replace supersedes a pending leave, cancelling it with no URL rollback.
-    let leaveInProgress = false;
+    let leaveTarget: RouteLocationNormalized | null = null;
+    // Syncs held back during a leave stack here, so the first one after it writes them all.
+    let deferredRouteQuery: LocationQueryRaw | null = null;
+    const routeQueryBase = () => deferredRouteQuery ?? route.query;
     const syncRouteQuery = (query: LocationQueryRaw) => {
-      if (leaveInProgress || stringifyQuery(query) === stringifyQuery(route.query)) return;
+      if (leaveTarget) {
+        deferredRouteQuery = query;
+        return;
+      }
+      deferredRouteQuery = null;
+      if (stringifyQuery(query) === stringifyQuery(route.query)) return;
       router.replace({ query });
     };
 
@@ -757,7 +766,7 @@ export default defineComponent({
       }
 
       syncRouteQuery({
-        ...route.query,
+        ...routeQueryBase(),
         ...variableObj,
         ...getQueryParamsForDuration(selectedDate.value),
       });
@@ -1413,7 +1422,7 @@ export default defineComponent({
 
         if (!newPanelTime) {
           // Panel time removed - clear panel time params from URL
-          const query = { ...route.query };
+          const query = { ...routeQueryBase() };
           delete query[`pt-period.${panelId}`];
           delete query[`pt-from.${panelId}`];
           delete query[`pt-to.${panelId}`];
@@ -1422,7 +1431,7 @@ export default defineComponent({
         }
 
         // Update URL with panel time parameters
-        const query = { ...route.query };
+        const query = { ...routeQueryBase() };
 
         if (newPanelTime.type === "relative" && newPanelTime.relativeTimePeriod) {
           // Relative time: pt-period.{panelId}={relativeTimePeriod}
@@ -1558,7 +1567,7 @@ export default defineComponent({
           end_time: effectiveTime.end_time,
         };
         syncRouteQuery({
-          ...route.query,
+          ...routeQueryBase(),
           ...getQueryParamsForDuration(selectedDate.value),
         });
       }
@@ -1640,17 +1649,42 @@ export default defineComponent({
       return true;
     };
 
+    const replayRouteQuery = () => {
+      window.removeEventListener("popstate", replayRouteQuery);
+      if (editorDisposed || leaveTarget || !deferredRouteQuery) return;
+      const { history } = router.options;
+      // A refused browser Back restores its entry asynchronously; replacing first would rewrite the previous page's entry.
+      if (router.resolve(history.location).fullPath !== router.currentRoute.value.fullPath) {
+        window.addEventListener("popstate", replayRouteQuery, { once: true });
+        return;
+      }
+      syncRouteQuery(deferredRouteQuery);
+    };
+
+    // A guard settling late must not end the leave a newer navigation has started.
+    const endLeave = (target: RouteLocationNormalized) => {
+      if (leaveTarget !== target) return;
+      leaveTarget = null;
+      replayRouteQuery();
+    };
+
+    // Kept after next(): the navigation stays pending while the next view loads.
+    const allowLeave = (to: RouteLocationNormalized, next: () => void) => {
+      leaveTarget = to;
+      next();
+    };
+
     onBeforeRouteLeave(async (to, from, next) => {
       // check if it is a force navigation, then allow
       if (forceSkipBeforeUnloadListener) {
-        next();
+        allowLeave(to, next);
         return;
       }
       // The old session is already dead and its drafts stay, so the panel is kept as after an expired session.
       if (draftSignOutForced.value) {
         onLeaveChoice("stay");
         draftAutosave.flush();
-        next();
+        allowLeave(to, next);
         return;
       }
 
@@ -1658,7 +1692,7 @@ export default defineComponent({
         // Edits that were undone must not leave their earlier draft behind.
         draftAutosave.flush();
         cleanupSessionVariables();
-        next();
+        allowLeave(to, next);
         return;
       }
 
@@ -1668,18 +1702,34 @@ export default defineComponent({
         return;
       }
 
-      leaveInProgress = true;
-      const leave = await resolveLeave(await askLeave());
-      // Kept on a confirmed leave: the navigation stays pending while the next view loads.
-      leaveInProgress = leave;
-      if (leave) next();
-      else next(false);
+      leaveTarget = to;
+      let leave: boolean;
+      try {
+        leave = await resolveLeave(await askLeave());
+      } catch (error) {
+        endLeave(to);
+        throw error;
+      }
+      if (leave) {
+        next();
+        return;
+      }
+      next(false);
+      endLeave(to);
     });
-    // A confirmed leave that fails later leaves the editor open, which must sync the URL again.
-    const stopLeaveFailureReset = router.afterEach((_to, _from, failure) => {
-      if (failure) leaveInProgress = false;
+    // Only the navigation this guard let through counts: a rejected second one fails while the dialog is still up.
+    const stopLeaveFailureReset = router.afterEach((to, _from, failure) => {
+      if (failure) endLeave(to);
     });
-    onBeforeUnmount(stopLeaveFailureReset);
+    // A navigation that throws, such as a view chunk failing to load, never reaches afterEach.
+    const stopLeaveErrorReset = router.onError((_error, to) => {
+      endLeave(to);
+    });
+    onBeforeUnmount(() => {
+      stopLeaveFailureReset();
+      stopLeaveErrorReset();
+      window.removeEventListener("popstate", replayRouteQuery);
+    });
     const panelTitle = computed(() => {
       return { title: dashboardPanelData.data.title };
     });

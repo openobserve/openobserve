@@ -154,7 +154,15 @@ vi.mock("vue-router", async () => {
     ...actual,
     onBeforeRouteLeave: vi.fn(),
     useRoute: () => nav.route,
-    useRouter: () => ({ push: nav.push, replace: nav.replace, afterEach: () => () => {} }),
+    useRouter: () => ({
+      push: nav.push,
+      replace: nav.replace,
+      afterEach: () => () => {},
+      onError: () => () => {},
+      options: { history: { location: "/dashboards/add_panel" } },
+      currentRoute: { value: { fullPath: "/dashboards/add_panel" } },
+      resolve: (location: string) => ({ fullPath: location }),
+    }),
   };
 });
 
