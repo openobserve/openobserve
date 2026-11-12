@@ -24,7 +24,7 @@ use super::metrics::{MetricsIndexMergeScope, metrics_index_merge_scope};
 use crate::incremental::OPEN_HOUR_MERGE_FILES;
 
 /// One planned merge: the files and the mode they merge in.
-type PlannedBatch = (Vec<FileKey>, MergeMode);
+pub(super) type PlannedBatch = (Vec<FileKey>, MergeMode);
 
 /// The size rules one merge round batches files under.
 pub(super) struct BatchLimits<'a> {
@@ -59,24 +59,12 @@ pub(super) fn plan_batches(
     // the open-hour round is a whole batch too, but only of the pending ingester files
     if mode.merges_open_hour_pending() {
         batches.extend(
-            pending_ingester_batches(mode_files, limits.max_merge_groups)
+            ingester_batches(&mode_files, OPEN_HOUR_MERGE_FILES, limits.max_merge_groups)
                 .into_iter()
                 .map(|pending| (pending, mode.clone())),
         );
     } else if mode.merges_whole_batch() {
-        let pre_merge = pre_merge_batches(&mode_files, mode, limits.max_merge_groups);
-        if !pre_merge.is_empty() {
-            log::info!(
-                "[COMPACTOR] merge_by_stream [{stream}] {mode} hour holds more than {} ingester files, pre-merging them in {} batches first",
-                limits.max_merge_groups,
-                pre_merge.len()
-            );
-            batches.extend(
-                pre_merge
-                    .into_iter()
-                    .map(|group| (group, MergeMode::MetricsHashMerged)),
-            );
-        } else if !mode_files.is_empty() {
+        if !mode_files.is_empty() {
             batches.push((mode_files, mode.clone()));
         }
     } else {
@@ -130,42 +118,55 @@ fn indexed_hour_scope(
     }
 }
 
-/// Hash-merged batches a closed indexed hour runs first when its ingester files exceed the cap.
-fn pre_merge_batches(files: &[FileKey], mode: &MergeMode, max_groups: usize) -> Vec<Vec<FileKey>> {
-    if mode.metrics_file_layout() != Some(MetricsFileLayout::Indexed) {
-        return Vec::new();
-    }
-    let pending = ingester_files(files);
-    if max_groups == 0 || pending.len() <= max_groups {
-        return Vec::new();
-    }
-    capped_batches(pending, max_groups)
-}
-
-/// The open hour's pending ingester files in capped batches, once enough have piled up.
-fn pending_ingester_batches(files: Vec<FileKey>, max_groups: usize) -> Vec<Vec<FileKey>> {
-    let pending = ingester_files(&files);
-    if pending.len() < OPEN_HOUR_MERGE_FILES {
-        return Vec::new();
-    }
-    capped_batches(pending, max_groups)
-}
-
-/// The hash-sorted files: each spans the whole hash range, so each is a merge input of its own.
-fn ingester_files(files: &[FileKey]) -> Vec<FileKey> {
-    files
+/// Hash-merged batches a closed hour runs first when it holds more merge groups than `max_groups`.
+pub(super) fn pre_merge_batches(
+    files: &[FileKey],
+    merged_chains: Option<Vec<Vec<FileKey>>>,
+    max_groups: usize,
+) -> Vec<Vec<FileKey>> {
+    let Some(chains) = merged_chains else {
+        // chains of unknown width are never rewritten: only fewer ingester files surely shrink it
+        return ingester_batches(files, max_groups + 1, max_groups);
+    };
+    let mut groups: Vec<Vec<FileKey>> = files
         .iter()
         .filter(|f| MetricsFileLayout::of(&f.key) == Some(MetricsFileLayout::HashSorted))
-        .cloned()
+        .map(|f| vec![f.clone()])
+        .collect();
+    groups.extend(chains);
+    if groups.len() <= max_groups {
+        return Vec::new();
+    }
+    // an indexed chain is already final: rewriting it hash-merged would drop its `.midx`
+    groups.retain(|group| {
+        group
+            .iter()
+            .all(|f| MetricsFileLayout::of(&f.key) != Some(MetricsFileLayout::Indexed))
+    });
+    // smallest first: the most groups collapse for the fewest bytes rewritten
+    groups.sort_by_key(|group| group.iter().map(|f| f.meta.compressed_size).sum::<i64>());
+    groups
+        .chunks(max_groups)
+        .filter(|chunk| chunk.len() > 1)
+        .map(|chunk| chunk.concat())
         .collect()
 }
 
-/// `files` in batches of at most `max_groups`; a lone trailing file waits for the next round.
-fn capped_batches(files: Vec<FileKey>, max_groups: usize) -> Vec<Vec<FileKey>> {
-    if max_groups == 0 {
-        return vec![files];
+/// The hash-sorted files, once `min_files` piled up, in batches of at most `max_groups`.
+fn ingester_batches(files: &[FileKey], min_files: usize, max_groups: usize) -> Vec<Vec<FileKey>> {
+    let pending: Vec<FileKey> = files
+        .iter()
+        .filter(|f| MetricsFileLayout::of(&f.key) == Some(MetricsFileLayout::HashSorted))
+        .cloned()
+        .collect();
+    if pending.len() < min_files {
+        return Vec::new();
     }
-    files
+    if max_groups == 0 {
+        return vec![pending];
+    }
+    // a lone trailing file has nothing to merge with and waits for the next round
+    pending
         .chunks(max_groups)
         .filter(|chunk| chunk.len() > 1)
         .map(<[FileKey]>::to_vec)
@@ -471,32 +472,52 @@ mod tests {
         assert_eq!(batch_sizes(&batches), [25]);
     }
 
-    /// A closed hour with more ingester files than the cap pre-merges only those files into
-    /// hash-merged output; earlier round outputs and indexed files stay out of it.
+    /// Over the cap, ingester files and hash-merged chains merge smallest first in groups of
+    /// the cap; indexed chains stay out, and within the cap nothing is pre-merged.
     #[test]
-    fn test_plan_batches_closed_hour_pre_merges_ingester_files_over_the_cap() {
-        let mut files = ingester_hour(7);
-        files.push(hash_file("hash-merged-v1-round1.parquet", 400));
-        files.push(hash_file("indexed-v1-a.parquet", 400));
-        let strategy = MergeStrategy::FileTime;
-        let mut limits = limits(&strategy, 0, false);
-        limits.max_merge_groups = 3;
-        let batches = plan_batches(files, &MergeMode::MetricsIndexed, &limits, "s");
-        assert_eq!(batch_sizes(&batches), [3, 3], "the lone 7th file waits");
-        for (files, mode) in &batches {
-            assert!(matches!(mode, MergeMode::MetricsHashMerged), "{mode}");
-            assert!(files.iter().all(|f| f.key.contains("/hash-sorted-v1-")));
-        }
-        limits.max_merge_groups = 7;
-        let mut files = ingester_hour(7);
-        files.push(hash_file("hash-merged-v1-round1.parquet", 400));
-        let batches = plan_batches(files, &MergeMode::MetricsIndexed, &limits, "s");
+    fn test_pre_merge_batches_group_smallest_first_over_the_cap() {
+        let files = ingester_hour(3);
+        let chains = vec![
+            vec![
+                hash_file("hash-merged-v1-a.parquet", 400),
+                hash_file("hash-merged-v1-b.parquet", 400),
+            ],
+            vec![hash_file("hash-merged-v1-c.parquet", 10)],
+            vec![hash_file("indexed-v1-d.parquet", 5)],
+        ];
+        assert!(pre_merge_batches(&files, Some(chains.clone()), 6).is_empty());
+        let batches = pre_merge_batches(&files, Some(chains), 4);
         assert_eq!(
-            batch_sizes(&batches),
-            [8],
-            "within the cap: one indexed merge"
+            batches.len(),
+            1,
+            "the lone largest chain waits: {batches:?}"
         );
-        assert!(matches!(batches[0].1, MergeMode::MetricsIndexed));
+        assert_eq!(
+            names(&batches[0]),
+            [
+                "hash-merged-v1-c.parquet",
+                "hash-sorted-v1-001.parquet",
+                "hash-sorted-v1-002.parquet",
+                "hash-sorted-v1-003.parquet"
+            ]
+        );
+    }
+
+    /// Without chain statistics only the ingester files pre-merge, and only over the cap.
+    #[test]
+    fn test_pre_merge_batches_without_chains_take_ingester_files_only() {
+        let mut files = ingester_hour(7);
+        files.extend((1..=20).map(|i| hash_file(&format!("hash-merged-v1-{i}.parquet"), 400)));
+        let batches = pre_merge_batches(&files, None, 3);
+        let sizes: Vec<usize> = batches.iter().map(Vec::len).collect();
+        assert_eq!(sizes, [3, 3], "the lone 7th file waits");
+        assert!(
+            batches
+                .iter()
+                .flatten()
+                .all(|f| f.key.contains("/hash-sorted-v1-"))
+        );
+        assert!(pre_merge_batches(&files, None, 7).is_empty());
     }
 
     #[test]
