@@ -2183,6 +2183,20 @@ describe("ONavGroup", () => {
       expect(document.activeElement).toBe(tile().element);
     });
 
+    it("a pointer press in the teleported flyout turns a stale Enter back into a mouse choice", async () => {
+      document.documentElement.dir = "ltr";
+      wrapper = mountTeleported();
+      await tile().trigger("keydown", { key: "ArrowRight" });
+      await settle();
+      const item = firstItem()!;
+      item.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+      item.dispatchEvent(new Event("pointerdown", { bubbles: true }));
+      click(item, 1);
+      await settle();
+      expect(docFlyout()).toBeNull();
+      expect(document.activeElement).not.toBe(tile().element);
+    });
+
     it("in LTR, ArrowRight opens and ArrowLeft closes, and ArrowLeft on the tile does nothing", async () => {
       document.documentElement.dir = "ltr";
       wrapper = mountTeleported();

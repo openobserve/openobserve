@@ -552,12 +552,12 @@ function clearActivationKey() {
 
 function isKeyboardActivation(event?: MouseEvent): boolean {
   const byKey = activatedByKey || event?.detail === 0;
-  activatedByKey = false;
+  clearActivationKey();
   return byKey;
 }
 
 function onTriggerClick() {
-  activatedByKey = false;
+  clearActivationKey();
   if (isPinned.value) {
     close();
   } else {
@@ -605,7 +605,7 @@ watch(openGroupKey, (key) => {
 });
 
 function onDocumentPointerDown(event: PointerEvent) {
-  activatedByKey = false;
+  clearActivationKey();
   const target = event.target as Node;
   if (wrapperRef.value?.contains(target) || flyoutRef.value?.contains(target)) {
     return;
