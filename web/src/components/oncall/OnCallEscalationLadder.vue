@@ -526,12 +526,7 @@ const problems = computed(() => {
   return out;
 });
 
-/// A ladder that hands the page to the default team has not stopped, so it must not say it did.
-const endTitle = computed<I18nText>(() =>
-  props.preview?.final_action === "notify_default_team"
-    ? t("oncall.ladderEndsHandsOff")
-    : t("oncall.ladderEndsNobodyAnswered"),
-);
+const endTitle = computed<I18nText>(() => t("oncall.ladderEndsNobodyAnswered"));
 
 /// How many faces a whole-team step shows before it counts the rest.
 const STACK = 3;

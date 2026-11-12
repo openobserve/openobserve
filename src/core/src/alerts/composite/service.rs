@@ -216,21 +216,17 @@ async fn increment_and_advance(
     Ok(())
 }
 
-pub async fn move_composite(
+/// The folder `id` sits in, when `editor` may move it out of there.
+pub async fn check_move_composite(
     org: &str,
     id: &str,
-    folder_id: &str,
     editor: &str,
-) -> Result<(), CompositeServiceError> {
+) -> Result<String, CompositeServiceError> {
+    use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
     ensure_mutation_allowed()?;
-    use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, sea_query::Expr};
-    let db = get_orm_client_rw().await;
-    // Resolve the current folder for the authorization check and OpenFGA
-    // relation rewrite below, mirroring alert::move_to_folder.
-    #[cfg(feature = "enterprise")]
     let current = composite_entity::Entity::find_by_id(id)
         .filter(composite_entity::Column::Org.eq(org))
-        .one(db)
+        .one(get_orm_client_rw().await)
         .await?
         .ok_or(CompositeServiceError::NotFound)?;
     #[cfg(feature = "enterprise")]
@@ -250,6 +246,21 @@ pub async fn move_composite(
     {
         return Err(CompositeServiceError::PermissionDenied);
     }
+    #[cfg(not(feature = "enterprise"))]
+    let _ = editor;
+    Ok(current.folder_id)
+}
+
+/// Moves `id` from `_src_folder_id`, which [`check_move_composite`] returned, to `folder_id`.
+pub async fn move_composite(
+    org: &str,
+    id: &str,
+    _src_folder_id: &str,
+    folder_id: &str,
+    editor: &str,
+) -> Result<(), CompositeServiceError> {
+    use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, sea_query::Expr};
+    let db = get_orm_client_rw().await;
     let result = composite_entity::Entity::update_many()
         .col_expr(composite_entity::Column::FolderId, Expr::value(folder_id))
         .col_expr(composite_entity::Column::LastEditedBy, Expr::value(editor))
@@ -278,7 +289,7 @@ pub async fn move_composite(
         remove_parent_relation(
             id,
             &get_ofga_type("alerts"),
-            &current.folder_id,
+            _src_folder_id,
             &get_ofga_type("alert_folders"),
         )
         .await;
