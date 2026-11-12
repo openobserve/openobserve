@@ -16,6 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from "vue";
+import { useStore } from "vuex";
 import { raw, useI18nTyped } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
@@ -69,6 +70,8 @@ const props = withDefaults(
     speed?: number;
     skipInactivity?: boolean;
     intent?: ReplayIntent;
+    /** RUM application that owns the session; image resources are fetched per application. */
+    applicationId?: string;
   }>(),
   {
     events: () => [],
@@ -85,6 +88,7 @@ const props = withDefaults(
     speed: undefined,
     skipInactivity: undefined,
     intent: "pause",
+    applicationId: undefined,
   },
 );
 
@@ -101,6 +105,7 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18nTyped();
+const store = useStore();
 
 // Skip gaps longer than this (ms) when "Skip inactivity" is on.
 const SKIP_THRESHOLD_MS = 1500;
@@ -186,7 +191,11 @@ const canvasStyle = computed(() => ({
 }));
 
 function imageSrc(w: Wireframe): string | undefined {
-  return w.base64 ? `data:image/png;base64,${w.base64}` : undefined;
+  if (w.base64) return `data:image/png;base64,${w.base64}`;
+  if (!w.resourceId || !props.applicationId) return undefined;
+  const org = encodeURIComponent(store.state.selectedOrganization.identifier);
+  const app = encodeURIComponent(props.applicationId);
+  return `${store.state.API_ENDPOINT}/api/${org}/rum/replay_resources/${app}/${encodeURIComponent(w.resourceId)}`;
 }
 
 // ---- event timeline markers (error highlight) ----------------------------
