@@ -115,6 +115,8 @@ export function useAssistantPlaces(input: () => AssistantPlacesInput): {
       run: toDock,
     };
     if (modalDock.value) return [full];
+    // Home hosts the chat as its AI tab: no side panel there, so the floating window is the only move.
+    if (placement === "full" && route.name === "home") return [window];
     if (sheet) return placement === "sidebar" ? [full] : [sidebar, full];
     if (!lgUp.value) return [sidebar, full];
     if (placement === "docked") return [dock, full, window];

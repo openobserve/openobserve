@@ -91,7 +91,7 @@ export interface OverviewNowInput {
   /** Microseconds. */
   window: { start: number; end: number };
   nowUs: number;
-  incidents: { open: Incident[]; acknowledged: Incident[]; resolved: Incident[] } | null;
+  incidents: { open: Incident[]; acknowledged: Incident[] } | null;
   trend: ServicesTrendResponse | null;
   topology: OverviewTopology | null;
   anomalies: OverviewAnomalyInput[] | null;
@@ -104,8 +104,6 @@ export interface OverviewNowInput {
 export interface OverviewNowState {
   resetKey: string;
   rows: OverviewNowRow[];
-  /** Degraded services the server counted that the list does not show. */
-  moreDegraded: number;
   services: OverviewNowSnapshot["services"];
   window: { start: number; end: number };
   /** True when the trend answered; a fallback to topology drops the hysteresis memory. */
@@ -210,10 +208,9 @@ export function buildOverviewNow(
   const fromTrend = input.trend !== null;
   const held =
     prev && prev.resetKey === input.resetKey && prev.fromTrend && fromTrend ? prev : null;
-  const services = serviceCandidates(input, held);
   const candidates = [
     ...incidentCandidates(input),
-    ...services.candidates,
+    ...serviceCandidates(input, held),
     ...alertCandidates(input),
     ...anomalyCandidates(input),
   ];
@@ -221,7 +218,6 @@ export function buildOverviewNow(
   return {
     resetKey: input.resetKey,
     rows: ordered(candidates, sameRange, input.nowUs),
-    moreDegraded: services.moreDegraded,
     services: servicesMeta(input),
     window: input.window,
     fromTrend,
@@ -242,7 +238,7 @@ function servicesMeta(input: OverviewNowInput): OverviewNowSnapshot["services"] 
 function incidentCandidates(input: OverviewNowInput): Candidate[] {
   const lists = input.incidents;
   if (!lists) return [];
-  const active = [...lists.open, ...lists.acknowledged]
+  return [...lists.open, ...lists.acknowledged]
     .sort(
       (a, b) =>
         (SEVERITY_RANK[a.severity] ?? 4) - (SEVERITY_RANK[b.severity] ?? 4) ||
@@ -252,19 +248,17 @@ function incidentCandidates(input: OverviewNowInput): Candidate[] {
       row: incidentRow(incident, isCritical(incident) ? "critical" : "degraded"),
       rank: (isCritical(incident) ? 100 : 300) + index,
     }));
-  const { start, end } = input.window;
-  const recovered = lists.resolved
-    .filter(
-      (incident) =>
-        incident.resolved_at && incident.resolved_at >= start && incident.resolved_at <= end,
-    )
-    .sort((a, b) => (b.resolved_at ?? 0) - (a.resolved_at ?? 0))
-    .map((incident, index) => ({ row: incidentRow(incident, "recovered"), rank: index }));
-  return [...active, ...recovered];
 }
 
 function isCritical(incident: Incident): boolean {
   return incident.severity === "P1" || incident.severity === "P2";
+}
+
+/** When an incident opened, in microseconds: its first alert, else its creation; 0 when neither is set. */
+export function incidentOpenedAt(
+  incident: Pick<Incident, "first_alert_at" | "created_at">,
+): number {
+  return incident.first_alert_at || incident.created_at || 0;
 }
 
 function incidentRow(incident: Incident, bucket: OverviewBucket): OverviewNowRow {
@@ -293,10 +287,7 @@ interface ServiceFigures {
   serverSignal: ServiceSignal;
 }
 
-function serviceCandidates(
-  input: OverviewNowInput,
-  held: OverviewNowState | null,
-): { candidates: Candidate[]; moreDegraded: number } {
+function serviceCandidates(input: OverviewNowInput, held: OverviewNowState | null): Candidate[] {
   const figures = input.trend
     ? input.trend.services.map(trendFigures)
     : topologyFigures(input.topology);
@@ -307,22 +298,15 @@ function serviceCandidates(
   );
   const partial = input.trend?.partial ?? false;
   const candidates: Candidate[] = [];
-  let shownServerDegraded = 0;
   figures.forEach((figure, index) => {
     const signal = heldSignal(figure, heldSignals.get(figure.service));
     if (signal !== "errors" && signal !== "latency") return;
-    if (figure.serverSignal === "errors" || figure.serverSignal === "latency") {
-      shownServerDegraded++;
-    }
     candidates.push({
       row: serviceRow(figure, signal, coverageOf(input.alertList, figure.service), partial),
       rank: 200 + index,
     });
   });
-  const total = input.trend
-    ? input.trend.degraded_total
-    : figures.filter((f) => f.serverSignal === "errors" || f.serverSignal === "latency").length;
-  return { candidates, moreDegraded: Math.max(0, total - shownServerDegraded) };
+  return candidates;
 }
 
 // A held row keeps its signal until it falls under the leave threshold, so a row does not flap at the edge.
@@ -478,7 +462,10 @@ function isRecovered(item: OverviewAlertItem, window: { start: number; end: numb
   return isOkOutcome(item.last_outcome) && (item.last_outcome_at ?? 0) > fired;
 }
 
-function firingGroups(hits: OverviewAlertHit[]): { name: string; count: number; lastAt: number }[] {
+/** The firing hits grouped by alert name, the most-fired first. */
+export function firingGroups(
+  hits: readonly OverviewAlertHit[],
+): { name: string; count: number; lastAt: number }[] {
   const groups = new Map<string, { name: string; count: number; lastAt: number }>();
   for (const hit of hits) {
     if (!hit.alert_name || !isFiringOutcome(hit.status)) continue;

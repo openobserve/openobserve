@@ -17,6 +17,15 @@ import type { CreditMode, GateCode } from "@/composables/assistant/pure";
 
 const CHAT_GATES: ReadonlySet<GateCode> = new Set(["available", "unhealthy"]);
 
+/** The Chats column beside Home's hero and beside a chat open on Home, so both draw one rail. */
+export const HOME_RAIL_CLASS =
+  "border-border-subtle bg-surface-base/40 h-full min-h-0 w-64 shrink-0 border-e";
+
+/** The gates whose chats Home's rail lists: the same ones the hero and the full view chat under. */
+export function railGate(gate: GateCode): boolean {
+  return CHAT_GATES.has(gate);
+}
+
 /** What Home can offer: the agent, the agent out of credits, no agent here, or the Open Source build. */
 export type AgentHomeState = "loading" | "ai" | "budget" | "noai" | "oss";
 

@@ -172,6 +172,8 @@ export interface AssistantMentionMenuProps {
   listboxId: string;
   /** The chat this menu's composer writes to; a floating chat is not the active one. */
   sid: Sid | null;
+  /** Lists context only; Home picks the agent with its own chip. */
+  hideAgents?: boolean;
 }
 
 /** At most this many options per group before "Show all", with no query typed. */
@@ -335,7 +337,7 @@ const pipelineOptions = computed<MentionOption[]>(() =>
 // The menu's own filter, not `group()`'s: a purpose line must never match (MULTI-AGENT-02 AC 2).
 const agentGroup = computed<Group[]>(() => {
   const roster = capability.value.agents;
-  if (!rosterOffersChoice(roster)) return [];
+  if (props.hideAgents || !rosterOffersChoice(roster)) return [];
   const shared = sharedAgentPolicy(roster, t);
   const items = (roster ?? []).flatMap((agent): MentionOption[] => {
     const label = agentName(agent.id, t);

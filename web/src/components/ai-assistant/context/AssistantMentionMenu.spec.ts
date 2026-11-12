@@ -191,6 +191,19 @@ describe("AssistantMentionMenu: Agents group (MULTI-AGENT-02)", () => {
     expect(none.wrapper.find('[data-test="assistant-mention-group-agents"]').exists()).toBe(false);
   });
 
+  it("lists no agents with hideAgents, so Home's menu holds context only", async () => {
+    withAgents();
+    const { wrapper } = await open("inv");
+    await wrapper.setProps({ hideAgents: true });
+    expect(wrapper.find('[data-test="assistant-mention-group-agents"]').exists()).toBe(false);
+    expect(agentRows(wrapper)).toEqual([]);
+    await wrapper.setProps({ query: "" });
+    expect(wrapper.findAll('[role="group"]')[0].attributes("data-test")).toBe(
+      "assistant-mention-group-streams",
+    );
+    expect(wrapper.vm.current()?.agent).toBeUndefined();
+  });
+
   it("hands a pick to the composer, sets the agent and speaks once, with no chip", async () => {
     const { store, sid } = withAgents();
     const { wrapper } = await open("inv");

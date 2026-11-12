@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :max-rows="MAX_ROWS"
       width="full"
       :input-attrs="fieldAttrs"
-      :class="[FRAME_CLASS, inert ? INERT_CLASS : '']"
+      :class="[glow ? GLOW_FRAME_CLASS : FRAME_CLASS, inert ? INERT_CLASS : '']"
       @update:model-value="(value: string) => emit('update:modelValue', value)"
     >
       <template #header>
@@ -53,6 +53,10 @@ export interface AssistantComposerFrameProps {
   opening?: boolean;
   /** Attributes for the textarea itself; `class` adds to the frame's own. */
   inputAttrs?: Record<string, string | number | boolean | undefined>;
+  /** Home's Ask box: a gradient border, a larger radius and a soft glow instead of the plain frame. */
+  glow?: boolean;
+  /** Home's Ask box starts three lines tall; the chat composer starts at one. */
+  tall?: boolean;
 }
 
 export interface AssistantComposerFrameEmits {
@@ -68,9 +72,16 @@ const FRAME_CLASS = [
   "[&>div]:focus-within:border-input-border-focus [&>div]:focus-within:ring-3 [&>div]:focus-within:ring-focus-ring-accent",
 ].join(" ");
 
+// A gradient has no border-color form, so the glow frame paints it on the wrapper and its box drops its own border; on focus the gradient drifts and blooms instead of a ring.
+const GLOW_FRAME_CLASS = [
+  "rounded-3xl bg-gradient-brand-ribbon assistant-border-flow p-0.5 transition-shadow duration-200",
+  "focus-within:shadow-ai-focus",
+  "[&>div]:rounded-3xl [&>div]:border-0 [&>div]:gap-0.5 [&>div]:px-2 [&>div]:pt-1.5 [&>div]:pb-2",
+].join(" ");
+
 const INERT_CLASS = "[&>div]:bg-surface-subtle";
 
-const FIELD_CLASS = "px-1! py-0! my-0.5! min-h-6 max-h-36! text-sm leading-6! basis-auto!";
+const FIELD_CLASS = "px-1! py-0! my-0.5! max-h-36! text-sm leading-6! basis-auto!";
 </script>
 
 <script setup lang="ts">
@@ -89,6 +100,8 @@ const props = withDefaults(defineProps<AssistantComposerFrameProps>(), {
   inert: false,
   opening: false,
   inputAttrs: () => ({}),
+  glow: false,
+  tall: false,
 });
 
 const emit = defineEmits<AssistantComposerFrameEmits>();
@@ -105,7 +118,7 @@ const textbox = ref<InstanceType<typeof OTextarea> | null>(null);
 
 const fieldAttrs = computed(() => ({
   ...props.inputAttrs,
-  class: [FIELD_CLASS, props.inputAttrs.class ?? ""].join(" "),
+  class: [FIELD_CLASS, props.tall ? "min-h-20" : "min-h-6", props.inputAttrs.class ?? ""].join(" "),
 }));
 
 defineExpose({

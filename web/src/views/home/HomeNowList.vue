@@ -16,82 +16,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <section :aria-labelledby="headingId" class="flex min-w-0 flex-col gap-2" data-test="home-now">
-    <div class="flex min-h-8 min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1 ps-1">
+    <div
+      class="flex min-h-8 min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1 ps-1"
+      data-test="home-now-heading"
+    >
       <h2 :id="headingId" class="text-text-heading text-base font-semibold">
-        {{ problems ? t("home.agent.problems.title") : t("home.agent.needsYouTitle") }}
+        {{ t("home.agent.problems.title") }}
       </h2>
-      <OTag v-if="problems" type="countChip" value="warning" data-test="home-now-count">{{
+      <OTag type="countChip" value="warning" data-test="home-now-count">{{
         snapshot.rows.length
       }}</OTag>
-      <OText v-if="problems" variant="meta" class="ms-auto" data-test="home-now-problems-note">{{
+      <OText variant="meta" class="ms-auto" data-test="home-now-problems-note">{{
         t("home.agent.problems.note")
       }}</OText>
-      <OText v-if="dataAsOf && !problems" variant="meta" data-test="home-now-data-as-of">{{
-        dataAsOf
-      }}</OText>
-      <OText v-if="servicesUntil && !problems" variant="meta" data-test="home-now-services-until">{{
-        servicesUntil
-      }}</OText>
-      <OText
-        v-if="snapshot.services.allRegions && !problems"
-        variant="meta"
-        data-test="home-now-all-regions"
-        >{{ t("overview.now.allRegions") }}</OText
-      >
     </div>
-    <HomeCreditsLine v-if="creditsExhausted && !problems" :org="org" />
     <div
       class="border-border-default rounded-surface bg-surface-panel overflow-hidden border border-[0.0625em]"
     >
-      <ul v-if="pending" class="flex flex-col gap-3 p-3" data-test="home-now-loading">
-        <li v-for="n in 3" :key="n"><OSkeleton type="text" class="h-5 w-2/3" /></li>
-      </ul>
-      <ul v-else class="flex flex-col" data-test="home-now-rows">
-        <li
-          v-if="trendCapped && !problems"
-          class="border-b-border-default text-text-secondary border-b-[0.0625em] px-3 py-2 text-xs"
-          data-test="home-now-trend-cap"
-        >
-          {{ t("overview.now.trendWindowCap") }}
-        </li>
-        <li
-          v-if="snapshot.services.partial && !problems"
-          class="border-b-border-default flex flex-col gap-0.5 border-b-[0.0625em] px-3 py-2"
-          data-test="home-now-partial"
-        >
-          <OText variant="body" class="text-status-warning-text text-sm">{{
-            t("overview.now.partial")
-          }}</OText>
-          <OText v-for="(warning, i) in warnings" :key="i" variant="meta">{{ warning }}</OText>
-        </li>
-        <li
-          v-for="source in failedSources"
-          :key="source.key"
-          class="border-b-border-default flex items-center gap-2 border-b-[0.0625em] px-3 py-2"
-          :data-test="`home-now-source-error-${source.key}`"
-        >
-          <OText variant="body" class="min-w-0 flex-1 text-sm">{{
-            t("overview.now.sourceError", { source: source.label })
-          }}</OText>
-          <OButton
-            variant="outline"
-            size="sm"
-            icon-left="refresh"
-            :data-test="`home-now-source-error-${source.key}-retry`"
-            @click="emit('retry')"
-          >
-            {{ t("emptyState.loadError.action") }}
-          </OButton>
-        </li>
-        <li
-          v-for="source in deniedSources"
-          :key="source.key"
-          class="border-b-border-default flex items-center gap-2 border-b-[0.0625em] px-3 py-2"
-          :data-test="`home-now-source-denied-${source.key}`"
-        >
-          <OText variant="body" class="min-w-0 flex-1 text-sm">{{ source.label }}</OText>
-          <OText variant="meta">{{ t("overview.state.tileForbidden") }}</OText>
-        </li>
+      <ul class="flex flex-col" data-test="home-now-rows">
         <HomeNowRow
           v-for="row in snapshot.rows"
           :key="row.key"
@@ -106,59 +48,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :link-locked="row.kind === 'service' && tracesLocked"
           :askable="askable"
           :meta="rowMeta[row.key] ?? null"
-          :create-alert="problems ? createAlert : null"
-          :run="row.kind === 'incident' ? (incidentRuns?.get(row.id) ?? null) : null"
+          :create-alert="createAlert"
           @investigate="onInvestigate"
-          @follow="(_r, run) => follow(run)"
           @create-alert="(r) => emit('createAlert', r)"
           @open="(r) => emit('open', r)"
           @service="(r) => emit('service', r)"
           @show-runs="showRunningChats"
         />
-        <HomeFailedRunRow
-          v-for="run in problems ? [] : failedRuns"
-          :key="run.run_id"
-          :run="run"
-          :timezone="timezone"
-          :busy="busyKeys.has(run.run_id)"
-          @retry="retryRun"
-          @open="(r) => emit('openIncident', r.incident_id)"
-        />
-        <li
-          v-if="
-            snapshot.rows.length === 0 &&
-            (problems || failedRuns.length === 0) &&
-            failedSources.length === 0 &&
-            deniedSources.length === 0
-          "
-          class="text-text-secondary px-3 py-3 text-sm"
-          data-test="home-now-clear"
-        >
-          {{ clearText ?? t("overview.status.clear") }}
-        </li>
       </ul>
     </div>
-    <HomeBuiltFrom
-      v-if="!problems"
-      :sources="sources"
-      :more-degraded="moreDegraded"
-      @open="(s) => emit('viewAll', s)"
-    />
   </section>
 </template>
 
 <script setup lang="ts">
-import {
-  computed,
-  nextTick,
-  onScopeDispose,
-  reactive,
-  useId,
-  watch,
-  type WatchStopHandle,
-} from "vue";
+import { computed, onScopeDispose, reactive, useId, watch, type WatchStopHandle } from "vue";
 
-import { useRcaFollow } from "@/components/ai-assistant/shell/rcaFollow";
 import {
   contextChipFor,
   openAssistant,
@@ -173,19 +77,10 @@ import type {
 } from "@/composables/contextProviders/types";
 import { armHomeReturn, type HomeReturnState } from "@/composables/goto/homeReturn";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import OButton from "@/lib/core/Button/OButton.vue";
 import OText from "@/lib/core/Typography/OText.vue";
-import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
-import { toast } from "@/lib/feedback/Toast/useToast";
-import incidents from "@/services/incidents";
-import type { OrgRcaRun } from "@/services/rca_runs_org";
 import type { ServicesTrendResponse } from "@/services/service_graph";
-import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
-import { formatTimestampInTimezone } from "@/utils/date";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 
-import HomeBuiltFrom, { type BuiltFromSource } from "./HomeBuiltFrom.vue";
-import HomeCreditsLine from "./HomeCreditsLine.vue";
-import HomeFailedRunRow from "./HomeFailedRunRow.vue";
 import HomeNowRow, { type NowRowMeta } from "./HomeNowRow.vue";
 import { investigateRow, rowSentence } from "./homeInvestigate";
 import { trendPoints } from "./useHomeNow";
@@ -194,45 +89,22 @@ const CHAT_GATES: ReadonlySet<string> = new Set(["available", "unhealthy"]);
 
 const props = withDefaults(
   defineProps<{
+    /** Home's services no alert matches, as one joined list. */
     snapshot: OverviewNowSnapshot;
     org: string;
     timezone: string;
     trend: ServicesTrendResponse | null;
-    pending: boolean;
-    failedSources: { key: string; label: I18nText }[];
-    /** Sources the role may not read; while any shows, the list never says nothing needs attention. */
-    deniedSources?: { key: string; label: I18nText }[];
-    sources: BuiltFromSource[];
-    moreDegraded: number;
     returnState: HomeReturnState;
-    dataAsOf?: I18nText | null;
-    /** The page range is over the trend's 7-day cap, so service rows show the topology figures. */
-    trendCapped?: boolean;
     tracesLocked?: boolean;
-    /** `problems` lists Home's services no alert matches, without the Now list's source rows. */
-    variant?: "now" | "problems";
     /** What Home's grouping learned per row key: its service and whether it flaps. */
     rowMeta?: Record<string, NowRowMeta>;
-    /** Problems rows offer Create alert; disabled for a role that cannot create alerts. */
+    /** Each row offers Create alert; disabled for a role that cannot create alerts. */
     createAlert?: { enabled: boolean } | null;
-    /** What an empty list says; Home's Now says nothing else is over baseline when Problems lists rows below. */
-    clearText?: I18nText | null;
-    /** Each incident's newest RCA run; null where the org's runs cannot be read. */
-    incidentRuns?: Map<string, OrgRcaRun> | null;
-    /** Auto-runs whose newest attempt failed; each is a row of its own. */
-    failedRuns?: OrgRcaRun[];
   }>(),
   {
-    dataAsOf: null,
-    trendCapped: false,
     tracesLocked: false,
-    deniedSources: () => [],
-    variant: "now",
     rowMeta: () => ({}),
     createAlert: null,
-    clearText: null,
-    incidentRuns: null,
-    failedRuns: () => [],
   },
 );
 
@@ -242,12 +114,7 @@ const emit = defineEmits<{
   service: [row: NowRow];
   /** The row's own page action: AI off, credits used up, or a gate the door refused. */
   fallback: [row: NowRow];
-  viewAll: [source: BuiltFromSource];
-  retry: [];
-  /** An incident's Investigate was sent; the page opens the incident's analysis beside the chat. */
-  analysis: [row: NowRow];
   createAlert: [row: NowRow];
-  openIncident: [id: string];
 }>();
 
 const { t } = useI18nTyped();
@@ -260,20 +127,9 @@ const notes = reactive<Record<string, { text: I18nText; showRuns: boolean }>>({}
 // The door accepts before the server admits, so each sent row watches its chat for a run-cap refusal.
 const refusalWatches = new Map<string, WatchStopHandle>();
 
-const rca = useRcaFollow();
-
 const creditsExhausted = computed(() => capability.value.creditMode === "exhausted");
 // Without a chat to send to, the row's button names the page it opens instead of falling back silently.
 const askable = computed(() => CHAT_GATES.has(capability.value.gate) && !creditsExhausted.value);
-const problems = computed(() => props.variant === "problems");
-const warnings = computed(() => (props.trend?.warnings ?? []).slice(0, 5).map((w) => raw(w)));
-const servicesUntil = computed(() => {
-  const until = props.snapshot.services.dataUntil;
-  if (until === null) return null;
-  return t("overview.now.servicesDataUntil", {
-    time: formatTimestampInTimezone(until, "HH:mm", props.timezone),
-  });
-});
 
 // A joined key, since a fresh array would fire on every returnState change, including a row selection.
 watch(
@@ -325,38 +181,12 @@ function fallbackOf(row: NowRow): I18nText | null {
   return t("overview.now.investigateFallback", { target: rowSentence(row, props.snapshot, t) });
 }
 
-function follow(run: Pick<OrgRcaRun, "incident_id" | "run_id">): void {
-  rca.follow({ org: props.org, incidentId: run.incident_id, runId: run.run_id });
-}
-
-// The incident's own analysis is the run to follow; a refused start falls back to asking in a chat.
-async function startRun(incidentId: string, busyKey: string): Promise<boolean> {
-  busyKeys.add(busyKey);
-  try {
-    const { data } = await incidents.triggerRca(props.org, incidentId);
-    follow({ incident_id: incidentId, run_id: data.run_id });
-    return true;
-  } catch (err) {
-    console.error("Failed to start the incident analysis:", err);
-    return false;
-  } finally {
-    busyKeys.delete(busyKey);
-  }
-}
-
-async function retryRun(run: OrgRcaRun): Promise<void> {
-  if (!(await startRun(run.incident_id, run.run_id)))
-    toast({ variant: "error", message: t("home.agent.retryRunFailed") });
-}
-
 async function onInvestigate(row: NowRow): Promise<void> {
+  emit("select", row);
   if (!askable.value) {
-    emit("select", row);
     emit("fallback", row);
     return;
   }
-  emit("select", row);
-  if (row.kind === "incident" && props.incidentRuns && (await startRun(row.id, row.key))) return;
   delete notes[row.key];
   refusalWatches.get(row.key)?.();
   refusalWatches.delete(row.key);
@@ -385,17 +215,13 @@ async function onInvestigate(row: NowRow): Promise<void> {
     if (outcome.kind === "not_sent")
       notes[row.key] = { text: outcome.note, showRuns: outcome.showRuns };
     if (outcome.kind === "sent") watchRefusal(row.key, outcome.sid);
-    if (outcome.kind === "sent" && row.kind === "incident") emit("analysis", row);
   } finally {
     busyKeys.delete(row.key);
   }
 }
 
-// In progress lists the running chats first, so the focus lands where the user can stop one.
-async function showRunningChats(): Promise<void> {
-  await nextTick();
-  const chats = document.querySelector<HTMLElement>('[data-test="assistant-launcher-your-chats"]');
-  chats?.scrollIntoView({ block: "nearest" });
-  chats?.querySelector<HTMLElement>("button")?.focus();
+// Home lists no chats, so the run cap's way out is All chats, where a running one can be stopped.
+function showRunningChats(): void {
+  void runs.requestOpen();
 }
 </script>

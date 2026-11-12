@@ -17,6 +17,8 @@ import { mount } from "@vue/test-utils";
 import { describe, expect, it, vi } from "vitest";
 import { nextTick, reactive } from "vue";
 
+import { raw } from "@/types/i18n";
+
 import AssistantHeaderSees from "./AssistantHeaderSees.vue";
 import { composerStripHoldsSees } from "./headerSees";
 
@@ -32,8 +34,9 @@ vi.mock("@/composables/assistant", async () => {
 vi.mock("@/components/ai-assistant/context/AssistantContextSeesPopover.vue", () => ({
   default: {
     name: "AssistantContextSeesPopover",
-    props: ["sid", "placement"],
-    template: '<button data-test="sees-stub" :data-sid="sid" :data-placement="placement" />',
+    props: ["sid", "placement", "label"],
+    template:
+      '<button data-test="sees-stub" :data-sid="sid" :data-placement="placement" :data-label="label" />',
   },
 }));
 
@@ -56,6 +59,16 @@ describe("AssistantHeaderSees", () => {
     (live.sessions.s1 as { composer: { chips: unknown[] } }).composer.chips.push(streamChip);
     await nextTick();
     expect(wrapper.find('[data-test="assistant-shell-sees"]').exists()).toBe(false);
+  });
+
+  it("hands a toolbar's own name for the ⓘ to its trigger", () => {
+    reactive(state).sessions = {};
+    const wrapper = mount(AssistantHeaderSees, {
+      props: { sid: null, label: raw("What the Assistant Sees") },
+    });
+    expect(wrapper.get('[data-test="assistant-shell-sees"]').attributes("data-label")).toBe(
+      "What the Assistant Sees",
+    );
   });
 
   it("shows the header ⓘ when there is no session yet", () => {

@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @focus="refreshPageContext"
         @blur="onBlur"
       >
-        <template #strip>
+        <template v-if="stripShown" #strip>
           <AssistantComposerStrip :notice="notice" :sentence-id="noticeId" @action="onNoticeAction">
             <slot v-if="!replying" name="chips" />
             <template #link-askAdmin>
@@ -82,27 +82,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #bar>
           <AssistantComposerBottomRow>
             <template #agent>
+              <AssistantComposerPlusMenu
+                :actions="plusActions"
+                :disabled="inertKind !== null"
+                @select="onPlus"
+              />
               <AssistantAgentPicker :sid="sid" :disabled="inertKind !== null || accessLost" />
             </template>
             <AssistantDictationWave v-if="voice.mine.value" :elapsed-ms="voice.elapsedMs.value" />
-            <AssistantIconButton
-              v-if="!replying"
-              :label="t('assistant.composer.attachImage')"
-              :icon="assistantGlyph.chipImage"
-              :disabled="inertKind !== null"
-              data-test="assistant-attach-image"
-              @click="openPicker"
-            />
-            <AssistantIconButton
-              v-if="coarse && recallEntries.length > 0"
-              :label="t('assistant.composer.recentPrompts')"
-              :icon="assistantGlyph.history"
-              :disabled="inertKind !== null"
-              aria-haspopup="dialog"
-              :aria-expanded="recallOpen"
-              data-test="assistant-recall-open"
-              @click="recallOpen = true"
-            />
             <AssistantDictateButton
               v-if="voice.mic.value !== 'none'"
               :mic="accessLost || inertKind ? 'crossed' : voice.mic.value"
@@ -263,7 +250,9 @@ import { formatBytes } from "@/utils/formatters";
 import { getUUIDv7 } from "@/utils/uuid";
 
 import AssistantComposerBottomRow, { ROUND_ACTION_CLASS } from "./AssistantComposerBottomRow.vue";
+import { attachImageFiles, imageTooBigLine, type ImageCap } from "./composerImages";
 import AssistantComposerFrame from "./AssistantComposerFrame.vue";
+import AssistantComposerPlusMenu, { type ComposerPlusAction } from "./AssistantComposerPlusMenu.vue";
 import AssistantComposerStrip from "./AssistantComposerStrip.vue";
 import AssistantDictateButton from "./AssistantDictateButton.vue";
 import AssistantDictationTail from "./AssistantDictationTail.vue";
@@ -283,7 +272,9 @@ import {
   announceComposer,
   composerLayoutKey,
   composerRowOf,
+  composerTimeOpenKey,
   composerUi,
+  focusIn,
   moveDraft,
   forgetComposerUi,
   noteCap,
@@ -370,6 +361,13 @@ const attached = computed(() => stagedChips.value.length > 0 || images.value.len
 // With no chips the panel header carries the ⓘ, so the strip shows it only beside chips and never beside a notice.
 const chipsShown = computed(() => composerStripHoldsSees(composer.value));
 const seesShown = computed(() => !notice.value && chipsShown.value);
+// The + menu opens the tray's time picker; the chip stays only for a range the user picked.
+const timeOpen = ref(false);
+const timeShown = computed(() => timeOpen.value || context.window.value.source === "custom");
+// An empty box draws no strip: it holds only a notice, or the chips and time the user added.
+const stripShown = computed(
+  () => !!notice.value || (!replying.value && (chipsShown.value || timeShown.value)),
+);
 // A bare `@` is an unfinished mention, not a question (CT-05).
 const hasContent = computed(() => /[^@\s]/.test(text.value) || attached.value);
 const storageBlocked = computed(() => store.drafts.storageBlocked.value);
@@ -616,6 +614,7 @@ provide(
     wide: width.wide.value,
   })),
 );
+provide(composerTimeOpenKey, timeOpen);
 
 const holdNotice = computed<ComposerNotice | null>(() => {
   if (prefillPending.value)
@@ -1285,32 +1284,41 @@ function capHit(cap: "rows" | "bytes" | "images" | "type" | "size", line?: I18nT
   if (id && props.visible) noteCap(id, sentence);
 }
 
-function imageCapLine(name: string): I18nText {
-  return t("assistant.composer.imageCap", {
-    name: raw(name),
-    count: MAX_IMAGES,
-    size: raw(formatBytes(MAX_IMAGE_SIZE_BYTES)),
-  });
-}
-
-function refuse(cap: "type" | "size" | "images", line: I18nText): void {
+function refuse(cap: ImageCap, line: I18nText): void {
   capHit(cap, line);
 }
 
 function refuseSize(picked: File): void {
-  refuse(
-    "size",
-    t("assistant.composer.imageTooBig", {
-      name: raw(picked.name),
-      size: raw(formatBytes(picked.size)),
-      count: MAX_IMAGES,
-      max: raw(formatBytes(MAX_IMAGE_SIZE_BYTES)),
-    }),
-  );
+  refuse("size", imageTooBigLine(t, picked));
 }
 
 function openPicker(): void {
   file.value?.open();
+}
+
+// A reply carries no context, so only Recent Prompts is left in it.
+const plusActions = computed<ComposerPlusAction[]>(() => [
+  ...(replying.value ? [] : (["attach", "context", "time"] as const)),
+  ...(coarse.value && recallEntries.value.length > 0 ? (["recall"] as const) : []),
+]);
+
+function onPlus(action: ComposerPlusAction): void {
+  if (action === "attach") openPicker();
+  else if (action === "context") addContext();
+  else if (action === "time") timeOpen.value = true;
+  else recallOpen.value = true;
+}
+
+// Add Context types the `@` at the caret, so it opens the same mention menu typing does.
+function addContext(): void {
+  const value = text.value;
+  const at = el()?.selectionStart ?? value.length;
+  const gap = at > 0 && !/\s/.test(value[at - 1]) ? " " : "";
+  onInput(`${value.slice(0, at)}${gap}@${value.slice(at)}`);
+  void nextTick(() => {
+    focusInput(at + gap.length + 1);
+    detectMention();
+  });
 }
 
 function onPicked(value: FileValue): void {
@@ -1375,35 +1383,11 @@ function pastedName(): string {
 async function addFiles(files: File[], pasted = false): Promise<void> {
   const id = ensureSid();
   if (!id) return;
-  for (const picked of files) {
-    if (picked.type !== "image/png" && picked.type !== "image/jpeg") {
-      refuse("type", t("assistant.context.imageType"));
-      continue;
-    }
-    if (picked.size > MAX_IMAGE_SIZE_BYTES) {
-      refuseSize(picked);
-      continue;
-    }
-    const data = await readBase64(picked).catch(() => null);
-    if (data === null) {
-      refuse("type", t("assistant.composer.imageReadFailed", { name: raw(picked.name) }));
-      continue;
-    }
-    const filename = pasted ? pastedName() : picked.name;
-    const result = store.addImage(id, { data, mimeType: picked.type, filename, size: picked.size });
-    if (!result.ok) {
-      capHit(result.cap === "images" ? "images" : result.cap, imageCapLine(filename));
-      break;
-    }
-  }
-}
-
-function readBase64(picked: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result).replace(/^data:[^,]*,/, ""));
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(picked);
+  await attachImageFiles(files, {
+    t,
+    add: (image) => store.addImage(id, image),
+    refuse,
+    ...(pasted && { nameOf: pastedName }),
   });
 }
 
@@ -1687,13 +1671,24 @@ watch(
   { immediate: true },
 );
 
-// A dismissed sheet hands focus back to its button; a pick puts it in the textbox (`95` §4).
+// A dismissed sheet hands focus back to the + menu it came from; a pick puts it in the textbox (`95` §4).
 watch(recallOpen, (open, was) => {
   if (open || !was || recallPicked) return;
   void nextTick(() =>
-    root.value?.querySelector<HTMLElement>('[data-test="assistant-recall-open"]')?.focus(),
+    root.value?.querySelector<HTMLElement>('[data-test="assistant-composer-plus"]')?.focus(),
   );
 });
+
+// A cleared or dismissed time chip leaves the strip; focus that was on it or in its picker lands in the textbox.
+watch(
+  timeShown,
+  async (shown) => {
+    if (shown || !focusIn(root.value)) return;
+    await nextTick();
+    if (document.activeElement === document.body) focusInput();
+  },
+  { flush: "pre" },
+);
 
 watch(
   () => Object.keys(store.state.sessions).join("\n"),

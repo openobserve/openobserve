@@ -20,10 +20,6 @@ import type { OverviewNowRow, OverviewNowSnapshot } from "@/composables/contextP
 import { homeReturnFor } from "@/composables/goto/homeReturn";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
-import { raw } from "@/types/i18n";
-
-import { followedRcaRun, stopFollowingRca } from "@/components/ai-assistant/shell/rcaFollow";
-import type { OrgRcaRun } from "@/services/rca_runs_org";
 
 import HomeNowList from "./HomeNowList.vue";
 
@@ -31,12 +27,11 @@ const mocks = vi.hoisted(() => ({
   open: vi.fn(),
   store: {
     state: { userOrgKey: "k1", sessions: {} as Record<string, { turn: unknown }> },
-    open: vi.fn(),
   },
-  triggerRca: vi.fn(),
   creditMode: { value: null as string | null },
   gate: { value: "available" },
   runs: { active: 0, cap: 3 },
+  requestOpen: vi.fn(),
 }));
 
 vi.mock("@/composables/assistant", async () => {
@@ -50,40 +45,33 @@ vi.mock("@/composables/assistant", async () => {
     useAssistantRuns: () => ({
       active: computed(() => mocks.runs.active),
       cap: computed(() => mocks.runs.cap),
+      requestOpen: mocks.requestOpen,
     }),
     useAssistantStore: () => mocks.store,
   };
 });
-vi.mock("@/services/incidents", () => ({ default: { triggerRca: mocks.triggerRca } }));
-vi.mock("./HomeCreditsLine.vue", () => ({
-  default: { name: "CreditsLine", template: '<div data-test="credits-line-stub" />' },
-}));
 
-const incident: OverviewNowRow = {
-  kind: "incident",
-  key: "incident:inc-7",
-  id: "inc-7",
-  bucket: "critical",
+const service = (name = "checkout"): OverviewNowRow => ({
+  kind: "service",
+  key: `service:${name}`,
+  id: name,
+  bucket: "degraded",
   changedAt: 1_762_300_000_000_000,
-  title: "Checkout errors",
-  severity: "P1",
-  status: "open",
-  alertCount: 3,
-};
+  service: name,
+  errorRate: 6,
+  requests: 100,
+  p99Ms: null,
+  p99Ratio: null,
+  baselineErrorRate: 0.4,
+  baselineHours: 24,
+  signal: "errors",
+  coverage: "none",
+  partial: false,
+});
 
-const RUN: OrgRcaRun = {
-  run_id: "run-1",
-  incident_id: "inc-7",
-  incident_title: "Checkout errors",
-  severity: "P1",
-  state: "completed",
-  trigger: "auto",
-  started_at: 1_762_299_000_000_000,
-  ended_at: 1_762_299_400_000_000,
-  error_code: null,
-};
+const checkout = service();
 
-const snapshot = (rows: OverviewNowRow[] = [incident]): OverviewNowSnapshot => ({
+const snapshot = (rows: OverviewNowRow[] = [checkout]): OverviewNowSnapshot => ({
   rows,
   selectedKey: null,
   window: { start: 1_762_296_400_000_000, end: 1_762_300_000_000_000 },
@@ -104,11 +92,8 @@ const mountList = (props: Record<string, unknown> = {}) =>
       org: "acme",
       timezone: "UTC",
       trend: null,
-      pending: false,
-      failedSources: [],
-      sources: ["incidents"],
-      moreDegraded: 0,
       returnState: { period: "1h" },
+      createAlert: { enabled: true },
       ...props,
     } as never,
     global: { plugins: [i18n, store] },
@@ -120,31 +105,50 @@ describe("HomeNowList", () => {
     mocks.creditMode.value = null;
     mocks.gate.value = "available";
     mocks.runs.active = 0;
-    mocks.store.open.mockReset();
-    mocks.triggerRca.mockReset();
-    stopFollowingRca();
     for (const sid of Object.keys(mocks.store.state.sessions))
       delete mocks.store.state.sessions[sid];
   });
 
-  it("titles the list Needs you with the services stamp and all regions combined", () => {
-    const wrapper = mountList();
-    expect(wrapper.get("h2").text()).toBe("Needs you");
-    expect(wrapper.get('[data-test="home-now-services-until"]').text()).toBe(
-      "Services data to 09:40",
+  it("titles the list Problems with no alert with its count and note, as one joined list", () => {
+    const wrapper = mountList({ snapshot: snapshot([checkout, service("cart")]) });
+    expect(wrapper.get("h2").text()).toBe("Problems with no alert");
+    const count = wrapper.get('[data-test="home-now-count"]');
+    expect(count.text()).toBe("2");
+    expect(count.classes()).not.toContain("bg-linear-to-br");
+    expect(wrapper.get('[data-test="home-now-problems-note"]').text()).toBe(
+      "Matched by service name in your alert queries",
     );
-    expect(wrapper.find('[data-test="home-now-all-regions"]').exists()).toBe(true);
+    expect(wrapper.get('[data-test="home-now-rows"]').classes()).not.toContain("gap-2");
+    const row = wrapper.get('[data-test="home-now-row-service:checkout"]').classes();
+    expect(row).toContain("border-b-[0.0625em]");
+    expect(row).not.toContain("rounded-surface");
+    for (const gone of ["services-until", "all-regions", "more-degraded", "clear", "loading"])
+      expect(wrapper.find(`[data-test="home-now-${gone}"]`).exists()).toBe(false);
+  });
+
+  it("offers Create alert to an editor and shows it disabled to a viewer", async () => {
+    const wrapper = mountList();
+    expect(wrapper.get('[data-test="home-now-row-no-alert"]').text()).toBe(
+      "No alert matches this service",
+    );
+    await wrapper.get('[data-test="home-now-row-create-alert"]').trigger("click");
+    expect(wrapper.emitted("createAlert")).toEqual([[checkout]]);
+    const viewer = mountList({ createAlert: { enabled: false } });
+    const create = viewer.get('[data-test="home-now-row-create-alert"]');
+    expect(create.attributes("aria-disabled")).toBe("true");
+    await create.trigger("click");
+    expect(viewer.emitted("createAlert")).toBeUndefined();
   });
 
   it("hands a row to a new sidebar chat, selects it and arms the way back", async () => {
     const wrapper = mountList();
     await wrapper.get('[data-test="home-now-row-investigate"]').trigger("click");
     await flushPromises();
-    expect(wrapper.emitted("select")).toEqual([[incident]]);
+    expect(wrapper.emitted("select")).toEqual([[checkout]]);
     expect(mocks.open).toHaveBeenCalledWith(
-      expect.objectContaining({ objectKind: "incident", container: "sidebar", thread: "new" }),
+      expect.objectContaining({ objectKind: "service_edge", container: "sidebar", thread: "new" }),
     );
-    expect(homeReturnFor("s1" as never)).toEqual({ period: "1h", row: "incident:inc-7" });
+    expect(homeReturnFor("s1" as never)).toEqual({ period: "1h", row: "service:checkout" });
   });
 
   it("does not send at the run cap and says how many chats run", async () => {
@@ -158,107 +162,25 @@ describe("HomeNowList", () => {
     );
   });
 
-  it("reads Open incident with credits used up, opens it, and shows the credits line", async () => {
-    mocks.creditMode.value = "exhausted";
-    const wrapper = mountList();
-    expect(wrapper.find('[data-test="credits-line-stub"]').exists()).toBe(true);
-    const button = wrapper.get('[data-test="home-now-row-investigate"]');
-    expect(button.text()).toBe("Open incident");
-    expect(wrapper.find('[data-test="home-now-row-open"]').exists()).toBe(false);
-    await button.trigger("click");
-    await flushPromises();
-    expect(wrapper.emitted("fallback")).toEqual([[incident]]);
+  it("names the page a row opens when the assistant cannot chat, and opens it", async () => {
+    for (const [creditMode, gate] of [
+      ["exhausted", "available"],
+      [null, "off_for_org"],
+    ] as const) {
+      mocks.creditMode.value = creditMode;
+      mocks.gate.value = gate;
+      const wrapper = mountList();
+      const button = wrapper.get('[data-test="home-now-row-investigate"]');
+      expect(button.text()).toBe("Open service");
+      await button.trigger("click");
+      await flushPromises();
+      expect(wrapper.emitted("select")).toEqual([[checkout]]);
+      expect(wrapper.emitted("fallback")).toEqual([[checkout]]);
+    }
     expect(mocks.open).not.toHaveBeenCalled();
   });
 
-  it("names the page a row opens when the assistant cannot chat", async () => {
-    mocks.gate.value = "off_for_org";
-    const alert: OverviewNowRow = {
-      kind: "alert",
-      key: "alert:a1",
-      id: "a1",
-      bucket: "degraded",
-      changedAt: 0,
-      alertId: "a1",
-      name: "p99 high",
-      state: "firing",
-      count: 1,
-      lastAt: 0,
-    };
-    const wrapper = mountList({ snapshot: snapshot([incident, alert]) });
-    const labels = wrapper
-      .findAll('[data-test="home-now-row-investigate"]')
-      .map((button) => button.text());
-    expect(labels).toEqual(["Open incident", "Open alert"]);
-    await wrapper.findAll('[data-test="home-now-row-investigate"]')[1].trigger("click");
-    expect(wrapper.emitted("fallback")).toEqual([[alert]]);
-    expect(mocks.open).not.toHaveBeenCalled();
-  });
-
-  it("opens the incident's analysis once its Investigate was sent", async () => {
-    const wrapper = mountList();
-    await wrapper.get('[data-test="home-now-row-investigate"]').trigger("click");
-    await flushPromises();
-    expect(wrapper.emitted("analysis")).toEqual([[incident]]);
-  });
-
-  it("lists Problems with no alert under their own title, with Create alert for an editor", async () => {
-    const service: OverviewNowRow = {
-      kind: "service",
-      key: "service:checkout",
-      id: "checkout",
-      bucket: "degraded",
-      changedAt: 0,
-      service: "checkout",
-      errorRate: 6,
-      requests: 100,
-      p99Ms: null,
-      p99Ratio: null,
-      baselineErrorRate: 0.4,
-      baselineHours: 24,
-      signal: "errors",
-      coverage: "none",
-      partial: false,
-    };
-    const wrapper = mountList({
-      snapshot: snapshot([service]),
-      variant: "problems",
-      createAlert: { enabled: true },
-    });
-    expect(wrapper.get("h2").text()).toBe("Problems with no alert");
-    expect(wrapper.get('[data-test="home-now-row-no-alert"]').text()).toBe(
-      "No alert matches this service",
-    );
-    expect(wrapper.find('[data-test="overview-built-from"]').exists()).toBe(false);
-    await wrapper.get('[data-test="home-now-row-create-alert"]').trigger("click");
-    expect(wrapper.emitted("createAlert")).toEqual([[service]]);
-    const viewer = mountList({
-      snapshot: snapshot([service]),
-      variant: "problems",
-      createAlert: { enabled: false },
-    });
-    const create = viewer.get('[data-test="home-now-row-create-alert"]');
-    expect(create.attributes("aria-disabled")).toBe("true");
-    await create.trigger("click");
-    expect(viewer.emitted("createAlert")).toBeUndefined();
-  });
-
-  it("keeps one Retry row per failed source and says when nothing needs attention", async () => {
-    const failed = mountList({
-      snapshot: snapshot([]),
-      failedSources: [{ key: "incidents", label: raw("Incidents") }],
-    });
-    expect(failed.get('[data-test="home-now-source-error-incidents"]').text()).toContain(
-      "Incidents couldn't load",
-    );
-    await failed.get('[data-test="home-now-source-error-incidents-retry"]').trigger("click");
-    expect(failed.emitted("retry")).toHaveLength(1);
-    expect(failed.find('[data-test="home-now-clear"]').exists()).toBe(false);
-    const clear = mountList({ snapshot: snapshot([]) });
-    expect(clear.get('[data-test="home-now-clear"]').text()).toBe("Nothing needs attention");
-  });
-
-  it("notes a server run-cap refusal on the row whose chat the door accepted", async () => {
+  it("notes a server run-cap refusal on the row whose chat the door accepted, and opens All chats from it", async () => {
     const wrapper = mountList();
     await wrapper.get('[data-test="home-now-row-investigate"]').trigger("click");
     await flushPromises();
@@ -273,7 +195,9 @@ describe("HomeNowList", () => {
     expect(wrapper.get('[data-test="home-now-row-note"]').text()).toContain(
       "Not sent: 4 chats running",
     );
-    expect(wrapper.find('[data-test="home-now-row-show-runs"]').exists()).toBe(true);
+    mocks.requestOpen.mockReset();
+    await wrapper.get('[data-test="home-now-row-show-runs"]').trigger("click");
+    expect(mocks.requestOpen).toHaveBeenCalledTimes(1);
   });
 
   it("leaves no note when the accepted chat ends any other way", async () => {
@@ -297,14 +221,14 @@ describe("HomeNowList", () => {
   });
 
   it("keeps a row's note and refusal watch across a row selection, and drops both on a range change", async () => {
-    const other: OverviewNowRow = { ...incident, key: "incident:inc-8", id: "inc-8" };
+    const other = service("cart");
     const refused = () => ({
       turn: { state: "refused", error: { code: "run_limit_member", active: 4, limit: 4 } },
     });
     mocks.open
       .mockResolvedValueOnce({ ok: true, sid: "s1" })
       .mockResolvedValueOnce({ ok: true, sid: "s2" });
-    const wrapper = mountList({ snapshot: snapshot([incident, other]) });
+    const wrapper = mountList({ snapshot: snapshot([checkout, other]) });
     await wrapper.findAll('[data-test="home-now-row-investigate"]')[0].trigger("click");
     await flushPromises();
     await wrapper.findAll('[data-test="home-now-row-investigate"]')[1].trigger("click");
@@ -335,10 +259,9 @@ describe("HomeNowList", () => {
   });
 
   it("keeps each row busy until its own Investigate settles", async () => {
-    const other: OverviewNowRow = { ...incident, key: "incident:inc-8", id: "inc-8" };
     const pending: Array<(v: unknown) => void> = [];
     mocks.open.mockImplementation(() => new Promise((resolve) => pending.push(resolve)));
-    const wrapper = mountList({ snapshot: snapshot([incident, other]) });
+    const wrapper = mountList({ snapshot: snapshot([checkout, service("cart")]) });
     const buttons = wrapper.findAll('[data-test="home-now-row-investigate"]');
     await buttons[0].trigger("click");
     await buttons[1].trigger("click");
@@ -350,90 +273,5 @@ describe("HomeNowList", () => {
     pending[0]({ ok: true, sid: "s1" });
     await flushPromises();
     expect(rows.map((r) => r.props("busy"))).toEqual([false, false]);
-  });
-
-  it("names a denied source and never says nothing needs attention beside it", () => {
-    const wrapper = mountList({
-      snapshot: snapshot([]),
-      deniedSources: [{ key: "incidents", label: raw("Incidents") }],
-    });
-    expect(wrapper.get('[data-test="home-now-source-denied-incidents"]').text()).toBe(
-      "IncidentsNo access",
-    );
-    expect(wrapper.find('[data-test="home-now-clear"]').exists()).toBe(false);
-  });
-
-  it("shows the partial and the 7-day notes", () => {
-    const wrapper = mountList({
-      snapshot: { ...snapshot(), services: { ...snapshot().services, partial: true } },
-      trend: { warnings: ["region eu1 truncated"] },
-      trendCapped: true,
-    });
-    expect(wrapper.get('[data-test="home-now-partial"]').text()).toContain(
-      "Service figures may be incomplete",
-    );
-    expect(wrapper.get('[data-test="home-now-partial"]').text()).toContain("region eu1 truncated");
-    expect(wrapper.find('[data-test="home-now-trend-cap"]').exists()).toBe(true);
-  });
-
-  it("shows skeleton rows on the first load", () => {
-    expect(mountList({ pending: true }).find('[data-test="home-now-loading"]').exists()).toBe(true);
-  });
-
-  it("follows an incident's run in the side panel instead of starting another", async () => {
-    const wrapper = mountList({ incidentRuns: new Map([["inc-7", RUN]]) });
-    expect(wrapper.find('[data-test="home-now-row-investigate"]').exists()).toBe(false);
-    await wrapper.get('[data-test="home-now-row-follow"]').trigger("click");
-    expect(followedRcaRun().value).toEqual({ org: "acme", incidentId: "inc-7", runId: "run-1" });
-    expect(mocks.store.open).toHaveBeenCalledWith(
-      { kind: "sidebar" },
-      expect.objectContaining({ focus: "none" }),
-    );
-    expect(mocks.open).not.toHaveBeenCalled();
-    expect(mocks.triggerRca).not.toHaveBeenCalled();
-  });
-
-  it("starts an incident's run with the existing request when none exists, and follows it", async () => {
-    mocks.triggerRca.mockResolvedValue({ data: { message: "started", run_id: "run-9" } });
-    const wrapper = mountList({ incidentRuns: new Map() });
-    await wrapper.get('[data-test="home-now-row-investigate"]').trigger("click");
-    await flushPromises();
-    expect(mocks.triggerRca).toHaveBeenCalledWith("acme", "inc-7");
-    expect(followedRcaRun().value).toEqual({ org: "acme", incidentId: "inc-7", runId: "run-9" });
-    expect(mocks.open).not.toHaveBeenCalled();
-  });
-
-  it("asks in a chat when the run cannot start", async () => {
-    mocks.triggerRca.mockRejectedValue(Object.assign(new Error("403"), { status: 403 }));
-    const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
-    const wrapper = mountList({ incidentRuns: new Map() });
-    await wrapper.get('[data-test="home-now-row-investigate"]').trigger("click");
-    await flushPromises();
-    expect(mocks.open).toHaveBeenCalledTimes(1);
-    expect(followedRcaRun().value).toBeNull();
-    error.mockRestore();
-  });
-
-  it("lists a failed auto-run as its own row with Retry and Open incident", async () => {
-    mocks.triggerRca.mockResolvedValue({ data: { message: "started", run_id: "run-10" } });
-    const failed: OrgRcaRun = {
-      ...RUN,
-      run_id: "run-2",
-      incident_id: "inc-481",
-      incident_title: "Payments timeouts",
-      state: "failed",
-      error_code: "query_timeout",
-    };
-    const wrapper = mountList({ snapshot: snapshot([]), failedRuns: [failed] });
-    expect(wrapper.find('[data-test="home-now-clear"]').exists()).toBe(false);
-    const row = wrapper.get('[data-test="home-failed-run"]');
-    expect(row.text()).toContain("Payments timeouts");
-    expect(row.get('[data-test="home-failed-run-state"]').text()).toBe("Failed");
-    await row.get('[data-test="home-failed-run-open"]').trigger("click");
-    expect(wrapper.emitted("openIncident")).toEqual([["inc-481"]]);
-    await row.get('[data-test="home-failed-run-retry"]').trigger("click");
-    await flushPromises();
-    expect(mocks.triggerRca).toHaveBeenCalledWith("acme", "inc-481");
-    expect(followedRcaRun().value?.runId).toBe("run-10");
   });
 });

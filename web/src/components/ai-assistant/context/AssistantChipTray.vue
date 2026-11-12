@@ -53,8 +53,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </li>
       </ul>
     </div>
+    <OTooltip v-if="hiddenLabels && hiddenCount > 0">
+      <OButton
+        variant="ghost"
+        size="chip"
+        :class="['text-text-secondary min-w-6 shrink-0 justify-center', TOUCH_TARGET_CLASS]"
+        :aria-label="t('assistant.context.moreName', { count: hiddenCount }, hiddenCount)"
+        data-test="assistant-context-more"
+      >
+        {{ t("assistant.context.more", { count: hiddenCount }) }}
+      </OButton>
+      <template #content>
+        <ul class="flex flex-col gap-0.5" data-test="assistant-context-more-list">
+          <li v-for="label in hiddenLabels" :key="label">{{ label }}</li>
+        </ul>
+      </template>
+    </OTooltip>
     <OButton
-      v-if="hiddenCount > 0 || expanded"
+      v-else-if="hiddenCount > 0 || expanded"
       variant="ghost"
       size="chip"
       :class="['text-text-secondary min-w-6 shrink-0 justify-center', TOUCH_TARGET_CLASS]"
@@ -103,6 +119,7 @@ import { nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 
 import { TOUCH_TARGET_CLASS } from "@/components/ai-assistant/common/touchTarget";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useI18nTyped } from "@/types/i18n";
 
 import { edgeFadeOf, edgeMask, wheelToScroll, type EdgeFade } from "./trayScroll";
@@ -112,6 +129,8 @@ const props = defineProps<{
   items: readonly T[];
   expanded: boolean;
   hiddenCount: number;
+  /** When set, `+N` only names the hidden chips in a tooltip instead of expanding the row. */
+  hiddenLabels?: readonly string[];
 }>();
 
 const emit = defineEmits<{ "update:expanded": [expanded: boolean] }>();

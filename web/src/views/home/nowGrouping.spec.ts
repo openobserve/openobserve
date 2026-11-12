@@ -16,7 +16,7 @@
 import { describe, expect, it } from "vitest";
 
 import { alertRow, anomalyRow, incidentRow, serviceRow } from "./homeFixtures";
-import { briefingCounts, groupNowRows, incidentService, splitNowRows } from "./nowGrouping";
+import { groupNowRows, incidentService, splitNowRows } from "./nowGrouping";
 
 const noService = () => null;
 
@@ -59,8 +59,8 @@ describe("groupNowRows", () => {
   });
 });
 
-describe("splitNowRows and briefingCounts", () => {
-  it("moves open services no alert matches to Problems and counts the rows Now draws", () => {
+describe("splitNowRows", () => {
+  it("moves open services no alert matches to Problems and keeps the rest in Now", () => {
     const grouped = groupNowRows(
       [
         serviceRow("checkout", { coverage: "none" }),
@@ -74,28 +74,10 @@ describe("splitNowRows and briefingCounts", () => {
     const split = splitNowRows(grouped);
     expect(split.problems.map((item) => item.row.key)).toEqual(["service:checkout"]);
     expect(split.now.map((item) => item.row.key)).not.toContain("service:checkout");
-    expect(briefingCounts(split)).toEqual({ needYou: 3, noAlert: 1 });
-  });
-
-  it("counts one headline item per drawn row, even two rows of one service", () => {
-    const grouped = groupNowRows(
-      [serviceRow("cart", { coverage: "covered" }), incidentRow("i1"), incidentRow("i2")],
-      () => "cart",
-    );
-    const split = splitNowRows(grouped);
     expect(split.now).toHaveLength(3);
-    expect(briefingCounts(split)).toEqual({ needYou: 3, noAlert: 0 });
   });
 
-  it("on a phone keeps services no alert matches in Now and still names them", () => {
-    const grouped = groupNowRows(
-      [serviceRow("checkout", { coverage: "none" }), alertRow("hot", { state: "firing" })],
-      noService,
-    );
-    expect(briefingCounts({ now: grouped, problems: [] })).toEqual({ needYou: 2, noAlert: 1 });
-  });
-
-  it("keeps recovered rows out of Now unless they flap, and counts exactly the rows shown", () => {
+  it("keeps recovered rows out of Now unless they flap", () => {
     const grouped = groupNowRows(
       [
         alertRow("calm", { state: "recovered", bucket: "recovered", count: 1 }),
@@ -105,12 +87,13 @@ describe("splitNowRows and briefingCounts", () => {
       ],
       noService,
     );
-    const split = splitNowRows(grouped);
-    expect(split.now.map((item) => item.row.key)).toEqual(["alert:hot", "alert:flap"]);
-    expect(briefingCounts(split).needYou).toBe(split.now.length);
+    expect(splitNowRows(grouped).now.map((item) => item.row.key)).toEqual([
+      "alert:hot",
+      "alert:flap",
+    ]);
   });
 
-  it("reads nothing to do on an empty list", () => {
-    expect(briefingCounts(splitNowRows([]))).toEqual({ needYou: 0, noAlert: 0 });
+  it("splits an empty list into two empty ones", () => {
+    expect(splitNowRows([])).toEqual({ now: [], problems: [] });
   });
 });

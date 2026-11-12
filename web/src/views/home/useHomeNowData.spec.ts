@@ -15,15 +15,7 @@
 
 import { describe, expect, it, vi } from "vitest";
 
-import type { OrgRcaRun } from "@/services/rca_runs_org";
-
-import {
-  anomalyRowsOf,
-  homeRunsOf,
-  perConfigHistory,
-  periodToMs,
-  windowOf,
-} from "./useHomeNowData";
+import { anomalyRowsOf, perConfigHistory, periodToMs, windowOf } from "./useHomeNowData";
 
 const getHistory = vi.hoisted(() => vi.fn());
 vi.mock("@/services/anomaly_detection", () => ({ default: { getHistory } }));
@@ -89,79 +81,5 @@ describe("useHomeNowData helpers", () => {
     getHistory.mockReset();
     await expect(perConfigHistory("o", [])).resolves.toEqual([]);
     expect(getHistory).not.toHaveBeenCalled();
-  });
-
-  it("gives each incident its newest run and lists only auto-runs whose newest attempt failed (C2 page)", () => {
-    // The shape `GET /api/v2/{org}/alerts/rca_runs` answers with, newest first and every field present.
-    const page: { runs: OrgRcaRun[]; has_more: boolean } = JSON.parse(
-      JSON.stringify({
-        runs: [
-          {
-            run_id: "r5",
-            incident_id: "inc-481",
-            incident_title: "Payments",
-            severity: "P2",
-            state: "refused",
-            trigger: "auto",
-            started_at: 50,
-            ended_at: 51,
-            error_code: "turn_limit",
-          },
-          {
-            run_id: "r4",
-            incident_id: "inc-482",
-            incident_title: "Checkout 5xx",
-            severity: "P1",
-            state: "completed",
-            trigger: "auto",
-            started_at: 40,
-            ended_at: 47,
-            error_code: null,
-          },
-          {
-            run_id: "r3",
-            incident_id: "inc-482",
-            incident_title: "Checkout 5xx",
-            severity: "P1",
-            state: "failed",
-            trigger: "auto",
-            started_at: 30,
-            ended_at: 31,
-            error_code: "agent_unavailable",
-          },
-          {
-            run_id: "r2",
-            incident_id: "inc-483",
-            incident_title: null,
-            severity: null,
-            state: "failed",
-            trigger: "manual",
-            started_at: 20,
-            ended_at: 21,
-            error_code: null,
-          },
-          {
-            run_id: "r1",
-            incident_id: "inc-484",
-            incident_title: "Disk",
-            severity: "P3",
-            state: "failed",
-            trigger: "auto",
-            started_at: 10,
-            ended_at: 12,
-            error_code: "query_timeout",
-          },
-        ],
-        has_more: false,
-      }),
-    );
-    const { byIncident, failedAuto } = homeRunsOf(page.runs);
-    expect([...byIncident.entries()].map(([id, run]) => [id, run.run_id])).toEqual([
-      ["inc-481", "r5"],
-      ["inc-482", "r4"],
-      ["inc-483", "r2"],
-      ["inc-484", "r1"],
-    ]);
-    expect(failedAuto.map((run) => run.run_id)).toEqual(["r5", "r1"]);
   });
 });

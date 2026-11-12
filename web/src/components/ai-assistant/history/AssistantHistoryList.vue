@@ -19,7 +19,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     ref="root"
     :class="[
       '@container flex h-full min-h-0 min-w-0 flex-col gap-2 p-2',
-      mode === 'rail' && 'bg-surface-panel pt-0',
+      mode === 'rail' && 'pt-0',
+      mode === 'rail' && !bare && 'bg-surface-panel',
     ]"
     :role="mode === 'panel' ? 'region' : undefined"
     :aria-label="mode === 'panel' ? t('assistant.history.view.title') : undefined"
@@ -33,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="toolsShown"
       :class="[
         'flex min-w-0 shrink-0 items-center gap-1',
-        mode === 'rail' && 'border-border-default -mx-2 h-10 border-b px-2',
+        mode === 'rail' && !bare && 'border-border-default -mx-2 h-10 border-b px-2',
       ]"
       data-test="assistant-history-tools"
     >
@@ -44,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :debounce="SEARCH_DEBOUNCE_MS"
         clearable
         :aria-controls="drawn.length ? listId : undefined"
-        class="min-w-0 flex-1"
+        :class="['min-w-0 flex-1', bare && BARE_SEARCH_CLASS]"
         data-test="assistant-history-search"
         @update:model-value="(q) => history.setFilter({ q })"
         @keydown="onSearchKey"
@@ -103,6 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :model-value="view"
         :aria-label="t('assistant.history.filter.show')"
         mobile-dropdown
+        :class="bare && BARE_VIEWS_CLASS"
         @update:model-value="(value) => setView(value as HistoryView)"
       >
         <OToggleGroupItem
@@ -110,6 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :key="item.id"
           :value="item.id"
           size="xs"
+          :class="bare && BARE_VIEW_CLASS"
           :data-test="`assistant-history-view-${item.id}`"
         >
           {{ item.label }}
@@ -362,6 +365,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :is-admin="capability.isAdmin"
         :clear-on-sign-out="clearOnSignOut"
         :description-id="modeLineId"
+        :compact="bare"
         class="px-2"
         @update:clear-on-sign-out="setClearOnSignOut"
       />
@@ -438,6 +442,8 @@ export interface AssistantHistoryListProps {
   /** Where a row opens: the rail routes to the full view, the others open in their container. */
   container: Container;
   narrow?: boolean;
+  /** On the page's own backdrop (Home): no panel surface or band, pill search and filters, one-line rows and footer. */
+  bare?: boolean;
 }
 
 /** Filter joins the tools from this many chats, or while one is active. */
@@ -467,6 +473,11 @@ const REM_PX = 16;
 const COUNTDOWN_TICK_MS = 1_000;
 
 const GROUP_HEADING_CLASS = "text-text-secondary px-2 pb-1 text-xs font-medium";
+
+// A bare list's search and filters take the Ask box's pill chips: the field's box is its first child.
+const BARE_SEARCH_CLASS = "[&>div]:h-7 [&>div]:rounded-full [&_input]:text-xs";
+const BARE_VIEWS_CLASS = "gap-1 border-0! bg-transparent! p-0! [&>[aria-hidden=true]]:rounded-full";
+const BARE_VIEW_CLASS = "h-6! rounded-full! px-2.5! font-normal!";
 
 type GroupId = (typeof GROUP_ORDER)[number];
 
@@ -808,6 +819,7 @@ function rowProps(row: HistoryRow) {
     serverMode: history.mode.value === "server",
     serverPins: history.serverPins.value,
     timezone: timezone.value,
+    compact: props.bare,
   };
 }
 

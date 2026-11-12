@@ -32,6 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @keydown="recordKeydown"
   >
     <div
+      v-if="!bare || (showTitle && state !== 'loading')"
       :class="chromeClasses"
       data-assistant-chrome
       :data-test="placement === 'window' ? 'assistant-window-titlebar' : 'assistant-shell-chrome'"
@@ -45,11 +46,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :container="container"
         :narrow="narrow"
         :layout-direct="onlyFullPage"
+        :toolbar="bare"
       >
         <template #container-actions="{ narrow }">
-          <AssistantHeaderSees v-if="headerSees" :sid="activeSid" />
           <AssistantOpenAsMenu
-            v-if="!narrow"
+            v-if="bare"
+            icon-only
+            :placement="placement"
+            :sheet="sheet"
+            :sid="activeSid"
+            :dock-host="host?.id"
+          />
+          <AssistantHeaderSees
+            v-if="headerSees"
+            :sid="activeSid"
+            :label="bare ? t('assistant.thread.toolbar.sees') : undefined"
+          />
+          <AssistantOpenAsMenu
+            v-if="!narrow && !bare"
             :placement="placement"
             :sheet="sheet"
             :sid="activeSid"
@@ -101,7 +115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </template>
       </AssistantThreadHeader>
-      <template v-else>
+      <template v-else-if="!bare">
         <OSkeleton v-if="state === 'loading'" type="text" class="ms-2 w-40" />
         <span class="flex-1" />
         <div class="flex shrink-0 items-center gap-1">
@@ -510,7 +524,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ? t('assistant.composer.rateLimited')
                   : undefined
           "
-          @show-running="threadHeader?.openChats()"
+          @show-running="openChats"
         >
           <template #chips>
             <slot name="tray">
@@ -568,6 +582,8 @@ export interface AssistantShellProps {
   sheet?: boolean;
   host?: AssistantHostAdapter;
   density?: "compact" | "roomy";
+  /** No chat bar: the chat's controls float in its top corner as icons, and the page around it lists the chats. */
+  bare?: boolean;
 }
 
 export type ShellState =
@@ -669,6 +685,7 @@ import {
   markSignedIn,
   queryRunOf,
   registerAssistantFocusTarget,
+  runHistoryTarget,
   starterPayload,
   turnLockKey,
   useAssistantCapability,
@@ -730,6 +747,7 @@ const props = withDefaults(defineProps<AssistantShellProps>(), {
   sheet: false,
   host: undefined,
   density: "compact",
+  bare: false,
 });
 
 defineSlots<{
@@ -830,6 +848,8 @@ const container = computed<Container>(() => {
 const closable = computed(() => props.placement !== "window" && props.placement !== "full");
 
 const chromeClasses = computed(() => {
+  // A bare shell's controls sit in the chat's top corner, never on a bar.
+  if (props.bare) return "flex shrink-0 items-center justify-end px-3 pt-3";
   const base = "border-border-default flex shrink-0 items-center gap-1 border-b ps-1 pe-2";
   if (props.placement === "window")
     return [
@@ -1315,7 +1335,7 @@ function onOutcomeAction(sid: string, action: OutcomeAction, outcome: TurnOutcom
       void stopBusy(sid).then((stopped) => stopped && focusAfterRequest(started));
       return;
     case "show_running":
-      return threadHeader.value?.openChats();
+      return openChats();
     case "sign_in":
       return signIn();
     case "retry_save":
@@ -1590,6 +1610,12 @@ function openChat(target: { sid: Sid } | { chatId: number }): Promise<Sid> {
   return own ? store.openInWindow(own, target) : store.openSession(target, { focus: true });
 }
 
+// A bare shell has no Chats button, so the page's rail takes the request when one is mounted.
+function openChats(): void {
+  if (threadHeader.value) threadHeader.value.openChats();
+  else if (props.bare) runHistoryTarget();
+}
+
 function closeChats(): void {
   chatsOpen.value = false;
   void nextTick(() => threadHeader.value?.focusChats());
@@ -1688,7 +1714,7 @@ watch(
   (requested) => {
     if (!requested) return;
     runs.takeOpenRequest();
-    threadHeader.value?.openChats();
+    openChats();
   },
   { immediate: true, flush: "post" },
 );

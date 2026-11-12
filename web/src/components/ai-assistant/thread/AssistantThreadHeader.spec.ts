@@ -39,12 +39,18 @@ const { fake, exporter, track, toast } = vi.hoisted(() => ({
   track: vi.fn(),
   toast: vi.fn(),
 }));
-const { md } = vi.hoisted(() => ({ md: { value: true } }));
+const { md, lg } = vi.hoisted(() => ({ md: { value: true }, lg: { value: true } }));
 
 vi.mock("@/composables/useBreakpoint", async (importOriginal) => {
   const { computed } = await import("vue");
   const real = (await importOriginal<typeof import("@/composables/useBreakpoint")>()).default;
-  return { default: () => ({ ...real(), mdUp: computed(() => md.value) }) };
+  return {
+    default: () => ({
+      ...real(),
+      mdUp: computed(() => md.value),
+      lgUp: computed(() => lg.value),
+    }),
+  };
 });
 
 vi.mock("@/composables/assistant", async (importOriginal) => ({
@@ -101,6 +107,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  lg.value = true;
   document.body.innerHTML = "";
   track.mockClear();
   toast.mockClear();
@@ -301,6 +308,76 @@ describe("AssistantThreadHeader", () => {
     const { wrapper, sid } = await setup();
     await wrapper.get('[data-test="assistant-thread-menu-download-markdown"]').trigger("click");
     expect(exporter.exportChat).toHaveBeenCalledWith(sid, "markdown");
+  });
+
+  describe("as a toolbar", () => {
+    const toolbar = { placement: "full", container: "full_view", toolbar: true } as const;
+
+    it("draws icons only, the container's controls before More, and no title or +", async () => {
+      const { wrapper } = await setup(toolbar);
+      expect(wrapper.find('[data-test="assistant-thread-title"]').element.tagName).toBe("DIV");
+      expect(wrapper.find(title).exists()).toBe(false);
+      expect(wrapper.find('[data-test="assistant-thread-title-text"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="assistant-thread-new"]').exists()).toBe(false);
+      const ids = wrapper
+        .findAll("button")
+        .map((b) => b.attributes("data-test"))
+        .filter((id) => ["close-stub", "assistant-thread-more"].includes(id ?? ""));
+      expect(ids).toEqual(["close-stub", "assistant-thread-more"]);
+      const more = wrapper.get('[data-test="assistant-thread-more"]');
+      expect(more.attributes("aria-label")).toBe("More Actions");
+      expect(more.attributes("aria-haspopup")).toBe("menu");
+      expect(wrapper.find('[data-test="assistant-title-menu-all"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="layout-stub"]').exists()).toBe(false);
+    });
+
+    it("puts New Chat first where no rail lists the chats", async () => {
+      lg.value = false;
+      const { wrapper, newChat } = await setup(toolbar);
+      const ids = wrapper
+        .findAll("button")
+        .map((b) => b.attributes("data-test"))
+        .filter((id) =>
+          ["assistant-thread-new", "close-stub", "assistant-thread-more"].includes(id ?? ""),
+        );
+      expect(ids).toEqual(["assistant-thread-new", "close-stub", "assistant-thread-more"]);
+      const add = wrapper.get('[data-test="assistant-thread-new"]');
+      expect(add.attributes("aria-label")).toBe("New Chat");
+      await add.trigger("click");
+      expect(newChat).toHaveBeenCalledTimes(1);
+      expect(wrapper.find('[data-test="assistant-title-menu-new"]').exists()).toBe(false);
+      lg.value = true;
+    });
+
+    it("runs the title menu's own actions from More: download, pin, rename and delete", async () => {
+      const { wrapper, sid, store, history } = await setup(toolbar);
+      await wrapper.get('[data-test="assistant-thread-menu-download-markdown"]').trigger("click");
+      expect(exporter.exportChat).toHaveBeenLastCalledWith(sid, "markdown");
+      await wrapper.get('[data-test="assistant-thread-menu-download-json"]').trigger("click");
+      expect(exporter.exportChat).toHaveBeenLastCalledWith(sid, "json");
+      const pin = vi.spyOn(history, "pin").mockResolvedValue(undefined as never);
+      await wrapper.get('[data-test="assistant-thread-menu-pin"]').trigger("click");
+      expect(pin).toHaveBeenCalledWith(sid, true);
+      expect(wrapper.find('[data-test="assistant-thread-menu-delete"]').exists()).toBe(true);
+      vi.useFakeTimers();
+      await wrapper.get('[data-test="assistant-thread-menu-rename"]').trigger("click");
+      await vi.runAllTimersAsync();
+      vi.useRealTimers();
+      await flushPromises();
+      expect(wrapper.find('[data-test="assistant-thread-more"]').exists()).toBe(false);
+      const input = wrapper.get('[data-test="assistant-thread-rename"] input');
+      await input.setValue("Payments p95");
+      await input.trigger("keydown", { key: "Enter" });
+      await flushPromises();
+      expect(String(store.state.sessions[sid].title)).toBe("Payments p95");
+      expect(document.activeElement).toBe(wrapper.get('[data-test="assistant-thread-more"]').element);
+    });
+
+    it("shows no More for a read-only role, as the title menu offers it no actions", async () => {
+      const { wrapper } = await setup(toolbar, { over: { canChat: "no" } });
+      expect(wrapper.find('[data-test="assistant-thread-more"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="close-stub"]').exists()).toBe(true);
+    });
   });
 
   it("keeps the chats and drops the actions for a read-only role", async () => {

@@ -39,20 +39,12 @@ vi.mock("@/components/ai-assistant/welcome/AssistantLauncher.vue", () => ({
     template: '<div data-test="launcher-stub" :data-layout="layout" />',
   },
 }));
-vi.mock("./AgentHomeBriefing.vue", () => ({
-  default: {
-    name: "AgentHomeBriefing",
-    props: ["canBrief"],
-    template: '<div data-test="brief-stub" :data-can="String(canBrief)" />',
-  },
-}));
-
 import AgentHomeFirstRun from "./AgentHomeFirstRun.vue";
 
 const mountFirstRun = () => mount(AgentHomeFirstRun, { global: { plugins: [i18n, fakeVuex()] } });
 
 describe("AgentHomeFirstRun (HomeFirstRun board, B-shell-5)", () => {
-  it("puts the no-data note above Ask, then the starters' launcher, in the main column", () => {
+  it("puts the no-data note above Ask, then the Ask launcher, in the main column", () => {
     const main = mountFirstRun().get('[data-test="agent-home-first-run-main"]');
     const order = [...main.element.children].map((el) => el.getAttribute("data-test"));
     expect(order).toEqual(["greeting-stub", "agent-home-first-run-note", "launcher-stub"]);
@@ -60,20 +52,19 @@ describe("AgentHomeFirstRun (HomeFirstRun board, B-shell-5)", () => {
     expect(main.get('[data-test="launcher-stub"]').attributes("data-layout")).toBe("overview");
   });
 
-  it("gives the page the right rail: Brief me, then the recent threads", () => {
-    homeState.value = "ai";
-    const aside = mountFirstRun().get('[data-test="agent-home-first-run-aside"]');
-    expect(aside.get('[data-test="brief-stub"]').attributes("data-can")).toBe("true");
-    expect(aside.get('[data-test="agent-home-first-run-threads"]').attributes("data-layout")).toBe(
-      "chats",
+  it("is one centred column with no right rail, Brief me or recent threads", () => {
+    const wrapper = mountFirstRun();
+    expect(wrapper.get('[data-test="agent-home-first-run-main"]').classes()).toEqual(
+      expect.arrayContaining(["mx-auto", "max-w-5xl"]),
     );
-  });
-
-  it("lists no threads and offers no Brief me while the agent cannot answer", () => {
-    homeState.value = "off";
-    const aside = mountFirstRun().get('[data-test="agent-home-first-run-aside"]');
-    expect(aside.get('[data-test="brief-stub"]').attributes("data-can")).toBe("false");
-    expect(aside.find('[data-test="agent-home-first-run-threads"]').exists()).toBe(false);
-    homeState.value = "ai";
+    expect(wrapper.findAll('[data-test="launcher-stub"]')).toHaveLength(1);
+    expect(wrapper.find("aside").exists()).toBe(false);
+    for (const gone of [
+      "agent-home-first-run-aside",
+      "agent-home-first-run-threads",
+      "agent-home-brief-me",
+    ]) {
+      expect(wrapper.find(`[data-test="${gone}"]`).exists()).toBe(false);
+    }
   });
 });

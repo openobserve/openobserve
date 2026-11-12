@@ -41,6 +41,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       {{ freshFull.label }}
     </ODropdownItem>
   </template>
+  <AssistantIconButton
+    v-else-if="places.length === 1 && iconOnly"
+    :label="places[0].label"
+    :icon="PLACE_ICONS[places[0].id]"
+    :disabled="places[0].disabled"
+    :data-test="`assistant-shell-place-${places[0].id}`"
+    @click="places[0].run"
+  />
+  <OButton
+    v-else-if="places.length === 1"
+    variant="ghost"
+    size="xs"
+    :icon-left="PLACE_ICONS[places[0].id]"
+    :disabled="places[0].disabled"
+    class="max-md:min-h-11 max-md:min-w-11 pointer-coarse:min-h-11"
+    :aria-label="places[0].label"
+    :data-test="`assistant-shell-place-${places[0].id}`"
+    @click="places[0].run"
+  >
+    <span class="max-md:sr-only">{{ places[0].label }}</span>
+  </OButton>
   <ODropdown v-else-if="places.length" align="end">
     <template #trigger>
       <OButton
@@ -115,6 +136,8 @@ export interface AssistantOpenAsMenuProps {
   dockHost?: DockHostId;
   /** The trigger reads "Open as" instead of an icon, where the bar has room for it. */
   labelled?: boolean;
+  /** A single move draws as an icon button, for the Home toolbar. */
+  iconOnly?: boolean;
 }
 
 const PLACE_ICONS: Record<PlaceId, IconName> = {
@@ -143,6 +166,7 @@ const props = withDefaults(defineProps<AssistantOpenAsMenuProps>(), {
   bare: false,
   dockHost: undefined,
   labelled: false,
+  iconOnly: false,
 });
 
 const { t } = useI18nTyped();

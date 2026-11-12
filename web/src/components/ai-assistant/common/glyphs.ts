@@ -101,7 +101,7 @@ export const assistantGlyph = {
   warning: "warning",
   fork: "fork-right",
   filter: "filter-list",
-  floatingWindow: "open-in-browser",
+  floatingWindow: "picture-in-picture",
   readAloud: "volume-up",
   pause: "pause",
   shareLink: "link",

@@ -317,6 +317,8 @@ export interface OpenAssistantArgs {
     homeStarter?: boolean;
     /** Page-context field keys the user removed before sending; written to the new chat's composer. */
     removedPageKeys?: string[];
+    /** Images attached at the door; the composer's own caps apply. */
+    images?: ImageAttachment[];
   };
   /** RCA interactive mode (`60` §5.1), forwarded on `PromptRequest`. */
   mode?: "chat";

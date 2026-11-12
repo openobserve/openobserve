@@ -23,8 +23,6 @@ import type {
 import i18n from "@/locales";
 import { raw } from "@/types/i18n";
 
-import type { OrgRcaRun } from "@/services/rca_runs_org";
-
 import HomeNowRow from "./HomeNowRow.vue";
 
 const CHANGED = Date.UTC(2026, 10, 5, 9, 41) * 1000;
@@ -206,7 +204,7 @@ describe("HomeNowRow", () => {
     expect(tag.html()).not.toMatch(/success/);
   });
 
-  it("offers Follow in thread on an incident with a run, with the run's state on the muted line", async () => {
+  it("draws an incident with its severity, Investigate and Open incident, and no Ack or Follow", () => {
     const incident: Row = {
       kind: "incident",
       key: "incident:inc-482",
@@ -218,27 +216,11 @@ describe("HomeNowRow", () => {
       status: "open",
       alertCount: 2,
     };
-    const run: OrgRcaRun = {
-      run_id: "run-1",
-      incident_id: "inc-482",
-      incident_title: "Checkout 5xx",
-      severity: "P1",
-      state: "completed",
-      trigger: "auto",
-      started_at: CHANGED,
-      ended_at: CHANGED + 420_000_000,
-      error_code: null,
-    };
-    const wrapper = mountRow({ row: incident, run });
-    expect(wrapper.find('[data-test="home-now-row-investigate"]').exists()).toBe(false);
-    const follow = wrapper.get('[data-test="home-now-row-follow"]');
-    expect(follow.text()).toBe("Follow in thread");
+    const wrapper = mountRow({ row: incident });
     expect(wrapper.get('[data-test="home-now-row-severity"]').exists()).toBe(true);
-    await follow.trigger("click");
-    expect(wrapper.emitted("follow")).toEqual([[incident, run]]);
+    expect(wrapper.get('[data-test="home-now-row-investigate"]').text()).toBe("Investigate");
     expect(wrapper.get('[data-test="home-now-row-open"]').text()).toBe("Open incident");
-    const plain = mountRow({ row: incident });
-    expect(plain.find('[data-test="home-now-row-follow"]').exists()).toBe(false);
-    expect(plain.get('[data-test="home-now-row-investigate"]').text()).toBe("Investigate");
+    for (const gone of ["follow", "ack", "ack-state", "owner", "opened", "last-alert"])
+      expect(wrapper.find(`[data-test="home-now-row-${gone}"]`).exists()).toBe(false);
   });
 });

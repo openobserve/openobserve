@@ -18,20 +18,32 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { computed } from "vue";
 
 import { contextRegistry } from "@/composables/contextProviders/registry";
+import OFile from "@/lib/forms/File/OFile.vue";
 import { requestOverviewFocus } from "@/composables/goto/goToRequests";
 import { GO_TO_PAGES, type GoToPage } from "@/composables/goto/types";
 
-import type { GateCode, Starter } from "@/composables/assistant";
+import type { CapabilityAgent, GateCode, Starter } from "@/composables/assistant";
 import { raw } from "@/types/i18n";
 
 import { fakeAssistant, fakeRouter, fakeVuex } from "../__tests__/fakeAssistant";
+import AssistantComposerPlusMenu, {
+  type ComposerPlusAction,
+} from "../composer/AssistantComposerPlusMenu.vue";
 import AssistantLauncher, { launcherState } from "./AssistantLauncher.vue";
+import AssistantLauncherAgent from "./AssistantLauncherAgent.vue";
 
-const { fake, open, loading, mentionPick } = vi.hoisted(() => ({
+const ROSTER: CapabilityAgent[] = [
+  { id: "o2-ai", pickable: true, available: true },
+  { id: "sre", pickable: true, available: true },
+];
+
+const { fake, open, loading, mentionPick, startersRead, toastCall } = vi.hoisted(() => ({
   fake: { current: null as any },
   open: vi.fn(),
   loading: { value: false },
   mentionPick: { current: null as any },
+  startersRead: vi.fn(),
+  toastCall: vi.fn(),
 }));
 
 const STARTERS: Starter[] = [0, 1, 2, 3].map((i) => ({
@@ -49,21 +61,25 @@ vi.mock("@/composables/assistant", async (importOriginal) => ({
   useAssistantHistory: () => fake.current.history,
   useAssistantCapability: () => fake.current.handle,
   openAssistant: (...args: unknown[]) => open(...args),
-  useAssistantStarters: () => ({
-    starters: computed(() => STARTERS),
-    loading: computed(() => loading.value),
-    scope: computed(() => ({ org: "default", streamCount: 3, timeRange: null, canWrite: "yes" })),
-  }),
+  useAssistantStarters: () => {
+    startersRead();
+    return {
+      starters: computed(() => STARTERS),
+      loading: computed(() => loading.value),
+      scope: computed(() => ({ org: "default", streamCount: 3, timeRange: null, canWrite: "yes" })),
+    };
+  },
 }));
-vi.mock("@/components/ai-assistant/context/AssistantContextSeesPopover.vue", () => ({
-  default: { name: "SeesStub", template: "<div><slot name='trigger' /></div>" },
+vi.mock("@/lib/feedback/Toast/useToast", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/feedback/Toast/useToast")>()),
+  toast: (...args: unknown[]) => toastCall(...args),
 }));
 vi.mock("@/components/ai-assistant/context/AssistantMentionMenu.vue", async () => {
   const { defineComponent, h } = await import("vue");
   return {
     default: defineComponent({
       name: "AssistantMentionMenu",
-      props: ["open", "query", "org", "listboxId", "sid"],
+      props: { open: null, query: null, org: null, listboxId: null, sid: null, hideAgents: Boolean },
       setup(props, { expose }) {
         expose({
           current: () => mentionPick.current,
@@ -72,7 +88,11 @@ vi.mock("@/components/ai-assistant/context/AssistantMentionMenu.vue", async () =
         });
         return () =>
           props.open
-            ? h("div", { "data-test": "assistant-mention-panel", "data-query": props.query })
+            ? h("div", {
+                "data-test": "assistant-mention-panel",
+                "data-query": props.query,
+                "data-hide-agents": String(props.hideAgents),
+              })
             : null;
       },
     }),
@@ -104,6 +124,10 @@ function setup(gate: GateCode = "available", history: Record<string, unknown> = 
 }
 
 const input = (wrapper: ReturnType<typeof setup>["wrapper"]) => wrapper.get("textarea");
+
+// The + menu's own spec covers its dropdown; here an item is picked as the menu reports it.
+const plus = (wrapper: ReturnType<typeof setup>["wrapper"], action: ComposerPlusAction) =>
+  wrapper.findComponent(AssistantComposerPlusMenu).vm.$emit("select", action);
 
 const PAGES: GoToPage[] = [
   {
@@ -143,6 +167,7 @@ describe("AssistantLauncher", () => {
 
   beforeEach(() => {
     open.mockReset().mockResolvedValue({ ok: true });
+    startersRead.mockReset();
     loading.value = false;
     document.body.innerHTML = "";
   });
@@ -204,24 +229,48 @@ describe("AssistantLauncher", () => {
     expect(wrapper.findAll('[data-test="assistant-launcher-mention-chip"]')).toHaveLength(0);
   });
 
-  it("keeps an unmatched @query as text and picks an agent from the @ menu for the new chat", async () => {
+  it("types an @ at the caret from the + menu's Add Context and opens the @ menu", async () => {
+    const { wrapper } = setupOn({ layout: "overview" });
+    await flushPromises();
+    await input(wrapper).setValue("count errors");
+    plus(wrapper, "context");
+    await flushPromises();
+    expect((input(wrapper).element as HTMLTextAreaElement).value).toBe("count errors @");
+    expect(document.activeElement).toBe(input(wrapper).element);
+    expect(wrapper.get('[data-test="assistant-mention-panel"]').attributes("data-query")).toBe("");
+  });
+
+  it("keeps an unmatched @query as text and lists context only in the @ menu", async () => {
     mentionPick.current = null;
     const { wrapper } = setupOn({ layout: "overview" });
     await flushPromises();
     await input(wrapper).setValue("@nothing");
     await flushPromises();
+    expect(
+      wrapper.get('[data-test="assistant-mention-panel"]').attributes("data-hide-agents"),
+    ).toBe("true");
     await input(wrapper).trigger("keydown", { key: "Enter" });
     expect(open).not.toHaveBeenCalled();
     expect((input(wrapper).element as HTMLTextAreaElement).value).toBe("@nothing");
-    mentionPick.current = { id: "agent:sre", kind: "field", label: raw("SRE"), agent: "sre" };
-    await input(wrapper).setValue("@inv");
+  });
+
+  it("sends the agent picked on the agent chip with the new chat, then goes back to the default", async () => {
+    const { wrapper } = setupOn({ layout: "overview" });
+    fake.current.capability.value = { ...fake.current.capability.value, agents: ROSTER };
     await flushPromises();
-    await input(wrapper).trigger("keydown", { key: "Enter" });
+    const agentChip = () => wrapper.get('[data-test="assistant-launcher-agent"]');
+    expect(agentChip().attributes("data-agent")).toBe("o2-ai");
+    wrapper.findComponent(AssistantLauncherAgent).vm.$emit("update:modelValue", "sre");
     await flushPromises();
-    expect(wrapper.get('[data-test="assistant-agent-pill"]').attributes("data-agent")).toBe("sre");
+    expect(agentChip().attributes("data-agent")).toBe("sre");
     await input(wrapper).setValue("why did checkout fail?");
     await input(wrapper).trigger("keydown", { key: "Enter" });
     expect(open.mock.calls[0][0]).toMatchObject({ agent: "sre" });
+    await flushPromises();
+    expect(agentChip().attributes("data-agent")).toBe("o2-ai");
+    await input(wrapper).setValue("and now?");
+    await input(wrapper).trigger("keydown", { key: "Enter" });
+    expect(open.mock.calls[1][0]).not.toHaveProperty("agent");
   });
 
   it("sends the typed line on Enter as a new chat in the full view (HOME-01)", async () => {
@@ -253,7 +302,7 @@ describe("AssistantLauncher", () => {
   });
 
   it("keeps the text on Escape while Home's Go to results are open (HOME-03)", async () => {
-    const { wrapper } = setupOn({ layout: "overview" });
+    const { wrapper } = setupOn({ layout: "overview", goToOnly: true });
     await flushPromises();
     await input(wrapper).setValue("keep this");
     await flushPromises();
@@ -364,25 +413,59 @@ describe("AssistantLauncher", () => {
     expect(wrapper.find('[data-test="assistant-launcher-suggestions"]').exists()).toBe(true);
   });
 
-  it("holds the time prefix and the i inside the input, and opens the full view in place", () => {
+  it("always shows the time chip after +, Last 15 min by default, and a pick from the chip replaces it with no remove", async () => {
     const { wrapper } = setup();
     const field = wrapper.get('[data-test="assistant-launcher-input"]');
-    expect(field.find('[data-test="assistant-context-chip-time"]').text()).toBe("Last 15 min");
-    expect(field.find('[data-test="assistant-launcher-sees"]').exists()).toBe(true);
-    expect(wrapper.get('[data-test="assistant-launcher-open"]').text()).toBe("Open full view");
-    expect(input(wrapper).attributes("placeholder")).toBe("Ask anything · @ to add context");
+    const chip = () => field.find('[data-test="assistant-context-chip-time"]');
+    const remove = () => chip().find('[data-test="assistant-context-chip-remove"]');
+    expect(chip().text()).toBe("Last 15 min");
+    expect(remove().exists()).toBe(false);
+    await chip().trigger("click");
+    await flushPromises();
+    (document.body.querySelector('[data-test="assistant-context-time-1h"]') as HTMLElement).click();
+    await flushPromises();
+    expect(chip().text()).toBe("Last 1 h");
+    expect(remove().exists()).toBe(false);
+    await input(wrapper).setValue("why?");
+    await input(wrapper).trigger("keydown", { key: "Enter" });
+    expect(open.mock.calls[0][0].payload.timeOverride).toMatchObject({ period: "1h" });
   });
 
-  it("is the composer everywhere else is: strip with chips and ⓘ on top, agent pill left, Send right", () => {
+  it("is the composer everywhere else is: no strip while empty, + and the time chip left, Send right", () => {
     const { wrapper } = setup();
     const field = wrapper.get('[data-test="assistant-composer-frame"]');
-    expect(field.find('[data-test="assistant-composer-strip"]').exists()).toBe(true);
+    expect(field.find('[data-test="assistant-composer-strip"]').exists()).toBe(false);
     const left = field.get('[data-test="assistant-composer-bar-left"]');
-    expect(left.find('[data-test="assistant-agent-pill"]').attributes("data-agent")).toBe("o2-ai");
-    expect(left.findAll("button")).toHaveLength(0);
+    expect(left.find('[data-test="assistant-context-chip-time"]').exists()).toBe(true);
+    expect(left.find('[data-test="assistant-agent-pill"]').exists()).toBe(false);
+    expect(left.findAll("button")[0].attributes("data-test")).toBe("assistant-composer-plus");
+    expect(wrapper.findComponent(AssistantComposerPlusMenu).props("actions")).toEqual([
+      "attach",
+      "context",
+    ]);
     const right = field.get('[data-test="assistant-composer-bar-right"]');
     expect(right.find('[data-test="assistant-launcher-ask"]').classes()).toContain("rounded-full");
     expect(wrapper.find('[data-test="assistant-launcher-narrow-tools"]').exists()).toBe(false);
+  });
+
+  it("gives Home's field the glow frame and a gradient Send once there is text", async () => {
+    const { wrapper } = setupOn({ layout: "overview" });
+    const box = wrapper.get('[data-test="assistant-composer-frame"] > div');
+    expect(box.classes()).toEqual(
+      expect.arrayContaining(["bg-gradient-brand-ribbon", "rounded-3xl", "assistant-border-flow"]),
+    );
+    const ask = () => wrapper.get('[data-test="assistant-launcher-ask"]');
+    expect(ask().classes()).not.toContain("bg-gradient-ai");
+    await input(wrapper).setValue("why?");
+    expect(ask().classes()).toContain("bg-gradient-ai");
+    const card = setup().wrapper;
+    expect(card.get('[data-test="assistant-composer-frame"] > div').classes()).not.toContain(
+      "bg-gradient-brand-ribbon",
+    );
+    await input(card).setValue("why?");
+    expect(card.get('[data-test="assistant-launcher-ask"]').classes()).not.toContain(
+      "bg-gradient-ai",
+    );
   });
 
   it("turns Ask on only with text", async () => {
@@ -402,13 +485,6 @@ describe("AssistantLauncher", () => {
     expect(row.text()).toContain("Couldn't load your chats");
     await wrapper.get('[data-test="assistant-launcher-recent-retry"]').trigger("click");
     expect(retry).toHaveBeenCalled();
-  });
-
-  it("opens What the assistant sees from a named icon that takes no text width (PO A34)", () => {
-    const { wrapper } = setup();
-    const sees = wrapper.get('[data-test="assistant-launcher-sees"]');
-    expect(sees.text()).toBe("");
-    expect(sees.attributes("aria-label")).toBe("What the assistant sees");
   });
 
   it("shows at most three suggestions and no other suggestion group (PO A34)", () => {
@@ -438,6 +514,88 @@ describe("AssistantLauncher", () => {
     });
   });
 
+  describe("Attach Image", () => {
+    const png = (name: string, size = 10) =>
+      new File([new Uint8Array(size)], name, { type: "image/png" });
+    const pick = (wrapper: ReturnType<typeof setup>["wrapper"], files: File[]) =>
+      wrapper.findComponent(OFile).vm.$emit("change", files);
+    const thumbs = (wrapper: ReturnType<typeof setup>["wrapper"]) =>
+      wrapper.findAll('[data-test="assistant-launcher-image-chip"]');
+
+    beforeEach(() => toastCall.mockReset());
+
+    it("opens the picker from + and shows the pick as a removable thumbnail chip in the bottom row", async () => {
+      const click = vi.spyOn(HTMLInputElement.prototype, "click").mockImplementation(() => undefined);
+      const { wrapper } = setupOn({ layout: "overview" });
+      await flushPromises();
+      plus(wrapper, "attach");
+      expect(click).toHaveBeenCalled();
+      click.mockRestore();
+      pick(wrapper, [png("shot.png")]);
+      await vi.waitFor(() => expect(thumbs(wrapper)).toHaveLength(1));
+      const left = wrapper.get('[data-test="assistant-composer-bar-left"]');
+      const chip = left.get('[data-test="assistant-launcher-image-chip"]');
+      expect(chip.text()).toBe("shot.png");
+      expect(chip.get('[data-test="assistant-context-chip-thumb"]').attributes("src")).toBe(
+        "data:image/png;base64,AAAAAAAAAAAAAA==",
+      );
+      expect(wrapper.find('[data-test="assistant-composer-strip"]').exists()).toBe(false);
+      await chip.get('[data-test="assistant-context-chip-remove"]').trigger("click");
+      expect(thumbs(wrapper)).toHaveLength(0);
+    });
+
+    it("hands the images to the new chat with the line on Enter and on Shift+Enter, and sends images alone", async () => {
+      const { wrapper } = setupOn({ layout: "overview" });
+      await flushPromises();
+      pick(wrapper, [png("a.png"), png("b.png", 20)]);
+      await vi.waitFor(() =>
+        expect(wrapper.find('[data-test="assistant-launcher-chips"]').text()).toContain("+1"),
+      );
+      await input(wrapper).setValue("what is this?");
+      await input(wrapper).trigger("keydown", { key: "Enter" });
+      expect(open.mock.calls[0][0]).toMatchObject({ intent: "send", payload: { text: "what is this?" } });
+      expect(open.mock.calls[0][0].payload.images).toEqual([
+        expect.objectContaining({ filename: "a.png", mimeType: "image/png", size: 10, data: "AAAAAAAAAAAAAA==" }),
+        expect.objectContaining({ filename: "b.png", mimeType: "image/png", size: 20 }),
+      ]);
+      expect(thumbs(wrapper)).toHaveLength(0);
+      pick(wrapper, [png("c.png")]);
+      await vi.waitFor(() => expect(thumbs(wrapper)).toHaveLength(1));
+      await input(wrapper).setValue("draft");
+      await input(wrapper).trigger("keydown", { key: "Enter", shiftKey: true });
+      expect(open.mock.calls[1][0]).toMatchObject({
+        intent: "stage",
+        payload: { text: "draft", images: [expect.objectContaining({ filename: "c.png" })] },
+      });
+      pick(wrapper, [png("d.png")]);
+      await vi.waitFor(() => expect(thumbs(wrapper)).toHaveLength(1));
+      expect(wrapper.get('[data-test="assistant-launcher-ask"]').attributes("disabled")).toBeUndefined();
+      await input(wrapper).trigger("keydown", { key: "Enter" });
+      expect(open.mock.calls[2][0].payload).toMatchObject({
+        text: "",
+        images: [expect.objectContaining({ filename: "d.png" })],
+      });
+    });
+
+    it("refuses with the composer's lines: a fifth image, a wrong type and an image over the size cap", async () => {
+      const { wrapper } = setupOn({ layout: "overview" });
+      await flushPromises();
+      pick(wrapper, ["1", "2", "3", "4", "5"].map((n) => png(`${n}.png`)));
+      await vi.waitFor(() => expect(toastCall).toHaveBeenCalledTimes(1));
+      expect(toastCall.mock.calls[0][0].message).toMatch(/^5\.png wasn't added\. Up to 4 images/);
+      pick(wrapper, [new File([new Uint8Array(4)], "a.gif", { type: "image/gif" })]);
+      await vi.waitFor(() => expect(toastCall).toHaveBeenCalledTimes(2));
+      expect(toastCall.mock.calls[1][0].message).toBe("Only PNG and JPEG images can be attached");
+      wrapper.findComponent(OFile).vm.$emit("size-error", [png("big.png", 3 * 1024 * 1024)]);
+      expect(toastCall.mock.calls[2][0].message).toMatch(/^big\.png is .+ Up to 4 images/);
+      await input(wrapper).setValue("why?");
+      await input(wrapper).trigger("keydown", { key: "Enter" });
+      expect(open.mock.calls[0][0].payload.images.map((i: { filename: string }) => i.filename)).toEqual(
+        ["1.png", "2.png", "3.png", "4.png"],
+      );
+    });
+  });
+
   describe("on the Overview", () => {
     afterEach(() => contextRegistry.cleanup());
 
@@ -451,15 +609,52 @@ describe("AssistantLauncher", () => {
       overviewServices: [],
     };
 
-    it("stays visible with the dock open and keeps the chats for the right column", async () => {
+    it("stays visible with the dock open, with no starters or recent chats", async () => {
       const { wrapper, store } = setupOn({ layout: "overview" });
       store.state.shell.placement = { kind: "sidebar" };
       await flushPromises();
       expect(wrapper.find('[data-test="assistant-launcher"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="assistant-launcher-your-chats"]').exists()).toBe(false);
-      const chats = setupOn({ layout: "chats" }).wrapper;
-      expect(chats.find("textarea").exists()).toBe(false);
-      expect(chats.find('[data-test="assistant-launcher-your-chats"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="assistant-launcher-suggestions"]').exists()).toBe(false);
+    });
+
+    it("draws the agent chip right after the time chip in both layouts, only with a choice of agents", async () => {
+      for (const mountIt of [() => setupOn({ layout: "overview" }), () => setup()]) {
+        const { wrapper } = mountIt();
+        expect(wrapper.find('[data-test="assistant-launcher-agent"]').exists()).toBe(false);
+        fake.current.capability.value = { ...fake.current.capability.value, agents: ROSTER };
+        await flushPromises();
+        const chips = wrapper
+          .get('[data-test="assistant-context-tray-scroller"]')
+          .findAll('[data-test^="assistant-"]')
+          .map((el) => el.attributes("data-test"));
+        expect(chips.indexOf("assistant-launcher-agent")).toBe(
+          chips.indexOf("assistant-context-chip-time") + 1,
+        );
+        // The two chips sit a gap apart, as + and the time chip do.
+        const agentChip = wrapper.get('[data-test="assistant-launcher-agent"]').element;
+        expect(agentChip.parentElement?.classList.contains("gap-2")).toBe(true);
+        // Home's chips keep the kit's small radius, not a pill.
+        for (const test of ["assistant-launcher-agent", "assistant-context-chip-time"]) {
+          const classes = wrapper.get(`[data-test="${test}"]`).classes();
+          expect(classes).toContain("rounded-default");
+          expect(classes).not.toContain("rounded-full");
+        }
+        expect(wrapper.html()).not.toContain(":rounded-full");
+        expect(wrapper.find('[data-test="assistant-agent-pill"]').exists()).toBe(false);
+      }
+    });
+
+    it("reads no starters, so their load never holds the field", () => {
+      loading.value = true;
+      const { wrapper } = setupOn({ layout: "overview" });
+      expect(startersRead).not.toHaveBeenCalled();
+      expect(wrapper.get('[data-test="assistant-launcher"]').attributes("data-state")).toBe(
+        "ready",
+      );
+      expect(wrapper.find('[data-test="assistant-launcher-loading"]').exists()).toBe(false);
+      setup();
+      expect(startersRead).toHaveBeenCalledTimes(1);
     });
 
     it("always starts a new chat, in the dock while it is open", async () => {
@@ -473,38 +668,7 @@ describe("AssistantLauncher", () => {
       );
     });
 
-    it("mirrors the page range in the time chip and moves the page range from it", async () => {
-      const range = { from: 1_000, to: 3_601_000, period: "1h" };
-      const { wrapper } = setupOn({ layout: "overview", pageRange: range });
-      await flushPromises();
-      const prefix = wrapper.findComponent({ name: "AssistantTimePrefix" });
-      expect(prefix.props("window")).toMatchObject({ ...range, source: "page" });
-      prefix.vm.$emit("change", { from: 0, to: 1, period: "24h" });
-      expect(wrapper.emitted("update:pageRange")).toEqual([[{ from: 0, to: 1, period: "24h" }]]);
-      await input(wrapper).setValue("what changed?");
-      await input(wrapper).trigger("keydown", { key: "Enter" });
-      expect(open.mock.calls[0][0].payload.timeOverride).toEqual(range);
-    });
-
-    it("leaves a removed page chip out of the next question only", async () => {
-      contextRegistry.register("home", { getContext: () => HOME_PAGE as never });
-      contextRegistry.setActive("home");
-      const { wrapper } = setupOn({ layout: "overview" });
-      await flushPromises();
-      const chips = () => wrapper.find('[data-test="assistant-launcher-chips"]');
-      expect(chips().text()).toContain("Incidents on Home (1)");
-      await chips().get('[data-test="assistant-context-chip-remove"]').trigger("click");
-      expect(chips().find('[data-state="ghost"]').exists()).toBe(true);
-      await input(wrapper).setValue("why?");
-      await input(wrapper).trigger("keydown", { key: "Enter" });
-      expect(open.mock.calls[0][0].payload.removedPageKeys).toEqual(["overviewIncidents"]);
-      expect(chips().find('[data-state="ghost"]').exists()).toBe(false);
-      await input(wrapper).setValue("and now?");
-      await input(wrapper).trigger("keydown", { key: "Enter" });
-      expect(open.mock.calls[1][0].payload.removedPageKeys).toBeUndefined();
-    });
-
-    it("B-verify-1: at phone width an @ pick and the page chips fold into +N, as the composer's tray does", async () => {
+    it("shows no page chip in the Ask box even with alert and incident rows, and Enter still sends the range", async () => {
       contextRegistry.register("home", {
         getContext: () =>
           ({
@@ -513,96 +677,80 @@ describe("AssistantLauncher", () => {
           }) as never,
       });
       contextRegistry.setActive("home");
-      const width = vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({
-        width: 358,
-      } as DOMRect);
-      vi.stubGlobal(
-        "ResizeObserver",
-        class {
-          constructor(private readonly callback: () => void) {}
-          observe() {
-            this.callback();
-          }
-          disconnect() {}
-        },
-      );
-      try {
-        mentionPick.current = {
-          id: "mention:stream:logs|ta_composer_logs",
-          kind: "stream",
-          label: raw("ta_composer_logs"),
-          chip: {
-            id: "mention:stream:logs|ta_composer_logs",
-            kind: "stream",
-            label: raw("ta_composer_logs"),
-            ref: { type: "stream", id: "ta_composer_logs", org: "default", streamType: "logs" },
-            sizeBytes: 16,
-            provenance: "mention",
-            sent: "whitelist",
-          },
-        };
-        const { wrapper } = setupOn({ layout: "overview" });
-        await flushPromises();
-        await input(wrapper).setValue("@ta_comp");
-        await flushPromises();
-        await input(wrapper).trigger("keydown", { key: "Enter" });
-        await flushPromises();
-        const tray = wrapper.get('[data-test="assistant-launcher-chips"]');
-        const more = tray.get('[data-test="assistant-context-more"]');
-        expect(tray.findAll('[data-test="assistant-context-chip-button"]')).toHaveLength(0);
-        expect(more.text()).toBe("+3");
-        await more.trigger("click");
-        expect(tray.findAll('[data-test="assistant-launcher-mention-chip"]')).toHaveLength(1);
-        expect(tray.findAll('[data-test="assistant-launcher-page-chip"]')).toHaveLength(2);
-      } finally {
-        width.mockRestore();
-        vi.unstubAllGlobals();
-      }
+      const range = { from: 1_000, to: 3_601_000, period: "1h" };
+      const { wrapper } = setupOn({ layout: "overview", pageRange: range });
+      await flushPromises();
+      expect(wrapper.find('[data-test="assistant-launcher-page-chip"]').exists()).toBe(false);
+      expect(wrapper.find('[data-state="ghost"]').exists()).toBe(false);
+      await input(wrapper).setValue("why?");
+      await input(wrapper).trigger("keydown", { key: "Enter" });
+      expect(open.mock.calls[0][0].payload).toEqual({ text: "why?", chips: [], timeOverride: range });
     });
 
-    it("takes a page chip's click to the Now section and still removes on its x", async () => {
-      contextRegistry.register("home", { getContext: () => HOME_PAGE as never });
-      contextRegistry.setActive("home");
-      const section = document.createElement("section");
-      section.dataset.test = "home-now";
-      const scroll = vi.fn();
-      section.scrollIntoView = scroll;
-      document.body.appendChild(section);
-      try {
-        const { wrapper } = setupOn({ layout: "overview" });
-        await flushPromises();
-        const chips = () => wrapper.find('[data-test="assistant-launcher-chips"]');
-        await chips()
-          .get(
-            '[data-test="assistant-launcher-page-chip"] [data-test="assistant-context-chip-button"]',
-          )
-          .trigger("click");
-        expect(scroll).toHaveBeenCalledWith(expect.objectContaining({ block: "start" }));
-        expect(document.activeElement).toBe(section);
-        await chips().get('[data-test="assistant-context-chip-remove"]').trigger("click");
-        expect(chips().find('[data-state="ghost"]').exists()).toBe(true);
-        expect(scroll).toHaveBeenCalledTimes(1);
-      } finally {
-        section.remove();
-      }
-    });
-
-    it("lists Go to matches before the ask and opens an arrowed match with the way back", async () => {
+    it("lists Go to matches and opens the first with the way back in go-to-only mode", async () => {
       const { wrapper, router } = setupOn({
         layout: "overview",
+        goToOnly: true,
         pageRange: { from: 1_000, to: 2_000, period: "1h" },
       });
       await flushPromises();
       await input(wrapper).setValue("logs");
       await flushPromises();
       const options = wrapper.findAll('[data-test^="assistant-launcher-go-to-results-option-"]');
-      expect(options.map((o) => o.attributes("data-kind"))).toEqual(["page", "ask"]);
+      expect(options.map((o) => o.attributes("data-kind"))).toEqual(["page"]);
       expect(input(wrapper).attributes("role")).toBe("combobox");
       await input(wrapper).trigger("keydown", { key: "Enter" });
       await flushPromises();
       expect(router.currentRoute.value.name).toBe("logs");
       expect(router.currentRoute.value.query.home_return).toBe("period=1h&focus=ask");
       expect(open).not.toHaveBeenCalled();
+    });
+
+    it("sends Enter's line, its @ chips and the page range as a new chat in the full view", async () => {
+      const chip = {
+        id: "mention:stream:logs|checkout",
+        kind: "stream",
+        label: raw("checkout"),
+        ref: { type: "stream", id: "checkout", org: "default", streamType: "logs" },
+        sizeBytes: 8,
+        provenance: "mention",
+        sent: "whitelist",
+      };
+      mentionPick.current = { id: chip.id, kind: "stream", label: chip.label, chip };
+      const range = { from: 1_000, to: 3_601_000, period: "1h" };
+      const { wrapper } = setupOn({ layout: "overview", pageRange: range });
+      await flushPromises();
+      await input(wrapper).setValue("@check");
+      await flushPromises();
+      await input(wrapper).trigger("keydown", { key: "Enter" });
+      await input(wrapper).setValue("why 5xx?");
+      await input(wrapper).trigger("keydown", { key: "Enter" });
+      expect(open).toHaveBeenCalledTimes(1);
+      expect(open).toHaveBeenCalledWith({
+        entryKind: "home_launcher",
+        entryVerb: "ask",
+        objectKind: "none",
+        intent: "send",
+        thread: "new",
+        container: "full",
+        payload: {
+          text: "why 5xx?",
+          chips: [chip],
+          timeOverride: range,
+        },
+      });
+    });
+
+    it("opens no Go to list or Ask row while typing when the assistant is usable", async () => {
+      const { wrapper } = setupOn({ layout: "overview" });
+      await flushPromises();
+      await input(wrapper).setValue("logs");
+      await flushPromises();
+      expect(wrapper.find('[data-test="assistant-launcher-go-to"]').exists()).toBe(false);
+      expect(wrapper.find('[role="listbox"]').exists()).toBe(false);
+      expect(wrapper.text()).not.toContain("Ask:");
+      await input(wrapper).trigger("keydown", { key: "Enter" });
+      expect(open.mock.calls[0][0]).toMatchObject({ payload: { text: "logs" } });
     });
 
     it("asks on Enter when nothing is arrowed onto", async () => {

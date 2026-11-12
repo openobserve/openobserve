@@ -119,19 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="flex shrink-0 basis-full flex-wrap items-center justify-start gap-1 ps-7 @[40rem]/row:w-64 @[40rem]/row:basis-auto @[40rem]/row:flex-nowrap @[40rem]/row:justify-end @[40rem]/row:ps-0"
         data-test="home-now-row-actions"
       >
-        <OButton
-          v-if="followRun"
-          variant="outline"
-          size="sm"
-          :icon-left="assistantGlyph.thread"
-          :aria-label="t('home.agent.followInThreadName', { row: sentence })"
-          class="max-md:min-h-11"
-          data-test="home-now-row-follow"
-          @click="emit('follow', row, followRun)"
-        >
-          {{ t("alerts.incidents.rcaRun.followInThread") }}
-        </OButton>
-        <OTooltip v-else :content="fallbackText ?? undefined" :disabled="!fallbackText">
+        <OTooltip :content="fallbackText ?? undefined" :disabled="!fallbackText">
           <OButton
             variant="outline"
             size="sm"
@@ -223,7 +211,6 @@ export interface NowRowMeta {
 import { computed } from "vue";
 
 import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
-import { runStateLabel } from "@/components/ai-assistant/history/autoRuns";
 import type { OverviewNowRow, OverviewNowSnapshot } from "@/composables/contextProviders/types";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -232,7 +219,6 @@ import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OSparkline from "@/lib/data/Sparkline/OSparkline.vue";
 import type { SparklinePoint } from "@/lib/data/Sparkline/OSparkline.types";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import type { OrgRcaRun } from "@/services/rca_runs_org";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { formatTimestampInTimezone } from "@/utils/date";
 
@@ -257,8 +243,6 @@ const props = withDefaults(
     meta?: NowRowMeta | null;
     /** Shown on Problems with no alert; a read-only role sees it disabled. */
     createAlert?: { enabled: boolean } | null;
-    /** The incident's newest RCA run; its door is Follow in thread instead of starting another. */
-    run?: OrgRcaRun | null;
   }>(),
   {
     selected: false,
@@ -270,7 +254,6 @@ const props = withDefaults(
     askable: true,
     meta: null,
     createAlert: null,
-    run: null,
   },
 );
 
@@ -280,7 +263,6 @@ const emit = defineEmits<{
   service: [row: OverviewNowRow];
   showRuns: [];
   createAlert: [row: OverviewNowRow];
-  follow: [row: OverviewNowRow, run: OrgRcaRun];
 }>();
 
 const { t } = useI18nTyped();
@@ -325,33 +307,15 @@ const linkLabel = computed<I18nText>(() => {
   if (props.row.kind === "incident") return t("home.agent.openIncident");
   return t("home.agent.openAlert");
 });
-// A run that is going or ended is followed; only a missing run starts one.
-const followRun = computed(() =>
-  props.row.kind === "incident" && props.askable ? (props.run ?? null) : null,
-);
 const severityValue = computed(() =>
   props.row.kind === "incident" ? props.row.severity.toLowerCase() : "",
 );
-// The muted line carries only what the title and pill do not: the service, the run, or what is off about a service row.
+// The muted line carries only what the title and pill do not: the service, or what is off about a service row.
 const detail = computed(() => {
   const row = props.row;
   const parts: { id: string; text: I18nText; tone?: string }[] = [];
   if (props.meta?.service && row.kind !== "service")
     parts.push({ id: "service-name", text: raw(props.meta.service) });
-  if (row.kind === "incident" && props.run)
-    parts.push({
-      id: "run",
-      text: t("home.agent.runLine", {
-        state: runStateLabel(props.run, t),
-        time: raw(
-          formatTimestampInTimezone(
-            props.run.ended_at ?? props.run.started_at,
-            "HH:mm",
-            props.timezone,
-          ),
-        ),
-      }),
-    });
   if (row.kind === "alert" && row.state === "recovered" && props.meta?.flapping)
     parts.push({ id: "recovered-note", text: t("overview.now.recovered") });
   if (row.kind === "anomaly") parts.push({ id: "stream", text: raw(row.stream) });

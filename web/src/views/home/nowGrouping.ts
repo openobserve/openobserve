@@ -89,12 +89,6 @@ export function needsYou(item: HomeNowRow): boolean {
   return item.row.bucket !== "recovered" || item.flapping;
 }
 
-/** The headline: the rows Now draws, and the services no alert matches wherever they are drawn. */
-export function briefingCounts(shown: HomeNowSplit): { needYou: number; noAlert: number } {
-  const noAlert = [...shown.now, ...shown.problems].filter(isProblem).length;
-  return { needYou: shown.now.length, noAlert };
-}
-
 function isProblem(item: HomeNowRow): boolean {
   const row = item.row;
   return row.kind === "service" && row.coverage === "none" && row.bucket !== "recovered";

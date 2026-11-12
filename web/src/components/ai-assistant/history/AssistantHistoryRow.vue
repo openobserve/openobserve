@@ -52,7 +52,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           block
           :tabindex="tabbable ? 0 : -1"
           :aria-current="current ? 'true' : undefined"
-          class="h-auto! min-h-8 min-w-0 flex-1 justify-start! py-1.5 text-start max-md:min-h-11 pointer-coarse:min-h-11"
+          :class="[
+            'h-auto! min-w-0 flex-1 justify-start! py-1.5 text-start max-md:min-h-11 pointer-coarse:min-h-11',
+            compact ? 'min-h-9' : 'min-h-8',
+          ]"
           data-test="assistant-history-row"
           :aria-disabled="org ? 'true' : undefined"
           @click="choose"
@@ -63,11 +66,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span class="flex min-w-0 flex-1 items-center gap-2">
             <!-- A fixed slot keeps every title on one edge whether or not its row has a light -->
             <span
-              class="inline-flex w-4 shrink-0 justify-center"
+              :class="['inline-flex shrink-0 justify-center', compact ? 'w-3' : 'w-4']"
               data-test="assistant-history-row-light"
-              :data-signal="signal ?? undefined"
+              :data-signal="signal ?? (compact ? 'ready' : undefined)"
             >
               <AssistantStatusDot v-if="signal" :state="signal" />
+              <!-- A compact row at rest still marks its slot, so no title sits beside a blank gutter -->
+              <span
+                v-else-if="compact"
+                aria-hidden="true"
+                class="bg-border-default size-1.5 rounded-full"
+              />
             </span>
             <OIcon
               v-if="agentIcon"
@@ -81,8 +90,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- A chosen row moves as the list re-sorts, so its bubble would be left over the nav (X1) -->
               <!-- The row is a button, whose nowrap would stop the 2-line clamp from wrapping or showing its ellipsis -->
               <OTruncatedText
-                class="text-text-body min-w-12 wrap-break-word whitespace-normal"
-                :lines="2"
+                :class="[
+                  'text-text-body min-w-12',
+                  !compact && 'wrap-break-word whitespace-normal',
+                ]"
+                :lines="compact ? 1 : 2"
                 :tooltip="chosen ? false : fullTitle"
                 >{{ row.title }}</OTruncatedText
               >
@@ -121,6 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :class="[
                 'group-hover/row:text-text-body min-w-12 shrink-0 text-end text-xs tabular-nums',
                 chatStatusClass(status, current),
+                compact && COMPACT_TRAIL_CLASS,
               ]"
               :data-status="status"
               data-test="assistant-history-row-state"
@@ -131,7 +144,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="meta"
               as="span"
               :class="[
-                'group-hover/row:text-text-body! w-12 shrink-0 text-end tabular-nums',
+                'group-hover/row:text-text-body! shrink-0 text-end tabular-nums',
+                compact ? COMPACT_TRAIL_CLASS : 'w-12',
                 current && 'text-text-body!',
               ]"
               data-test="assistant-history-row-time"
@@ -158,7 +172,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :disabled="!!pending"
       :disabled-reason="pending ? pendingText : undefined"
       no-tooltip
-      :class="KEBAB_CLASS"
+      :class="[KEBAB_CLASS, compact && COMPACT_KEBAB_CLASS]"
       data-test="assistant-history-row-menu"
       @click="openMenuSoon"
     />
@@ -176,7 +190,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :disabled="!!pending"
           :disabled-reason="pending ? pendingText : undefined"
           no-tooltip
-          :class="KEBAB_CLASS"
+          :class="[KEBAB_CLASS, compact && COMPACT_KEBAB_CLASS]"
           data-test="assistant-history-row-menu"
         />
       </template>
@@ -234,6 +248,8 @@ export interface AssistantHistoryRowProps {
   timezone?: string;
   /** `div` inside a virtual list, which names it a list item itself. */
   tag?: "li" | "div";
+  /** One-line row for a narrow rail: every row marks its status, and the menu covers the time while shown. */
+  compact?: boolean;
 }
 
 type RowAction =
@@ -246,6 +262,15 @@ const KEBAB_CLASS = [
   "opacity-0 group-hover/row:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100",
   "group-data-[current]/row:opacity-100",
   "max-md:opacity-100 pointer-coarse:opacity-100",
+];
+// The compact kebab sits over the time, so the time reaches the row's end; a touch screen keeps it in line.
+const COMPACT_KEBAB_CLASS =
+  "absolute! end-1 group-focus-within/row:opacity-100 pointer-coarse:static!";
+// The time steps aside wherever the kebab shows over it, and is never narrower than the kebab.
+const COMPACT_TRAIL_CLASS = [
+  "min-w-7",
+  "pointer-fine:group-hover/row:invisible pointer-fine:group-focus-within/row:invisible",
+  "pointer-fine:group-data-[current]/row:invisible pointer-fine:group-has-[[data-state=open]]/row:invisible",
 ];
 </script>
 
@@ -292,6 +317,7 @@ const props = withDefaults(defineProps<AssistantHistoryRowProps>(), {
   readonly: false,
   timezone: undefined,
   tag: "li",
+  compact: false,
 });
 
 const emit = defineEmits<{

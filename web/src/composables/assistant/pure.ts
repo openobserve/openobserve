@@ -43,6 +43,7 @@ export {
   HOME_TAB_QUERY_KEY,
   THREAD_QUERY_KEY,
   fullThreadLocation,
+  homeAskLocation,
   isFullThreadRoute,
   threadParam,
   withoutThread,

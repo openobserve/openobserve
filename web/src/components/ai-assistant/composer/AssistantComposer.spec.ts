@@ -15,6 +15,7 @@
 
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { h } from "vue";
 
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
@@ -31,10 +32,12 @@ import { alertKeys } from "@/services/alerts.querykeys";
 import { dashboardKeys } from "@/services/dashboards.querykeys";
 import { pipelineKeys } from "@/services/pipelines.querykeys";
 import { streamKeys } from "@/services/stream.querykeys";
+import AssistantContextTray from "../context/AssistantContextTray.vue";
 import AssistantComposer, {
   PREFILL_CHOICE_CHARS,
   type AssistantComposerProps,
 } from "./AssistantComposer.vue";
+import AssistantComposerPlusMenu, { type ComposerPlusAction } from "./AssistantComposerPlusMenu.vue";
 import { composerUi, noteCap, noteDraftCleared, resetComposerUiForTests } from "./composerUi";
 import { queuedOf, resetComposerQueueForTests } from "./useComposerQueue";
 import { HOLD_MS, SILENCE_MS, resetVoiceForTests, setVoiceOptIn } from "./useAssistantVoice";
@@ -123,6 +126,11 @@ async function type(textarea: ReturnType<ReturnType<typeof setup>["textarea"]>, 
   await flushPromises();
 }
 
+// The + menu's own spec covers its dropdown; here an item is picked as the menu reports it.
+function plus(wrapper: VueWrapper, action: ComposerPlusAction): void {
+  wrapper.findComponent(AssistantComposerPlusMenu).vm.$emit("select", action);
+}
+
 beforeEach(() => {
   breakpoint.md = true;
   fake.member = false;
@@ -203,9 +211,12 @@ describe("rows (§1, S1)", () => {
     vi.unstubAllGlobals();
   });
 
-  it("draws one frame: the strip on top, the text, then the bar, all inside the border", async () => {
+  it("draws one frame: no strip while empty, else the strip on top, the text, then the bar, all inside the border", async () => {
     wide();
-    const { wrapper, textarea } = setup();
+    const { wrapper, textarea, store, sid } = setup();
+    await flushPromises();
+    expect(wrapper.find('[data-test="assistant-composer-strip"]').exists()).toBe(false);
+    store.addChip(sid, ROW);
     await flushPromises();
     const frame = textarea().element.parentElement!;
     const strip = wrapper.get('[data-test="assistant-composer-strip"]').element;
@@ -218,16 +229,16 @@ describe("rows (§1, S1)", () => {
     );
   });
 
-  it("never moves the bar or the strip on a keystroke, a new line, a chip or a notice (F2)", async () => {
+  it("never moves the bar or a shown strip on a keystroke, a new line or a notice (F2)", async () => {
     wide();
     const { wrapper, textarea, store, sid } = setup();
+    store.addChip(sid, ROW);
     await flushPromises();
     const bar = () => wrapper.get('[data-test="assistant-composer-bar"]');
     const strip = () => wrapper.get('[data-test="assistant-composer-strip"]');
     const before = [bar().element, strip().element];
     const classes = [bar().classes().join(" "), strip().classes().join(" ")];
     await type(textarea(), "one\ntwo and a much longer second line than the frame holds");
-    store.addChip(sid, ROW);
     noteCap(sid, raw("Up to 4 images, 2 MB each"));
     await flushPromises();
     expect(wrapper.find(NOTICE).exists()).toBe(true);
@@ -240,7 +251,7 @@ describe("rows (§1, S1)", () => {
     );
   });
 
-  it("keeps the agent pill alone on the left and image, mic, Send on the right, with no @ button", async () => {
+  it("puts + and the agent pill on the left and mic, Send on the right, with no @ button", async () => {
     resetVoiceForTests(fakeVoiceEngine());
     const { wrapper } = setup();
     setVoiceOptIn("k1", true);
@@ -248,11 +259,17 @@ describe("rows (§1, S1)", () => {
     const left = wrapper.get('[data-test="assistant-composer-bar-left"]');
     const right = wrapper.get('[data-test="assistant-composer-bar-right"]');
     expect(left.findAll("button, [data-test]").map((n) => n.attributes("data-test"))).toEqual([
+      "assistant-composer-plus",
       "assistant-agent-pill",
     ]);
     expect(
       right.findAll('[data-test^="assistant-"]').map((n) => n.attributes("data-test")),
-    ).toEqual(["assistant-attach-image", "assistant-dictate", "assistant-send"]);
+    ).toEqual(["assistant-dictate", "assistant-send"]);
+    expect(wrapper.findComponent(AssistantComposerPlusMenu).props("actions")).toEqual([
+      "attach",
+      "context",
+      "time",
+    ]);
     expect(wrapper.find('[data-test="assistant-mention-button"]').exists()).toBe(false);
     expect(wrapper.text()).not.toContain("@ ");
     resetVoiceForTests();
@@ -525,7 +542,7 @@ describe("states (`40` §1.3)", () => {
     expect(textarea().element.value).toBe("kept");
     expect(textarea().classes()).toContain("text-text-muted!");
     expect(wrapper.get('[data-notice="inert"]').text()).toContain("Decide above to continue");
-    for (const id of ["assistant-attach-image", "assistant-send"])
+    for (const id of ["assistant-composer-plus", "assistant-send"])
       expect(wrapper.get(`[data-test="${id}"]`).attributes("aria-disabled")).toBe("true");
     const pill = wrapper.get('[data-test="assistant-agent-pill"]');
     expect(pill.classes()).toContain("text-text-body!");
@@ -1159,21 +1176,66 @@ describe("one frame, the + menu and long pastes (D4 §3.1, §3.6, §3.9)", () =>
     const frame = textarea().element.parentElement!;
     expect(frame.className).toContain("border");
     expect(frame.querySelector('[data-test="assistant-composer-bar"]')).not.toBeNull();
-    expect(frame.querySelector('[data-test="assistant-attach-image"]')).not.toBeNull();
+    expect(frame.querySelector('[data-test="assistant-composer-plus"]')).not.toBeNull();
     expect(frame.querySelector('[data-test="assistant-send"]')).not.toBeNull();
     expect(wrapper.find('[data-test="assistant-composer-hints"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="assistant-add-context"]').exists()).toBe(false);
   });
 
-  it("opens the file picker in one click from Attach image", async () => {
+  it("opens the file picker from the + menu's Attach Image", async () => {
     const { wrapper } = setup();
-    const button = wrapper.get('[data-test="assistant-attach-image"]');
-    expect(button.attributes("aria-label")).toBe("Attach image");
+    expect(wrapper.get('[data-test="assistant-composer-plus"]').attributes("aria-label")).toBe(
+      "Add to Message",
+    );
     const click = vi.spyOn(HTMLInputElement.prototype, "click").mockImplementation(() => {});
-    await button.trigger("click");
+    plus(wrapper, "attach");
     expect(click).toHaveBeenCalledTimes(1);
     expect((click.mock.contexts[0] as HTMLInputElement).type).toBe("file");
     click.mockRestore();
+  });
+
+  it("types an @ at the caret from the + menu's Add Context and opens the mention menu", async () => {
+    const { wrapper, textarea } = setup();
+    await type(textarea(), "why is checkout slow");
+    textarea().element.setSelectionRange(6, 6);
+    plus(wrapper, "context");
+    await flushPromises();
+    expect(textarea().element.value).toBe("why is @ checkout slow");
+    expect(document.activeElement).toBe(textarea().element);
+    expect(textarea().element.selectionStart).toBe(8);
+    expect(textarea().attributes("aria-controls")).toMatch(/^assistant-mention-/);
+  });
+
+  it("opens the tray's time picker from the + menu, keeps a picked range as a chip, and its ✕ returns focus", async () => {
+    fake.current = fakeAssistant();
+    const sid = fake.current.store.createSession({
+      origin: { entryKind: "header_button", objectKind: "none", container: "sidebar" },
+    });
+    const wrapper = mount(AssistantComposer, {
+      props: { sid },
+      slots: { chips: () => h(AssistantContextTray, { sid }) },
+      global: { plugins: [fakeRouter(), fakeVuex()] },
+      attachTo: document.body,
+    });
+    mounted.push(wrapper);
+    await flushPromises();
+    const chip = () => wrapper.find('[data-test="assistant-context-chip-time"]');
+    expect(wrapper.find('[data-test="assistant-composer-strip"]').exists()).toBe(false);
+    plus(wrapper, "time");
+    await flushPromises();
+    expect(chip().text()).toBe("Last 15 min");
+    (document.body.querySelector('[data-test="assistant-context-time-24h"]') as HTMLElement).click();
+    await flushPromises();
+    expect(chip().text()).toBe("Last 24 h");
+    const remove = wrapper.get<HTMLElement>('[data-test="assistant-context-chip-time-remove"]');
+    remove.element.focus();
+    await remove.trigger("click");
+    await flushPromises();
+    expect(fake.current.store.state.sessions[sid].composer.timeOverride).toBeNull();
+    expect(wrapper.find('[data-test="assistant-composer-strip"]').exists()).toBe(false);
+    expect(document.activeElement).toBe(
+      wrapper.get('[data-test="assistant-composer-field"]').element,
+    );
   });
 
   it("shows the agent as a pill, which opens the agent menu once there is a choice", async () => {
@@ -1281,7 +1343,7 @@ describe("round 2 (U7–U9, U12, U16, U18–U19, F5, F8)", () => {
     expect(notice().attributes("title")).toBe("AI credits are used up for default.");
     expect(wrapper.get('[data-test="assistant-send"]').attributes("aria-disabled")).toBe("true");
     expect(
-      wrapper.get('[data-test="assistant-attach-image"]').attributes("aria-disabled"),
+      wrapper.get('[data-test="assistant-composer-plus"]').attributes("aria-disabled"),
     ).toBeUndefined();
     await textarea().trigger("keydown", { key: "Enter" });
     expect(send).not.toHaveBeenCalled();
@@ -1437,7 +1499,7 @@ describe("round 2 (U7–U9, U12, U16, U18–U19, F5, F8)", () => {
     expect(textarea().attributes("aria-controls")).toBeUndefined();
   });
 
-  it("returns focus to Recent prompts when its sheet is dismissed (U20)", async () => {
+  it("offers Recent Prompts in the + menu on touch and returns focus to + when its sheet is dismissed (U20)", async () => {
     breakpoint.md = false;
     vi.stubGlobal("matchMedia", (query: string) => ({ matches: query.includes("coarse") }));
     const { wrapper } = setup();
@@ -1446,18 +1508,16 @@ describe("round 2 (U7–U9, U12, U16, U18–U19, F5, F8)", () => {
       .setupState;
     state.recallEntries = [{ text: "earlier question", chips: [], at: 1 }];
     await flushPromises();
-    const button = wrapper.find('[data-test="assistant-recall-open"]');
-    expect(button.exists()).toBe(true);
-    expect(button.attributes("aria-expanded")).toBe("false");
-    await button.trigger("click");
+    expect(wrapper.findComponent(AssistantComposerPlusMenu).props("actions")).toContain("recall");
+    plus(wrapper, "recall");
     await flushPromises();
-    // An expanded trigger keeps its tooltip shut, so the bubble never floats over the sheet (D2).
-    expect(button.attributes("aria-expanded")).toBe("true");
     (
       document.body.querySelector('[data-test="assistant-recall-sheet-close"]') as HTMLElement
     ).click();
     await flushPromises();
-    expect(document.activeElement).toBe(button.element);
+    expect(document.activeElement).toBe(
+      wrapper.get('[data-test="assistant-composer-plus"]').element,
+    );
   });
 
   it("closes the mention menu when the textbox loses focus (V2)", async () => {
@@ -1782,7 +1842,7 @@ describe("dictation (WP-48)", () => {
     expect(ctx.status()).toBe("Dictation cancelled.");
   });
 
-  it("shows listening in the bottom row just left of the image button, and says the start once", async () => {
+  it("shows listening in the bottom row just left of the mic, and says the start once", async () => {
     const ctx = voiceSetup();
     await listen(ctx);
     expect(mic(ctx.wrapper).attributes("aria-pressed")).toBe("true");
@@ -1792,9 +1852,7 @@ describe("dictation (WP-48)", () => {
     expect(wave.get('[data-test="assistant-dictate-elapsed"]').text()).toBe("0:00");
     const right = ctx.wrapper.get('[data-test="assistant-composer-bar-right"]').element;
     expect(wave.element.parentElement).toBe(right);
-    expect(wave.element.nextElementSibling).toBe(
-      ctx.wrapper.get('[data-test="assistant-attach-image"]').element,
-    );
+    expect(wave.element.nextElementSibling).toBe(mic(ctx.wrapper).element);
     expect(ctx.textarea().classes()).not.toContain("pe-24!");
     expect(mic(ctx.wrapper).attributes("data-on")).toBeDefined();
     expect(mic(ctx.wrapper).element.parentElement).toBe(

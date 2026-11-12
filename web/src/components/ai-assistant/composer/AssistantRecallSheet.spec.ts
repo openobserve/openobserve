@@ -49,7 +49,7 @@ describe("AssistantRecallSheet", () => {
     });
     await flushPromises();
     const sheet = document.body.querySelector('[data-test="assistant-recall-sheet"]')!;
-    expect(sheet.textContent).toContain("Recent prompts");
+    expect(sheet.textContent).toContain("Recent Prompts");
     const rows = document.body.querySelectorAll<HTMLElement>(
       '[data-test^="assistant-recall-entry-"]',
     );

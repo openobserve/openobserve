@@ -15,8 +15,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="flex h-8 min-w-0 items-center gap-1" data-test="assistant-composer-bar">
-    <span class="flex min-w-0 items-center" data-test="assistant-composer-bar-left">
+  <div
+    :class="[
+      'flex min-w-0 items-center gap-1',
+      divided
+        ? 'relative -mx-2 mt-1 h-10 px-2 pt-1.5 before:bg-gradient-brand-ribbon before:absolute before:inset-x-0 before:top-0 before:h-px before:opacity-50 before:content-[\'\']'
+        : 'h-8',
+    ]"
+    data-test="assistant-composer-bar"
+  >
+    <span class="flex min-w-0 items-center gap-1" data-test="assistant-composer-bar-left">
       <slot name="agent" />
     </span>
     <span
@@ -34,5 +42,9 @@ export const ROUND_ACTION_CLASS = "rounded-full";
 </script>
 
 <script setup lang="ts">
+withDefaults(defineProps<{ /** A thin line above the controls, for Home's Ask box. */ divided?: boolean }>(), {
+  divided: false,
+});
+
 defineSlots<{ agent?: () => unknown; default?: () => unknown }>();
 </script>

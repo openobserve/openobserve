@@ -42,10 +42,10 @@ describe("AssistantTimePrefix", () => {
     expect(button.attributes("aria-label")).toBe("Time range, Last 15 min, default");
   });
 
-  it("marks the default on a page with no range, and offers no Page time", async () => {
+  it("offers no Page time on a page with no range, and draws no default tag", async () => {
     const { row } = await open({ window: DEFAULT });
     expect(row("page")).toBeNull();
-    expect(row("15m")?.textContent).toContain("default");
+    expect(row("15m")?.textContent).not.toContain("default");
     expect(row("15m")?.getAttribute("aria-checked")).toBe("true");
   });
 
@@ -69,6 +69,26 @@ describe("AssistantTimePrefix", () => {
     expect(chip.attributes("aria-haspopup")).toBe("dialog");
     expect(chip.classes()).not.toContain("pointer-coarse:min-h-11");
     expect(chip.classes()).toContain("pointer-coarse:after:-inset-y-2.5");
+  });
+
+  it("carries a ✕ only on a picked range, and a press on the open chip closes its picker", async () => {
+    const remove = '[data-test="assistant-context-chip-time-remove"]';
+    const picker = () => document.body.querySelector('[data-test="assistant-context-time-picker"]');
+    expect(mount(AssistantTimePrefix, { props: { window: PAGE } }).find(remove).exists()).toBe(false);
+    const { wrapper } = await open({ window: { ...PAGE, source: "custom" } });
+    expect(picker()).not.toBeNull();
+    const chip = wrapper.get('[data-test="assistant-context-chip-time"]');
+    // The outside-press listener is added a tick after the picker opens.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    chip.element.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true }));
+    await flushPromises();
+    expect(picker()).not.toBeNull();
+    await chip.trigger("click");
+    await flushPromises();
+    expect(picker()).toBeNull();
+    await wrapper.get(remove).trigger("click");
+    expect(wrapper.emitted("change")).toEqual([[null]]);
+    expect(wrapper.emitted("update:open")?.at(-1)).toEqual([false]);
   });
 
   it("is a radiogroup whose arrows move focus between rows and Tab reaches only the checked one", async () => {
