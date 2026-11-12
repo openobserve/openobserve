@@ -242,11 +242,18 @@ const where = computed<I18nText | null>(() => {
     : t("insight.decisions.apply.where", params);
 });
 
+/** A run from before the first onset was stored has no `first_at`, so it keeps the plain warning. */
 const acknowledged = computed(() => {
   const dropped = change.value?.acknowledged_firings_dropped;
-  return dropped && dropped.count > 0
-    ? t("insight.decisions.apply.acknowledged", { count: dropped.count, of: dropped.of })
-    : null;
+  if (!dropped || dropped.count <= 0) return null;
+  const counts = { count: dropped.count, of: dropped.of };
+  if (typeof dropped.first_at !== "number")
+    return t("insight.decisions.apply.acknowledged", counts);
+  const first = new Intl.DateTimeFormat(locale.value, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(dropped.first_at / 1000);
+  return t("insight.decisions.apply.acknowledgedFirst", { ...counts, first: raw(first) });
 });
 
 const readNotice = computed<{ variant: Variant; text: I18nText } | null>(() => {

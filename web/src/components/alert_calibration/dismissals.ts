@@ -19,6 +19,7 @@ import { httpStatus } from "@/services/alert_calibration";
 import type { AutoObserveSuggestion } from "@/services/autoobserve";
 import {
   countOrDash,
+  dismissedByRule,
   schemaVersion,
   type FindingRecord,
   type RuleId,
@@ -248,6 +249,22 @@ export function hiddenByRun(
   if (run.dismissed_count === undefined) return 0;
   return (page?.items ?? []).filter((v) => v.state === "active" && v.dismissed_at < run.emitted_at)
     .length;
+}
+
+/** Each rule's alerts the run left out, which `hiddenByRun` counts only as one org total. */
+export function hiddenByRunPerRule(
+  run: Pick<RunRow, "dismissed_rules" | "emitted_at">,
+  page: { items: DismissalView[] } | null | undefined,
+): Map<string, number> {
+  if (run.dismissed_rules !== null) return dismissedByRule(run.dismissed_rules);
+  const alerts = new Map<string, Set<string>>();
+  for (const view of page?.items ?? []) {
+    if (view.state !== "active" || view.dismissed_at >= run.emitted_at) continue;
+    if (view.scope_kind !== "alert") continue;
+    const seen = alerts.get(view.rule_id) ?? new Set<string>();
+    alerts.set(view.rule_id, seen.add(view.scope_key));
+  }
+  return new Map([...alerts].map(([rule, ids]) => [rule, ids.size]));
 }
 
 /** The one copy helper for every P5a surface (spec-detail 7); server text is never shown. */

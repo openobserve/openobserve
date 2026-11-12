@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
+import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import { raw, type I18nKey, type I18nText, type TranslateFn } from "@/types/i18n";
 import { formatSeconds } from "./format";
 import { ADVICE_LABEL, LIMITATION_LABEL, QUALITY_REASON_LABEL } from "./rules";
@@ -62,6 +63,14 @@ export interface Coverage {
   coverage_definition_checks_truncated?: boolean;
   /** Failing alerts whose errors were not classified; absent before P7a, null for a scoped reader. */
   coverage_error_classes_unassessed?: number | null;
+  /** Enabled alerts AutoObserve did not check; absent before it was counted, null for a scoped reader. */
+  coverage_definitions_not_checked?: number | null;
+}
+
+/** One rule's alerts a run left out as dismissed. */
+export interface DismissedRule {
+  rule_id: string;
+  alerts: number;
 }
 
 /** One run as the timeline lists it; a run is identified by its window, not by an id. */
@@ -77,6 +86,8 @@ export interface RunRow extends Coverage {
   omitted_routine_skip_count?: number | null;
   /** Alert subjects the run left out as dismissed; absent before P4, null for a scoped reader. */
   dismissed_count?: number | null;
+  /** Each rule's alerts the run left out, stored as JSON text; absent before it was written, null for a scoped reader. */
+  dismissed_rules?: string | DismissedRule[] | null;
   /** Null for a scoped reader: the org's count is not one it may see. */
   alerts_in_scope: number | null;
   coverage_gap: boolean;
@@ -244,6 +255,7 @@ export function runIdentity(record: DigestRecord): RunRow {
     written_skip_count: record.written_skip_count,
     omitted_routine_skip_count: record.omitted_routine_skip_count,
     dismissed_count: record.dismissed_count,
+    dismissed_rules: record.dismissed_rules,
     alerts_in_scope: record.alerts_in_scope,
     coverage_gap: record.coverage_gap,
     coverage_unreadable_definitions: record.coverage_unreadable_definitions,
@@ -257,6 +269,7 @@ export function runIdentity(record: DigestRecord): RunRow {
     coverage_definition_checks: record.coverage_definition_checks,
     coverage_definition_checks_truncated: record.coverage_definition_checks_truncated,
     coverage_error_classes_unassessed: record.coverage_error_classes_unassessed,
+    coverage_definitions_not_checked: record.coverage_definitions_not_checked,
     schema_version: record.schema_version,
     visibility: record.visibility,
   };
@@ -325,6 +338,18 @@ export const isScoped = (row: Pick<RunRow, "visibility">) => row.visibility === 
 export const countOrDash = (count: number | null | undefined, locale: string): I18nText =>
   typeof count === "number" ? raw(new Intl.NumberFormat(locale).format(count)) : raw("—");
 
+/** Four digits and up read compact in the reader's locale ("12.3K"), so a tile's label never truncates. */
+export const countTile = (
+  count: number | null | undefined,
+  locale: string,
+): Pick<StatItem, "value"> =>
+  typeof count === "number" && Math.abs(count) >= 1000
+    ? { value: raw(compactCount(locale).format(count)) }
+    : { value: countOrDash(count, locale) };
+
+const compactCount = (locale: string) =>
+  new Intl.NumberFormat(locale, { notation: "compact", maximumFractionDigits: 1 });
+
 /** No finding, no gap and nothing declined, over the alerts the reader can see. */
 export const isQuiet = (row: RunRow) =>
   row.finding_count === 0 && !row.coverage_gap && row.skip_count === 0;
@@ -392,9 +417,35 @@ export function parseLagRows(value: unknown, keyField: "org_id" | "hour_start_mi
     }));
 }
 
-export function coverageVerdict(row: RunRow): CoverageVerdict {
+/** The run's own count, or the listed not-checked skips of a run from before it was counted. */
+export const uncheckedDefinitions = (row: RunRow, uncheckedSkips = 0): number =>
+  Math.max(Number(row.coverage_definitions_not_checked) || 0, uncheckedSkips);
+
+/** Full only when nothing was left unchecked, so "Definition not checked" never sits beside it. */
+export function coverageVerdict(row: RunRow, uncheckedSkips = 0): CoverageVerdict {
   if (row.coverage_stream_substrate_empty) return "none";
-  return row.coverage_gap ? "gap" : "full";
+  return row.coverage_gap || uncheckedDefinitions(row, uncheckedSkips) > 0 ? "gap" : "full";
+}
+
+/** Each rule's dismissed alerts; a malformed column counts nothing rather than a guess. */
+export function dismissedByRule(value: unknown): Map<string, number> {
+  let parsed: unknown = value;
+  if (typeof value === "string") {
+    try {
+      parsed = JSON.parse(value);
+    } catch {
+      return new Map();
+    }
+  }
+  const out = new Map<string, number>();
+  if (!Array.isArray(parsed)) return out;
+  for (const item of parsed) {
+    if (typeof item !== "object" || item === null) continue;
+    const { rule_id: rule, alerts } = item as Record<string, unknown>;
+    const count = Number(alerts);
+    if (typeof rule === "string" && Number.isInteger(count) && count > 0) out.set(rule, count);
+  }
+  return out;
 }
 
 export interface CoverageNote {
@@ -412,7 +463,7 @@ const DEFINITION_CHECK_NOTE: Record<DefinitionChecks, { key: I18nKey; gap: boole
 };
 
 /** Every coverage column off its default, including the ones `coverage_gap` does not count. */
-export function coverageNoteRows(t: TranslateFn, row: RunRow): CoverageNote[] {
+export function coverageNoteRows(t: TranslateFn, row: RunRow, uncheckedSkips = 0): CoverageNote[] {
   const notes: CoverageNote[] = [];
   if (row.coverage_stream_substrate_empty)
     notes.push({ text: t("alertCalibration.coverage.substrateEmpty"), gap: true });
@@ -448,6 +499,15 @@ export function coverageNoteRows(t: TranslateFn, row: RunRow): CoverageNote[] {
   for (const [column, key] of flags) {
     if (row[column]) notes.push({ text: t(key), gap: true });
   }
+  const unchecked = uncheckedDefinitions(row, uncheckedSkips);
+  if (unchecked > 0) {
+    const text = t(
+      "alertCalibration.coverage.definitionsNotChecked",
+      { count: unchecked },
+      unchecked,
+    );
+    notes.push({ text, gap: true });
+  }
   const checks = row.coverage_definition_checks;
   const definitionNote =
     checks && Object.hasOwn(DEFINITION_CHECK_NOTE, checks) ? DEFINITION_CHECK_NOTE[checks] : null;
@@ -455,5 +515,5 @@ export function coverageNoteRows(t: TranslateFn, row: RunRow): CoverageNote[] {
   return notes;
 }
 
-export const coverageNotes = (t: TranslateFn, row: RunRow): I18nText[] =>
-  coverageNoteRows(t, row).map((note) => note.text);
+export const coverageNotes = (t: TranslateFn, row: RunRow, uncheckedSkips = 0): I18nText[] =>
+  coverageNoteRows(t, row, uncheckedSkips).map((note) => note.text);
