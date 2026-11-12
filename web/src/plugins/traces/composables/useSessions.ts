@@ -22,6 +22,7 @@ import { type GenAiAgentListItem } from "@/services/gen-ai-agent-mapping.service
 import type { AgentsLoadError } from "@/enterprise/composables/useAgentScope";
 import { useLLMStreamQuery } from "./useLLMStreamQuery";
 import { compactSql } from "../config/llmInsightsPanels";
+import { sqlLiteral } from "@/utils/query/sqlFilterBuilder";
 import { unpricedFields } from "../llmDataTrust.utils";
 
 export interface SessionDetail {
@@ -30,6 +31,7 @@ export interface SessionDetail {
   serviceName: string | null;
   firstSeenMicros: number;
   durationNanos: number;
+  /** The session's turn count, loaded or not. Every other total covers the loaded turns. */
   turns: number;
   inputTokens: number;
   outputTokens: number;
@@ -80,6 +82,39 @@ export interface SessionTraceRow {
    * string when no user message is present.
    */
   turnUserMessage: string;
+  /** First service on the trace; the session rollup takes the first one found. */
+  serviceName?: string | null;
+  /** First non-empty user id on the trace; the session rollup takes the first one found. */
+  userId?: string | null;
+  agentName?: string | null;
+}
+
+/** Turns per session-details page: the newest page loads first, "Load older turns" pages back. */
+export const SESSION_TURNS_PAGE_SIZE = 1000;
+/** Turns are packed by span count so no query hits its LIMIT and drops spans. */
+export const SESSION_SPANS_PER_QUERY = 2000;
+
+/** `limit` is never below a chunk's span total, so every span of every turn comes back. */
+export function chunkTurnsBySpans(
+  turns: Pick<SessionTraceRow, "traceId" | "spanCount">[],
+  budget = SESSION_SPANS_PER_QUERY,
+): { traceIds: string[]; limit: number }[] {
+  const chunks: { traceIds: string[]; spans: number }[] = [];
+  let current: { traceIds: string[]; spans: number } | null = null;
+  for (const turn of turns) {
+    const spans = Math.max(1, turn.spanCount);
+    if (
+      !current ||
+      current.spans + spans > budget ||
+      current.traceIds.length >= SESSION_TURNS_PAGE_SIZE
+    ) {
+      current = { traceIds: [], spans: 0 };
+      chunks.push(current);
+    }
+    current.traceIds.push(turn.traceId);
+    current.spans += spans;
+  }
+  return chunks.map((c) => ({ traceIds: c.traceIds, limit: Math.max(budget, c.spans) }));
 }
 
 /** Single message inside a turn (USER block / ASSISTANT block). */
@@ -145,6 +180,11 @@ export interface SessionRow {
   userId: string;
   /** First user message in the session (truncated server-side). */
   firstUserMessage: string;
+  /** Harness blocks the agent's patterns hid from it. */
+  harnessHidden: number;
+  /** The tag that hid a message that was only harness text. */
+  harnessOnly: string;
+  title: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -173,17 +213,13 @@ const rowsPerPage = ref(20);
 // preserves the exact list when navigating into a session and back.
 const sortBy = ref<SessionSortField>("end_time");
 const sortOrder = ref<SessionSortOrder>("desc");
-// Active list search (the search box on the scope row) — this ref IS the
-// box's v-model directly (live, debounced), no separate draft. Module-scoped
-// like the pagination so a back-navigation from a session detail restores the
-// filtered page together with the term that produced it. Deliberately NOT
-// persisted to localStorage: the scope is remembered across visits, a search
-// is a one-time action. The backend matches it against the user id OR the
-// conversation text (whichever the stream has), so one term searches both.
+// Module-scoped so back-navigation restores the filtered page; not persisted, a search is one-time.
 export interface SessionSearch {
   keyword?: string;
+  user?: string;
 }
 const searchKeyword = ref("");
+const searchUser = ref("");
 /** Hard cap on a search term; longer input is truncated, never rejected. */
 export const SESSION_SEARCH_MAX_LEN = 256;
 /** Trims and caps a raw search term. Empty result = no search. */
@@ -269,6 +305,7 @@ export function useSessions() {
         pageSize,
         filter,
         keyword: keywordTerm || undefined,
+        userId: normalizeSearchTerm(search?.user ?? "") || undefined,
         sortBy: sortBy.value,
         sortOrder: sortOrder.value,
       });
@@ -301,6 +338,9 @@ export function useSessions() {
           status: errorCount > 0 ? "error" : "ok",
           userId: usersArr[0] || "",
           firstUserMessage: String(h.first_user_message || ""),
+          harnessHidden: Number(h.harness_hidden) || 0,
+          harnessOnly: h.harness_only ?? "",
+          title: h.session_title ?? "",
         };
       });
       total.value = Number(body.total) || 0;
@@ -327,22 +367,16 @@ export function useSessions() {
     }
   }
 
-  /**
-   * Fetch the per-turn trace list for a single session and derive the
-   * session-level rollup client-side.
-   *
-   * The backend returns the same trace-summary hit shape that this mapper
-   * already consumes, but with per-turn status computed from all spans in each
-   * trace.
-   */
+  /** Fetch one page of a session's turns, newest first; `total` is the session's turn count. */
   async function fetchSession(
     streamName: string,
     sessionId: string,
     startTime: number,
     endTime: number,
-  ): Promise<{ detail: SessionDetail | null; traces: SessionTraceRow[] }> {
+    loaded: SessionTraceRow[] = [],
+  ): Promise<{ detail: SessionDetail | null; traces: SessionTraceRow[]; hasOlder: boolean }> {
     if (!streamName || !sessionId || !startTime || !endTime) {
-      return { detail: null, traces: [] };
+      return { detail: null, traces: [], hasOlder: false };
     }
     const orgId = store.state.selectedOrganization?.identifier || "default";
     const res = await sessionsService.details({
@@ -351,19 +385,14 @@ export function useSessions() {
       sessionId,
       startTime,
       endTime,
-      from: 0,
-      size: 1000,
+      from: loaded.length,
+      size: SESSION_TURNS_PAGE_SIZE,
     });
     const accumulated: any[] = res.data?.hits || [];
 
-    if (accumulated.length === 0) {
-      return { detail: null, traces: [] };
+    if (accumulated.length === 0 && loaded.length === 0) {
+      return { detail: null, traces: [], hasOlder: false };
     }
-
-    // Sort chronologically so the conversation list reads in turn
-    // order. The endpoint returns DESC by default to surface "most
-    // recent" first; for a session we want oldest-first.
-    accumulated.sort((a, b) => (Number(a.start_time) || 0) - (Number(b.start_time) || 0));
 
     // Map each trace summary to SessionTraceRow.
     //
@@ -393,7 +422,7 @@ export function useSessions() {
       }
       return "";
     };
-    const traces: SessionTraceRow[] = accumulated.map((r: any) => {
+    const page = accumulated.map((r: any): SessionTraceRow => {
       const spansArr = Array.isArray(r.spans) ? r.spans : [];
       const spanCount = Number(spansArr[0]) || 0;
       const errorCount = Number(spansArr[1]) || 0;
@@ -429,8 +458,28 @@ export function useSessions() {
         models: modelsArr,
         turnUserMessage: userMessageOf(r.gen_ai_input_messages),
         serviceName: svcArr[0]?.service_name ? String(svcArr[0].service_name) : null,
-      } as SessionTraceRow & { serviceName: string | null };
+        agentName: r.agent_name ? String(r.agent_name) : null,
+        userId:
+          (Array.isArray(r.user_ids) &&
+            r.user_ids.find(
+              (value: unknown) => typeof value === "string" && value.trim().length > 0,
+            )) ||
+          null,
+      };
     });
+
+    // Offsets shift when a new turn arrives, so an older page can repeat a loaded turn.
+    const loadedIds = new Set(loaded.map((tr) => tr.traceId));
+    const traces = [...loaded, ...page.filter((tr) => !loadedIds.has(tr.traceId))].sort(
+      (a, b) => a.startTimeMicros - b.startTimeMicros,
+    );
+    // `total` keeps ids whose spans were deleted, so a page adding no turn also ends loading.
+    const total = Number(res.data?.total) || 0;
+    const exhausted =
+      accumulated.length === 0 ||
+      traces.length === loaded.length ||
+      loaded.length + SESSION_TURNS_PAGE_SIZE >= total;
+    const turns = exhausted ? traces.length : Math.max(total, traces.length);
 
     // Roll the per-trace rows up into the session-level detail.
     let firstSeenNanos = Infinity;
@@ -451,11 +500,9 @@ export function useSessions() {
     let totalErrors = 0;
     let userId: string | null = null;
     let serviceName: string | null = null;
-    for (let i = 0; i < accumulated.length; i++) {
-      const r = accumulated[i];
-      const t = traces[i] as SessionTraceRow & { serviceName?: string | null };
-      const sn = Number(r.start_time) || 0;
-      const en = Number(r.end_time) || 0;
+    for (const t of traces) {
+      const sn = t.startTimeMicros;
+      const en = sn + t.durationNanos;
       if (sn && sn < firstSeenNanos) firstSeenNanos = sn;
       if (en > lastSeenNanos) lastSeenNanos = en;
       totalInputTokens += t.inputTokens;
@@ -472,12 +519,7 @@ export function useSessions() {
       totalCacheReadSavings += t.cacheReadSavings;
       totalNetCacheImpact += t.netCacheImpact;
       totalErrors += t.errorCount;
-      if (!userId && Array.isArray(r.user_ids)) {
-        const firstUserId = r.user_ids.find(
-          (value: unknown) => typeof value === "string" && value.trim().length > 0,
-        );
-        if (firstUserId) userId = firstUserId;
-      }
+      if (!userId && t.userId) userId = t.userId;
       if (!serviceName && t.serviceName) serviceName = t.serviceName;
     }
     if (firstSeenNanos === Infinity) firstSeenNanos = 0;
@@ -488,7 +530,7 @@ export function useSessions() {
       serviceName,
       firstSeenMicros: firstSeenNanos,
       durationNanos: lastSeenNanos > firstSeenNanos ? lastSeenNanos - firstSeenNanos : 0,
-      turns: traces.length,
+      turns,
       inputTokens: totalInputTokens,
       outputTokens: totalOutputTokens,
       tokens: totalTokens,
@@ -506,7 +548,7 @@ export function useSessions() {
       status: totalErrors > 0 ? "error" : "ok",
     };
 
-    return { detail, traces };
+    return { detail, traces, hasOlder: !exhausted };
   }
 
   /**
@@ -536,8 +578,6 @@ export function useSessions() {
         otherOps: [],
       };
     }
-    const safeId = traceId.replace(/'/g, "''");
-
     // Fetch all gen_ai spans for this trace in one query. No
     // gen_ai_input_messages IS NOT NULL filter, so the LLM/tool call badge
     // counts can be computed client-side from the same result set rather than
@@ -551,7 +591,7 @@ export function useSessions() {
         gen_ai_operation_name,
         start_time
       FROM "${streamName}"
-      WHERE trace_id = '${safeId}'
+      WHERE trace_id = ${sqlLiteral(traceId)}
         AND gen_ai_operation_name IS NOT NULL
       ORDER BY start_time ASC
       LIMIT 50
@@ -566,38 +606,36 @@ export function useSessions() {
     return buildTurnDetail(traceId, hits || []);
   }
 
-  /**
-   * Fetch all gen_ai spans across a session's traces — the raw span rows the
-   * `ThreadView` component renders from (it groups by `trace_id` and classifies
-   * by `gen_ai_operation_name`). Used by the session-detail "Pretty" transcript
-   * view. Filters by the session's trace ids (rather than conversation_id) so
-   * tool-execution spans are included, and selects exactly the columns
-   * `ThreadView` reads.
-   */
+  /** Fetch all gen_ai spans of the given turns, by trace id so tool-execution spans are included. */
   async function fetchSessionSpans(
     streamName: string,
-    traceIds: string[],
+    turns: Pick<SessionTraceRow, "traceId" | "spanCount">[],
     startTime: number,
     endTime: number,
   ): Promise<any[]> {
-    if (!streamName || !traceIds.length || !startTime || !endTime) return [];
-    const inList = traceIds.map((id) => `'${String(id).replace(/'/g, "''")}'`).join(",");
-    const sql = compactSql(`
-      SELECT
-        span_id, trace_id, operation_name, gen_ai_operation_name,
-        gen_ai_tool_name,
-        duration, start_time, end_time,
-        span_status, status_message,
-        gen_ai_request_model, gen_ai_response_model,
-        gen_ai_usage_cost, gen_ai_usage_total_tokens,
-        gen_ai_input_messages, gen_ai_output_messages
-      FROM "${streamName}"
-      WHERE trace_id IN (${inList})
-        AND gen_ai_operation_name IS NOT NULL
-      ORDER BY start_time ASC
-      LIMIT 2000
-    `);
-    return (await executeQuery(sql, startTime, endTime)) || [];
+    if (!streamName || !turns.length || !startTime || !endTime) return [];
+    const pages = await Promise.all(
+      chunkTurnsBySpans(turns).map(({ traceIds, limit }) => {
+        const inList = traceIds.map(sqlLiteral).join(",");
+        const sql = compactSql(`
+          SELECT
+            span_id, trace_id, operation_name, gen_ai_operation_name,
+            gen_ai_tool_name,
+            duration, start_time, end_time,
+            span_status, status_message,
+            gen_ai_request_model, gen_ai_response_model,
+            gen_ai_usage_cost, gen_ai_usage_total_tokens,
+            gen_ai_input_messages, gen_ai_output_messages
+          FROM "${streamName}"
+          WHERE trace_id IN (${inList})
+            AND gen_ai_operation_name IS NOT NULL
+          ORDER BY start_time ASC
+          LIMIT ${limit}
+        `);
+        return executeQuery(sql, startTime, endTime);
+      }),
+    );
+    return pages.flatMap((rows) => rows || []);
   }
 
   /**
@@ -621,6 +659,7 @@ export function useSessions() {
     currentPage,
     rowsPerPage,
     searchKeyword,
+    searchUser,
     sortBy,
     sortOrder,
     agents,

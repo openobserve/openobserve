@@ -162,4 +162,21 @@ describe("OFormSelect", () => {
     wrapper.findComponent(OSelect).vm.$emit("header-action", header);
     expect(received).toEqual([header]);
   });
+
+  it("renders the consumer's before-options and after-options rows in the open menu", async () => {
+    const Host = defineComponent({
+      components: { OForm, OFormSelect },
+      template: `<OForm :default-values="{ kind: '' }">
+        <OFormSelect name="kind" :options="[{ label: 'A', value: 'a' }]">
+          <template #before-options><div data-test="unit-before">Before</div></template>
+          <template #after-options><button data-test="unit-after">After</button></template>
+        </OFormSelect>
+      </OForm>`,
+    });
+    wrapper = mount(Host, { attachTo: document.body });
+    await wrapper.find("button").trigger("click");
+    await flushPromises();
+    expect(document.body.querySelector('[data-test="unit-before"]')?.textContent).toBe("Before");
+    expect(document.body.querySelector('[data-test="unit-after"]')?.textContent).toBe("After");
+  });
 });

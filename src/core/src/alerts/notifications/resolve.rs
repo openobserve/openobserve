@@ -27,12 +27,17 @@
 //! The ONE exception is the markdown BODY, which is escaped at substitution
 //! time by [`escape_markdown`]. That is not format escaping — it is source
 //! escaping, and it cannot be deferred to the renderers: the body is parsed
-//! as markdown by every one of them, so by the time a renderer sees it, a
+//! as markdown by every markdown renderer, so by the time a renderer sees it, a
 //! value's `>` has already become a blockquote and is indistinguishable from
-//! structure the author wrote. Title, fields, links and rows are not
-//! markdown-parsed and stay raw.
+//! structure the author wrote. Opsgenie, PagerDuty and ServiceNow bodies are
+//! plain text and stay raw. Title, fields, links and rows stay raw here too;
+//! Teams parses them as markdown and guards them in its own renderer.
 
-use config::meta::alerts::{content_spec::ContentSpec, level::AlertLevel};
+use config::meta::alerts::{
+    content_spec::ContentSpec,
+    level::AlertLevel,
+    notification_kind::{NotificationEvent, NotificationKind},
+};
 
 use super::{context::NotificationContext, custom::scan_and_replace_var};
 
@@ -40,11 +45,14 @@ use super::{context::NotificationContext, custom::scan_and_replace_var};
 /// Never blank, never literal braces.
 pub const UNMATCHED_MARKER: &str = "–";
 
+/// Families whose renderers send the body as plain text, so escaped values would show backslashes.
+const PLAIN_TEXT_BODY_FAMILIES: [&str; 3] = ["opsgenie", "pagerduty", "servicenow"];
+
 /// Fully resolved, still-raw content for one channel render.
 pub struct RenderedContent {
     /// Per-channel override already applied.
     pub title: String,
-    /// Substituted, still markdown, raw values.
+    /// Substituted body: values markdown-escaped, raw for Opsgenie/PagerDuty/ServiceNow.
     pub body_markdown: String,
     /// `show_when`-filtered, substituted.
     pub fields: Vec<(String, String)>,
@@ -77,12 +85,13 @@ pub fn resolve_content(
     let (title, mut unk) = substitute_raw(title_tpl, ctx);
     unknown_variables.append(&mut unk);
 
-    // The BODY is the only markdown-parsed surface (§ `escape_markdown`).
-    // Values are escaped as they are substituted so a value can never inject
-    // markdown STRUCTURE into the author's document. Title, fields, links and
-    // rows are NOT markdown-parsed and are deliberately left raw — escaping
-    // them would surface literal backslashes to users.
-    let (body_markdown, mut unk) = substitute_markdown_body(&spec.body, ctx);
+    // Body values are markdown-escaped, except plain-text families, which get raw values.
+    // Title, fields, links and rows stay raw; Teams guards them in its renderer.
+    let (body_markdown, mut unk) = if PLAIN_TEXT_BODY_FAMILIES.contains(&channel_family) {
+        substitute_raw(&spec.body, ctx)
+    } else {
+        substitute_markdown_body(&spec.body, ctx)
+    };
     unknown_variables.append(&mut unk);
 
     let mut fields = Vec::new();
@@ -96,6 +105,10 @@ pub fn resolve_content(
         unknown_variables.append(&mut unk);
         let (value, mut unk) = substitute_raw(&field.value, ctx);
         unknown_variables.append(&mut unk);
+        // Only legacy Custom templates keep a blank value; they never reach this function.
+        if value.trim().is_empty() || every_variable_blank(&field.value, ctx) {
+            continue;
+        }
         fields.push((label, value));
     }
 
@@ -110,6 +123,13 @@ pub fn resolve_content(
         unknown_variables.append(&mut unk);
         let (url, mut unk) = substitute_raw(&link.url, ctx);
         unknown_variables.append(&mut unk);
+        // A card for another kind drops a link whose URL is empty, such as a page with no runbook;
+        // an alert keeps a blank link unless its URL names another kind's variable.
+        if url.trim().is_empty()
+            && (ctx.kind != NotificationKind::Alert || uses_kind_variable(&link.url))
+        {
+            continue;
+        }
         links.push((label, url));
     }
     // Appended alert link: empty label — renderers supply the localized
@@ -164,6 +184,11 @@ pub fn resolve_content(
     }
 }
 
+/// The body with markdown-escaped values, for surfaces that parse it as markdown on any family.
+pub fn escaped_body_markdown(spec: &ContentSpec, ctx: &NotificationContext) -> String {
+    substitute_markdown_body(&spec.body, ctx).0
+}
+
 /// Substitute `{var}` / `{var:N}` in `input` against a single row's full
 /// column set (used by `RowsSpec.format`, which operates on the full row
 /// regardless of the `columns` selection — design §4.2).
@@ -171,7 +196,7 @@ pub fn resolve_content(
 /// Same input-scan discipline as `substitute_raw`: "unmatched" is decided
 /// from the ORIGINAL `input`, not the substituted output, so a row value
 /// that happens to look like `{something}` is never marker-stamped.
-fn substitute_raw_row(
+pub(crate) fn substitute_raw_row(
     input: &str,
     row: &config::utils::json::Map<String, config::utils::json::Value>,
     unknown: &mut Vec<String>,
@@ -215,10 +240,8 @@ fn substitute_raw_row(
 /// Raw substitution: `{var}` and `{var:N}` over the context, NO escaping.
 /// Unmatched tokens render [`UNMATCHED_MARKER`] and are reported.
 ///
-/// For the markdown body use [`substitute_markdown_body`] instead — values
-/// substituted into a markdown-parsed surface must be escaped or they inject
-/// structure. This function is for the NON-markdown surfaces (title, fields,
-/// links), where escaping would show users literal backslashes.
+/// For a markdown body use [`substitute_markdown_body`]. This serves title, fields, links, rows and
+/// plain-text bodies (Opsgenie/PagerDuty/ServiceNow), where escaping shows literal backslashes.
 ///
 /// Lookup order (design §5.1): scalar context fields → `row_columns`
 /// (dedup + `", "` join) → `context_attributes` → `metadata` → `group_labels`
@@ -260,65 +283,69 @@ fn substitute_with(
     ctx: &NotificationContext,
     esc: impl Fn(&str) -> String,
 ) -> (String, Vec<String>) {
-    let unknown = scan_unmatched(input)
-        .into_iter()
-        .filter(|name| !is_known_var(name, ctx))
-        .collect::<Vec<_>>();
-
-    let mut out = input.to_string();
-
-    for (name, value) in scalar_vars(ctx) {
-        scan_and_replace_var(&mut out, name, |len| esc(&truncate(value, len)));
-    }
-
-    for (key, values) in ctx.row_columns.iter() {
-        let joined = values.join(", ");
-        scan_and_replace_var(&mut out, key, |len| esc(&truncate(&joined, len)));
-    }
-
-    for (key, value) in ctx.context_attributes.iter() {
-        scan_and_replace_var(&mut out, key, |len| esc(&truncate(value, len)));
-    }
-
-    for (key, value) in ctx.metadata.iter() {
-        scan_and_replace_var(&mut out, key, |len| esc(&truncate(value, len)));
-    }
-
-    if let Some(labels) = &ctx.group_labels {
-        for (name, value) in config::meta::alerts::grouping::group_template_vars(labels) {
-            scan_and_replace_var(&mut out, &name, |len| esc(&truncate(&value, len)));
+    // One pass over the authored tokens: an inserted value is never scanned again.
+    let mut unknown = Vec::new();
+    let mut out = String::with_capacity(input.len());
+    let mut rest = input;
+    while let Some(start) = rest.find('{') {
+        out.push_str(&rest[..start]);
+        let at = &rest[start..];
+        let Some((inner, token_len)) = parse_token(at) else {
+            out.push('{');
+            rest = &at[1..];
+            continue;
+        };
+        // A key may hold a colon, such as a column `http:status`, so the whole text is a key first.
+        let (name, value, len) = match var_value(inner, ctx) {
+            Some(value) => (inner, Some(value), 0),
+            None => match inner.split_once(':') {
+                Some((name, n)) => match n.parse::<usize>() {
+                    Ok(len) if !name.is_empty() => (name, var_value(name, ctx), len),
+                    _ => {
+                        out.push('{');
+                        rest = &at[1..];
+                        continue;
+                    }
+                },
+                None => (inner, None, 0),
+            },
+        };
+        match value {
+            Some(value) => out.push_str(&esc(&truncate(&value, len))),
+            // Only a name that looks like a variable is marked; other braced text stays as typed.
+            None if is_ident(name) => {
+                out.push_str(UNMATCHED_MARKER);
+                unknown.push(name.to_string());
+            }
+            None => out.push_str(&at[..token_len]),
         }
+        rest = &at[token_len..];
     }
-
-    // Only tokens confirmed unknown from the ORIGINAL input are marker-
-    // replaced here — substituted values that happen to look like tokens are
-    // left alone (see doc comment above).
-    let out = replace_unmatched_with_marker(&out, &unknown);
+    out.push_str(rest);
     (out, unknown)
 }
 
-/// Whether `name` resolves in some lookup tier for `ctx` — used to decide,
-/// from the pre-substitution input, which `{name}` tokens are genuinely
-/// unknown rather than merely a substring of the raw template.
-fn is_known_var(name: &str, ctx: &NotificationContext) -> bool {
-    if scalar_vars(ctx).iter().any(|(n, _)| *n == name) {
-        return true;
-    }
-    if ctx.row_columns.iter().any(|(k, _)| k == name) {
-        return true;
-    }
-    if ctx.context_attributes.iter().any(|(k, _)| k == name) {
-        return true;
-    }
-    if ctx.metadata.iter().any(|(k, _)| k == name) {
-        return true;
-    }
-    if let Some(labels) = &ctx.group_labels {
-        return config::meta::alerts::grouping::group_template_vars(labels)
-            .iter()
-            .any(|(n, _)| n == name);
-    }
-    false
+/// `{text}` at the start of `at`: the text inside and the token length. Any text without braces
+/// counts, since a row column or label such as `http-status` is a key too.
+fn parse_token(at: &str) -> Option<(&str, usize)> {
+    let end = at.find('}')?;
+    let inner = &at[1..end];
+    (!inner.is_empty() && !inner.contains('{')).then_some((inner, end + 1))
+}
+
+/// Whether `input` names a variable of some kind's group, such as `{anomaly_explore_url}`.
+fn uses_kind_variable(input: &str) -> bool {
+    scan_unmatched(input)
+        .iter()
+        .any(|name| super::examples::is_kind_variable(name))
+}
+
+/// The grammar `scan_unmatched` reads: what an author meant as a variable.
+fn is_ident(name: &str) -> bool {
+    !name.is_empty()
+        && name
+            .chars()
+            .all(|c| c.is_alphanumeric() || c == '_' || c == '.')
 }
 
 /// Make a substituted value inert as markdown SOURCE.
@@ -367,7 +394,58 @@ fn truncate(value: &str, len: usize) -> String {
 
 /// Find every remaining `{identifier}` / `{identifier:N}` token — anything
 /// still present after all known-variable passes ran is unmatched.
-fn scan_unmatched(tpl: &str) -> Vec<String> {
+/// Known variables in `input` whose value for `ctx` is blank, each once, in order of use.
+pub(crate) fn empty_variables(input: &str, ctx: &NotificationContext) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    for name in scan_unmatched(input) {
+        let blank = var_value(&name, ctx).is_some_and(|v| v.trim().is_empty());
+        if blank && !out.contains(&name) {
+            out.push(name);
+        }
+    }
+    out
+}
+
+/// True when `input` names variables and each is blank, so `{check_name} ({check_type})` hides.
+fn every_variable_blank(input: &str, ctx: &NotificationContext) -> bool {
+    let names = scan_unmatched(input);
+    !names.is_empty()
+        && names
+            .iter()
+            .all(|n| var_value(n, ctx).is_some_and(|v| v.trim().is_empty()))
+}
+
+/// The value a `{name}` token takes for `ctx`, in the substitution engine's tier order.
+fn var_value(name: &str, ctx: &NotificationContext) -> Option<String> {
+    if let Some((_, v)) = extra_scalar_vars(ctx).into_iter().find(|(n, _)| *n == name) {
+        return Some(v);
+    }
+    if let Some((_, v)) = scalar_vars(ctx).into_iter().find(|(n, _)| *n == name) {
+        return Some(v.to_string());
+    }
+    if let Some((_, values)) = ctx.row_columns.iter().find(|(k, _)| k == name) {
+        return Some(values.join(", "));
+    }
+    if let Some((_, v)) = ctx
+        .context_attributes
+        .iter()
+        .chain(ctx.metadata.iter())
+        .find(|(k, _)| k == name)
+    {
+        return Some(v.clone());
+    }
+    if let Some(labels) = &ctx.group_labels
+        && let Some((_, v)) = config::meta::alerts::grouping::group_template_vars(labels)
+            .into_iter()
+            .find(|(n, _)| n == name)
+    {
+        return Some(v);
+    }
+    // One template serves every kind, so another kind's variable reads blank and its field hides.
+    super::examples::is_kind_variable(name).then(String::new)
+}
+
+pub(crate) fn scan_unmatched(tpl: &str) -> Vec<String> {
     let mut out = Vec::new();
     let bytes = tpl.as_bytes();
     let mut i = 0usize;
@@ -446,6 +524,94 @@ pub(crate) fn scalar_vars(ctx: &NotificationContext) -> Vec<(&'static str, &str)
     ]
 }
 
+/// Scalars added for the shared send path; kept apart so the alert webhook envelope is unchanged.
+pub(crate) fn extra_scalar_vars(ctx: &NotificationContext) -> Vec<(&'static str, String)> {
+    let trigger_millis = ctx.alert_trigger_time / 1000;
+    vec![
+        ("notification_kind", ctx.kind.as_str().to_string()),
+        ("notification_event", ctx.event.as_str().to_string()),
+        ("notification_kind_label", ctx.kind.label().to_string()),
+        (
+            "notification_event_label",
+            ctx.kind.event_label(ctx.event).to_string(),
+        ),
+        ("status_dot", status_dot(ctx).to_string()),
+        ("alert_level_label", level_label(&ctx.alert_level)),
+        ("alert_trigger_time_utc", utc_stamp(ctx.alert_trigger_time)),
+        ("cluster_name", ctx.cluster_name.clone()),
+        (
+            "alert_start_time_millis",
+            ctx.alert_start_time_millis.clone(),
+        ),
+        ("alert_end_time_millis", ctx.alert_end_time_millis.clone()),
+        ("alert_trigger_time", ctx.alert_trigger_time.to_string()),
+        ("alert_trigger_time_millis", trigger_millis.to_string()),
+        (
+            "alert_trigger_time_seconds",
+            (trigger_millis / 1000).to_string(),
+        ),
+        (
+            "alert_promql_operator",
+            ctx.promql_operator.clone().unwrap_or_default(),
+        ),
+        (
+            "alert_promql_value",
+            ctx.promql_value.clone().unwrap_or_default(),
+        ),
+    ]
+}
+
+/// The title's severity marker: red failing, orange degraded, green recovered, blue a notice.
+pub(crate) fn status_dot(ctx: &NotificationContext) -> &'static str {
+    match (ctx.event, ctx.level) {
+        (NotificationEvent::Resolved, _) | (_, Some(AlertLevel::Ok)) => "🟢",
+        // Before Informational: a degraded synthetics check is a Warning sent as Informational.
+        (_, Some(AlertLevel::Warning | AlertLevel::NoData)) => "🟠",
+        (NotificationEvent::Informational, _) => "🔵",
+        // A maintenance window opening is a notice, not a failure.
+        _ if ctx.kind == NotificationKind::Downtime => "🔵",
+        _ => "🔴",
+    }
+}
+
+/// `critical` reads `Critical` and `no_data` reads `No data`; a priority such as `P1` is kept.
+pub(crate) fn level_label(level: &str) -> String {
+    let words = level.replace('_', " ");
+    let mut chars = words.chars();
+    chars
+        .next()
+        .map(|first| first.to_uppercase().chain(chars).collect())
+        .unwrap_or_default()
+}
+
+/// One UTC stamp for every kind; alert times in `alert_trigger_time_str` keep their own zone.
+pub(crate) fn utc_stamp(micros: i64) -> String {
+    if micros <= 0 {
+        return String::new();
+    }
+    chrono::DateTime::from_timestamp_micros(micros)
+        .map(|at| at.format("%Y-%m-%d %H:%M:%S UTC").to_string())
+        .unwrap_or_default()
+}
+
+pub(crate) const EXTRA_SCALAR_NAMES: [&str; 15] = [
+    "notification_kind",
+    "notification_event",
+    "notification_kind_label",
+    "notification_event_label",
+    "status_dot",
+    "alert_level_label",
+    "alert_trigger_time_utc",
+    "cluster_name",
+    "alert_start_time_millis",
+    "alert_end_time_millis",
+    "alert_trigger_time",
+    "alert_trigger_time_millis",
+    "alert_trigger_time_seconds",
+    "alert_promql_operator",
+    "alert_promql_value",
+];
+
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeMap;
@@ -509,6 +675,7 @@ mod tests {
             chart_png: None,
             alert_id: String::new(),
             incident_id: String::new(),
+            ..Default::default()
         }
     }
 
@@ -531,6 +698,22 @@ mod tests {
         let (out, unknown) = substitute_raw("x {no_such_var} y", &fixture_ctx());
         assert_eq!(out, "x – y");
         assert_eq!(unknown, vec!["no_such_var"]);
+    }
+
+    #[test]
+    fn a_key_with_a_colon_fills_before_the_length_split() {
+        let mut ctx = fixture_ctx();
+        ctx.row_columns
+            .push(("http:status".into(), vec!["503".into()]));
+        ctx.row_columns
+            .push(("metric".into(), vec!["latency".into()]));
+        ctx.row_columns
+            .push(("metric:2".into(), vec!["p99".into()]));
+        ctx.row_columns.push(("load".into(), vec!["93.5".into()]));
+        assert_eq!(substitute_raw("{http:status}", &ctx).0, "503");
+        assert_eq!(substitute_raw("{metric:2}", &ctx).0, "p99");
+        // No `load:2` key, so the length applies.
+        assert_eq!(substitute_raw("{load:2}", &ctx).0, "93");
     }
 
     #[test]
@@ -984,5 +1167,86 @@ mod tests {
                 assert!(unknown.is_empty());
             }
         }
+    }
+
+    #[test]
+    fn status_dot_colors_by_event_and_level() {
+        use NotificationEvent::{Firing, Informational, Resolved};
+        use NotificationKind::{Alert, Downtime, Synthetics};
+        for (kind, event, level, expected) in [
+            (Alert, Resolved, Some(AlertLevel::Critical), "🟢"),
+            (Alert, Firing, Some(AlertLevel::Ok), "🟢"),
+            (Synthetics, Informational, Some(AlertLevel::Warning), "🟠"),
+            (Alert, Informational, None, "🔵"),
+            (Downtime, Firing, None, "🔵"),
+            (Alert, Firing, Some(AlertLevel::Critical), "🔴"),
+            (Alert, Firing, None, "🔴"),
+        ] {
+            let ctx = NotificationContext {
+                kind,
+                event,
+                level,
+                ..Default::default()
+            };
+            assert_eq!(status_dot(&ctx), expected, "{kind:?} {event:?} {level:?}");
+        }
+    }
+
+    #[test]
+    fn a_hyphenated_row_column_fills_and_other_braced_text_stays() {
+        let ctx = NotificationContext {
+            row_columns: vec![("http-status".into(), vec!["503".into()])],
+            ..fixture_ctx()
+        };
+        let (out, unknown) = substitute_raw("{http-status} {not a var} {nope}", &ctx);
+        assert_eq!(out, format!("503 {{not a var}} {UNMATCHED_MARKER}"));
+        assert_eq!(unknown, vec!["nope".to_string()]);
+    }
+
+    #[test]
+    fn an_extra_value_with_a_kind_token_stays_literal() {
+        let ctx = NotificationContext {
+            cluster_name: "prod-{anomaly_score}".into(),
+            ..fixture_ctx()
+        };
+        let (out, unknown) = substitute_raw("{cluster_name}", &ctx);
+        assert_eq!(out, "prod-{anomaly_score}");
+        assert!(unknown.is_empty());
+    }
+
+    #[test]
+    fn alert_name_with_token_renders_literally_in_content_title() {
+        use config::meta::alerts::content_spec::ContentSpec;
+
+        let spec = ContentSpec {
+            title: "{alert_name}".into(),
+            ..Default::default()
+        };
+        for name in ["cpu-{notification_kind}", "x {check_name}"] {
+            let ctx = NotificationContext {
+                alert_name: name.into(),
+                ..fixture_ctx()
+            };
+            let r = resolve_content(&spec, &ctx, "slack");
+            assert_eq!(r.title, name);
+            assert!(r.unknown_variables.is_empty());
+        }
+    }
+
+    #[test]
+    fn kind_variable_from_context_attribute_still_fills() {
+        use config::meta::alerts::content_spec::ContentSpec;
+
+        let spec = ContentSpec {
+            title: "{check_name} ({check_type})".into(),
+            ..Default::default()
+        };
+        let ctx = NotificationContext {
+            kind: NotificationKind::Synthetics,
+            context_attributes: vec![("check_name".into(), "Homepage".into())],
+            ..fixture_ctx()
+        };
+        let r = resolve_content(&spec, &ctx, "slack");
+        assert_eq!(r.title, "Homepage ()");
     }
 }

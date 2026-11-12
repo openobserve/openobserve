@@ -123,6 +123,9 @@ export class DateTimePickerPage {
         const btn = this.relativePeriodBtn(suffix);
         await expect(btn).toBeVisible();
         await btn.click();
+        // An auto-apply picker closes on a chip pick; reopen it so the panel controls stay reachable.
+        const closed = await this.panel.waitFor({ state: 'hidden', timeout: 1500 }).then(() => true, () => false);
+        if (closed) await this.openPicker();
     }
 
     async expectAbsolutePanelActive() {

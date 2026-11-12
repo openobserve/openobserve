@@ -190,37 +190,11 @@
           <OStatStrip
             :items="firingTiles"
             selectable
+            :tray="false"
             data-test="alerts-alertdetail-tiles"
             @select="openIncident"
           />
         </OContent>
-
-        <!-- A grouped alert that never opted in has no Groups tab, because it
-           has no per-group state to show. Without saying so, the chart below
-           showing one line per group makes that look like a bug rather than
-           the deliberate opt-in it is (M-9). -->
-        <OBanner
-          v-if="isGroupedButSimple"
-          variant="info"
-          class="shrink-0"
-          data-test="alerts-alertdetail-simple-grouped-banner"
-        >
-          {{
-            t("alerts.multiAlert.groupedButSimple", {
-              columns: (aggregation?.group_by || []).join(", "),
-            })
-          }}
-          <template #actions>
-            <OButton
-              variant="outline"
-              size="sm"
-              data-test="alerts-alertdetail-enable-multi"
-              @click="editAlert"
-            >
-              {{ t("alerts.multiAlert.enableCta") }}
-            </OButton>
-          </template>
-        </OBanner>
 
         <!-- Above the tabs, not inside the Groups tab: the evaluation chart
            answers "what is this alert watching, and how close is it to the
@@ -232,7 +206,8 @@
            renders then is an empty frame that reads as "no data" — a lie about
            an alert that is evaluating perfectly well. -->
         <!-- An anomaly config has no query_condition for generate_sql to build from. -->
-        <OContent v-if="alert && !isSloAlertView && !isAnomalyAlert" class="shrink-0 py-3">
+        <!-- Mounted before the GET lands so its placeholder holds the chart's height and the tabs never move. -->
+        <OContent v-if="!alert || (!isSloAlertView && !isAnomalyAlert)" class="shrink-0 py-3">
           <AlertGroupChart :alert="alert" />
         </OContent>
 
@@ -243,7 +218,9 @@
            the strip takes no horizontal wrapper padding (the first label
            self-aligns to the px-page-edge grid) and carries its own bottom
            divider via `bordered`. -->
+        <!-- Waits for the alert: an SLO or anomaly alert has no chart, and tabs painted under the placeholder would jump up. -->
         <OTabs
+          v-if="alert"
           v-model="activeTab"
           dense
           bordered
@@ -281,11 +258,34 @@
           <OTab name="configuration" :label="t('alerts.configuration')" icon="settings" />
         </OTabs>
 
-        <OTabPanels v-model="activeTab" class="min-h-0 flex-1">
+        <!-- Without a Groups tab a line per group reads as a bug (M-9); it lands with the alert, so nothing painted moves. -->
+        <OContent v-if="isGroupedButSimple" class="shrink-0 pt-3">
+          <OBanner variant="info" data-test="alerts-alertdetail-simple-grouped-banner">
+            {{
+              t("alerts.multiAlert.groupedButSimple", {
+                columns: (aggregation?.group_by || []).join(", "),
+              })
+            }}
+            <template #actions>
+              <OButton
+                variant="outline"
+                size="sm"
+                data-test="alerts-alertdetail-enable-multi"
+                @click="editAlert"
+              >
+                {{ t("alerts.multiAlert.enableCta") }}
+              </OButton>
+            </template>
+          </OBanner>
+        </OContent>
+
+        <!-- Every panel waits for the alert, so an empty box placed early would only be pushed down by the banner. -->
+        <OTabPanels v-if="alert" v-model="activeTab" class="min-h-0 flex-1">
           <OTabPanel v-if="isMultiAlert" name="groups" stretch>
             <AlertGroupsTable
               :groups="groupData?.list || []"
               :loading="loadingGroups"
+              :load-error="groupsLoadError"
               :alert-id="alertId"
               :alert-name="alert?.name || alertId"
               :folder-id="folderId"
@@ -372,6 +372,7 @@
           <OTabPanel name="configuration" stretch>
             <OContent class="h-full overflow-y-auto py-4">
               <AlertConfigSummary v-if="alert" :alert="alert" :slo-name="sloName" />
+              <AlertCalibrationHeadroomCard v-if="alert && !isAnomalyAlert" :alert-id="alertId" />
             </OContent>
           </OTabPanel>
         </OTabPanels>
@@ -388,6 +389,7 @@ import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 
 import AlertConfigSummary from "@/components/alerts/AlertConfigSummary.vue";
+import AlertCalibrationHeadroomCard from "@/components/alert_calibration/AlertCalibrationHeadroomCard.vue";
 import AlertEvaluationHistory from "@/components/alerts/AlertEvaluationHistory.vue";
 import AlertGroupChart from "@/components/alerts/AlertGroupChart.vue";
 import AlertGroupHistory from "@/components/alerts/AlertGroupHistory.vue";
@@ -458,6 +460,7 @@ const downtimesEnabled = useDowntimesEnabled();
 
 const alert = ref<any>(null);
 const groupData = ref<AlertGroupsResponse | null>(null);
+const groupsLoadError = ref(false);
 const transitions = ref<AlertGroupTransition[]>([]);
 const loadingGroups = ref(false);
 const loadingTransitions = ref(false);
@@ -841,8 +844,10 @@ const fetchGroups = async () => {
   try {
     const res = await alertsService.list_groups(orgId.value, alertId.value);
     groupData.value = res.data;
+    groupsLoadError.value = false;
   } catch {
     groupData.value = null;
+    groupsLoadError.value = true;
   } finally {
     loadingGroups.value = false;
   }

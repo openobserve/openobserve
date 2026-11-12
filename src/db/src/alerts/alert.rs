@@ -20,7 +20,7 @@ use config::{
     meta::{
         alerts::{
             FrequencyType,
-            alert::{Alert, ListAlertsParams},
+            alert::{Alert, ListAlertsParams, is_siem_detection},
         },
         folder::{DEFAULT_FOLDER, Folder},
         stream::StreamType,
@@ -252,58 +252,21 @@ pub async fn update<C: ConnectionTrait + TransactionTrait>(
     alert: Alert,
 ) -> Result<Alert, infra::errors::Error> {
     let alert = table::update(conn, org_id, folder_id, alert).await?;
-    let schedule_key = scheduler_key(alert.id);
+    announce_update(org_id, folder_id, alert).await
+}
 
-    infra::coordinator::alerts::emit_put_event(org_id, &alert, folder_id.map(|id| id.to_string()))
-        .await?;
-    #[cfg(feature = "enterprise")]
-    super_cluster::emit_update_event(org_id, folder_id, alert.clone()).await?;
-
-    let next_run_at = if alert.trigger_condition.frequency_type == FrequencyType::Cron {
-        match alert
-            .trigger_condition
-            .get_next_trigger_time(true, alert.tz_offset, false, None)
-        {
-            Ok(t) => t,
-            Err(e) => {
-                log::error!(
-                    "Failed to compute next trigger time for alert {schedule_key}: org_id: {org_id}, error: {e}"
-                );
-                now_micros()
-            }
-        }
-    } else {
-        now_micros()
-    };
-    let mut trigger = db::scheduler::Trigger {
-        org: org_id.to_string(),
-        module_key: schedule_key.clone(),
-        next_run_at,
-        is_realtime: alert.is_real_time,
-        is_silenced: false,
-        ..Default::default()
-    };
-
-    if let Ok(job) =
-        db::scheduler::get(org_id, db::scheduler::TriggerModule::Alert, &schedule_key).await
-    {
-        trigger.data = job.data;
-        trigger.start_time = job.start_time;
-        let _ = db::scheduler::update_trigger(trigger, false, "")
-            .await
-            .map_err(|e| {
-                log::error!("Failed to update trigger for alert {schedule_key}: org_id: {org_id}, error: {e}");
-            });
-    } else {
-        let _ = db::scheduler::push(trigger).await.map_err(|e| {
-            log::error!(
-                "Failed to save trigger for alert {schedule_key}: org_id: {org_id}, error: {e}"
-            );
-            e
-        });
+/// `table::update_where` and then the same announcements; None when the guard refused the write.
+pub async fn update_where<C: ConnectionTrait + TransactionTrait>(
+    conn: &C,
+    org_id: &str,
+    folder_id: Option<&str>,
+    alert: Alert,
+    guard: Option<table::WriteGuard>,
+) -> Result<Option<Alert>, infra::errors::Error> {
+    match table::update_where(conn, org_id, folder_id, alert, guard).await? {
+        Some(alert) => Ok(Some(announce_update(org_id, folder_id, alert).await?)),
+        None => Ok(None),
     }
-
-    Ok(alert)
 }
 
 pub async fn delete_by_id<C: ConnectionTrait>(
@@ -348,15 +311,27 @@ pub async fn list(
     stream_type: Option<StreamType>,
     stream_name: Option<&str>,
 ) -> Result<Vec<Alert>, infra::errors::Error> {
-    let params = ListAlertsParams::new(org_id).in_folder("default");
-    let params = if let Some(stream_name) = stream_name {
-        params.for_stream(stream_type.unwrap_or_default(), Some(stream_name))
-    } else {
-        params
-    };
-
     let client = get_orm_client_ro().await;
-    let alerts = table::list(client, params)
+    let alerts = table::list(
+        client,
+        default_folder_params(org_id, stream_type, stream_name),
+    )
+    .await?
+    .into_iter()
+    .map(|(_f, a)| a)
+    .collect();
+    Ok(alerts)
+}
+
+/// Like `list` but fails on an unreadable row, so a stream delete cannot leave its alert behind.
+pub async fn list_fully_decoded(
+    org_id: &str,
+    stream_type: Option<StreamType>,
+    stream_name: Option<&str>,
+) -> Result<Vec<Alert>, infra::errors::Error> {
+    let client = get_orm_client_ro().await;
+    let params = default_folder_params(org_id, stream_type, stream_name);
+    let alerts = table::list_fully_decoded(client, params)
         .await?
         .into_iter()
         .map(|(_f, a)| a)
@@ -364,10 +339,10 @@ pub async fn list(
     Ok(alerts)
 }
 
-/// Every alert of the org in every folder; `list` reads only the default folder.
+/// Every alert of the org in every folder, failing on an unreadable row so teardown misses none.
 pub async fn list_all_for_cleanup(org_id: &str) -> Result<Vec<Alert>, infra::errors::Error> {
     let client = get_orm_client_ro().await;
-    let alerts = table::list(client, ListAlertsParams::new(org_id))
+    let alerts = table::list_fully_decoded(client, ListAlertsParams::new(org_id))
         .await?
         .into_iter()
         .map(|(_f, a)| a)
@@ -382,25 +357,44 @@ pub async fn list_with_folders<C: ConnectionTrait>(
     table::list(conn, params).await
 }
 
+/// Like `list_with_folders` but fails on an unreadable row; unreadable must not mean "unused".
+pub async fn list_with_folders_fully_decoded<C: ConnectionTrait>(
+    conn: &C,
+    params: ListAlertsParams,
+) -> Result<Vec<(Folder, Alert)>, infra::errors::Error> {
+    table::list_fully_decoded(conn, params).await
+}
+
 pub async fn watch() -> Result<(), anyhow::Error> {
     infra::coordinator::alerts::watch_events(put_into_cache, delete_from_cache).await
 }
 
 pub async fn cache() -> Result<(), anyhow::Error> {
     let client = get_orm_client_rw().await;
+    let orgs: HashSet<String> = infra::schema::STREAM_SCHEMAS
+        .read()
+        .await
+        .keys()
+        .filter(|key| key.contains('/'))
+        .filter_map(|key| key.split('/').next().map(str::to_string))
+        .collect();
+    cache_orgs(client, orgs).await
+}
+
+pub async fn reset() -> Result<(), anyhow::Error> {
+    let key = "/alerts/";
+    Ok(db::delete(key, true, db::NO_NEED_WATCH, None).await?)
+}
+
+/// Loads the alerts of `orgs` into the caches; an alert row this version cannot read is skipped
+/// by the table layer, so it cannot stop the node from starting.
+async fn cache_orgs<C: ConnectionTrait>(
+    conn: &C,
+    orgs: HashSet<String>,
+) -> Result<(), anyhow::Error> {
     let mut alerts: Vec<(Folder, Alert)> = Vec::new();
-    let r = infra::schema::STREAM_SCHEMAS.read().await;
-    let mut orgs = HashSet::new();
-    for key in r.keys() {
-        if !key.contains('/') {
-            continue;
-        }
-        let split_key = key.split('/').collect::<Vec<&str>>();
-        let org_name = split_key[0];
-        orgs.insert(org_name);
-    }
     for org_name in orgs {
-        let alerts_in_orgs = table::list(client, ListAlertsParams::new(org_name)).await?;
+        let alerts_in_orgs = table::list(conn, ListAlertsParams::new(&org_name)).await?;
         alerts.extend(alerts_in_orgs);
     }
 
@@ -420,11 +414,6 @@ pub async fn cache() -> Result<(), anyhow::Error> {
     }
     log::info!("Alerts Cached");
     Ok(())
-}
-
-pub async fn reset() -> Result<(), anyhow::Error> {
-    let key = "/alerts/";
-    Ok(db::delete(key, true, db::NO_NEED_WATCH, None).await?)
 }
 
 async fn put_into_cache(
@@ -497,6 +486,19 @@ async fn delete_from_cache(org: String, alert_id: String) -> Result<(), anyhow::
     Ok(())
 }
 
+fn default_folder_params(
+    org_id: &str,
+    stream_type: Option<StreamType>,
+    stream_name: Option<&str>,
+) -> ListAlertsParams {
+    let params = ListAlertsParams::new(org_id).in_folder("default");
+    if let Some(stream_name) = stream_name {
+        params.for_stream(stream_type.unwrap_or_default(), Some(stream_name))
+    } else {
+        params
+    }
+}
+
 pub async fn get_alert_from_cache(org_id: &str, alert_id: &str) -> Option<(Folder, Alert)> {
     let alerts_cacher = ALERTS.read().await;
     alerts_cacher
@@ -529,6 +531,32 @@ pub async fn resolve_alert_ids_by_tags(org_id: &str, filter_tags: &[String]) -> 
         })
         .filter_map(|(_, (_, alert))| alert.id.map(|id| id.to_string()))
         .collect()
+}
+
+/// Ids of the org's SIEM detections (`context_attributes.siem == "true"`), from the alert cache.
+#[cfg(feature = "enterprise")]
+pub async fn resolve_siem_alert_ids(org_id: &str) -> Vec<String> {
+    let prefix = format!("{org_id}/");
+    let alerts_cacher = ALERTS.read().await;
+    alerts_cacher
+        .iter()
+        .filter(|(key, _)| key.starts_with(&prefix))
+        .filter(|(_, (_, alert))| is_siem_detection(alert.context_attributes.as_ref()))
+        .filter_map(|(_, (_, alert))| alert.id.map(|id| id.to_string()))
+        .collect()
+}
+
+/// Whether any of `alert_ids` is a cached SIEM detection of the org, by keyed lookup.
+pub async fn any_siem_alert<'a>(
+    org_id: &str,
+    alert_ids: impl IntoIterator<Item = &'a str>,
+) -> bool {
+    let alerts_cacher = ALERTS.read().await;
+    alert_ids.into_iter().any(|id| {
+        alerts_cacher
+            .get(&cache_alert_key(org_id, id))
+            .is_some_and(|(_, alert)| is_siem_detection(alert.context_attributes.as_ref()))
+    })
 }
 
 /// Distinct tags in an org with occurrence counts, for the facet endpoint
@@ -580,6 +608,65 @@ pub fn scheduler_key(alert_id: Option<Ksuid>) -> String {
     alert_id.map_or_else(|| DEFAULT_FOLDER.to_string(), |id| id.to_string())
 }
 
+async fn announce_update(
+    org_id: &str,
+    folder_id: Option<&str>,
+    alert: Alert,
+) -> Result<Alert, infra::errors::Error> {
+    let schedule_key = scheduler_key(alert.id);
+
+    infra::coordinator::alerts::emit_put_event(org_id, &alert, folder_id.map(|id| id.to_string()))
+        .await?;
+    #[cfg(feature = "enterprise")]
+    super_cluster::emit_update_event(org_id, folder_id, alert.clone()).await?;
+
+    let next_run_at = if alert.trigger_condition.frequency_type == FrequencyType::Cron {
+        match alert
+            .trigger_condition
+            .get_next_trigger_time(true, alert.tz_offset, false, None)
+        {
+            Ok(t) => t,
+            Err(e) => {
+                log::error!(
+                    "Failed to compute next trigger time for alert {schedule_key}: org_id: {org_id}, error: {e}"
+                );
+                now_micros()
+            }
+        }
+    } else {
+        now_micros()
+    };
+    let mut trigger = db::scheduler::Trigger {
+        org: org_id.to_string(),
+        module_key: schedule_key.clone(),
+        next_run_at,
+        is_realtime: alert.is_real_time,
+        is_silenced: false,
+        ..Default::default()
+    };
+
+    if let Ok(job) =
+        db::scheduler::get(org_id, db::scheduler::TriggerModule::Alert, &schedule_key).await
+    {
+        trigger.data = job.data;
+        trigger.start_time = job.start_time;
+        let _ = db::scheduler::update_trigger(trigger, false, "")
+            .await
+            .map_err(|e| {
+                log::error!("Failed to update trigger for alert {schedule_key}: org_id: {org_id}, error: {e}");
+            });
+    } else {
+        let _ = db::scheduler::push(trigger).await.map_err(|e| {
+            log::error!(
+                "Failed to save trigger for alert {schedule_key}: org_id: {org_id}, error: {e}"
+            );
+            e
+        });
+    }
+
+    Ok(alert)
+}
+
 #[cfg(test)]
 mod tests {
     use config::meta::stream::StreamType;
@@ -624,6 +711,123 @@ mod tests {
         let expected = ksuid.to_string();
         let key = scheduler_key(Some(ksuid));
         assert_eq!(key, expected);
+    }
+
+    fn alert_row(
+        org: &str,
+        id: &str,
+        query_conditions: Option<serde_json::Value>,
+    ) -> infra::table::entity::alerts::Model {
+        infra::table::entity::alerts::Model {
+            id: id.to_string(),
+            org: org.to_string(),
+            folder_id: "folder_pk".to_string(),
+            name: format!("alert-{id}"),
+            stream_type: "logs".to_string(),
+            stream_name: "s".to_string(),
+            is_real_time: false,
+            destinations: serde_json::json!([]),
+            template: None,
+            context_attributes: None,
+            row_template: None,
+            row_template_type: 0,
+            description: None,
+            enabled: true,
+            tz_offset: 0,
+            last_triggered_at: None,
+            last_satisfied_at: None,
+            query_type: 0,
+            query_conditions,
+            query_sql: None,
+            query_promql: None,
+            query_promql_condition: None,
+            query_aggregation: None,
+            query_promql_multi_alert: None,
+            query_promql_rule_mode: None,
+            query_vrl_function: None,
+            query_search_event_type: None,
+            query_multi_time_range: None,
+            trigger_threshold_operator: ">".to_string(),
+            trigger_period_seconds: 900,
+            trigger_threshold_count: 1,
+            trigger_thresholds: None,
+            priority: None,
+            tags: None,
+            slo_id: None,
+            oncall_team: None,
+            runbook_url: None,
+            incident_title_template: None,
+            query_slo_condition: None,
+            trigger_frequency_type: 1,
+            trigger_frequency_seconds: 300,
+            trigger_frequency_cron: None,
+            trigger_frequency_cron_timezone: None,
+            trigger_silence_seconds: 0,
+            trigger_tolerance_seconds: None,
+            owner: None,
+            last_edited_by: None,
+            updated_at: None,
+            align_time: false,
+            dedup_enabled: false,
+            dedup_time_window_minutes: None,
+            dedup_config: None,
+            creates_incident: false,
+            workflows: serde_json::json!([]),
+            pending_period_sec: 0,
+            notify_on_recovery: None,
+            recovery_destinations: None,
+            keep_firing_for_seconds: None,
+            suppress_repeats: None,
+        }
+    }
+
+    #[tokio::test]
+    async fn test_cache_orgs_skips_an_alert_this_version_cannot_read() {
+        use infra::table::entity::{alerts, folders};
+        use sea_orm::{ActiveModelTrait, ActiveValue::Set, Database, Schema};
+        use svix_ksuid::KsuidLike;
+
+        const ORG: &str = "cache_skips_unreadable";
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        let backend = db.get_database_backend();
+        let schema = Schema::new(backend);
+        for create in [
+            schema.create_table_from_entity(folders::Entity),
+            schema.create_table_from_entity(alerts::Entity),
+        ] {
+            db.execute(backend.build(&create)).await.unwrap();
+        }
+        folders::ActiveModel {
+            id: Set("folder_pk".to_string()),
+            org: Set(ORG.to_string()),
+            folder_id: Set(DEFAULT_FOLDER.to_string()),
+            name: Set("default".to_string()),
+            description: Set(None),
+            icon: Set(None),
+            r#type: Set(1),
+        }
+        .insert(&db)
+        .await
+        .unwrap();
+        let future_rule = serde_json::json!({"version": 2, "conditions": {
+            "filterType": "group", "logicalOperator": "AND", "conditions": [
+                {"filterType": "condition", "column": "level", "operator": "future_op",
+                 "value": ["error"], "logicalOperator": "AND"}]}});
+        let ids = [Ksuid::new(None, None), Ksuid::new(None, None)].map(|id| id.to_string());
+        for (id, conditions) in ids.iter().zip([None, Some(future_rule)]) {
+            alerts::ActiveModel::from(alert_row(ORG, id, conditions))
+                .insert(&db)
+                .await
+                .unwrap();
+        }
+
+        cache_orgs(&db, HashSet::from([ORG.to_string()]))
+            .await
+            .unwrap();
+
+        let cached = ALERTS.read().await;
+        assert!(cached.contains_key(&cache_alert_key(ORG, &ids[0])));
+        assert!(!cached.contains_key(&cache_alert_key(ORG, &ids[1])));
     }
 }
 

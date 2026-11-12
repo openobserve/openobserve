@@ -22,7 +22,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         ? t('telephony.connectTitle', { provider: PROVIDER })
         : t('telephony.updateTitle', { provider: PROVIDER })
     "
-    :sub-title="t('telephony.dialogSubtitle')"
     :form-id="FORM_ID"
     :primary-button-label="primaryLabel"
     :secondary-button-label="t('common.cancel')"
@@ -76,6 +75,7 @@ import { setServerFieldErrors, useOForm } from "@/lib/forms/Form/useOForm";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import { saveTelephonyMutation } from "@/services/oncall.queries";
+import analytics from "@/services/product_analytics";
 import type { OrgTelephonyView, PutTelephonyBody } from "@/ts/interfaces/oncall";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -135,7 +135,7 @@ const tokenHelp = computed<I18nText | undefined>(() => {
 const submitting = form.useStore((s) => s.isSubmitting);
 const primaryLabel = computed<I18nText>(() => {
   if (submitting.value) return t("telephony.checking", { provider: PROVIDER });
-  return props.mode === "connect" ? t("telephony.connect") : t("telephony.update");
+  return t("common.save");
 });
 
 function failureText(err: unknown): I18nText {
@@ -166,6 +166,7 @@ async function submit(value: TelephonyForm) {
   };
   try {
     await save.mutateAsync(body);
+    analytics.track(props.mode === "connect" ? "telephony_connected" : "telephony_updated");
     emit("update:open", false);
   } catch (err) {
     if (isForbidden(err)) {

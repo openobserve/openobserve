@@ -32,7 +32,10 @@ vi.mock("@/composables/useStreams", () => ({
   }),
 }));
 
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
+
 import searchService from "@/services/search";
+import analytics from "@/services/product_analytics";
 import { rumPaApiMock as api } from "@/utils/rum/__fixtures__/namedEventsApiMock";
 import { resetNamedEvents } from "@/composables/rum/useNamedEvents";
 import { encodeDef } from "@/utils/rum/productAnalyticsModel";
@@ -302,6 +305,22 @@ describe("AnalyticsRetention", () => {
     expect(gridSqls()).toHaveLength(0);
   });
 
+  it("the too-short empty state at 1d offers the widen button", async () => {
+    await mountRetention({ period: "1d" });
+    expect(wrapper!.find('[data-test="rum-analytics-retention-widen-range-btn"]').exists()).toBe(
+      true,
+    );
+  });
+
+  it("the too-short empty state at 30d (range clipped to data start) has no widen button", async () => {
+    streamStats.doc_time_min = Date.now() * 1000 - 2 * DAY_US;
+    await mountRetention({ period: "30d" });
+    expect(wrapper!.find('[data-test="rum-analytics-retention-too-short"]').exists()).toBe(true);
+    expect(wrapper!.find('[data-test="rum-analytics-retention-widen-range-btn"]').exists()).toBe(
+      false,
+    );
+  });
+
   it("the legend says a cell click shows who returned", async () => {
     await mountRetention();
     expect(wrapper!.find('[data-test="rum-analytics-retention-cell-hint"]').text()).toBe(
@@ -321,6 +340,16 @@ describe("AnalyticsRetention", () => {
     expect(
       document.querySelector('[data-test="rum-analytics-retention-users-truncated"]')?.textContent,
     ).toContain("1 most recently seen of 20");
+  });
+
+  it("tracks a cell drill-down with its period and granularity only", async () => {
+    await mountRetention();
+    vi.mocked(analytics.track).mockClear();
+    await wrapper!.find('[data-test="rum-analytics-retention-cell-0-1"]').trigger("click");
+    expect(analytics.track).toHaveBeenCalledWith("rum_retention_cell_opened", {
+      period: 1,
+      granularity: expect.any(String),
+    });
   });
 
   it("names a cell for a screen reader with its unit and whether it is still running (W30)", async () => {

@@ -57,6 +57,8 @@ export interface Incident {
   rca_off_reason?: string | null;
   /** List only: every alert that fired into the incident and how often, most-fired first. */
   alert_groups?: { alert_id: string; alert_name: string; count: number }[];
+  /** A security case only backfills over past data fired into. */
+  historical?: boolean;
 }
 
 export type RcaRunState = "running" | "waiting_input" | "completed" | "failed" | "cancelled";
@@ -686,13 +688,22 @@ export interface IncidentAlert {
   incident_id: string;
   alert_id: string;
   alert_name: string;
-  alert_kind?: "internal" | "external";
+  alert_kind?: "internal" | "external" | "autoobserve";
   alert_fired_at: number;
   correlation_reason: "service_discovery" | "primary_match" | "secondary_match" | "alert_id";
   created_at: number;
   source_url?: string | null;
   labels?: Record<string, string> | null;
   detected_source?: string | null;
+}
+
+/** One deduplicated alert definition on an incident; firings live in `IncidentWithAlerts.triggers`. */
+export interface IncidentAlertDefinition {
+  id?: string | null;
+  name: string;
+  stream_name?: string;
+  enabled?: boolean;
+  [key: string]: unknown;
 }
 
 export interface CompositeAlertSummary {
@@ -704,7 +715,9 @@ export interface CompositeAlertSummary {
 }
 
 export interface IncidentWithAlerts extends Incident {
-  alerts: IncidentAlert[];
+  /** Unique alert definitions behind the incident. */
+  alerts: IncidentAlertDefinition[];
+  /** Each firing correlated into the incident. */
   triggers: IncidentAlert[];
   composite_alerts?: CompositeAlertSummary[];
 }
@@ -798,6 +811,7 @@ const incidents = {
     limit: number = 50,
     offset: number = 0,
     keyword?: string,
+    siem?: boolean,
   ) => {
     let url = `/api/v2/${org_identifier}/alerts/incidents?limit=${limit}&offset=${offset}`;
     if (status) {
@@ -805,6 +819,9 @@ const incidents = {
     }
     if (keyword) {
       url += `&keyword=${encodeURIComponent(keyword)}`;
+    }
+    if (siem) {
+      url += "&siem=true";
     }
     return http().get<ListIncidentsResponse>(url);
   },

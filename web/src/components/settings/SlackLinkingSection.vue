@@ -34,11 +34,13 @@ import {
 } from "@/services/slack.queries";
 import { useI18nTyped } from "@/types/i18n";
 import type { InstallationView } from "@/types/slack";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import SlackLinkedPeople from "./SlackLinkedPeople.vue";
-import SlackOncallUnlinked from "./SlackOncallUnlinked.vue";
+import { useSlackReadOnly } from "./slackReadOnly";
 import { makeLinkingSchema, type LinkingForm } from "./SlackSettings.schema";
 
 const props = defineProps<{ installation: InstallationView }>();
+const readOnly = useSlackReadOnly();
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -61,9 +63,10 @@ const summary = computed(() => {
   const current = view.value;
   if (!current) return "";
   if (!current.enabled) return t("slackApp.linking.offSummary");
+  // Typed-in domains are one Edit domains click away; only a mapping's domains need saying, since they cannot be edited here.
   return current.source === "mapping"
     ? t("slackApp.linking.mappedSummary", { domains: domainsText.value })
-    : t("slackApp.linking.manualSummary", { domains: domainsText.value });
+    : "";
 });
 const noDomains = computed(() => !!view.value?.enabled && !view.value.domains.length);
 const autoCount = computed(() =>
@@ -113,16 +116,15 @@ const runLinkAll = async (): Promise<void> => {
         <h2 class="text-text-heading m-0 text-lg font-semibold">
           {{ t("slackApp.linking.title") }}
         </h2>
-        <p class="text-text-secondary m-0 text-sm">
-          {{
-            managed ? t("slackApp.linking.setByInstanceAdmin") : t("slackApp.linking.removedUsers")
-          }}
+        <p v-if="managed" class="text-text-secondary m-0 text-sm">
+          {{ t("slackApp.linking.setByInstanceAdmin") }}
         </p>
       </div>
       <OButton
         v-if="!managed"
-        variant="ghost-primary"
-        size="sm"
+        variant="outline"
+        size="sm-action"
+        icon-left="manage-accounts"
         data-test="slack-linking-manage"
         @click="peopleOpen = true"
       >
@@ -177,7 +179,11 @@ const runLinkAll = async (): Promise<void> => {
                   }}
                 </template>
               </span>
-              <span v-else class="text-text-secondary text-sm" data-test="slack-linking-summary">
+              <span
+                v-else-if="summary"
+                class="text-text-secondary text-sm"
+                data-test="slack-linking-summary"
+              >
                 {{ summary }}
               </span>
               <span class="text-text-secondary text-xs" data-test="slack-linking-counts">
@@ -190,16 +196,23 @@ const runLinkAll = async (): Promise<void> => {
               v-if="!editing && !managed"
               variant="outline"
               size="sm"
+              icon-left="edit"
+              :disabled="readOnly"
               data-test="slack-linking-edit"
               @click="editing = true"
             >
               {{ t("slackApp.linking.editDomains") }}
+              <OTooltip
+                v-if="readOnly"
+                side="bottom"
+                :content="t('slackApp.connect.permissionHint')"
+              />
             </OButton>
             <OSwitch
               :model-value="view.enabled"
               :label="view.enabled ? t('slackApp.linking.on') : t('slackApp.linking.off')"
               label-position="left"
-              :disabled="managed || update.isPending.value"
+              :disabled="managed || readOnly || update.isPending.value"
               data-test="slack-linking-switch"
               @update:model-value="toggle"
             />
@@ -248,7 +261,9 @@ const runLinkAll = async (): Promise<void> => {
         <OButton
           variant="outline"
           size="sm-action"
+          icon-left="link"
           :loading="linkAll.isPending.value"
+          :disabled="readOnly"
           @click="runLinkAll"
         >
           {{ t("slackApp.linking.linkAllMatches", { count: matches }) }}
@@ -256,19 +271,12 @@ const runLinkAll = async (): Promise<void> => {
       </div>
 
       <div class="flex flex-wrap items-center justify-between gap-3 p-4">
-        <div class="flex min-w-0 flex-col gap-0.5">
-          <span class="text-text-heading text-sm font-medium">
-            {{ t("slackApp.linking.appHome") }}
-          </span>
-          <span class="text-text-secondary text-xs">
-            {{ t("slackApp.linking.appHomeDescription") }}
-          </span>
-        </div>
+        <span class="text-text-heading text-sm font-medium">
+          {{ t("slackApp.linking.appHome") }}
+        </span>
         <OTag variant="success-soft" :label="t('slackApp.linking.enabled')" />
       </div>
     </OCard>
-
-    <SlackOncallUnlinked :installation="installation" />
 
     <SlackLinkedPeople v-model:open="peopleOpen" :installation-id="installation.id" />
   </section>

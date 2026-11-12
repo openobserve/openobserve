@@ -16,6 +16,7 @@
 use std::{
     future::Future,
     pin::Pin,
+    sync::LazyLock,
     task::{Context, Poll},
     time::Instant,
 };
@@ -30,16 +31,23 @@ use tower::{Layer, Service};
 const SHARE_TOKEN_PREFIX: usize = 6;
 
 /// Request headers whose value is a credential and is never written to the log.
-const REDACTED_REQUEST_HEADERS: [&str; 6] = [
+const REDACTED_REQUEST_HEADERS: [&str; 7] = [
     "authorization",
     "proxy-authorization",
     "cookie",
     "x-api-key",
     "x-o2-mcp",
     "webhook-signature",
+    "dd-api-key",
 ];
 /// Workflow hook credentials; a URL value starting with one, in any case or encoding, is cut.
 const HOOK_CREDENTIAL_PREFIXES: [&str; 2] = ["o2wh_", "whsec_"];
+
+// Handle generic %{Header}i patterns for request headers
+static RE_REQ_HEADER: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"%\{([^}]+)\}i").unwrap());
+
+// Handle generic %{Header}o patterns for response headers
+static RE_RES_HEADER: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"%\{([^}]+)\}o").unwrap());
 
 /// The access log format: `common`, `json`, or a custom one (%a %t %r %s %b %U %T %D %{Header}i/o).
 pub fn get_http_access_log_format() -> String {
@@ -251,9 +259,7 @@ where
 
                 // Generic header patterns are parsed only when the format has one (regex work).
                 if this.format.contains("}i") {
-                    // Handle generic %{Header}i patterns for request headers
-                    let request_header_regex = Regex::new(r"%\{([^}]+)\}i").unwrap();
-                    for cap in request_header_regex.captures_iter(&this.format.clone()) {
+                    for cap in RE_REQ_HEADER.captures_iter(&this.format.clone()) {
                         let header_name = &cap[1];
                         // Skip already-handled headers to avoid redundant work
                         if header_name == "Content-Length"
@@ -281,9 +287,7 @@ where
                 }
 
                 if this.format.contains("}o") {
-                    // Handle generic %{Header}o patterns for response headers
-                    let response_header_regex = Regex::new(r"%\{([^}]+)\}o").unwrap();
-                    for cap in response_header_regex.captures_iter(&this.format.clone()) {
+                    for cap in RE_RES_HEADER.captures_iter(&this.format.clone()) {
                         let header_name = &cap[1];
                         let header_value = response_headers
                             .iter()
@@ -304,9 +308,14 @@ where
     }
 }
 
-/// `url` as the access log may write it: share tokens cut, Slack callback secrets dropped.
+/// `url` as the access log may write it, with every known credential in it cut.
 pub fn mask_log_url(url: &str) -> String {
-    mask_slack_callback_query(&mask_share_tokens(url))
+    let masked = mask_slack_callback_query(&mask_share_tokens(url));
+    if !masked.contains("api_key=") {
+        return masked;
+    }
+    // A Datadog Agent sends its API key as `?api_key=` on validate calls.
+    mask_query_values(&masked, &["api_key"])
 }
 
 /// `path` (or a URL) with every share token, dashboard slug or hook credential cut short.
@@ -396,13 +405,19 @@ fn hex_digit(byte: u8) -> Option<u8> {
 
 /// A Slack callback's `code` and `state` are one-time OAuth secrets the SPA sends as Referer.
 fn mask_slack_callback_query(url: &str) -> String {
-    let Some((path, rest)) = url.split_once('?') else {
-        return url.to_string();
-    };
-    let route = path.trim_end_matches('/');
+    let route = url.split_once('?').map_or(url, |(path, _)| path);
+    let route = route.trim_end_matches('/');
     if !(route.contains("/slack/") && route.ends_with("/callback")) {
         return url.to_string();
     }
+    mask_query_values(url, &["code", "state"])
+}
+
+/// `url` with the value of every query parameter named in `keys` replaced by `…`.
+fn mask_query_values(url: &str, keys: &[&str]) -> String {
+    let Some((path, rest)) = url.split_once('?') else {
+        return url.to_string();
+    };
     let (query, fragment) = match rest.split_once('#') {
         Some((q, f)) => (q, Some(f)),
         None => (rest, None),
@@ -410,7 +425,7 @@ fn mask_slack_callback_query(url: &str) -> String {
     let pairs: Vec<String> = query
         .split('&')
         .map(|pair| match pair.split_once('=') {
-            Some((key, _)) if matches!(key, "code" | "state") => format!("{key}=…"),
+            Some((key, _)) if keys.contains(&key) => format!("{key}=…"),
             _ => pair.to_string(),
         })
         .collect();
@@ -425,6 +440,23 @@ fn mask_slack_callback_query(url: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    static LOG_LINES: std::sync::Mutex<Vec<String>> = std::sync::Mutex::new(Vec::new());
+    static CAPTURE_LOGGER: CaptureLogger = CaptureLogger;
+
+    struct CaptureLogger;
+
+    impl log::Log for CaptureLogger {
+        fn enabled(&self, _: &log::Metadata) -> bool {
+            true
+        }
+
+        fn log(&self, record: &log::Record) {
+            LOG_LINES.lock().unwrap().push(record.args().to_string());
+        }
+
+        fn flush(&self) {}
+    }
 
     #[test]
     fn share_tokens_never_reach_the_access_log() {
@@ -556,6 +588,54 @@ mod tests {
     fn webhook_signature_header_is_redacted() {
         assert!(REDACTED_REQUEST_HEADERS.contains(&"webhook-signature"));
         assert!(REDACTED_REQUEST_HEADERS.contains(&"authorization"));
+    }
+
+    #[test]
+    fn datadog_api_keys_never_reach_the_access_log() {
+        assert!(REDACTED_REQUEST_HEADERS.contains(&"dd-api-key"));
+        for (url, masked) in [
+            (
+                "/datadog/default/api/v1/validate?api_key=o2oi_s3cr3t",
+                "/datadog/default/api/v1/validate?api_key=…",
+            ),
+            (
+                "/o2/datadog/default/api/v1/validate?x=1&api_key=o2oi_s3cr3t#f",
+                "/o2/datadog/default/api/v1/validate?x=1&api_key=…#f",
+            ),
+        ] {
+            assert_eq!(mask_log_url(url), masked);
+        }
+        for untouched in [
+            "/datadog/default/api/v2/series",
+            "/datadog/default/api/v1/validate?xapi_key=1",
+        ] {
+            assert_eq!(mask_log_url(untouched), untouched);
+        }
+    }
+
+    #[tokio::test]
+    async fn a_custom_format_printing_the_datadog_key_header_logs_it_redacted() {
+        let _ = log::set_logger(&CAPTURE_LOGGER);
+        log::set_max_level(log::LevelFilter::Trace);
+        let secret = "o2oi_accessLogSecret9";
+        let mut svc = AccessLogLayer::new("dd=%{DD-API-KEY}i req=%r".to_string()).layer(
+            tower::service_fn(|_req: Request<Body>| async {
+                Ok::<_, std::convert::Infallible>(Response::new(Body::empty()))
+            }),
+        );
+        let req = Request::builder()
+            .uri(format!("/datadog/default/api/v1/validate?api_key={secret}"))
+            .header("DD-API-KEY", secret)
+            .body(Body::empty())
+            .unwrap();
+        svc.call(req).await.unwrap();
+        let lines = LOG_LINES.lock().unwrap().clone();
+        let line = lines
+            .iter()
+            .find(|l| l.starts_with("dd="))
+            .expect("access line");
+        assert!(line.contains("dd=[REDACTED]"), "{line}");
+        assert!(!line.contains(secret), "{line}");
     }
 
     #[test]

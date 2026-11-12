@@ -13,10 +13,21 @@ const {
   ingestTraces,
   waitForServiceGraphData,
   countTopologyNodes,
+  SERVICE_GRAPH_READY_FLOOR_MS,
 } = require('../utils/service-graph-ingestion.js');
 
+const SERVICE_GRAPH_WAIT_MS = SERVICE_GRAPH_READY_FLOOR_MS + 120000;
+
 const EMPTY_TOPOLOGY_MESSAGE =
-  'Service graph topology is still empty 4 minutes after ingesting traces: the service-graph jobs are not producing data on this environment (check O2_SERVICE_GRAPH_ENABLED).';
+  `Service graph topology is still empty ${SERVICE_GRAPH_WAIT_MS / 60000} minutes after ingesting traces: the service-graph jobs are not producing data on this environment (check O2_SERVICE_GRAPH_ENABLED).`;
+
+// Same scale as the node border, catalog row and side panel: Healthy < 1%, Degraded 1-5%, Warning >5-10%, Critical > 10%.
+const expectedHealth = (errorRate) => {
+  if (errorRate > 10) return 'critical';
+  if (errorRate > 5) return 'warning';
+  if (errorRate >= 1) return 'degraded';
+  return 'healthy';
+};
 
 test.describe("Service Graph testcases", { tag: '@enterprise' }, () => {
   test.describe.configure({ mode: 'parallel' });
@@ -25,9 +36,8 @@ test.describe("Service Graph testcases", { tag: '@enterprise' }, () => {
   let topologyEmpty = false;
 
   test.beforeAll(async ({ browser }, testInfo) => {
-    // 4-min daemon wait + 30s buffer + ingestion time exceeds the default 3-5 min test timeout.
-    test.setTimeout(600000); // 10 minutes for beforeAll
-    // Every retry starts a new worker; this marker stops each one from repeating a 4-minute wait for a graph that never fills.
+    test.setTimeout(SERVICE_GRAPH_WAIT_MS + 180000);
+    // Every retry starts a new worker; this marker stops each one from repeating the full wait for a graph that never fills.
     const emptyTopologyMarker = path.join(testInfo.project.outputDir, 'service-graph-empty-topology.marker');
     const context = await browser.newContext({
       storageState: 'playwright-tests/utils/auth/user.json',
@@ -53,11 +63,9 @@ test.describe("Service Graph testcases", { tag: '@enterprise' }, () => {
       await ingestTraces(page, allTraces, { delayMs: 50 });
       testLogger.info('Trace ingestion complete');
 
-      // Wait for the service graph daemon to process (runs every ~30s)
-      // Increased to 4 minutes to allow 6-8 daemon cycles for full topology processing
       testLogger.info('Waiting for service graph daemon to process data...');
       const waitResult = await waitForServiceGraphData(page, {
-        maxWaitMs: 240000,  // 4 minutes (was 2 min) - allows more daemon cycles
+        maxWaitMs: SERVICE_GRAPH_WAIT_MS,
         pollIntervalMs: 10000,
         expectedMinEdges: 10,
       });
@@ -220,7 +228,7 @@ test.describe("Service Graph testcases", { tag: '@enterprise' }, () => {
     }
   });
 
-  test("P1: Verify user-service has degraded status and high error rate", {
+  test("P1: Verify user-service shows the Warning or Critical status its high error rate maps to", {
     tag: ['@serviceGraph', '@traces', '@functional', '@P1', '@all']
   }, async ({ page }) => {
     testLogger.info('=== Verifying user-service health status ===');
@@ -243,13 +251,12 @@ test.describe("Service Graph testcases", { tag: '@enterprise' }, () => {
 
     const status = await pm.serviceGraphPage.getHealthStatus();
     testLogger.info(`user-service health status: ${status}`);
-    // Should be degraded (>5% error rate) or critical (>10%)
-    expect(['degraded', 'critical']).toContain(status);
+    expect(status).toBe(expectedHealth(apiErrorRate));
 
     await pm.serviceGraphPage.closeSidePanel();
   });
 
-  test("P1: Verify search-service has healthy status and 0% error rate", {
+  test("P1: Verify search-service shows the Healthy or Degraded status its low error rate maps to", {
     tag: ['@serviceGraph', '@traces', '@functional', '@P1', '@all']
   }, async ({ page }) => {
     testLogger.info('=== Verifying search-service health status ===');
@@ -272,7 +279,7 @@ test.describe("Service Graph testcases", { tag: '@enterprise' }, () => {
 
     const status = await pm.serviceGraphPage.getHealthStatus();
     testLogger.info(`search-service health status: ${status}`);
-    expect(status).toBe('healthy');
+    expect(status).toBe(expectedHealth(apiErrorRate));
 
     await pm.serviceGraphPage.closeSidePanel();
   });
@@ -454,9 +461,11 @@ test.describe("Service Graph testcases", { tag: '@enterprise' }, () => {
     await pm.serviceGraphPage.expectOperationsSectionVisible();
     testLogger.info('Operations section is visible');
 
+    // The operations rows load after the section shows, so poll instead of counting once.
+    await expect.poll(() => pm.serviceGraphPage.getOperationsTableRowCount(), { timeout: 15000 }).toBeGreaterThan(0);
     const rowCount = await pm.serviceGraphPage.getOperationsTableRowCount();
     testLogger.info(`Operations table row count: ${rowCount}`);
-    expect(rowCount).toBeGreaterThanOrEqual(0);
+    expect(rowCount).toBeGreaterThan(0);
 
     await pm.serviceGraphPage.closeSidePanel();
   });

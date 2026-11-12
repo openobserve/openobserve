@@ -71,6 +71,7 @@ vi.mock("./composables/useLLMInsights", () => ({
     availableStreams: mockAvailableStreams,
     streamsLoaded: mockStreamsLoaded,
     fetchAll: mockFetchAll,
+    restore: vi.fn(),
     cancelAll: mockCancelAll,
   }),
 }));
@@ -187,7 +188,12 @@ function mountDashboard(
     global: {
       stubs: {
         LLMSchemaPanel: { template: '<div data-test="llm-schema-panel" />' },
-        LLMErrorTable: { template: '<div data-test="llm-error-table" />' },
+        LLMInsightsSearchBar: {
+          props: ["applied"],
+          emits: ["apply"],
+          template: '<div data-test="llm-insights-search" />',
+        },
+        LLMTopErrorsTable: { template: '<div data-test="llm-top-errors" />' },
         KpiSparkline: { template: '<div data-test="kpi-sparkline" />' },
         LLMInsightsSkeleton: { template: '<div data-test="llm-insights-skeleton" />' },
         // Compare-mode surfaces stubbed with a distinguishing data-test each,
@@ -200,6 +206,7 @@ function mountDashboard(
         },
         VersionDeltaStrip: { template: '<div data-test="version-delta-strip" />' },
         VersionOverlayChart: { template: '<div data-test="version-overlay-chart" />' },
+        ReleaseWatchCard: { name: "ReleaseWatchCard", template: "<div />" },
         OButton: {
           props: ["disabled"],
           template: '<button :disabled="disabled" @click="$emit(\'click\')"><slot /></button>',
@@ -262,16 +269,98 @@ describe("LLMInsightsDashboard — version compare entry", () => {
     expect(btn.exists()).toBe(false);
   });
 
+  it("hides the compare entry when the other version is only in another stream", async () => {
+    const elsewhere = { ...AGENT_V14, id: "x2", source_stream: "other" };
+    mockListAgents.mockResolvedValue({ agents: [AGENT_V15, elsewhere] });
+    const wrapper = mountDashboard();
+    await flushPromises();
+    await flushPromises();
+    await (wrapper.vm as any).loadInsights();
+    await flushPromises();
+    expect(wrapper.find('[data-test="llm-insights-compare-entry"]').exists()).toBe(false);
+  });
+
   it("passes the page start to the compare version list so it is never narrower than the page", async () => {
     const wrapper = mountDashboard();
     await flushPromises();
     await flushPromises();
     await (wrapper.vm as any).loadInsights();
     await flushPromises();
+    // The release watch reads the same list on load; count only the entry's call.
+    mockListVersionsForCompare.mockClear();
     await wrapper.find('[data-test="llm-insights-compare-entry"]').trigger("click");
     await flushPromises();
     expect(mockListVersionsForCompare).toHaveBeenCalledTimes(1);
     expect(mockListVersionsForCompare.mock.calls[0][4]).toBe(1_700_000_000_000_000);
+  });
+
+  it("opens Release watch's pair, listing only the effective stream's versions", async () => {
+    const OTHER_STREAM = { ...AGENT_V15, id: "x1", version: "9.9.9", source_stream: "other" };
+    // Data in the window, so the dashboard body (and the card) renders.
+    const emptyKpi = mockKpi.value;
+    mockKpi.value = { ...emptyKpi, requestCount: 5, traceCount: 5 };
+    const wrapper = mountDashboard();
+    await flushPromises();
+    await flushPromises();
+    await (wrapper.vm as any).loadInsights();
+    await flushPromises();
+    mockListVersionsForCompare.mockResolvedValue([OTHER_STREAM, AGENT_V15, AGENT_V14]);
+    mockKpi.value = emptyKpi;
+    wrapper
+      .findComponent({ name: "ReleaseWatchCard" })
+      .vm.$emit("open-compare", { next: AGENT_V15, prev: AGENT_V14 });
+    await flushPromises();
+    const view = wrapper.findComponent({ name: "VersionCompareView" });
+    // A = previous (baseline), B = the new version: the compare reads A → B.
+    expect(view.props("initialPair")).toEqual({ a: AGENT_V14.version, b: AGENT_V15.version });
+    expect(view.props("versionList").map((v: any) => v.version)).toEqual([
+      AGENT_V15.version,
+      AGENT_V14.version,
+    ]);
+  });
+
+  it("opens the card's pair when the previous version has no spans in the page window", async () => {
+    mockListAgents.mockResolvedValue({ agents: [AGENT_V15] });
+    const emptyKpi = mockKpi.value;
+    mockKpi.value = { ...emptyKpi, requestCount: 5, traceCount: 5 };
+    const wrapper = mountDashboard();
+    await flushPromises();
+    await flushPromises();
+    await (wrapper.vm as any).loadInsights();
+    await flushPromises();
+    mockKpi.value = emptyKpi;
+    expect(wrapper.find('[data-test="llm-insights-compare-entry"]').exists()).toBe(false);
+    wrapper
+      .findComponent({ name: "ReleaseWatchCard" })
+      .vm.$emit("open-compare", { next: AGENT_V15, prev: AGENT_V14 });
+    await flushPromises();
+    const view = wrapper.findComponent({ name: "VersionCompareView" });
+    expect(view.exists()).toBe(true);
+    expect(view.props("initialPair")).toEqual({ a: AGENT_V14.version, b: AGENT_V15.version });
+  });
+
+  it("compares only env-less variants when the selected env is (No env)", async () => {
+    const NOENV_V2 = { ...AGENT_V15, id: "n2", env: null, version: "2.0" };
+    const NOENV_V1 = { ...AGENT_V14, id: "n1", env: null, version: "1.0" };
+    const PROD_V2 = { ...AGENT_V15, id: "p2", env: "production", version: "2.0" };
+    mockListAgents.mockResolvedValue({ agents: [NOENV_V2, NOENV_V1] });
+    mockListVersionsForCompare.mockResolvedValue([NOENV_V2, NOENV_V1]);
+    const emptyKpi = mockKpi.value;
+    mockKpi.value = { ...emptyKpi, requestCount: 5, traceCount: 5 };
+    const wrapper = mountDashboard();
+    await flushPromises();
+    await flushPromises();
+    await (wrapper.vm as any).loadInsights();
+    await flushPromises();
+    mockKpi.value = emptyKpi;
+    // The service reads a null env as "any env": production rows come back too.
+    mockListVersionsForCompare.mockResolvedValue([PROD_V2, NOENV_V2, NOENV_V1]);
+    wrapper
+      .findComponent({ name: "ReleaseWatchCard" })
+      .vm.$emit("open-compare", { next: NOENV_V2, prev: NOENV_V1 });
+    await flushPromises();
+    const list = wrapper.findComponent({ name: "VersionCompareView" }).props("versionList");
+    expect(list.map((v: { id: string }) => v.id)).toEqual(["n2", "n1"]);
   });
 });
 
@@ -481,6 +570,7 @@ describe("LLMInsightsDashboard — filter mode toggle", () => {
       expect.any(Number),
       expect.any(Number),
       null,
+      "",
     );
   });
 });
@@ -500,6 +590,7 @@ describe("LLMInsightsDashboard — per-variant KPI cache", () => {
       expect.any(Number),
       expect.any(Number),
       expect.objectContaining({ version: "1.4.0" }),
+      "",
     );
   });
 });

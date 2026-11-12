@@ -34,16 +34,17 @@ export interface MetricDef {
 }
 
 export interface MetricSeries {
-  points: [number, number][];
+  // A null value is a bucket with nothing to measure, drawn as a gap rather than a zero.
+  points: [number, number | null][];
   band: [number, number, number][] | null;
   anomalies: [number, number][];
-  current: number;
-  previous: number;
+  current: number | null;
+  previous: number | null;
   low: number | null;
   high: number | null;
 }
 
-const STEPS: Record<ChartRange, { count: number; stepMs: number }> = {
+export const STEPS: Record<ChartRange, { count: number; stepMs: number }> = {
   "1h": { count: 60, stepMs: 60_000 },
   "24h": { count: 96, stepMs: 15 * 60_000 },
   "7d": { count: 168, stepMs: 60 * 60_000 },
@@ -54,8 +55,8 @@ export const CHART_SIGNALS: Signal[] = ["requests", "errors", "latency", "satura
 // One accent per metric, so the four charts and their tiles read apart at a glance.
 export const ACCENT: Record<Signal, `--${string}`> = {
   requests: "--color-chart-series-1",
-  errors: "--color-chart-series-8",
-  latency: "--color-chart-series-3",
+  errors: "--color-chart-series-5",
+  latency: "--color-chart-series-9",
   saturation: "--color-chart-series-5",
   logPatterns: "--color-chart-series-7",
   dependencies: "--color-chart-series-9",
@@ -351,6 +352,7 @@ export const formatValue = ({ unit, max, rate }: MetricDef, value: number) => {
   if (unit === "ms") return value >= 1000 ? `${(value / 1000).toFixed(1)} s` : `${n(1)} ms`;
   if (unit === "seconds") return `${n(1)} s`;
   if (unit === "perSec") return `${n(value < 10 ? 1 : 0)} ${rate ?? "/s"}`;
-  if (unit === "perMin") return `${n(1)}/min`;
+  // A quiet service's errors or an alert's threshold sit well under 1/min, which one decimal would show as 0.
+  if (unit === "perMin") return `${n(value > 0 && value < 0.1 ? 3 : value < 1 ? 2 : 1)}/min`;
   return max ? `${n(0)} / ${max}` : n(0);
 };

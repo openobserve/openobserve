@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, nextTick, computed } from "vue";
+import { ref, nextTick, computed } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import AiPageShell from "@/enterprise/components/AIObservability/AiPageShell.vue";
 import LLMInsightsDashboard from "@/plugins/traces/LLMInsightsDashboard.vue";
@@ -50,17 +50,13 @@ defineOptions({ name: "AILLMInsightsPage" });
 
 const { t } = useI18nTyped();
 
-// Shared across LLM Insights, LLM Sessions, and Quality — picking a window
-// on any of the three lands on the other two (singleton ref + localStorage
-// persistence). See useAiDateRange.ts for the contract. LLM Insights syncs its
-// date to the URL (urlSync:true) so deep-/share-links reproduce the exact view.
+// Shared with LLM Sessions and Quality; LLM Insights also syncs it to the URL for share links.
 const {
   dateState,
   timeRange,
   applyRelative,
   onDateChange: onDateStateChange,
   writeToUrl,
-  mountResolve,
   DEFAULT_RELATIVE,
 } = useAiDateController();
 
@@ -119,10 +115,4 @@ async function onDateChange(value: any) {
     userPicked,
   );
 }
-
-onMounted(() => {
-  // Precedence: URL > shared state (cross-page persisted) > default relative.
-  // The shared state is already loaded from localStorage by the composable.
-  mountResolve();
-});
 </script>

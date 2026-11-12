@@ -354,7 +354,9 @@ describe("FleetCollectors", () => {
   it("shows the skeleton while the list is loading", async () => {
     vi.mocked(fleet.listCollectors).mockReturnValue(new Promise(() => {}) as any);
     wrapper = await mountList();
-    expect(wrapper.find('[data-test="o2-table-skeleton-body"]').exists()).toBe(true);
+    await vi.waitFor(() =>
+      expect(wrapper.find('[data-test="o2-table-skeleton-body"]').exists()).toBe(true),
+    );
   });
 
   it("shows the error state when the list fails to load", async () => {

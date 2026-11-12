@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import type { AxiosRequestConfig } from "axios";
 import http from "./http";
 import analytics from "./product_analytics";
 import type {
@@ -73,6 +74,7 @@ const alerts = {
     query?: string,
     alert_type?: string,
     include_dependencies?: boolean,
+    options?: { silentForbidden?: boolean },
   ) => {
     let url = `/api/v2/${org_identifier}/alerts?sort_by=${sort_by}&desc=${desc}&name=${name}`;
     if (folder_id) {
@@ -89,7 +91,7 @@ const alerts = {
     if (include_dependencies) {
       url += `&include_dependencies=true`;
     }
-    return http().get(url);
+    return options ? http().get(url, options) : http().get(url);
   },
   create: (org_identifier: string, stream_name: string, stream_type: string, data: any) => {
     return http()
@@ -143,17 +145,20 @@ const alerts = {
     )}/preview?type=${stream_type}`;
     return http().get(url);
   },
-  create_by_alert_id: (org_identifier: string, data: any, folder_id?: any) => {
+  create_by_alert_id: (
+    org_identifier: string,
+    data: any,
+    folder_id?: any,
+    options?: AxiosRequestConfig,
+  ) => {
     let url = `/api/v2/${org_identifier}/alerts`;
     if (folder_id) {
       url += `?folder=${folder_id}`;
     }
-    return http()
-      .post(url, data)
-      .then((res) => {
-        analytics.track("alert_created");
-        return res;
-      });
+    return (options ? http().post(url, data, options) : http().post(url, data)).then((res) => {
+      analytics.track("alert_created");
+      return res;
+    });
   },
   update_by_alert_id: (org_identifier: string, data: any, folder_id?: any) => {
     let url = `/api/v2/${org_identifier}/alerts/${data.id}`;
@@ -176,17 +181,20 @@ const alerts = {
         return res;
       });
   },
-  delete_by_alert_id: (org_identifier: string, alert_id: string, folder_id?: any) => {
+  delete_by_alert_id: (
+    org_identifier: string,
+    alert_id: string,
+    folder_id?: any,
+    options?: { silentForbidden?: boolean },
+  ) => {
     let url = `/api/v2/${org_identifier}/alerts/${alert_id}`;
     if (folder_id) {
       url += `?folder=${folder_id}`;
     }
-    return http()
-      .delete(url)
-      .then((res) => {
-        analytics.track("alert_deleted", { count: 1 });
-        return res;
-      });
+    return (options ? http().delete(url, options) : http().delete(url)).then((res) => {
+      analytics.track("alert_deleted", { count: 1 });
+      return res;
+    });
   },
   toggle_state_by_alert_id: (
     org_identifier: string,
@@ -249,7 +257,12 @@ const alerts = {
       `/api/v2/${org_identifier}/alerts?slo_id=${encodeURIComponent(slo_id)}&alert_type=slo`,
     );
   },
-  get_by_alert_id: (org_identifier: string, alert_id: string, folder_id?: any) => {
+  get_by_alert_id: (
+    org_identifier: string,
+    alert_id: string,
+    folder_id?: any,
+    options?: { silentForbidden?: boolean },
+  ) => {
     // A teardown-time watcher can reach here with no id; that must not become
     // a GET /alerts/undefined on the wire.
     if (!alert_id) return Promise.reject(new Error("alert_id is required"));
@@ -257,7 +270,7 @@ const alerts = {
     if (folder_id) {
       url += `?folder=${folder_id}`;
     }
-    return http().get(url);
+    return options ? http().get(url, options) : http().get(url);
   },
   validateComposite: (
     org_identifier: string,
@@ -299,6 +312,9 @@ const alerts = {
     const params = new URLSearchParams();
     if (query.anomaly_id) params.append("anomaly_id", query.anomaly_id);
     if (query.alert_id) params.append("alert_id", query.alert_id);
+    if (query.alert_ids) params.append("alert_ids", query.alert_ids);
+    if (query.outcome) params.append("outcome", query.outcome);
+    if (query.siem) params.append("siem", "true");
     if (query.downtime_id) params.append("downtime_id", query.downtime_id);
     if (query.status) params.append("status", query.status);
     if (query.start_time) params.append("start_time", query.start_time);
@@ -308,6 +324,26 @@ const alerts = {
     if (query.sort_by) params.append("sort_by", query.sort_by);
     if (query.sort_order) params.append("sort_order", query.sort_order);
     return http().get(`/api/v2/${org_identifier}/alerts/history?${params}`);
+  },
+  /** Evaluation counts per time bucket, alert and outcome (`interval` in seconds). */
+  getHistorySummary: (
+    org_identifier: string,
+    query: {
+      start_time: number;
+      end_time: number;
+      interval?: number;
+      alert_ids?: string;
+      siem?: boolean;
+    },
+  ) => {
+    const params = new URLSearchParams({
+      start_time: String(query.start_time),
+      end_time: String(query.end_time),
+    });
+    if (query.interval) params.append("interval", String(query.interval));
+    if (query.alert_ids) params.append("alert_ids", query.alert_ids);
+    if (query.siem) params.append("siem", "true");
+    return http().get(`/api/v2/${org_identifier}/alerts/history/summary?${params}`);
   },
   // Semantic field groups management
   getSemanticGroups: (org_identifier: string) => {

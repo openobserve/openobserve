@@ -11,6 +11,15 @@ import {
   isNumericYField,
 } from "@/utils/dashboard/heatmapYAxis";
 
+// Builder y functions that stay per-row, so a raw-value chart can filter on them in WHERE.
+const ROW_SCALAR_FUNCTIONS = new Set<string | null>([null, "cast", "try_cast"]);
+
+interface BuilderYField {
+  type?: string;
+  functionName?: string | null;
+  isDerived?: boolean;
+}
+
 export function buildSQLQueryFromInput(fields: any, defaultStream: any): string {
   // Handle undefined or null fields
   if (!fields) {
@@ -408,7 +417,8 @@ export function buildSQLChartQuery(config: {
 
   // WHERE clause
   const whereClause = buildWhereClause(queryData.fields.filter.conditions, dashboardPanelData);
-  query += yBucket?.where ? andWhere(whereClause, yBucket.where) : whereClause;
+  const extraWhere = yBucket?.where || rawValuePresentSql(queryData, chartType, streamAlias);
+  query += extraWhere ? andWhere(whereClause, extraWhere) : whereClause;
 
   // GROUP BY clause - chart-type-specific logic
   // Only include fields that have valid expressions (are in validFieldAliases)
@@ -561,6 +571,29 @@ function heatmapYBucketPlan(
   };
 }
 
+/** A raw-value chart keeps only rows with a y value, so its row cap is not spent on rows it cannot plot. */
+function rawValuePresentSql(
+  queryData: { fields: { y: BuilderYField[] } },
+  chartType: string,
+  streamAlias: string,
+): string {
+  if (!isRawValueChart(chartType)) return "";
+  const fields = queryData.fields.y.filter((field) => !field?.isDerived);
+  // An aggregate cannot go in WHERE, and skipping one y field would drop the rows only it has.
+  if (
+    fields.some(
+      (field) => field?.type === "raw" || !ROW_SCALAR_FUNCTIONS.has(field?.functionName ?? null),
+    )
+  ) {
+    return "";
+  }
+  const present = fields
+    .map((field) => buildSQLQueryFromInput(field, streamAlias))
+    .filter(Boolean)
+    .map((expr: string) => `${/^[\w."]+$/.test(expr) ? expr : `(${expr})`} IS NOT NULL`);
+  return present.length > 1 ? `(${present.join(" OR ")})` : (present[0] ?? "");
+}
+
 /** `whereClause` (" WHERE ..." or "") with `condition` ANDed on, keeping the user's OR groups intact. */
 function andWhere(whereClause: string, condition: string): string {
   const existing = whereClause.replace(/^ WHERE /, "").trim();
@@ -639,7 +672,7 @@ const formatValue = (
     tempValue = value.substring(1, value.length - 1);
   }
   // escape any single quotes in the value
-  tempValue = escapeSingleQuotes(tempValue);
+  tempValue = escapeSingleQuotes(String(tempValue));
   // Quote string values, leave numeric values unquoted
   if (columnType === "Utf8") {
     tempValue = `'${tempValue}'`;
@@ -719,6 +752,14 @@ export const buildCondition = (condition: any, dashboardPanelData: any) => {
           selectFilter += `IS NOT NULL`;
           break;
       }
+    } else if (condition.operator === "Is Empty" || condition.operator === "Is Not Empty") {
+      const fieldRef = streamAlias
+        ? `${streamAlias}.${condition.column.field}`
+        : condition.column.field;
+      selectFilter +=
+        condition.operator === "Is Empty"
+          ? `(${fieldRef} IS NULL OR ${fieldRef} = '')`
+          : `(${fieldRef} IS NOT NULL AND ${fieldRef} != '')`;
     } else if (condition.operator === "IN") {
       const fieldRef = streamAlias
         ? `${streamAlias}.${condition.column.field}`
@@ -809,6 +850,18 @@ export const buildCondition = (condition: any, dashboardPanelData: any) => {
   return "";
 };
 
+// A blank condition is dropped with its connector, so each kept item keeps its own AND/OR.
+const buildConditionList = (
+  conditions: any[],
+  dashboardPanelData: any,
+): { sql: string; logicalOperator: string }[] =>
+  conditions
+    .map((condition: any) => ({
+      sql: buildCondition(condition, dashboardPanelData),
+      logicalOperator: condition?.logicalOperator || "AND",
+    }))
+    .filter(({ sql }) => Boolean(sql));
+
 /**
  * Build a WHERE clause from the given filter data.
  * @param {array} filterData - an array of filter objects, each with properties
@@ -827,15 +880,8 @@ const buildWhereClause = (filterData: any, dashboardPanelData: any) => {
  * and can leave a trailing AND.
  */
 const joinConditions = (conditions: any[], dashboardPanelData: any): string =>
-  (conditions ?? [])
-    .map((condition: any) => ({
-      sql: buildCondition(condition, dashboardPanelData),
-      logicalOperator: condition?.logicalOperator || "AND",
-    }))
-    .filter((part: any) => part.sql)
-    .map((part: any, index: number) =>
-      index === 0 ? part.sql : `${part.logicalOperator} ${part.sql}`,
-    )
+  buildConditionList(conditions ?? [], dashboardPanelData)
+    .map((part, index) => (index === 0 ? part.sql : `${part.logicalOperator} ${part.sql}`))
     .join(" ");
 
 export const mapChart = (dashboardPanelData: any) => {

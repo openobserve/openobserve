@@ -286,6 +286,21 @@ describe("IncidentAlertTriggersTable", () => {
       expect(wrapper.find('[data-test="trigger-source-badge"]').exists()).toBe(false);
     });
 
+    it("an AutoObserve trigger names its source", () => {
+      wrapper = mountComp({
+        triggers: [
+          makeAlert({ alert_kind: "autoobserve", created_at: 1 }),
+          makeAlert({ alert_kind: "internal", created_at: 2 }),
+          makeAlert({ alert_kind: "external", detected_source: "grafana", created_at: 3 }),
+        ],
+      });
+      const cells = wrapper.findAll("tbody tr").map((row) => row.findAll("td")[1]);
+      expect(cells[0].find('[data-test="trigger-source-autoobserve"]').text()).toBe("AutoObserve");
+      expect(cells[1].text()).toBe("—");
+      expect(cells[2].find('[data-test="trigger-source-badge"]').text()).toBe("grafana");
+      expect(cells[0].find('[data-test="trigger-source-badge"]').exists()).toBe(false);
+    });
+
     it("renders a label chip per key/value pair", () => {
       wrapper = mountComp({
         triggers: [

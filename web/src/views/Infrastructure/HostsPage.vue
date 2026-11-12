@@ -24,6 +24,7 @@ import { computed, nextTick, onMounted, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import { raw, useI18nTyped } from "@/types/i18n";
+import analytics from "@/services/product_analytics";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef, OTableSortParams } from "@/lib/core/Table/OTable.types";
@@ -143,6 +144,12 @@ const onDateChange = (date: {
   };
   // DateTime replays on mount with userChangedValue:false — "do not fetch" (DateTime.vue contract).
   if (date.userChangedValue === false && !reAnchoring) return;
+  if (!reAnchoring) {
+    analytics.track("infra_time_range_changed", {
+      page: "hosts",
+      type: date.valueType === "absolute" ? "absolute" : "relative",
+    });
+  }
   // The picker re-emitted, so the window is current whether or not we fetch.
   if (reAnchoring) reAnchorFetched = true;
   if (hostsState.value !== "detected") return;
@@ -275,6 +282,9 @@ const onViewChange = (name: string | number) => {
   const { view: _view, lowTraffic: _lowTraffic, ...rest } = route.query;
   // A history entry per tab, so Back returns to the other one.
   router.push({ query: name === "dependencies" ? { ...rest, view: "dependencies" } : rest });
+  analytics.track("infra_hosts_view_changed", {
+    view: name === "dependencies" ? "dependencies" : "table",
+  });
 };
 
 // The map's low-traffic switch, kept in the URL like the view.
@@ -303,6 +313,7 @@ const drawerLastSeenUs = computed(
 );
 const openDrawer = (host: string) => {
   router.replace({ query: { ...route.query, host } });
+  analytics.track("infra_host_detail_opened", { view: view.value });
 };
 const closeDrawer = () => {
   const q: Record<string, any> = { ...route.query };
@@ -312,11 +323,13 @@ const closeDrawer = () => {
 
 // ── Facets ───────────────────────────────────────────────────────────────────
 const toggleStatus = (value: string) => {
+  analytics.track("infra_hosts_filter_applied", { facet: "status" });
   statusFilter.value = statusFilter.value.includes(value)
     ? statusFilter.value.filter((v) => v !== value)
     : [...statusFilter.value, value];
 };
 const toggleOs = (value: string) => {
+  analytics.track("infra_hosts_filter_applied", { facet: "os" });
   osFilter.value = osFilter.value.includes(value)
     ? osFilter.value.filter((v) => v !== value)
     : [...osFilter.value, value];

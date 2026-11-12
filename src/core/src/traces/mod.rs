@@ -244,6 +244,12 @@ impl<'a> SpanServiceScope<'a> {
 }
 
 fn normalize_llm_field_types(record_val: &mut Map<String, json::Value>) {
+    if let Some(value) = record_val.get_mut("gen_ai_prompt_version")
+        && let Some(num) = value.as_i64()
+    {
+        *value = json::Value::String(num.to_string());
+    }
+
     for &field in GEN_AI_INT64_FIELDS.iter() {
         if let Some(value) = record_val.get_mut(field)
             && value.as_i64().is_none()
@@ -1117,30 +1123,18 @@ pub async fn handle_otlp_request(
     // batch process records through pipeline
     if !executable_pipelines.is_empty() {
         let records = stream_pipeline_inputs.clone();
-        let mut evaluation_tasks = tokio::task::JoinSet::new();
+        let evaluation_tasks = crate::ingestion::spawn_llm_evaluations(
+            org_id,
+            &traces_stream_name,
+            &executable_pipelines,
+            &records,
+            in_stream_name,
+        );
 
-        for exec_pl in &executable_pipelines {
-            if exec_pl.kind == config::meta::pipeline::PipelineKind::Evaluation
-                && exec_pl.contains_llm_evaluation_node()
-            {
-                let exec_pl = exec_pl.clone();
-                let org_id = org_id.to_string();
-                let records = records.clone();
-                let in_stream_name = in_stream_name.map(String::from);
-                let traces_stream_name = traces_stream_name.clone();
-                evaluation_tasks.spawn(async move {
-                    if let Err(e) = exec_pl
-                        .process_batch(&org_id, records, in_stream_name)
-                        .await
-                    {
-                        log::error!(
-                            "[TRACES:OTLP] evaluation pipeline({org_id}/{traces_stream_name}) batch execution error: {e}."
-                        );
-                    }
-                });
-                continue;
-            }
-
+        for exec_pl in executable_pipelines
+            .iter()
+            .filter(|p| !crate::ingestion::is_llm_evaluation(p))
+        {
             let records_count = records.len();
             match exec_pl
                 .process_batch(org_id, records.clone(), in_stream_name.map(String::from))
@@ -1230,29 +1224,14 @@ pub async fn handle_otlp_request(
             }
         } // for each pipeline
 
-        while let Some(result) = evaluation_tasks.join_next().await {
-            if let Err(e) = result {
-                log::error!(
-                    "[TRACES:OTLP] evaluation pipeline task({org_id}/{traces_stream_name}) failed: {e}.",
-                );
-            }
-        }
+        crate::ingestion::join_llm_evaluations(evaluation_tasks, org_id, &traces_stream_name).await;
 
-        // When only evaluation pipelines exist for this stream (no user pipeline
-        // is responsible for writing to the source stream), preserve original
-        // records by writing them back to the source stream.
-        let has_user_pipeline = executable_pipelines
-            .iter()
-            .any(|p| p.kind == config::meta::pipeline::PipelineKind::User);
-        let has_evaluation_pipeline = executable_pipelines
-            .iter()
-            .any(|p| p.kind == config::meta::pipeline::PipelineKind::Evaluation);
-        log::debug!(
-            "[TRACES:OTLP] source preservation check org_id={org_id}, stream={traces_stream_name}, pipelines={}, has_user_pipeline={has_user_pipeline}, has_evaluation_pipeline={has_evaluation_pipeline}, source_buffered={}",
-            executable_pipelines.len(),
-            json_data_by_stream.contains_key(&traces_stream_name)
-        );
-        if !has_user_pipeline && !json_data_by_stream.contains_key(&traces_stream_name) {
+        if crate::ingestion::should_preserve_source(
+            org_id,
+            &traces_stream_name,
+            &executable_pipelines,
+            json_data_by_stream.contains_key(&traces_stream_name),
+        ) {
             for value in &stream_pipeline_inputs {
                 let _ = finalize_and_buffer_trace_span(
                     value.clone(),
@@ -1944,9 +1923,11 @@ async fn write_traces(
     .await
     .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e.to_string()))?;
     // the check that turned the UDS on projected the schema, which would drop unpacked columns
-    if let Some(fields) =
-        crate::ingestion::newly_enabled_uds_fields(has_uds, traces_schema_map.get(stream_name))
-    {
+    if let Some(fields) = crate::ingestion::newly_enabled_uds_fields(
+        StreamType::Traces,
+        has_uds,
+        traces_schema_map.get(stream_name),
+    ) {
         repack_for_new_uds(&mut json_data, &fields);
         check_batch_schema(
             org_id,
@@ -2293,6 +2274,7 @@ mod tests {
             "gen_ai_usage_cost_cache_read_savings": "0.18",
             "gen_ai_usage_cost_net_cache_impact": "0.11",
             "gen_ai_usage_cost": false,
+            "gen_ai_prompt_version": 3,
             "unrelated": "value"
         })
         .as_object()
@@ -2382,6 +2364,10 @@ mod tests {
         assert_eq!(
             record.get("gen_ai_usage_cost").and_then(|v| v.as_f64()),
             Some(0.0)
+        );
+        assert_eq!(
+            record.get("gen_ai_prompt_version").and_then(|v| v.as_str()),
+            Some("3")
         );
         assert_eq!(
             record.get("unrelated").and_then(|v| v.as_str()),

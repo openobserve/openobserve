@@ -18,11 +18,16 @@ import {
   promRulePreviewQuery,
   alertHistoryQuery,
   alertAcksQuery,
+  alertDetailQuery,
   ackAlertMutation,
+  ackAlertsMutation,
+  toggleAlertStateMutation,
+  toggleAnomalyAlertStateMutation,
   unackAlertMutation,
   muteAlertMutation,
   extendAlertMuteMutation,
   cancelAlertMuteMutation,
+  retrainAnomalyMutation,
 } from "./alerts.queries";
 import { alertKeys } from "./alerts.querykeys";
 import { incidentKeys } from "./incidents.querykeys";
@@ -37,8 +42,10 @@ import { downtimeKeys } from "./downtimes.querykeys";
 import { announcementKeys } from "./announcements.querykeys";
 import alerts from "./alerts";
 import search from "./search";
+import analytics from "./product_analytics";
 
 vi.mock("./search", () => ({ default: { metrics_query: vi.fn() } }));
+vi.mock("./product_analytics", () => ({ default: { track: vi.fn() } }));
 
 vi.mock("./alerts", () => ({
   default: {
@@ -130,6 +137,23 @@ describe("promRulePreviewQuery", () => {
   });
 });
 
+describe("alert state toggles", () => {
+  // The cache's error handler skips a mutation with no meta, so the toast needs meta present and not silent.
+  it.each([
+    ["alert", toggleAlertStateMutation],
+    ["anomaly", toggleAnomalyAlertStateMutation],
+  ])("leaves a failed %s toggle to the central mutation toast", (_kind, build) => {
+    const { meta } = build(ORG);
+    expect(meta).toBeDefined();
+    expect(meta?.silentError).toBeUndefined();
+  });
+
+  // The list toasts a failed retrain itself, so a central toast would report it twice.
+  it("keeps a failed retrain out of the central mutation toast", () => {
+    expect(retrainAnomalyMutation(ORG).meta?.silentError).toBe(true);
+  });
+});
+
 describe("ack and mute queries", () => {
   const ACK = {
     group_key: "",
@@ -146,6 +170,16 @@ describe("ack and mute queries", () => {
     expect(options.queryKey.slice(0, alertKeys.all(ORG).length)).toEqual(alertKeys.all(ORG));
     expect(await (options.queryFn as () => Promise<unknown>)()).toEqual([ACK]);
     expect(alerts.listAlertAcks).toHaveBeenCalledWith(ORG, "a1", undefined);
+  });
+
+  it("re-reads an alert once its folder is known, since the folder decides the route check", () => {
+    expect(alertAcksQuery(ORG, "a1", "f1").queryKey).not.toEqual(
+      alertAcksQuery(ORG, "a1").queryKey,
+    );
+    expect(alertDetailQuery(ORG, "a1", "f1").queryKey).not.toEqual(
+      alertDetailQuery(ORG, "a1").queryKey,
+    );
+    expect(alertDetailQuery(ORG, "a1").queryKey).toEqual(alertKeys.detail(ORG, "a1"));
   });
 
   it("returns the server's ack answer and refreshes every alert read", async () => {
@@ -176,6 +210,58 @@ describe("ack and mute queries", () => {
     ]) {
       expect(scopes).toContainEqual(key);
     }
+  });
+
+  it("counts every row of an incident one bulk ack wrote", async () => {
+    const answer = (changed: boolean, id?: string) => ({
+      data: { changed, acks: [], incident: id ? { id, status: "acknowledged" } : undefined },
+    });
+    vi.mocked(alerts.ackAlert)
+      .mockResolvedValueOnce(answer(false, "inc") as any)
+      .mockResolvedValueOnce(answer(true, "inc") as any)
+      .mockResolvedValueOnce(answer(false, "inc") as any)
+      .mockResolvedValueOnce(answer(false, "held-elsewhere") as any)
+      .mockResolvedValueOnce(answer(false) as any);
+    const targets = ["1", "2", "3", "4", "5"].map((alertId) => ({ alertId, body: {} }));
+
+    const result = await (ackAlertsMutation(ORG).mutationFn as any)(targets);
+
+    expect(result).toEqual({ acked: 3, failures: [] });
+  });
+
+  it("reports a rejected bulk ack as a failure with its reason", async () => {
+    const reason = { response: { status: 409, data: { code: "firing_changed" } } };
+    vi.mocked(alerts.ackAlert)
+      .mockResolvedValueOnce({ data: { changed: true, acks: [] } } as any)
+      .mockRejectedValueOnce(reason);
+    const targets = ["1", "2"].map((alertId) => ({ alertId, body: {} }));
+
+    const result = await (ackAlertsMutation(ORG).mutationFn as any)(targets);
+
+    expect(result).toEqual({ acked: 1, failures: [{ alertId: "2", error: reason }] });
+  });
+
+  it("tracks an ack only when it changed something", () => {
+    vi.mocked(analytics.track).mockClear();
+    const single = ackAlertMutation(ORG).onSuccess as (answer: unknown) => void;
+    single({ changed: false, acks: [] });
+    expect(analytics.track).not.toHaveBeenCalled();
+    single({ changed: true, acks: [] });
+    expect(analytics.track).toHaveBeenCalledWith("alert_acknowledged", { count: 1 });
+
+    vi.mocked(analytics.track).mockClear();
+    const bulk = ackAlertsMutation(ORG).onSuccess as (result: unknown) => void;
+    bulk({ acked: 0, failures: [] });
+    expect(analytics.track).not.toHaveBeenCalled();
+    bulk({ acked: 3, failures: [] });
+    expect(analytics.track).toHaveBeenCalledWith("alert_acknowledged", { count: 3 });
+  });
+
+  it("refreshes the Firing read after a pause or resume", () => {
+    expect(toggleAlertStateMutation(ORG).meta?.invalidates).toContainEqual(alertKeys.firing(ORG));
+    expect(toggleAnomalyAlertStateMutation(ORG).meta?.invalidates).toContainEqual(
+      alertKeys.firing(ORG),
+    );
   });
 
   it("refreshes alerts and downtimes after a mute, and the banner after extend or cancel", async () => {

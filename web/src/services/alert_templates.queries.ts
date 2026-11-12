@@ -18,12 +18,15 @@ import template from "./alert_templates";
 import { templateKeys } from "./alert_templates.querykeys";
 import { NORMAL_STALE_TIME } from "@/composables/query/cachePolicy";
 
-export const templatesQuery = (org: string) =>
+export const templatesQuery = (org: string, includeUsage = false) =>
   queryOptions({
-    queryKey: templateKeys.list(org),
-    queryFn: async (): Promise<any[]> => (await template.list({ org_identifier: org })).data ?? [],
-    // A catalogue read by every alert form, not alert state — so the normal tier, not the live one.
-    staleTime: NORMAL_STALE_TIME,
+    queryKey: includeUsage ? templateKeys.listWithUsage(org) : templateKeys.list(org),
+    queryFn: async (): Promise<any[]> =>
+      (await template.list({ org_identifier: org, ...(includeUsage && { include_usage: true }) }))
+        .data ?? [],
+    // Usage counts change on saves that never invalidate this key, so the graph re-reads them;
+    // the plain catalogue keeps the normal tier.
+    staleTime: includeUsage ? 0 : NORMAL_STALE_TIME,
   });
 
 // ── Writes ──────────────────────────────────────────────────────────────────

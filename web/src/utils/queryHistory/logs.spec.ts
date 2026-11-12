@@ -95,6 +95,14 @@ describe("which Logs runs record", () => {
   it("maps a settled run: failure, cancel, partial", () => {
     expect(logsRunResult({ partial: false, error: null })).toEqual({ status: "ok" });
     expect(logsRunResult({ partial: true, error: null })).toEqual({ status: "ok", warning: "" });
+    expect(logsRunResult({ partial: false, noResults: true, error: null })).toEqual({
+      status: "ok",
+      noResults: true,
+    });
+    expect(logsRunResult({ partial: true, noResults: true, error: null })).toEqual({
+      status: "ok",
+      warning: "",
+    });
     expect(logsRunResult({ partial: false, error: { code: 20009 } })).toBeNull();
     expect(logsRunResult({ partial: false, error: { code: 20001, message: "bad" } })).toEqual({
       status: "error",

@@ -65,7 +65,6 @@ function mountMainLayout() {
         WebinarBanner: StubDiv,
         AnnouncementBanner: StubDiv,
         ShortcutCheatsheet: StubDiv,
-        GetStarted: StubDiv,
         CommunitySlackInvite: StubDiv,
         ThemeSwitcher: StubDiv,
         PredefinedThemes: StubDiv,
@@ -124,6 +123,20 @@ describe("MainLayout — sendToAiChat", () => {
         autoSend: false,
         context: { currentPage: "incidents", org_id: "default" },
         id: expect.any(Number),
+      });
+    });
+
+    it("passes a prefilled request through with the chip", async () => {
+      await open(true);
+
+      send({ ...HANDOFF, prompt: "What should I check first?" });
+      await flushPromises();
+
+      expect(seenPayloads[0].payload).toMatchObject({
+        text: HANDOFF.query,
+        chipName: HANDOFF.chipName,
+        prompt: "What should I check first?",
+        autoSend: false,
       });
     });
 

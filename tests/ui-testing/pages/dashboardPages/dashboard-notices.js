@@ -17,6 +17,7 @@ export default class DashboardNotices {
     // Static panel-header selectors.
     this.noticesContainer = page.locator('[data-test="panel-notice-chips"]');
     this.lastRefreshed = page.locator('[data-test="panel-last-refreshed-at"]');
+    this.lastRefreshedIcon = page.locator('[data-test="panel-last-refreshed-icon"]');
     this.errorIcon = page.locator('[data-test="panel-error-data"]');
     // Only the Panel Editor wires this; the dashboard view never passes the prop.
     this.xAliasWarning = page.locator('[data-test="panel-x-alias-inconsistency-warning"]');

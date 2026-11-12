@@ -8,6 +8,7 @@ const logsInit = vi.hoisted(() => vi.fn());
 const setInitialVersion = vi.hoisted(() => vi.fn());
 const bindAccess = vi.hoisted(() => vi.fn());
 const appMount = vi.hoisted(() => vi.fn());
+const reoInit = vi.hoisted(() => vi.fn());
 
 vi.mock("@/services/config.queries", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/services/config.queries")>()),
@@ -33,7 +34,7 @@ vi.mock("./locales", () => ({
 vi.mock("./aws-exports", () => ({ default: {} }));
 vi.mock("@openobserve/browser-rum", () => ({ openobserveRum: { init: rumInit } }));
 vi.mock("@openobserve/browser-logs", () => ({ openobserveLogs: { init: logsInit } }));
-vi.mock("./services/reodotdev_analytics", () => ({ useReo: () => ({ reoInit: vi.fn() }) }));
+vi.mock("./services/reodotdev_analytics", () => ({ useReo: () => ({ reoInit }) }));
 vi.mock("./composables/contextProviders", () => ({
   contextRegistry: { register: vi.fn() },
   createDefaultContextProvider: vi.fn(),
@@ -87,6 +88,16 @@ describe("main.ts access store", () => {
     expect(boundStore).toBe(store);
     await vi.waitFor(() => expect(appMount).toHaveBeenCalled());
     expect(bindAccess.mock.invocationCallOrder[0]).toBeLessThan(
+      appMount.mock.invocationCallOrder[0],
+    );
+  });
+});
+
+describe("main.ts Reo", () => {
+  it("starts the Reo script only after the app has mounted", async () => {
+    await vi.waitFor(() => expect(reoInit).toHaveBeenCalledTimes(1));
+    expect(appMount).toHaveBeenCalled();
+    expect(reoInit.mock.invocationCallOrder[0]).toBeGreaterThan(
       appMount.mock.invocationCallOrder[0],
     );
   });

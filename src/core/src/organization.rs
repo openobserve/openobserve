@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use common::meta::stream::Stream;
 use config::{
     DEFAULT_ORG, META_ORG_ID, ider,
     meta::{
@@ -60,6 +61,7 @@ use crate::{
             TriggerStatusSearchResult,
         },
     },
+    ingestion::feature_writer::{FeatureWriter, SYSTEM_CREATOR},
     ingestion_tokens, self_reporting,
     users::add_admin_to_org,
 };
@@ -119,8 +121,7 @@ async fn create_and_assign_sre_readonly_role(
     .await
 }
 
-pub async fn get_summary(org_id: &str) -> OrgSummary {
-    let streams = get_streams(org_id, None, false, None).await;
+fn summarize_streams(org_id: &str, streams: &[Stream]) -> (StreamSummary, bool) {
     let mut stream_summary = StreamSummary::default();
     let mut has_trigger_stream = false;
     for stream in streams.iter() {
@@ -131,6 +132,9 @@ pub async fn get_summary(org_id: &str) -> OrgSummary {
             && !stream.stream_type.eq(&StreamType::Metadata)
         {
             stream_summary.num_streams += 1;
+            if usage::is_user_data_stream(org_id, &stream.name, stream.stream_type) {
+                stream_summary.num_user_streams += 1;
+            }
             stream_summary.total_records += stream.stats.doc_num;
             stream_summary.total_storage_size += stream.stats.storage_size;
             stream_summary.total_compressed_size += stream.stats.compressed_size;
@@ -138,6 +142,12 @@ pub async fn get_summary(org_id: &str) -> OrgSummary {
             stream_summary.total_mindex_size += stream.stats.mindex_size;
         }
     }
+    (stream_summary, has_trigger_stream)
+}
+
+pub async fn get_summary(org_id: &str) -> OrgSummary {
+    let streams = get_streams(org_id, None, false, None).await;
+    let (stream_summary, has_trigger_stream) = summarize_streams(org_id, &streams);
 
     let trigger_status_results = if !has_trigger_stream {
         vec![]
@@ -366,7 +376,7 @@ async fn update_passcode_inner(
                 .await
                 .is_ok_and(|r| r.is_some());
         if should_use_org_ingestion_token(is_service_account, default_org_token_exists) {
-            let new_token = db::org_ingestion_tokens::rotate_token(local_org_id, "default").await?;
+            let new_token = rotate_org_passcode(local_org_id).await?;
             return Ok(IngestionTokensContainer::Passcode(IngestionPasscode {
                 user: db_user.email,
                 passcode: new_token,
@@ -389,6 +399,59 @@ async fn update_passcode_inner(
         })
     };
     Ok(ret)
+}
+
+/// Rotates the org's `default` token and, with it, the tokens its feature writers hold.
+async fn rotate_org_passcode(org_id: &str) -> Result<String, anyhow::Error> {
+    use infra::table::org_ingestion_tokens::get_by_name_rw;
+
+    let mut reads = Vec::new();
+    for writer in FeatureWriter::ALL {
+        // From the primary: a writer token made moments ago may not have reached a replica.
+        let row = get_by_name_rw(org_id, writer.token_name()).await;
+        reads.push((
+            writer,
+            row.map(|r| r.map(|r| r.created_by)).map_err(Into::into),
+        ));
+    }
+    let writers = system_writers(org_id, reads)?;
+    rotate_writers_then_default(org_id, &writers).await
+}
+
+/// The writers whose token the system made, from each writer's `created_by` read.
+fn system_writers(
+    org_id: &str,
+    reads: Vec<(FeatureWriter, Result<Option<String>, anyhow::Error>)>,
+) -> Result<Vec<FeatureWriter>, anyhow::Error> {
+    let mut writers = Vec::new();
+    for (writer, read) in reads {
+        match read {
+            Ok(created_by) if created_by.as_deref() == Some(SYSTEM_CREATOR) => writers.push(writer),
+            Ok(_) => {}
+            Err(e) => {
+                let name = writer.token_name();
+                log::error!("[ORG] could not read {org_id}'s {name} ingestion token: {e}");
+                anyhow::bail!(writer.rotation_failed_message());
+            }
+        }
+    }
+    Ok(writers)
+}
+
+/// Rotates writer tokens before `default`, so a failed one leaves `default` unrotated.
+async fn rotate_writers_then_default(
+    org_id: &str,
+    writers: &[FeatureWriter],
+) -> Result<String, anyhow::Error> {
+    // A writer looks its token up by name before each pass, so it picks the new value up.
+    for writer in writers {
+        let name = writer.token_name();
+        if let Err(e) = db::org_ingestion_tokens::rotate_token(org_id, name).await {
+            log::error!("[ORG] rotating {org_id}'s {name} ingestion token failed: {e}");
+            anyhow::bail!(writer.rotation_failed_message());
+        }
+    }
+    db::org_ingestion_tokens::rotate_token(org_id, "default").await
 }
 
 pub async fn list_all_orgs(limit: Option<i64>) -> Result<Vec<Organization>, anyhow::Error> {
@@ -690,20 +753,6 @@ pub async fn create_org(
                     );
                 }
                 crate::alerts::alert_calibration::ensure_org_config(&org.identifier).await;
-            }
-            // Best-effort — the compiled-in fallback (design §4.4) covers the
-            // race if this fails or the backfill hasn't run yet; never block
-            // org creation on it.
-            if let Err(e) = crate::alerts::notifications::org_default::set_org_default_template(
-                &org.identifier,
-                crate::alerts::notifications::default_template::DEFAULT_CONTENT_TEMPLATE_NAME,
-            )
-            .await
-            {
-                log::warn!(
-                    "Failed to set default_alert_template for org '{}': {e}",
-                    org.identifier
-                );
             }
             #[cfg(feature = "cloud")]
             enqueue_cloud_event(CloudEvent {
@@ -1515,6 +1564,61 @@ mod tests {
     use super::*;
     use crate::{common::meta::user::UserRequest, users};
 
+    fn summary_stream(name: &str, stream_type: StreamType) -> Stream {
+        stream::stream_res(
+            "summary_org",
+            name,
+            stream_type,
+            arrow_schema::Schema::empty(),
+            None,
+        )
+    }
+
+    #[test]
+    fn test_summarize_streams_does_not_count_system_streams_as_user_data() {
+        let streams = [summary_stream(
+            "_o2_alert_calibration_digests",
+            StreamType::Logs,
+        )];
+        let (summary, _) = summarize_streams("summary_org", &streams);
+        assert_eq!(summary.num_streams, 1);
+        assert_eq!(summary.num_user_streams, 0);
+    }
+
+    #[test]
+    fn test_summarize_streams_counts_a_customer_stream_named_like_a_meta_stream() {
+        let streams = [summary_stream(usage::ERROR_STREAM, StreamType::Logs)];
+        let (summary, _) = summarize_streams("acme", &streams);
+        assert_eq!(summary.num_user_streams, 1);
+        let (summary, _) = summarize_streams(META_ORG_ID, &streams);
+        assert_eq!(summary.num_user_streams, 0);
+    }
+
+    #[test]
+    fn test_summarize_streams_does_not_count_slo_slices_as_user_data() {
+        let streams = [summary_stream(
+            config::meta::slo::stream::SLO_SLICES_STREAM,
+            StreamType::Logs,
+        )];
+        let (summary, _) = summarize_streams("acme", &streams);
+        assert_eq!(summary.num_streams, 1);
+        assert_eq!(summary.num_user_streams, 0);
+    }
+
+    #[test]
+    fn test_summarize_streams_counts_user_streams() {
+        let streams = [
+            summary_stream("_o2_alert_calibration_digests", StreamType::Logs),
+            summary_stream(usage::TRIGGERS_STREAM, StreamType::Logs),
+            summary_stream("default", StreamType::Logs),
+            summary_stream("cpu_usage", StreamType::Metrics),
+        ];
+        let (summary, has_trigger_stream) = summarize_streams("summary_org", &streams);
+        assert_eq!(summary.num_streams, 4);
+        assert_eq!(summary.num_user_streams, 2);
+        assert!(has_trigger_stream);
+    }
+
     // TODO: move these tests to integration tests,
     // the below test case will fail as is_root_user()
     // will not work as watchers are not initialized
@@ -1575,6 +1679,118 @@ mod tests {
 
         let resp = update_passcode(Some(org_id), user_id).await.unwrap();
         assert_ne!(resp.passcode, passcode);
+    }
+
+    #[tokio::test]
+    async fn rotating_the_org_passcode_rotates_its_writer_tokens() {
+        use crate::ingestion::feature_writer::{self, FeatureWriter, tests::meta_store};
+        meta_store().await;
+        let org = format!("demo-org-rotate-{}", config::utils::time::now_micros());
+        crate::ingestion_tokens::create_default_token(&org, "system")
+            .await
+            .unwrap();
+        feature_writer::token(FeatureWriter::AlertCalibration, &org)
+            .await
+            .unwrap();
+        crate::ingestion_tokens::create_token(&org, "ci-collector", "", "admin@demo-org", false)
+            .await
+            .unwrap();
+        let values = || async {
+            let mut rows = db::org_ingestion_tokens::list_by_org(&org).await.unwrap();
+            rows.sort_by(|a, b| a.name.cmp(&b.name));
+            rows.into_iter()
+                .map(|r| (r.name, r.token))
+                .collect::<Vec<_>>()
+        };
+        let before = values().await;
+        let passcode = rotate_org_passcode(&org).await.unwrap();
+        let after = values().await;
+        let changed: Vec<&str> = before
+            .iter()
+            .zip(&after)
+            .filter(|(b, a)| b.1 != a.1)
+            .map(|(b, _)| b.0.as_str())
+            .collect();
+        assert_eq!(changed, ["_o2_alert_calibration", "default"]);
+        assert!(after.contains(&("default".to_string(), passcode)));
+    }
+
+    fn assert_plain_rotation_failure(err: &anyhow::Error) {
+        let msg = err.to_string();
+        assert_eq!(
+            msg,
+            FeatureWriter::AlertCalibration.rotation_failed_message()
+        );
+        for internal in [
+            "_o2_",
+            "demo-org",
+            "row 42",
+            "connection reset",
+            "not found",
+        ] {
+            assert!(!msg.contains(internal), "{msg}");
+        }
+    }
+
+    #[test]
+    fn a_failed_writer_token_lookup_fails_the_rotation() {
+        let reads = vec![
+            (
+                FeatureWriter::AlertCalibration,
+                Err(anyhow::anyhow!("connection reset reading token row 42")),
+            ),
+            (FeatureWriter::AutoObserve, Ok(None)),
+        ];
+        let err = system_writers("demo-org", reads).unwrap_err();
+        assert_plain_rotation_failure(&err);
+    }
+
+    #[test]
+    fn only_system_made_writer_tokens_are_rotated() {
+        use FeatureWriter::{AlertCalibration, AutoObserve};
+        let cases: [(Option<&str>, Option<&str>, &[FeatureWriter]); 4] = [
+            (
+                Some("system"),
+                Some("system"),
+                &[AlertCalibration, AutoObserve],
+            ),
+            (Some("system"), Some("admin@demo-org"), &[AlertCalibration]),
+            (None, Some("system"), &[AutoObserve]),
+            (Some("admin@demo-org"), None, &[]),
+        ];
+        for (calibration, autoobserve, want) in cases {
+            let read = |c: Option<&str>| Ok(c.map(str::to_string));
+            let reads = vec![
+                (AlertCalibration, read(calibration)),
+                (AutoObserve, read(autoobserve)),
+            ];
+            let got = system_writers("demo-org", reads).unwrap();
+            assert_eq!(got, want, "{calibration:?} {autoobserve:?}");
+        }
+    }
+
+    #[tokio::test]
+    async fn a_failed_writer_token_rotation_fails_the_rotation_and_keeps_default() {
+        use crate::ingestion::feature_writer::tests::meta_store;
+        meta_store().await;
+        let org = format!("demo-org-rotate-fail-{}", config::utils::time::now_micros());
+        crate::ingestion_tokens::create_default_token(&org, "system")
+            .await
+            .unwrap();
+        let default_token = || async {
+            infra::table::org_ingestion_tokens::get_by_name_rw(&org, "default")
+                .await
+                .unwrap()
+                .unwrap()
+                .token
+        };
+        let before = default_token().await;
+        // The org has no `_o2_alert_calibration` row, so the store fails to rotate it.
+        let err = rotate_writers_then_default(&org, &[FeatureWriter::AlertCalibration])
+            .await
+            .unwrap_err();
+        assert_plain_rotation_failure(&err);
+        assert_eq!(default_token().await, before);
     }
 
     #[test]

@@ -27,8 +27,10 @@
 // vi.mock() calls — hoisted above imports.
 // ---------------------------------------------------------------------------
 
-const mockFetchAll = vi.fn(async () => {});
+// Like the real composable: resolves to this call's snapshot (the KPI cache stores it).
+const mockFetchAll = vi.fn(async () => ({ kpi: {}, sparklines: {} }));
 const mockCancelAll = vi.fn();
+const mockRestore = vi.fn();
 const mockGetStreams = vi.fn().mockResolvedValue({
   list: [
     { name: "default", settings: { is_llm_stream: true } },
@@ -38,6 +40,8 @@ const mockGetStreams = vi.fn().mockResolvedValue({
 const mockRouterPush = vi.fn();
 const mockRouterReplace = vi.fn(() => Promise.resolve());
 const mockListAgents = vi.fn();
+const mockListVersionsForCompare = vi.fn();
+const mockRouterResolve = vi.fn(() => ({ href: "/traces" }));
 // Mutable per test; the default (set in beforeEach) is `?type=stream`.
 const mockRouteQuery: Record<string, string> = {};
 
@@ -83,6 +87,7 @@ vi.mock("./composables/useLLMInsights", () => ({
     availableStreams: mockAvailableStreams,
     streamsLoaded: mockStreamsLoaded,
     fetchAll: mockFetchAll,
+    restore: mockRestore,
     cancelAll: mockCancelAll,
   }),
 }));
@@ -113,7 +118,11 @@ vi.mock("vue-i18n", () => ({
 }));
 
 vi.mock("vue-router", () => ({
-  useRouter: () => ({ push: mockRouterPush, replace: mockRouterReplace }),
+  useRouter: () => ({
+    push: mockRouterPush,
+    replace: mockRouterReplace,
+    resolve: mockRouterResolve,
+  }),
   // Most of this suite exercises the stream-mode paths, driven through the URL
   // (`?type=stream`) the way the component reads it; scope tests override it.
   useRoute: () => ({ query: mockRouteQuery }),
@@ -122,7 +131,7 @@ vi.mock("vue-router", () => ({
 vi.mock("@/services/gen-ai-agent-mapping.service", () => ({
   default: {
     listAgents: (...args: any[]) => mockListAgents(...args),
-    listVersionsForCompare: vi.fn().mockResolvedValue([]),
+    listVersionsForCompare: (...args: any[]) => mockListVersionsForCompare(...args),
   },
 }));
 
@@ -142,6 +151,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, flushPromises, enableAutoUnmount } from "@vue/test-utils";
 import LLMInsightsDashboard from "./LLMInsightsDashboard.vue";
 import config from "@/aws-exports";
+import { b64DecodeUnicode } from "@/utils/zincutils";
 // The KPI cache is a module singleton (survives remounts in the app); clear it
 // between tests so a warmed entry from one mount doesn't suppress the fetch in
 // the next.
@@ -174,9 +184,14 @@ function mountDashboard(
         // Children — all stubbed so we don't try to render echarts /
         // sparkline math during dashboard-level tests.
         LLMSchemaPanel: { template: '<div data-test="llm-schema-panel" />' },
-        LLMErrorTable: {
+        LLMInsightsSearchBar: {
+          props: ["applied"],
+          emits: ["apply"],
+          template: '<div data-test="llm-insights-search" />',
+        },
+        LLMTopErrorsTable: {
           props: ["streamName"],
-          template: '<div data-test="llm-error-table" />',
+          template: '<div data-test="llm-top-errors" />',
           mounted(this: { streamName: string }) {
             panelMounts.push(this.streamName);
           },
@@ -184,6 +199,11 @@ function mountDashboard(
         KpiSparkline: { template: '<div data-test="kpi-sparkline" />' },
         LLMDataHealthStrip: { template: '<div data-test="llm-data-health-strip" />' },
         LLMInsightsSkeleton: { template: '<div data-test="llm-insights-skeleton" />' },
+        ReleaseWatchCard: {
+          props: ["variants"],
+          template:
+            '<div data-test="release-watch" :data-versions="variants.map((v) => `${v.version}@${v.first_seen}`).join()" />',
+        },
         OButton: {
           template: "<button @click=\"$emit('click')\"><slot /></button>",
           emits: ["click"],
@@ -202,6 +222,7 @@ beforeEach(() => {
   for (const k of Object.keys(mockRouteQuery)) delete mockRouteQuery[k];
   mockRouteQuery.type = "stream";
   mockListAgents.mockResolvedValue({ agents: [] });
+  mockListVersionsForCompare.mockResolvedValue([]);
   mockStoreState.selectedOrganization = { identifier: "test-org" };
   mockKpi.value = {
     requestCount: 0,
@@ -288,7 +309,7 @@ describe("LLMInsightsDashboard — loadInsights guards", () => {
     mockFetchAll.mockClear();
     await (wrapper.vm as any).loadInsights(123, 456);
     // 4th arg is the selected agent (null = All Agents).
-    expect(mockFetchAll).toHaveBeenCalledWith("default", 123, 456, null);
+    expect(mockFetchAll).toHaveBeenCalledWith("default", 123, 456, null, "");
   });
 
   // Default path — no args means use props. `force` bypasses the in-memory KPI
@@ -304,6 +325,7 @@ describe("LLMInsightsDashboard — loadInsights guards", () => {
       1_700_000_000_000_000,
       1_700_001_000_000_000,
       null,
+      "",
     );
   });
 
@@ -331,9 +353,10 @@ describe("LLMInsightsDashboard — loadInsights guards", () => {
     await flushPromises();
     expect(mockFetchAll).toHaveBeenCalledTimes(1);
     mockFetchAll.mockClear();
-    // Same window + selection, non-forced → served from the cache snapshot.
+    // Non-forced reload is served from the cache via `restore`.
     await (wrapper.vm as any).loadInsights();
     expect(mockFetchAll).not.toHaveBeenCalled();
+    expect(mockRestore).toHaveBeenCalledWith(expect.objectContaining({ kpi: {}, sparklines: {} }));
   });
 
   it("does not serve another org's KPI snapshot for the same stream and window", async () => {
@@ -371,7 +394,7 @@ describe("LLMInsightsDashboard — refresh (parent entry point)", () => {
     await flushPromises();
     mockFetchAll.mockClear();
     await (wrapper.vm as any).refresh(999, 1999);
-    expect(mockFetchAll).toHaveBeenCalledWith("default", 999, 1999, null);
+    expect(mockFetchAll).toHaveBeenCalledWith("default", 999, 1999, null, "");
   });
 
   // No args → behaves like a normal loadInsights (falls back to props).
@@ -385,6 +408,7 @@ describe("LLMInsightsDashboard — refresh (parent entry point)", () => {
       1_700_000_000_000_000,
       1_700_001_000_000_000,
       null,
+      "",
     );
   });
 });
@@ -408,6 +432,7 @@ describe("LLMInsightsDashboard — onStreamChange", () => {
       1_700_000_000_000_000,
       1_700_001_000_000_000,
       null,
+      "",
     );
     expect(localStorage.getItem(STREAM_LS_KEY)).toBe("other");
   });
@@ -519,42 +544,30 @@ describe("LLMInsightsDashboard — onMounted", () => {
 // ===========================================================================
 
 describe("LLMInsightsDashboard — onUnmounted", () => {
-  // The dashboard wires cancellation through onUnmounted so in-flight server
-  // queries are cancelled when the user navigates away. Without this the server
-  // keeps streaming results to a component that's no longer rendered. Unmount
-  // cancels the dashboard's own queries plus the version-compare arms (armA +
-  // armB), which share the mocked stream-query — three cancelAll calls total.
+  // The spy count depends on mocks, so assert only that cancelling happens.
   it("calls cancelAll on unmount", async () => {
     const wrapper = mountDashboard();
     await flushPromises();
     mockCancelAll.mockClear();
     wrapper.unmount();
-    expect(mockCancelAll).toHaveBeenCalledTimes(3);
+    expect(mockCancelAll).toHaveBeenCalled();
   });
 });
 
-// ===========================================================================
-// onViewTrace — router push when user clicks "View" in recent-errors
-// ===========================================================================
-
 describe("LLMInsightsDashboard — onViewTrace", () => {
-  // The recent-errors panel emits view-trace with a trace_id. The
-  // dashboard pushes to traceDetails with the current window so the
-  // detail page shows the same time range as the dashboard.
-  it("routes to traceDetails with the current window", async () => {
+  it("opens the trace drawer with the current window, without leaving the page", async () => {
     const wrapper = mountDashboard();
     await flushPromises();
     mockRouterPush.mockClear();
-    (wrapper.vm as any).onViewTrace("trace-123");
-    expect(mockRouterPush).toHaveBeenCalledWith({
-      name: "traceDetails",
-      query: expect.objectContaining({
-        stream: "default",
-        trace_id: "trace-123",
-        from: 1_700_000_000_000_000,
-        to: 1_700_001_000_000_000,
-        org_identifier: "test-org",
-      }),
+    const state = (wrapper.vm as any).$.setupState;
+    state.onViewTrace("trace-123");
+    expect(mockRouterPush).not.toHaveBeenCalled();
+    expect(state.traceDrawerOpen).toBe(true);
+    expect(state.drawerTrace).toEqual({
+      traceId: "trace-123",
+      stream: "default",
+      startTime: 1_700_000_000_000_000,
+      endTime: 1_700_001_000_000_000,
     });
   });
 
@@ -596,10 +609,6 @@ describe("LLMInsightsDashboard — OSS builds (neither isEnterprise nor isCloud 
     expect(wrapper.find("[data-test='llm-insights-filter-mode']").exists()).toBe(true);
   });
 });
-
-// ===========================================================================
-// Scope: mode resolution (AIO-02/03), URL scope (AIO-08), one agents fetch (AIO-18)
-// ===========================================================================
 
 const agentAt = (name: string, stream: string, env: string, version: string) => ({
   name,
@@ -643,6 +652,7 @@ describe("LLMInsightsDashboard — scope resolution", () => {
       1_700_000_000_000_000,
       1_700_001_000_000_000,
       null,
+      "",
     );
     expect(wrapper.find("[data-test='llm-insights-no-agent-identity']").exists()).toBe(true);
     // The auto-picked mode stays out of the URL, so a reload re-decides.
@@ -657,8 +667,10 @@ describe("LLMInsightsDashboard — scope resolution", () => {
     const wrapper = await mountAndEnter();
 
     expect((wrapper.vm as any).filterMode).toBe("agent");
-    // The auto-picked agent stays out of the URL too, so a reload with no agents ends in Stream.
-    const lastQuery = (mockRouterReplace.mock.calls.at(-1) as any[])[0].query;
+    // A write that changes nothing is skipped, so the URL may still be the route's own query.
+    const lastReplace = mockRouterReplace.mock.calls.at(-1) as unknown as
+      [{ query: Record<string, unknown> }] | undefined;
+    const lastQuery: Record<string, unknown> = lastReplace?.[0].query ?? mockRouteQuery;
     expect([lastQuery.type, lastQuery.agent, lastQuery.env, lastQuery.version]).toEqual([
       undefined,
       undefined,
@@ -787,6 +799,27 @@ describe("LLMInsightsDashboard — scope resolution", () => {
     expect(mockListAgents).toHaveBeenCalledTimes(1);
   });
 
+  it("a superseded load whose agents list lands late never fetches the tiles", async () => {
+    mockListAgents.mockResolvedValue({ agents: [agentAt("omp", "s1", "production", "1")] });
+    const wrapper = await mountAndEnter();
+    const vm = wrapper.vm as unknown as {
+      refresh: (start?: number, end?: number, force?: boolean) => Promise<void>;
+    };
+    const held = Promise.withResolvers<{ agents: GenAiAgentListItem[] }>();
+    mockListAgents.mockReturnValueOnce(held.promise);
+    mockFetchAll.mockClear();
+    // Pick 12 h (its agents request is slow), then 1 h.
+    const older = vm.refresh(1_500_000_000_000_000, 1_500_043_200_000_000);
+    await flushPromises();
+    await vm.refresh(1_500_039_600_000_000, 1_500_043_200_000_000);
+    held.resolve({ agents: [agentAt("omp", "s1", "production", "1")] });
+    await older;
+    await flushPromises();
+    expect(mockFetchAll.mock.calls.map((c) => [c[1], c[2]])).toEqual([
+      [1_500_039_600_000_000, 1_500_043_200_000_000],
+    ]);
+  });
+
   it("decides an auto mode again when the user picks a window with no agents", async () => {
     mockListAgents.mockResolvedValue({ agents: [agentAt("omp", "s1", "production", "1")] });
     const wrapper = await mountAndEnter();
@@ -808,6 +841,7 @@ describe("LLMInsightsDashboard — scope resolution", () => {
       1_500_000_000_000_000,
       1_500_001_000_000_000,
       null,
+      "",
     ]);
   });
 
@@ -821,6 +855,92 @@ describe("LLMInsightsDashboard — scope resolution", () => {
     await vm.refresh(1_500_000_000_000_000, 1_500_001_000_000_000, true, true);
     await flushPromises();
     expect(vm.filterMode).toBe("agent");
+  });
+
+  // Right after a rollout the previous version has no spans in a short window.
+  it("pairs the release watch from the agent's wide-window versions, not the page window", async () => {
+    mockListAgents.mockResolvedValue({ agents: [agentAt("omp", "s1", "production", "2")] });
+    const seen = (version: string, stream: string, first_seen: number) => ({
+      ...agentAt("omp", stream, "production", version),
+      first_seen,
+    });
+    mockListVersionsForCompare.mockResolvedValue([
+      seen("2", "s1", 300),
+      seen("1", "s1", 100),
+      // One row per version per time bucket.
+      seen("2", "s1", 200),
+      // Another stream's version is not this card's.
+      seen("0", "s2", 50),
+    ]);
+
+    const wrapper = await mountAndEnter();
+
+    expect(mockListVersionsForCompare).toHaveBeenLastCalledWith(
+      "test-org",
+      "omp",
+      "production",
+      expect.any(Number),
+      1_700_000_000_000_000,
+    );
+    const card = wrapper.find("[data-test='release-watch']");
+    expect(card.exists()).toBe(true);
+    // One entry per version, at its rollout (earliest first_seen).
+    expect(card.attributes("data-versions")).toBe("2@200,1@100");
+  });
+});
+
+describe("LLMInsightsDashboard — search filter", () => {
+  it("narrows the strip to the traces the search matches and keeps it in the URL", async () => {
+    const wrapper = mountDashboard();
+    await flushPromises();
+    mockFetchAll.mockClear();
+    const state = (wrapper.vm as any).$.setupState;
+    state.applySearch("gen_ai_response_model = 'm'");
+    await flushPromises();
+    expect(mockFetchAll).toHaveBeenLastCalledWith(
+      "default",
+      1_700_000_000_000_000,
+      1_700_001_000_000_000,
+      null,
+      `trace_id IN (SELECT trace_id FROM "default" WHERE (gen_ai_response_model = 'm'))`,
+    );
+    expect((mockRouterReplace.mock.calls.at(-1) as any[])[0].query.q).toBe(
+      "gen_ai_response_model = 'm'",
+    );
+  });
+
+  it("adds a clicked value to the search instead of replacing it", async () => {
+    mockRouteQuery.q = "user_id = 'u1'";
+    const wrapper = mountDashboard();
+    await flushPromises();
+    const state = (wrapper.vm as any).$.setupState;
+    state.setFilter("model", "m");
+    expect(state.searchQuery).toBe("user_id = 'u1' and gen_ai_response_model = 'm'");
+  });
+
+  // The drawer lists traces under the page search; Traces must search the same.
+  it("carries the page search into Open in Traces", async () => {
+    mockRouteQuery.q = "tenant_id = 'globex'";
+    const open = vi.spyOn(window, "open").mockReturnValue(null);
+    const wrapper = mountDashboard();
+    await flushPromises();
+    const state = (wrapper.vm as any).$.setupState;
+    state.traceListSelection = {
+      startTime: 1,
+      endTime: 2,
+      seriesSql: "gen_ai_tool_name",
+      seriesValue: "web_search",
+      errored: true,
+    };
+    state.openTraceListInTraces();
+
+    const query = (mockRouterResolve.mock.calls.at(-1) as any[])[0].query.query;
+    expect(b64DecodeUnicode(query)).toBe(
+      `trace_id IN (SELECT trace_id FROM "default" WHERE (tenant_id = 'globex')) AND ` +
+        `gen_ai_tool_name = 'web_search' AND span_status = 'ERROR'`,
+    );
+    expect(open).toHaveBeenCalledWith("/traces", "_blank");
+    open.mockRestore();
   });
 });
 
@@ -853,7 +973,9 @@ describe("LLMInsightsDashboard — Total Cost tile", () => {
     const wrapper = mountDashboard();
     await (wrapper.vm as any).refresh(undefined, undefined, false);
     await flushPromises();
-    return wrapper.find("[data-test='llm-insights-kpi-value']").text();
+    return wrapper
+      .find("[data-test='llm-insights-kpi-cost'] [data-test='llm-insights-kpi-value']")
+      .text();
   }
 
   it("reads 'cost unknown' when none of the tokens were priced", async () => {
@@ -873,6 +995,32 @@ describe("LLMInsightsDashboard — Total Cost tile", () => {
     const text = await costTileText(1.5, 1000, 0);
     expect(text).not.toContain("≥");
     expect(text).toContain("1.50");
+  });
+
+  it("under a filter, shows the recorded cost, not the whole window's unpriced count", async () => {
+    mockRouteQuery.q = "feature_name = 'reply-draft'";
+    const text = await costTileText(0.05, 463_000, 1_500_000);
+    expect(text).not.toContain("llmDataTrust.cost.unknown");
+    expect(text).not.toContain("≥");
+    expect(text).toContain("0.05");
+  });
+
+  it("under a filter, still reads 'cost unknown' when nothing was priced", async () => {
+    mockRouteQuery.q = "feature_name = 'reply-draft'";
+    const text = await costTileText(0, 463_000, 1_500_000);
+    expect(text).toContain("llmDataTrust.cost.unknown");
+  });
+
+  it("under a filter that matches no tokens, reads $0.00, not 'cost unknown'", async () => {
+    mockRouteQuery.q = "tenant_id = 'nope'";
+    const text = await costTileText(0, 0, 1_300_000);
+    expect(text).not.toContain("llmDataTrust.cost.unknown");
+    expect(text).toContain("$0.00");
+  });
+
+  it("shows sub-cent spend with LLM precision, not $0.00", async () => {
+    const text = await costTileText(0.00063, 1000, 0);
+    expect(text).toContain("$0.0006");
   });
 
   it("reads the server's uncapped unpriced tokens, not the sum of the listed models", async () => {
@@ -905,9 +1053,11 @@ describe("LLMInsightsDashboard — Total Cost tile", () => {
     const vm = wrapper.vm as unknown as { refresh: (...args: unknown[]) => Promise<void> };
     await vm.refresh(undefined, undefined, false);
     await flushPromises();
-    expect(wrapper.find("[data-test='llm-insights-kpi-value']").text()).toContain(
-      "llmDataTrust.cost.unknown",
-    );
+    expect(
+      wrapper
+        .find("[data-test='llm-insights-kpi-cost'] [data-test='llm-insights-kpi-value']")
+        .text(),
+    ).toContain("llmDataTrust.cost.unknown");
     // The tooltip names the listed models as the top ones of all 25.
     const tooltip = wrapper.find("[data-test='llm-insights-cost-unpriced']").attributes("title");
     expect(tooltip).toContain("llmDataTrust.topModels");

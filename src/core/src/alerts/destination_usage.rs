@@ -210,11 +210,17 @@ async fn usage_for(
 /// Reads the database directly; the `ALERTS` cache cannot answer "used" while cold.
 async fn alert_usage(org_id: &str) -> Result<Vec<DestinationUse>, DestinationError> {
     let conn = get_orm_client_ro().await;
-    let alerts = db::alerts::alert::list_with_folders(conn, ListAlertsParams::new(org_id)).await?;
+    let alerts =
+        db::alerts::alert::list_with_folders_fully_decoded(conn, ListAlertsParams::new(org_id))
+            .await?;
     let mut uses = Vec::new();
     for (folder, alert) in alerts {
         let id = alert.id.map(|id| id.to_string()).unwrap_or_default();
-        for destination_name in unique_names(alert.destinations) {
+        let names = alert
+            .destinations
+            .into_iter()
+            .chain(alert.recovery_destinations);
+        for destination_name in unique_names(names.collect()) {
             uses.push(DestinationUse {
                 consumer: DestinationConsumer::Alert,
                 id: id.clone(),
@@ -253,7 +259,7 @@ async fn composite_alert_usage(org_id: &str) -> Result<Vec<DestinationUse>, Dest
 }
 
 async fn pipeline_usage(org_id: &str) -> Result<Vec<DestinationUse>, DestinationError> {
-    let pipelines = infra::pipeline::list_by_org(org_id).await?;
+    let pipelines = infra::pipeline::list_by_org_fully_decoded(org_id).await?;
     let mut uses = Vec::new();
     for pl in pipelines {
         let names = pl.nodes.iter().filter_map(|node| {
@@ -334,7 +340,7 @@ async fn oncall_team_channel_usage(org_id: &str) -> Result<Vec<DestinationUse>, 
 /// Folder-blind like the alerts arm: a workflow node can name a destination in any folder.
 #[cfg(feature = "enterprise")]
 async fn workflow_usage(org_id: &str) -> Result<Vec<DestinationUse>, DestinationError> {
-    let workflows = crate::workflows::list_workflows(org_id, None, None, None)
+    let workflows = infra::table::workflows::list_by_org_fully_decoded(org_id)
         .await
         .map_err(|e| DestinationError::InfraError(infra::errors::Error::Message(e.to_string())))?;
     let mut uses = Vec::new();
@@ -494,6 +500,31 @@ mod tests {
         .unwrap()
     }
 
+    /// A recovery sent to a deleted destination is lost, so naming it only for recovery is a use.
+    #[tokio::test]
+    async fn test_alert_arm_counts_a_recovery_only_destination() {
+        if std::env::var("ZO_META_STORE").is_err() {
+            eprintln!("skipped: needs the meta store CI configures through ZO_META_STORE");
+            return;
+        }
+        std::fs::create_dir_all(&config::get_config().common.data_db_dir).expect("db dir");
+        infra::db_init().await.expect("meta store");
+        infra::table::migrate().await.expect("migrations");
+        let org_id = format!("du_recovery_{}", config::utils::time::now_micros());
+        ensure_default_folder(&org_id).await;
+        let mut alert = test_alert("du-recovery", "fire");
+        alert.recovery_destinations = vec!["rec".to_string(), "fire".to_string()];
+        let conn = get_orm_client_rw().await;
+        infra::table::alerts::create(conn, &org_id, "default", alert, false)
+            .await
+            .unwrap();
+
+        let uses = destination_usage(&org_id, "rec").await.unwrap();
+        assert_eq!(uses.len(), 1);
+        assert_eq!(uses[0].consumer, DestinationConsumer::Alert);
+        assert_eq!(destination_usage(&org_id, "fire").await.unwrap().len(), 1);
+    }
+
     /// The regression this module closes: `ALERTS` stays empty here, so a cache-backed guard would
     /// miss this.
     #[tokio::test]
@@ -545,6 +576,7 @@ mod tests {
             updated_at: Set(None),
             evaluation_generation: Set(0),
             pending_period_sec: Set(0),
+            incident_title_template: Set(None),
         };
         infra::table::alert_composites::create_with_children(conn, active, vec![])
             .await
@@ -885,6 +917,7 @@ mod tests {
             last_failed_at: None,
             last_alert_fired_at: None,
             last_recovery_notified_at: None,
+            template: None,
             detection_lease_us: None,
             last_updated: 0,
             created_at: 1_000_000,

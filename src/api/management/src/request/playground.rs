@@ -206,6 +206,10 @@ async fn require_scorer_provider_visibility(
         (status = 200, body = inline(PlaygroundSnapshotResponseBody)),
         (status = 400, description = "Payload is malformed or over a workbench limit", body = ()),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Playground", "operation": "create"}))
+    )
 )]
 pub async fn share_playground_snapshot(
     Path(org_id): Path<String>,
@@ -247,6 +251,10 @@ pub async fn share_playground_snapshot(
         (status = 200, body = inline(PlaygroundSnapshotResponseBody)),
         (status = 404, description = "Snapshot not found", body = ()),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Playground", "operation": "get"}))
+    )
 )]
 pub async fn get_playground_snapshot(
     Path((org_id, snapshot_id)): Path<(String, String)>,
@@ -452,6 +460,10 @@ fn split_params(
         (status = 502, description = "The provider failed before streaming", body = ()),
         (status = 504, description = "The provider timed out before streaming", body = ()),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Playground", "operation": "create"}))
+    )
 )]
 pub async fn run_playground_cell(
     Path(org_id): Path<String>,
@@ -599,6 +611,10 @@ pub async fn run_playground_cell(
         (status = 404, description = "A referenced scorer does not exist", body = ()),
         (status = 500, description = "Scorer resolution failed", body = ()),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Playground", "operation": "create"}))
+    )
 )]
 pub async fn score_playground_cell(
     Path(org_id): Path<String>,

@@ -19,7 +19,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import i18n from "@/locales";
 import announcements from "@/services/announcements";
 import AnnouncementBannerList from "./AnnouncementBannerList.vue";
+import analytics from "@/services/product_analytics";
 
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 vi.mock("@/services/announcements", () => ({
   default: { getActive: vi.fn(), getConfig: vi.fn(), setConfig: vi.fn() },
 }));
@@ -157,6 +159,7 @@ describe("AnnouncementBannerList", () => {
       ],
       styles: [],
     });
+    expect(analytics.track).toHaveBeenCalledWith("announcement_deleted");
   });
 
   it("opens the editor for a row, a copy, or a new banner", async () => {
@@ -219,5 +222,6 @@ describe("AnnouncementBannerList", () => {
 
     expect(service.setConfig).not.toHaveBeenCalled();
     expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
+    expect(analytics.track).not.toHaveBeenCalled();
   });
 });

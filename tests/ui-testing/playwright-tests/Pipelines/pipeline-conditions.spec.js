@@ -91,8 +91,8 @@ test.describe("Pipeline Conditions - Comprehensive Tests", () => {
     // Verify condition dialog is open
     await pageManager.pipelinesPage.verifyConditionDialogOpen();
 
-    // Test 1: Verify first condition shows "if" label
-    await pageManager.pipelinesPage.verifyFirstConditionLabel("if");
+    // Test 1: Verify the first line reads "Where"
+    await pageManager.pipelinesPage.verifyFirstConditionLabel("Where");
 
     // Test 2: Fill first condition with "Contains" operator
     await pageManager.pipelinesPage.fillCondition("kubernetes_container_name", "Contains", "prometheus", 0);
@@ -108,6 +108,7 @@ test.describe("Pipeline Conditions - Comprehensive Tests", () => {
     // Test 5: Toggle second condition to OR operator
     await pageManager.pipelinesPage.toggleConditionOperator(0);
     await page.waitForTimeout(500);
+    await pageManager.pipelinesPage.verifyOperatorLabel("OR", 0);
 
     // Test 6: Add third condition and test other operators
     await pageManager.pipelinesPage.addNewCondition();
@@ -150,78 +151,6 @@ test.describe("Pipeline Conditions - Comprehensive Tests", () => {
     await page.waitForTimeout(1000);
     await pageManager.pipelinesPage.deletePipelineByName(pipelineName);
   });
-  //skipping it because with the new alert revamp we have changed the locator for the and or tabs
-  test.skip("should handle condition groups, nesting, and reordering", {
-    tag: ['@all', '@pipelines', '@pipelinesConditions', '@pipelinesNesting', '@pipelinesReordering']
-  }, async ({ page }) => {
-    await pageManager.pipelinesPage.createPipelineWithCondition(`e2e_conditions_groups${streamSuffix}`);
-
-    // Test 1: Add first condition
-    await pageManager.pipelinesPage.fillCondition("kubernetes_container_name", "=", "test-A", 0);
-
-    // Test 2: Add nested condition group
-    await pageManager.pipelinesPage.addConditionGroup();
-    await page.waitForTimeout(500);
-
-    // Verify nested group exists
-    await pageManager.pipelinesPage.verifyNestedGroupsExist();
-
-    // Test 3: Add conditions in nested group
-    const addConditionButtons = pageManager.pipelinesPage.addConditionButton;
-    const buttonCount = await addConditionButtons.count();
-    expect(buttonCount).toBeGreaterThan(1);
-
-    // Fill the first condition in nested group
-    await pageManager.pipelinesPage.fillCondition("kubernetes_namespace_name", "=", "test-B", 1);
-
-    // Add another condition in nested group
-    await addConditionButtons.nth(1).click();
-    await page.waitForTimeout(500);
-
-    // Fill the second condition in nested group
-    await pageManager.pipelinesPage.fillCondition("kubernetes_pod_name", "=", "test-C", 2);
-
-    // Test 4: Verify group-level tabs exist for nested group
-    await pageManager.pipelinesPage.verifyScheduledAlertTabsVisible();
-
-    // Test 5: Test reorder button with actual reordering validation
-    const reorderButtons = pageManager.pipelinesPage.reorderBtn;
-    const reorderButtonCount = await reorderButtons.count();
-    expect(reorderButtonCount).toBeGreaterThan(1);
-
-    // Capture order of condition values before reorder
-    const beforeValues = await pageManager.pipelinesPage.captureConditionValues();
-    testLogger.info('Condition values before reorder:', { beforeValues });
-
-    // Take screenshot before reorder
-    const beforeScreenshot = await pageManager.pipelinesPage.captureConditionScreenshot();
-
-    // Click reorder button at nested level
-    await pageManager.pipelinesPage.clickReorderButton(1);
-
-    // Capture order of condition values after reorder
-    const afterValues = await pageManager.pipelinesPage.captureConditionValues();
-    testLogger.info('Condition values after reorder:', { afterValues });
-
-    // Take screenshot after reorder
-    const afterScreenshot = await pageManager.pipelinesPage.captureConditionScreenshot();
-
-    // Verify screenshots were captured
-    expect(beforeScreenshot.length).toBeGreaterThan(0);
-    expect(afterScreenshot.length).toBeGreaterThan(0);
-
-    // Verify that the order has changed (arrays should not be equal)
-    expect(beforeValues.length).toBe(afterValues.length);
-    expect(beforeValues).not.toEqual(afterValues);
-
-    // Verify reorder button is still visible after click
-    await expect(reorderButtons.nth(1)).toBeVisible();
-
-    // Cancel without saving
-    await pageManager.pipelinesPage.cancelConditionDialog();
-    await pageManager.pipelinesPage.verifyConfirmationDialog();
-  });
-
   test("should validate fields and show proper error messages", {
     tag: ['@all', '@pipelines', '@pipelinesConditions', '@pipelinesValidation', '@pipelinesErrorMessages']
   }, async ({ page }) => {
@@ -241,7 +170,7 @@ test.describe("Pipeline Conditions - Comprehensive Tests", () => {
     await pageManager.pipelinesPage.verifyNotificationVisible();
 
     // Test 3: Fill partial condition (missing value)
-    await pageManager.pipelinesPage.fillPartialCondition("kubernetes");
+    await pageManager.pipelinesPage.fillPartialCondition("kubernetes_container_name");
     await pageManager.pipelinesPage.selectOperatorFromMenu("=");
 
     // Test 4: Test cancel with unsaved changes
@@ -268,11 +197,11 @@ test.describe("Pipeline Conditions - Comprehensive Tests", () => {
     // Condition A
     await pageManager.pipelinesPage.fillCondition("kubernetes_container_name", "=", "value-A", 0);
 
-    // Condition B with OR
+    // Condition B, then switch its join to OR
     await pageManager.pipelinesPage.addNewCondition();
+    await pageManager.pipelinesPage.fillCondition("kubernetes_host", "=", "value-B", 1);
     await pageManager.pipelinesPage.toggleConditionOperator(0);
     await page.waitForTimeout(300);
-    await pageManager.pipelinesPage.fillCondition("kubernetes_host", "=", "value-B", 1);
 
     // Guard: the OR toggle took effect on condition B's join before we rely on
     // the A OR B combination below.
@@ -427,7 +356,7 @@ test.describe("Pipeline Conditions - Comprehensive Tests", () => {
     // Select column + unary operator (no value input for unary operators).
     await pageManager.pipelinesPage.fillUnaryCondition("kubernetes_container_name", "is_null", 0);
 
-    // The value input is v-if-removed for a unary operator.
+    // A unary chip carries no value part.
     await pageManager.pipelinesPage.verifyValueInputCount(0);
 
     // Saving a unary condition is complete without a value: no inline error and
@@ -459,9 +388,11 @@ test.describe("Pipeline Conditions - Comprehensive Tests", () => {
     await pageManager.pipelinesPage.verifyOperatorSelected("is_null", 0);
     await pageManager.pipelinesPage.verifyValueInputCount(0);
 
-    // Switching to a binary operator restores the value input for that row.
+    // Switching to a binary operator asks for a value, and the chip shows it once given.
     await pageManager.pipelinesPage.selectOperatorFromMenu("=");
+    await pageManager.pipelinesPage.fillFirstConditionValue("restored");
     await pageManager.pipelinesPage.verifyValueInputCount(1);
+    await pageManager.pipelinesPage.verifyConditionValueInputValue("restored", 0);
 
     // Cleanup
     await pageManager.pipelinesPage.openPipelineMenu();
@@ -489,8 +420,8 @@ test.describe("Pipeline Conditions - Comprehensive Tests", () => {
     await pageManager.pipelinesPage.fillPartialCondition("kubernetes_container_name");
     await pageManager.pipelinesPage.selectOperatorFromMenu("=");
 
-    // Guard: the binary operator actually took effect before asserting its error.
-    await pageManager.pipelinesPage.verifyOperatorSelected("=", 0);
+    // Guard: the half-built condition carries the binary operator before asserting its error.
+    await pageManager.pipelinesPage.verifyDraftOperator("=");
 
     // A binary operator still requires a value: saving with an empty value
     // surfaces the inline schema error (unary exemption did not weaken this).
@@ -506,14 +437,13 @@ test.describe("Pipeline Conditions - Comprehensive Tests", () => {
     // Enter a binary condition with a stale value.
     await pageManager.pipelinesPage.fillCondition("kubernetes_container_name", "=", "stale-value", 0);
 
-    // Switching to a unary operator drops the stale value and hides the input.
+    // Switching to a unary operator drops the stale value and its chip part.
     await pageManager.pipelinesPage.selectOperatorFromMenu("is_null");
     await pageManager.pipelinesPage.verifyValueInputCount(0);
 
-    // Switching back to a binary operator restores the input, now empty —
-    // proving the stale value did not leak into the form.
+    // Switching back to a binary operator asks for a value with an empty box —
+    // proving the stale value did not leak back in.
     await pageManager.pipelinesPage.selectOperatorFromMenu("=");
-    await pageManager.pipelinesPage.verifyValueInputCount(1);
-    await pageManager.pipelinesPage.verifyConditionValueInputValue("", 0);
+    await pageManager.pipelinesPage.verifyValuePromptEmpty();
   });
 });

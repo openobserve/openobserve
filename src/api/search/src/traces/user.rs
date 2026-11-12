@@ -60,7 +60,7 @@ use crate::{
         ("timeout" = Option<i64>, Query, description = "timeout, seconds"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({
+        (status = 200, description = "Success", content_type = "application/json", body = config::meta::search::PaginatedResponse, example = json!({
             "took": 155,
             "total": 2,
             "from": 0,
@@ -80,7 +80,8 @@ use crate::{
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-mcp" = json!({"description": "List recent LLM users from a trace stream: user_id, event count, token usage, cost.", "category": "traces"}))
+        ("x-o2-mcp" = json!({"description": "List recent LLM users from a trace stream: user_id, event count, token usage, cost.", "category": "traces"})),
+        ("x-o2-ratelimit" = json!({"module": "Traces", "operation": "list"}))
     )
 )]
 pub async fn get_latest_users(
@@ -94,7 +95,8 @@ pub async fn get_latest_users(
 
     #[cfg(feature = "enterprise")]
     {
-        if let Err(e) = search_service::check_search_allowed(&org_id, Some(&stream_name)) {
+        // the request's SQL or filter may read streams other than the one it names
+        if let Err(e) = search_service::check_org_search_allowed(&org_id) {
             return MetaHttpResponse::too_many_requests(e.to_string());
         }
     }
@@ -189,6 +191,11 @@ pub async fn get_latest_users(
 
     // Get paginated user list with trace_ids per user
     let query_sql = build_latest_users_page_sql(&stream_name, user_id_col, &filter);
+    if let Some(response) =
+        super::check_sql_permissions(&org_id, user_id, &query_sql, &trace_id).await
+    {
+        return response;
+    }
 
     let mut req = config::meta::search::Request {
         query: config::meta::search::Query {
@@ -509,18 +516,20 @@ fn build_user_trace_usage_sql(
 ) -> String {
     let stream_ident = quote_identifier(stream_name);
     if layout.has_gen_ai {
-        let usage =
-            |column: &str| super::schema_compat::usage_sum_expr(column, layout.has_operation_name);
+        let usage = |column: &str| super::session::usage_rule(column, layout.has_operation_name);
         let total_tokens_expr = usage("gen_ai_usage_total_tokens");
         let cost_expr = usage("gen_ai_usage_cost");
+        let trace_filter = format!("trace_id IN ('{trace_ids_sql}')");
+        let agent_parents =
+            super::session::agent_parents_join(&stream_ident, layout, Some(&trace_filter));
         format!(
             "SELECT trace_id, \
             min(start_time) as trace_start_time, \
             max(end_time) as trace_end_time, \
             {total_tokens_expr} as gen_ai_usage_details_total, \
             {cost_expr} as gen_ai_usage_cost_details \
-            FROM {stream_ident} \
-            WHERE trace_id IN ('{trace_ids_sql}') \
+            FROM {stream_ident}{agent_parents} \
+            WHERE {trace_filter} \
             GROUP BY trace_id"
         )
     } else {
@@ -762,6 +771,16 @@ mod tests {
     }
 
     #[test]
+    fn user_page_sql_names_every_stream_a_filter_reaches() {
+        let filter = "1=1) UNION SELECT user_id FROM \"other\" WHERE (1=1";
+        assert!(config::utils::sql::validate_optional_where_fragment(filter).is_ok());
+        let sql = build_latest_users_page_sql("default", "user_id", filter);
+        let tables = openobserve_core::authz::resolve_sql_tables(&sql).unwrap();
+        let names: Vec<_> = tables.iter().map(|t| t.table()).collect();
+        assert!(names.contains(&"default") && names.contains(&"other"));
+    }
+
+    #[test]
     fn user_page_sql_splices_a_filter_and_quotes_the_stream() {
         let sql = build_latest_users_page_sql("default", "user_id", "service_name = 'api'");
         assert!(sql.contains("FROM \"default\""));
@@ -793,6 +812,7 @@ mod tests {
             StreamLlmLayout {
                 has_gen_ai: true,
                 has_operation_name: false,
+                has_parent_span: true,
             },
         );
         let legacy = build_user_trace_usage_sql("a\"b", "abc-1", StreamLlmLayout::default());
@@ -804,28 +824,42 @@ mod tests {
         assert!(current.contains("sum(gen_ai_usage_total_tokens) as gen_ai_usage_details_total"));
         assert!(current.contains("sum(gen_ai_usage_cost) as gen_ai_usage_cost_details"));
         assert!(!current.contains("gen_ai_operation_name"));
+        assert!(!current.contains("agent_parents"));
         assert!(legacy.contains("sum(llm_usage_tokens_total) as gen_ai_usage_details_total"));
         assert!(legacy.contains("sum(llm_usage_cost_total) as gen_ai_usage_cost_details"));
     }
 
     #[test]
-    fn user_trace_usage_sql_sums_only_llm_call_spans() {
+    fn user_trace_usage_sql_uses_the_per_trace_usage_rule() {
         let sql = build_user_trace_usage_sql(
             "default",
             "abc-1",
             super::super::schema_compat::StreamLlmLayout {
                 has_gen_ai: true,
                 has_operation_name: true,
+                has_parent_span: true,
             },
         );
         let llm_call = "(gen_ai_operation_name IS NULL OR gen_ai_operation_name IN \
                         ('chat', 'text_completion', 'generate_content', 'embeddings'))";
-        assert!(sql.contains(&format!(
-            "sum(CASE WHEN {llm_call} THEN gen_ai_usage_total_tokens ELSE 0 END) \
-             as gen_ai_usage_details_total"
-        )));
-        assert!(sql.contains(&format!(
-            "sum(CASE WHEN {llm_call} THEN gen_ai_usage_cost ELSE 0 END) as gen_ai_usage_cost_details"
-        )));
+        // LLM-call usage, else top-level agents', so nested usage counts once.
+        for (column, alias) in [
+            ("gen_ai_usage_total_tokens", "gen_ai_usage_details_total"),
+            ("gen_ai_usage_cost", "gen_ai_usage_cost_details"),
+        ] {
+            assert!(sql.contains(&format!(
+                "COALESCE(NULLIF(sum(CASE WHEN {llm_call} THEN {column} ELSE 0 END), 0), \
+                 sum(CASE WHEN gen_ai_operation_name = 'invoke_agent' AND agent_parent_span IS NULL \
+                 THEN {column} END), 0) as {alias}"
+            )));
+        }
+        // The agent lookup reads only this page's traces.
+        assert!(sql.contains(
+            "FROM \"default\" LEFT JOIN (SELECT DISTINCT trace_id AS agent_parent_trace, \
+             span_id AS agent_parent_span FROM \"default\" WHERE gen_ai_operation_name = 'invoke_agent' \
+             AND (trace_id IN ('abc-1'))) AS agent_parents \
+             ON trace_id = agent_parent_trace AND reference_parent_span_id = agent_parent_span \
+             WHERE trace_id IN ('abc-1') GROUP BY trace_id"
+        ));
     }
 }

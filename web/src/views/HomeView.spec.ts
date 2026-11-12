@@ -47,6 +47,7 @@ vi.mock("@/components/ingestion/FirstDataPanel.vue", async () => {
     }),
   };
 });
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 vi.mock("@/views/OverviewTab.vue", () => ({
   default: { name: "OverviewTab", template: '<div data-test="overview-tab-stub" />' },
 }));
@@ -73,8 +74,33 @@ vi.mock("@/components/shared/HomeViewSkeleton.vue", () => ({
   default: { name: "HomeViewSkeleton", template: '<div data-test="home-skeleton-stub" />' },
 }));
 
+// whether the org holds any stream; true keeps the saved tab the rest of this file tests.
+// One ref per call: a test flips the ones made since its mount (`orgData.flip`).
+const orgData = vi.hoisted(() => ({
+  initial: true as boolean | undefined,
+  // the _meta org: no user data, but O2's own streams to ask the assistant about
+  ownStreamsOnly: false,
+  refs: [] as { value: boolean | undefined }[],
+  flip(value: boolean | undefined) {
+    this.refs.forEach((r) => (r.value = value));
+  },
+}));
+vi.mock("@/composables/useOrgHasUserData", async () => {
+  const { ref } = await import("vue");
+  return {
+    useOrgHasUserData: () => {
+      const hasUserData = ref(orgData.initial);
+      orgData.refs.push(hasUserData);
+      const hasAnyStream = orgData.ownStreamsOnly ? ref(true) : hasUserData;
+      return { hasUserData, isFetching: ref(false), hasAnyStream };
+    },
+  };
+});
+
 import config from "@/aws-exports";
 import HomeView from "./HomeView.vue";
+import analytics from "@/services/product_analytics";
+import settings from "@/services/settings";
 import { useHomeDashboard } from "@/composables/useHomeDashboard";
 import { raw } from "@/types/i18n";
 
@@ -141,6 +167,40 @@ describe("HomeView", () => {
       expect(has(`home-tab-${TAB}`)).toBe(true);
       expect(has(`home-tab-lock-${TAB}`)).toBe(false);
     });
+
+    it("tracks a tab the user picks, naming a pinned dashboard by its kind only", async () => {
+      wrapper = mountHome();
+      await flushPromises();
+      vi.mocked(analytics.track).mockClear();
+      wrapper.findComponent({ name: "OTabs" }).vm.$emit("change", TAB);
+      wrapper.findComponent({ name: "OTabs" }).vm.$emit("change", "overview");
+      expect(analytics.track).toHaveBeenCalledWith("home_tab_switched", { tab: "dashboard" });
+      expect(analytics.track).toHaveBeenCalledWith("home_tab_switched", { tab: "overview" });
+    });
+
+    it("tracks an unpin from the tab's close button once the pin is cleared", async () => {
+      vi.spyOn(settings, "deleteOrgSetting").mockResolvedValue({} as never);
+      wrapper = mountHome();
+      await flushPromises();
+      vi.mocked(analytics.track).mockClear();
+      await wrapper.find(`[data-test="home-tab-close-${TAB}"]`).trigger("click");
+      await flushPromises();
+      expect(analytics.track).toHaveBeenCalledWith("home_dashboard_unpinned", {
+        source: "home_tab",
+      });
+    });
+
+    it("does not track an unpin the server refused", async () => {
+      vi.spyOn(settings, "deleteOrgSetting").mockRejectedValue({ response: { status: 500 } });
+      wrapper = mountHome();
+      await flushPromises();
+      vi.mocked(analytics.track).mockClear();
+      await wrapper.find(`[data-test="home-tab-close-${TAB}"]`).trigger("click");
+      await flushPromises();
+      expect(analytics.track).not.toHaveBeenCalledWith("home_dashboard_unpinned", {
+        source: "home_tab",
+      });
+    });
   });
 
   describe("the AI Assistant tab", () => {
@@ -194,6 +254,13 @@ describe("HomeView", () => {
       expect(has("overview-tab-stub")).toBe(true);
       expect(has("first-data-panel-stub")).toBe(false);
       expect(has("first-data-panel")).toBe(false);
+    });
+
+    it("should run the Overview panel edge to edge by cancelling the body inset", () => {
+      wrapper = mountHome();
+      expect(wrapper.get('[data-test="home-overview-panel"]').classes()).toEqual(
+        expect.arrayContaining(["-mx-2.5", "-mb-2.5", "flex-1"]),
+      );
     });
 
     it("should render Usage as at BASE with no first-data panel around it", () => {
@@ -354,6 +421,82 @@ describe("HomeView", () => {
 
       expect(has("first-data-panel-stub")).toBe(false);
       expect(has("home-first-data-hero")).toBe(false);
+    });
+  });
+
+  describe("an org with no data", () => {
+    beforeEach(() => {
+      setFlag(false);
+      store.commit("setConfig", { ...store.state.zoConfig, ai_enabled: true });
+      openTab("ai");
+      orgData.refs.length = 0;
+    });
+    afterEach(() => {
+      orgData.initial = true;
+      orgData.ownStreamsOnly = false;
+    });
+    const savedTab = () => localStorage.getItem("o2_home_active_tab");
+    const activeTab = () => (wrapper.vm as unknown as { activeHomeTab: string }).activeHomeTab;
+
+    it("opens Overview instead of the assistant, without saving that as the user's tab", async () => {
+      orgData.initial = false;
+      wrapper = mountHome();
+      await flushPromises();
+
+      expect(has("overview-tab-stub")).toBe(true);
+      expect(has("ai-chat-stub")).toBe(false);
+      expect(savedTab()).toBe("ai");
+    });
+
+    it("saves the next tab the user picks", async () => {
+      orgData.initial = false;
+      wrapper = mountHome();
+      await flushPromises();
+      (wrapper.vm as unknown as { activeHomeTab: string }).activeHomeTab = "usage";
+      await flushPromises();
+
+      expect(savedTab()).toBe("usage");
+    });
+
+    it("switches once the data check resolves with no data", async () => {
+      orgData.initial = undefined;
+      wrapper = mountHome();
+      await flushPromises();
+      expect(activeTab()).toBe("ai");
+
+      orgData.flip(false);
+      await flushPromises();
+
+      expect(activeTab()).toBe("overview");
+      expect(savedTab()).toBe("ai");
+    });
+
+    it.each([true, undefined])("keeps the assistant when the data check is %s", async (value) => {
+      orgData.initial = value;
+      wrapper = mountHome();
+      await flushPromises();
+
+      expect(has("ai-chat-stub")).toBe(true);
+      expect(savedTab()).toBe("ai");
+    });
+
+    it("keeps the assistant for an org with only O2's own streams, such as _meta", async () => {
+      orgData.initial = false;
+      orgData.ownStreamsOnly = true;
+      wrapper = mountHome();
+      await flushPromises();
+
+      expect(activeTab()).toBe("ai");
+      expect(has("ai-chat-stub")).toBe(true);
+    });
+
+    it("leaves a saved Usage tab alone", async () => {
+      orgData.initial = false;
+      openTab("usage");
+      wrapper = mountHome();
+      await flushPromises();
+
+      expect(activeTab()).toBe("usage");
     });
   });
 });

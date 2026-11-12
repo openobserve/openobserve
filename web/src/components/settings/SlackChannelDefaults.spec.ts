@@ -33,6 +33,8 @@ import {
   orgAccessView,
 } from "@/test/unit/helpers/slack";
 import type { InstallationView, SlackChannelDefaultRow } from "@/types/slack";
+import { SLACK_READ_ONLY } from "./slackReadOnly";
+import { computed } from "vue";
 
 vi.mock("@/services/alert_destination", () => ({ default: { list: vi.fn() } }));
 
@@ -106,11 +108,12 @@ const mountOn = async (
   return w;
 };
 
-const mountWith = async (realTable = false) => {
+const mountWith = async (realTable = false, readOnly = false) => {
   const w = mount(SlackChannelDefaults, {
     props: { installationId: "inst-1" },
     attachTo: document.body,
     global: {
+      provide: { [SLACK_READ_ONLY as symbol]: computed(() => readOnly) },
       plugins: [i18n, makeSlackStore()],
       stubs: realTable
         ? { ConfirmDialog: ConfirmDialogStub }
@@ -152,6 +155,18 @@ afterEach(() => {
 });
 
 describe("SlackChannelDefaults (rows 21-22)", () => {
+  it("a_reader_without_manage_slack_can_neither_set_nor_change_a_default", async () => {
+    vi.mocked(slack.listChannelDefaults).mockReturnValue(ok({ defaults: rows }) as any);
+    await mountWith(true, true);
+    expect(
+      document.body
+        .querySelector('[data-test="slack-channel-set-default"]')
+        ?.hasAttribute("disabled"),
+    ).toBe(true);
+    expect(document.body.querySelector('[data-test^="slack-channel-edit-"]')).toBeNull();
+    expect(document.body.querySelector('[data-test^="slack-channel-remove-"]')).toBeNull();
+  });
+
   it("lists each channel with its answer mode, who set it and a dash when no alert routes", async () => {
     const w = await mountDefaults();
     expect(slack.listChannelDefaults).toHaveBeenCalledWith("acme", "inst-1");
@@ -202,6 +217,9 @@ describe("SlackChannelDefaults (rows 21-22)", () => {
     const confirmDialog = w.find('[data-test-stub="confirm-dialog"]');
     expect(confirmDialog.attributes("message-keypath")).toBe("slackApp.channels.removeMessage");
     expect(confirmDialog.attributes("message-name")).toBe("#sre-prod");
+    expect(w.findComponent({ name: "ConfirmDialog" }).props("okLabel")).toBe("Remove default");
+    expect(w.find('[data-test="slack-channel-remove-C1"]').attributes("aria-label")).toBe("Remove");
+    expect(w.find('[data-test="slack-channel-C1-menu"]').exists()).toBe(true);
     expect(i18n.global.t("slackApp.channels.removeMessage", { name: "#sre-prod" })).toBe(
       "Questions in #sre-prod then go to each person's default org (they can change it with /o2 org).",
     );

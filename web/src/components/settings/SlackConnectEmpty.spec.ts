@@ -94,22 +94,29 @@ describe("SlackConnectEmpty on Cloud (A1)", () => {
     const w = mountEmpty();
     const text = w.text();
     expect(text).toContain("Connect a Slack workspace");
-    expect(text).toContain(
-      "Your team asks OpenObserve questions from Slack and gets answers with their own permissions.",
-    );
-    expect(text).not.toContain("creates and installs your own Slack app");
-    expect(text).toContain("What happens next");
+    expect(text).not.toContain("Your team asks OpenObserve questions from Slack");
+    expect(text).not.toContain("What happens next");
     const steps = w.findAll('[data-test="slack-connect-step"]').map((s) => s.text());
     expect(steps).toHaveLength(2);
     expect(steps[0]).toContain("Add to Slack");
-    expect(steps[0]).toContain("Opens Slack in a popup: pick a channel for alerts, then Allow");
+    expect(steps[0]).not.toContain("Opens Slack in a popup");
     expect(steps[1]).toContain("Link people");
     expect(text).not.toMatch(/Acknowledge|unfurl|Phase/);
-    expect(w.find('[data-test="slack-connect-consent"]').text()).toBe(
-      "Two-way Slack also reads your direct messages with OpenObserve and replies in threads it is part of. It never reads other channel history.",
+    // A privacy fact rides behind one info icon, not a banner under the steps.
+    expect(w.find('[data-test="slack-connect-consent"]').exists()).toBe(true);
+    expect(w.find('[data-test="slack-connect-consent"]').attributes("aria-label")).not.toContain(
+      "nothing is shared with a third party",
     );
+    expect(text).not.toContain("It never reads other channel history.");
     expect(text).toContain("Needs the Manage Slack permission");
     expect(w.find('[data-test="slack-setup-app"]').exists()).toBe(false);
+  });
+
+  it("says connecting also lets AutoObserve post its digest", () => {
+    const w = mountEmpty();
+    expect(w.find('[data-test="slack-connect-autoobserve"]').text()).toBe(
+      "Once connected, AutoObserve can post a daily digest to a channel you pick.",
+    );
   });
 
   it("renders Add to Slack as a button carrying the Slack artwork", () => {
@@ -283,37 +290,112 @@ describe("SlackConnectEmpty self-hosted (A1)", () => {
   it("explains what Set up Slack app starts, in three steps", () => {
     const w = mountEmpty({ isCloud: false });
     const text = w.text();
-    expect(text).toContain(
-      "OpenObserve creates and installs your own Slack app; nothing is shared with a third party.",
-    );
-    expect(text).toContain("What happens next · about 5 minutes");
+    expect(text).not.toContain("nothing is shared with a third party");
+    expect(text).not.toContain("What happens next");
     const steps = w.findAll('[data-test="slack-connect-step"]').map((s) => s.text());
     expect(steps).toHaveLength(3);
     expect(steps[0]).toContain("Check this server");
-    expect(steps[0]).toContain("Encryption key, web URL and AI agent");
     expect(steps[1]).toContain("Create the app");
-    expect(steps[1]).toContain("Paste one configuration token from Slack");
     expect(steps[2]).toContain("Install and link people");
     expect(text).not.toContain("Ask questions; answers use your own permissions");
     expect(text).toContain("Needs the Manage Slack permission");
-    expect(w.find('[data-test="slack-connect-consent"]').exists()).toBe(true);
+    // A screen reader gets both tooltip lines, not just the first.
+    const consent = w.find('[data-test="slack-connect-consent"]').attributes("aria-label");
+    expect(consent).toContain("It never reads other channel history.");
+    expect(consent).toContain("nothing is shared with a third party");
     expect(w.find('[data-test="slack-connect-steps"]').attributes("role")).toBe("list");
   });
 
-  it("shortens the step details on a phone", () => {
-    breakpoint.mobile = true;
-    try {
-      const steps = mountEmpty({ isCloud: false })
-        .findAll('[data-test="slack-connect-step"]')
-        .map((s) => s.text());
-      expect(steps[0]).toContain("Encryption key, web URL and AI agent");
-      expect(steps[0]).not.toContain("verified before anything touches Slack");
-      expect(steps[1]).toContain("Paste one configuration token from Slack");
-      expect(steps[1]).not.toContain("builds the app for you");
-      expect(steps[2]).toContain("Allow it in Slack, then link members");
-    } finally {
-      breakpoint.mobile = false;
-    }
+  /// A step is its title alone: the sub-lines under each made the empty state a wall of text.
+  it("shows each step as its title only", () => {
+    const steps = mountEmpty({ isCloud: false })
+      .findAll('[data-test="slack-connect-step"]')
+      .map((s) => s.text());
+    expect(steps).toEqual(["1Check this server", "2Create the app", "3Install and link people"]);
+  });
+
+  it("offers Connect this org to an existing workspace before the setup wizard", () => {
+    const w = mountEmpty({
+      isCloud: false,
+      available: [{ installation_id: "inst-9", team_name: "Acme Corp" }],
+    });
+    const html = w.html();
+    expect(html.indexOf('data-test="slack-available"')).toBeLessThan(
+      html.indexOf('data-test="slack-setup-app"'),
+    );
+    const connect = w.find('[data-test="slack-available-inst-9"] button');
+    expect(connect.classes()).toContain("bg-button-primary");
+    expect(w.find('[data-test="slack-setup-app"]').classes()).not.toContain("bg-button-primary");
+  });
+
+  it("tells two workspaces with one name apart by app name and install date, never by app id (T4-22, F-N7)", () => {
+    const NOV_1 = Date.UTC(2026, 10, 1, 12) * 1000;
+    const NOV_5 = Date.UTC(2026, 10, 5, 12) * 1000;
+    const w = mountEmpty({
+      isCloud: false,
+      available: [
+        {
+          installation_id: "a",
+          team_name: "Acme Corp",
+          app_id: "A01",
+          app_name: "Acme Insights",
+          created_at: NOV_1,
+        },
+        {
+          installation_id: "b",
+          team_name: "Acme Corp",
+          app_id: "A02",
+          app_name: "Acme Insights (staging)",
+          created_at: NOV_5,
+        },
+        {
+          installation_id: "c",
+          team_name: "Beta",
+          app_id: "A03",
+          app_name: "Beta app",
+          created_at: NOV_1,
+        },
+        {
+          installation_id: "d",
+          team_name: "Gamma",
+          app_id: "A04",
+          app_name: "",
+          created_at: NOV_1,
+        },
+        {
+          installation_id: "e",
+          team_name: "Gamma",
+          app_id: "A05",
+          created_at: NOV_1 + 3_600_000_000,
+        },
+      ],
+    });
+    const detail = (id: string) => w.find(`[data-test="slack-available-detail-${id}"]`);
+    expect(detail("a").text()).toBe("Acme Insights · Added Nov 1, 2026");
+    expect(detail("b").text()).toBe("Acme Insights (staging) · Added Nov 5, 2026");
+    expect(detail("c").exists()).toBe(false);
+    expect(detail("d").text()).toBe("Added Nov 1, 2026 at 12:00");
+    expect(detail("e").text()).toBe("Added Nov 1, 2026 at 13:00");
+    expect(w.text()).not.toMatch(/A0[1-5]/);
+  });
+
+  it("names the app alone for a same-name workspace an older server sends without a date, and never its id", () => {
+    const w = mountEmpty({
+      isCloud: false,
+      available: [
+        { installation_id: "a", team_name: "Acme Corp", app_id: "A01", app_name: "Acme Insights" },
+        { installation_id: "b", team_name: "Acme Corp", app_id: "A02" },
+      ],
+    });
+    expect(w.find('[data-test="slack-available-detail-a"]').text()).toBe("Acme Insights");
+    expect(w.find('[data-test="slack-available-detail-b"]').exists()).toBe(false);
+    expect(w.text()).not.toContain("A01");
+  });
+
+  it("keeps Set up Slack app primary when no workspace is set up yet", () => {
+    const w = mountEmpty({ isCloud: false });
+    expect(w.find('[data-test="slack-available"]').exists()).toBe(false);
+    expect(w.find('[data-test="slack-setup-app"]').classes()).toContain("bg-button-primary");
   });
 
   it("AC-12.1 Connect existing proves the admin with Sign in with Slack, then connects", async () => {
@@ -406,7 +488,7 @@ describe("SlackConnectEmpty for an org the instance workspace does not serve (M4
     const served = mountEmpty({ isCloud: false });
     await flushPromises();
     expect(served.find('[data-test="slack-not-included"]').exists()).toBe(false);
-    expect(served.text()).toContain("OpenObserve creates and installs your own Slack app");
+    expect(served.find('[data-test="slack-setup-app"]').exists()).toBe(true);
     expect(served.text()).not.toContain("For a different Slack workspace");
   });
 

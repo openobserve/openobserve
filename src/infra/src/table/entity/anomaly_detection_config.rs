@@ -4,7 +4,7 @@ use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
 
 // No `Eq`: `alert_budget_per_day` is f64, which has no total equality.
-#[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
 #[sea_orm(table_name = "anomaly_detection_config")]
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
@@ -64,7 +64,8 @@ pub struct Model {
     pub priority: Option<i32>,
     /// Feature 2 (PT-6): JSON array of normalized tags. NULL = none.
     pub tags: Option<Json>,
-    /// 0=waiting, 1=ready, 2=training, 3=failed, 4=disabled
+    /// 0=waiting, 1=ready, 2=training, 3=failed, 4=disabled, 5=waiting_for_data, 6=not_applicable.
+    /// The re-check delay of 5 and 6 starts at `training_started_at`.
     pub status: i32,
     pub retries: i32,
     /// When the last training attempt FAILED, in microseconds — the retry backoff's anchor.
@@ -73,6 +74,8 @@ pub struct Model {
     /// Data-time of the delivered alert still owed a recovery message, in microseconds.
     /// NULL means none is owed — this is pending state, not a log of the last recovery sent.
     pub last_recovery_notified_at: Option<i64>,
+    /// The template override by name; NULL uses the destination's template.
+    pub template: Option<String>,
     /// Start of this region's in-flight detection run; NULL or expired means free.
     #[serde(skip)]
     pub detection_lease_us: Option<i64>,
@@ -149,6 +152,7 @@ mod tests {
             last_failed_at: None,
             last_alert_fired_at: None,
             last_recovery_notified_at: None,
+            template: None,
             detection_lease_us: None,
             last_updated: 0,
             created_at: 1000,

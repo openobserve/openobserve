@@ -198,13 +198,14 @@ vi.mock("@/composables/useStreams", () => ({
 // Mock vue-router
 // ---------------------------------------------------------------------------
 const mockRouterPush = vi.fn();
+const routeQuery = vi.hoisted(() => ({}) as Record<string, string>);
 vi.mock("vue-router", async () => {
   const actual: any = await vi.importActual("vue-router");
   return {
     ...actual,
     useRouter: () => ({
       push: mockRouterPush,
-      currentRoute: { value: { query: {} } },
+      currentRoute: { value: { query: routeQuery } },
     }),
   };
 });
@@ -1333,6 +1334,65 @@ describe("ServicesCatalog", () => {
       const panelAfter = wrapper.findComponent('[data-test="services-catalog-node-side-panel"]');
       expect(panelAfter.vm).toBe(panelBefore.vm);
       expect(panelAfter.props("selectedNode")?.name).toBe("auth-service");
+    });
+
+    // o2-enterprise#3126: without the row's error rate the panel badge always read Healthy.
+    it("should hand the clicked row's error rate to the side panel", async () => {
+      mockFetchQueryDataWithHttpStream.mockImplementation((_req: any, callbacks: any) => {
+        const hits = mockServices.map((s) => ({
+          service_name: s.service_name,
+          total_requests: s.total_requests,
+          error_count: s.error_count,
+          error_rate: s.error_rate,
+        }));
+        callbacks?.data?.(null, { type: "search_response_hits", content: { results: { hits } } });
+        callbacks?.complete?.(null, {});
+      });
+      wrapper = mountServicesCatalog();
+      await flushPromises();
+
+      const payment = wrapper.vm.services.find(
+        (s: { service_name: string }) => s.service_name === "payment-service",
+      );
+      wrapper.vm.handleRowClick(payment);
+      await flushPromises();
+
+      const panel = wrapper.findComponent('[data-test="services-catalog-node-side-panel"]');
+      expect(panel.props("selectedNode")).toMatchObject({
+        name: "payment-service",
+        error_rate: 7.0,
+      });
+    });
+
+    it("should give the open side panel the refreshed error rate after a reload", async () => {
+      let paymentErrorRate = 0.5;
+      mockFetchQueryDataWithHttpStream.mockImplementation((_req: any, callbacks: any) => {
+        const hits = mockServices.map((s) => ({
+          service_name: s.service_name,
+          total_requests: s.total_requests,
+          error_count: s.error_count,
+          error_rate: s.service_name === "payment-service" ? paymentErrorRate : s.error_rate,
+        }));
+        callbacks?.data?.(null, { type: "search_response_hits", content: { results: { hits } } });
+        callbacks?.complete?.(null, {});
+      });
+      wrapper = mountServicesCatalog();
+      await flushPromises();
+      await wrapper
+        .find('[data-test="services-catalog-row-name-payment-service"]')
+        .trigger("click");
+      const panel = () => wrapper.findComponent('[data-test="services-catalog-node-side-panel"]');
+      expect(panel().props("selectedNode")).toMatchObject({ error_rate: 0.5 });
+
+      paymentErrorRate = 12;
+      await wrapper.vm.loadServicesCatalog();
+      await flushPromises();
+
+      expect(wrapper.vm.showSidePanel).toBe(true);
+      expect(panel().props("selectedNode")).toMatchObject({
+        name: "payment-service",
+        error_rate: 12,
+      });
     });
   });
 
@@ -3267,6 +3327,17 @@ describe("ServicesCatalog", () => {
       expect(wrapper.vm.rowsPerPage).toBe(50);
       expect(wrapper.vm.sortBy).toBe("service_name");
       expect(wrapper.vm.sortOrder).toBe("asc");
+    });
+
+    it("opens filtered to the service a link names (T2-7)", () => {
+      useListViewState("servicesCatalog", { filterText: "pay" });
+      routeQuery.service = "svc-a";
+      try {
+        wrapper = mountServicesCatalog();
+        expect(wrapper.vm.filterText).toBe("svc-a");
+      } finally {
+        delete routeQuery.service;
+      }
     });
 
     it("saves changes to the view state", async () => {

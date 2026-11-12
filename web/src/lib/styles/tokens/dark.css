@@ -231,6 +231,8 @@
   --color-tooltip-text: var(--color-text-heading);
   --color-tooltip-border: var(--d-border);
   --color-tooltip-arrow: var(--d-overlay);
+  --color-copy-confirm-bg: var(--color-grey-200);
+  --color-copy-confirm-text: var(--color-grey-900);
 
   /* ToggleGroup */
   --color-toggle-item-hover-bg: var(--color-primary-950);
@@ -482,6 +484,7 @@
   --color-datepicker-border: var(--color-border-strong);
   --color-datepicker-disabled-bg: var(--color-surface-subtle);
   --color-datepicker-disabled-border: var(--color-border-default);
+  --color-datepicker-error-text: var(--color-error-400);
   --color-datepicker-error-border: var(--color-error-400);
   --color-datepicker-segment-focus-bg: var(--color-primary-500);
   --color-datepicker-segment-focus-text: var(--color-white);
@@ -678,8 +681,7 @@
   /* Chart expected-range band fill — dark override (see base.css) */
   --color-chart-band: rgba(255, 255, 255, 0.18);
 
-  /* Crosshair axis-pointer label chip — dark-only. Light leaves this undefined so
-     chartColor() resolves to "" and ECharts uses its auto default (see base.css). */
+  /* Crosshair axis-pointer label chip — dark override (see base.css) */
   --color-chart-crosshair-bg: #333;
 
   /* trace span palette (16 colors) — dark values; see base.css for the reserved-hue
@@ -845,6 +847,12 @@
      border below is unchanged while the light one had to move with the fill. */
   --color-panel-bar-bg: #252526;
   --color-panel-bar-border: var(--d-border);
+
+  /* Onboarding brand panel: two steps deeper than light, so it does not glare
+     next to the dark page and white text keeps its contrast. */
+  --color-onboarding-panel-start: var(--color-primary-900);
+  --color-onboarding-panel-end: var(--color-primary-800);
+  --color-onboarding-choice-active-bg: var(--color-primary-800);
 }
 /* Domain data-viz & color tokens (dark) */
 :root.dark,

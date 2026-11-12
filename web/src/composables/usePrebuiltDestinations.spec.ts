@@ -318,6 +318,77 @@ describe("usePrebuiltDestinations", () => {
       expect(lastTestResult.value?.success).toBe(true);
     });
 
+    describe("with a picked template", () => {
+      const contentTemplate = () =>
+        mockGetByName.mockResolvedValue({
+          data: { name: "prebuilt_default", kind: "content", body: "{}" },
+        });
+
+      it("slack: sends the template rendered for the slack channel", async () => {
+        contentTemplate();
+        mockTemplatePreview.mockResolvedValue({ data: { payload: { text: "unified" } } });
+        mockDestTest.mockResolvedValue({ data: { success: true } });
+
+        const { testDestination } = usePrebuiltDestinations();
+        await testDestination("slack", makeSlackCredentials(), "prebuilt_default");
+
+        expect(mockTemplatePreview.mock.calls[0][0].data.channel).toBe("slack");
+        expect(JSON.parse(mockDestTest.mock.calls[0][0].data.body)).toEqual({ text: "unified" });
+      });
+
+      it("pagerduty: adds the integration key the server renderer leaves out", async () => {
+        contentTemplate();
+        mockTemplatePreview.mockResolvedValue({ data: { payload: { event_action: "trigger" } } });
+        mockDestTest.mockResolvedValue({ data: { success: true } });
+
+        const { testDestination } = usePrebuiltDestinations();
+        await testDestination(
+          "pagerduty",
+          { integrationKey: "a".repeat(32), severity: "error" },
+          "prebuilt_default",
+        );
+
+        expect(mockTemplatePreview.mock.calls[0][0].data.channel).toBe("pagerduty");
+        expect(JSON.parse(mockDestTest.mock.calls[0][0].data.body)).toEqual({
+          event_action: "trigger",
+          routing_key: "a".repeat(32),
+        });
+      });
+
+      it("email: sends the rendered HTML as the body", async () => {
+        contentTemplate();
+        mockTemplatePreview.mockResolvedValue({
+          data: { payload: { subject: "s", html: "<p>unified</p>", text: "unified" } },
+        });
+        mockDestTest.mockResolvedValue({ data: { success: true } });
+
+        const { testDestination } = usePrebuiltDestinations();
+        await testDestination("email", { recipients: ["a@acme.io"] }, "prebuilt_default");
+
+        expect(mockTemplatePreview.mock.calls[0][0].data.channel).toBe("email");
+        expect(mockDestTest.mock.calls[0][0].data.body).toBe("<p>unified</p>");
+      });
+
+      it("a user template with a raw body gets the credentials as sample values", async () => {
+        mockGetByName.mockResolvedValue({
+          data: { name: "mine", kind: "custom", body: '{"key": "{routing_key}"}' },
+        });
+        mockDestTest.mockResolvedValue({ data: { success: true } });
+
+        const { testDestination } = usePrebuiltDestinations();
+        await testDestination(
+          "pagerduty",
+          { integrationKey: "b".repeat(32), severity: "error" },
+          "mine",
+        );
+
+        expect(mockTemplatePreview).not.toHaveBeenCalled();
+        expect(JSON.parse(mockDestTest.mock.calls[0][0].data.body)).toEqual({
+          key: "b".repeat(32),
+        });
+      });
+    });
+
     it("returns failure when credentials are invalid (validation short-circuit)", async () => {
       const { testDestination } = usePrebuiltDestinations();
       const result = await testDestination("slack", { webhookUrl: "" });

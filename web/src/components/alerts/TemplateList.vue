@@ -58,6 +58,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
       </template>
 
+      <OBanner
+        v-if="allKindsNoticeCount > 0"
+        dense
+        variant="info"
+        class="mx-3 mt-2 shrink-0"
+        :content="t('alert_templates.allKindsNotice', { count: allKindsNoticeCount })"
+        data-test="template-list-all-kinds-notice"
+      >
+        <template #actions>
+          <OButton
+            variant="outline"
+            size="sm"
+            data-test="template-list-all-kinds-review"
+            @click="reviewAllKinds"
+            >{{ t("alert_templates.allKindsNoticeReview") }}</OButton
+          >
+          <OButton
+            variant="ghost"
+            size="sm"
+            data-test="template-list-all-kinds-dismiss"
+            @click="dismissAllKindsNotice"
+            >{{ t("common.dismiss") }}</OButton
+          >
+        </template>
+      </OBanner>
+
       <div class="bg-card-glass-bg min-h-0 flex-1 overflow-hidden">
         <OTable
           ref="oTableRef"
@@ -113,6 +139,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ t("alert_templates.filterCustom") }}
                 </OToggleGroupItem>
               </OToggleGroup>
+              <OSelect
+                v-model="appliesToFilter"
+                :options="appliesToFilterOptions"
+                labelKey="label"
+                valueKey="value"
+                size="sm"
+                width="sm"
+                class="shrink-0"
+                :aria-label="t('alert_templates.appliesTo')"
+                data-test="template-list-applies-to-filter"
+              />
               <OSearchInput
                 v-model="filterQuery"
                 class="min-w-0 flex-1 max-md:min-w-40"
@@ -136,7 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OEmptyState
               size="hero"
               preset="no-alert-templates"
-              :filtered="!!filterQuery"
+              :filtered="!!filterQuery || appliesToFilter !== 'any'"
               :actions="[
                 {
                   id: 'create',
@@ -154,7 +191,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @action="
                 (id) =>
                   id === 'clear-filters'
-                    ? (filterQuery = '')
+                    ? clearListFilters()
                     : id === 'import'
                       ? importTemplate()
                       : editTemplate(null)
@@ -321,6 +358,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </ODropdownItem>
             </ODropdown>
           </template>
+          <template #cell-applies_to="{ row }">
+            <OTruncatedText :data-test="`alert-template-list-${row.name}-applies-to`">{{
+              appliesToText(row)
+            }}</OTruncatedText>
+          </template>
           <template #cell-used_by="{ row }">
             <DependencyUsageCell
               :graph="depGraph"
@@ -404,6 +446,14 @@ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import {
+  NOTIFICATION_KINDS,
+  kindLabelKey,
+  templateAppliesTo,
+  type NotificationKind,
+} from "@/utils/alerts/notificationKinds";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
@@ -459,6 +509,16 @@ const columns: OTableColumnDef[] = [
     meta: { align: "left", autoWidth: true },
   },
   {
+    id: "applies_to",
+    header: t("alert_templates.appliesTo"),
+    cell: " ",
+    sortable: false,
+    resizable: true,
+    hideable: true,
+    size: 200,
+    meta: { align: "left" },
+  },
+  {
     id: "used_by",
     header: t("alert_dependencies.usedByColumn"),
     cell: " ",
@@ -499,13 +559,13 @@ const viewState = useListViewState("alertTemplates", {
   pageSize: 20,
   sortBy: "",
   sortOrder: "asc" as "asc" | "desc",
+  appliesTo: "any" as AppliesToFilter,
 });
 const filterQuery = ref(viewState.filterQuery);
 const pageSize = ref(viewState.pageSize);
 const sortBy = ref(viewState.sortBy);
 const sortOrder = ref<"asc" | "desc">(viewState.sortOrder);
-// Top-right tab filter — mirrors the alerts list pattern. "prebuilt" shows
-// system templates (name starts with `prebuilt_`), "custom" shows the rest.
+// "Prebuilt" trusts the server's isPrebuilt flag, which covers prebuilt_default and the prebuilt_* rows.
 const activeTab = ref<"all" | "prebuilt" | "custom">(viewState.tab);
 watch([filterQuery, activeTab, pageSize, sortBy, sortOrder], () => {
   Object.assign(viewState, {
@@ -722,7 +782,8 @@ const openClone = (template: Template) => {
   // reserved characters (':', '#', '?', '&', '%', '/', quotes).
   editingTemplate.value = {
     ...template,
-    name: `Copy_of_${template.name}`,
+    // The server refuses names over 256 characters, so cut the copy to fit.
+    name: Array.from(`Copy_of_${template.name}`).slice(0, 256).join(""),
   };
   cloningTemplate.value = true;
   cloningSource.value = template.name;
@@ -796,10 +857,12 @@ const cancelDeleteTemplate = () => {
 const toggleTemplateEditor = () => {
   showTemplateEditor.value = !showTemplateEditor.value;
   if (!showTemplateEditor.value) {
+    // `applies_to` seeds only the editor it opened; the next new template starts on Inferred.
     const {
       action: _action,
       name: _name,
       clone: _clone,
+      applies_to: _appliesTo,
       ...restQuery
     } = router.currentRoute.value.query;
     router.push({
@@ -847,11 +910,82 @@ watch(
   () => {
     if (!templatesList.data.value) return;
     updateRoute();
-    loadDepGraph(orgIdForList.value, graphInputsStale ? ["alerts", "destinations"] : []);
+    // The graph reads its own templates query (it carries usage counts), so a refresh re-reads it too.
+    loadDepGraph(
+      orgIdForList.value,
+      graphInputsStale ? ["alerts", "destinations", "templates"] : [],
+    );
     graphInputsStale = false;
   },
   { immediate: true },
 );
+
+// "any" shows every row, "all_kinds" only rows stored as every kind, a kind the rows that serve it.
+type AppliesToFilter = "any" | "all_kinds" | NotificationKind;
+const isAppliesToFilter = (v: unknown): v is AppliesToFilter =>
+  v === "any" || v === "all_kinds" || NOTIFICATION_KINDS.includes(v as NotificationKind);
+// A valid address value wins, then the filter kept from the last visit, then "any".
+const routeAppliesTo = router.currentRoute.value.query.applies_to;
+const appliesToFilter = ref<AppliesToFilter>(
+  isAppliesToFilter(routeAppliesTo)
+    ? routeAppliesTo
+    : isAppliesToFilter(viewState.appliesTo)
+      ? viewState.appliesTo
+      : "any",
+);
+watch(appliesToFilter, (value) => {
+  viewState.appliesTo = value;
+});
+const appliesToFilterOptions = computed(() => [
+  { label: t("alert_templates.appliesToAny"), value: "any" },
+  { label: t("alert_templates.appliesToAll"), value: "all_kinds" },
+  ...NOTIFICATION_KINDS.map((kind) => ({ label: t(kindLabelKey(kind)), value: kind })),
+]);
+const isAllKinds = (row: Template) => !row.applies_to?.length;
+// Other kinds skip a prebuilt channel template; only prebuilt_default serves every kind.
+const appliesToText = (row: Template) =>
+  row.isPrebuilt && row.name !== "prebuilt_default"
+    ? t(kindLabelKey("alert"))
+    : isAllKinds(row)
+      ? t("alert_templates.appliesToAll")
+      : raw(
+          NOTIFICATION_KINDS.filter((k) => row.applies_to?.includes(k))
+            .map((k) => String(t(kindLabelKey(k))))
+            .join(", "),
+        );
+
+// The upgrade stored every existing template as every kind; the notice stays until dismissed.
+const allKindsNoticeKey = computed(() => `o2-templates-all-kinds-notice:${orgIdForList.value}`);
+const allKindsNoticeDismissed = ref(false);
+const readAllKindsNotice = () => {
+  try {
+    allKindsNoticeDismissed.value = localStorage.getItem(allKindsNoticeKey.value) === "1";
+  } catch {
+    allKindsNoticeDismissed.value = false;
+  }
+};
+watch(allKindsNoticeKey, readAllKindsNotice, { immediate: true });
+const allKindsNoticeCount = computed(() =>
+  allKindsNoticeDismissed.value
+    ? 0
+    : templates.value.filter((row) => !row.isPrebuilt && isAllKinds(row)).length,
+);
+const dismissAllKindsNotice = () => {
+  allKindsNoticeDismissed.value = true;
+  try {
+    localStorage.setItem(allKindsNoticeKey.value, "1");
+  } catch {
+    // The notice still hides for this visit.
+  }
+};
+const clearListFilters = () => {
+  filterQuery.value = "";
+  appliesToFilter.value = "any";
+};
+const reviewAllKinds = () => {
+  activeTab.value = "custom";
+  appliesToFilter.value = "all_kinds";
+};
 
 const visibleRows = computed(() => {
   const base = templates.value || [];
@@ -861,8 +995,24 @@ const visibleRows = computed(() => {
       : activeTab.value === "custom"
         ? base.filter((t: any) => !t.isPrebuilt)
         : base;
-  if (!filterQuery.value) return byTab;
-  return filterData(byTab, filterQuery.value);
+  const filter = appliesToFilter.value;
+  const byKind =
+    filter === "any"
+      ? byTab
+      : filter === "all_kinds"
+        ? byTab.filter(isAllKinds)
+        : byTab.filter((row) => templateAppliesTo(row, filter));
+  if (!filterQuery.value) return byKind;
+  return filterData(byKind, filterQuery.value);
+});
+// Unselect rows that tab, filter, or search hide; selections on other pages stay.
+watch(visibleRows, (rows) => {
+  if (!selectedTemplates.value.length) return;
+  const visible = new Map(rows.map((r: any) => [r.name, r]));
+  const kept = selectedTemplates.value
+    .map((tpl: any) => visible.get(tpl.name))
+    .filter((r: any) => r && !r.isPrebuilt);
+  if (kept.length !== selectedTemplates.value.length) selectedTemplates.value = kept;
 });
 const openBulkDeleteDialog = () => {
   confirmBulkDelete.value = true;

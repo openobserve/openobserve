@@ -15,11 +15,15 @@
 
 use bytes::Bytes;
 use common::infra::config::KVS;
+use config::meta::autoobserve::DISMISSAL_PREFIX;
 use infra::{
     db::{delete_from_db_coordinator, put_into_db_coordinator},
     errors::{Error, Result},
 };
-use o2_enterprise::enterprise::super_cluster::queue::{Message, MessageType};
+use o2_enterprise::enterprise::{
+    alert_calibration_service::dismissals,
+    super_cluster::queue::{Message, MessageType},
+};
 
 /// Process KV messages from super cluster queue
 ///
@@ -57,8 +61,20 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
                 Error::Message(format!("KV put message missing value for key: {}", msg.key))
             })?;
 
-            // Write to kv_store table (primary storage)
-            infra::table::kv_store::set(org_id, kv_key, &value).await?;
+            // A writer can publish after losing its lease, so a dismissal applies only if newer.
+            if kv_key.starts_with(DISMISSAL_PREFIX) {
+                let applied = dismissals::apply_replica(org_id, kv_key, &value)
+                    .await
+                    .map_err(|e| Error::Message(e.to_string()))?;
+                if !applied {
+                    log::debug!(
+                        "[SUPER_CLUSTER:KV] Kept the newer stored dismissal {org_id}/{kv_key}"
+                    );
+                    return Ok(());
+                }
+            } else {
+                infra::table::kv_store::set(org_id, kv_key, &value).await?;
+            }
 
             // Publish coordinator event for within-cluster synchronization
             // This ensures other nodes in the same cluster get notified
@@ -72,7 +88,7 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
 
             // Update local cache
             let cache_key = format!("{}/{}", org_id, kv_key);
-            KVS.insert(cache_key, value);
+            db::kv::cache(cache_key, kv_key, value);
 
             log::debug!(
                 "[SUPER_CLUSTER:KV] Put key: {}/{} to kv_store table and coordinator",
@@ -113,4 +129,68 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use config::meta::autoobserve::dismissal_key;
+
+    use super::*;
+
+    /// The global meta store CI configures through `ZO_META_STORE`, migrated once per binary.
+    async fn meta_store() -> bool {
+        static ONCE: tokio::sync::OnceCell<()> = tokio::sync::OnceCell::const_new();
+        if std::env::var("ZO_META_STORE").is_err() {
+            eprintln!("skipped: needs the meta store CI configures through ZO_META_STORE");
+            return false;
+        }
+        ONCE.get_or_init(|| async {
+            infra::db_init().await.expect("meta store");
+            infra::table::migrate().await.expect("migrations");
+        })
+        .await;
+        true
+    }
+
+    fn put(org: &str, key: &str, value: String) -> Message {
+        let key = format!("/kv/{org}/{key}");
+        Message::new(key, Some(Bytes::from(value)), None, true, MessageType::Put)
+    }
+
+    fn dismissal(revision: u64) -> String {
+        serde_json::json!({
+            "version": 1, "id": "f1", "rule_id": "noise", "pattern": null,
+            "scope_kind": "alert", "scope_key": "a1", "state": "active", "revision": revision,
+            "reason": "expected", "note": null, "actor": "u-ops", "dismissed_at": 1,
+            "duration_days": null, "expires_at": null, "reopened_at": null,
+            "reopened_by": null, "updated_at": 1
+        })
+        .to_string()
+    }
+
+    async fn stored(org: &str, key: &str) -> String {
+        let row = infra::table::kv_store::get(org, key)
+            .await
+            .unwrap()
+            .unwrap();
+        String::from_utf8(row.value).unwrap()
+    }
+
+    #[tokio::test]
+    async fn a_late_dismissal_publish_cannot_roll_back_a_newer_revision() {
+        if !meta_store().await {
+            return;
+        }
+        let org = format!("t_sc_kv_{}", config::utils::time::now_micros());
+        let key = dismissal_key("a1", "f1");
+        process(put(&org, &key, dismissal(3))).await.unwrap();
+        process(put(&org, &key, dismissal(2))).await.unwrap();
+        assert_eq!(stored(&org, &key).await, dismissal(3));
+        process(put(&org, &key, dismissal(4))).await.unwrap();
+        assert_eq!(stored(&org, &key).await, dismissal(4));
+        process(put(&org, "plain", "2".to_string())).await.unwrap();
+        process(put(&org, "plain", "1".to_string())).await.unwrap();
+        assert_eq!(stored(&org, "plain").await, "1");
+        infra::table::kv_store::delete_by_org(&org).await.unwrap();
+    }
 }

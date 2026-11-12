@@ -1,10 +1,21 @@
 <script setup lang="ts">
 import type { ButtonProps, ButtonEmits, ButtonSlots } from "./OButton.types";
 import { Primitive } from "reka-ui";
-import { computed, ref, onMounted, onBeforeUnmount, useAttrs, useId } from "vue";
+import {
+  computed,
+  getCurrentInstance,
+  ref,
+  onMounted,
+  onBeforeUnmount,
+  useAttrs,
+  useId,
+} from "vue";
 import { UNNAMED_ICON_ONLY_DELAY_MS, warnIfUnnamedIconOnly } from "./iconOnlyName";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { useFeatureLock } from "@/composables/useFeatureLock";
+import { useDelayedFlag } from "@/composables/shared/useDelayedFlag";
+import { LOADER_DELAY_MS } from "@/lib/styles/motion";
+import { activates } from "./activation";
 
 defineOptions({ inheritAttrs: false });
 
@@ -16,6 +27,7 @@ const props = withDefaults(defineProps<ButtonProps>(), {
   disabled: false,
   focusableUnavailable: false,
   loading: false,
+  spinner: true,
   active: false,
   block: false,
 });
@@ -28,6 +40,10 @@ const isDisabled = computed(() => props.disabled || locked.value);
 // No native `disabled` reaches an anchor or a slotted child, so a locked one is styled and blocked by hand.
 const lockedLink = computed(() => locked.value && (props.as !== "button" || !!props.asChild));
 const unavailable = computed(() => isDisabled.value && props.focusableUnavailable);
+// A busy button stays focusable (no native disabled), so it looks and acts unavailable without losing focus.
+const inactive = computed(() => unavailable.value || props.loading);
+// The button is busy at once; the spinner waits so a fast action never flashes one.
+const showSpinner = useDelayedFlag(() => props.loading && props.spinner, LOADER_DELAY_MS);
 const reasonId = computed(() => props.descriptionId ?? `${id}-reason`);
 const rootRef = ref<{ $el?: Element } | null>(null);
 // Labels that arrive with data are not unnamed, so the dev check waits for them.
@@ -297,12 +313,39 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
     "focus-visible:ring-3 focus-visible:ring-button-ghost-focus-ring",
     "disabled:opacity-60",
   ].join(" "),
+  // row: list row whose content is itself the action.
+  row: [
+    "bg-transparent text-button-ghost-text border-0 text-start rounded-default",
+    "h-auto! justify-between! gap-3! px-0! py-1.5!",
+    "enabled:hover:bg-button-ghost-hover-bg",
+    "enabled:active:bg-button-ghost-active-bg",
+    "focus-visible:ring-3 focus-visible:ring-button-ghost-focus-ring",
+    "disabled:text-text-disabled",
+  ].join(" "),
+  // locked-body: outlined prompt whose message is the action.
+  "locked-body": [
+    "bg-transparent text-button-outline-text border border-button-outline-border text-start",
+    "h-auto! justify-start! px-3! py-3! whitespace-normal!",
+    "enabled:hover:bg-button-outline-hover-bg enabled:hover:border-button-outline-hover-border",
+    "enabled:active:bg-button-outline-active-bg",
+    "focus-visible:ring-3 focus-visible:ring-button-outline-hover-border",
+    "disabled:opacity-50",
+  ].join(" "),
   // pricing-chip: Pill-shaped toggle chip for model pricing quick-setup template selection
   "pricing-chip": [
     "bg-transparent text-inherit border border-border-default",
     "!rounded-full !text-xs !font-medium !h-auto !py-1.25 !px-3.5 !gap-1.5",
     "transition-colors duration-150",
     "enabled:hover:border-accent enabled:hover:text-accent enabled:hover:bg-button-ghost-hover-bg",
+    "disabled:opacity-60",
+  ].join(" "),
+  "section-chip": [
+    "bg-transparent text-text-body border border-border-default whitespace-nowrap",
+    "!rounded-full !h-auto !py-1 !px-3 !text-sm",
+    "enabled:hover:bg-button-ghost-hover-bg",
+    "aria-[current=location]:bg-surface-accent-active aria-[current=location]:border-button-outline-hover-border",
+    "aria-[current=location]:text-text-heading aria-[current=location]:font-semibold",
+    "focus-visible:ring-3 focus-visible:ring-button-ghost-focus-ring",
     "disabled:opacity-60",
   ].join(" "),
   // tint-*: soft categorical badge fill for tiles that identify an entity by colour, e.g. a cluster code.
@@ -333,6 +376,7 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
 };
 
 const disabledVariantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
+  "section-chip": "opacity-60",
   primary: "bg-button-primary-disabled text-button-primary-foreground",
   secondary: "bg-button-secondary-disabled text-text-disabled",
   outline: "opacity-50",
@@ -371,6 +415,8 @@ const disabledVariantClasses: Record<NonNullable<ButtonProps["variant"]>, string
   "tint-blue": "opacity-60",
   "tint-orange": "opacity-60",
   cell: "opacity-60",
+  row: "text-text-disabled",
+  "locked-body": "opacity-50",
 };
 
 const unavailableClasses = computed(() => {
@@ -381,9 +427,10 @@ const unavailableClasses = computed(() => {
       .split(" ")
       .filter(
         (value) =>
-          !value.startsWith("enabled:") &&
-          !value.startsWith("disabled:") &&
-          !overriddenGroups.includes(value.split("-")[0]),
+          value === "text-start" ||
+          (!value.startsWith("enabled:") &&
+            !value.startsWith("disabled:") &&
+            !overriddenGroups.includes(value.split("-")[0])),
       ),
     ...disabledClasses,
     "cursor-not-allowed!",
@@ -454,11 +501,11 @@ const classes = computed<string[]>(() => [
   "outline-none",
   // A hugging ring vanishes on accent fills, so the outline sits off a gap; ring-0! mutes the per-variant rings.
   "focus-visible:outline-2! focus-visible:outline-solid! focus-visible:outline-offset-2! focus-visible:outline-focus-ring-accent! focus-visible:ring-0!",
-  unavailable.value || lockedLink.value
+  inactive.value || lockedLink.value
     ? "cursor-not-allowed!"
     : "disabled:cursor-not-allowed enabled:cursor-pointer",
   // Variant + size (active overrides variant to primary appearance)
-  unavailable.value || lockedLink.value
+  inactive.value || lockedLink.value
     ? unavailableClasses.value
     : props.active
       ? activeClasses
@@ -467,15 +514,26 @@ const classes = computed<string[]>(() => [
 ]);
 
 function handleKeydown(event: KeyboardEvent): void {
-  if (unavailable.value && (event.key === "Enter" || event.key === " ")) {
+  if (inactive.value && activates(event)) {
     event.preventDefault();
     event.stopImmediatePropagation();
   }
 }
 
+const instance = getCurrentInstance();
+const ACTION_LISTENERS = ["onClick", "onPointerdown", "onMousedown", "onPointerup"];
+
+// A plain button with no listener does nothing on click, so a child tooltip may claim the click to open.
+function isInert(): boolean {
+  if (props.as !== "button" || props.asChild || props.type !== "button") return false;
+  if (attrs["aria-haspopup"] !== undefined || attrs["aria-expanded"] !== undefined) return false;
+  const vnodeProps = instance?.vnode.props ?? {};
+  return !ACTION_LISTENERS.some((name) => vnodeProps[name]);
+}
+
 function handleClick(event: MouseEvent): void {
   if (isDisabled.value || props.loading) {
-    if (unavailable.value || lockedLink.value) {
+    if (inactive.value || lockedLink.value) {
       event.preventDefault();
       event.stopImmediatePropagation();
     }
@@ -492,15 +550,12 @@ function handleClick(event: MouseEvent): void {
     :as-child="asChild"
     :class="classes"
     :type="as === 'button' ? type : undefined"
-    :disabled="
-      as === 'button'
-        ? (isDisabled && !focusableUnavailable) || (loading && !unavailable)
-        : undefined
-    "
+    :disabled="as === 'button' ? isDisabled && !focusableUnavailable : undefined"
     :aria-disabled="isDisabled || loading || undefined"
     :aria-busy="loading || undefined"
     data-o2-btn
     :data-o2-variant="variant"
+    :data-o2-inert="isInert() || undefined"
     v-bind="$attrs"
     :aria-describedby="unavailable ? reasonId : (attrs['aria-describedby'] as string | undefined)"
     @keydown.capture="handleKeydown"
@@ -508,15 +563,17 @@ function handleClick(event: MouseEvent): void {
   >
     <!-- Loading spinner overlay — centered, absolute, shown only when loading -->
     <span
-      v-if="loading"
+      v-if="loading && showSpinner"
       class="pointer-events-none absolute inset-0 flex items-center justify-center"
       aria-hidden="true"
     >
-      <OIcon name="progress-activity" size="sm" class="animate-spin" />
+      <OIcon name="progress-activity" size="sm" class="o2-motion-keep animate-spin" />
     </span>
 
     <!-- Keep display:contents while loading: a wrapper that later loses its box strands a child-mode OTooltip anchored to it at (0,0) -->
-    <span :class="loading ? 'contents text-transparent [&>*]:opacity-0' : 'contents'">
+    <span
+      :class="loading && showSpinner ? 'contents text-transparent [&>*]:opacity-0' : 'contents'"
+    >
       <slot name="icon-left">
         <OIcon
           v-if="iconLeft"

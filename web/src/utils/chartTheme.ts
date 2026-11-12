@@ -103,8 +103,7 @@ const FALLBACKS: Record<string, string> = {
   "--color-chart-table-24": "#E8F4FD",
   "--color-chart-gridline": "rgba(0, 10, 23, 0.09)",
   "--color-chart-band": "rgba(115, 115, 115, 0.22)",
-  // --color-chart-crosshair-bg is deliberately absent: it is dark-only, and the empty
-  // string light returns is what makes ECharts use its own auto default (base.css:262).
+  "--color-chart-crosshair-bg": "#525252",
   // Trace span palette (HEX/canvas variant), light values.
   "--color-trace-span-1": "#84CC16",
   "--color-trace-span-2": "#7C3AED",
@@ -200,6 +199,7 @@ export function chartNumber(token: `--${string}`, fallback: number): number {
 
 // Convenience getters used by the dashboard/trace chart converters.
 export const chartTextColor = (): string => chartColor("--color-text-secondary");
+export const chartAxisTextColor = (): string => chartColor("--color-text-body");
 export const chartAxisLine = (): string => chartColor("--color-border-default");
 export const chartBg = (): string => chartColor("--color-surface-base");
 export const chartGridLine = (): string => chartColor("--color-border-subtle");

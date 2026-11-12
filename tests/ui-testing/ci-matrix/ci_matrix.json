@@ -18,11 +18,13 @@
       "alerts-chart-error-state.spec.js",
       "alertsPagination.spec.js",
       "alertTemplatesPagination.spec.js",
+      "alertTemplatesToolbar.spec.js",
       "alertDestinationsPagination.spec.js",
       "alerts-destinations-usage.spec.js",
       "alerts-no-destination.spec.js",
       "alerts-from-panel.spec.js",
       "alertCalibration.spec.js",
+      "alertCalibrationDismiss.spec.js",
       "alerts-content-templates.spec.js"
     ],
     "disabled": [
@@ -48,6 +50,7 @@
       "alerts-ui-operations.spec.js",
       "alerts-destinations-prebuilt.spec.js",
       "alert-library.spec.js",
+      "alert-library-anomaly.spec.js",
       "alerts-composite-builder.spec.js",
       "alerts-composite-detail.spec.js",
       "alerts-composite-list.spec.js",
@@ -130,14 +133,10 @@
       "dashboard-save-conflict.spec.js",
       "refreshCancelButtons.spec.js",
       "dashboard-refresh-button.spec.js",
-      "panelNotices.spec.js"
+      "panelNotices.spec.js",
+      "promqlAutocomplete.spec.js"
     ],
-    "disabled": [
-      {
-        "file": "promqlAutocomplete.spec.js",
-        "reason": "silently dead: manifest listed it under the wrong folder, so it never ran; revalidate before enabling"
-      }
-    ]
+    "disabled": []
   },
   {
     "testfolder": "Dashboards-Isolated",
@@ -372,7 +371,8 @@
       "logs-search-around-multistream.spec.js",
       "logs-default-columns.spec.js",
       "logsResultsToolbar.spec.js",
-      "logsSavedFunctionOverwrite.spec.js"
+      "logsSavedFunctionOverwrite.spec.js",
+      "logs-explain-analyze.spec.js"
     ],
     "disabled": [
       {
@@ -575,11 +575,11 @@
       "ingestionTokens.spec.js",
       "ingestion-passcode-forbidden.spec.js",
       "ingestion-passcode-loading.spec.js",
-      "connectDataSourcePopup.spec.js",
       "splunk-hec-ingestion-window.spec.js",
       "enrichment.spec.js",
       "schema.spec.js",
-      "first-event-status.spec.js"
+      "first-event-status.spec.js",
+      "ingestion-setup-card-tracing.spec.js"
     ],
     "disabled": []
   },
@@ -616,6 +616,19 @@
     "disabled": []
   },
   {
+    "testfolder": "Ingestion-Onboarding",
+    "actual_folder": "Onboarding",
+    "browser": "chrome",
+    "run_files": [
+      "first-data-notice.spec.js",
+      "diagnosis.spec.js",
+      "first-event.spec.js",
+      "legacy-pages.spec.js",
+      "token-picker.spec.js"
+    ],
+    "disabled": []
+  },
+  {
     "testfolder": "SLO",
     "_comment": "SLO lifecycle, form validation and the alert SLI type. No backfill dependency, so these run in parallel \u2014 but pinned to 3 workers: at 5 the concurrent SLO/alert/destination writes trip SQLite's 'database is locked' on the single-node meta store. The REST contract is covered by pytest in tests/api-testing/tests/slos/.",
     "actual_folder": "SLO",
@@ -626,7 +639,8 @@
       "slo-crud.spec.js",
       "slo-form-validation.spec.js",
       "slo-required-fields.spec.js",
-      "slo-alert-sli.spec.js"
+      "slo-alert-sli.spec.js",
+      "slo-import.spec.js"
     ],
     "disabled": []
   },

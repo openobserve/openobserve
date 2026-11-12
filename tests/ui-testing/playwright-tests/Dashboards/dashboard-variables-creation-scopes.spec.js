@@ -149,17 +149,10 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", { tag: ['@d
     await filterValueInput.waitFor({ state: "visible", timeout: 5000 });
     await filterValueInput.click();
 
-    // OCombobox opens on focus (:open-on-focus="true"); options appear immediately
-    const hasDropdown = await scopedVars.getFilterValueOptions().first().isVisible({ timeout: 2000 }).catch(() => false);
-
-    if (hasDropdown) {
-      // If dropdown appears, verify panel variable is NOT in the list
-      const options = await scopedVars.getFilterValueOptionTexts();
-      expect(options).not.toContain(panelVar);
-    } else {
-      // If dropdown doesn't appear, it means there are no variables available (correct behavior)
-      // This is expected - tab variables cannot depend on panel variables
-    }
+    // The value list is already open after the operator; it lists the visible $variables first.
+    await expect(scopedVars.getFilterValueList()).toBeVisible({ timeout: 10000 });
+    const options = await scopedVars.getFilterValueOptionTexts();
+    expect(options).not.toContain(panelVar);
 
     await pm.dashboardSetting.closeSettingWindow();
 
@@ -236,17 +229,10 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", { tag: ['@d
     await filterValueInput2.waitFor({ state: "visible", timeout: 5000 });
     await filterValueInput2.click();
 
-    // OCombobox opens on focus (:open-on-focus="true"); options appear immediately
-    const hasDropdown2 = await scopedVars.getFilterValueOptions().first().isVisible({ timeout: 2000 }).catch(() => false);
-
-    if (hasDropdown2) {
-      // If dropdown appears, verify tab1's variable is NOT in the list
-      const options2 = await scopedVars.getFilterValueOptionTexts();
-      expect(options2).not.toContain(tab1Var);
-    } else {
-      // If dropdown doesn't appear, it means there are no variables available (correct behavior)
-      // This is actually the expected behavior - tab2 cannot depend on tab1's variable
-    }
+    // The value list is already open after the operator; it lists the visible $variables first.
+    await expect(scopedVars.getFilterValueList()).toBeVisible({ timeout: 10000 });
+    const options2 = await scopedVars.getFilterValueOptionTexts();
+    expect(options2).not.toContain(tab1Var);
 
     await pm.dashboardSetting.closeSettingWindow();
 
@@ -371,8 +357,7 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", { tag: ['@d
     await filterValueInput3.waitFor({ state: "visible", timeout: 10000 });
     await filterValueInput3.click();
 
-    // OCombobox opens on focus; wait for options to appear
-    await scopedVars.getFilterValueOptions().first().waitFor({ state: "visible", timeout: 10000 });
+    await expect(scopedVars.getFilterValueList()).toBeVisible({ timeout: 10000 });
 
     const options3 = await scopedVars.getFilterValueOptionTexts();
     expect(options3).toContain(globalVar);
@@ -459,17 +444,10 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", { tag: ['@d
     await filterValueInput4.waitFor({ state: "visible", timeout: 5000 });
     await filterValueInput4.click();
 
-    // OCombobox opens on focus (:open-on-focus="true"); options appear immediately
-    const hasDropdown4 = await scopedVars.getFilterValueOptions().first().isVisible({ timeout: 2000 }).catch(() => false);
-
-    if (hasDropdown4) {
-      // If dropdown appears, verify panel1's variable is NOT in the list
-      const options4 = await scopedVars.getFilterValueOptionTexts();
-      expect(options4).not.toContain(panel1Var);
-    } else {
-      // If dropdown doesn't appear, it means there are no variables available (correct behavior)
-      // This is expected - panel variables cannot depend on other panel variables
-    }
+    // The value list is already open after the operator; it lists the visible $variables first.
+    await expect(scopedVars.getFilterValueList()).toBeVisible({ timeout: 10000 });
+    const options4 = await scopedVars.getFilterValueOptionTexts();
+    expect(options4).not.toContain(panel1Var);
 
     await pm.dashboardSetting.closeSettingWindow();
 

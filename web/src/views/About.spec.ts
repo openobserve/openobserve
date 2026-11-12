@@ -13,12 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, it, expect, beforeEach, vi } from "vitest";
-import { mount } from "@vue/test-utils";
+import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
+import { flushPromises, mount } from "@vue/test-utils";
 import About from "./About.vue";
 import i18n from "@/locales";
 import { createStore } from "vuex";
 import { createRouter, createWebHistory } from "vue-router";
+import config from "@/aws-exports";
+import licenseServer from "@/services/license_server";
 
 // Mock getImageURL
 vi.mock("@/utils/zincutils", () => ({
@@ -33,30 +35,59 @@ vi.mock("@/aws-exports", () => ({
   },
 }));
 
+// A serialized LicenseResponse, as GET /api/license sends it.
+const licenseResponse = (overrides: Record<string, unknown> = {}) => ({
+  key: "anonymised-key",
+  waivers: [],
+  base: {
+    search_allowed: true,
+    blocks: [],
+    exceeded_days: 0,
+    allowed_days: 3,
+    limit_today_gb: 100,
+    used_today_gb: 42,
+    waiver_ids_applied: [],
+  },
+  env_key_active: false,
+  env_key_in_use: false,
+  installation_id: "inst_test",
+  license: {
+    license_id: "lic_test",
+    active: true,
+    created_at: 1704067200000000,
+    expires_at: 1735689600000000,
+    limits: { Ingestion: { typ: "PerDayCount", value: 100 } },
+    features: ["ai_assistant"],
+    feature_definition: {
+      features: {
+        ai_assistant: { display_name: "AI Assistant", gate: true },
+        oncall: { display_name: "On-Call", gate: true },
+        alerts: { display_name: "Alerts", gate: false },
+      },
+    },
+  },
+  expired: false,
+  ingestion_used: 42,
+  ingestion_exceeded: 0,
+  decision: {
+    search_allowed: true,
+    blocks: [],
+    exceeded_days: 0,
+    allowed_days: 3,
+    limit_today_gb: 100,
+    used_today_gb: 42,
+    waiver_ids_applied: [],
+  },
+  evaluated_at: 1704067200000000,
+  can_update_license: true,
+  ...overrides,
+});
+
 // Mock license server
 vi.mock("@/services/license_server", async (importOriginal) => {
   const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
   return overlayServiceMock(await importOriginal(), {
-    default: {
-      get_license: vi.fn().mockResolvedValue({
-        data: {
-          license: {
-            license_id: "test-license-123",
-            created_at: 1704067200000000,
-            expires_at: 1735689600000000,
-            limits: {
-              Ingestion: {
-                typ: "PerDayCount",
-                value: 100,
-              },
-            },
-          },
-          expired: false,
-          ingestion_used: 45.5,
-          installation_id: "install-123",
-        },
-      }),
-    },
+    default: { get_license: vi.fn() },
   });
 });
 
@@ -353,5 +384,176 @@ describe("About", () => {
 
     // Root element is a div (replaces old .aboutPage class check)
     expect(wrapper.element.tagName).toBe("DIV");
+  });
+
+  describe("enterprise license details", () => {
+    const decision = (overrides: Record<string, unknown>) => ({
+      ...licenseResponse().decision,
+      ...overrides,
+    });
+    const limits = (typ: string, value: number) => ({
+      ...licenseResponse().license,
+      limits: { Ingestion: { typ, value } },
+    });
+
+    const mountAbout = async (overrides: Record<string, unknown> = {}) => {
+      vi.mocked(licenseServer.get_license).mockResolvedValue({
+        data: licenseResponse(overrides),
+      } as never);
+      const wrapper = mount(About, {
+        global: {
+          plugins: [
+            i18n,
+            createStore({
+              state: {
+                theme: "light",
+                zoConfig: {
+                  build_type: "enterprise",
+                  version: "v0.70.0",
+                  feature_revision: 1,
+                  license_server_url: "https://license.example.com",
+                  feature_names: { oncall: "On-Call", ai_assistant: "AI Assistant" },
+                  features: { ai_assistant: "enabled", oncall: "locked", alerts: "enabled" },
+                },
+              },
+            }),
+            router,
+          ],
+        },
+      });
+      await flushPromises();
+      return wrapper;
+    };
+    const text = (wrapper: ReturnType<typeof mount>, id: string) =>
+      wrapper.find(`[data-test="${id}"]`).text();
+
+    beforeEach(() => {
+      config.isEnterprise = "true";
+    });
+
+    afterEach(() => {
+      config.isEnterprise = "false";
+    });
+
+    it("shows the limit in force, with no raw type or separator", async () => {
+      const wrapper = await mountAbout();
+
+      expect(text(wrapper, "about-license-limit")).toBe("100 GB / day");
+      expect(text(wrapper, "about-license-used")).toBe("42 GB today100 GB / day");
+      expect(wrapper.text()).toContain("42%");
+      expect(wrapper.text()).not.toContain("PerDayCount");
+      expect(wrapper.text()).not.toContain("· limit");
+    });
+
+    it("shows the 50 an expired 200 GB key is held to", async () => {
+      const wrapper = await mountAbout({
+        expired: true,
+        license: limits("PerDayCount", 200),
+        ingestion_used: 21,
+        decision: decision({ limit_today_gb: 50 }),
+      });
+
+      expect(text(wrapper, "about-license-limit")).toBe("50 GB / day");
+      expect(text(wrapper, "about-license-used")).toBe("42 GB today50 GB / day");
+      expect(wrapper.text()).toContain("84%");
+    });
+
+    it("shows Unlimited, not 50, for an Unlimited key", async () => {
+      const wrapper = await mountAbout({
+        license: limits("Unlimited", 0),
+        decision: decision({ limit_today_gb: null }),
+      });
+
+      expect(text(wrapper, "about-license-limit")).toBe("Unlimited");
+      expect(text(wrapper, "about-license-used")).toBe("42 GB today");
+      expect(wrapper.text()).not.toContain("of daily limit used today");
+      expect(wrapper.find('[data-test="about-license-plan-detail"]').exists()).toBe(false);
+    });
+
+    it("shows a 200 GB key's own limit while the decision is not evaluated", async () => {
+      const wrapper = await mountAbout({
+        license: limits("PerDayCount", 200),
+        ingestion_used: 21,
+        evaluated_at: 0,
+        decision: decision({ limit_today_gb: null, used_today_gb: 0 }),
+      });
+
+      expect(text(wrapper, "about-license-limit")).toBe("200 GB / day");
+      expect(text(wrapper, "about-license-used")).toBe("42 GB today200 GB / day");
+      expect(wrapper.text()).toContain("21%");
+    });
+
+    it.each([
+      ["200 GB", limits("PerDayCount", 200)],
+      ["Unlimited", limits("Unlimited", 0)],
+    ])("holds an expired %s key to 50 while the decision is not evaluated", async (_n, license) => {
+      const wrapper = await mountAbout({
+        expired: true,
+        license,
+        ingestion_used: 20,
+        evaluated_at: 0,
+        decision: decision({ limit_today_gb: null, used_today_gb: 0 }),
+      });
+
+      expect(text(wrapper, "about-license-limit")).toBe("50 GB / day");
+      expect(text(wrapper, "about-license-used")).toBe("10 GB today50 GB / day");
+      expect(wrapper.text()).toContain("20%");
+    });
+
+    it("keeps the free-plan note on the free limit only", async () => {
+      const free = await mountAbout({
+        license: limits("PerDayCount", 50),
+        decision: decision({ limit_today_gb: 50 }),
+      });
+      expect(free.find('[data-test="about-license-plan-detail"]').exists()).toBe(true);
+
+      const paid = await mountAbout();
+      expect(paid.find('[data-test="about-license-plan-detail"]').exists()).toBe(false);
+    });
+
+    it("lists a partial license and says so in the comparison sentence", async () => {
+      const wrapper = await mountAbout();
+      const list = wrapper.find('[data-test="about-license-features"]');
+
+      expect(list.text()).toContain("Features");
+      expect(list.find('[data-test="settings-license-features-unlocked"]').text()).toContain(
+        "AI Assistant",
+      );
+      expect(list.find('[data-test="settings-license-features-missing"]').text()).toContain(
+        "On-Call",
+      );
+      expect(text(wrapper, "feature-comparison-ent-msg")).toContain(
+        "Some features are not in your license",
+      );
+    });
+
+    it("opens the request form with the installation's context for an admin", async () => {
+      const wrapper = await mountAbout();
+      const open = vi.spyOn(window, "open").mockReturnValue(null);
+
+      await wrapper.find('[data-test="settings-license-features-request-access"]').trigger("click");
+
+      const url = new URL(String(open.mock.calls[0][0]));
+      expect(`${url.origin}${url.pathname}`).toBe(
+        "https://license.example.com/user/request-license",
+      );
+      expect(Object.fromEntries(url.searchParams)).toEqual({
+        base_url: window.location.origin,
+        license_id: "inst_test",
+        o2_version: "v0.70.0",
+        feature_revision: "1",
+        features: "ai_assistant",
+      });
+      open.mockRestore();
+    });
+
+    it("shows a non-admin the list without Request Access", async () => {
+      const wrapper = await mountAbout({ can_update_license: false });
+
+      expect(wrapper.find('[data-test="settings-license-features-request-access"]').exists()).toBe(
+        false,
+      );
+      expect(wrapper.find('[data-test="settings-license-features-missing"]').exists()).toBe(true);
+    });
   });
 });

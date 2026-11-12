@@ -50,6 +50,10 @@ use tokio::sync::mpsc;
 use tracing::{Instrument, Span};
 use transform as functions;
 use usage_reporting::report_request_usage_stats;
+use utoipa::openapi::{
+    RefOr,
+    schema::{AnyOfBuilder, ArrayBuilder, ObjectBuilder, Schema, SchemaType, Type},
+};
 #[cfg(feature = "cloud")]
 use {
     axum::http::StatusCode as AxumStatusCode,
@@ -70,6 +74,34 @@ use crate::{
     },
     search::{error_utils::map_error_to_http_response, utils::SearchStreamGuard},
 };
+
+/// Only documents `_search_multi`: with `per_query_response` each hit is one query's rows.
+struct MultiSearchResponse;
+
+impl utoipa::PartialSchema for MultiSearchResponse {
+    fn schema() -> RefOr<Schema> {
+        let mut schema = <search::Response as utoipa::PartialSchema>::schema();
+        if let RefOr::T(Schema::Object(response)) = &mut schema {
+            let row = || ObjectBuilder::new().schema_type(Type::Object);
+            // A ResultArray VRL may put non-object values inside a per-query group.
+            let any_value = ObjectBuilder::new().schema_type(SchemaType::AnyValue);
+            let hit = AnyOfBuilder::new()
+                .item(row())
+                .item(ArrayBuilder::new().items(any_value));
+            let hits = ArrayBuilder::new().items(hit).description(Some(
+                "Rows, or with `per_query_response` one array of values per query",
+            ));
+            response.properties.insert("hits".to_string(), hits.into());
+        }
+        schema
+    }
+}
+
+impl utoipa::ToSchema for MultiSearchResponse {
+    fn schemas(schemas: &mut Vec<(String, RefOr<Schema>)>) {
+        <search::Response as utoipa::ToSchema>::schemas(schemas);
+    }
+}
 
 /// SearchStreamData
 #[utoipa::path(
@@ -104,7 +136,7 @@ use crate::{
             status = 200,
             description = "Success",
             content_type = "application/json",
-            body = Object,
+            body = MultiSearchResponse,
             example = json!({
             "took": 155,
             "hits": [
@@ -236,6 +268,10 @@ pub async fn search_multi(
     for req in queries.iter_mut() {
         if let Err(e) = req.decode() {
             return MetaHttpResponse::bad_request(e);
+        }
+        // Each query runs inside the loop below, so a later refusal would follow earlier results.
+        if let Some(res) = super::digest_query_refusal(&req.query.sql, stream_type, &trace_id) {
+            return res;
         }
     }
     let queries_len = queries.len();
@@ -672,7 +708,7 @@ pub async fn search_multi(
             status = 200,
             description = "Success",
             content_type = "application/json",
-            body = Object,
+            body = config::meta::search::SearchPartitionResponse,
             example = json!({
             "took": 155,
             "file_num": 10,
@@ -753,6 +789,13 @@ pub async fn _search_partition_multi(
 
     if let Err(e) = req.decode() {
         return MetaHttpResponse::bad_request(e);
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    for sql in &req.sql {
+        if let Some(res) = super::digest_query_refusal(sql, stream_type, &trace_id) {
+            return res;
+        }
     }
 
     #[cfg(feature = "enterprise")]
@@ -853,7 +896,7 @@ pub async fn _search_partition_multi(
         ("timeout" = Option<i64>, Query, description = "timeout, seconds"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({
+        (status = 200, description = "Success", content_type = "application/json", body = config::meta::search::Response, example = json!({
             "took": 155,
             "hits": [
                 {
@@ -1012,6 +1055,8 @@ fn parse_simple_multi_stream_request(
     #[derive(serde::Deserialize)]
     struct SimpleMultiStreamWrapper {
         query: SimpleMultiStreamQuery,
+        #[serde(default = "search::default_use_index")]
+        use_index: bool,
     }
     #[derive(serde::Deserialize)]
     struct SimpleMultiStreamQuery {
@@ -1061,6 +1106,7 @@ fn parse_simple_multi_stream_request(
         uses_zo_fn: simple_req.query.query_fn.is_some(),
         query_fn: simple_req.query.query_fn,
         skip_wal: false,
+        use_index: simple_req.use_index,
         regions: vec![],
         clusters: vec![],
         search_type: None,
@@ -1368,6 +1414,11 @@ pub async fn search_multi_stream(
             return http_response;
         }
 
+        #[cfg(not(feature = "enterprise"))]
+        if let Some(res) = super::digest_query_refusal(&req.query.sql, stream_type, &trace_id) {
+            return res;
+        }
+
         #[cfg(feature = "enterprise")]
         if let Some(res) = super::check_sql_stream_permissions(
             &req.query.sql,
@@ -1550,6 +1601,8 @@ pub async fn report_to_audit(
     let is_audit_enabled = get_o2_config().common.audit_enabled;
     if is_audit_enabled {
         audit(AuditMessage {
+            login_ip: None,
+            user_agent: None,
             user_email: user_id,
             org_id,
             _timestamp: config::utils::time::now_micros(),
@@ -1587,7 +1640,25 @@ mod tests {
     use openobserve_api_common::extractors::Headers;
     use openobserve_core::auth::UserEmail;
 
-    use super::around_multi;
+    use super::{around_multi, parse_simple_multi_stream_request};
+
+    #[test]
+    fn test_parse_simple_multi_stream_request_use_index() {
+        let body = |extra: &str| {
+            format!(
+                r#"{{"query":{{"sql":["SELECT * FROM t"],"start_time":0,"end_time":1}}{extra}}}"#
+            )
+        };
+        assert!(
+            parse_simple_multi_stream_request(body("").as_bytes())
+                .unwrap()
+                .use_index
+        );
+        let req = parse_simple_multi_stream_request(body(r#","use_index":false"#).as_bytes());
+        assert!(!req.unwrap().use_index);
+    }
+
+    const DIGEST_SQL: &str = r#"SELECT * FROM "default" WHERE x IN (SELECT alert_id FROM "_o2_alert_calibration_digests")"#;
 
     #[test]
     fn multi_stream_checks_each_query_after_decoding_it() {
@@ -1630,6 +1701,7 @@ mod tests {
             uses_zo_fn: false,
             query_fn: None,
             skip_wal: false,
+            use_index: true,
             regions: vec![],
             clusters: vec![],
             search_type: None,
@@ -1683,6 +1755,7 @@ mod tests {
             uses_zo_fn: false,
             query_fn: None,
             skip_wal: false,
+            use_index: true,
             regions: vec![],
             clusters: vec![],
             search_type: None,
@@ -1711,6 +1784,7 @@ mod tests {
             uses_zo_fn: false,
             query_fn: None,
             skip_wal: false,
+            use_index: true,
             regions: vec![],
             clusters: vec![],
             search_type: None,
@@ -1744,6 +1818,7 @@ mod tests {
             uses_zo_fn: false,
             query_fn: Some("base64_encoded_vrl_function".to_string()),
             skip_wal: false,
+            use_index: true,
             regions: vec![],
             clusters: vec![],
             search_type: None,
@@ -1778,6 +1853,7 @@ mod tests {
             uses_zo_fn: false,
             query_fn: None,
             skip_wal: false,
+            use_index: true,
             regions: vec![],
             clusters: vec![],
             search_type: None,
@@ -1820,6 +1896,7 @@ mod tests {
             uses_zo_fn: false,
             query_fn: None,
             skip_wal: false,
+            use_index: true,
             regions: vec![],
             clusters: vec![],
             search_type: None,
@@ -1855,6 +1932,7 @@ mod tests {
             uses_zo_fn: false,
             query_fn: None,
             skip_wal: false,
+            use_index: true,
             regions: vec![],
             clusters: vec![],
             search_type: None,
@@ -1921,6 +1999,7 @@ mod tests {
             uses_zo_fn: false,
             query_fn: Some("dG9wX2xldmVsX3ZybA==".to_string()), // "top_level_vrl" base64
             skip_wal: false,
+            use_index: true,
             regions: vec![],
             clusters: vec![],
             search_type: None,
@@ -1962,6 +2041,7 @@ mod tests {
             uses_zo_fn: false,
             query_fn: Some("dG9wX2xldmVsX3ZybA==".to_string()), // "top_level_vrl"
             skip_wal: false,
+            use_index: true,
             regions: vec![],
             clusters: vec![],
             search_type: None,
@@ -2025,6 +2105,7 @@ mod tests {
             uses_zo_fn: false,
             query_fn: Some(encoded),
             skip_wal: false,
+            use_index: true,
             regions: vec![],
             clusters: vec![],
             search_type: None,
@@ -2090,6 +2171,7 @@ mod tests {
             uses_zo_fn: false,
             query_fn: Some(encoded),
             skip_wal: false,
+            use_index: true,
             regions: vec![],
             clusters: vec![],
             search_type: None,
@@ -2163,6 +2245,7 @@ mod tests {
             uses_zo_fn: false,
             query_fn: Some(encoded),
             skip_wal: false,
+            use_index: true,
             regions: vec![],
             clusters: vec![],
             search_type: None,
@@ -2435,5 +2518,100 @@ mod tests {
         )
         .await;
         assert_unauthorized(resp).await;
+    }
+
+    async fn assert_protected(resp: axum::response::Response) {
+        assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+        let code = resp
+            .headers()
+            .get(crate::common::meta::http::ERROR_HEADER)
+            .map(|v| v.to_str().unwrap().to_string());
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let body = String::from_utf8_lossy(&body);
+        assert_eq!(code.as_deref(), Some("20014"), "{body}");
+        assert!(body.contains("\"code\":20014"), "{body}");
+    }
+
+    fn digest_multi_body(per_query_response: bool, query_fn: Option<&str>) -> serde_json::Value {
+        serde_json::json!({
+            "sql": [{"sql": r#"SELECT * FROM "default""#}, {"sql": DIGEST_SQL}],
+            "start_time": 1,
+            "end_time": 2,
+            "per_query_response": per_query_response,
+            "query_fn": query_fn.map(base64::encode_url),
+        })
+    }
+
+    // The cloud build checks the org's trial period first, which can answer 403 before this guard.
+    #[cfg(not(feature = "cloud"))]
+    #[tokio::test]
+    async fn search_multi_refuses_a_digest_query_with_403_before_any_query_runs() {
+        use axum::Json;
+
+        let req: MultiStreamRequest =
+            serde_json::from_value(digest_multi_body(false, None)).unwrap();
+        let resp = super::search_multi(
+            Path("default".to_string()),
+            Query(HashMap::new()),
+            Headers(UserEmail {
+                user_id: "user@example.com".to_string(),
+            }),
+            HeaderMap::new(),
+            Json(req),
+        )
+        .await;
+        assert_protected(resp).await;
+    }
+
+    // Enterprise answers the same refusal from its audited stream-permission check.
+    #[cfg(not(any(feature = "cloud", feature = "enterprise")))]
+    #[tokio::test]
+    async fn search_multi_stream_refuses_a_digest_query_with_403_before_streaming() {
+        for (per_query_response, query_fn) in [
+            (false, None),
+            (true, Some("#ResultArray#\n.")),
+            (true, None),
+        ] {
+            let body = digest_multi_body(per_query_response, query_fn);
+            let resp = super::search_multi_stream(
+                Path("default".to_string()),
+                Query(HashMap::new()),
+                Headers(UserEmail {
+                    user_id: "user@example.com".to_string(),
+                }),
+                HeaderMap::new(),
+                axum::body::Bytes::from(body.to_string()),
+            )
+            .await;
+            assert_protected(resp).await;
+        }
+    }
+
+    #[cfg(not(any(feature = "cloud", feature = "enterprise")))]
+    #[tokio::test]
+    async fn search_partition_multi_refuses_a_digest_query_with_403() {
+        let resp = super::_search_partition_multi(
+            Path("default".to_string()),
+            HeaderMap::new(),
+            Query(HashMap::new()),
+            Headers(UserEmail {
+                user_id: "user@example.com".to_string(),
+            }),
+            axum::Json(MultiSearchPartitionRequest {
+                sql: vec![DIGEST_SQL.to_string()],
+                start_time: 1,
+                end_time: 2,
+                encoding: config::meta::search::RequestEncoding::Empty,
+                regions: vec![],
+                clusters: vec![],
+                query_fn: None,
+                streaming_output: false,
+                histogram_interval: 0,
+            }),
+        )
+        .await;
+        assert_protected(resp).await;
     }
 }

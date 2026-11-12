@@ -126,7 +126,9 @@ export function isPrebuiltType(type: string): boolean {
  */
 export function detectPrebuiltType(destination: any): PrebuiltTypeId | null {
   if (destination.type === "email") {
-    return destination.template?.startsWith("prebuilt_") ? "email" : null;
+    // prebuilt_default is the built-in card every kind falls back to, not the prebuilt email.
+    const template: string | undefined = destination.template;
+    return template?.startsWith("prebuilt_") && template !== "prebuilt_default" ? "email" : null;
   }
   const type = destination.destination_type_name;
   return type && isPrebuiltType(type) ? (type as PrebuiltTypeId) : null;
@@ -221,6 +223,17 @@ export function generateDestinationHeaders(
   }
 
   return headers;
+}
+
+// Same host rule as the server's teams_format_for_url.
+const TEAMS_MESSAGE_CARD_URL = /^https?:\/\/(outlook|webhook)\.office\.com(\/|$)/i;
+const SAME_NAME_CHANNELS = ["slack", "email", "discord", "pagerduty", "opsgenie", "servicenow"];
+
+export function templateChannelFor(type: string, url: string): string {
+  if (type === "msteams") {
+    return TEAMS_MESSAGE_CARD_URL.test(url) ? "teams_messagecard" : "teams_adaptivecard";
+  }
+  return SAME_NAME_CHANNELS.includes(type) ? type : "webhook";
 }
 
 /**

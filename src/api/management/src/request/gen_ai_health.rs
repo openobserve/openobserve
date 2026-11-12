@@ -35,7 +35,7 @@ use config::{
         search::{Query as SearchQuery, Request as SearchRequest, RequestEncoding},
         stream::StreamType,
     },
-    utils::{json, time::now_micros},
+    utils::{json, sql::quote_sql_string, time::now_micros},
 };
 use db::model_pricing::DefinitionMatch;
 use serde::{Deserialize, Serialize};
@@ -212,10 +212,6 @@ const CHECK_IDS: [CheckId; 4] = [
     CheckId::MissingSessionId,
 ];
 
-fn quote_str(value: &str) -> String {
-    format!("'{}'", value.replace('\'', "''"))
-}
-
 fn quote_ident(value: &str) -> String {
     format!("\"{}\"", value.replace('"', "\"\""))
 }
@@ -231,7 +227,7 @@ fn check_pred(id: CheckId, cols: &Columns, pricing_enabled: bool) -> Pred {
         CheckId::UnpricedModels if pricing_enabled && cols.has(COST_STATUS_COLUMN) => {
             Pred::Sql(format!(
                 "{COST_STATUS_COLUMN} = {}",
-                quote_str(CostStatus::Unpriced.as_str())
+                quote_sql_string(CostStatus::Unpriced.as_str())
             ))
         }
         CheckId::UnpricedModels => Pred::Never,
@@ -294,7 +290,7 @@ fn base_where(cols: &Columns, query: &DataHealthQuery) -> Option<String> {
         if !cols.has(column) {
             return None;
         }
-        preds.push(format!("{column} = {}", quote_str(value)));
+        preds.push(format!("{column} = {}", quote_sql_string(value)));
     }
     Some(preds.join(" AND "))
 }
@@ -835,7 +831,9 @@ fn validate_window(start_time: i64, end_time: i64) -> Result<(), &'static str> {
 async fn authorize_read(org_id: &str, user_id: &str, stream: &str) -> Result<(), Response> {
     #[cfg(feature = "enterprise")]
     {
-        if let Err(e) = search_service::check_search_allowed(org_id, Some(stream)) {
+        if let Err(e) =
+            search_service::check_search_allowed(org_id, Some((stream, StreamType::Traces)))
+        {
             return Err(MetaHttpResponse::too_many_requests(e.to_string()));
         }
         if let Some(denied) = openobserve_core::authz::check_stream_permissions(
@@ -877,7 +875,7 @@ async fn authorize_read(org_id: &str, user_id: &str, stream: &str) -> Result<(),
     security(("Authorization" = [])),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Traces", "operation": "list"})),
-        ("x-o2-mcp" = json!({"enabled": false}))
+        ("x-o2-mcp" = json!({"description": "AI data health: count LLM spans with no model price, no agent identity, zero duration or no session id in a trace stream; pass agent to scope to one app", "category": "traces"}))
     )
 )]
 pub async fn get_data_health(
@@ -970,8 +968,8 @@ pub struct UnpricedModelRow {
 fn listed_status_pred() -> String {
     format!(
         "{COST_STATUS_COLUMN} IN ({}, {})",
-        quote_str(CostStatus::Unpriced.as_str()),
-        quote_str(CostStatus::Approximate.as_str())
+        quote_sql_string(CostStatus::Unpriced.as_str()),
+        quote_sql_string(CostStatus::Approximate.as_str())
     )
 }
 

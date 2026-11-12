@@ -170,6 +170,18 @@
   );
 }
 
+/* At a fractional device pixel ratio the browser blurs a canvas by resampling it; print keeps smoothing since its scale is arbitrary. */
+@utility chart-canvas-pixelated {
+  & canvas {
+    image-rendering: pixelated;
+  }
+  @media print {
+    & canvas {
+      image-rendering: auto;
+    }
+  }
+}
+
 /* Green-to-red scale for the click heat legend; hues mirror the canvas palette in utils/rum/clickHeatmap.ts. */
 @utility bg-heat-legend {
   background-image: linear-gradient(
@@ -178,6 +190,13 @@
     var(--color-warning),
     var(--color-status-negative)
   );
+}
+
+/* On a card wrapping an OTable: the card's edge is the table's last line, so the last row draws none. */
+@utility table-last-row-flush {
+  & tbody > tr:last-child > td {
+    border-bottom-width: 0;
+  }
 }
 
 /* Thin ring cut around a glyph so it stays legible when it overlaps another icon. */
@@ -191,4 +210,10 @@
 /* Bare amber lock glyph, no container: the one look for every lock icon. */
 @utility lock-chip {
   @apply text-icon-locked;
+}
+
+/* Dotted canvas behind a pannable node graph. Consumer: components/query-plan/ProfileCanvas.vue. */
+@utility bg-dot-grid {
+  background-image: radial-gradient(var(--color-border-strong) 0.0625rem, transparent 0.0625rem);
+  background-size: 1.125rem 1.125rem;
 }

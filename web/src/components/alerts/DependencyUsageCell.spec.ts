@@ -65,6 +65,35 @@ describe("DependencyUsageCell", () => {
     wrapper.unmount();
   });
 
+  it("a template shows server usage: other-org references and detector bindings", async () => {
+    const g = buildGraph(
+      [],
+      [{ name: "slack", type: "http", template: "shared" }],
+      [
+        {
+          name: "shared",
+          type: "http",
+          used_by: {
+            destinations: 3,
+            alerts: 1,
+            anomaly: 1,
+            synthetics: 1,
+            on_call: 0,
+            composites: 0,
+          },
+        },
+      ],
+    );
+    const wrapper = mountCell(g, { kind: "template", name: "shared" });
+    await flushPromises();
+    expect(wrapper.find('[data-test="used-by-shared-destination"]').text()).toContain("3");
+    expect(wrapper.find('[data-test="used-by-shared-alert"]').text()).toContain("1");
+    expect(wrapper.find('[data-test="used-by-shared-anomaly_detection"]').text()).toContain("1");
+    expect(wrapper.find('[data-test="used-by-shared-synthetic_check"]').text()).toContain("1");
+    expect(wrapper.text()).not.toContain("Unused");
+    wrapper.unmount();
+  });
+
   it("shows an em dash and no badges or dialog while alerts is license-locked", async () => {
     store.state.zoConfig.features = { alerts: "locked" };
     try {

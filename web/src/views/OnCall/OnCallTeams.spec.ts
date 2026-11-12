@@ -13,7 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { flushPromises, mount } from "@vue/test-utils";
+import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
+import type { ComponentPublicInstance } from "vue";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { __resetOnCallRoutingConfig } from "@/composables/useOnCallRoutingConfig";
@@ -22,6 +23,8 @@ import i18n from "@/locales";
 import { resetListViewState, useListViewState } from "@/composables/useListViewState";
 import oncallService from "@/services/oncall";
 import { userKeys } from "@/services/users.querykeys";
+import { orgUsersQuery } from "@/services/users.queries";
+import { ok } from "@/test/unit/helpers/mockService";
 import store from "@/test/unit/helpers/store";
 import OnCallTeams from "@/views/OnCall/OnCallTeams.vue";
 import {
@@ -67,6 +70,9 @@ vi.mock("@/composables/useConfirmDialog", () => ({
 
 const service = vi.mocked(oncallService);
 
+// A selector lookup cannot know the component it lands on, so its props are read by name.
+type AnyPropsWrapper = VueWrapper<ComponentPublicInstance<Record<string, unknown>>>;
+
 const stubs = {
   OPageLayout: { name: "OPageLayout", template: "<div><slot name='actions' /><slot /></div>" },
   // Renders the real cell slots, so the tests exercise what the page actually
@@ -82,6 +88,7 @@ const stubs = {
       "pageSize",
       "sortBy",
       "sortOrder",
+      "persistColumns",
     ],
     emits: ["update:currentPage", "update:pageSize", "update:sortBy", "update:sortOrder"],
     template: `<div>
@@ -112,10 +119,27 @@ const stubs = {
   // `props` declared deliberately: a stub that does not declare what it is
   // passed drops it silently, and an assertion about a tooltip then passes
   // with no tooltip mounted.
-  OTooltip: { name: "OTooltip", props: ["content"], template: "<span>{{ content }}</span>" },
+  OTooltip: {
+    name: "OTooltip",
+    props: ["content"],
+    template: "<span>{{ content }}<slot /></span>",
+  },
   OTag: { name: "OTag", props: ["variant", "type", "value"], template: "<span><slot /></span>" },
   OUserCell: { name: "OUserCell", props: ["value"], template: "<span>{{ value }}</span>" },
-  OnCallTeamForm: { name: "OnCallTeamForm", props: ["open", "team"], template: "<div />" },
+  // Renders the menu open, so a row action behind ⋯ can be found and clicked like any other.
+  ODropdown: { name: "ODropdown", template: "<div><slot name='trigger' /><slot /></div>" },
+  ODropdownItem: {
+    name: "ODropdownItem",
+    props: ["iconLeft", "variant", "disabled", "description", "focusableUnavailable"],
+    emits: ["select"],
+    template: `<button :data-icon="iconLeft" @click="$emit('select')"><slot /></button>`,
+  },
+  OnCallTeamForm: {
+    name: "OnCallTeamForm",
+    props: ["open", "team", "offerDefault", "isDefault"],
+    emits: ["saved", "update:open"],
+    template: "<div />",
+  },
   ConfirmDialog: {
     name: "ConfirmDialog",
     props: ["modelValue", "message", "messageKeypath", "messageName", "okLabel", "okVariant"],
@@ -145,7 +169,7 @@ function render() {
 }
 
 /// The rendered row, which is where the coverage signal lives.
-function onCallCell(wrapper: any, _row?: unknown) {
+function onCallCell(wrapper: ReturnType<typeof render>, _row?: unknown) {
   return wrapper.find('[data-test="row"]');
 }
 
@@ -156,8 +180,19 @@ describe("OnCallTeams", () => {
     vi.clearAllMocks();
     mockConfirm.mockResolvedValue(true);
     for (const key of Object.keys(routeQuery)) delete routeQuery[key];
-    service.whoIsOnCall.mockResolvedValue({ data: [] } as any);
-    service.getRoutingConfig.mockResolvedValue({ data: { default_team_id: null } } as any);
+    service.whoIsOnCall.mockResolvedValue(ok([]));
+    service.getRoutingConfig.mockResolvedValue(ok({ default_team_id: null }));
+  });
+
+  /// Mounts the real page layout so the tag is proven to reach the rendered header.
+  it("tags the page title as Beta", async () => {
+    const wrapper = mount(OnCallTeams, {
+      global: { plugins: [i18n, store], stubs: { ...stubs, OPageLayout: false } },
+    });
+    await flushPromises();
+    const badge = wrapper.find('[data-test="beta-badge"]');
+    expect(badge.exists()).toBe(true);
+    expect(badge.text()).toBe(String(i18n.global.t("common.beta")));
   });
 
   /// The setup checklist's first step sends somebody here already meaning to
@@ -165,7 +200,7 @@ describe("OnCallTeams", () => {
   /// click asked twice.
   describe("arriving with the intent to create", () => {
     it("opens the form straight away on ?action=add", async () => {
-      service.listTeams.mockResolvedValue({ data: [] } as any);
+      service.listTeams.mockResolvedValue(ok([]));
       routeQuery.action = "add";
       const wrapper = mount(OnCallTeams, { global: { plugins: [i18n, store], stubs } });
       await flushPromises();
@@ -178,7 +213,7 @@ describe("OnCallTeams", () => {
     /// Consumed, not left behind: a refresh or a Back into this page would
     /// otherwise reopen a form the reader had deliberately closed.
     it("strips the parameter once it has acted on it", async () => {
-      service.listTeams.mockResolvedValue({ data: [] } as any);
+      service.listTeams.mockResolvedValue(ok([]));
       routeQuery.action = "add";
       routeQuery.org_identifier = "default";
       mount(OnCallTeams, { global: { plugins: [i18n, store], stubs } });
@@ -190,7 +225,7 @@ describe("OnCallTeams", () => {
     });
 
     it("leaves the form closed without it", async () => {
-      service.listTeams.mockResolvedValue({ data: [] } as any);
+      service.listTeams.mockResolvedValue(ok([]));
       const wrapper = mount(OnCallTeams, { global: { plugins: [i18n, store], stubs } });
       await flushPromises();
 
@@ -199,25 +234,74 @@ describe("OnCallTeams", () => {
     });
   });
 
+  // A create action reads as a button with its icon, like every other On-Call header action.
+  it("gives New team its add icon", async () => {
+    service.listTeams.mockResolvedValue(ok([]));
+    const wrapper = render();
+    await flushPromises();
+    expect(wrapper.find('[data-test="oncall-teams-add-btn"]').attributes("icon-left")).toBe("add");
+  });
+
+  // Search, columns and refresh have nothing to act on until a team exists.
+  it("shows no search or refresh while the org has no teams", async () => {
+    service.listTeams.mockResolvedValue(ok([]));
+    const wrapper = render();
+    await flushPromises();
+    expect(wrapper.find('[data-test="oncall-teams-search"]').exists()).toBe(false);
+    expect(wrapper.findComponent({ name: "OTable" }).props("persistColumns")).toBe(false);
+  });
+
+  it("keeps search once there is a team to find", async () => {
+    service.listTeams.mockResolvedValue(ok([team("team_1", "Platform")]));
+    const wrapper = render();
+    await flushPromises();
+    expect(wrapper.find('[data-test="oncall-teams-search"]').exists()).toBe(true);
+    expect(wrapper.findComponent({ name: "OTable" }).props("persistColumns")).toBe(true);
+  });
+
   it("shows who is on call for each team", async () => {
-    service.listTeams.mockResolvedValue({ data: [team("team_1", "Platform")] } as any);
-    service.whoIsOnCall.mockResolvedValue({
-      data: [{ level: "primary", user_email: "engineer@example.com" }],
-    } as any);
+    service.listTeams.mockResolvedValue(ok([team("team_1", "Platform")]));
+    service.whoIsOnCall.mockResolvedValue(
+      ok([{ rotation_name: "Primary", user_email: "engineer@example.com" }]),
+    );
 
     const wrapper = render();
     await flushPromises();
 
-    expect(onCallCell(wrapper).findComponent({ name: "OUserCell" }).props("value")).toBe(
+    expect(onCallCell(wrapper).findComponent({ name: "OnCallPersonName" }).props("email")).toBe(
       "engineer@example.com",
     );
+  });
+
+  // Names are what a responder recognises; the email rides in the tooltip because two people can share a name.
+  it("names the people on call and keeps their email in a tooltip", async () => {
+    queryClient.setQueryData(orgUsersQuery("default").queryKey, [
+      { email: "engineer@example.com", first_name: "Ena", last_name: "Gineer" },
+    ]);
+    service.listTeams.mockResolvedValue(ok([team("team_1", "Platform")]));
+    service.whoIsOnCall.mockResolvedValue(
+      ok([{ rotation_id: "r1", rotation_name: "Primary", user_email: "engineer@example.com" }]),
+    );
+
+    const wrapper = render();
+    await flushPromises();
+
+    const person = wrapper.find('[data-test="oncall-teams-primary-team_1"]');
+    expect(person.text()).toContain("Ena Gineer");
+    // The tooltip's two lines are OnCallPersonName's own contract, covered in its spec.
+    const name = wrapper
+      .findAllComponents({ name: "OnCallPersonName" })
+      .find((one) => one.attributes("data-test") === "oncall-teams-primary-team_1");
+    expect(name?.props("email")).toBe("engineer@example.com");
+    expect(person.attributes("title")).toBeUndefined();
+    queryClient.removeQueries({ queryKey: orgUsersQuery("default").queryKey });
   });
 
   /// A team nobody staffs will page no one, so it earns the one colour on this
   /// page rather than an empty cell.
   it("flags a team with nobody on call", async () => {
-    service.listTeams.mockResolvedValue({ data: [team("team_1", "Platform")] } as any);
-    service.whoIsOnCall.mockResolvedValue({ data: [] } as any);
+    service.listTeams.mockResolvedValue(ok([team("team_1", "Platform")]));
+    service.whoIsOnCall.mockResolvedValue(ok([]));
 
     const wrapper = render();
     await flushPromises();
@@ -233,8 +317,8 @@ describe("OnCallTeams", () => {
   /// holder" to look for. A team whose only rotation has a gap answers `[]`,
   /// and that is the page's one alarm.
   it("flags a team with nobody on call at all", async () => {
-    service.listTeams.mockResolvedValue({ data: [team("team_1", "Platform")] } as any);
-    service.whoIsOnCall.mockResolvedValue({ data: [] } as any);
+    service.listTeams.mockResolvedValue(ok([team("team_1", "Platform")]));
+    service.whoIsOnCall.mockResolvedValue(ok([]));
 
     const wrapper = render();
     await flushPromises();
@@ -247,9 +331,9 @@ describe("OnCallTeams", () => {
   /// so the first entry fills the first column and everything else stays on the
   /// page beside it.
   it("keeps a rotation neither column is named after", async () => {
-    service.listTeams.mockResolvedValue({ data: [team("team_1", "Platform")] } as any);
-    service.whoIsOnCall.mockResolvedValue({
-      data: [
+    service.listTeams.mockResolvedValue(ok([team("team_1", "Platform")]));
+    service.whoIsOnCall.mockResolvedValue(
+      ok([
         {
           rotation_id: "rot_primary",
           rotation_name: "Primary",
@@ -262,15 +346,15 @@ describe("OnCallTeams", () => {
           rule: "Base",
           user_email: "dba@example.com",
         },
-      ],
-    } as any);
+      ]),
+    );
 
     const wrapper = render();
     await flushPromises();
 
     const emails = wrapper
-      .findAllComponents({ name: "OUserCell" })
-      .map((cell: any) => cell.props("value"));
+      .findAllComponents({ name: "OnCallPersonName" })
+      .map((cell) => cell.props("email"));
     expect(emails).toEqual(["primary@example.com", "dba@example.com"]);
     // It keeps its own name rather than being filed under "Secondary".
     expect(wrapper.find('[data-test="oncall-teams-rotation-team_1-rot_db"]').exists()).toBe(true);
@@ -279,7 +363,7 @@ describe("OnCallTeams", () => {
   /// "We could not load it" and "nobody is on call" are different claims, and
   /// showing the second for the first sends someone chasing a phantom gap.
   it("does not call a failed lookup a coverage gap", async () => {
-    service.listTeams.mockResolvedValue({ data: [team("team_1", "Platform")] } as any);
+    service.listTeams.mockResolvedValue(ok([team("team_1", "Platform")]));
     service.whoIsOnCall.mockRejectedValue(new Error("boom"));
 
     const wrapper = render();
@@ -290,9 +374,9 @@ describe("OnCallTeams", () => {
   });
 
   it("looks up every team", async () => {
-    service.listTeams.mockResolvedValue({
-      data: [team("team_1", "Platform"), team("team_2", "Payments")],
-    } as any);
+    service.listTeams.mockResolvedValue(
+      ok([team("team_1", "Platform"), team("team_2", "Payments")]),
+    );
 
     render();
     await flushPromises();
@@ -311,7 +395,7 @@ describe("OnCallTeams", () => {
       });
 
     it("restores search, page, page size and sort on mount", async () => {
-      service.listTeams.mockResolvedValue({ data: [team("team_1", "Platform")] } as any);
+      service.listTeams.mockResolvedValue(ok([team("team_1", "Platform")]));
       Object.assign(seed(), {
         search: "plat",
         currentPage: 2,
@@ -331,7 +415,7 @@ describe("OnCallTeams", () => {
     });
 
     it("saves search, page and sort changes", async () => {
-      service.listTeams.mockResolvedValue({ data: [team("team_1", "Platform")] } as any);
+      service.listTeams.mockResolvedValue(ok([team("team_1", "Platform")]));
       const wrapper = render();
       await flushPromises();
 
@@ -350,7 +434,7 @@ describe("OnCallTeams", () => {
   });
 
   it("opens a team on row click", async () => {
-    service.listTeams.mockResolvedValue({ data: [team("team_1", "Platform")] } as any);
+    service.listTeams.mockResolvedValue(ok([team("team_1", "Platform")]));
     const wrapper = render();
     await flushPromises();
 
@@ -360,7 +444,7 @@ describe("OnCallTeams", () => {
 
   // S1: a team just created is the one the reader wants to set up next.
   it("opens the new team after create", async () => {
-    service.listTeams.mockResolvedValue({ data: [] } as any);
+    service.listTeams.mockResolvedValue(ok([]));
     const wrapper = render();
     await flushPromises();
 
@@ -376,7 +460,7 @@ describe("OnCallTeams", () => {
   /// and its service method both existed and nothing called them.
   describe("deleting a team", () => {
     async function open() {
-      service.listTeams.mockResolvedValue({ data: [team("team_1", "Platform")] } as any);
+      service.listTeams.mockResolvedValue(ok([team("team_1", "Platform")]));
       const wrapper = render();
       await flushPromises();
       await wrapper.find('[data-test="oncall-team-delete-team_1"]').trigger("click");
@@ -410,12 +494,12 @@ describe("OnCallTeams", () => {
     });
 
     it("sends routed alerts to the default team when one is set", async () => {
-      service.getRoutingConfig.mockResolvedValue({
-        data: { default_team_id: "team_2", default_team_name: "Payments" },
-      } as any);
-      service.listTeams.mockResolvedValue({
-        data: [team("team_1", "Platform"), team("team_2", "Payments")],
-      } as any);
+      service.getRoutingConfig.mockResolvedValue(
+        ok({ default_team_id: "team_2", default_team_name: "Payments" }),
+      );
+      service.listTeams.mockResolvedValue(
+        ok([team("team_1", "Platform"), team("team_2", "Payments")]),
+      );
       const wrapper = render();
       await flushPromises();
       await wrapper.find('[data-test="oncall-team-delete-team_1"]').trigger("click");
@@ -427,7 +511,7 @@ describe("OnCallTeams", () => {
     });
 
     it("deletes on confirm and reloads", async () => {
-      service.deleteTeam.mockResolvedValue({ data: {} } as any);
+      service.deleteTeam.mockResolvedValue(ok({}));
       const wrapper = await open();
 
       wrapper.findComponent({ name: "ConfirmDialog" }).vm.$emit("update:ok");
@@ -454,7 +538,7 @@ describe("OnCallTeams", () => {
   /// screen announced.
   describe("row actions", () => {
     async function rendered() {
-      service.listTeams.mockResolvedValue({ data: [team("team_1", "Platform")] } as any);
+      service.listTeams.mockResolvedValue(ok([team("team_1", "Platform")]));
       const wrapper = render();
       await flushPromises();
       return wrapper;
@@ -472,14 +556,49 @@ describe("OnCallTeams", () => {
     /// asserted — and both must SAY something, not merely exist.
     it("names every icon-only action, on hover and to a screen reader", async () => {
       const wrapper = await rendered();
-      for (const [id, name] of [
-        ["edit", "Edit team"],
-        ["delete", "Delete team"],
-      ] as const) {
-        const button = wrapper.find(`[data-test="oncall-team-${id}-team_1"]`);
-        expect(button.attributes("aria-label")).toBe(name);
-        expect(button.text()).toContain(name);
-      }
+      const edit = wrapper.find('[data-test="oncall-team-edit-team_1"]');
+      expect(edit.attributes("aria-label")).toBe("Edit team");
+      expect(edit.text()).toContain("Edit team");
+      expect(wrapper.find('[data-test="oncall-team-delete-team_1"]').text()).toBe("Delete team");
+    });
+
+    /// A row holds its actions as icons on desktop; setting the default lives in the Edit drawer.
+    it("offers no set-default on the row, with no star", async () => {
+      const wrapper = await rendered();
+      expect(wrapper.find('[data-test="oncall-teams-row-more-actions"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="oncall-team-set-default-team_1"]').exists()).toBe(false);
+      expect(wrapper.html()).not.toContain("star-outline");
+    });
+
+    /// On a phone the icons give way to one ⋯ holding both, so Delete is never cut off the pinned column.
+    it("mirrors Edit and Delete in a phone-only menu", async () => {
+      const wrapper = await rendered();
+      expect(wrapper.find('[data-test="oncall-team-edit-team_1"]').classes()).toContain(
+        "max-md:hidden",
+      );
+      expect(wrapper.find('[data-test="oncall-team-delete-team_1"]').classes()).toContain(
+        "max-md:hidden",
+      );
+      expect(wrapper.find('[data-test="oncall-team-more-team_1"]').classes()).toContain(
+        "md:hidden",
+      );
+
+      await wrapper.find('[data-test="oncall-team-edit-team_1-menu"]').trigger("click");
+      expect(wrapper.findComponent({ name: "OnCallTeamForm" }).props("team")).toEqual(
+        expect.objectContaining({ id: "team_1" }),
+      );
+      await wrapper.find('[data-test="oncall-team-delete-team_1-menu"]').trigger("click");
+      expect(wrapper.find('[data-test="confirm"]').text()).toContain("Platform");
+    });
+
+    it("keeps the default team's phone Delete off, with the reason", async () => {
+      service.getRoutingConfig.mockResolvedValue(ok({ default_team_id: "team_1" }));
+      const wrapper = await rendered();
+      const item = wrapper.findComponent(
+        '[data-test="oncall-team-delete-team_1-menu"]',
+      ) as AnyPropsWrapper;
+      expect(item.props("disabled")).toBe(true);
+      expect(String(item.props("description"))).toBe("Make another team the default first");
     });
 
     /// The destructive one last, so the mouse does not pass over it on the way
@@ -508,53 +627,106 @@ describe("OnCallTeams", () => {
   /// leave the list to learn who catches everything it can't place.
   describe("default team", () => {
     it("badges the team the routing config names as default", async () => {
-      service.getRoutingConfig.mockResolvedValue({ data: { default_team_id: "team_2" } } as any);
-      service.listTeams.mockResolvedValue({
-        data: [team("team_1", "Platform"), team("team_2", "Payments")],
-      } as any);
+      service.getRoutingConfig.mockResolvedValue(ok({ default_team_id: "team_2" }));
+      service.listTeams.mockResolvedValue(
+        ok([team("team_1", "Platform"), team("team_2", "Payments")]),
+      );
 
       const wrapper = render();
       await flushPromises();
 
-      expect(wrapper.find('[data-test="oncall-team-default-badge-team_2"]').exists()).toBe(true);
+      const badge = wrapper.find('[data-test="oncall-team-default-badge-team_2"]');
+      expect(badge.exists()).toBe(true);
       expect(wrapper.find('[data-test="oncall-team-default-badge-team_1"]').exists()).toBe(false);
+      // It says what being the default means.
+      expect(badge.text()).toContain("Gets every alert no team owns");
     });
 
-    // The server refuses to delete the default team, so its row offers no Delete, as the phone menu already does.
-    it("offers no Delete on the default team's row", async () => {
-      service.getRoutingConfig.mockResolvedValue({ data: { default_team_id: "team_2" } } as any);
-      service.listTeams.mockResolvedValue({
-        data: [team("team_1", "Platform"), team("team_2", "Payments")],
-      } as any);
+    /// Every row keeps the same Edit and Delete slots, the default team's included.
+    it("gives the default row the same Edit and Delete slots as every other row", async () => {
+      service.getRoutingConfig.mockResolvedValue(ok({ default_team_id: "team_2" }));
+      service.listTeams.mockResolvedValue(
+        ok([team("team_1", "Platform"), team("team_2", "Payments")]),
+      );
+      const wrapper = render();
+      await flushPromises();
+
+      for (const id of ["team_1", "team_2"]) {
+        expect(wrapper.find(`[data-test="oncall-team-edit-${id}"]`).exists()).toBe(true);
+        expect(wrapper.find(`[data-test="oncall-team-delete-${id}"]`).exists()).toBe(true);
+      }
+    });
+
+    // The server refuses to delete the default team, so its Delete is shown disabled with the reason.
+    it("disables Delete on the default team's row and says why", async () => {
+      service.getRoutingConfig.mockResolvedValue(ok({ default_team_id: "team_2" }));
+      service.listTeams.mockResolvedValue(
+        ok([team("team_1", "Platform"), team("team_2", "Payments")]),
+      );
 
       const wrapper = render();
       await flushPromises();
 
-      expect(wrapper.find('[data-test="oncall-team-delete-team_2"]').exists()).toBe(false);
-      expect(wrapper.find('[data-test="oncall-team-delete-team_1"]').exists()).toBe(true);
+      const blocked = wrapper.findComponent('[data-test="oncall-team-delete-team_2"]');
+      expect(blocked.attributes("disabled")).toBeDefined();
+      expect(blocked.attributes("focusable-unavailable")).toBeDefined();
+      expect(blocked.element.parentElement?.textContent).toContain(
+        "Make another team the default first",
+      );
+      const open = wrapper.find('[data-test="oncall-team-delete-team_1"]');
+      expect(open.attributes("disabled")).toBeUndefined();
+      await open.trigger("click");
+      expect(wrapper.find('[data-test="confirm"]').text()).toContain("Platform");
     });
 
-    it("offers to set as default on every team but the current one", async () => {
-      service.getRoutingConfig.mockResolvedValue({ data: { default_team_id: "team_2" } } as any);
-      service.listTeams.mockResolvedValue({
-        data: [team("team_1", "Platform"), team("team_2", "Payments")],
-      } as any);
+    it("keeps the default team's Delete focusable and describes it by why it is off", async () => {
+      service.getRoutingConfig.mockResolvedValue(ok({ default_team_id: "team_2" }));
+      service.listTeams.mockResolvedValue(
+        ok([team("team_1", "Platform"), team("team_2", "Payments")]),
+      );
+      const wrapper = mount(OnCallTeams, {
+        global: { plugins: [i18n, store], stubs: { ...stubs, OButton: false } },
+      });
+      await flushPromises();
 
+      const blocked = wrapper.find('[data-test="oncall-team-delete-team_2"]');
+      expect(blocked.attributes("disabled")).toBeUndefined();
+      expect(blocked.attributes("aria-disabled")).toBe("true");
+      const reason = wrapper.find(`[id="${blocked.attributes("aria-describedby")}"]`);
+      expect(reason.text()).toBe("Make another team the default first");
+      await blocked.trigger("click");
+      expect(wrapper.find('[data-test="confirm"]').exists()).toBe(false);
+    });
+
+    it("tells the Edit drawer whether the team is already the default", async () => {
+      service.getRoutingConfig.mockResolvedValue(ok({ default_team_id: "team_2" }));
+      service.listTeams.mockResolvedValue(
+        ok([team("team_1", "Platform"), team("team_2", "Payments")]),
+      );
+      const wrapper = render();
+      await flushPromises();
+      const form = () => wrapper.findComponent({ name: "OnCallTeamForm" });
+
+      await wrapper.find('[data-test="oncall-team-edit-team_2"]').trigger("click");
+      expect(form().props("offerDefault")).not.toBe(false);
+      expect(form().props("isDefault")).toBe(true);
+      await wrapper.find('[data-test="oncall-team-edit-team_1"]').trigger("click");
+      expect(form().props("isDefault")).toBe(false);
+    });
+
+    async function savedAsDefault(wrapper: ReturnType<typeof render>) {
+      await wrapper.find('[data-test="oncall-team-edit-team_1"]').trigger("click");
+      wrapper.findComponent({ name: "OnCallTeamForm" }).vm.$emit("saved", "team_1", true);
+      await flushPromises();
+    }
+
+    it("nominates the team when the Edit drawer saves with Default team on", async () => {
+      service.listTeams.mockResolvedValue(ok([team("team_1", "Platform")]));
+      service.setRoutingConfig.mockResolvedValue(ok({ default_team_id: "team_1" }));
       const wrapper = render();
       await flushPromises();
 
-      expect(wrapper.find('[data-test="oncall-team-set-default-team_1"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="oncall-team-set-default-team_2"]').exists()).toBe(false);
-    });
-
-    it("nominates the team without a trip to the routing page", async () => {
-      service.listTeams.mockResolvedValue({ data: [team("team_1", "Platform")] } as any);
-      service.setRoutingConfig.mockResolvedValue({ data: { default_team_id: "team_1" } } as any);
-      const wrapper = render();
-      await flushPromises();
-
-      await wrapper.find('[data-test="oncall-team-set-default-team_1"]').trigger("click");
-      await flushPromises();
+      await savedAsDefault(wrapper);
 
       expect(service.setRoutingConfig).toHaveBeenCalledWith({
         org_identifier: "default",
@@ -568,16 +740,13 @@ describe("OnCallTeams", () => {
     /// Mirrors the routing screen's own guard: nominating a team is the one
     /// moment "nobody is on call" is still avoidable.
     it("warns before nominating a team with nobody on it", async () => {
-      service.listTeams.mockResolvedValue({ data: [team("team_1", "Platform")] } as any);
-      service.coverageGaps.mockResolvedValue({
-        data: { teams: [{ id: "team_1" }], total: 1 },
-      } as any);
+      service.listTeams.mockResolvedValue(ok([team("team_1", "Platform")]));
+      service.coverageGaps.mockResolvedValue(ok({ teams: [{ id: "team_1" }], total: 1 }));
       mockConfirm.mockResolvedValue(false);
       const wrapper = render();
       await flushPromises();
 
-      await wrapper.find('[data-test="oncall-team-set-default-team_1"]').trigger("click");
-      await flushPromises();
+      await savedAsDefault(wrapper);
 
       expect(mockConfirm).toHaveBeenCalledWith(
         expect.objectContaining({ title: "This team is unstaffed" }),
@@ -626,7 +795,7 @@ describe("OnCallTeams", () => {
     expect(wrapper.find('[data-test="oncall-teams-error"]').exists()).toBe(true);
     expect(wrapper.text()).toContain("boom");
 
-    service.listTeams.mockResolvedValue({ data: [] } as any);
+    service.listTeams.mockResolvedValue(ok([]));
     await wrapper.find('[data-test="oncall-teams-error"] button').trigger("click");
     await flushPromises();
     expect(wrapper.find('[data-test="oncall-teams-error"]').exists()).toBe(false);
@@ -646,61 +815,11 @@ describe("OnCallTeams", () => {
     expect(spy).not.toHaveBeenCalledWith(usersExpiry);
 
     // Retry and the toolbar's Refresh are the same `refreshTeams` handler.
-    service.listTeams.mockResolvedValue({ data: [] } as any);
+    service.listTeams.mockResolvedValue(ok([]));
     await wrapper.find('[data-test="oncall-teams-error"] button').trigger("click");
     await flushPromises();
     expect(spy).toHaveBeenCalledWith(usersExpiry);
     spy.mockRestore();
-  });
-
-  /// A phone's action column holds one control, so the row's buttons are mirrored in a menu that must act the same.
-  describe("the phone row menu", () => {
-    const menuStubs = {
-      ...stubs,
-      ODropdown: { name: "ODropdown", template: "<div><slot name='trigger' /><slot /></div>" },
-      ODropdownItem: {
-        name: "ODropdownItem",
-        emits: ["select"],
-        template: `<button @click="$emit('select')"><slot /></button>`,
-      },
-    };
-
-    async function rendered() {
-      service.listTeams.mockResolvedValue({ data: [team("team_1", "Platform")] } as any);
-      const wrapper = mount(OnCallTeams, { global: { plugins: [i18n, store], stubs: menuStubs } });
-      await flushPromises();
-      return wrapper;
-    }
-
-    it("shows the buttons from md up and the menu below it, never both", async () => {
-      const wrapper = await rendered();
-
-      for (const action of ["edit", "delete"]) {
-        expect(wrapper.find(`[data-test="oncall-team-${action}-team_1"]`).classes()).toContain(
-          "max-md:hidden",
-        );
-      }
-      expect(wrapper.find('[data-test="oncall-teams-row-more-actions"]').classes()).toContain(
-        "md:hidden",
-      );
-    });
-
-    it("edits the team the row is for", async () => {
-      const wrapper = await rendered();
-      await wrapper.find('[data-test="oncall-team-edit-team_1-menu"]').trigger("click");
-      await flushPromises();
-
-      expect(wrapper.findComponent({ name: "OnCallTeamForm" }).props("team")).toEqual(
-        expect.objectContaining({ id: "team_1" }),
-      );
-    });
-
-    it("asks before deleting, as the button does", async () => {
-      const wrapper = await rendered();
-      await wrapper.find('[data-test="oncall-team-delete-team_1-menu"]').trigger("click");
-
-      expect(wrapper.find('[data-test="confirm"]').text()).toContain("Platform");
-    });
   });
 });
 
@@ -720,11 +839,11 @@ describe("OnCallTeams - editor drafts", () => {
     __resetOnCallRoutingConfig();
     resetListViewState();
     vi.clearAllMocks();
-    service.whoIsOnCall.mockResolvedValue({ data: [] } as never);
-    service.getRoutingConfig.mockResolvedValue({ data: { default_team_id: null } } as never);
-    service.listTeams.mockResolvedValue({
-      data: [team("team_1", "Platform"), team("team_2", "Payments")],
-    } as never);
+    service.whoIsOnCall.mockResolvedValue(ok([]));
+    service.getRoutingConfig.mockResolvedValue(ok({ default_team_id: null }));
+    service.listTeams.mockResolvedValue(
+      ok([team("team_1", "Platform"), team("team_2", "Payments")]),
+    );
   });
 
   it("dots a team whose rotation or escalation policy has an unsaved draft", async () => {
@@ -744,9 +863,9 @@ describe("OnCallTeams - editor drafts", () => {
   });
 
   it("dots a team by its own rotation drafts, new and duplicated ones included, never by a team whose id it prefixes", async () => {
-    service.listTeams.mockResolvedValue({
-      data: [team("team_1", "Platform"), team("team_10", "Search"), team("team_2", "Payments")],
-    } as never);
+    service.listTeams.mockResolvedValue(
+      ok([team("team_1", "Platform"), team("team_10", "Search"), team("team_2", "Payments")]),
+    );
     writeEditorDraft(scopeOf("oncall_schedule", "team_10/rot_a"), { data: {} });
     writeEditorDraft(
       { ...scopeOf("oncall_schedule", "team_2"), entityId: null, variant: "team_2/clone:rot_b" },
@@ -782,7 +901,7 @@ describe("OnCallTeams - editor drafts", () => {
     writeEditorDraft(scopeOf("oncall_schedule", "team_10/rot_a"), { data: {} });
     writeEditorDraft(scopeOf("oncall_policy", "team_1"), { data: {} });
     writeEditorDraft(scopeOf("oncall_policy", "team_2"), { data: {} });
-    service.deleteTeam.mockResolvedValue({ data: {} } as never);
+    service.deleteTeam.mockResolvedValue(ok({}));
     const wrapper = render();
     await flushPromises();
     await wrapper.find('[data-test="oncall-team-delete-team_1"]').trigger("click");
@@ -809,5 +928,46 @@ describe("OnCallTeams - editor drafts", () => {
     await flushPromises();
 
     expect(readEditorDraft(scopeOf("oncall_schedule", "team_1/rot_a"))).not.toBeNull();
+  });
+  /// With no team the empty state is already the next step; once one exists the setup bar takes over.
+  describe("setup bar and first-run empty state", () => {
+    const withBanner = () =>
+      mount(OnCallTeams, {
+        global: {
+          plugins: [i18n, store],
+          stubs: {
+            ...stubs,
+            OnCallSetupBanner: {
+              name: "OnCallSetupBanner",
+              emits: ["create-team"],
+              template: "<div data-test='setup-banner' />",
+            },
+          },
+        },
+      });
+
+    it("shows the setup bar over a list that has teams, and lets it open the create form", async () => {
+      service.listTeams.mockResolvedValue(ok([team("team_1", "Checkout")]));
+      const wrapper = withBanner();
+      await flushPromises();
+
+      const banner = wrapper.findComponent({ name: "OnCallSetupBanner" });
+      expect(banner.exists()).toBe(true);
+      banner.vm.$emit("create-team");
+      await flushPromises();
+      expect(wrapper.findComponent({ name: "OnCallTeamForm" }).props("open")).toBe(true);
+    });
+
+    it("leaves the bar out while the org has no team, and the empty state says no more than its title", async () => {
+      service.listTeams.mockResolvedValue(ok([]));
+      const wrapper = withBanner();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="setup-banner"]').exists()).toBe(false);
+      const empty = wrapper.findComponent('[data-test="oncall-teams-empty"]') as AnyPropsWrapper;
+      expect(empty.exists()).toBe(true);
+      expect(empty.props("description")).toBeUndefined();
+      expect(empty.text()).not.toContain("A team decides who gets woken");
+    });
   });
 });

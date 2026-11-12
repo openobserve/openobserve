@@ -23,6 +23,7 @@ export const NAV_GROUP_TILE = {
     // selector does not move if the group's parentLink ever changes.
     reliability: '[data-test="nav-group-reliability"]',
     experience: '[data-test="nav-group-experience"]',
+    settings: '[data-test="nav-group-settings"]',
 };
 
 // route `name` of each child within its group (matches navGroups.ts).
@@ -40,6 +41,8 @@ export const NAV_FLYOUT_CHILD = {
     templates: { group: 'reliability', name: 'alertTemplates' },
     // Synthetics is feature-gated, so the Experience tile itself lands on RUM.
     synthetics: { group: 'experience', name: 'synthetics' },
+    // IAM has no rail tile of its own; it is the second row of the Settings flyout.
+    iam: { group: 'settings', name: 'iam' },
 };
 
 /**

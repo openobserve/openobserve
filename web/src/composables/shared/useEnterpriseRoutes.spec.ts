@@ -274,6 +274,12 @@ describe("useEnterpriseRoutes.ts", () => {
       expect(names).not.toContain("fleetConfigEditor");
     });
 
+    it("should not register AutoObserve, so its coverage drawer charts never render on OSS", () => {
+      const routes = useEnterpriseRoutes();
+      expect(routes.map((route: any) => route.name)).not.toContain("autoobserve");
+      expect(routes.map((route: any) => route.path)).not.toContain("auto-observe-2");
+    });
+
     // Synthetics moved out of `o2_enterprise` into `src/synthetics`; only the
     // private-VPC-agent half stays enterprise, so the pages register in an OSS
     // build and the backend `/config` flag decides whether they are reachable.
@@ -394,10 +400,10 @@ describe("useEnterpriseRoutes.ts", () => {
       expect(iamRoute.children.length).toBe(12);
     });
 
-    // Test 34: iam + synthetics + 6 synthetics sub-routes + 7 oncall + 2 incidents + workflows = 18
-    it("should have 18 routes in cloud configuration", () => {
+    // Test 34: iam + synthetics + 6 synthetics sub-routes + 7 oncall + 2 incidents + workflows + onboarding = 19
+    it("should have 19 routes in cloud configuration", () => {
       const routes = useEnterpriseRoutes();
-      expect(routes.length).toBe(18);
+      expect(routes.length).toBe(19);
     });
   });
 
@@ -475,10 +481,10 @@ describe("useEnterpriseRoutes.ts", () => {
       config.default.isEnterprise = "true";
     });
 
-    // Test 38: Should add all routes when both flags are true (iam + synthetics + 6 synthetics sub-routes + 7 oncall + 2 incidents + 2 autoobserve + 2 fleet + workflows = 22)
+    // Test 38: Should add all routes when both flags are true (iam + synthetics + 6 synthetics sub-routes + 7 oncall + 2 incidents + 2 autoobserve + 2 fleet + workflows + onboarding = 23)
     it("should add all routes when both flags are true", () => {
       const routes = useEnterpriseRoutes();
-      expect(routes.length).toBe(22);
+      expect(routes.length).toBe(23);
     });
 
     // Test 39: Should have all IAM children when both flags are true
@@ -690,6 +696,7 @@ describe("useEnterpriseRoutes.ts", () => {
       ["workflowRuns", "workflows"],
       ["onCallTeams", "oncall"],
       ["onCallTeamDetail", "oncall"],
+      ["onCallMine", "oncall"],
       ["incidentList", "incidents"],
       ["incidentDetail", "incidents"],
       ["groups", "rbac"],
@@ -1002,5 +1009,35 @@ describe("useEnterpriseRoutes lazy loading", () => {
         if (route.children) walk(route.children);
       });
     walk(useEnterpriseRoutes());
+  });
+
+  describe("AutoObserve is enterprise-only", () => {
+    const autoobserveRoutes = () =>
+      useEnterpriseRoutes().filter((route: any) => String(route.path).includes("autoobserve"));
+
+    it.each([
+      ["an OSS build", "false", "false"],
+      ["a cloud build without enterprise", "true", "false"],
+    ])("registers no AutoObserve route in %s", async (_name, isCloud, isEnterprise) => {
+      const config = await import("@/aws-exports");
+      config.default.isCloud = isCloud;
+      config.default.isEnterprise = isEnterprise;
+      expect(autoobserveRoutes()).toEqual([]);
+    });
+
+    it("registers the AutoObserve routes in an enterprise build", async () => {
+      const config = await import("@/aws-exports");
+      config.default.isCloud = "false";
+      config.default.isEnterprise = "true";
+      expect(autoobserveRoutes().map((route: any) => route.name)).toContain("autoobserve");
+    });
+
+    it("keeps each AutoObserve sub-page's access denials apart, so What I've changed never counts the home's (T3-N7)", async () => {
+      const config = await import("@/aws-exports");
+      config.default.isCloud = "false";
+      config.default.isEnterprise = "true";
+      const home = autoobserveRoutes().find((route: any) => route.name === "autoobserve");
+      expect(home.meta.accessScopeQuery).toEqual(["page"]);
+    });
   });
 });

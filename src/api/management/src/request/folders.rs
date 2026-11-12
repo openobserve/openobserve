@@ -58,7 +58,9 @@ fn folder_error_response(value: FolderError) -> Response {
         FolderError::DeleteWithPrompts => MetaHttpResponse::bad_request(
             "Folder contains prompts, please move/delete prompts from folder",
         ),
-        FolderError::DeleteFleet(message) => MetaHttpResponse::bad_request(message),
+        FolderError::DeleteFleet(message) | FolderError::FleetInUse(message, _) => {
+            MetaHttpResponse::bad_request(message)
+        }
         FolderError::FleetChanged(message) => MetaHttpResponse::conflict(message),
         FolderError::NotFound => MetaHttpResponse::not_found("Folder not found"),
         FolderError::PermittedFoldersMissingUser => MetaHttpResponse::forbidden(""),
@@ -608,7 +610,7 @@ pub mod deprecated {
             ("folder_id" = String, Path, description = "Folder ID"),
         ),
         responses(
-            (status = StatusCode::OK, description = "Success", body = ()),
+            (status = StatusCode::OK, description = "Success", body = MetaHttpResponse),
             (status = StatusCode::NOT_FOUND, description = "NotFound", body = ()),
             (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Error", body = ()),
         ),

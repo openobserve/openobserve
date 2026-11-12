@@ -24,6 +24,7 @@
  * enterprise-only surfaces.
  */
 
+import config from "@/aws-exports";
 import type { AlertPrefillThresholdShape } from "@/ts/interfaces/alertPrefill";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 
@@ -43,6 +44,12 @@ export interface AlertSourceDefinition {
   pickQueryOnly?: boolean;
   /** Its aggregation is a Builder-tab seed, not a threshold, so it must not set the trigger on its own. */
   aggregationIsSeed?: boolean;
+  /** Resolves only on an enterprise build; an OSS build treats the id as unknown. */
+  enterpriseOnly?: boolean;
+  /** Its `meta` carries the new alert's description and destinations, which the form applies. */
+  metaSettings?: boolean;
+  /** Its query holds the condition and its own window, so the dialog asks no Alert on and names no time range. */
+  conditionInQuery?: boolean;
 }
 
 export const DEFAULT_ALERT_SOURCE: AlertSourceDefinition = {
@@ -132,6 +139,15 @@ export const ALERT_SOURCES: Record<string, AlertSourceDefinition> = {
     defaultThreshold: "count",
     showQueryPreview: true,
   },
+  ai: {
+    id: "ai",
+    labelKey: "alerts.prefill.sources.ai.label",
+    toastKey: "alerts.prefill.sources.ai.toast",
+    icon: "shield-alert-outline",
+    // The HAVING clause is the whole condition, so any returned row fires.
+    defaultThreshold: "count",
+    showQueryPreview: true,
+  },
   rumfunnel: {
     id: "rumfunnel",
     labelKey: "alerts.prefill.sources.rumfunnel.label",
@@ -150,10 +166,24 @@ export const ALERT_SOURCES: Record<string, AlertSourceDefinition> = {
     defaultThreshold: "count",
     showQueryPreview: true,
   },
+  autoobserve: {
+    id: "autoobserve",
+    labelKey: "alerts.prefill.sources.autoobserve.label",
+    toastKey: "alerts.prefill.sources.autoobserve.toast",
+    icon: "shield-alert-outline",
+    // The condition is the HAVING or PromQL threshold, so any returned row fires.
+    defaultThreshold: "count",
+    showQueryPreview: true,
+    enterpriseOnly: true,
+    metaSettings: true,
+    conditionInQuery: true,
+  },
 };
 
 export const getAlertSource = (id: string | undefined): AlertSourceDefinition => {
-  if (id && ALERT_SOURCES[id]) return ALERT_SOURCES[id];
+  const known = id ? ALERT_SOURCES[id] : undefined;
+  if (known?.enterpriseOnly && config.isEnterprise !== "true") return DEFAULT_ALERT_SOURCE;
+  if (known) return known;
   if (id && import.meta.env?.DEV) {
     console.warn(
       `[alerts] Unregistered alert source "${id}" — falling back to defaults. ` +

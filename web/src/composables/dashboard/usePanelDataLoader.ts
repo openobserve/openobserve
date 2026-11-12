@@ -32,6 +32,7 @@ import config from "@/aws-exports";
 
 import { usePanelCache } from "./usePanelCache";
 import { cachedWindowDiffers, usePanelRefreshAfterRestore } from "./usePanelRefreshAfterRestore";
+import { useFailedRefreshHold } from "./panelFailedRefreshHold";
 import { isEqual, omit } from "lodash-es";
 
 import { useAnnotations } from "./useAnnotations";
@@ -208,6 +209,7 @@ export const usePanelDataLoader = (
   const isVisible: any = ref(false);
 
   const refreshAfterRestore = usePanelRefreshAfterRestore({ state, panelSchema, dashboardId });
+  const failedRefreshHold = useFailedRefreshHold(state, () => panelSchema.value);
 
   // Until the first load settles the panel has no answer yet, so "No Data" would flash over a cached result.
   const isFirstLoadSettled = ref(false);
@@ -416,6 +418,7 @@ export const usePanelDataLoader = (
 
   const loadData = async () => {
     const loadCall = ++latestLoadCall;
+    failedRefreshHold.loadScheduled();
     log("[usePanelDataLoader] " + panelSchema?.value?.title + ": loadData() PROCEEDING");
 
     // Only reset isPartialData if we're starting a fresh load and not restoring from cache
@@ -438,7 +441,8 @@ export const usePanelDataLoader = (
       invalidateRun();
 
       // Create a new AbortController for the new operation
-      abortController = new AbortController();
+      const runController = new AbortController();
+      abortController = runController;
       // Injected-data path: the caller already fetched the PromQL results and
       // owns the fetch lifecycle (the metrics explorer's preview queue —
       // concurrency-capped, viewport-gated, cancellable, cached). Render those
@@ -475,7 +479,7 @@ export const usePanelDataLoader = (
 
       log("loadData: now waiting for the timeout to avoid frequent updates");
 
-      await waitForTimeout(abortController.signal);
+      await waitForTimeout(runController.signal);
 
       log("loadData: now waiting for the panel to become visible");
 
@@ -490,18 +494,20 @@ export const usePanelDataLoader = (
 
       // Wait for visibility BEFORE the cache restore below — restoring first
       // rendered every cached panel on mount, visible or not.
-      await waitForThePanelToBecomeVisible(abortController.signal);
+      await waitForThePanelToBecomeVisible(runController.signal);
 
       // if force load is true, skip restoring from cache
       if (runCount == 0 && forceLoad?.value != true) {
         log("loadData: panelcache: run count is 0");
         // restore from the cache and return
         const isRestoredFromCache = await restoreFromCache();
+        if (runController.signal.aborted) return;
         log("loadData: panelcache: isRestoredFromCache", isRestoredFromCache);
         if (isRestoredFromCache) {
           state.loading = false;
           state.isOperationCancelled = false;
           log("loadData: panelcache: restored from cache");
+          failedRefreshHold.loadRestored();
           runCount++;
           if (!refreshAfterRestore.queueRefresh()) return;
         }
@@ -510,7 +516,7 @@ export const usePanelDataLoader = (
       log("loadData: now waiting for the variables to load");
 
       // Wait for variables to load
-      await waitForTheVariablesToLoad(abortController.signal);
+      await waitForTheVariablesToLoad(runController.signal);
 
       log("loadData: good to go... starting query executions...");
 
@@ -535,6 +541,8 @@ export const usePanelDataLoader = (
 
       // Enrichment rows carry their upload time, so the dashboard range would hide them; Explore does the same.
       const tableRange = await getEnrichmentTableRange(getStream, panelSchema.value);
+      // A newer run started during the lookup; resuming would abort it after it cleared the panel's data.
+      if (runController.signal.aborted) return;
       if (tableRange) {
         startISOTimestamp = tableRange.from;
         endISOTimestamp = tableRange.to;
@@ -547,6 +555,7 @@ export const usePanelDataLoader = (
       runCount++;
 
       refreshAfterRestore.holdIfQueued();
+      failedRefreshHold.loadStarted();
       state.loading = true;
       state.isCachedDataDifferWithCurrentTimeRange = false;
 
@@ -558,12 +567,12 @@ export const usePanelDataLoader = (
 
       // Check if the query type is "promql"
       if (panelSchema.value.queryType == "promql") {
-        await executePromQL(startISOTimestamp, endISOTimestamp, abortController);
+        await executePromQL(startISOTimestamp, endISOTimestamp, runController);
       } else if (panelSchema.value.queries.length > 1) {
         const pageType = panelSchema.value.queries[0]?.fields?.stream_type;
-        await executeMultiSQL(startISOTimestamp, endISOTimestamp, abortController, pageType);
+        await executeMultiSQL(startISOTimestamp, endISOTimestamp, runController, pageType);
       } else {
-        await executeSQL(startISOTimestamp, endISOTimestamp, abortController);
+        await executeSQL(startISOTimestamp, endISOTimestamp, runController);
       }
     } catch (error: any) {
       if (error.name === "AbortError" || error.message === "Aborted waiting for loading") {

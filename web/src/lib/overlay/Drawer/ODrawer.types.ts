@@ -87,6 +87,9 @@ export interface DrawerProps {
    */
   seamless?: boolean;
 
+  /** Accessible name for a drawer that renders its own header (no `title`). */
+  ariaLabel?: string;
+
   // ── Header subtitle ────────────────────────────────────────────────────
 
   /**
@@ -94,6 +97,9 @@ export interface DrawerProps {
    * Ignored when the `header` slot is provided.
    */
   subTitle?: I18nText;
+
+  /** Optional data-test attribute rendered on the structured subtitle element. */
+  subTitleDataTest?: string;
 
   // ── Inbuilt footer buttons ──────────────────────────────────────────────
 

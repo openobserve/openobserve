@@ -212,6 +212,28 @@ describe("OEmptyState", () => {
       expect(description.text()).toContain("Dashboards bring your metrics");
     });
 
+    // On-call's empty tabs state a title and one action, with no sub-sentence, in one wording.
+    it.each([
+      ["no-oncall-members", "No members yet", "Add members"],
+      ["no-oncall-rules", "No routing rules yet", "New rule"],
+      ["no-oncall-schedule", "Create your first rotation", "From scratch"],
+    ])("renders %s as a title and its action only", (preset, title, action) => {
+      wrapper = buildWrapper({ preset });
+      expect(wrapper.find("h2").text()).toBe(title);
+      expect(wrapper.find("p").exists()).toBe(false);
+      expect(wrapper.text()).toContain(action);
+    });
+
+    // The on-call schedule cards use the Add rotation menu's two words, each with a short line.
+    it("labels the on-call schedule cards as the Add rotation menu does", () => {
+      wrapper = buildWrapper({ preset: "no-oncall-schedule" });
+      const cards = wrapper.findAllComponents({ name: "EmptyStateActionCard" });
+      expect(cards.map((card) => [card.props("label"), card.props("sublabel")])).toEqual([
+        ["From a template", "Follow the sun, weekdays and weekend, and more"],
+        ["From scratch", "Set the shift rules yourself"],
+      ]);
+    });
+
     it("uses an inline p tag for title when size is inline", () => {
       // Arrange & Act
       wrapper = buildWrapper({ size: "inline" });
@@ -219,6 +241,29 @@ describe("OEmptyState", () => {
       // Assert — inline size renders title as a <p>, not <h2>
       expect(wrapper.find("h2").exists()).toBe(false);
       expect(wrapper.find("p").exists()).toBe(true);
+    });
+
+    it("renders a text-only p title for slim, with no icon or illustration", () => {
+      wrapper = buildWrapper({ size: "slim" });
+
+      expect(wrapper.find("h2").exists()).toBe(false);
+      expect(wrapper.find("p").exists()).toBe(true);
+      expect(wrapper.find('[data-test="o-icon-stub"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="illustration-stub"]').exists()).toBe(false);
+    });
+
+    it("draws no dot-grid backdrop for slim or inline unless asked for", () => {
+      expect(buildWrapper({ size: "slim" }).find('[aria-hidden="true"].absolute').exists()).toBe(
+        false,
+      );
+      expect(buildWrapper({ size: "inline" }).find('[aria-hidden="true"].absolute').exists()).toBe(
+        false,
+      );
+      expect(
+        buildWrapper({ size: "slim", backdrop: true })
+          .find('[aria-hidden="true"].absolute')
+          .exists(),
+      ).toBe(true);
     });
 
     it("does not render the illustration when size is inline", () => {
@@ -235,6 +280,26 @@ describe("OEmptyState", () => {
 
       // Assert — the inline icon wrapper + OIcon stub should be present
       expect(wrapper.find('[data-test="o-icon-stub"]').exists()).toBe(true);
+    });
+
+    it("keeps the inline icon grey for an error unless toneIcon is set", () => {
+      wrapper = buildWrapper({ size: "inline", variant: "error" });
+      const icon = wrapper.find(".o2-empty-state__inline-icon");
+      expect(icon.classes()).toContain("bg-surface-subtle");
+      expect(icon.classes()).not.toContain("bg-status-error-bg");
+    });
+
+    it("tints the inline icon red for an error when toneIcon is set", () => {
+      wrapper = buildWrapper({ size: "inline", variant: "error", toneIcon: true });
+      const icon = wrapper.find(".o2-empty-state__inline-icon");
+      expect(icon.classes()).toContain("bg-status-error-bg");
+      expect(icon.classes()).toContain("text-status-error-text");
+      expect(icon.classes()).not.toContain("bg-surface-subtle");
+    });
+
+    it("keeps a neutral inline icon grey even with toneIcon", () => {
+      wrapper = buildWrapper({ size: "inline", variant: "neutral", toneIcon: true });
+      expect(wrapper.find(".o2-empty-state__inline-icon").classes()).toContain("bg-surface-subtle");
     });
   });
 

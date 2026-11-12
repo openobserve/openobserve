@@ -1,16 +1,12 @@
 // Copyright 2026 OpenObserve Inc.
 //
-// A Score Config's healthy rule as text ("≥ 0.7", "true", "low, medium"), and the SQL escape the score queries share.
+// A Score Config's healthy rule as text ("≥ 0.7", "true", "low, medium").
 
 import { gt, raw, type I18nText } from "@/types/i18n";
 
 import type { ScoreConfig } from "@/services/online-evals.service";
 import { dataTypeOf, valueOf } from "./evalEntity";
 import { formatExact } from "./qualityFormat";
-
-export function escapeSqlString(s: string): string {
-  return s.replace(/'/g, "''");
-}
 
 /** The healthy rule as text; empty when the config has no usable threshold. */
 /** A numeric config's threshold as a value and a direction, for the trend's threshold line; null otherwise. */

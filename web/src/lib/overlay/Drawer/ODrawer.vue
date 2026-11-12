@@ -480,10 +480,10 @@ watch(shown, (open) => {
       >
         <!-- Accessibility: hidden title required by Reka UI -->
         <DialogTitle class="sr-only absolute">
-          {{ title ?? t("common.drawer") }}
+          {{ ariaLabel ?? title ?? t("common.drawer") }}
         </DialogTitle>
         <DialogDescription class="sr-only absolute">
-          {{ title ?? t("common.drawer") }}
+          {{ ariaLabel ?? title ?? t("common.drawer") }}
         </DialogDescription>
 
         <!-- ── Header ───────────────────────────────────────── -->
@@ -515,6 +515,7 @@ watch(shown, (open) => {
               <OTruncatedText
                 v-if="subTitle"
                 class="text-dialog-content-text mt-0.5 block text-xs opacity-70"
+                :data-test="subTitleDataTest"
               >
                 {{ subTitle }}
               </OTruncatedText>

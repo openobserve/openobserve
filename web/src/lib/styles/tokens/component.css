@@ -170,6 +170,10 @@
   --color-tooltip-text: var(--color-text-heading);
   --color-tooltip-border: var(--color-border-subtle);
   --color-tooltip-arrow: var(--color-surface-overlay);
+  /* Copy confirmation bubble: inverse of the page so it reads on any surface; failure in the error tint. */
+  --color-copy-confirm-bg: var(--color-grey-800);
+  --color-copy-confirm-text: var(--color-grey-50);
+  --color-copy-confirm-error-bg: var(--color-status-error-bg);
 
   /* Icon sizes */
   --text-icon-xs: var(--spacing-3);
@@ -827,6 +831,16 @@
   /* Darker than the fill so the header/body edge stays readable. NOT
      border-default — see above. */
   --color-panel-bar-border: var(--color-grey-300);
+
+  /* ── Onboarding brand panel ────────────────────────────────
+     The panel beside each onboarding step (OnboardingPreview) is the brand
+     colour, darker at the top where its text sits, and the option it describes
+     (OnboardingChoiceButton) is filled with the same colour so the two read as
+     a pair. Built from the primary ramp, so it follows the org's theme. */
+  --color-onboarding-panel-start: var(--color-primary-700);
+  --color-onboarding-panel-end: var(--color-primary-600);
+  --color-onboarding-panel-text: var(--color-white);
+  --color-onboarding-choice-active-bg: var(--color-primary-700);
 }
 
 /* The attribute lets a preview render light banners inside a dark app; see AnnouncementBannerPreviewPanel. */
@@ -1490,6 +1504,9 @@
   --color-tooltip-text: var(--color-tooltip-text);
   --color-tooltip-border: var(--color-tooltip-border);
   --color-tooltip-arrow: var(--color-tooltip-arrow);
+  --color-copy-confirm-bg: var(--color-copy-confirm-bg);
+  --color-copy-confirm-text: var(--color-copy-confirm-text);
+  --color-copy-confirm-error-bg: var(--color-copy-confirm-error-bg);
 
   /* Icon sizes */
   --text-icon-xs: var(--text-icon-xs);
@@ -2032,6 +2049,12 @@
   /* Chart panel bar */
   --color-panel-bar-bg: var(--color-panel-bar-bg);
   --color-panel-bar-border: var(--color-panel-bar-border);
+
+  /* Onboarding brand panel */
+  --color-onboarding-panel-start: var(--color-onboarding-panel-start);
+  --color-onboarding-panel-end: var(--color-onboarding-panel-end);
+  --color-onboarding-panel-text: var(--color-onboarding-panel-text);
+  --color-onboarding-choice-active-bg: var(--color-onboarding-choice-active-bg);
 
   /* Shared hover + surface accent */
   --color-interactive-hover-bg: var(--color-interactive-hover-bg);

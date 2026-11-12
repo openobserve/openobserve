@@ -24,11 +24,14 @@ pub mod alerts;
 pub mod anomaly_detection;
 pub mod auth;
 pub mod authz;
+#[cfg(feature = "enterprise")]
+pub mod autoobserve;
 #[cfg(any(feature = "enterprise", test))]
 pub mod background_access;
 pub mod bootstrap;
 pub mod cache;
 pub mod dashboards;
+pub mod datadog;
 pub mod db_monitoring;
 #[cfg(feature = "enterprise")]
 pub mod downtimes;
@@ -57,6 +60,7 @@ pub mod org_cleanup;
 #[cfg(feature = "cloud")]
 pub mod org_usage;
 pub mod organization;
+pub mod overview;
 pub mod pipeline;
 pub mod profiles;
 pub mod prompts;
@@ -66,6 +70,9 @@ pub mod public_dashboards;
 #[cfg(feature = "enterprise")]
 pub mod ratelimit;
 pub mod rum_pa;
+pub mod sample_data;
+#[cfg(feature = "enterprise")]
+pub mod security;
 use search_service as search;
 #[cfg(feature = "cpu-profiling")]
 pub mod self_profiles;

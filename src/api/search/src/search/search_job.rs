@@ -88,7 +88,7 @@ use crate::service::auth::UserEmail;
         }
     })),
     responses(
-        (status = 200, description = "Search Job submitted successfully", body = Object),
+        (status = 200, description = "Search Job submitted successfully", body = crate::common::meta::http::HttpResponse),
         (status = 400, description = "Bad Request", body = Object),
         (status = 500, description = "Internal Server Error", body = Object),
     ),
@@ -174,11 +174,9 @@ pub async fn submit_job(
         }
 
         // get stream name
-        let stream_names = match resolve_stream_names(&req.query.sql) {
-            Ok(v) => v.clone(),
-            Err(e) => {
-                return map_error_to_http_response(&e.into(), Some(trace_id));
-            }
+        let stream_names = match job_stream_names(&req.query.sql, &trace_id) {
+            Ok(v) => v,
+            Err(res) => return res,
         };
 
         if let Some(res) = crate::search::check_sql_stream_permissions(
@@ -253,7 +251,7 @@ pub async fn submit_job(
         ("org_id" = String, Path, description = "Organization name")
     ),
     responses(
-        (status = 200, description = "List of search jobs", body = inline(Vec<Object>), example = json!([{
+        (status = 200, description = "List of search jobs", body = Vec<infra::table::entity::search_jobs::Model>, example = json!([{
             "id": "abc123",
             "trace_id": "xyz789",
             "org_id": "default",
@@ -318,7 +316,7 @@ pub async fn list_status(Path(org_id): Path<String>) -> Response {
         ("job_id" = String, Path, description = "Search job ID")
     ),
     responses(
-        (status = 200, description = "Search job status", body = Object, example = json!({
+        (status = 200, description = "Search job status", body = infra::table::entity::search_jobs::Model, example = json!({
             "id": "abc123",
             "trace_id": "xyz789",
             "org_id": "default",
@@ -391,7 +389,7 @@ pub async fn get_status(
         ("job_id" = String, Path, description = "Search job ID")
     ),
     responses(
-        (status = 200, description = "Search job cancelled successfully", body = Object, example = json!({
+        (status = 200, description = "Search job cancelled successfully", body = crate::common::meta::http::HttpResponse, example = json!({
             "code": 200,
             "message": "[Job_Id: abc123] Running Search Job cancelled successfully."
         })),
@@ -450,7 +448,7 @@ pub async fn cancel_job(
         ("size" = Option<i64>, Query, description = "Number of results to return")
     ),
     responses(
-        (status = 200, description = "Search job results", body = Object, example = json!({
+        (status = 200, description = "Search job results", body = config::meta::search::Response, example = json!({
             "took": 155,
             "hits": [],
             "total": 27179431,
@@ -539,7 +537,7 @@ pub async fn get_job_result(
         ("job_id" = String, Path, description = "Search job ID")
     ),
     responses(
-        (status = 200, description = "Search job deleted successfully", body = Object, example = json!({
+        (status = 200, description = "Search job deleted successfully", body = crate::common::meta::http::HttpResponse, example = json!({
             "code": 200,
             "message": "[Job_Id: abc123] Running Search Job deleted successfully."
         })),
@@ -604,7 +602,7 @@ pub async fn delete_job(
         ("job_id" = String, Path, description = "Search job ID")
     ),
     responses(
-        (status = 200, description = "Search job retry initiated successfully", body = Object, example = json!({
+        (status = 200, description = "Search job retry initiated successfully", body = crate::common::meta::http::HttpResponse, example = json!({
             "code": 200,
             "message": "[Job_Id: abc123] Search Job retry successfully."
         })),
@@ -790,4 +788,46 @@ async fn check_permissions(job: &JobModel, org_id: &str, user_id: &str) -> Optio
         }
     }
     None
+}
+
+/// The job's streams, refused now when one is protected, as its querier would refuse it.
+#[cfg(feature = "enterprise")]
+fn job_stream_names(sql: &str, trace_id: &str) -> Result<Vec<String>, Response> {
+    let stream_names = resolve_stream_names(sql)
+        .map_err(|e| map_error_to_http_response(&e.into(), Some(trace_id.to_string())))?;
+    match search::sql::protected_stream_refusal(stream_names.iter().map(String::as_str), None) {
+        Some(code) => Err(map_error_to_http_response(
+            &infra::errors::Error::ErrorCode(code),
+            Some(trace_id.to_string()),
+        )),
+        None => Ok(stream_names),
+    }
+}
+
+#[cfg(all(test, feature = "enterprise"))]
+mod tests {
+    use super::*;
+    use crate::common::meta::http::ERROR_HEADER;
+
+    fn refusal(sql: &str) -> (StatusCode, String) {
+        let res = job_stream_names(sql, "t").expect_err("refused");
+        let code = res.headers().get(ERROR_HEADER).unwrap().to_str().unwrap();
+        (res.status(), code.to_string())
+    }
+
+    #[test]
+    fn a_search_job_on_a_protected_stream_is_refused_before_it_is_queued() {
+        assert_eq!(
+            refusal(r#"SELECT * FROM "_o2_alert_calibration_digests""#),
+            (StatusCode::FORBIDDEN, "20014".to_string())
+        );
+        assert_eq!(
+            refusal(r#"SELECT * FROM "_o2_ai_chat_events""#),
+            (StatusCode::BAD_REQUEST, "20002".to_string())
+        );
+        assert_eq!(
+            job_stream_names(r#"SELECT * FROM "default""#, "t").ok(),
+            Some(vec!["default".to_string()])
+        );
+    }
 }

@@ -74,7 +74,7 @@ struct SpanExtractions {
     user_id: Option<String>,
     session_id: Option<String>,
     prompt_name: Option<String>,
-    prompt_version: Option<i64>,
+    prompt_version: Option<String>,
     prompt_label: Option<String>,
     completion_start_time: Option<i64>,
     tool_name: Option<String>,
@@ -104,6 +104,30 @@ pub struct OtelIngestionProcessor {
 impl Default for OtelIngestionProcessor {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+/// Resource keys arrive as `service_<key>` (`resource_attribute_key`).
+fn apply_attribution_fallbacks(
+    span_attributes: &mut HashMap<String, json::Value>,
+    resource_attributes: &HashMap<String, json::Value>,
+    config: &GenAiAgentMappingConfig,
+) {
+    for (target, fallbacks) in config.attribution_fields.targets() {
+        if fallbacks.is_empty() || span_attributes.contains_key(target) {
+            continue;
+        }
+        let found = fallbacks.iter().find_map(|f| {
+            span_attributes
+                .get(f)
+                .or_else(|| resource_attributes.get(&format!("service_{f}")))
+                .or_else(|| resource_attributes.get(f))
+                .filter(|v| !v.is_null() && v.as_str() != Some(""))
+                .cloned()
+        });
+        if let Some(value) = found {
+            span_attributes.insert(target.to_string(), value);
+        }
     }
 }
 
@@ -176,6 +200,8 @@ impl OtelIngestionProcessor {
         span: SpanContext<'_>,
         agent_mapping_config: &GenAiAgentMappingConfig,
     ) {
+        apply_attribution_fallbacks(span_attributes, resource_attributes, agent_mapping_config);
+
         // Phase 1: Extract all raw data from span attributes.
         let extracted = self.extract_all(
             span_attributes,
@@ -625,9 +651,7 @@ impl OtelIngestionProcessor {
             );
         }
 
-        // The raw prompt reference survives extraction; replace it with the normalised value,
-        // or drop it when the extractor rejected it (a non-string name, a version that is not a
-        // positive integer), so `gen_ai_prompt_version` stays an Int64 column.
+        // Replace raw prompt reference with normalised value, or drop if rejected by extractor.
         for (key, value) in [
             (
                 GenAiAttributes::PROMPT_NAME,
@@ -635,7 +659,7 @@ impl OtelIngestionProcessor {
             ),
             (
                 GenAiAttributes::PROMPT_VERSION,
-                extracted.prompt_version.map(|v| json::json!(v)),
+                extracted.prompt_version.as_deref().map(|v| json::json!(v)),
             ),
             (
                 GenAiAttributes::PROMPT_LABEL,
@@ -1189,6 +1213,36 @@ mod tests {
     }
 
     #[test]
+    fn attribution_fallbacks_fill_the_standard_keys_only_when_missing() {
+        use config::meta::gen_ai::AttributionFields;
+        let config = GenAiAgentMappingConfig {
+            attribution_fields: AttributionFields {
+                tenant: vec!["customer.org".to_string()],
+                user: vec!["app.user".to_string()],
+                feature: vec!["app.feature".to_string()],
+            },
+            ..Default::default()
+        };
+        let mut span = HashMap::from([
+            ("app.user".to_string(), json::json!("u-1")),
+            ("user.id".to_string(), json::json!("u-standard")),
+            ("app.feature".to_string(), json::json!("")),
+        ]);
+        let resource = HashMap::from([("service_customer.org".to_string(), json::json!("acme"))]);
+        apply_attribution_fallbacks(&mut span, &resource, &config);
+        assert_eq!(span["tenant.id"], json::json!("acme"), "resource fallback");
+        assert_eq!(
+            span["user.id"],
+            json::json!("u-standard"),
+            "standard key wins"
+        );
+        assert!(
+            !span.contains_key("feature.name"),
+            "empty fallback is skipped"
+        );
+    }
+
+    #[test]
     fn test_process_span_uses_configured_agent_mapping() {
         let processor = OtelIngestionProcessor::new();
 
@@ -1420,11 +1474,15 @@ mod tests {
         );
         assert_eq!(
             span_attrs.get(GenAiAttributes::PROMPT_VERSION),
-            Some(&json::json!(3))
+            Some(&json::json!("3"))
         );
         assert_eq!(
             span_attrs.get(GenAiAttributes::PROMPT_LABEL),
             Some(&json::json!("production"))
+        );
+        assert_eq!(
+            span_attrs.get("gen_ai.prompt.variable.customer"),
+            Some(&json::json!("must-not-be-normalized"))
         );
         assert!(!span_attrs.contains_key("gen_ai_prompt_variable_customer"));
     }
@@ -1432,7 +1490,7 @@ mod tests {
     #[test]
     fn process_span_replaces_or_drops_raw_prompt_reference() {
         let processor = OtelIngestionProcessor::new();
-        // Rejected by the extractor: a non-numeric version and a non-string name.
+        // Rejected by the extractor: a non-string name; the version is kept.
         let mut rejected = HashMap::from([
             (GenAiAttributes::PROMPT_NAME.to_string(), json::json!(42)),
             (
@@ -1445,14 +1503,17 @@ mod tests {
             ),
         ]);
         processor.process_span(&mut rejected, &HashMap::new(), None, &[]);
-        assert!(!rejected.contains_key(GenAiAttributes::PROMPT_VERSION));
         assert!(!rejected.contains_key(GenAiAttributes::PROMPT_NAME));
+        assert_eq!(
+            rejected.get(GenAiAttributes::PROMPT_VERSION),
+            Some(&json::json!("latest"))
+        );
         assert_eq!(
             rejected.get(GenAiAttributes::PROMPT_LABEL),
             Some(&json::json!("production"))
         );
 
-        // A numeric string version is stored as the integer it names.
+        // String versions are kept as strings, including numeric strings.
         let mut accepted = HashMap::from([
             (
                 GenAiAttributes::PROMPT_NAME.to_string(),
@@ -1466,7 +1527,7 @@ mod tests {
         processor.process_span(&mut accepted, &HashMap::new(), None, &[]);
         assert_eq!(
             accepted.get(GenAiAttributes::PROMPT_VERSION),
-            Some(&json::json!(3))
+            Some(&json::json!("3"))
         );
         assert_eq!(
             accepted.get(GenAiAttributes::PROMPT_NAME),

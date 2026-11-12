@@ -825,6 +825,28 @@ describe("access store classification", () => {
     expect(extractResourceInfo(url, method)?.key).toBe(key);
     expect(accessPermission(method, url)).toBe(permission);
   });
+
+  it.each([
+    ["POST", "/api/acme/security/intel/sweep", "get"],
+    ["POST", "/api/acme/security/intel/sightings", "get"],
+    ["POST", "/api/acme/security/intel/validate", "get"],
+    ["POST", "/api/acme/security/entities", "get"],
+    ["POST", "/api/acme/security/entities/graph", "get"],
+    ["POST", "/api/acme/security/entities/detail", "get"],
+    ["POST", "/api/acme/security/ueba", "get"],
+    ["POST", "/api/acme/security/events/search", "get"],
+    ["POST", "/api/acme/security/sigma/compile", "get"],
+    ["POST", "/api/acme/security/sources/match", "get"],
+    ["GET", "/api/acme/security/sources", "get"],
+    ["POST", "/api/acme/security/cases", "update"],
+    ["PUT", "/api/acme/security/cases/settings", "update"],
+    ["POST", "/api/acme/security/sources/okta/attach", "create"],
+    ["POST", "/api/acme/security/sources/classify", "create"],
+    ["POST", "/api/acme/security/sources/okta/detach", "delete"],
+  ])("checks Security %s %s as %s, as the server's route table does", (method, url, permission) => {
+    expect(extractResourceInfo(url, method)?.key).toBe("security");
+    expect(accessPermission(method, url)).toBe(permission);
+  });
 });
 
 describe("access store lifecycle", () => {

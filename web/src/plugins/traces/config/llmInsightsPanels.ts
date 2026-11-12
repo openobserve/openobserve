@@ -29,29 +29,18 @@
  */
 
 import { type I18nKey } from "@/types/i18n";
-import {
-  LLM_LATENCY_SERIES_COLORS,
-  LLM_ERRORS_COLOR,
-  LLM_SPANS_COLOR,
-  LLM_TOKENS_COLOR,
-} from "@/utils/dashboard/colorPalette";
+import type { AiAlertKind } from "@/utils/alerts/prefill/fromAi";
+import { LLM_ERRORS_COLOR, LLM_TRACES_COLOR } from "@/utils/dashboard/colorPalette";
 
-export type LLMPanelType = "stacked-area" | "stacked-bar" | "horizontal-bar" | "table";
-
-export type LLMTableColumnFormat =
-  "time" | "service-chip" | "error" | "cost" | "view-link" | "text";
-
-export interface LLMTableColumn {
-  /** Hit field used as the value source. May be omitted for "view-link". */
-  field?: string;
-  /**
-   * Header label, translated at the render site (this module is a plain config,
-   * so a resolved string would not follow the locale). Omit for no header.
-   */
-  labelKey?: I18nKey;
-  format?: LLMTableColumnFormat;
-  align?: "left" | "right";
-}
+export type LLMPanelType =
+  | "stacked-area"
+  | "stacked-bar"
+  | "line"
+  | "horizontal-bar"
+  /** The errors grouped by message (LLMTopErrorsTable). */
+  | "error-table"
+  /** The failing-tools ranking (LLMFailingToolsTable). */
+  | "tool-table";
 
 export type LLMValueFormat = "cost" | "latency-ms";
 
@@ -64,17 +53,17 @@ export interface LLMPanelQuery {
   seriesField?: string;
   /** Hit field used for the y-value (or bar length). */
   valueField?: string;
-  /**
-   * i18n KEY for the legend label used when seriesField is not set. Resolved by
-   * `buildLLMPanelSchema` — see {@link LLMTableColumn.labelKey} for why this
-   * module stores a key rather than a translated string.
-   */
+  /** i18n key for the legend label when seriesField is unset, resolved per locale. */
   seriesLabelKey?: I18nKey;
+  /** Series drawn one per value column; `errored` picks errored (true) or error-free (false) traces on click. */
+  measures?: Array<{ field: string; labelKey: I18nKey; color?: string; errored?: boolean }>;
   /**
    * Hint to the renderer for axis / tooltip formatting.
    * - "cost": prefix with `$` and use 2-decimal precision in tooltips.
    */
   valueFormat?: LLMValueFormat;
+  /** Keep the top `n` series; `others` folds the rest only for additive values (percentiles don't add up). */
+  topSeries?: { n: number; others: boolean };
 }
 
 export interface LLMPanelLayout {
@@ -84,10 +73,7 @@ export interface LLMPanelLayout {
 
 export interface LLMPanelDef {
   id: string;
-  /**
-   * i18n KEY for the panel heading — see {@link LLMTableColumn.labelKey} for why
-   * these are keys and not text. Resolved by LLMSchemaPanel / LLMErrorTable.
-   */
+  /** i18n KEY for the panel heading, resolved by the panel component. */
   titleKey: I18nKey;
   /** i18n KEY for the panel sub-heading. */
   subtitleKey?: I18nKey;
@@ -98,18 +84,17 @@ export interface LLMPanelDef {
   color?: string;
   /** Optional row cap for horizontal-bar panels (top N). */
   limit?: number;
-  /**
-   * For grouped-bar panels: the value columns to render as side-by-side bars
-   * per category (e.g. p50/p90/p95/p99 per model). Each maps a hit field to a
-   * legend label and bar color. When set, these become the chart's Y-axis
-   * series instead of `query.valueField`.
-   */
-  series?: Array<{ field: string; label: string; color: string }>;
-  /** Column definitions for "table" panels. */
-  columns?: LLMTableColumn[];
-  /** i18n key for the message shown when the panel has no data (overrides "No data"). */
-  emptyStateKey?: I18nKey;
+  /** A trace matches when any span has the `seriesSql` value; `errored` selects errored traces. */
+  drill?: { seriesSql?: string; errored?: true };
+  /** "Create alert" from this panel: the pack template it maps to. */
+  alert?: AiAlertKind;
 }
+
+/** The series expressions a drill can select on, shared with the panels. */
+export const MODEL_SERIES_SQL = "gen_ai_response_model";
+const TOOL_SERIES_SQL = "gen_ai_tool_name";
+/** The failing span's status message; a span with none groups under "". */
+export const ERROR_MESSAGE_SQL = "COALESCE(status_message, '')";
 
 // Time-range pruning is handled by the search engine via the start_time /
 // end_time fields on the request payload — no need to repeat it in WHERE.
@@ -122,7 +107,9 @@ const baseFilter = `gen_ai_operation_name IS NOT NULL`;
 
 // Centralised column names so a future rename only touches this file.
 const COST_FIELD = `gen_ai_usage_cost`;
-const TOKENS_FIELD = `gen_ai_usage_total_tokens`;
+const INPUT_TOKENS_FIELD = `gen_ai_usage_input_tokens`;
+const OUTPUT_TOKENS_FIELD = `gen_ai_usage_output_tokens`;
+const TOTAL_TOKENS_FIELD = `gen_ai_usage_total_tokens`;
 const MODEL_FIELD = `gen_ai_response_model`;
 const OBSERVATION_TYPE_FIELD = `gen_ai_operation_name`;
 
@@ -158,22 +145,95 @@ export function llmCallUsageSum(column: string): string {
   return `SUM(CASE WHEN ${predicate} THEN ${column} ELSE 0 END)`;
 }
 
+const AGENT_SPAN = `${OBSERVATION_TYPE_FIELD} = 'invoke_agent'`;
+
+/** Stored column holding a span's parent span id; a stream whose spans never had a parent lacks it. */
+export const PARENT_SPAN_FIELD = "reference_parent_span_id";
+
+/** Joins each span to its `invoke_agent` parent; without the parent column every agent span is top-level. Mirrors `agent_parents_join` in session.rs. */
+export function agentParentsJoin(stream: string, hasParentSpan: boolean): string {
+  const agents = `SELECT DISTINCT trace_id AS agent_parent_trace, span_id AS agent_parent_span FROM "${stream}"`;
+  return hasParentSpan
+    ? ` LEFT JOIN (${agents} WHERE ${AGENT_SPAN}) AS agent_parents ` +
+        `ON trace_id = agent_parent_trace AND ${PARENT_SPAN_FIELD} = agent_parent_span`
+    : ` LEFT JOIN (${agents} WHERE false) AS agent_parents ON trace_id = agent_parent_trace`;
+}
+
+/** Nested agents are skipped because their parent's usage already includes theirs; needs `agentParentsJoin` in FROM. */
+export const topLevelAgentUsage = (column: string) =>
+  `SUM(CASE WHEN ${AGENT_SPAN} AND agent_parent_span IS NULL THEN ${column} END)`;
+
+/** Top-level agent usage when no LLM call in the trace carries any; per-model views show it as unattributed. */
+export const agentFallbackUsage = (column: string) =>
+  `CASE WHEN COALESCE(${llmCallUsageSum(column)}, 0) = 0 ` +
+  `THEN COALESCE(${topLevelAgentUsage(column)}, 0) ELSE 0 END`;
+
+/** Agent-only traces judged whole (not per bucket) so they never count twice; `first_ts` because `_timestamp` cannot be aliased. */
+function agentOnlyTracesSql(columns: Array<[string, string]>, havingColumn: string): string {
+  const projected = columns.map(([col, alias]) => `${agentFallbackUsage(col)} as ${alias}`);
+  return `
+    SELECT trace_id, MIN(_timestamp) as first_ts, ${projected.join(", ")}
+    FROM {{stream}}{{agentParents}}
+    WHERE trace_id IS NOT NULL{{scope}}
+    GROUP BY trace_id
+    HAVING ${agentFallbackUsage(havingColumn)} > 0`;
+}
+
 export const LLM_INSIGHTS_PANELS: LLMPanelDef[] = [
   {
-    id: "cost-trend",
-    titleKey: "aiObservability.panels.costTrend.title",
-    subtitleKey: "aiObservability.panels.costTrend.subtitle",
+    // Counted like the KPI strip (approx_distinct trace_id) so the bars add up to the Traces tile.
+    id: "traces-over-time",
+    titleKey: "aiObservability.panels.tracesOverTime.title",
+    subtitleKey: "aiObservability.panels.tracesOverTime.subtitle",
     type: "stacked-bar",
     layout: { colSpan: 1 },
+    // A click lists the bucket's traces of the clicked series (`measures[].errored`).
+    drill: {},
+    alert: "failure_rate",
     query: {
-      // Cost field populated by the backend extractor from
-      // gen_ai.usage.cost / Langfuse cost_details — same source the Traces
-      // tab uses.
+      // No baseFilter: failures land on deep child spans without gen_ai_operation_name.
+      sql: `
+        SELECT
+          histogram(_timestamp, '{{interval}}') as ts,
+          approx_distinct(trace_id) - approx_distinct(trace_id) FILTER (WHERE span_status = 'ERROR') as ok,
+          approx_distinct(trace_id) FILTER (WHERE span_status = 'ERROR') as errored
+        FROM {{stream}}
+        WHERE trace_id IS NOT NULL
+        GROUP BY ts
+        ORDER BY ts
+      `,
+      timeField: "ts",
+      measures: [
+        {
+          field: "ok",
+          labelKey: "aiObservability.panels.tracesOverTime.ok",
+          color: LLM_TRACES_COLOR,
+          errored: false,
+        },
+        {
+          field: "errored",
+          labelKey: "aiObservability.panels.tracesOverTime.errored",
+          color: LLM_ERRORS_COLOR,
+          errored: true,
+        },
+      ],
+    },
+  },
+  {
+    id: "latency-trend",
+    titleKey: "aiObservability.panels.latencyByModel.title",
+    subtitleKey: "aiObservability.panels.latencyByModel.subtitle",
+    // Not stacked: percentiles of two models do not add up.
+    type: "line",
+    layout: { colSpan: 1 },
+    drill: { seriesSql: MODEL_SERIES_SQL },
+    query: {
+      // Scoped to LLM calls so fast tool/child spans don't drag the tail down.
       sql: `
         SELECT
           histogram(_timestamp, '{{interval}}') as ts,
           ${MODEL_FIELD} as model,
-          COALESCE(${llmCallUsageSum(COST_FIELD)}, 0) as cost
+          approx_percentile_cont(duration, 0.95) / 1000.0 as p95
         FROM {{stream}}
         WHERE ${modelScopedFilter}
         GROUP BY ts, ${MODEL_FIELD}
@@ -181,8 +241,94 @@ export const LLM_INSIGHTS_PANELS: LLMPanelDef[] = [
       `,
       timeField: "ts",
       seriesField: "model",
+      // The alias is the axis label; the unit formatter adds ms / s.
+      valueField: "p95",
+      valueFormat: "latency-ms",
+      topSeries: { n: 10, others: false },
+    },
+  },
+  {
+    // `operation` uses MIN so it is stable across reloads.
+    id: "top-errors",
+    titleKey: "aiObservability.panels.topErrors.title",
+    subtitleKey: "aiObservability.panels.topErrors.subtitle",
+    type: "error-table",
+    layout: { colSpan: 1 },
+    drill: { seriesSql: ERROR_MESSAGE_SQL, errored: true },
+    query: {
+      // No baseFilter, for the same reason as traces-over-time.
+      sql: `
+        SELECT
+          ${ERROR_MESSAGE_SQL} as message,
+          MIN(operation_name) as operation,
+          approx_distinct(operation_name) as operations,
+          approx_distinct(trace_id) as traces,
+          MAX(_timestamp) as last_seen
+        FROM {{stream}}
+        WHERE span_status = 'ERROR'
+        GROUP BY ${ERROR_MESSAGE_SQL}
+        ORDER BY traces DESC
+        LIMIT 10
+      `,
+    },
+  },
+  {
+    // Every span carries the agent's canonical name, so the agent filter needs no parent climb.
+    id: "failing-tools",
+    titleKey: "aiObservability.panels.failingTools.title",
+    subtitleKey: "aiObservability.panels.failingTools.subtitle",
+    type: "tool-table",
+    layout: { colSpan: 1 },
+    drill: { seriesSql: TOOL_SERIES_SQL, errored: true },
+    query: {
+      sql: `
+        SELECT
+          ${TOOL_SERIES_SQL} as tool,
+          SUM(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END) as failures,
+          COUNT(*) as calls,
+          approx_distinct(CASE WHEN span_status = 'ERROR' THEN trace_id END) as traces,
+          MAX(CASE WHEN span_status = 'ERROR' THEN _timestamp END) as last_failed
+        FROM {{stream}}
+        WHERE ${OBSERVATION_TYPE_FIELD} = 'execute_tool' AND ${TOOL_SERIES_SQL} IS NOT NULL
+        GROUP BY ${TOOL_SERIES_SQL}
+        HAVING SUM(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END) > 0
+        ORDER BY failures DESC
+        LIMIT 10
+      `,
+    },
+  },
+  {
+    id: "cost-trend",
+    titleKey: "aiObservability.panels.costTrend.title",
+    subtitleKey: "aiObservability.panels.costTrend.subtitle",
+    type: "stacked-bar",
+    layout: { colSpan: 1 },
+    drill: { seriesSql: MODEL_SERIES_SQL },
+    alert: "cost",
+    query: {
+      // Agent-only cost is the unattributed series so the bars add up to the Total Cost tile.
+      sql: `
+        SELECT ts, model, SUM(cost) as cost
+        FROM (
+          SELECT
+            histogram(_timestamp, '{{interval}}') as ts,
+            ${MODEL_FIELD} as model,
+            COALESCE(${llmCallUsageSum(COST_FIELD)}, 0) as cost
+          FROM {{stream}}
+          WHERE ${modelScopedFilter}{{scope}}
+          GROUP BY ts, ${MODEL_FIELD}
+          UNION ALL
+          SELECT histogram(first_ts, '{{interval}}') as ts, {{unattributed}} as model, cost
+          FROM (${agentOnlyTracesSql([[COST_FIELD, "cost"]], COST_FIELD)})
+        )
+        GROUP BY ts, model
+        ORDER BY ts
+      `,
+      timeField: "ts",
+      seriesField: "model",
       valueField: "cost",
       valueFormat: "cost",
+      topSeries: { n: 10, others: true },
     },
   },
   {
@@ -191,226 +337,43 @@ export const LLM_INSIGHTS_PANELS: LLMPanelDef[] = [
     subtitleKey: "aiObservability.panels.tokenTrend.subtitle",
     type: "stacked-bar",
     layout: { colSpan: 1 },
+    // A click lists the bucket's traces; input and output are measures, not a filter.
+    drill: {},
     query: {
+      // Includes agent-span-only tokens, as the Total Tokens tile does.
       sql: `
-        SELECT
-          histogram(_timestamp, '{{interval}}') as ts,
-          ${MODEL_FIELD} as model,
-          COALESCE(${llmCallUsageSum(TOKENS_FIELD)}, 0) as tokens
-        FROM {{stream}}
-        WHERE ${modelScopedFilter}
-        GROUP BY ts, ${MODEL_FIELD}
-        ORDER BY ts
-      `,
-      timeField: "ts",
-      seriesField: "model",
-      valueField: "tokens",
-    },
-  },
-  {
-    id: "span-trend",
-    titleKey: "aiObservability.panels.spanTrend.title",
-    subtitleKey: "aiObservability.panels.spanTrend.subtitle",
-    type: "stacked-bar",
-    layout: { colSpan: 1 },
-    query: {
-      sql: `
-        SELECT
-          histogram(_timestamp, '{{interval}}') as ts,
-          LOWER(COALESCE(${OBSERVATION_TYPE_FIELD}, 'span')) as kind,
-          COUNT(*) as count
-        FROM {{stream}}
-        WHERE ${baseFilter}
-        GROUP BY ts, kind
-        ORDER BY ts
-      `,
-      timeField: "ts",
-      seriesField: "kind",
-      valueField: "count",
-    },
-  },
-  {
-    id: "latency-by-model",
-    titleKey: "aiObservability.panels.latencyByModel.title",
-    subtitleKey: "aiObservability.panels.latencyByModel.subtitle",
-    type: "horizontal-bar",
-    layout: { colSpan: 1 },
-    limit: 8,
-    query: {
-      // One row per model with its latency percentiles (ms). Scoped to LLM
-      // calls so fast tool/child spans don't drag the tail down. Ordered by
-      // p95 so the slowest models surface first; the four percentile columns
-      // render as grouped bars per model (see `series`).
-      sql: `
-        SELECT
-          ${MODEL_FIELD} as model,
-          approx_percentile_cont(duration, 0.5)  / 1000.0 as p50_ms,
-          approx_percentile_cont(duration, 0.9)  / 1000.0 as p90_ms,
-          approx_percentile_cont(duration, 0.95) / 1000.0 as p95_ms,
-          approx_percentile_cont(duration, 0.99) / 1000.0 as p99_ms
-        FROM {{stream}}
-        WHERE ${modelScopedFilter}
-        GROUP BY ${MODEL_FIELD}
-        ORDER BY p95_ms DESC
-      `,
-      seriesField: "model",
-      valueFormat: "latency-ms",
-    },
-    // Severity escalation: slate (typical) → red (slow tail).
-    series: [
-      { field: "p50_ms", label: "p50", color: LLM_LATENCY_SERIES_COLORS.p50 },
-      { field: "p90_ms", label: "p90", color: LLM_LATENCY_SERIES_COLORS.p90 },
-      { field: "p95_ms", label: "p95", color: LLM_LATENCY_SERIES_COLORS.p95 },
-      { field: "p99_ms", label: "p99", color: LLM_LATENCY_SERIES_COLORS.p99 },
-    ],
-  },
-  {
-    id: "traces-over-time",
-    titleKey: "aiObservability.panels.tracesOverTime.title",
-    subtitleKey: "aiObservability.panels.tracesOverTime.subtitle",
-    type: "stacked-bar",
-    layout: { colSpan: 1 },
-    query: {
-      sql: `
-        SELECT
-          histogram(_timestamp, '{{interval}}') as ts,
-          COALESCE(service_name, 'unknown') as service,
-          approx_distinct(trace_id) as count
-        FROM {{stream}}
-        WHERE ${baseFilter}
-        GROUP BY ts, COALESCE(service_name, 'unknown')
-        ORDER BY ts
-      `,
-      timeField: "ts",
-      seriesField: "service",
-      valueField: "count",
-    },
-  },
-  {
-    id: "errors-over-time",
-    titleKey: "aiObservability.panels.errorsOverTime.title",
-    subtitleKey: "aiObservability.panels.errorsOverTime.subtitle",
-    type: "stacked-bar",
-    layout: { colSpan: 1 },
-    color: LLM_ERRORS_COLOR,
-    query: {
-      // No baseFilter: OTel SDKs typically propagate the failure to a deep
-      // child span (e.g. tool.<name>) which doesn't carry
-      // gen_ai_operation_name. The chosen stream is LLM-marked, so every
-      // error in it is relevant to the dashboard.
-      sql: `
-        SELECT
-          histogram(_timestamp, '{{interval}}') as ts,
-          COUNT(*) as count
-        FROM {{stream}}
-        WHERE span_status = 'ERROR'
+        SELECT ts, SUM(input_tokens) as input_tokens, SUM(output_tokens) as output_tokens
+        FROM (
+          SELECT
+            histogram(_timestamp, '{{interval}}') as ts,
+            COALESCE(${llmCallUsageSum(INPUT_TOKENS_FIELD)}, 0) as input_tokens,
+            COALESCE(${llmCallUsageSum(OUTPUT_TOKENS_FIELD)}, 0) as output_tokens
+          FROM {{stream}}
+          WHERE ${baseFilter}{{scope}}
+          GROUP BY ts
+          UNION ALL
+          SELECT histogram(first_ts, '{{interval}}') as ts, input_tokens, output_tokens
+          FROM (${agentOnlyTracesSql(
+            [
+              [INPUT_TOKENS_FIELD, "input_tokens"],
+              [OUTPUT_TOKENS_FIELD, "output_tokens"],
+            ],
+            TOTAL_TOKENS_FIELD,
+          )})
+        )
         GROUP BY ts
         ORDER BY ts
       `,
       timeField: "ts",
-      valueField: "count",
-      seriesLabelKey: "traces.lLMInsightsDashboard.errorsSeries",
+      measures: [
+        { field: "input_tokens", labelKey: "aiObservability.panels.tokenTrend.input" },
+        { field: "output_tokens", labelKey: "aiObservability.panels.tokenTrend.output" },
+      ],
     },
-  },
-  {
-    id: "spans-by-model",
-    titleKey: "aiObservability.panels.spansByModel.title",
-    subtitleKey: "aiObservability.panels.spansByModel.subtitle",
-    type: "horizontal-bar",
-    layout: { colSpan: 1 },
-    color: LLM_SPANS_COLOR,
-    limit: 10,
-    query: {
-      sql: `
-        SELECT
-          ${MODEL_FIELD} as model,
-          COUNT(*) as count
-        FROM {{stream}}
-        WHERE ${modelScopedFilter}
-        GROUP BY ${MODEL_FIELD}
-        ORDER BY count DESC
-      `,
-      seriesField: "model",
-      valueField: "count",
-    },
-  },
-  {
-    id: "tokens-by-model",
-    titleKey: "aiObservability.panels.tokensByModel.title",
-    subtitleKey: "aiObservability.panels.tokensByModel.subtitle",
-    type: "horizontal-bar",
-    layout: { colSpan: 1 },
-    color: LLM_TOKENS_COLOR,
-    limit: 10,
-    query: {
-      sql: `
-        SELECT
-          ${MODEL_FIELD} as model,
-          COALESCE(${llmCallUsageSum(TOKENS_FIELD)}, 0) as tokens
-        FROM {{stream}}
-        WHERE ${modelScopedFilter}
-        GROUP BY ${MODEL_FIELD}
-        ORDER BY tokens DESC
-      `,
-      seriesField: "model",
-      valueField: "tokens",
-    },
-  },
-  {
-    id: "recent-errors",
-    titleKey: "aiObservability.panels.recentErrors.title",
-    subtitleKey: "aiObservability.panels.recentErrors.subtitle",
-    type: "table",
-    layout: { colSpan: 2 },
-    emptyStateKey: "traces.lLMErrorTable.noErrorsInRange",
-    query: {
-      // No baseFilter for the same reason as errors-over-time. Operation
-      // label uses `operation_name` (the actual OO traces column) — `span_name`
-      // does not exist in the schema and would fail at SQL parse time.
-      //
-      // Model/cost are not surfaced here: the failure usually lives on a deep
-      // child span (e.g. `tool.<name>`) which doesn't carry those attributes.
-      // The dedicated Cost / Tokens panels handle attribution.
-      sql: `
-        SELECT
-          _timestamp,
-          COALESCE(service_name, 'unknown') as service_name,
-          COALESCE(operation_name, '—') as operation,
-          trace_id
-        FROM {{stream}}
-        WHERE span_status = 'ERROR'
-        ORDER BY _timestamp DESC
-        LIMIT 10
-      `,
-    },
-    columns: [
-      { field: "_timestamp", labelKey: "traces.lLMErrorTable.time", format: "time" },
-      { field: "service_name", labelKey: "traces.lLMErrorTable.service", format: "service-chip" },
-      { field: "operation", labelKey: "traces.lLMErrorTable.operation", format: "error" },
-      { field: "trace_id", labelKey: "traces.lLMErrorTable.traceId", format: "text" },
-      { field: "trace_id", format: "view-link", align: "right" },
-    ],
   },
 ];
 
-/**
- * Substitute the standard placeholders in a SQL template with concrete values.
- *
- * Replaces (globally, all occurrences):
- *   {{stream}}     → `"streamName"` (always quoted — DataFusion treats unquoted
- *                                    identifiers as case-insensitive)
- *   {{startTime}}  → numeric microseconds, unquoted
- *   {{endTime}}    → numeric microseconds, unquoted
- *   {{interval}}   → bucket width string ("5 minutes", "1 hour", etc.) — used
- *                                    only inside `histogram(_timestamp, '…')`
- *
- * @example
- *   renderPanelSql(
- *     `SELECT histogram(_timestamp, '{{interval}}') FROM {{stream}}`,
- *     { stream: "default", startTime: 1700000000000000, endTime: 1700001000000000, interval: "1 minute" },
- *   )
- *   // => `SELECT histogram(_timestamp, '1 minute') FROM "default"`
- */
+/** Fills `{{…}}` placeholders; `{{stream}}` is quoted since DataFusion folds unquoted identifiers. */
 export function renderPanelSql(
   sql: string,
   ctx: {
@@ -421,15 +384,27 @@ export function renderPanelSql(
     // Bare agent predicate (no leading AND). Empty = "All Agents".
     // Auto-spliced into each panel's WHERE (see below).
     agentFilter?: string;
+    /** Translated name of the series for usage with no model ({{unattributed}}). */
+    unattributedLabel?: string;
+    /** The stream stores span parents ({{agentParents}}); false or absent when it has none. */
+    hasParentSpan?: boolean;
   },
 ): string {
+  const marked = sql.includes("{{scope}}");
   const rendered = sql
     .replace(/\{\{stream\}\}/g, `"${ctx.stream}"`)
     .replace(/\{\{startTime\}\}/g, String(ctx.startTime))
     .replace(/\{\{endTime\}\}/g, String(ctx.endTime))
-    .replace(/\{\{interval\}\}/g, ctx.interval);
+    .replace(/\{\{interval\}\}/g, ctx.interval)
+    // Function replacers: a `$` in a user's filter or label is not a replacement pattern.
+    .replace(/\{\{scope\}\}/g, () => (ctx.agentFilter ? ` AND (${ctx.agentFilter})` : ""))
+    .replace(
+      /\{\{unattributed\}\}/g,
+      () => `'${(ctx.unattributedLabel ?? "Unattributed").replace(/'/g, "''")}'`,
+    )
+    .replace(/\{\{agentParents\}\}/g, () => agentParentsJoin(ctx.stream, !!ctx.hasParentSpan));
 
-  if (!ctx.agentFilter) return compactSql(rendered);
+  if (!ctx.agentFilter || marked) return compactSql(rendered);
 
   // Append the agent predicate to the query's WHERE clause. Every panel has
   // exactly one flat WHERE, so we splice ` AND
@@ -497,6 +472,26 @@ export function compactSql(sql: string): string {
  *   pickInterval(14 * 86400 * 1_000_000)  // "6 hours"    (14 day window)
  *   pickInterval(60 * 86400 * 1_000_000)  // "1 day"      (60 day window)
  */
+/** Mirrors `generate_histogram_interval` in histogram_interval.rs so a clicked bar maps back to its range. */
+export function autoHistogramBucketMicros(startMicros: number, endMicros: number): number {
+  const HOUR = 3_600_000_000;
+  const range = endMicros - startMicros;
+  const steps: Array<[number, number]> = [
+    [24 * 60 * HOUR, 24 * HOUR],
+    [24 * 30 * HOUR, 12 * HOUR],
+    [24 * 28 * HOUR, 6 * HOUR],
+    [24 * 21 * HOUR, 3 * HOUR],
+    [24 * 15 * HOUR, 2 * HOUR],
+    [6 * HOUR, HOUR],
+    [2 * HOUR, 60_000_000],
+    [HOUR, 30_000_000],
+    [HOUR / 2, 15_000_000],
+    [10_000_000, 10_000_000],
+  ];
+  for (const [atLeast, width] of steps) if (range >= atLeast) return width;
+  return 1_000_000;
+}
+
 export function pickInterval(durationMicros: number): string {
   // Target ~30 buckets across the window — the histogram() arg is chosen
   // by checking which "round" interval slot the per-bucket width falls in.

@@ -279,11 +279,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </OTable>
     </div>
+    <!-- Rows open in a drawer here, keeping the agent, version and time range. -->
+    <AiTraceDrawer v-model:open="traceDrawerOpen" :trace="drawerTrace" />
   </AiPageShell>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
+import analytics from "@/services/product_analytics";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -315,6 +318,8 @@ import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { useLicenseLock } from "@/composables/useFeatureLock";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import AiTraceDrawer from "@/plugins/traces/AiTraceDrawer.vue";
+import type { AiDrawerTrace } from "@/plugins/traces/AiTraceDrawer.types";
 
 defineOptions({ name: "AIDiscoveryPage" });
 
@@ -331,8 +336,9 @@ const orgQuery = computed(() => ({ org_identifier: orgId.value }));
 const {
   dateState,
   timeRange,
+  applyRelative,
+  DEFAULT_RELATIVE,
   onDateChange: onDateStateChange,
-  mountResolve,
 } = useAiDateController();
 
 // The scope tab survives a revisit — same shape the trace detail view uses for
@@ -605,8 +611,12 @@ function durationLabel(row: LlmDiscoveryItem) {
   return row.durationUs == null ? DASH : raw(formatTimeWithSuffix(row.durationUs));
 }
 
+// Only the latest request may fill the table, or a slower earlier range overwrites it.
+let seq = 0;
+
 async function fetchItems() {
   if (!orgId.value) return;
+  const mine = ++seq;
   loading.value = true;
   try {
     const res = await llmDiscoveryService.search(orgId.value, {
@@ -617,18 +627,24 @@ async function fetchItems() {
       size: pageSize.value,
       queueStatus: queueStatus.value,
     });
+    if (mine !== seq) return;
     items.value = res.items;
     total.value = res.total;
     selectedIds.value = [];
     lastRunAt.value = Date.now();
   } catch {
+    if (mine !== seq) return;
     toast({ variant: "error", message: t("aiObservability.discovery.loadError") });
   } finally {
-    loading.value = false;
+    if (mine === seq) loading.value = false;
   }
 }
 
+/** Refresh re-anchors a relative window to now, as the other AI pages do. */
 function refresh() {
+  if (dateState.value.valueType === "relative") {
+    applyRelative(dateState.value.relativeTimePeriod ?? DEFAULT_RELATIVE);
+  }
   fetchItems();
 }
 
@@ -649,11 +665,16 @@ function onScopeChange(value: unknown) {
   // Each scope shows different fields, so a term typed against the old columns
   // shouldn't silently hide rows in the new ones.
   search.value = "";
+  analytics.track("llm_discovery_filter_applied", { filter: "scope", value: scope.value });
   reload();
 }
 
 function onQueueStatusChange(value: unknown) {
   queueStatus.value = value as DiscoveryQueueStatus;
+  analytics.track("llm_discovery_filter_applied", {
+    filter: "queue_status",
+    value: queueStatus.value,
+  });
   reload();
 }
 
@@ -668,10 +689,8 @@ function onPageSizeChange(size: number) {
 }
 
 function onDateChange(value: any) {
-  onDateStateChange(value);
-  // The DateTime picker fires a programmatic date-change on mount (window replay);
-  // only a genuine user pick should re-fetch, else we double-load with onMounted.
-  if (value?.userChangedValue === true) reload();
+  // Skip the picker's mount replay of the seeded range; onMounted already loads it.
+  if (onDateStateChange(value) || value?.userChangedValue === true) reload();
 }
 
 /** Row click drills into the object itself, reusing the Traces views. */
@@ -694,12 +713,24 @@ function openTarget(row: LlmDiscoveryItem) {
 
   if (row.scope === "session") {
     if (row.sessionId) {
+      analytics.track("llm_discovery_target_opened", { scope: row.scope });
       router.push({ name: "sessionDetails", query: { ...query, session_id: row.sessionId } });
     }
     return;
   }
   const traceId = row.scope === "trace" ? row.targetId : row.traceId;
-  if (traceId) {
+  if (traceId) analytics.track("llm_discovery_target_opened", { scope: row.scope });
+  if (traceId && row.sourceStream) {
+    drawerTrace.value = {
+      traceId,
+      stream: row.sourceStream,
+      startTime: row.refTimestamp - TRACE_WINDOW_US,
+      endTime: row.refTimestamp + TRACE_WINDOW_US,
+      // A span row opens its parent trace with that span selected.
+      spanId: row.scope === "span" ? row.targetId : undefined,
+    };
+    traceDrawerOpen.value = true;
+  } else if (traceId) {
     router.push({
       name: "traceDetails",
       query: {
@@ -711,6 +742,9 @@ function openTarget(row: LlmDiscoveryItem) {
     });
   }
 }
+
+const traceDrawerOpen = ref(false);
+const drawerTrace = ref<AiDrawerTrace | null>(null);
 
 // ── Add to queue (row action and bulk share this path) ──
 const BULK = "__bulk__";
@@ -756,8 +790,5 @@ async function addToQueue(queue: LlmQueue, rows: LlmDiscoveryItem[]) {
   }
 }
 
-onMounted(() => {
-  mountResolve();
-  fetchItems();
-});
+onMounted(fetchItems);
 </script>

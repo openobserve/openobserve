@@ -178,12 +178,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="flex py-1.5"
       />
     </template>
-    <template v-if="FUNNEL[scenario].incidents > issues.length" #footer-note>
+    <template v-if="funnelFor(scenario).incidents > issues.length" #footer-note>
       <span class="text-text-secondary text-xs" data-test="autoobserve-issues-subset-note">
         {{
           t("autoobserve.issues.subsetNote", {
             shown: rows.length,
-            total: FUNNEL[scenario].incidents,
+            total: funnelFor(scenario).incidents,
           })
         }}
       </span>
@@ -221,7 +221,7 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
-import { CONFIDENCE_LABEL, FUNNEL, type Issue, type Scenario } from "./fixtures";
+import { CONFIDENCE_LABEL, funnelFor, type Issue, type Scenario } from "./fixtures";
 import { DAY_DATE, type DayKey } from "./data/facts";
 import {
   DAY_LABEL,

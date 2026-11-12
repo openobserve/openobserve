@@ -110,20 +110,24 @@ const isMissing = computed(() => !!summary.value.node?.missing);
 // destination uses) — that isn't what this entity is used by.
 const badges = computed(() => {
   const c = summary.value.counts;
+  // A template adds the server's references that have no edge here (other orgs, unlisted rows).
+  const external = props.focus.kind === "template" ? summary.value.node?.externalCounts : undefined;
+  const destinations = c.destinations + (external?.destinations ?? 0);
+  const alerts = c.alerts + (external?.alerts ?? 0);
   const out: { kind: DepNodeKind; count: number; label: I18nText }[] = [];
-  if (props.focus.kind === "template" && c.destinations)
+  if (props.focus.kind === "template" && destinations)
     out.push({
       kind: "destination",
-      count: c.destinations,
-      label: t("alert_dependencies.countDestinations", { count: c.destinations }, c.destinations),
+      count: destinations,
+      label: t("alert_dependencies.countDestinations", { count: destinations }, destinations),
     });
-  if (c.alerts)
+  if (alerts)
     out.push({
       kind: "alert",
-      count: c.alerts,
-      label: t("alert_dependencies.usedBy", { count: c.alerts }, c.alerts),
+      count: alerts,
+      label: t("alert_dependencies.usedBy", { count: alerts }, alerts),
     });
-  if (props.focus.kind === "destination") {
+  if (props.focus.kind === "destination" || props.focus.kind === "template") {
     for (const b of consumerBadges(summary.value.node)) {
       out.push({ kind: b.kind, count: b.count, label: t(b.labelKey, { count: b.count }, b.count) });
     }

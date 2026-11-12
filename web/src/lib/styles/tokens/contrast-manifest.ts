@@ -602,13 +602,6 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
     themes: ["light"],
   },
   {
-    fg: "--color-datepicker-error-text",
-    category: "pending",
-    why: "fails the threshold against the page surface it is painted on",
-    issue: "WCAG-AA colour remediation (follow-up PR)",
-    themes: ["dark"],
-  },
-  {
     fg: "--color-datepicker-focus-border",
     category: "pending",
     why: "fails the threshold against the page surface it is painted on",
@@ -1083,6 +1076,12 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
     why: "the tick is drawn inside the checked box",
   },
   {
+    fg: "--color-copy-confirm-text",
+    bg: "--color-copy-confirm-bg",
+    category: "text",
+    why: "the copy bubble's label is painted on the bubble's own inverse fill",
+  },
+  {
     fg: "--color-dag-node-agent-text",
     bg: "--color-dag-node-agent-bg",
     category: "text",
@@ -1432,5 +1431,11 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
     bg: "--color-button-primary",
     category: "text",
     why: "the inverse foreground exists for filled controls, and the primary button is the fill it is sized against",
+  },
+  {
+    fg: "--color-onboarding-panel-text",
+    bg: "--color-onboarding-choice-active-bg",
+    category: "text",
+    why: "onboarding text sits on the brand panel top and the brand-filled option; the option fill is as light as or lighter than the panel top in both themes. Panel text stays in the top part; the lighter end stop carries only the example screen",
   },
 ];

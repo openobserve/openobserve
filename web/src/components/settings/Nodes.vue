@@ -419,7 +419,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
           <div class="flex shrink-0 justify-end border-t px-2 py-2">
-            <OButton variant="primary" size="sm-action" @click="applyFilter()">
+            <OButton variant="primary" size="sm-action" @click="onApplyFilterClick">
               {{ t("nodes.applyFilter") }}
             </OButton>
           </div>
@@ -452,10 +452,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Health strip: node counts by status, doubling as the status facet.
                  Attention-first — offline, then starting, then online, Total last. -->
             <template #subheader>
-              <div
-                class="px-page-edge border-table-row-divider border-b py-1.5"
-                data-test="nodes-summary"
-              >
+              <div data-test="nodes-summary">
                 <OStatStrip
                   :items="summaryStats"
                   :loading="loading"
@@ -568,6 +565,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { useQuery } from "@tanstack/vue-query";
 import { useOrgId } from "@/composables/query/useOrgId";
 import { nodesQuery } from "@/services/common.queries";
+import analytics from "@/services/product_analytics";
 import { defineComponent, reactive, ref, computed, watch, nextTick } from "vue";
 import useBreakpoint from "@/composables/useBreakpoint";
 import { useStore } from "vuex";
@@ -1064,6 +1062,16 @@ export default defineComponent({
       resultTotal.value = data.length;
     };
 
+    const onApplyFilterClick = () => {
+      applyFilter();
+      analytics.track("nodes_filter_applied", {
+        regions: selectedRegions.value.length,
+        clusters: selectedClusters.value.length,
+        node_types: selectedNodetypes.value.length,
+        statuses: selectedStatuses.value.length,
+      });
+    };
+
     const clearAll = () => {
       filterQuery.value = "";
       statusFilter.value = null;
@@ -1191,6 +1199,7 @@ export default defineComponent({
       }
       statusFilter.value =
         statusFilter.value === key ? null : (key as "offline" | "prepare" | "online");
+      if (statusFilter.value) analytics.track("nodes_health_filter_applied", { status: key });
     };
 
     const healthCounts = computed(() => {
@@ -1355,6 +1364,7 @@ export default defineComponent({
       maxClosewait,
       maxWaittime,
       applyFilter,
+      onApplyFilterClick,
       clearAll,
       filterOTableColumns,
       filterQuery,

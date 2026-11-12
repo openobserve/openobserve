@@ -22,6 +22,9 @@ use utoipa::ToSchema;
 
 use crate::stats::MemorySize;
 
+/// `Endpoint::destination_type` of a Jira destination.
+pub const JIRA_DESTINATION_TYPE: &str = "jira";
+
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
 #[serde(default)]
 #[serde(rename_all = "snake_case")]
@@ -123,6 +126,12 @@ pub struct Endpoint {
     pub destination_type: Option<String>,
     #[serde(default)]
     pub metadata: HashMap<String, String>,
+}
+
+impl Endpoint {
+    pub fn is_jira(&self) -> bool {
+        self.destination_type.as_deref() == Some(JIRA_DESTINATION_TYPE)
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
@@ -311,6 +320,20 @@ pub struct Template {
     pub body: String,
     #[serde(default)]
     pub kind: TemplateKind,
+    /// The kinds this template is meant for; empty means every kind.
+    #[serde(default)]
+    #[schema(value_type = Vec<String>)]
+    pub applies_to: Vec<crate::meta::alerts::notification_kind::NotificationKind>,
+}
+
+impl Template {
+    /// Empty `applies_to` applies to every kind.
+    pub fn applies_to_kind(
+        &self,
+        kind: crate::meta::alerts::notification_kind::NotificationKind,
+    ) -> bool {
+        self.applies_to.is_empty() || self.applies_to.contains(&kind)
+    }
 }
 
 impl MemorySize for Template {
@@ -320,6 +343,7 @@ impl MemorySize for Template {
             + self.org_id.mem_size()
             + self.name.mem_size()
             + self.body.mem_size()
+            + self.applies_to.len()
     }
 }
 
@@ -506,6 +530,7 @@ mod tests {
             },
             body: "Hello {{name}}!".to_string(),
             kind: TemplateKind::default(),
+            applies_to: Vec::new(),
         };
 
         assert_eq!(template.id, Some(id));
@@ -1007,5 +1032,20 @@ mod tests {
         assert!(err.to_string().contains("slack_app"), "{err}");
         let http = serde_json::to_value(DestinationType::Http(Endpoint::default())).unwrap();
         assert!(serde_json::from_value::<PreviousRelease>(http).is_ok());
+    }
+
+    #[test]
+    fn endpoint_is_jira_reads_its_destination_type() {
+        let typed = |t: Option<&str>| Endpoint {
+            destination_type: t.map(String::from),
+            ..Default::default()
+        };
+        assert!(typed(Some(JIRA_DESTINATION_TYPE)).is_jira());
+        assert!(!typed(Some("custom")).is_jira());
+        assert!(
+            !typed(Some("Jira")).is_jira(),
+            "the saved type is matched exactly"
+        );
+        assert!(!typed(None).is_jira());
     }
 }

@@ -55,6 +55,7 @@ export type ButtonVariant =
   | "banner-dismiss"
   // Pricing template chip — pill-shaped toggle chip for quick-setup template selection
   | "pricing-chip"
+  | "section-chip"
   // Outline with primary color text + border — for "always highlighted" branded badges (e.g. edition indicator)
   | "outline-primary"
   // Dashed outline "add tile" — transparent bg, dashed muted border + muted icon.
@@ -66,7 +67,11 @@ export type ButtonVariant =
   | "tint-blue"
   | "tint-orange"
   // Table-cell content that is itself the action: no chrome, full cell width, stacked lines.
-  | "cell";
+  | "cell"
+  // Borderless list row whose whole content is the action.
+  | "row"
+  // Outlined prompt whose message is the action, e.g. a locked section.
+  | "locked-body";
 
 /** Size controls height, padding, font-size, and border-radius */
 export type ButtonSize =
@@ -112,6 +117,8 @@ export interface ButtonProps extends PrimitiveProps {
   descriptionId?: string;
   /** Shows loading state and disables interaction */
   loading?: boolean;
+  /** `false` keeps the busy state but never spins, for a control whose region already shows one spinner. */
+  spinner?: boolean;
   /** Applies active/selected state styling (overrides variant to primary appearance) */
   active?: boolean;
   /** Native button type attribute — only meaningful when as="button" */

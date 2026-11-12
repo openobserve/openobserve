@@ -14,12 +14,17 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { ref } from "vue";
+import { KeepAlive, defineComponent, h, ref } from "vue";
 import ChartRenderer from "./ChartRenderer.vue";
 import i18n from "@/locales";
 import { raw } from "@/types/i18n";
 import store from "@/test/unit/helpers/store";
-import { use as echartsUse } from "echarts/core";
+import { use as echartsUse, init as echartsInit } from "echarts/core";
+import {
+  fakeCanvasPainter,
+  fakeDevicePixelRatio,
+  type DevicePixelRatioFake,
+} from "@/test/unit/helpers/devicePixelRatioFake";
 import {
   BoxplotChart,
   FunnelChart,
@@ -265,6 +270,34 @@ describe("ChartRenderer", () => {
       expect(wrapper.props("data")).toEqual(mockChartData);
       expect(wrapper.props("renderType")).toBe("canvas");
       expect(wrapper.props("height")).toBe("100%");
+    });
+  });
+
+  describe("the painted event (first frame for the chart placeholder)", () => {
+    const renderedHandler = async () => {
+      const echarts = await import("echarts/core");
+      const chart = vi.mocked(echarts.init).mock.results.at(-1)?.value;
+      return vi
+        .mocked(chart.on)
+        .mock.calls.filter(([event]: any[]) => event === "rendered")
+        .at(-1)?.[1] as () => void;
+    };
+
+    it("reports painted once per drawn frame of its current data, never for a frame of older data", async () => {
+      await flushPromises();
+      const rendered = await renderedHandler();
+      expect(rendered).toBeTypeOf("function");
+
+      await wrapper.setProps({ data: { ...mockChartData, options: { ...mockChartData.options } } });
+      // A frame drawn before the new data's setOption is the old data's frame.
+      rendered();
+      expect(wrapper.emitted("painted")).toBeUndefined();
+
+      await flushPromises();
+      rendered();
+      expect(wrapper.emitted("painted")).toHaveLength(1);
+      rendered();
+      expect(wrapper.emitted("painted")).toHaveLength(1);
     });
   });
 
@@ -1781,5 +1814,248 @@ describe("ChartRenderer", () => {
         currTrigger: "leave",
       });
     });
+  });
+});
+
+describe("ChartRenderer device pixel ratio", () => {
+  let display: DevicePixelRatioFake;
+  let wrapper: any;
+  let zr: any;
+
+  const mountAt = async (renderType = "canvas") => {
+    wrapper = mount(ChartRenderer, {
+      props: {
+        data: { options: { series: [{ type: "line", data: [[1609459200000, 10]] }] } },
+        renderType,
+      },
+      global: { plugins: [i18n], provide: { store, hoveredSeriesState: ref(null) } },
+    });
+    await flushPromises();
+  };
+
+  const attachPainter = (type: "canvas" | "svg" = "canvas") => {
+    const chart = vi.mocked(echartsInit).mock.results[0].value;
+    const painter = fakeCanvasPainter(1, type);
+    zr = chart.getZr();
+    zr.painter = painter;
+    chart.setOption.mockClear();
+    chart.dispose.mockClear();
+    return { chart, painter };
+  };
+
+  const initRatios = () =>
+    vi.mocked(echartsInit).mock.calls.map(([, , opts]) => opts?.devicePixelRatio);
+
+  beforeEach(() => {
+    vi.mocked(echartsInit).mockClear();
+    global.IntersectionObserver = vi.fn(function () {
+      return { observe: vi.fn(), unobserve: vi.fn(), disconnect: vi.fn() };
+    }) as any;
+    store.state.theme = "light";
+  });
+
+  afterEach(() => {
+    wrapper?.unmount();
+    display.restore();
+    // The mocked instance and its zr are shared by every test in this file.
+    if (zr) delete zr.painter;
+    zr = null;
+  });
+
+  it("inits the chart at the live ratio, not the one zrender cached at import", async () => {
+    display = fakeDevicePixelRatio(2);
+    await mountAt();
+    expect(initRatios()).toEqual([2]);
+    expect(wrapper.classes()).not.toContain("chart-canvas-pixelated");
+  });
+
+  it("pixel-snaps its canvases only while the ratio is fractional", async () => {
+    display = fakeDevicePixelRatio(1);
+    await mountAt();
+    attachPainter();
+    const pixelated = () => wrapper.classes().includes("chart-canvas-pixelated");
+    expect(pixelated()).toBe(false);
+
+    display.setRatio(1.25);
+    await flushPromises();
+    expect(pixelated()).toBe(true);
+    display.setRatio(2);
+    await flushPromises();
+    expect(pixelated()).toBe(false);
+    display.setRatio(1);
+    await flushPromises();
+    expect(pixelated()).toBe(false);
+    display.setRatio(1.5);
+    await flushPromises();
+    expect(pixelated()).toBe(true);
+  });
+
+  it("re-rasterizes the mounted chart in place when the window changes display", async () => {
+    display = fakeDevicePixelRatio(1);
+    await mountAt();
+    const { chart, painter } = attachPainter();
+
+    display.setRatio(2);
+    await flushPromises();
+
+    expect(initRatios()).toEqual([1]);
+    expect(chart.dispose).not.toHaveBeenCalled();
+    expect(chart.setOption).not.toHaveBeenCalled();
+    expect(painter.dpr).toBe(2);
+    expect(painter.layers["zr_0.0"].ctx.dpr).toBe(2);
+    expect(painter.refresh).toHaveBeenCalledWith({ paintAll: true });
+
+    display.setRatio(1.5);
+    await flushPromises();
+    expect(initRatios()).toEqual([1]);
+    expect(painter.dpr).toBe(1.5);
+  });
+
+  it("leaves an SVG chart alone, since it does not rasterize at a ratio", async () => {
+    display = fakeDevicePixelRatio(1);
+    await mountAt("svg");
+    const { chart, painter } = attachPainter("svg");
+
+    display.setRatio(2);
+    await flushPromises();
+
+    expect(initRatios()).toEqual([1]);
+    expect(chart.dispose).not.toHaveBeenCalled();
+    expect(painter.refresh).not.toHaveBeenCalled();
+  });
+
+  it("stays smooth at a fractional ratio an SVG chart was not re-rasterized at", async () => {
+    display = fakeDevicePixelRatio(1);
+    await mountAt("svg");
+    attachPainter("svg");
+
+    display.setRatio(1.5);
+    await flushPromises();
+
+    expect(wrapper.classes()).not.toContain("chart-canvas-pixelated");
+  });
+
+  it("pixel-snaps once a re-init rasterizes at the fractional ratio a skipped change left behind", async () => {
+    display = fakeDevicePixelRatio(1);
+    await mountAt();
+    const { painter } = attachPainter();
+    painter.getLayers.mockReturnValue({ ...painter.layers, gl: { dpr: 1, resize: vi.fn() } });
+
+    display.setRatio(1.5);
+    await flushPromises();
+    expect(painter.dpr).toBe(1);
+    expect(wrapper.classes()).not.toContain("chart-canvas-pixelated");
+
+    // A real init at the live ratio builds its painter at that ratio.
+    painter.dpr = 1.5;
+    store.state.theme = "dark";
+    await flushPromises();
+    expect(initRatios()).toEqual([1, 1.5]);
+    expect(wrapper.classes()).toContain("chart-canvas-pixelated");
+  });
+
+  it("stops listening for ratio changes on unmount", async () => {
+    display = fakeDevicePixelRatio(1);
+    await mountAt();
+    expect(display.listenerCount()).toBe(1);
+    wrapper.unmount();
+    wrapper = null;
+    expect(display.listenerCount()).toBe(0);
+  });
+});
+
+describe("ChartRenderer motion", () => {
+  const lineData = (value: number, options: Record<string, unknown> = {}) => ({
+    chartType: "line",
+    options: { series: [{ type: "line", data: [[1609459200000, value]] }], ...options },
+    extras: { panelId: "motion-1" },
+  });
+  const drawn = async () => {
+    const echarts = await import("echarts/core");
+    const chart = vi.mocked(echarts.init).mock.results.at(-1)?.value;
+    return vi
+      .mocked(chart.setOption)
+      .mock.calls.map((call) => call[0] as Record<string, unknown>)
+      .filter((option) => "series" in option);
+  };
+  const mountKept = (data: ReturnType<typeof ref>, shown: ReturnType<typeof ref>) =>
+    mount(
+      defineComponent({
+        setup: () => () =>
+          h(KeepAlive, null, [
+            shown.value
+              ? h(ChartRenderer, { data: data.value, renderType: "canvas", height: "100%" })
+              : h("div"),
+          ]),
+      }),
+      {
+        global: {
+          plugins: [i18n],
+          provide: { store, hoveredSeriesState: ref({ panelId: null }) },
+        },
+      },
+    );
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("draws with no entrance or update animation on first draw, data update and keep-alive return", async () => {
+    const data = ref(lineData(1));
+    const shown = ref(true);
+    const wrapper = mountKept(data, shown);
+    await flushPromises();
+    const first = (await drawn()).length;
+    expect(first).toBeGreaterThan(0);
+
+    data.value = lineData(2);
+    await flushPromises();
+    const firstAndUpdate = await drawn();
+    expect(firstAndUpdate.length).toBeGreaterThan(first);
+    shown.value = false;
+    await flushPromises();
+    vi.clearAllMocks();
+    shown.value = true;
+    await flushPromises();
+    const onReturn = await drawn();
+    expect(onReturn.length).toBeGreaterThan(0);
+
+    for (const option of [...firstAndUpdate, ...onReturn]) {
+      expect(option).toMatchObject({ animationDuration: 0, animationDurationUpdate: 0 });
+    }
+    wrapper.unmount();
+  });
+
+  it("zeroes a series' own durations, as on the service graph tree", async () => {
+    const { convertServiceGraphToTree } = await import("@/utils/traces/convertTraceData");
+    const { options } = convertServiceGraphToTree(
+      {
+        nodes: [
+          { id: "a", label: "a", requests: 1, errors: 0, errorRate: 0 },
+          { id: "b", label: "b", requests: 1, errors: 0, errorRate: 0 },
+        ],
+        edges: [{ from: "a", to: "b", total_requests: 1, failed_requests: 0 }],
+      } as any,
+      "horizontal",
+    );
+    const wrapper = mountKept(ref({ chartType: "tree", options, extras: {} }), ref(true));
+    await flushPromises();
+    const drawnOptions = await drawn();
+    expect(drawnOptions.length).toBeGreaterThan(0);
+    for (const option of drawnOptions) {
+      for (const series of option.series as Record<string, unknown>[]) {
+        expect(series).toMatchObject({ animationDuration: 0, animationDurationUpdate: 0 });
+      }
+    }
+    wrapper.unmount();
+  });
+
+  it("keeps a panel's own animation switch", async () => {
+    const wrapper = mountKept(ref(lineData(1, { animation: false })), ref(true));
+    await flushPromises();
+    for (const option of await drawn()) {
+      expect(option).toMatchObject({ animation: false, animationDuration: 0 });
+    }
+    wrapper.unmount();
   });
 });

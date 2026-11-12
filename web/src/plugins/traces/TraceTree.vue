@@ -164,6 +164,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :title="t('traces.traceTree.errorSpan')"
                         :data-test="`trace-tree-span-error-icon-${(spans as any[])[virtualRow.index].spanId}`"
                       />
+                      <!-- The chip on a rule issue's last evidence span. -->
+                      <OIcon
+                        v-if="issueSpans[(spans as any[])[virtualRow.index].spanId]"
+                        name="report-problem"
+                        size="sm"
+                        class="text-status-warning-text! me-1 cursor-pointer"
+                        :title="issueSpans[(spans as any[])[virtualRow.index].spanId]"
+                        :data-test="`trace-tree-span-issue-chip-${(spans as any[])[virtualRow.index].spanId}`"
+                        @click.stop="$emit('open-issue', (spans as any[])[virtualRow.index].spanId)"
+                      />
                       <!-- shrink-0 + a cap, not plain shrink: flex shrinks in proportion to width, so a long operation name would eat a short service name first. -->
                       <OTruncatedText
                         class="me-2 max-w-[50%] shrink-0 text-sm font-bold font-medium"
@@ -460,6 +470,11 @@ export default defineComponent({
       // DOM Element ref from parent — no runtime type check needed
       default: null,
     },
+    /** Span id → rule label, for spans that carry an issue chip. */
+    issueSpans: {
+      type: Object as PropType<Record<string, I18nText>>,
+      default: () => ({}),
+    },
   },
   emits: [
     "toggleCollapse",
@@ -470,6 +485,7 @@ export default defineComponent({
     "update-current-index",
     "search-result",
     "view-correlated-logs",
+    "open-issue",
   ],
   setup(props, { emit }) {
     const { buildQueryDetails, navigateToLogs, searchObj } = useTraces();

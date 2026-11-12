@@ -16,6 +16,7 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import i18n from "@/locales";
+import store from "@/test/unit/helpers/store";
 
 // ---------------------------------------------------------------------------
 // Module mocks — hoisted before component import
@@ -46,7 +47,10 @@ vi.mock("@/lib/core/Button/OButton.vue", () => ({
   },
 }));
 
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
+
 import ErrorSessionReplay from "@/components/rum/errorTracking/view/ErrorSessionReplay.vue";
+import analytics from "@/services/product_analytics";
 
 // ---------------------------------------------------------------------------
 // Test data
@@ -69,7 +73,7 @@ const mockError = {
 function mountComponent(error: Record<string, any> = mockError) {
   return mount(ErrorSessionReplay, {
     props: { error },
-    global: { plugins: [i18n] },
+    global: { plugins: [i18n, store] },
   });
 }
 
@@ -203,8 +207,15 @@ describe("ErrorSessionReplay", () => {
           start_time: TIMESTAMP_US,
           end_time: TIMESTAMP_US,
           event_time: EVENT_TIME_MS,
+          org_identifier: "default",
         },
       });
+    });
+
+    it("tracks the replay opened from an error", async () => {
+      vi.mocked(analytics.track).mockClear();
+      await wrapper.find('[data-test="error-session-replay-play-btn"]').trigger("click");
+      expect(analytics.track).toHaveBeenCalledWith("rum_error_replay_opened");
     });
 
     it("includes event_time as Math.floor(_timestamp / 1000)", async () => {
@@ -234,6 +245,7 @@ describe("ErrorSessionReplay", () => {
           start_time: newTs,
           end_time: newTs,
           event_time: Math.floor(newTs / 1000),
+          org_identifier: "default",
         },
       });
     });

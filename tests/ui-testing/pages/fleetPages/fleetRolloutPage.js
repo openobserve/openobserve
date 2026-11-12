@@ -14,6 +14,7 @@ class FleetRolloutPage {
     this.initialField = '[data-test="fleet-new-rollout-dialog-initial-field"]';
     this.maxField = '[data-test="fleet-new-rollout-dialog-max-field"]';
     this.maxError = '[data-test="fleet-new-rollout-dialog-max-error"]';
+    this.timeoutNote = '[data-test="fleet-new-rollout-dialog-timeout"]';
     this.primaryBtn = '[data-test="o-dialog-primary-btn"]';
   }
 
@@ -56,6 +57,15 @@ class FleetRolloutPage {
 
   async expectFirstError(text) {
     await expect(this.page.locator(this.firstError)).toHaveText(text, { timeout: PAGE_TIMEOUT_MS });
+  }
+
+  async expectTimeoutNoteContains(text) {
+    await expect(this.page.locator(this.timeoutNote)).toContainText(text, { timeout: PAGE_TIMEOUT_MS });
+  }
+
+  async timeoutNoteText() {
+    await expect(this.page.locator(this.timeoutNote)).toBeVisible({ timeout: PAGE_TIMEOUT_MS });
+    return (await this.page.locator(this.timeoutNote).textContent()) ?? '';
   }
 
   async expectMaxError(text) {

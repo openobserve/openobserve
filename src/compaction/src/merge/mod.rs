@@ -24,4 +24,5 @@ pub use job::{
     generate_downsampling_job_by_stream_and_rule, generate_job_by_stream,
     generate_old_data_job_by_stream,
 };
+pub(crate) use job::{job_range, job_range_end, scheduling_level};
 pub use stream::merge_by_stream;

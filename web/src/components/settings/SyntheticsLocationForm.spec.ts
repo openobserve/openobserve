@@ -21,6 +21,7 @@ import store from "@/test/unit/helpers/store";
 
 // ── Mocks ────────────────────────────────────────────────────────────────────
 
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 vi.mock("@/aws-exports", () => ({
   default: {
     isEnterprise: "true",
@@ -49,6 +50,7 @@ vi.mock("@/services/synthetics", async (importOriginal) => {
 });
 
 import syntheticsService from "@/services/synthetics";
+import analytics from "@/services/product_analytics";
 
 // ── ODrawer stub ─────────────────────────────────────────────────────────────
 // Renders the slot body and exposes title attr so tests can assert against the
@@ -316,6 +318,9 @@ describe("SyntheticsLocationForm", () => {
     );
 
     // On success emits close and update:list.
+    expect(analytics.track).toHaveBeenCalledWith("synthetics_location_created", {
+      provider: "aws",
+    });
     expect(wrapper.emitted("close")).toBeTruthy();
     expect(wrapper.emitted("update:list")).toBeTruthy();
   });
@@ -379,6 +384,9 @@ describe("SyntheticsLocationForm", () => {
     );
 
     // On success emits close and update:list.
+    expect(analytics.track).toHaveBeenCalledWith("synthetics_location_updated", {
+      provider: "azure",
+    });
     expect(wrapper.emitted("close")).toBeTruthy();
     expect(wrapper.emitted("update:list")).toBeTruthy();
   });

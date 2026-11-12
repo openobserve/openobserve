@@ -27,6 +27,8 @@ import {
   ok,
 } from "@/test/unit/helpers/slack";
 import type { InstallationView, LinkingView } from "@/types/slack";
+import { SLACK_READ_ONLY } from "./slackReadOnly";
+import { computed } from "vue";
 
 vi.mock("@/services/slack", () => ({
   default: {
@@ -46,12 +48,17 @@ const PeopleStub = {
 const mountSection = async (
   linking: LinkingView,
   installation: InstallationView = installationView(),
+  readOnly = false,
 ) => {
   vi.mocked(slack.getLinking).mockReturnValue(ok(linking) as any);
   const w = mount(SlackLinkingSection, {
     props: { installation },
     attachTo: document.body,
-    global: { plugins: [i18n, makeSlackStore()], stubs: { SlackLinkedPeople: PeopleStub } },
+    global: {
+      provide: { [SLACK_READ_ONLY as symbol]: computed(() => readOnly) },
+      plugins: [i18n, makeSlackStore()],
+      stubs: { SlackLinkedPeople: PeopleStub },
+    },
   });
   await flushPromises();
   return w;
@@ -83,9 +90,24 @@ describe("SlackLinkingSection (row 11)", () => {
     expect(slack.updateLinking).toHaveBeenCalledWith("acme", "inst-1", { enabled: false });
   });
 
+  it("a_reader_without_manage_slack_cannot_edit_domains_or_switch_linking", async () => {
+    const w = await mountSection(
+      linkingView({ source: "manual", domains: ["acme.example"] }),
+      installationView(),
+      true,
+    );
+    expect(w.find('[data-test="slack-linking-edit"]').attributes("disabled")).toBeDefined();
+    expect(
+      w
+        .find('[data-test="slack-linking-switch"]')
+        .find("button, [role=switch]")
+        .attributes("disabled"),
+    ).toBeDefined();
+  });
+
   it("AC-12.1 manual: edits domains and refuses a public email domain", async () => {
     const w = await mountSection(linkingView({ source: "manual", domains: ["acme.example"] }));
-    expect(w.find('[data-test="slack-linking-summary"]').text()).toBe("Automatic for acme.example");
+    expect(w.find('[data-test="slack-linking-summary"]').exists()).toBe(false);
     await w.find('[data-test="slack-linking-edit"]').trigger("click");
     const input = w.find('[data-test="slack-linking-domains"] [data-test="tag-input-field"]');
     await input.setValue("gmail.com");
@@ -164,7 +186,7 @@ describe("SlackLinkingSection (row 11)", () => {
     const w = await mountSection(linkingView({ domains: c.domains, counts }));
     const warning = w.find('[data-test="slack-linking-no-domains"]');
     expect(warning.exists() ? warning.text().replace(/\s+/g, " ") : null).toBe(c.warning);
-    expect(w.find('[data-test="slack-linking-summary"]').exists()).toBe(!c.warning);
+    expect(w.find('[data-test="slack-linking-summary"]').exists()).toBe(false);
     expect(w.find('[data-test="slack-linking-edit"]').exists()).toBe(true);
   });
 
@@ -198,7 +220,7 @@ describe("SlackLinkingSection (row 11)", () => {
     await error.find("button").trigger("click");
     await flushPromises();
     expect(slack.getLinking).toHaveBeenCalledTimes(2);
-    expect(w.find('[data-test="slack-linking-summary"]').exists()).toBe(true);
+    expect(w.find('[data-test="slack-linking-counts"]').exists()).toBe(true);
   });
 
   it("a managed workspace shows linking read-only, set by your instance admin", async () => {

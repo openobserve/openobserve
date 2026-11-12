@@ -176,6 +176,7 @@ describe("FleetFleets", () => {
     expect(btn(wrapper, "desired").text()).toBe("edge-config v3");
     expect(btn(wrapper, "stable").text()).toBe("edge-config v2");
     expect(btn(wrapper, "members").text()).toBe("1 of 2 online");
+    expect(wrapper.text()).toContain("1 of 2 assigned the desired version");
     expect(btn(wrapper, "rollout-progress").text()).toContain("28 of 40 running the new version");
   });
 

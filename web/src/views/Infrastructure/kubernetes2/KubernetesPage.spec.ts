@@ -19,11 +19,12 @@ import { createStore } from "vuex";
 import { createMemoryHistory, createRouter } from "vue-router";
 import { defineComponent, h } from "vue";
 import i18n from "@/locales";
+import analytics from "@/services/product_analytics";
 import searchService from "@/services/search";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { queryClient } from "@/composables/query/queryClient";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import K8sClusterHotbar from "./K8sClusterHotbar.vue";
+import K8sResourceTree from "./K8sResourceTree.vue";
 import K8sCommandPalette from "./K8sCommandPalette.vue";
 import KubernetesPage from "./KubernetesPage.vue";
 import { QUERY_STREAM, VIEWS, queryText, type QueryId } from "./kubernetesQueries";
@@ -44,6 +45,7 @@ vi.mock("@/composables/useStreamingSearch", async () => {
   return { default: () => streamSearchApi((args) => streamSearch(args)) };
 });
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: vi.fn() }));
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 vi.mock("@/composables/useStreams", () => ({ default: () => ({ getStreams, getStream }) }));
 
 const metricsQuery = vi.mocked(searchService.metrics_query);
@@ -736,6 +738,25 @@ describe("KubernetesPage", () => {
       expect(push).not.toHaveBeenCalled();
     });
 
+    it("tracks the action with its type and kind only", async () => {
+      vi.mocked(analytics.track).mockClear();
+      await act("metrics");
+      expect(analytics.track).toHaveBeenCalledWith("infra_k8s_action_clicked", {
+        action: "metrics",
+        kind: "pod",
+      });
+    });
+
+    it("counts a details action only as a details open", async () => {
+      vi.mocked(analytics.track).mockClear();
+      await act("details");
+      expect(analytics.track).toHaveBeenCalledWith("infra_k8s_details_opened", { kind: "pod" });
+      expect(analytics.track).not.toHaveBeenCalledWith(
+        "infra_k8s_action_clicked",
+        expect.anything(),
+      );
+    });
+
     it("opens Metrics with the pod's query", async () => {
       const push = await act("metrics");
       expect(push.mock.calls[0][0]).toMatchObject({
@@ -784,19 +805,11 @@ describe("KubernetesPage", () => {
       expect(wrapper.findComponent(YamlPanelStub).props("row")).toMatchObject({ name: "p" });
     });
 
-    it("switches the cluster in the URL from the hot-bar", async () => {
+    it("switches the cluster in the URL from the cluster picker", async () => {
       await mountPage({ view: "pods", cluster: "alpha" });
-      wrapper.findComponent(K8sClusterHotbar).vm.$emit("select", "beta");
+      wrapper.findComponent(K8sResourceTree).vm.$emit("cluster", "beta");
       await flushPromises();
       expect(query().cluster).toBe("beta");
-    });
-
-    it("opens the palette on its clusters group from the hot-bar", async () => {
-      await mountPage();
-      wrapper.findComponent(K8sClusterHotbar).vm.$emit("all");
-      await flushPromises();
-      expect(palette().props("open")).toBe(true);
-      expect(palette().props("group")).toBe("clusters");
     });
 
     it("toggles the palette from the k8sPalette shortcut", async () => {
@@ -821,6 +834,12 @@ describe("KubernetesPage", () => {
       palette().vm.$emit("select", item({ type: "details", details: { ...ref, cluster: "beta" } }));
       await flushPromises();
       expect(query().details).toBe("pod/beta/a/p");
+      expect(analytics.track).toHaveBeenCalledWith("infra_k8s_view_changed", { view: "pods" });
+      expect(analytics.track).toHaveBeenCalledWith("infra_k8s_details_opened", { kind: "pod" });
+      expect(analytics.track).not.toHaveBeenCalledWith(
+        "infra_k8s_palette_selected",
+        expect.anything(),
+      );
     });
 
     it("explains an empty last-known range instead of repeating the offline copy", async () => {

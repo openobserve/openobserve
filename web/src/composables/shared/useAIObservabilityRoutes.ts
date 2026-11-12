@@ -29,6 +29,8 @@ import type { I18nKey } from "@/types/i18n";
 const AIObservabilityShell = () => import("@/enterprise/views/AIObservability/Index.vue");
 const AILLMInsightsPage = () => import("@/enterprise/views/AIObservability/LLMInsightsPage.vue");
 const AISessionsPage = () => import("@/enterprise/views/AIObservability/SessionsPage.vue");
+const AIUsersPage = () => import("@/enterprise/views/AIObservability/UsersPage.vue");
+const AIBudgetsPage = () => import("@/enterprise/views/AIObservability/BudgetsPage.vue");
 const AIAgentGraphPage = () => import("@/enterprise/views/AIObservability/AgentGraphPage.vue");
 const AIAgentBehaviorPage = () =>
   import("@/enterprise/views/AIObservability/AgentBehaviorPage.vue");
@@ -54,26 +56,61 @@ const AIRemoteTaskFormPage = () =>
 const AIRemoteTaskDetailPage = () =>
   import("@/enterprise/views/AIObservability/RemoteTaskDetailPage.vue");
 const AIOnlineEvals = () => import("@/enterprise/components/OnlineEvals.vue");
+// Route names kept from Settings so existing links still resolve.
+const AILlmProvidersPage = () => import("@/components/settings/LlmProvidersSettings.vue");
+const AIAgentMappingPage = () => import("@/components/settings/GenAiAgentMappingSettings.vue");
+const AIModelPricingPage = () => import("@/components/settings/ModelPricingList.vue");
+const AIModelPricingGapsPage = () => import("@/components/settings/ModelPricingGaps.vue");
+const AIModelPricingEditorPage = () => import("@/components/settings/ModelPricingEditor.vue");
 // Reused for the AI/LLM session drill-down so it lives under /ai (keeps the
 // AI menu item active) instead of the Traces session-details route.
 const SessionDetails = () => import("@/plugins/traces/SessionDetails.vue");
 
-export type AiObservabilityGroup = "Monitor" | "Annotate" | "Experiment" | "Evaluate";
+export type AiObservabilityGroup = "Monitor" | "Annotate" | "Evaluate" | "Configure";
 
-/**
- * The ONE list an AI Observability nav rail item AND its primary route are
- * both built from (see `Index.vue`'s `sectionItems` and
- * `useAIObservabilityRouteChildren` below) — a typo in `featureKey` or
- * `routeName` now breaks the nav tooltip and the route guard the SAME way,
- * instead of silently drifting between independently hand-typed copies.
- *
- * `featureKey: null` marks the two sections OSS serves from its own backend
- * (LLM Insights, Sessions) — always reachable, no gate. Several entries
- * share one `routeName` (the four Evaluate tabs all land on `aiEvaluations`)
- * — `useAIObservabilityRouteChildren` collapses those to a single route
- * record; `tabQuery` carries the `?tab=` value the nav item's link needs
- * that the shared route itself doesn't know about.
- */
+/** Rail items that hold several sections as tabs (see `tabOf` below). */
+export type AiObservabilityTabbedItemKey =
+  "agents" | "costUsage" | "evaluations" | "scorers" | "experiments";
+
+export interface AiObservabilityTabbedItem {
+  labelKey: I18nKey;
+  icon: IconName;
+  dataTest: string;
+}
+
+/** Routes stay flat siblings so each tab keeps its own URL and feature gate. */
+export const AI_OBSERVABILITY_TABBED_ITEMS: Record<
+  AiObservabilityTabbedItemKey,
+  AiObservabilityTabbedItem
+> = {
+  agents: {
+    labelKey: "aiObservability.nav.agents",
+    icon: "hub",
+    dataTest: "ai-secondary-nav-agents",
+  },
+  costUsage: {
+    labelKey: "aiObservability.nav.costUsage",
+    icon: "paid",
+    dataTest: "ai-secondary-nav-cost-usage",
+  },
+  evaluations: {
+    labelKey: "aiObservability.nav.evaluations",
+    icon: "star-rate",
+    dataTest: "ai-secondary-nav-evaluations",
+  },
+  scorers: {
+    labelKey: "aiObservability.nav.scorers",
+    icon: "rule",
+    dataTest: "ai-secondary-nav-scorers",
+  },
+  experiments: {
+    labelKey: "aiObservability.nav.experiments",
+    icon: "science",
+    dataTest: "ai-secondary-nav-experiments",
+  },
+};
+
+/** One list builds nav items and routes so `featureKey`/`routeName` can't drift; `null` = OSS. */
 export interface AiObservabilitySection {
   key: string;
   featureKey: FeatureKey | null;
@@ -83,6 +120,12 @@ export interface AiObservabilitySection {
   group: AiObservabilityGroup;
   dataTest: string;
   tabQuery?: string;
+  /** The rail item this section is a tab of; omitted, it is a rail item of its own. */
+  tabOf?: AiObservabilityTabbedItemKey;
+  /** Pinned to the foot of the rail, outside the groups (Playground). */
+  footer?: true;
+  /** A `/config` flag that must be true to list this section, in every edition. */
+  requiresConfigFlag?: "online_evals_enabled" | "model_pricing_enabled";
   /** Omitted only for `prompts`, whose routes come from the external,
       already-shared `promptRoutes` table (also consumed directly by
       components that build prompt links) — see the `key === "prompts"`
@@ -92,10 +135,7 @@ export interface AiObservabilitySection {
   /** Extra route `props`. Only the first entry for a deduped `routeName`
       (here, `quality` for `aiEvaluations`) is read. */
   routeProps?: Record<string, unknown>;
-  /** Route `meta.titleKey`, when it must differ from the nav `labelKey` —
-      only `aiEvaluations` needs this: its 4 nav entries each have their own
-      tab label, but the route itself (reachable before any tab is picked)
-      keeps the page-level `onlineEvals.title`. Defaults to `labelKey`. */
+  /** Route `meta.titleKey` when it must differ from `labelKey`; defaults to `labelKey`. */
   metaTitleKey?: I18nKey;
 }
 
@@ -123,6 +163,30 @@ export const AI_OBSERVABILITY_SECTIONS: AiObservabilitySection[] = [
     dataTest: "ai-secondary-nav-sessions",
   },
   {
+    key: "users",
+    featureKey: null,
+    routeName: "aiUsers",
+    path: "users",
+    component: AIUsersPage,
+    labelKey: "aiObservability.nav.users",
+    icon: "group",
+    group: "Monitor",
+    tabOf: "costUsage",
+    dataTest: "ai-section-tab-users",
+  },
+  {
+    key: "budgets",
+    featureKey: null,
+    routeName: "aiBudgets",
+    path: "budgets",
+    component: AIBudgetsPage,
+    labelKey: "aiObservability.nav.budgets",
+    icon: "account-balance",
+    group: "Monitor",
+    tabOf: "costUsage",
+    dataTest: "ai-section-tab-budgets",
+  },
+  {
     key: "agentGraph",
     featureKey: "agentGraph",
     routeName: "aiAgentGraph",
@@ -131,7 +195,8 @@ export const AI_OBSERVABILITY_SECTIONS: AiObservabilitySection[] = [
     labelKey: "aiObservability.nav.agentGraph",
     icon: "hub",
     group: "Monitor",
-    dataTest: "ai-secondary-nav-agent-graph",
+    tabOf: "agents",
+    dataTest: "ai-section-tab-agent-graph",
   },
   {
     key: "agentBehavior",
@@ -142,7 +207,8 @@ export const AI_OBSERVABILITY_SECTIONS: AiObservabilitySection[] = [
     labelKey: "aiObservability.nav.agentBehavior",
     icon: "troubleshoot",
     group: "Monitor",
-    dataTest: "ai-secondary-nav-agent-behavior",
+    tabOf: "agents",
+    dataTest: "ai-section-tab-agent-behavior",
   },
   {
     key: "discovery",
@@ -178,48 +244,6 @@ export const AI_OBSERVABILITY_SECTIONS: AiObservabilitySection[] = [
     dataTest: "ai-secondary-nav-datasets",
   },
   {
-    key: "prompts",
-    featureKey: "prompts",
-    routeName: "aiPrompts",
-    labelKey: "aiObservability.nav.prompts",
-    icon: "edit",
-    group: "Experiment",
-    dataTest: "ai-secondary-nav-prompts",
-  },
-  {
-    key: "playground",
-    featureKey: "playground",
-    routeName: "aiPlayground",
-    path: "playground",
-    component: AIPlaygroundPage,
-    labelKey: "aiObservability.nav.playground",
-    icon: "play-circle",
-    group: "Experiment",
-    dataTest: "ai-secondary-nav-playground",
-  },
-  {
-    key: "experiments",
-    featureKey: "experiments",
-    routeName: "aiExperiments",
-    path: "experiments",
-    component: AIExperimentsPage,
-    labelKey: "aiObservability.nav.experiments",
-    icon: "science",
-    group: "Experiment",
-    dataTest: "ai-secondary-nav-experiments",
-  },
-  {
-    key: "remoteTasks",
-    featureKey: "remoteTasks",
-    routeName: "aiRemoteTasks",
-    path: "remote-tasks",
-    component: AIRemoteTasksPage,
-    labelKey: "aiObservability.nav.remoteTasks",
-    icon: "cloud-upload",
-    group: "Experiment",
-    dataTest: "ai-secondary-nav-remote-tasks",
-  },
-  {
     key: "quality",
     featureKey: "evaluations",
     routeName: "aiEvaluations",
@@ -230,7 +254,8 @@ export const AI_OBSERVABILITY_SECTIONS: AiObservabilitySection[] = [
     labelKey: "aiObservability.nav.quality",
     icon: "star-rate",
     group: "Evaluate",
-    dataTest: "ai-secondary-nav-quality",
+    tabOf: "evaluations",
+    dataTest: "ai-section-tab-quality",
     tabQuery: "quality",
   },
   {
@@ -242,8 +267,33 @@ export const AI_OBSERVABILITY_SECTIONS: AiObservabilitySection[] = [
     labelKey: "aiObservability.nav.evalJobs",
     icon: "event",
     group: "Evaluate",
-    dataTest: "ai-secondary-nav-eval-jobs",
+    tabOf: "evaluations",
+    dataTest: "ai-section-tab-eval-jobs",
     tabQuery: "jobs",
+  },
+  {
+    key: "experiments",
+    featureKey: "experiments",
+    routeName: "aiExperiments",
+    path: "experiments",
+    component: AIExperimentsPage,
+    labelKey: "aiObservability.nav.experiments",
+    icon: "science",
+    group: "Evaluate",
+    tabOf: "experiments",
+    dataTest: "ai-section-tab-experiments",
+  },
+  {
+    key: "remoteTasks",
+    featureKey: "remoteTasks",
+    routeName: "aiRemoteTasks",
+    path: "remote-tasks",
+    component: AIRemoteTasksPage,
+    labelKey: "aiObservability.nav.remoteTasks",
+    icon: "cloud-upload",
+    group: "Evaluate",
+    tabOf: "experiments",
+    dataTest: "ai-section-tab-remote-tasks",
   },
   {
     key: "scorers",
@@ -254,7 +304,8 @@ export const AI_OBSERVABILITY_SECTIONS: AiObservabilitySection[] = [
     labelKey: "aiObservability.nav.scorers",
     icon: "rule",
     group: "Evaluate",
-    dataTest: "ai-secondary-nav-scorers",
+    tabOf: "scorers",
+    dataTest: "ai-section-tab-scorers",
     tabQuery: "scorers",
   },
   {
@@ -266,8 +317,67 @@ export const AI_OBSERVABILITY_SECTIONS: AiObservabilitySection[] = [
     labelKey: "aiObservability.nav.scoreConfigs",
     icon: "tune",
     group: "Evaluate",
-    dataTest: "ai-secondary-nav-score-configs",
+    tabOf: "scorers",
+    dataTest: "ai-section-tab-score-configs",
     tabQuery: "scoreConfigs",
+  },
+  {
+    key: "prompts",
+    featureKey: "prompts",
+    routeName: "aiPrompts",
+    labelKey: "aiObservability.nav.prompts",
+    icon: "edit",
+    group: "Evaluate",
+    dataTest: "ai-secondary-nav-prompts",
+  },
+  {
+    key: "playground",
+    featureKey: "playground",
+    routeName: "aiPlayground",
+    path: "playground",
+    component: AIPlaygroundPage,
+    labelKey: "aiObservability.nav.playground",
+    icon: "play-circle",
+    group: "Evaluate",
+    footer: true,
+    dataTest: "ai-secondary-nav-playground",
+  },
+  {
+    key: "llmProviders",
+    featureKey: "llmProviders",
+    routeName: "llmProviders",
+    path: "llm-providers",
+    component: AILlmProvidersPage,
+    labelKey: "llmProviders.tabLabel",
+    icon: "smart-toy",
+    group: "Configure",
+    dataTest: "ai-secondary-nav-llm-providers",
+    requiresConfigFlag: "online_evals_enabled",
+  },
+  {
+    // Moved from Settings; listed, as there, while model pricing is on.
+    key: "modelPricing",
+    featureKey: "modelPricing",
+    routeName: "modelPricing",
+    path: "model-pricing",
+    component: AIModelPricingPage,
+    labelKey: "settings.llmModelPricing",
+    icon: "paid",
+    group: "Configure",
+    dataTest: "ai-secondary-nav-model-pricing",
+    requiresConfigFlag: "model_pricing_enabled",
+  },
+  {
+    key: "agentMapping",
+    featureKey: "genAiAgentMapping",
+    routeName: "genAiAgentMapping",
+    path: "agent-mapping",
+    component: AIAgentMappingPage,
+    labelKey: "genAiAgentMapping.tabLabel",
+    icon: "account-tree",
+    group: "Configure",
+    dataTest: "ai-secondary-nav-agent-mapping",
+    requiresConfigFlag: "online_evals_enabled",
   },
 ];
 
@@ -286,9 +396,28 @@ interface AiObservabilitySubRoute {
   component: () => Promise<unknown>;
   metaTitleKey: I18nKey;
   after: string;
+  /** Route meta beyond the title (e.g. `accessScopeQuery`). */
+  meta?: Record<string, unknown>;
 }
 
 const AI_OBSERVABILITY_SUB_ROUTES: AiObservabilitySubRoute[] = [
+  {
+    featureKey: "modelPricing",
+    routeName: "modelPricingGaps",
+    path: "model-pricing/gaps",
+    component: AIModelPricingGapsPage,
+    metaTitleKey: "modelPricing.unpriced.title",
+    after: "modelPricing",
+  },
+  {
+    featureKey: "modelPricing",
+    routeName: "modelPricingEditor",
+    path: "model-pricing/edit",
+    component: AIModelPricingEditorPage,
+    metaTitleKey: "routeTitles.modelPricingEditor",
+    after: "modelPricing",
+    meta: { accessScopeQuery: ["id"] },
+  },
   {
     featureKey: "queues",
     routeName: "aiQueueDetail",
@@ -372,6 +501,8 @@ export const ONLINE_EVAL_FEATURE_KEYS: Partial<Record<FeatureKey, true>> = {
   experiments: true,
   remoteTasks: true,
   evaluations: true,
+  // `/providers`; Agent Mapping's API is registered either way.
+  llmProviders: true,
 };
 
 /**
@@ -404,6 +535,7 @@ export function useAIObservabilityRouteChildren(): RouteRecordRaw[] {
       component: section.component!,
       meta: {
         titleKey: section.metaTitleKey ?? section.labelKey,
+        titleKeyByTab: titleKeysByTab(section.routeName),
         keepAlive: false,
         requiresOnlineEvals: !!section.featureKey && !!ONLINE_EVAL_FEATURE_KEYS[section.featureKey],
       },
@@ -419,6 +551,7 @@ export function useAIObservabilityRouteChildren(): RouteRecordRaw[] {
         name: sub.routeName,
         component: sub.component,
         meta: {
+          ...sub.meta,
           titleKey: sub.metaTitleKey,
           keepAlive: false,
           requiresOnlineEvals: !!ONLINE_EVAL_FEATURE_KEYS[sub.featureKey],
@@ -428,6 +561,17 @@ export function useAIObservabilityRouteChildren(): RouteRecordRaw[] {
     }
   }
   return children;
+}
+
+/** Per-`?tab=` titles for routes several rail items share; the router prefers these over `titleKey`. */
+function titleKeysByTab(routeName: string): Record<string, I18nKey> | undefined {
+  const entries = AI_OBSERVABILITY_SECTIONS.filter(
+    (section) => section.routeName === routeName && section.tabQuery,
+  ).map((section): [string, I18nKey] => [
+    section.tabQuery!,
+    section.tabOf ? AI_OBSERVABILITY_TABBED_ITEMS[section.tabOf].labelKey : section.labelKey,
+  ]);
+  return entries.length ? Object.fromEntries(entries) : undefined;
 }
 
 /** The `ai` shell route itself — same `component`/guard in every edition. */

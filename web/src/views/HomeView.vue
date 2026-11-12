@@ -53,6 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           align="left"
           reorderable
           data-test="home-tab-bar"
+          @change="onTabChange"
           @reorder="onTabReorder"
         >
           <OTab
@@ -106,6 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @open="firstDataNotice.open"
           @dismiss="firstDataNotice.dismiss"
         />
+        <SampleDataHomeBanner v-if="activeHomeTab === 'overview'" class="mt-2.5 mb-1" />
         <FirstDataPanel
           v-if="flagOn && isDataTab && arrived"
           signal="any"
@@ -193,7 +195,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
             </HomeNoDataState>
           </div>
-          <div v-else-if="activeHomeTab === 'overview'" class="min-h-0 flex-1 overflow-hidden">
+          <!-- Overview pads itself like the Kubernetes overview, so it cancels the body inset to run edge to edge -->
+          <div
+            v-else-if="activeHomeTab === 'overview'"
+            class="-mx-2.5 -mb-2.5 min-h-0 flex-1 overflow-hidden"
+            data-test="home-overview-panel"
+          >
             <OverviewTab />
           </div>
           <div v-else class="-mx-2.5 min-h-0 flex-1 overflow-hidden">
@@ -204,7 +211,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template v-else>
           <!-- Overview tab (no inner card-container — the outer section panel
                already provides the border; avoids a double-bordered card). -->
-          <div v-if="activeHomeTab === 'overview'" class="min-h-0 flex-1 overflow-hidden">
+          <div
+            v-if="activeHomeTab === 'overview'"
+            class="-mx-2.5 -mb-2.5 min-h-0 flex-1 overflow-hidden"
+            data-test="home-overview-panel"
+          >
             <OverviewTab />
           </div>
 
@@ -260,10 +271,13 @@ import FirstDataNotice from "@/components/ingestion/FirstDataNotice.vue";
 import { FIRST_DATA_NOTICE } from "@/composables/firstEvent/useFirstDataNotice";
 import type { FirstEventResult } from "@/composables/firstEvent/useFirstEventWatch";
 import { rangeRoute } from "@/composables/firstEvent/confirmQuery";
+import { useOrgHasUserData } from "@/composables/useOrgHasUserData";
 import HomeNoDataState from "@/views/HomeNoDataState.vue";
+import SampleDataHomeBanner from "@/components/sampleData/SampleDataHomeBanner.vue";
 import HomeViewSkeleton from "@/components/shared/HomeViewSkeleton.vue";
 import TrialPeriod from "@/enterprise/components/billings/TrialPeriod.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import analytics from "@/services/product_analytics";
 
 export default defineComponent({
   name: "PageHome",
@@ -332,11 +346,12 @@ export default defineComponent({
     // gone" path (onPinnedUnavailable) and the deliberate close (onCloseTab).
     function removeHomePin() {
       const org = store.state.selectedOrganization?.identifier;
-      clearHomeDashboard(org);
+      const cleared = clearHomeDashboard(org);
       // Active tab no longer exists in the recomputed set → fall back to first.
       if (!DEFAULT_TABS.value.find((tb) => tb.id === activeHomeTab.value)) {
         activeHomeTab.value = tabOrder.value[0]?.id ?? "usage";
       }
+      return cleared;
     }
 
     let verifyingPin = false;
@@ -372,7 +387,16 @@ export default defineComponent({
     function onCloseTab(id: string) {
       if (!id.startsWith("dash:")) return;
       // Deliberate unpin — no error toast.
-      removeHomePin();
+      void removeHomePin().then(() => {
+        // A failed clear restores the pin, so only a cleared one counts.
+        if (!homeDashboard.value)
+          analytics.track("home_dashboard_unpinned", { source: "home_tab" });
+      });
+    }
+
+    function onTabChange(id: string | number) {
+      const tab = String(id).startsWith("dash:") ? "dashboard" : String(id);
+      analytics.track("home_tab_switched", { tab });
     }
 
     function loadTabOrder() {
@@ -447,7 +471,29 @@ export default defineComponent({
       );
     }
 
-    watch(activeHomeTab, (val) => localStorage.setItem(LS_ACTIVE_TAB_KEY, val));
+    // An org with no stream at all opens on Overview's setup state, not the assistant; that choice
+    // is the app's, so it is not saved as the user's tab.
+    let skipSave = false;
+    watch(activeHomeTab, (val) => {
+      if (skipSave) {
+        skipSave = false;
+        return;
+      }
+      localStorage.setItem(LS_ACTIVE_TAB_KEY, val);
+    });
+    const { hasAnyStream, isFetching } = useOrgHasUserData(
+      () => store.state.selectedOrganization?.identifier ?? "",
+    );
+    // O2's own streams count, so the _meta org keeps the assistant; a stale cached list may be out of date
+    watch(
+      [hasAnyStream, isFetching],
+      ([has, fetching]) => {
+        if (has !== false || fetching || activeHomeTab.value !== "ai") return;
+        skipSave = true;
+        activeHomeTab.value = "overview";
+      },
+      { immediate: true },
+    );
 
     // The cached pin can be stale from another device, so it is re-read without holding the tab; a stale folder is caught by onPinnedUnavailable.
     function revalidatePin() {
@@ -562,6 +608,7 @@ export default defineComponent({
       onPinnedLabel,
       onPinnedUnavailable,
       onCloseTab,
+      onTabChange,
       flagOn,
       isDataTab,
       arrived,
@@ -587,6 +634,7 @@ export default defineComponent({
     FirstDataPanel,
     FirstDataNotice,
     HomeNoDataState,
+    SampleDataHomeBanner,
     HomeViewSkeleton,
     TrialPeriod,
     OEmptyState,

@@ -51,6 +51,74 @@ describe("AlertSettingsHelpDrawer", () => {
     vi.clearAllMocks();
   });
 
+  it("uses kind-neutral copy for an object override and names the destinations it does not fit", async () => {
+    w = mountDrawer({
+      subject: "object",
+      currentTemplate: "hook",
+      templates: [{ name: "hook", body: "hello" }],
+      unfitDestinations: ["play_email"],
+    });
+    await w.setProps({ open: false });
+    await w.setProps({ open: true });
+
+    const text = w.text();
+    expect(text).not.toContain("for this alert only");
+    expect(text).not.toContain("All destinations use this template");
+    expect(text).toContain("Destinations that fit use this template:");
+    expect(w.find('[data-test="help-current-unfit"]').text()).toContain("play_email");
+    expect(w.find('[data-test="help-apply-template-btn"]').text()).toBe("Use this template");
+  });
+
+  it("lists the resolved template per destination when an object has no override", async () => {
+    w = mountDrawer({
+      subject: "object",
+      currentTemplate: "",
+      selectedDestinations: ["hook"],
+      resolvedDestinations: [{ destination: "hook", label: "card (destination template)" }],
+    });
+    await w.setProps({ open: false });
+    await w.setProps({ open: true });
+
+    const rows = w.findAll('[data-test="help-resolved-row"]');
+    expect(rows.map((r) => r.findAll("span").map((x) => x.text()))).toEqual([
+      ["hook", "card (destination template)"],
+    ]);
+  });
+
+  // B30: a Content template stores a JSON spec; the preview shows its title and body.
+  it("previews a Content template as its title and body, not the raw JSON", async () => {
+    const spec = {
+      title: "Anomaly on {alert_name}",
+      title_overrides: {},
+      body: "Score is high",
+      fields: [],
+      rows: { enabled: false, max: 5, columns: null, format: null },
+      links: [],
+      chart: { enabled: false },
+    };
+    w = mountDrawer({
+      subject: "object",
+      currentTemplate: "card",
+      templates: [
+        { name: "card", kind: "content", body: JSON.stringify(spec) },
+        { name: "hook", kind: "custom", body: '{"text":"{alert_name}"}' },
+      ],
+      facts: { alert_name: "cpu" },
+    });
+    await w.setProps({ open: false });
+    await w.setProps({ open: true });
+    const box = w.find('[data-test="help-preview-box"]').text();
+    expect(box).toContain("Anomaly on cpu");
+    expect(box).toContain("Score is high");
+    expect(box).not.toContain("title_overrides");
+
+    (w.vm as any).previewTemplate = "hook";
+    await w.vm.$nextTick();
+    expect(
+      w.findAll('[data-test="help-preview-box"]').some((b) => b.text().includes('"text"')),
+    ).toBe(true);
+  });
+
   it("renders the current section for topic=template", () => {
     w = mountDrawer({ topic: "template" });
     expect(w.find('[data-test="help-current-section"]').exists()).toBe(true);

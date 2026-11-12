@@ -32,7 +32,10 @@ use config::{
 use infra::table;
 use itertools::Itertools;
 
-use crate::{self as db, authz::remove_ownership};
+use crate::{
+    self as db,
+    authz::{remove_ownership, set_ownership},
+};
 
 // db cache watcher prefix
 const TEMPLATE_WATCHER_PREFIX: &str = "/templates/";
@@ -47,7 +50,9 @@ pub enum TemplateError {
         "Template name cannot contain ':', '#', '?', '&', '%', '/', quotes and space characters"
     )]
     InvalidName,
-    #[error("Email Template cannot have empty title")]
+    #[error("Template name cannot be longer than {0} characters")]
+    NameTooLong(usize),
+    #[error("Template title cannot be empty")]
     EmptyTitle,
     #[error("Template body cannot be empty")]
     EmptyBody,
@@ -73,9 +78,51 @@ pub enum TemplateError {
     InvalidKind(String),
     #[error("content template body is not a valid content spec: {0}")]
     InvalidContentSpec(String),
+    #[error(
+        "applies_to: unknown kind '{0}'; allowed: alert, incident, anomaly, synthetics, downtime, on_call"
+    )]
+    UnknownKind(String),
+    #[error("template is used for {kind} by: {by}; remove the binding first")]
+    InUseForKind { kind: String, by: String },
+    #[error("Template is in use by {0}")]
+    DeleteWithBinding(String),
 }
 
 pub async fn get(org_id: &str, name: &str) -> Result<Template, TemplateError> {
+    if !follows_alias(name) {
+        return get_shared(org_id, name).await;
+    }
+    // A node whose destination or alert cache predates a rename still asks for the old name: the
+    // org's own rename wins over the shared default row of that name.
+    if org_id != DEFAULT_ORG {
+        if let Some(template) = own_row(org_id, name).await? {
+            return Ok(template);
+        }
+        if let Some(to) = alias(org_id, name).await?
+            && let Ok(template) = get_shared(org_id, &to).await
+        {
+            return Ok(template);
+        }
+    }
+    match get_shared(org_id, name).await {
+        Err(TemplateError::NotFound) => match alias(DEFAULT_ORG, name).await? {
+            Some(to) => get_shared(org_id, &to).await,
+            None => Err(TemplateError::NotFound),
+        },
+        found => found,
+    }
+}
+
+/// Only reserved and retired names are ever renamed, so other lookups skip the alias reads; the
+/// system owns prebuilt_default now, so a new binding to it reads the system row.
+fn follows_alias(name: &str) -> bool {
+    (table::templates::is_reserved_default_name(name)
+        || table::templates::RETIRED_DEFAULT_NAMES.contains(&name))
+        && name != table::templates::DEFAULT_TEMPLATE_NAME
+}
+
+/// The org's row, else the shared default org's row of that name.
+async fn get_shared(org_id: &str, name: &str) -> Result<Template, TemplateError> {
     let map_key = format!("{org_id}/{name}");
     if let Some(v) = ALERTS_TEMPLATES.get(&map_key) {
         return Ok(v.value().clone());
@@ -84,7 +131,6 @@ pub async fn get(org_id: &str, name: &str) -> Result<Template, TemplateError> {
     if let Some(v) = ALERTS_TEMPLATES.get(&default_org_key) {
         return Ok(v.value().clone());
     }
-
     if let Some(template) = table::templates::get(org_id, name).await? {
         return Ok(template);
     }
@@ -93,8 +139,25 @@ pub async fn get(org_id: &str, name: &str) -> Result<Template, TemplateError> {
         .ok_or(TemplateError::NotFound)
 }
 
+async fn own_row(org_id: &str, name: &str) -> Result<Option<Template>, TemplateError> {
+    if let Some(v) = ALERTS_TEMPLATES.get(&format!("{org_id}/{name}")) {
+        return Ok(Some(v.value().clone()));
+    }
+    Ok(table::templates::get_own(org_id, name).await?)
+}
+
+/// The name `name` was renamed to in exactly `org_id`.
+async fn alias(org_id: &str, name: &str) -> Result<Option<String>, TemplateError> {
+    Ok(table::templates::renamed_in(org_id, name)
+        .await
+        .map_err(infra::errors::Error::from)?
+        .filter(|to| to != name))
+}
+
 pub async fn set(template: Template) -> Result<Template, TemplateError> {
     let saved = table::templates::put(template).await?;
+    // Read-your-own-write on this node; the watcher catches up after the broadcast.
+    apply_template_cache_event(&format!("{}/{}", saved.org_id, saved.name), Some(&saved));
 
     // trigger watch event to update in-memory cache
     let event_key = format!("{TEMPLATE_WATCHER_PREFIX}{}/{}", saved.org_id, saved.name);
@@ -121,11 +184,17 @@ pub async fn set(template: Template) -> Result<Template, TemplateError> {
 }
 
 pub async fn delete(org_id: &str, name: &str) -> Result<(), TemplateError> {
-    check_not_in_use(org_id, name).await?;
+    delete_as(org_id, name, false).await
+}
+
+/// Deletes the template; the in-use error names another org's reference only for root.
+pub async fn delete_as(org_id: &str, name: &str, is_root: bool) -> Result<(), TemplateError> {
+    check_not_in_use(org_id, name, is_root).await?;
 
     if !table::templates::delete(org_id, name).await? {
         return Err(TemplateError::NotFound);
     }
+    apply_template_cache_event(&format!("{org_id}/{name}"), None);
     let event_key = format!("{TEMPLATE_WATCHER_PREFIX}{org_id}/{name}");
 
     // trigger watch event to update in-memory cache
@@ -230,27 +299,9 @@ pub async fn watch() -> Result<(), anyhow::Error> {
         };
         match ev {
             db::Event::Put(ev) => {
-                let (org_id, name) =
-                    match super::destinations::parse_event_key(TEMPLATE_WATCHER_PREFIX, &ev.key) {
-                        Ok(parsed) => parsed,
-                        Err(e) => {
-                            log::error!("{e}");
-                            continue;
-                        }
-                    };
-                let item_value: Template = match table::templates::get(org_id, name).await {
-                    Ok(Some(val)) => val,
-                    Ok(None) => {
-                        log::error!("Template not found in db, org_id: {org_id}");
-                        continue;
-                    }
-                    Err(e) => {
-                        log::error!("Error getting from db: org_id: {org_id}, error: {e}");
-                        continue;
-                    }
-                };
-                let cache_key = format!("{org_id}/{name}");
-                apply_template_cache_event(&cache_key, Some(&item_value));
+                if let Some((cache_key, item_value)) = put_event_entry(&ev.key).await {
+                    apply_template_cache_event(&cache_key, Some(&item_value));
+                }
             }
             db::Event::Delete(ev) => {
                 let item_key = ev.key.strip_prefix(TEMPLATE_WATCHER_PREFIX).unwrap();
@@ -348,19 +399,168 @@ pub fn get_parsed_content(template: &Template) -> Result<Arc<ContentSpec>, serde
     Ok(spec)
 }
 
-async fn check_not_in_use(org_id: &str, name: &str) -> Result<(), TemplateError> {
+async fn check_not_in_use(org_id: &str, name: &str, is_root: bool) -> Result<(), TemplateError> {
+    let (destinations, alerts) = cached_references(org_id, name).await;
+    if let Some(by) = visible_reference(&destinations, org_id, is_root) {
+        return Err(TemplateError::DeleteWithDestination(by));
+    }
+    if let Some(by) = visible_reference(&alerts, org_id, is_root) {
+        return Err(TemplateError::DeleteWithAlert(by));
+    }
+    Ok(())
+}
+
+/// The org part of an `{org}/...` cache key.
+fn cache_key_org(cache_key: &str) -> &str {
+    cache_key.split('/').next().unwrap_or_default()
+}
+
+/// How the delete guard names `refs` to the caller: the first name root or a caller of the same
+/// org may see, else a count of the references held by other orgs.
+fn visible_reference(refs: &[(String, String)], org_id: &str, is_root: bool) -> Option<String> {
+    let visible = |org: &str| is_root || org == org_id;
+    if let Some((_, name)) = refs.iter().find(|(org, _)| visible(org)) {
+        return Some(name.clone());
+    }
+    (!refs.is_empty()).then(|| format!("{} in another organization", refs.len()))
+}
+
+/// `(org, name)` of cached destinations and alerts that name the template, scoped like the
+/// delete guard.
+pub async fn cached_references(
+    org_id: &str,
+    name: &str,
+) -> (Vec<(String, String)>, Vec<(String, String)>) {
+    let destinations = DESTINATIONS
+        .iter()
+        .filter(|dest| {
+            references_from(org_id, dest.key())
+                && matches!(&dest.module, Module::Alert { template: Some(t), .. } if t == name)
+        })
+        .map(|dest| (cache_key_org(dest.key()).to_string(), dest.name.clone()))
+        .collect();
+    let alerts = ALERTS
+        .read()
+        .await
+        .iter()
+        .filter(|(key, (_, alert))| {
+            references_from(org_id, key) && alert.template.as_deref() == Some(name)
+        })
+        .map(|(key, (_, alert))| (cache_key_org(key).to_string(), alert.name.clone()))
+        .collect();
+    (destinations, alerts)
+}
+
+/// `cached_references` counted for every template name at once, in one pass over each cache.
+pub async fn cached_reference_counts(
+    org_id: &str,
+) -> (HashMap<String, usize>, HashMap<String, usize>) {
+    let mut destinations: HashMap<String, usize> = HashMap::new();
     for dest in DESTINATIONS.iter() {
-        if references_from(org_id, dest.key())
-            && matches!(&dest.module, Module::Alert { template: Some(t), .. } if t == name)
+        if let Module::Alert {
+            template: Some(t), ..
+        } = &dest.module
+            && references_from(org_id, dest.key())
         {
-            return Err(TemplateError::DeleteWithDestination(dest.name.clone()));
+            *destinations.entry(t.clone()).or_default() += 1;
         }
     }
-    let alerts_cache = ALERTS.read().await;
-    for (key, (_folder, alert)) in alerts_cache.iter() {
-        if references_from(org_id, key) && alert.template.as_deref() == Some(name) {
-            return Err(TemplateError::DeleteWithAlert(alert.name.clone()));
+    let mut alerts: HashMap<String, usize> = HashMap::new();
+    for (key, (_, alert)) in ALERTS.read().await.iter() {
+        if let Some(t) = alert.template.as_deref()
+            && references_from(org_id, key)
+        {
+            *alerts.entry(t.to_string()).or_default() += 1;
         }
+    }
+    (destinations, alerts)
+}
+
+/// Moves user rows out of the reserved prefix and tells every node's cache.
+pub async fn rename_reserved_collisions()
+-> Result<Vec<table::templates::ReservedRename>, TemplateError> {
+    let db = infra::db::get_orm_client_rw().await;
+    let renames =
+        table::templates::rename_reserved_collisions(db, &table::templates::BOOT_SEEDS, true)
+            .await
+            .map_err(infra::errors::Error::from)?;
+    // Tuples are keyed by name; one that did not move stays queued, so a later boot retries it.
+    // Queued before the emits, because the rows are already renamed and a failed emit returns.
+    table::templates::record_pending_renames(db, &renames)
+        .await
+        .map_err(infra::errors::Error::from)?;
+    for r in &renames {
+        infra::coordinator::emit_delete(&format!("{TEMPLATE_WATCHER_PREFIX}{}/{}", r.org, r.from))
+            .await?;
+        infra::coordinator::emit_put(&format!("{TEMPLATE_WATCHER_PREFIX}{}/{}", r.org, r.to))
+            .await?;
+    }
+    let pending = table::templates::pending_renames(db)
+        .await
+        .map_err(infra::errors::Error::from)?;
+    let mut left = Vec::new();
+    for r in pending {
+        if let Err(e) = move_tuples(&r).await {
+            log::warn!(
+                "[TEMPLATES] tuples of '{}' in org {} not moved to '{}' yet: {e}",
+                r.from,
+                r.org,
+                r.to
+            );
+            left.push(r);
+        }
+    }
+    table::templates::set_pending_renames(db, &left)
+        .await
+        .map_err(infra::errors::Error::from)?;
+    Ok(renames)
+}
+
+/// Folds the retired default rows into `prebuilt_default` and tells every node's cache.
+pub async fn retire_default_templates()
+-> Result<Vec<table::templates::ReservedRename>, TemplateError> {
+    let moved = table::templates::retire_default_templates(infra::db::get_orm_client_rw().await)
+        .await
+        .map_err(infra::errors::Error::from)?;
+    // System rows: the seeder writes no tuple for prebuilt_default, so none is set here. The old
+    // tuples go first, because the rows are already folded and a failed emit returns.
+    for r in &moved {
+        disown_old_name(r).await?;
+    }
+    for r in &moved {
+        infra::coordinator::emit_delete(&format!("{TEMPLATE_WATCHER_PREFIX}{}/{}", r.org, r.from))
+            .await?;
+        infra::coordinator::emit_put(&format!("{TEMPLATE_WATCHER_PREFIX}{}/{}", r.org, r.to))
+            .await?;
+    }
+    Ok(moved)
+}
+
+/// Moves every tuple on the old name, ownership and role grants, to the new one.
+async fn move_tuples(r: &table::templates::ReservedRename) -> Result<(), TemplateError> {
+    let mut orgs = tuple_owners(&r.org, std::slice::from_ref(&r.from))
+        .await?
+        .remove(&r.from)
+        .unwrap_or_default();
+    let unowned = !orgs.contains(&r.org);
+    if unowned {
+        orgs.push(r.org.clone());
+    }
+    db::authz::rename_object(&orgs, "templates", &r.from, &r.to, r.org == DEFAULT_ORG)
+        .await
+        .map_err(|e| TemplateError::InfraError(infra::errors::Error::Message(e.to_string())))?;
+    // A row with no tuple on its old name still needs an owner on the new one.
+    if unowned && db::authz::tracks_ownership() {
+        set_ownership(&r.org, "templates", Authz::new(&r.to)).await;
+    }
+    Ok(())
+}
+
+/// Removes the tuples of the name a row was moved off.
+async fn disown_old_name(r: &table::templates::ReservedRename) -> Result<(), TemplateError> {
+    let owners = tuple_owners(&r.org, std::slice::from_ref(&r.from)).await?;
+    for owner in owners.get(&r.from).into_iter().flatten() {
+        remove_ownership(owner, "templates", Authz::new(&r.from)).await;
     }
     Ok(())
 }
@@ -399,6 +599,31 @@ async fn names_shared_with_live_orgs(
         .collect())
 }
 
+/// The row a Put event caches, as `(cache_key, template)`; `None` when it has no row of its own.
+async fn put_event_entry(event_key: &str) -> Option<(String, Template)> {
+    let (org_id, name) =
+        match super::destinations::parse_event_key(TEMPLATE_WATCHER_PREFIX, event_key) {
+            Ok(parsed) => parsed,
+            Err(e) => {
+                log::error!("{e}");
+                return None;
+            }
+        };
+    let template = match table::templates::get_own(org_id, name).await {
+        Ok(Some(val)) => val,
+        Ok(None) => {
+            log::error!("Template not found in db, org_id: {org_id}");
+            return None;
+        }
+        Err(e) => {
+            log::error!("Error getting from db: org_id: {org_id}, error: {e}");
+            return None;
+        }
+    };
+    let cache_key = format!("{}/{}", template.org_id, template.name);
+    Some((cache_key, template))
+}
+
 /// The owners of the template's tuples: the org, and the name, which older releases wrote as org.
 fn ownership_owners<'a>(org_id: &'a str, name: &'a str, name_shared: bool) -> Vec<&'a str> {
     let mut owners = vec![org_id];
@@ -418,6 +643,16 @@ mod tests {
     };
 
     use super::*;
+
+    #[test]
+    fn only_a_retired_or_reserved_user_name_follows_its_rename() {
+        assert!(!follows_alias("prebuilt_default"));
+        assert!(!follows_alias("prebuilt_slack"));
+        assert!(!follows_alias("ops-card"));
+        assert!(follows_alias("o2_default_content"));
+        assert!(follows_alias("o2_default_mine"));
+        assert!(follows_alias("prebuilt_downtime"));
+    }
 
     fn seed_destination(org_id: &str, name: &str, template: &str) {
         DESTINATIONS.insert(
@@ -446,12 +681,12 @@ mod tests {
     async fn test_check_not_in_use_ignores_a_prefix_sibling_org() {
         seed_destination("tpl_scope_acme2", "d", "tpl_scope_prefix_tpl");
         assert!(
-            check_not_in_use("tpl_scope_acme", "tpl_scope_prefix_tpl")
+            check_not_in_use("tpl_scope_acme", "tpl_scope_prefix_tpl", false)
                 .await
                 .is_ok()
         );
         assert!(matches!(
-            check_not_in_use("tpl_scope_acme2", "tpl_scope_prefix_tpl").await,
+            check_not_in_use("tpl_scope_acme2", "tpl_scope_prefix_tpl", false).await,
             Err(TemplateError::DeleteWithDestination(d)) if d == "d"
         ));
     }
@@ -460,7 +695,7 @@ mod tests {
     async fn test_check_not_in_use_sees_every_org_for_a_default_template() {
         seed_destination("tpl_scope_other", "d", "tpl_scope_shared_dest");
         assert!(matches!(
-            check_not_in_use(DEFAULT_ORG, "tpl_scope_shared_dest").await,
+            check_not_in_use(DEFAULT_ORG, "tpl_scope_shared_dest", true).await,
             Err(TemplateError::DeleteWithDestination(d)) if d == "d"
         ));
 
@@ -472,13 +707,65 @@ mod tests {
             .await
             .insert("tpl_scope_other/a1".to_string(), (Folder::default(), alert));
         assert!(matches!(
-            check_not_in_use(DEFAULT_ORG, "tpl_scope_shared_alert").await,
+            check_not_in_use(DEFAULT_ORG, "tpl_scope_shared_alert", true).await,
             Err(TemplateError::DeleteWithAlert(a)) if a == "a"
         ));
         assert!(
-            check_not_in_use("tpl_scope_unrelated", "tpl_scope_shared_alert")
+            check_not_in_use("tpl_scope_unrelated", "tpl_scope_shared_alert", false)
                 .await
                 .is_ok()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_check_not_in_use_hides_another_orgs_name_from_a_non_root_caller() {
+        seed_destination("tpl_redact_other", "secret_dest", "tpl_redact_dest");
+        assert!(matches!(
+            check_not_in_use(DEFAULT_ORG, "tpl_redact_dest", false).await,
+            Err(TemplateError::DeleteWithDestination(d)) if d == "1 in another organization"
+        ));
+        assert!(matches!(
+            check_not_in_use(DEFAULT_ORG, "tpl_redact_dest", true).await,
+            Err(TemplateError::DeleteWithDestination(d)) if d == "secret_dest"
+        ));
+        seed_destination(DEFAULT_ORG, "own_dest", "tpl_redact_own");
+        assert!(matches!(
+            check_not_in_use(DEFAULT_ORG, "tpl_redact_own", false).await,
+            Err(TemplateError::DeleteWithDestination(d)) if d == "own_dest"
+        ));
+
+        let mut alert = Alert::default();
+        alert.name = "secret_alert".to_string();
+        alert.template = Some("tpl_redact_alert".to_string());
+        ALERTS.write().await.insert(
+            "tpl_redact_other/a1".to_string(),
+            (Folder::default(), alert),
+        );
+        assert!(matches!(
+            check_not_in_use(DEFAULT_ORG, "tpl_redact_alert", false).await,
+            Err(TemplateError::DeleteWithAlert(a)) if a == "1 in another organization"
+        ));
+        assert!(matches!(
+            check_not_in_use(DEFAULT_ORG, "tpl_redact_alert", true).await,
+            Err(TemplateError::DeleteWithAlert(a)) if a == "secret_alert"
+        ));
+        // A same-org reference is named even when another org's is also cached.
+        seed_destination("tpl_redact_other", "secret_mixed", "tpl_redact_mixed");
+        seed_destination(DEFAULT_ORG, "own_mixed", "tpl_redact_mixed");
+        assert!(matches!(
+            check_not_in_use(DEFAULT_ORG, "tpl_redact_mixed", false).await,
+            Err(TemplateError::DeleteWithDestination(d)) if d == "own_mixed"
+        ));
+        seed_destination("tpl_redact_other2", "secret_two", "tpl_redact_dest");
+        assert!(matches!(
+            check_not_in_use(DEFAULT_ORG, "tpl_redact_dest", false).await,
+            Err(TemplateError::DeleteWithDestination(d)) if d == "2 in another organization"
+        ));
+        let (dests, alerts) = cached_references(DEFAULT_ORG, "tpl_redact_alert").await;
+        assert!(dests.is_empty());
+        assert_eq!(
+            alerts,
+            vec![("tpl_redact_other".to_string(), "secret_alert".to_string())]
         );
     }
 
@@ -729,9 +1016,35 @@ mod tests {
             template_type: config::meta::destinations::TemplateType::Http,
             body: r#"{"text":"{alert_name}"}"#.to_string(),
             kind: TemplateKind::Custom,
+            applies_to: Vec::new(),
         })
         .await
         .unwrap();
+    }
+
+    #[tokio::test]
+    async fn a_put_event_caches_only_the_row_its_own_org_holds() {
+        if !meta_store().await {
+            return;
+        }
+        let suffix = config::utils::time::now_micros();
+        let owner = format!("t_tpl_put_owner_{suffix}");
+        let other = format!("t_tpl_put_other_{suffix}");
+        let name = format!("t_tpl_put_{suffix}");
+        put_template(DEFAULT_ORG, &name).await;
+
+        // `other` holds no row of that name, so the default fallback would cache the shared
+        // `default` row under `other/name` and shadow the shared entry.
+        let entry = put_event_entry(&format!("{TEMPLATE_WATCHER_PREFIX}{other}/{name}")).await;
+        assert!(entry.is_none(), "cached {entry:?}");
+
+        let entry =
+            put_event_entry(&format!("{TEMPLATE_WATCHER_PREFIX}{DEFAULT_ORG}/{name}")).await;
+        assert_eq!(entry.map(|e| e.0), Some(format!("{DEFAULT_ORG}/{name}")));
+
+        put_template(&owner, &name).await;
+        let entry = put_event_entry(&format!("{TEMPLATE_WATCHER_PREFIX}{owner}/{name}")).await;
+        assert_eq!(entry.map(|e| e.0), Some(format!("{owner}/{name}")));
     }
 
     #[tokio::test]
@@ -825,5 +1138,41 @@ mod tests {
         }
 
         assert_eq!(held, [name]);
+    }
+
+    #[tokio::test]
+    async fn test_list_reads_its_own_set_and_delete_without_the_watcher() {
+        if !meta_store().await {
+            return;
+        }
+        let suffix = config::utils::time::now_micros();
+        let org_id = format!("t_tpl_ryow_{suffix}");
+        let name = format!("t_tpl_ryow_{suffix}");
+        let key = format!("{org_id}/{name}");
+        let listed = |templates: Vec<Template>| templates.iter().any(|t| t.name == name);
+
+        set(custom_template(
+            &org_id,
+            &name,
+            r#"{"text":"{alert_name}"}"#,
+        ))
+        .await
+        .unwrap();
+        let cached_after_set = ALERTS_TEMPLATES.contains_key(&key);
+        let listed_after_set = listed(list(&org_id).await.unwrap());
+        delete(&org_id, &name).await.unwrap();
+        let cached_after_delete = ALERTS_TEMPLATES.contains_key(&key);
+        let listed_after_delete = listed(list(&org_id).await.unwrap());
+
+        assert!(cached_after_set, "set() must cache {key} on this node");
+        assert!(listed_after_set, "list() right after set() misses {name}");
+        assert!(
+            !cached_after_delete,
+            "delete() must evict {key} on this node"
+        );
+        assert!(
+            !listed_after_delete,
+            "list() right after delete() still has {name}"
+        );
     }
 }

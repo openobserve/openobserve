@@ -15,7 +15,7 @@ import type { TooltipSide } from "@/lib/overlay/Tooltip/OTooltip.types";
  * semantic ramp (`--color-priority-p*`) rather than a status tone — a P1 row is
  * not "an error", it is a P1.
  */
-export type RowRailTone = StatTone | "p1" | "p2" | "p3" | "p4" | "p5";
+export type RowRailTone = StatTone | "amber" | "p1" | "p2" | "p3" | "p4" | "p5";
 
 /** How a row is de-emphasised. One value today; a union so it can grow. */
 export type RowTone = "muted";
@@ -57,6 +57,8 @@ export const ROW_RAIL_TONE_CLASS: Record<RowRailTone, string> = {
   teal: "[&>td:first-child]:border-s-4 [&>td:first-child]:border-s-badge-teal-soft-text",
   purple: "[&>td:first-child]:border-s-4 [&>td:first-child]:border-s-badge-purple-soft-text",
   neutral: "[&>td:first-child]:border-s-4 [&>td:first-child]:border-s-border-default",
+  // The amber of a Coverage gap chip, so a gap row's rail matches its chip.
+  amber: "[&>td:first-child]:border-s-4 [&>td:first-child]:border-s-badge-amber-soft-text",
 };
 
 /** Tone → utility classes for a de-emphasised row. */
@@ -72,13 +74,17 @@ export const ROW_TONE_CLASS: Record<RowTone, string> = {
  * cells skip the mouse bookkeeping entirely.
  */
 export interface OTableCellActionsContext {
-  activeCellKey: Ref<string | null>;
+  activeCellKey: Readonly<Ref<string | null>>;
   setActiveCell: (key: string | null) => void;
   enabled: ComputedRef<boolean>;
 }
 
 export const OTableCellActionsKey: InjectionKey<OTableCellActionsContext> =
   Symbol("OTableCellActions");
+
+// ─── Stale rows context ──────────────────────────────────────────
+/** True while kept rows are dimmed during a refetch; controls that act on those rows read it to disable themselves. */
+export const OTableStaleKey: InjectionKey<Readonly<Ref<boolean>>> = Symbol("OTableStale");
 
 // ─── Cut-off cell tooltip context ────────────────────────────────
 /** A body cell reports hover; OTable shows one shared tooltip, only when that cell's text is cut. */
@@ -468,12 +474,18 @@ export interface OTableProps<TData = any> {
   fillHeight?: boolean;
 
   // ── Display ──
-  /** While true, a table that has settled rows keeps them on screen, dimmed and inert once the load is slow; otherwise it shows the skeleton. */
+  /** While true, a table that has settled rows keeps them on screen, dimmed once the load is slow; otherwise it shows the skeleton after a delay. */
   loading?: boolean;
+  /** Dim kept rows and disable actions on them during a slow refetch; turn off for live mode and same-window auto-refresh (default: true). */
+  dimOnRefetch?: boolean;
   /** Show the skeleton on every load instead of keeping the last settled rows. */
   skeletonOnRefetch?: boolean;
+  /** Skeleton rows while loading, when the caller already knows how many rows will land; keeps the first paint the loaded height. */
+  skeletonRows?: number;
   /** Changing it drops the kept rows so the next load shows the skeleton; bind the folder or tab whose rows must not show under another. */
   loadingResetKey?: unknown;
+  /** Draw the table's own progress line under the header while loading; turn off when the page draws one line for the whole region (default: true). */
+  progressLine?: boolean;
   /** Data is arriving incrementally (SSE/WebSocket). Shows a pulsing indicator. */
   streaming?: boolean;
   error?: string | null;
@@ -593,6 +605,8 @@ export interface OTableEmits<TData = any> {
   "update:currentPage": [page: number];
   "update:pageSize": [size: number];
   "pagination-change": [params: OTablePaginationParams];
+  /** The error state's Retry; also re-emits `pagination-change` for server data. */
+  retry: [];
 
   // Sorting
   "update:sortBy": [columnId: string];
@@ -715,6 +729,8 @@ export interface OTableSlots<TData = any> {
   error?: (props: { message: string }) => any;
   /** One `<tr>` (cells spanning the columns) rendered as the first row of the body, under the column header, before the first data row; not measured by virtual scrolling. */
   "body-start"?: () => any;
+  /** One `<tr>` (cells spanning the columns) rendered as the last row of the body, above the footer; not measured by virtual scrolling. */
+  "body-end"?: () => any;
   /** Expanded row content — scoped to the plain row data (`row.original`) */
   expansion?: (props: { row: TData }) => any;
   /** Tree-mode warning row — rendered between an expanded parent and its children when `getRowWarning(row)` is true. */
@@ -741,6 +757,8 @@ export interface OTableExposed<TData = any> {
   /** True when column resizing is enabled and the user has resized at least one
    *  column. Read this when rendering your own `OTableColumnToggle`. */
   hasResizedColumns: boolean;
+  /** True while a load keeps the settled rows on screen instead of the skeleton. */
+  keepingRows: boolean;
   /** Reset column sizes to default */
   resetColumnSizes: () => void;
   /** Reset column order to default */

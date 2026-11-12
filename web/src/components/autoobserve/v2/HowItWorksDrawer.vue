@@ -36,12 +36,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-test="`autoobserve2-how-step-${i + 1}`"
         >
           <span
-            class="bg-icon-chip-primary-bg text-icon-chip-primary-text flex size-7 shrink-0 items-center justify-center rounded-full text-sm font-semibold"
+            class="bg-surface-subtle text-text-heading border-border-default flex size-7 shrink-0 items-center justify-center rounded-full border text-sm font-semibold"
           >
             {{ i + 1 }}
           </span>
           <div class="flex flex-col gap-1">
-            <span class="text-text-heading text-base font-semibold">{{ t(step.title) }}</span>
+            <span class="text-text-heading text-sm font-semibold">{{ t(step.title) }}</span>
             <p class="text-text-body text-sm leading-relaxed">{{ t(step.body) }}</p>
           </div>
         </li>
