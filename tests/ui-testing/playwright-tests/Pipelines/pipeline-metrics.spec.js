@@ -316,9 +316,7 @@ test.describe("Metrics Pipeline Tests", { tag: ['@all', '@pipelines', '@metrics'
 
     // Save function
     await pageManager.pipelinesPage.saveNewFunction();
-    await page.waitForTimeout(2000);
-    await pageManager.pipelinesPage.saveFunction();
-    await page.waitForTimeout(2000);
+    await pageManager.pipelinesPage.saveCreatedFunction();
 
     testLogger.info(`Function node created: ${funcName}`);
 
