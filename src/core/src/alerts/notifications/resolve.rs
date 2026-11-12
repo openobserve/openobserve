@@ -82,8 +82,11 @@ pub fn resolve_content(
         .title_overrides
         .get(channel_family)
         .unwrap_or(&spec.title);
-    let (title, mut unk) = substitute_raw(title_tpl, ctx);
+    let (mut title, mut unk) = substitute_raw(title_tpl, ctx);
     unknown_variables.append(&mut unk);
+    if ctx.render_hints.test_marker {
+        title.insert_str(0, super::TEST_MARKER);
+    }
 
     // Body values are markdown-escaped, except plain-text families, which get raw values.
     // Title, fields, links and rows stay raw; Teams guards them in its renderer.

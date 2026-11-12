@@ -193,6 +193,7 @@ pub fn synthetics_notification_context(
         render_hints: RenderHints {
             fallback_subject: Some(check_title(n)),
             escape_email_attributes: true,
+            ..Default::default()
         },
         ..Default::default()
     }
@@ -1311,6 +1312,7 @@ fn location_down_context(
         render_hints: RenderHints {
             fallback_subject: Some(subject),
             escape_email_attributes: true,
+            ..Default::default()
         },
         ..Default::default()
     }

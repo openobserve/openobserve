@@ -19,6 +19,8 @@ import { createStore } from "vuex";
 import i18n from "@/locales";
 import TemplatePreviewPanel from "./TemplatePreviewPanel.vue";
 import templateService from "@/services/alert_templates";
+import destinationService from "@/services/alert_destination";
+import { dismissAll, toastRecords } from "@/lib/feedback/Toast/useToast";
 import { emptyContentSpec } from "./contentSpec";
 
 function makeStore() {
@@ -416,5 +418,98 @@ describe("TemplatePreviewPanel", () => {
     await flushPromises();
     expect(w.find('[data-test="template-preview-panel-forbidden"]').exists()).toBe(true);
     expect(w.find('[data-test="template-preview-panel-test-send-btn"]').exists()).toBe(false);
+  });
+
+  const rowsModel = (extra: Record<string, unknown>) => ({
+    preview_model: {
+      title: "Alert fired",
+      body_html: "<p>body</p>",
+      fields: [],
+      links: [],
+      color: "#ff0000",
+      severity: "critical",
+      footer: null,
+      chart_placeholder: false,
+      rows: [
+        [
+          { label: "host", value: "web-1" },
+          { label: "cpu", value: "92.5" },
+        ],
+        [
+          { label: "host", value: "web-2" },
+          { label: "cpu", value: "88.1" },
+        ],
+      ],
+      row_lines: null,
+      ...extra,
+    },
+  });
+
+  it("lists the sample rows the real message adds, with no severity bar", async () => {
+    vi.spyOn(templateService, "preview").mockResolvedValue(
+      makePreviewResponse(rowsModel({})) as any,
+    );
+    const w = await mountPanel();
+    await vi.advanceTimersByTimeAsync(300);
+    await flushPromises();
+    const rows = w.get('[data-test="template-preview-panel-rows"]').text();
+    expect(rows).toContain("host");
+    expect(rows).toContain("web-1");
+    expect(rows).toContain("88.1");
+    const card = w.get('[data-test="template-preview-panel-visual-card"]');
+    expect(card.classes()).not.toContain("border-s-4");
+    expect(card.classes().some((c) => c.startsWith("border-s-"))).toBe(false);
+  });
+
+  it("shows the template's row lines instead of the columns when it formats rows", async () => {
+    vi.spyOn(templateService, "preview").mockResolvedValue(
+      makePreviewResponse(rowsModel({ row_lines: ["web-1 at 92.5", "web-2 at 88.1"] })) as any,
+    );
+    const w = await mountPanel();
+    await vi.advanceTimersByTimeAsync(300);
+    await flushPromises();
+    expect(w.get('[data-test="template-preview-panel-row-lines"]').text()).toContain(
+      "web-1 at 92.5",
+    );
+    expect(w.find('[data-test="template-preview-panel-rows"]').exists()).toBe(false);
+  });
+
+  it("keeps the rows out when the template formats them to no lines", async () => {
+    vi.spyOn(templateService, "preview").mockResolvedValue(
+      makePreviewResponse(rowsModel({ row_lines: [] })) as any,
+    );
+    const w = await mountPanel();
+    await vi.advanceTimersByTimeAsync(300);
+    await flushPromises();
+    expect(w.find('[data-test="template-preview-panel-rows"]').exists()).toBe(false);
+    expect(w.find('[data-test="template-preview-panel-row-lines"]').exists()).toBe(false);
+  });
+
+  it("drops the typography backticks around inline code in the body", async () => {
+    vi.spyOn(templateService, "preview").mockResolvedValue(makePreviewResponse() as any);
+    const w = await mountPanel();
+    await vi.advanceTimersByTimeAsync(300);
+    await flushPromises();
+    const body = w.get('[data-test="template-preview-panel-body"]');
+    expect(body.classes()).toContain("prose-code:before:content-none");
+    expect(body.classes()).toContain("prose-code:after:content-none");
+  });
+
+  it("shows the server's wait time when a test send is rate limited", async () => {
+    dismissAll();
+    vi.spyOn(templateService, "preview").mockResolvedValue(makePreviewResponse() as any);
+    vi.spyOn(destinationService, "testSend").mockRejectedValue({
+      response: {
+        status: 429,
+        data: { message: "Too many test-sends — try again in 41s (limit: 6/min)" },
+      },
+    });
+    const w = await mountPanel();
+    (w.vm as any).selectedDestination = "slack";
+    await (w.vm as any).runTestSend();
+    await flushPromises();
+    const error = toastRecords.find((r) => r.variant === "error");
+    expect(String(error?.message)).toContain("try again in 41s");
+    dismissAll();
   });
 });
