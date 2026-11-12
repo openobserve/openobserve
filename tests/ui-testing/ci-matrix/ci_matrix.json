@@ -615,7 +615,7 @@
     "disabled": []
   },
   {
-    "testfolder": "Onboarding",
+    "testfolder": "Ingestion-Onboarding",
     "actual_folder": "Onboarding",
     "browser": "chrome",
     "run_files": [
