@@ -6184,9 +6184,43 @@ export class LogsPage {
         return buttonCount;
     }
 
+    async waitForSearchStreamQuiet({ quietMs = 1500, timeout = 30000 } = {}) {
+        const isSearch = (request) => request.url().includes('/_search_stream') && request.method() === 'POST';
+        let inFlight = 0;
+        let lastActivity = Date.now();
+        const onStart = (request) => {
+            if (!isSearch(request)) return;
+            inFlight++;
+            lastActivity = Date.now();
+        };
+        const onEnd = (request) => {
+            if (!isSearch(request)) return;
+            inFlight = Math.max(0, inFlight - 1);
+            lastActivity = Date.now();
+        };
+        this.page.on('request', onStart);
+        this.page.on('requestfinished', onEnd);
+        this.page.on('requestfailed', onEnd);
+        try {
+            const deadline = Date.now() + timeout;
+            while (Date.now() < deadline) {
+                if (inFlight === 0 && Date.now() - lastActivity >= quietMs) return true;
+                await this.page.waitForTimeout(100);
+            }
+            return false;
+        } finally {
+            this.page.off('request', onStart);
+            this.page.off('requestfinished', onEnd);
+            this.page.off('requestfailed', onEnd);
+        }
+    }
+
     async setupAPICallTracking() {
+        // A search the SQL or histogram toggle set off can land after the tracked shortcut and be counted as its own.
+        await this.waitForRunQueryReady();
+        await this.waitForSearchStreamQuiet();
         const allRequests = [];
-        
+
         const requestHandler = (request) => {
             if (request.url().includes('/_search_stream') && request.method() === 'POST') {
                 let postData = null;
