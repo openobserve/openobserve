@@ -173,4 +173,10 @@ describe("K8sResourceTree", () => {
   it("has no cluster picker without clusters", () => {
     expect(mountTree().find('[data-test="k8s2-tree-cluster"]').exists()).toBe(false);
   });
+
+  it("shows a loading cluster picker while clusters load", () => {
+    const wrapper = mountTree({ clustersLoading: true });
+    expect(wrapper.find('[data-test="k8s2-tree-cluster"]').exists()).toBe(true);
+    expect(wrapper.findComponent({ name: "K8sClusterPicker" }).props("loading")).toBe(true);
+  });
 });
