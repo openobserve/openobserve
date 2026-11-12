@@ -420,6 +420,18 @@ export class DashboardPage {
     await expect(this.dateTimeButton).toContainText(Past30SecondsValue);
   }
   async verifyShareDashboardLink(randomDashboardName){
+    // Firefox gives tests no clipboard-read permission, so keep a copy of what the app writes.
+    await this.page.evaluate(() => {
+      window.__e2eCopiedText = "";
+      const clip = navigator.clipboard;
+      if (!clip || clip.__e2eWrapped) return;
+      const write = clip.writeText.bind(clip);
+      clip.writeText = (text) => {
+        window.__e2eCopiedText = text;
+        return write(text);
+      };
+      clip.__e2eWrapped = true;
+    });
     await this.shareButton.click();
     // Success toast container — ShareButton.vue triggers it after the
     // short-URL API resolves AND the clipboard write completes.
@@ -432,8 +444,10 @@ export class DashboardPage {
     await expect
       .poll(
         async () => {
-          copiedUrl = await this.page.evaluate(() =>
-            navigator.clipboard.readText()
+          copiedUrl = await this.page.evaluate(
+            async () =>
+              window.__e2eCopiedText ||
+              (await navigator.clipboard.readText().catch(() => ""))
           );
           return copiedUrl;
         },
