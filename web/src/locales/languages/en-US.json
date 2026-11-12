@@ -18515,10 +18515,6 @@
     }
   },
   "settings": {
-    "groups": {
-      "data": "Data",
-      "llmObservability": "LLM observability"
-    },
     "header": "Settings",
     "correlationSettings": "Correlation Settings",
     "generalLabel": "General Settings",
