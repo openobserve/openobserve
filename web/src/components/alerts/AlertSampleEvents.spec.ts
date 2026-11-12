@@ -24,7 +24,7 @@ const answer = (hits: unknown[] | null) =>
     handlers.complete();
   });
 
-const mountSamples = (streamName = "checkout") =>
+const mountSamples = (streamName = "checkout", zoConfig: Record<string, unknown> = {}) =>
   mount(AlertSampleEvents, {
     props: { streamName, streamType: "logs" },
     global: {
@@ -33,7 +33,7 @@ const mountSamples = (streamName = "checkout") =>
         createStore({
           state: {
             timezone: "UTC",
-            zoConfig: {},
+            zoConfig,
             selectedOrganization: { identifier: "default" },
           },
         }),
@@ -71,6 +71,34 @@ describe("AlertSampleEvents", () => {
     expect(request.type).toBe("search");
     expect(request.queryReq.encoding).toBe("base64");
     expect(b64DecodeUnicode(request.queryReq.query.sql)).toContain('FROM "odd""name"');
+  });
+
+  it("orders by and reads the deployment's own timestamp column", async () => {
+    answer([{ ts: 1_700_000_000_000_000, message: "payment failed" }]);
+    const wrapper = mountSamples("checkout", { timestamp_column: "ts" });
+    await flushPromises();
+    const request = stream.mock.calls[0][0] as { queryReq: { query: { sql: string } } };
+    expect(b64DecodeUnicode(request.queryReq.query.sql)).toContain('ORDER BY "ts" DESC');
+    const row = wrapper.get('[data-test="add-alert-sample-event"]').text();
+    expect(row).toContain("payment failed");
+    expect(row).not.toContain("Invalid");
+  });
+
+  it("keeps only the latest chunk of a streaming aggregation instead of stacking chunks", async () => {
+    stream.mockImplementation((_req: unknown, handlers: Handlers) => {
+      const chunk = (message: string) => ({
+        type: "search_response_hits",
+        content: { streaming_aggs: true, results: { hits: [{ _timestamp: 1, message }] } },
+      });
+      handlers.data({}, chunk("first pass"));
+      handlers.data({}, chunk("final pass"));
+      handlers.complete();
+    });
+    const wrapper = mountSamples();
+    await flushPromises();
+    const rows = wrapper.findAll('[data-test="add-alert-sample-event"]');
+    expect(rows).toHaveLength(1);
+    expect(rows[0].text()).toContain("final pass");
   });
 
   it("says so when the stream has nothing recent", async () => {
