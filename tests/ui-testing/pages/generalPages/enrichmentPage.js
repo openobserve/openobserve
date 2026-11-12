@@ -1,6 +1,7 @@
 const { expect } = require('@playwright/test');
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
 const { isCloudEnvironment } = require('../cloudPages/cloud-env.js');
+const MonacoEditorHelper = require('../../playwright-tests/utils/MonacoEditorHelper.js');
 
 // The dropdown trigger intermittently drops the opening click, so it is re-tried.
 const HELP_MENU_OPEN_ATTEMPTS = 3;
@@ -516,13 +517,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
                 timeout: 30000
             });
 
-            // Get textbox using the original working approach
-            const textbox = this.page.locator(this.vrlEditor).locator('.inputarea');
-            await textbox.waitFor({ state: 'visible', timeout: 15000 });
-
-            // Fill the VRL query
-            await textbox.clear();
-            await textbox.fill(fullQuery);
+            await new MonacoEditorHelper(this.page).fillInputArea(this.page.locator(this.vrlEditor).first(), fullQuery, 15000);
 
             // Critical: Wait for the Monaco model to actually contain the typed
             // VRL query before proceeding — this replaces the prior networkidle
@@ -697,8 +692,9 @@ abc, err = get_enrichment_table_record("${fileName}", {
     // Complete workflow methods
     async uploadAndExploreEnrichmentTable(filePath, fileName) {
         await this.uploadEnrichmentFile(filePath, fileName);
-        await this.searchForEnrichmentTable(fileName);
-        await this.exploreEnrichmentTable();
+        await this.searchEnrichmentTableInList(fileName);
+        await this.clickExploreButton(fileName);
+        await expect(this.page).toHaveURL(/\/web\/logs/, { timeout: 30000 });
         await this.clickTimestampColumn();
         await this.closeLogDialog();
     }

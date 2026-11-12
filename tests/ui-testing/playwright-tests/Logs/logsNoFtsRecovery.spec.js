@@ -2,11 +2,12 @@
 
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const { trackSearches, ingestRows } = require('../utils/auto-run-helpers.js');
-const { getAuthHeaders } = require('../utils/cloud-auth.js');
+const { getAuthHeaders, getOrgIdentifier } = require('../utils/cloud-auth.js');
 
-const ORG = `noftsrecovery${Date.now()}`;
-const NOFTS = 'nofts_recovery';
-const FTS = 'fts_recovery';
+const ORG = getOrgIdentifier() || 'default';
+const RUN_ID = Math.random().toString(36).slice(2, 7);
+const NOFTS = `e2e_ftsrecovery_nofts_${RUN_ID}`;
+const FTS = `e2e_ftsrecovery_fts_${RUN_ID}`;
 const panel = '[data-test="logs-no-fts-panel"]';
 const run = '[data-test="logs-search-bar-refresh-btn"]';
 const b64 = (text) => Buffer.from(text, 'utf8').toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '.');

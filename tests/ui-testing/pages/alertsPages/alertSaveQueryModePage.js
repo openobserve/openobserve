@@ -168,7 +168,8 @@ export class AlertSaveQueryModePage {
     const table = (sql.match(/FROM\s+"([^"]+)"/i) || [])[1];
     await expect(async () => {
       await editor.locator('.view-lines').click();
-      await input.fill(sql);
+      // Firefox renders Monaco's textarea 0px wide, so the fill must skip the visibility check.
+      await input.fill(sql, { force: true });
       await expect(editor).toContainText(table, { timeout: 5000 });
     }).toPass({ timeout: 40000 });
     // Click away afterwards: the stream-name sync runs off the committed value,
