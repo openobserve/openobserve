@@ -339,6 +339,15 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
     "enabled:hover:border-accent enabled:hover:text-accent enabled:hover:bg-button-ghost-hover-bg",
     "disabled:opacity-60",
   ].join(" "),
+  "section-chip": [
+    "bg-transparent text-text-body border border-border-default whitespace-nowrap",
+    "!rounded-full !h-auto !py-1 !px-3 !text-sm",
+    "enabled:hover:bg-button-ghost-hover-bg",
+    "aria-[current=location]:bg-surface-accent-active aria-[current=location]:border-button-outline-hover-border",
+    "aria-[current=location]:text-text-heading aria-[current=location]:font-semibold",
+    "focus-visible:ring-3 focus-visible:ring-button-ghost-focus-ring",
+    "disabled:opacity-60",
+  ].join(" "),
   // tint-*: soft categorical badge fill for tiles that identify an entity by colour, e.g. a cluster code.
   "tint-teal": [
     "bg-badge-teal-soft-bg text-badge-teal-soft-text border-0",
@@ -367,6 +376,7 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
 };
 
 const disabledVariantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
+  "section-chip": "opacity-60",
   primary: "bg-button-primary-disabled text-button-primary-foreground",
   secondary: "bg-button-secondary-disabled text-text-disabled",
   outline: "opacity-50",

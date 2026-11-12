@@ -17,6 +17,8 @@
 pub mod ai;
 #[cfg(feature = "enterprise")]
 pub mod alert_calibration;
+#[cfg(feature = "enterprise")]
+pub(crate) mod alert_grants;
 pub mod alerts;
 #[cfg(feature = "enterprise")]
 pub mod annotation_queues;
@@ -26,6 +28,8 @@ pub mod announcements;
 #[cfg(feature = "enterprise")]
 pub mod anomaly_detection;
 pub mod authz;
+#[cfg(feature = "enterprise")]
+pub mod autoobserve;
 #[cfg(feature = "cloud")]
 pub mod cloud;
 pub mod dashboards;

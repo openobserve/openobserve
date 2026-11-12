@@ -17,10 +17,13 @@ use common::infra::config::{ORG_INGESTION_TOKENS, ROOT_USER};
 use config::meta::cluster::get_internal_grpc_token;
 use db::{org_users::get_cached_user_org, user::is_root_user};
 use http_auth_basic::Credentials;
-use infra::table::org_ingestion_tokens::ORG_INGESTION_TOKEN_PREFIX;
+use infra::table::org_ingestion_tokens::{ORG_INGESTION_TOKEN_PREFIX, is_writer_token_name};
 #[cfg(test)]
 use openobserve_core::auth::get_hash;
-use openobserve_core::auth::try_get_hash;
+use openobserve_core::{
+    auth::try_get_hash,
+    ingestion::feature_writer::{FeatureWriter, WRITER_METADATA_KEY},
+};
 use tonic::{
     Request, Status,
     metadata::{MetadataMap, MetadataValue},
@@ -46,6 +49,33 @@ pub fn check_internal_auth(req: Request<()>) -> Result<Request<()>, Status> {
     } else {
         Err(Status::unauthenticated("No valid auth token[6]"))
     }
+}
+
+/// Authenticate the internal ingest RPC: the internal token, or a feature writer's own org token.
+pub fn check_ingest_auth(mut req: Request<()>) -> Result<Request<()>, Status> {
+    req.metadata_mut().remove(WRITER_METADATA_KEY);
+    let token = auth_token(req.metadata())?;
+    if is_internal_token(token) {
+        return Ok(req);
+    }
+    let Some(writer) = feature_writer_of(req.metadata(), token) else {
+        return Err(Status::unauthenticated("No valid auth token[7]"));
+    };
+    // The handler holds a writer to its own stream; a user identity would skip that check.
+    req.metadata_mut().remove("user_id");
+    req.metadata_mut().insert(
+        WRITER_METADATA_KEY,
+        MetadataValue::from_static(writer.token_name()),
+    );
+    Ok(req)
+}
+
+/// The password of the request's Basic credential, which for a writer is its token.
+pub(crate) fn basic_password(metadata: &MetadataMap) -> Option<String> {
+    let header = metadata.get("authorization")?.to_str().ok()?;
+    Credentials::from_header(header.to_string())
+        .ok()
+        .map(|c| c.password)
 }
 
 fn check_auth_inner(
@@ -89,7 +119,11 @@ fn check_auth_inner(
     let user_id = credentials.user_id;
     if allow_org_ingestion_token && credentials.password.starts_with(ORG_INGESTION_TOKEN_PREFIX) {
         let cache_key = db::org_ingestion_tokens::cache_key(org_id, &credentials.password);
-        if ORG_INGESTION_TOKENS.contains_key(&cache_key) {
+        // A feature writer's token is good only for its own stream, over the ingest RPC.
+        let is_writer = ORG_INGESTION_TOKENS
+            .get(&cache_key)
+            .map(|name| is_writer_token_name(name.value()));
+        if is_writer == Some(false) {
             return attach_user_id(req, &user_id);
         }
         return Err(Status::unauthenticated("No valid auth token[5]"));
@@ -130,6 +164,21 @@ fn auth_token(metadata: &MetadataMap) -> Result<&str, Status> {
         return Err(Status::unauthenticated("No valid auth token[2]"));
     }
     Ok(token)
+}
+
+/// The feature writer whose enabled token this is, in the org that writer's token lives in.
+fn feature_writer_of(metadata: &MetadataMap, token: &str) -> Option<FeatureWriter> {
+    let org_id = metadata
+        .get(&config::get_config().grpc.org_header_key)?
+        .to_str()
+        .ok()?;
+    let credentials = Credentials::from_header(token.to_string()).ok()?;
+    if !credentials.password.starts_with(ORG_INGESTION_TOKEN_PREFIX) {
+        return None;
+    }
+    let cache_key = db::org_ingestion_tokens::cache_key(org_id, &credentials.password);
+    let writer = FeatureWriter::from_token_name(ORG_INGESTION_TOKENS.get(&cache_key)?.value())?;
+    (writer.token_org(org_id) == org_id).then_some(writer)
 }
 
 fn is_internal_token(token: &str) -> bool {
@@ -583,5 +632,127 @@ pub(crate) mod tests {
         let status =
             check_auth(basic_request("auth-sso", "sso@example.com", "anything")).unwrap_err();
         assert_eq!(status.code(), tonic::Code::Unauthenticated);
+    }
+
+    /// A request carrying `token` as Basic credentials of `user`, for `org_id`.
+    fn writer_request(org_id: &str, user: &str, token: &str) -> tonic::Request<()> {
+        basic_request(org_id, user, token)
+    }
+
+    fn writer_header(request: &tonic::Request<()>) -> Option<String> {
+        request
+            .metadata()
+            .get(WRITER_METADATA_KEY)
+            .map(|v| v.to_str().unwrap().to_string())
+    }
+
+    #[test]
+    fn ingest_auth_accepts_a_writer_token_and_marks_it() {
+        let key = db::org_ingestion_tokens::cache_key("demo-org", "o2oi_w_accept");
+        ORG_INGESTION_TOKENS.insert(key.clone(), "_o2_alert_calibration".to_string());
+        let mut request = writer_request(
+            "demo-org",
+            "alert_calibration@system.local",
+            "o2oi_w_accept",
+        );
+        request
+            .metadata_mut()
+            .insert("user_id", "someone@example.com".parse().unwrap());
+        let request = check_ingest_auth(request).unwrap();
+        assert_eq!(
+            writer_header(&request).as_deref(),
+            Some("_o2_alert_calibration")
+        );
+        assert!(
+            user_ids(&request).is_empty(),
+            "a writer token carried a user identity"
+        );
+        ORG_INGESTION_TOKENS.remove(&key);
+    }
+
+    #[test]
+    fn ingest_auth_refuses_a_customer_ingestion_token() {
+        let key = db::org_ingestion_tokens::cache_key("demo-org", "o2oi_c_refuse");
+        ORG_INGESTION_TOKENS.insert(key.clone(), "ci-collector".to_string());
+        let request = writer_request("demo-org", "collector@example.com", "o2oi_c_refuse");
+        let status = check_ingest_auth(request).unwrap_err();
+        assert_eq!(status.code(), tonic::Code::Unauthenticated);
+        ORG_INGESTION_TOKENS.remove(&key);
+    }
+
+    #[test]
+    fn ingest_auth_refuses_the_autoobserve_token_outside_meta() {
+        let key = db::org_ingestion_tokens::cache_key("demo-org", "o2oi_ao_outside");
+        ORG_INGESTION_TOKENS.insert(key.clone(), "_o2_autoobserve".to_string());
+        let request = writer_request("demo-org", "autoobserve@system.local", "o2oi_ao_outside");
+        assert!(check_ingest_auth(request).is_err());
+        ORG_INGESTION_TOKENS.remove(&key);
+    }
+
+    #[test]
+    fn ingest_auth_strips_a_forged_writer_header() {
+        let key = db::org_ingestion_tokens::cache_key("demo-org", "o2oi_c_forged");
+        ORG_INGESTION_TOKENS.insert(key.clone(), "ci-collector".to_string());
+        let mut request = writer_request("demo-org", "collector@example.com", "o2oi_c_forged");
+        request.metadata_mut().insert(
+            WRITER_METADATA_KEY,
+            "_o2_alert_calibration".parse().unwrap(),
+        );
+        let status = check_ingest_auth(request).unwrap_err();
+        assert_eq!(status.code(), tonic::Code::Unauthenticated);
+        ORG_INGESTION_TOKENS.remove(&key);
+
+        cache_instance_id("instance");
+        let mut request = tonic::Request::new(());
+        request
+            .metadata_mut()
+            .insert("authorization", get_internal_grpc_token().parse().unwrap());
+        request.metadata_mut().insert(
+            WRITER_METADATA_KEY,
+            "_o2_alert_calibration".parse().unwrap(),
+        );
+        let request = check_ingest_auth(request).unwrap();
+        assert_eq!(writer_header(&request), None);
+    }
+
+    #[test]
+    fn a_disabled_writer_token_stops_the_write() {
+        let key = db::org_ingestion_tokens::cache_key("demo-org", "o2oi_w_disabled");
+        ORG_INGESTION_TOKENS.insert(key.clone(), "_o2_alert_calibration".to_string());
+        let request = || {
+            writer_request(
+                "demo-org",
+                "alert_calibration@system.local",
+                "o2oi_w_disabled",
+            )
+        };
+        assert!(check_ingest_auth(request()).is_ok());
+        // What the org_ingestion_tokens watch does when the token is disabled.
+        ORG_INGESTION_TOKENS.remove(&key);
+        let status = check_ingest_auth(request()).unwrap_err();
+        assert_eq!(status.code(), tonic::Code::Unauthenticated);
+    }
+
+    #[test]
+    fn writer_tokens_are_refused_on_otlp() {
+        let key = db::org_ingestion_tokens::cache_key("demo-org", "o2oi_w_otlp");
+        ORG_INGESTION_TOKENS.insert(key.clone(), "_o2_alert_calibration".to_string());
+        let request = writer_request("demo-org", "alert_calibration@system.local", "o2oi_w_otlp");
+        let status = check_otlp_auth(request).unwrap_err();
+        assert_eq!(status.code(), tonic::Code::Unauthenticated);
+        ORG_INGESTION_TOKENS.remove(&key);
+    }
+
+    #[test]
+    fn the_other_node_services_still_refuse_a_writer_token() {
+        let key = db::org_ingestion_tokens::cache_key("demo-org", "o2oi_w_internal");
+        ORG_INGESTION_TOKENS.insert(key.clone(), "_o2_alert_calibration".to_string());
+        let request = writer_request(
+            "demo-org",
+            "alert_calibration@system.local",
+            "o2oi_w_internal",
+        );
+        assert!(check_internal_auth(request).is_err());
+        ORG_INGESTION_TOKENS.remove(&key);
     }
 }

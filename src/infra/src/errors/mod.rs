@@ -256,6 +256,8 @@ pub enum ErrorCodes {
     InvalidParams(String),
     RatelimitExceeded(String),
     SearchHistogramNotAvailable(String),
+    /// The stream holds internal records that only their own API reads; carries the stream.
+    SearchStreamProtected(String),
     /// The o2-ai replica holding a conversation is unreachable; carries the
     /// session id. Recoverable — the UI restores it into a fresh session.
     AiSessionOwnerUnavailable(String),
@@ -345,7 +347,7 @@ impl ErrorCodes {
             ErrorCodes::SearchCancelQuery(_) | ErrorCodes::RatelimitExceeded(_) => 429,
             ErrorCodes::SearchTimeout(_) => 408,
             ErrorCodes::AiSessionOwnerUnavailable(_) | ErrorCodes::AiChatSessionBusy(_) => 409,
-            ErrorCodes::LicenseFeatureNotEntitled(_) => 403,
+            ErrorCodes::LicenseFeatureNotEntitled(_) | ErrorCodes::SearchStreamProtected(_) => 403,
             ErrorCodes::ServerInternalError(_) | ErrorCodes::SearchParquetFileNotFound => 500,
             ErrorCodes::InvalidParams(_)
             | ErrorCodes::SearchSQLExecuteError(_)
@@ -375,6 +377,7 @@ impl ErrorCodes {
             ErrorCodes::InvalidParams(_) => 20011,
             ErrorCodes::RatelimitExceeded(_) => 20012,
             ErrorCodes::SearchHistogramNotAvailable(_) => 20013,
+            ErrorCodes::SearchStreamProtected(_) => 20014,
             ErrorCodes::AiSessionOwnerUnavailable(_) => 30001,
             ErrorCodes::AiChatSessionBusy(_) => 30002,
             ErrorCodes::LicenseFeatureNotEntitled(_) => 40001,
@@ -406,6 +409,9 @@ impl ErrorCodes {
             ErrorCodes::RatelimitExceeded(_) => "Ratelimit exceeded".to_string(),
             ErrorCodes::SearchHistogramNotAvailable(_) => {
                 "Search histogram not available".to_string()
+            }
+            ErrorCodes::SearchStreamProtected(stream) => {
+                format!("Stream {stream} holds internal records and cannot be searched")
             }
             ErrorCodes::AiSessionOwnerUnavailable(_) => {
                 "The replica serving this conversation is unavailable".to_string()
@@ -442,6 +448,7 @@ impl ErrorCodes {
             ErrorCodes::InvalidParams(msg) => msg.to_owned(),
             ErrorCodes::RatelimitExceeded(msg) => msg.to_owned(),
             ErrorCodes::SearchHistogramNotAvailable(msg) => msg.to_owned(),
+            ErrorCodes::SearchStreamProtected(stream) => stream.to_owned(),
             ErrorCodes::AiSessionOwnerUnavailable(session_id) => session_id.to_owned(),
             ErrorCodes::AiChatSessionBusy(session_id) => session_id.to_owned(),
             ErrorCodes::LicenseFeatureNotEntitled(features) => features.to_owned(),
@@ -464,6 +471,7 @@ impl ErrorCodes {
             ErrorCodes::InvalidParams(msg) => msg.to_owned(),
             ErrorCodes::RatelimitExceeded(msg) => msg.to_owned(),
             ErrorCodes::SearchHistogramNotAvailable(msg) => msg.to_owned(),
+            ErrorCodes::SearchStreamProtected(_) => "".to_string(),
             ErrorCodes::AiSessionOwnerUnavailable(session_id) => session_id.to_owned(),
             ErrorCodes::AiChatSessionBusy(session_id) => session_id.to_owned(),
             ErrorCodes::LicenseFeatureNotEntitled(features) => features.to_owned(),
@@ -519,6 +527,7 @@ impl ErrorCodes {
             20011 => Ok(ErrorCodes::InvalidParams(message)),
             20012 => Ok(ErrorCodes::RatelimitExceeded(message)),
             20013 => Ok(ErrorCodes::SearchHistogramNotAvailable(message)),
+            20014 => Ok(ErrorCodes::SearchStreamProtected(message)),
             30001 => Ok(ErrorCodes::AiSessionOwnerUnavailable(message)),
             30002 => Ok(ErrorCodes::AiChatSessionBusy(message)),
             40001 => Ok(ErrorCodes::LicenseFeatureNotEntitled(message)),
@@ -616,6 +625,27 @@ mod tests {
             "Features not included in your license: Real User Monitoring, not_a_feature"
         );
         assert_eq!(err.get_error_detail(), "rum, not_a_feature");
+    }
+
+    #[test]
+    fn a_protected_stream_refusal_is_a_403_with_its_own_code() {
+        let err = ErrorCodes::SearchStreamProtected("s".into());
+        assert_eq!(err.http_status(), 403);
+        assert_eq!(
+            Error::ErrorCode(ErrorCodes::SearchStreamProtected("s".into())).http_status(),
+            403
+        );
+        assert_eq!(err.get_code(), 20014);
+        assert_eq!(err.get_inner_message(), "s");
+        assert_eq!(err.get_error_detail(), "");
+        assert_eq!(
+            err.get_message(),
+            "Stream s holds internal records and cannot be searched"
+        );
+        match ErrorCodes::from_json(&err.to_json()).unwrap() {
+            ErrorCodes::SearchStreamProtected(stream) => assert_eq!(stream, "s"),
+            other => panic!("round trip lost the variant: {other:?}"),
+        }
     }
 
     #[test]

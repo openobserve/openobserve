@@ -188,6 +188,33 @@ describe("useOrgCredential", () => {
     expect(passcode()).toBe(TOKEN_A.token);
   });
 
+  it("never offers an _o2_ token to the snippet picker or publishes one", async () => {
+    const SYSTEM = {
+      name: "_o2_alert_calibration",
+      token: "org-token-sys",
+      enabled: true,
+      created_by: "system",
+    };
+    const cases = [
+      { list: [SYSTEM], offered: [], published: "user-passcode" },
+      { list: [SYSTEM, TOKEN_A, TOKEN_B], offered: ["default", "ci"], published: TOKEN_A.token },
+      { list: [TOKEN_A], offered: ["default"], published: TOKEN_A.token },
+    ];
+    for (const { list, offered, published } of cases) {
+      queryClient.clear();
+      store = makeStore();
+      api.list_org_ingestion_tokens.mockResolvedValue({ data: { data: list } });
+      const credential = consumer();
+      await settle();
+      const names = (store.state.organizationData.orgTokens as { name: string }[]).map(
+        (t) => t.name,
+      );
+      expect(names).toEqual(offered);
+      expect(passcode()).toBe(published);
+      expect(credential.ready.value).toBe(true);
+    }
+  });
+
   it("starts afresh for another org", async () => {
     const credential = consumer();
     await settle();

@@ -1148,6 +1148,8 @@ pub struct ApiDoc;
     openobserve_api_management::request::security::sigma::compile,
     openobserve_api_management::request::security::sigma::get_mitre_coverage,
     openobserve_api_management::request::security::sigma::get_detection_evidence,
+    openobserve_api_management::request::slack::insights::get_insights_settings,
+    openobserve_api_management::request::slack::insights::put_insights_settings,
     openobserve_api_management::request::prompts::list_prompts,
     openobserve_api_management::request::prompts::create_prompt,
     openobserve_api_management::request::prompts::match_prompts,
@@ -1216,6 +1218,9 @@ pub struct ApiDoc;
     openobserve_api_management::request::alert_calibration::digests::list_runs_for_alert,
     openobserve_api_management::request::alert_calibration::digests::get_run_records,
     openobserve_api_management::request::alert_calibration::digests::count_findings_by_rule,
+    openobserve_api_management::request::alert_calibration::dismissals::list_dismissals,
+    openobserve_api_management::request::alert_calibration::dismissals::dismiss_finding,
+    openobserve_api_management::request::alert_calibration::dismissals::reopen_dismissal,
     openobserve_api_management::request::db_monitoring::handler::get_dbm_deadlocks,
     openobserve_api_management::request::db_monitoring::handler::get_dbm_blocking,
     openobserve_api_management::request::db_monitoring::handler::get_dbm_table_health,
@@ -1432,6 +1437,25 @@ pub struct ApiDoc;
     openobserve_core::traces::agent_signals::api::compare_agent_versions,
     openobserve_core::traces::agent_signals::api::get_agent_signals,
     openobserve_core::traces::service_graph::api::get_edge_history,
+    openobserve_api_management::request::autoobserve::entity_types,
+    openobserve_api_management::request::autoobserve::coverage,
+    openobserve_api_management::request::autoobserve::coverage_history,
+    openobserve_api_management::request::autoobserve::suggestions,
+    openobserve_api_management::request::autoobserve::decisions::preview_decision,
+    openobserve_api_management::request::autoobserve::decisions::decide,
+    openobserve_api_management::request::autoobserve::decisions::undo_decision,
+    openobserve_api_management::request::autoobserve::decisions::list_decisions,
+    openobserve_api_management::request::autoobserve::list_marks,
+    openobserve_api_management::request::autoobserve::put_mark,
+    openobserve_api_management::request::autoobserve::delete_mark,
+    openobserve_api_management::request::autoobserve::incidents::list_incidents,
+    openobserve_api_management::request::autoobserve::review::get_review,
+    openobserve_api_management::request::autoobserve::review::put_verdict,
+    openobserve_api_management::request::autoobserve::paging::get_paging_settings,
+    openobserve_api_management::request::autoobserve::paging::put_paging_settings,
+))]
+#[openapi(tags(
+    (name = "AutoObserve", description = "Monitoring coverage, suggestions and entity marks from the AutoObserve engine (enterprise)"),
 ))]
 #[openapi(components(schemas(
     openobserve_api_management::models::experiments::ExperimentResultRowSortBody,
@@ -1510,7 +1534,14 @@ pub struct SecurityAddon;
 impl Modify for SecurityAddon {
     fn modify(&self, openapi: &mut utoipa::openapi::OpenApi) {
         #[cfg(feature = "enterprise")]
-        overlay_doc(openapi, EnterpriseExperimentApiDoc::openapi());
+        {
+            let mut enterprise = EnterpriseExperimentApiDoc::openapi();
+            openapi
+                .tags
+                .get_or_insert_with(Vec::new)
+                .extend(enterprise.tags.take().unwrap_or_default());
+            overlay_doc(openapi, enterprise);
+        }
         #[cfg(all(feature = "enterprise", not(feature = "cloud")))]
         overlay_doc(openapi, WorkflowHttpTriggerApiDoc::openapi());
         #[cfg(feature = "cloud")]
@@ -2213,6 +2244,80 @@ mod tests {
         }
     }
 
+    #[cfg(not(feature = "enterprise"))]
+    #[test]
+    fn a_build_without_enterprise_publishes_no_autoobserve_path_or_tag() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let paths: Vec<&String> = spec["paths"]
+            .as_object()
+            .unwrap()
+            .keys()
+            .filter(|p| p.contains("autoobserve"))
+            .collect();
+        assert!(paths.is_empty(), "{paths:?}");
+        let tags = spec["tags"].to_string();
+        assert!(!tags.contains("AutoObserve"), "{tags}");
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn autoobserve_paths_are_rate_limited_mcp_tagged_and_delete_has_no_body() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let tags = spec["tags"].as_array().unwrap();
+        assert!(tags.iter().any(|t| t["name"] == "AutoObserve"), "{tags:?}");
+        let paths = &spec["paths"];
+        let mark = "/api/v2/{org_id}/autoobserve/marks/{mark}/{entity_type}/{entity_id}";
+        let base = "/api/v2/{org_id}/autoobserve";
+        for (path, method, operation) in [
+            (format!("{base}/entity_types"), "get", "list"),
+            (format!("{base}/coverage"), "get", "get"),
+            (format!("{base}/coverage/history"), "get", "list"),
+            (format!("{base}/suggestions"), "get", "list"),
+            (format!("{base}/incidents"), "get", "list"),
+            (format!("{base}/marks"), "get", "list"),
+            (mark.to_string(), "put", "update"),
+            (mark.to_string(), "delete", "delete"),
+            (format!("{base}/review"), "get", "list"),
+            (
+                format!("{base}/review/{{decision_kind}}/{{cohort_id}}"),
+                "put",
+                "update",
+            ),
+        ] {
+            let op = &paths[path.as_str()][method];
+            assert_eq!(
+                op["x-o2-ratelimit"]["module"], "AutoObserve",
+                "{method} {path}"
+            );
+            assert_eq!(
+                op["x-o2-ratelimit"]["operation"], operation,
+                "{method} {path}"
+            );
+            assert_eq!(op["x-o2-mcp"]["category"], "autoobserve", "{method} {path}");
+            let responses = &op["responses"];
+            assert_eq!(
+                responses["403"]["description"], "Forbidden",
+                "{method} {path}"
+            );
+            assert!(
+                responses["404"]["description"]
+                    .as_str()
+                    .is_some_and(|d| d.contains("disabled")),
+                "{method} {path}: a switched-off deployment is a 404"
+            );
+        }
+        let delete = &paths[mark]["delete"];
+        assert_eq!(delete["x-o2-mcp"]["requires_confirmation"], true);
+        assert!(delete.get("requestBody").is_none(), "{delete}");
+        let params = delete["parameters"].as_array().unwrap();
+        assert!(
+            params
+                .iter()
+                .any(|p| p["name"] == "group_key" && p["in"] == "query"),
+            "{params:?}"
+        );
+    }
+
     #[test]
     fn slack_paths_are_rate_limited_and_hidden_from_mcp() {
         let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
@@ -2243,6 +2348,13 @@ mod tests {
             .iter()
             .map(|(m, p)| (m.to_string(), p.to_string()))
             .collect();
+        #[cfg(feature = "enterprise")]
+        want.extend(["get", "put"].map(|m| {
+            (
+                m.to_string(),
+                "/api/{org_id}/slack/insights-settings".to_string(),
+            )
+        }));
         want.sort();
         assert_eq!(documented, want);
     }

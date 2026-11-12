@@ -198,13 +198,14 @@ vi.mock("@/composables/useStreams", () => ({
 // Mock vue-router
 // ---------------------------------------------------------------------------
 const mockRouterPush = vi.fn();
+const routeQuery = vi.hoisted(() => ({}) as Record<string, string>);
 vi.mock("vue-router", async () => {
   const actual: any = await vi.importActual("vue-router");
   return {
     ...actual,
     useRouter: () => ({
       push: mockRouterPush,
-      currentRoute: { value: { query: {} } },
+      currentRoute: { value: { query: routeQuery } },
     }),
   };
 });
@@ -3326,6 +3327,17 @@ describe("ServicesCatalog", () => {
       expect(wrapper.vm.rowsPerPage).toBe(50);
       expect(wrapper.vm.sortBy).toBe("service_name");
       expect(wrapper.vm.sortOrder).toBe("asc");
+    });
+
+    it("opens filtered to the service a link names (T2-7)", () => {
+      useListViewState("servicesCatalog", { filterText: "pay" });
+      routeQuery.service = "svc-a";
+      try {
+        wrapper = mountServicesCatalog();
+        expect(wrapper.vm.filterText).toBe("svc-a");
+      } finally {
+        delete routeQuery.service;
+      }
     });
 
     it("saves changes to the view state", async () => {

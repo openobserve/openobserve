@@ -233,6 +233,7 @@ async function mountView({
         AlertGroupChart: true,
         AlertGroupsTable: true,
         AlertConfigSummary: true,
+        AlertCalibrationHeadroomCard: true,
         AnomalyDetectionChart: true,
         AlertHeaderActions: true,
       },
@@ -570,6 +571,41 @@ describe("AlertDetail — History tab", () => {
         false,
       );
     });
+  });
+});
+
+describe("AlertDetail — alert calibration headroom", () => {
+  let wrapper: VueWrapper;
+
+  beforeEach(() => vi.clearAllMocks());
+  afterEach(() => {
+    wrapper?.unmount();
+  });
+
+  const configuration = async (alert: Record<string, unknown>) => {
+    wrapper = await mountView({ alert });
+    (wrapper.vm as any).activeTab = "configuration";
+    await flushPromises();
+    return wrapper;
+  };
+
+  it("alert_detail_puts_headroom_last_in_configuration", async () => {
+    const scheduled = await configuration(makeSimpleAlert());
+    const summary = scheduled.find("alert-config-summary-stub");
+    const card = scheduled.find("alert-calibration-headroom-card-stub");
+    expect(card.exists()).toBe(true);
+    expect(scheduled.findComponent({ name: "AlertCalibrationHeadroomCard" }).props("alertId")).toBe(
+      "alert-1",
+    );
+    expect(summary.element.nextElementSibling).toBe(card.element);
+    expect(card.element.nextElementSibling).toBeNull();
+    scheduled.unmount();
+
+    for (const alert of [makeCompositeAlert(), makeAnomalyAlert()]) {
+      const other = await configuration(alert);
+      expect(other.find("alert-calibration-headroom-card-stub").exists()).toBe(false);
+      other.unmount();
+    }
   });
 });
 

@@ -276,8 +276,8 @@ const SEARCH_IMPORT: &str = r"\buse [^;]*\b(?:search|search_service|SearchServic
 
 /// Every production fn that calls a search entry point, as (file, fn), and how it is licence-gated.
 #[rustfmt::skip]
-const SEARCH_CALLERS: [(&str, &str, Caller); 73] = [
-    ("api/management/src/request/alert_calibration/digests.rs", "read", Caller::Operational),
+const SEARCH_CALLERS: [(&str, &str, Caller); 75] = [
+    ("api/management/src/request/alert_calibration/digests.rs", "search_at", Caller::Operational),
     ("api/management/src/request/alerts/history.rs", "get_alert_history", Caller::Exempt("the org's own alert and anomaly run history; its routes stay open")),
     ("api/management/src/request/alerts/history.rs", "get_all_anomaly_history", Caller::Exempt("the org's own alert and anomaly run history; its routes stay open")),
     ("api/management/src/request/alerts/history_summary.rs", "get_alert_history_summary", Caller::Exempt("the org's own alert and anomaly run history; its routes stay open")),
@@ -330,6 +330,8 @@ const SEARCH_CALLERS: [(&str, &str, Caller); 73] = [
     ("core/src/anomaly_detection.rs", "execute_anomaly_query", Caller::Background("anomaly detection runs")),
     ("core/src/anomaly_detection/partitioned_search.rs", "plan", Caller::Background("anomaly detection runs")),
     ("core/src/anomaly_detection/partitioned_search.rs", "search", Caller::Background("anomaly detection runs")),
+    ("core/src/autoobserve/ports.rs", "promql", Caller::Background("AutoObserve engine runs")),
+    ("core/src/autoobserve/ports.rs", "search", Caller::Background("AutoObserve engine runs")),
     ("core/src/db_monitoring/rollup.rs", "run_dbm_search", Caller::Background("DBM rollup")),
     ("core/src/downtimes/values.rs", "run_search", Caller::Routed("downtimes::")),
     ("core/src/fleet.rs", "instant", Caller::Helper("fleet pipelines; request/fleet/mod.rs checks the licence")),

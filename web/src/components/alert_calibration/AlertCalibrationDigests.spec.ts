@@ -19,7 +19,10 @@ import { createMemoryHistory, createRouter } from "vue-router";
 import store from "@/test/unit/helpers/store";
 import { queryClient } from "@/composables/query/queryClient";
 import alertCalibration from "@/services/alert_calibration";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 import AlertCalibrationDigests from "./AlertCalibrationDigests.vue";
+import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
+import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import type { RunRow } from "./digests";
 import analytics from "@/services/product_analytics";
 
@@ -64,6 +67,11 @@ const run = (windowEnd: number, emittedAt: number, findings: number): RunRow => 
   coverage_error_clusters_unattributed: 0,
   coverage_stream_substrate_empty: false,
 });
+
+const serverError = (status: number, data: unknown) =>
+  Object.assign(new Error(`Request failed with status code ${status}`), {
+    response: { status, data },
+  });
 
 const mountPage = async () => {
   const router = createRouter({
@@ -123,6 +131,17 @@ describe("AlertCalibrationDigests", () => {
     vi.mocked(alertCalibration.getStatus).mockResolvedValue({ data: { last_run: null } } as never);
   });
 
+  it("the_schedule_stat_reads_as_a_phrase_and_stays_neutral_because_it_is_a_setting", async () => {
+    vi.mocked(alertCalibration.readDigests).mockResolvedValue([] as never);
+    const wrapper = await mountPage();
+    const items = wrapper.findComponent(OStatStrip).props("items") as StatItem[];
+    const schedule = items.find((item) => item.key === "schedule")!;
+    expect(`${schedule.value} ${schedule.label}`).toBe("1 day between runs");
+    expect(schedule.sub).toBeUndefined();
+    expect(schedule.tone ?? "neutral").toBe("neutral");
+    wrapper.unmount();
+  });
+
   it("lists a run pulled twice once, as its newest emission", async () => {
     vi.mocked(alertCalibration.readDigests).mockResolvedValue([
       run(NOW - DAY_MICROS, NOW - 100, 3),
@@ -162,6 +181,29 @@ describe("AlertCalibrationDigests", () => {
     wrapper.unmount();
   });
 
+  it("a_reader_without_access_sees_no_access_not_a_failure", async () => {
+    vi.mocked(alertCalibration.readDigests).mockRejectedValue(
+      serverError(403, { message: "Unauthorized Access" }),
+    );
+    const wrapper = await mountPage();
+    const notice = wrapper.find('[data-test="alert-calibration-digests-error"]');
+    expect(notice.text()).toContain("You don't have access to Alert calibration");
+    expect(notice.find('[data-test="alert-calibration-digests-retry"]').exists()).toBe(false);
+    expect(wrapper.text()).not.toContain("Runs unavailable");
+    wrapper.unmount();
+  });
+
+  it("a failed runs read shows the plain error copy, never the server's words", async () => {
+    vi.mocked(alertCalibration.readDigests).mockRejectedValue(serverError(500, "internal"));
+    const wrapper = await mountPage();
+    expect(wrapper.text()).toContain("Couldn't load runs");
+    expect(wrapper.text()).toContain(
+      "Something went wrong while loading them. Try again in a moment.",
+    );
+    expect(wrapper.text()).not.toContain("internal");
+    wrapper.unmount();
+  });
+
   it("opens a run by its window", async () => {
     const latest = run(NOW - DAY_MICROS, NOW - 100, 1);
     vi.mocked(alertCalibration.readDigests).mockResolvedValue([latest]);
@@ -192,5 +234,41 @@ describe("AlertCalibrationDigests", () => {
     const page = await mountPage();
     expect(page.router.currentRoute.value.name).toBe("alertList");
     page.unmount();
+  });
+
+  it("a scoped run hides View in Logs and the org count: its list row is never Clean", async () => {
+    const clean = { ...run(NOW - 2 * DAY_MICROS, NOW - 300, 0), skip_count: 0 };
+    const scoped: RunRow = {
+      ...clean,
+      window_end: NOW - DAY_MICROS,
+      emitted_at: NOW - 100,
+      alerts_in_scope: null,
+      visibility: "scoped",
+    };
+    vi.mocked(alertCalibration.readDigests).mockResolvedValue([scoped, clean]);
+    const wrapper = await mountPage();
+    const rows = wrapper.findAll("tbody tr");
+    expect(rows[0].text()).toContain("None found");
+    expect(rows[0].text()).not.toContain("Clean");
+    expect(rows[1].text()).toContain("Clean");
+    wrapper.unmount();
+  });
+
+  it("a scoped run whose counts are not ready yet is pending in amber, never None found", async () => {
+    const pending: RunRow = {
+      ...run(NOW - DAY_MICROS, NOW - 100, 0),
+      finding_count: null,
+      skip_count: null,
+      alerts_in_scope: null,
+      visibility: "scoped",
+    };
+    vi.mocked(alertCalibration.readDigests).mockResolvedValue([pending]);
+    const wrapper = await mountPage();
+    const row = wrapper.findAll("tbody tr")[0];
+    expect(row.text()).toContain("Pending");
+    expect(row.text()).not.toContain("None found");
+    const badge = wrapper.findAllComponents(OBadge).find((b) => b.text() === "Pending");
+    expect(badge?.props("variant")).toBe("warning-soft");
+    wrapper.unmount();
   });
 });

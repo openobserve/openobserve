@@ -87,8 +87,8 @@ impl JsonColumnar {
         if settings.partition_keys.iter().any(|key| !key.disabled) {
             return None;
         }
-        // The protected chat stream evaluates no realtime alerts, so cached ones do not apply.
-        if !config::meta::self_reporting::ai_chat::is_protected_ai_chat_stream(stream_name) {
+        // A protected stream evaluates no realtime alerts, so cached ones do not apply.
+        if !config::meta::self_reporting::protected_streams::is_read_protected_stream(stream_name) {
             let mut alerts = HashMap::new();
             crate::ingestion::get_stream_alerts(
                 &[StreamParams::new(org_id, stream_name, StreamType::Logs)],

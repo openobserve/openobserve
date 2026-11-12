@@ -7,6 +7,8 @@ import destinationService from "@/services/alert_destination";
 import alertsService from "@/services/alerts";
 import templateService from "@/services/alert_templates";
 import { queryClient } from "@/composables/query/queryClient";
+import { fenceAlertWrite } from "@/services/alerts.readFence";
+import { alertKeys } from "@/services/alerts.querykeys";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import {
   readEditorDraft,
@@ -393,6 +395,44 @@ describe("AddAlertView.vue", () => {
       resolveAlert({ data: { name: "my-alert" } });
       await flushPromises();
       expect(wrapper.find(".add-alert-stub").exists()).toBe(true);
+    });
+
+    it("an alert read answered after an AutoObserve Apply or Undo is read again, so the form gets the new values (F2)", async () => {
+      vi.mocked(destinationService.list).mockResolvedValue({ data: [{ id: 1 }] } as any);
+      let answerLate: (value: any) => void = () => {};
+      vi.mocked(alertsService.get_by_alert_id)
+        .mockReturnValueOnce(new Promise((resolve) => (answerLate = resolve)) as any)
+        .mockResolvedValue({
+          data: { name: "my-alert", trigger_condition: { period: 15 } },
+        } as any);
+      await router.push({ name: "editAlert", params: { alert_id: "alert-1" } });
+      const wrapper = mount(AddAlertView, {
+        global: { plugins: [store, router], stubs: { AddAlert: AddAlertStub } },
+      });
+      await flushPromises();
+      await fenceAlertWrite(queryClient, "test-org", async () => "undone");
+      answerLate({ data: { name: "my-alert", trigger_condition: { period: 5 } } });
+      await flushPromises();
+      const seeded = wrapper.findComponent(AddAlertStub).props("modelValue") as any;
+      expect(seeded.trigger_condition.period).toBe(15);
+      expect(toast).not.toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
+    });
+
+    it("an alert that keeps changing while it loads shows the load failure, never an older copy (F2)", async () => {
+      vi.mocked(destinationService.list).mockResolvedValue({ data: [{ id: 1 }] } as any);
+      const key = alertKeys.detail("test-org", "alert-1");
+      queryClient.setQueryData(key, { name: "my-alert", version: 0 });
+      await queryClient.invalidateQueries({ queryKey: key, refetchType: "none" });
+      let version = 0;
+      vi.mocked(alertsService.get_by_alert_id).mockImplementation((() => {
+        version += 1;
+        void fenceAlertWrite(queryClient, "test-org", async () => "applied");
+        return Promise.resolve({ data: { name: "my-alert", version } });
+      }) as any);
+      const wrapper = await mountEditing();
+      await flushPromises();
+      expect(wrapper.find(".add-alert-stub").exists()).toBe(false);
+      expect(toast).toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
     });
 
     it("sends the user back to the list when the alert cannot be loaded", async () => {

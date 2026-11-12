@@ -1,0 +1,183 @@
+{
+  "paging": true,
+  "has_more": true,
+  "items": [
+    {
+      "finding": {
+        "id": "1111111111111111111111111111111111111111111111111111111111111111",
+        "kind": "stream_silence",
+        "stream_type": "logs",
+        "stream_name": "checkout",
+        "first_seen_at": 1762300000000000
+      },
+      "incident": {
+        "id": "inc-0001",
+        "status": "open",
+        "severity": "P2",
+        "title": "checkout (logs) stopped sending data",
+        "created_at": 1762300060000000
+      },
+      "investigation": {
+        "run_id": "run-0001",
+        "state": "running",
+        "outcome": null,
+        "summary": {
+          "stage": "gather",
+          "stage_index": 2,
+          "stage_count": 7,
+          "steps": 3,
+          "tool_calls": 5,
+          "reusable_steps": null,
+          "steered_by": [],
+          "unblocked_by": null,
+          "detail": null,
+          "deadline_at": null,
+          "cancelled_by": null,
+          "previous": null
+        },
+        "not_run_reason": null
+      }
+    },
+    {
+      "finding": {
+        "id": "2222222222222222222222222222222222222222222222222222222222222222",
+        "kind": "stream_drop",
+        "stream_type": "logs",
+        "stream_name": "payments",
+        "first_seen_at": 1762299000000000
+      },
+      "incident": {
+        "id": "inc-0002",
+        "status": "acknowledged",
+        "severity": "P2",
+        "title": "payments (logs) volume dropped sharply",
+        "created_at": 1762299060000000
+      },
+      "investigation": {
+        "run_id": "run-0002",
+        "state": "failed",
+        "outcome": null,
+        "summary": {
+          "stage": null,
+          "stage_index": null,
+          "stage_count": 7,
+          "steps": 1,
+          "tool_calls": 0,
+          "reusable_steps": 0,
+          "steered_by": [],
+          "unblocked_by": null,
+          "detail": "agent unreachable",
+          "deadline_at": null,
+          "cancelled_by": null,
+          "previous": null
+        },
+        "not_run_reason": null
+      }
+    },
+    {
+      "finding": {
+        "id": "3333333333333333333333333333333333333333333333333333333333333333",
+        "kind": "stream_rise",
+        "stream_type": "logs",
+        "stream_name": "orders",
+        "first_seen_at": 1762298000000000
+      },
+      "incident": {
+        "id": "inc-0003",
+        "status": "resolved",
+        "severity": "P2",
+        "title": "orders (logs) volume rose sharply",
+        "created_at": 1762298060000000
+      },
+      "investigation": {
+        "run_id": "run-0003",
+        "state": "completed",
+        "outcome": "root_cause_identified",
+        "summary": {
+          "stage": null,
+          "stage_index": null,
+          "stage_count": 7,
+          "steps": 7,
+          "tool_calls": 12,
+          "reusable_steps": 7,
+          "steered_by": [],
+          "unblocked_by": null,
+          "detail": null,
+          "deadline_at": null,
+          "cancelled_by": null,
+          "previous": null
+        },
+        "not_run_reason": null
+      }
+    },
+    {
+      "finding": {
+        "id": "4444444444444444444444444444444444444444444444444444444444444444",
+        "kind": "stream_silence",
+        "stream_type": "metrics",
+        "stream_name": "inventory",
+        "first_seen_at": 1762297000000000
+      },
+      "incident": {
+        "id": "inc-0004",
+        "status": "open",
+        "severity": "P2",
+        "title": "inventory (metrics) stopped sending data",
+        "created_at": 1762297060000000
+      },
+      "investigation": {
+        "run_id": null,
+        "state": null,
+        "outcome": null,
+        "summary": null,
+        "not_run_reason": "l0_off"
+      }
+    },
+    {
+      "finding": {
+        "id": "5555555555555555555555555555555555555555555555555555555555555555",
+        "kind": "stream_drop",
+        "stream_type": "logs",
+        "stream_name": "search",
+        "first_seen_at": 1762296000000000
+      },
+      "incident": {
+        "id": "inc-0005",
+        "status": "open",
+        "severity": "P2",
+        "title": "search (logs) volume dropped sharply",
+        "created_at": 1762296060000000
+      },
+      "investigation": {
+        "run_id": null,
+        "state": null,
+        "outcome": null,
+        "summary": null,
+        "not_run_reason": null
+      }
+    },
+    {
+      "finding": {
+        "id": "6666666666666666666666666666666666666666666666666666666666666666",
+        "kind": null,
+        "stream_type": null,
+        "stream_name": null,
+        "first_seen_at": 1762295000000000
+      },
+      "incident": {
+        "id": "inc-0006",
+        "status": "open",
+        "severity": "P2",
+        "title": "shipping (logs) stopped sending data",
+        "created_at": 1762295060000000
+      },
+      "investigation": {
+        "run_id": null,
+        "state": null,
+        "outcome": null,
+        "summary": null,
+        "not_run_reason": null
+      }
+    }
+  ]
+}

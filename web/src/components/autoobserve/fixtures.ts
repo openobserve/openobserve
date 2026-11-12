@@ -15,6 +15,7 @@
 
 import { raw, type I18nKey, type I18nText, type TranslateFn } from "@/types/i18n";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import type { AutoObserveCellState } from "@/services/autoobserve";
 import {
   AUTONOMY,
   DAY_DATE,
@@ -60,6 +61,8 @@ export type PolicyMode = "off" | "suggest" | "auto";
 export type CellState = "watched" | "learning" | "gap" | "na";
 export type Signal =
   "requests" | "errors" | "latency" | "saturation" | "logPatterns" | "dependencies";
+// The engine's own coverage checks; a service is a gap when none of them is covered.
+export type LiveCheck = "errors" | "latency" | "absence";
 
 export interface Evidence {
   kind: "log" | "trace" | "metric";
@@ -203,16 +206,57 @@ export interface CoverageCell {
   stream?: string;
   progress?: [number, number];
   reason?: I18nText;
+  engine?: EngineCellInfo;
+}
+
+// What the AutoObserve engine saw for one cell; only the live preview sets it.
+export interface EngineCellInfo {
+  state: I18nText;
+  stateKey: AutoObserveCellState;
+  detectorKind?: I18nText;
+  monitors: EngineMonitor[];
+}
+
+export interface EngineMonitor {
+  id: string;
+  name: string;
+  kind: I18nText;
+  state: I18nText;
+  stateKey: string;
+  kindKey: string;
+  predicate: string;
+}
+
+export interface CoverageExtra {
+  key: string;
+  label: I18nText;
+  cell: CoverageCell;
 }
 
 export interface CoverageRow {
   service: string;
   stream: string;
+  where?: I18nText;
+  extra?: CoverageExtra[];
   blockedBy?: "noLink" | "stopped";
   addedThisWeek?: boolean;
   lastScanned: I18nText;
   scannedMinutes: number | null;
   cells: Record<Signal, CoverageCell>;
+  // Live preview only: the engine's own service rollup, which replaces the per-signal one.
+  status?: { state: "watched" | "gap"; label: I18nText };
+  checks?: Record<LiveCheck, CoverageCell>;
+  detectors?: number;
+  // Live preview only: the engine row's identity, which the drawer's charts scope their queries by.
+  identity?: LiveIdentity;
+}
+
+export interface LiveIdentity {
+  serviceId: string;
+  serviceName: string;
+  cluster: string | null;
+  namespace: string | null;
+  streams: { type: string; name: string; learning_until?: number | null }[];
 }
 
 export interface StreamScan {
@@ -243,6 +287,8 @@ export const SIGNALS: Signal[] = [
   "logPatterns",
   "dependencies",
 ];
+
+export const LIVE_CHECKS: LiveCheck[] = ["errors", "latency", "absence"];
 
 const DAY_LABEL: Record<DayKey, I18nKey> = {
   today: "autoobserve2.days.today",
@@ -283,10 +329,6 @@ export const funnelFor = (scenario: Scenario) => {
     oldAlertPages: stats.oldAlertPages,
   };
 };
-
-export const FUNNEL: Record<Scenario, ReturnType<typeof funnelFor>> = Object.fromEntries(
-  SCENARIOS.map((s) => [s, funnelFor(s)]),
-) as Record<Scenario, ReturnType<typeof funnelFor>>;
 
 const SEVERITY_TONE: Record<Severity, UnfoldTone> = {
   p1: "danger",
@@ -847,6 +889,10 @@ export const coverageStats = (scenario: Scenario) => {
     detectors,
   };
 };
+
+// A live row carries the distinct monitors over its three checks, the same set the header counts.
+export const detectorsOf = (row: CoverageRow): number =>
+  row.detectors ?? SIGNALS.filter((signal) => row.cells[signal].detector).length;
 
 export const gapServices = (scenario: Scenario): string[] =>
   scenarioFacts(scenario)
