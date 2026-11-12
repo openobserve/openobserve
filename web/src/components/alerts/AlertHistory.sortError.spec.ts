@@ -306,8 +306,7 @@ describe("AlertHistory sort failure", () => {
   });
 });
 
-// These cases render up to 50 full rows several times, about 1s locally and past 5s on a CI shard.
-describe("AlertHistory failed page read", { timeout: 20_000 }, () => {
+describe("AlertHistory failed page read", () => {
   const TOTAL = 60;
   const pagedHistory = () =>
     vi.mocked(alertsService.getHistory).mockImplementation(async (_org: any, q: any) => {
@@ -364,28 +363,28 @@ describe("AlertHistory failed page read", { timeout: 20_000 }, () => {
   it("keeps the shown page size when a page-size change fails, and Retry asks for the new size", async () => {
     await mountHistory();
     failOnce();
-    await wrapper.vm.onPaginationChange({ page: 1, size: 50 });
+    await wrapper.vm.onPaginationChange({ page: 1, size: 10 });
     await flushPromises();
 
     expect(wrapper.vm.pageSize).toBe(20);
     expect(range()).toBe("Showing 1 - 20 of 60");
 
-    expect(await retry()).toMatchObject({ from: "0", size: "50" });
-    expect(range()).toBe("Showing 1 - 50 of 60");
+    expect(await retry()).toMatchObject({ from: "0", size: "10" });
+    expect(range()).toBe("Showing 1 - 10 of 60");
   });
 
   it("drops the shown page when a new time range fails, and the table's Retry asks for the new range", async () => {
     await mountHistory();
-    await wrapper.vm.onPaginationChange({ page: 2, size: 20 });
+    await wrapper.vm.onPaginationChange({ page: 2, size: 10 });
     await flushPromises();
-    expect(range()).toBe("Showing 21 - 40 of 60");
+    expect(range()).toBe("Showing 11 - 20 of 60");
 
     failOnce();
     wrapper.vm.updateDateTime({ startTime: 1, endTime: 2, relativeTimePeriod: "1h" });
     await flushPromises();
 
     expect(wrapper.find(FAILED).exists()).toBe(false);
-    expect(wrapper.text()).not.toContain("alert-21");
+    expect(wrapper.text()).not.toContain("alert-11");
     expect(wrapper.text()).toContain("History is unavailable");
 
     const before = vi.mocked(alertsService.getHistory).mock.calls.length;
@@ -396,7 +395,7 @@ describe("AlertHistory failed page read", { timeout: 20_000 }, () => {
       start_time: "1",
       end_time: "2",
     });
-    expect(range()).toBe("Showing 1 - 20 of 60");
+    expect(range()).toBe("Showing 1 - 10 of 60");
   });
 
   it("lets an open row menu act on the kept row after the refresh fails", async () => {
@@ -427,10 +426,10 @@ describe("AlertHistory failed page read", { timeout: 20_000 }, () => {
     await flushPromises();
     expect(document.querySelector('[data-test="alert-history-view-details-menu"]')).not.toBeNull();
 
-    await wrapper.vm.onPaginationChange({ page: 2, size: 20 });
+    await wrapper.vm.onPaginationChange({ page: 2, size: 10 });
     await flushPromises();
 
-    expect(wrapper.find('[data-test="o2-table-body"]').text()).toContain("alert-21");
+    expect(wrapper.find('[data-test="o2-table-body"]').text()).toContain("alert-11");
     expect(document.querySelector('[data-test="alert-history-view-details-menu"]')).toBeNull();
   });
 });
