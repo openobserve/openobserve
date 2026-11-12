@@ -62,8 +62,13 @@ pub(super) async fn plan_batches(
     batches.extend(match mode {
         MergeMode::MetricsHashMerged => open_hour_batches(&mode_files, limits),
         MergeMode::MetricsIndexed => closed_hour_batches(mode_files, limits, schema, stream).await,
-        _ if mode.merges_whole_batch() && mode_files.is_empty() => Vec::new(),
-        _ if mode.merges_whole_batch() => vec![(mode_files, mode.clone())],
+        _ if mode.merges_whole_batch() => {
+            if mode_files.is_empty() {
+                Vec::new()
+            } else {
+                vec![(mode_files, mode.clone())]
+            }
+        }
         _ => size_bounded_groups(&mode_files, limits)
             .into_iter()
             .map(|group| (group, mode.clone()))
