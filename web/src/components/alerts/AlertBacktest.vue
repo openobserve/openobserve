@@ -49,7 +49,10 @@ watch(
   () => [sql.value, props.streamType],
   () => {
     clearTimeout(timer);
-    if (!sql.value) return;
+    if (!sql.value) {
+      search.cancel();
+      return;
+    }
     timer = setTimeout(() => {
       const endMs = Date.now();
       startMs = endMs - DAY_MS;
@@ -86,6 +89,7 @@ const hint = computed(() => {
 
 <template>
   <OSettingRow
+    v-if="sql"
     :label="t('alerts.sections.backtest.label')"
     :description="t('alerts.sections.backtest.help')"
     fill

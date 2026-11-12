@@ -110,7 +110,7 @@ const showsSummary = (item: SectionNavItem): boolean =>
                 item.stateLabel
               "
               :class="[
-                'text-xs max-lg:hidden',
+                'text-xs max-lg:sr-only',
                 item.state === 'error'
                   ? 'text-status-error-text'
                   : item.state === 'changed'
@@ -123,7 +123,7 @@ const showsSummary = (item: SectionNavItem): boolean =>
             </span>
             <span
               v-if="showsSummary(item) || item.tag"
-              class="text-text-secondary flex min-w-0 gap-1.5 text-xs max-lg:hidden"
+              class="text-text-secondary flex min-w-0 gap-1.5 text-xs max-lg:sr-only"
             >
               <span
                 v-if="item.tag"
