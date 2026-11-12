@@ -542,12 +542,13 @@ function scheduleClose(event?: MouseEvent) {
 // Firefox reports Enter on a link as a click with detail 1, so the keydown is the reliable signal.
 let activatedByKey = false;
 
-function noteActivationKey(event: KeyboardEvent) {
-  activatedByKey = event.key === "Enter" || event.key === " ";
-}
-
 function clearActivationKey() {
   activatedByKey = false;
+}
+
+function noteActivationKey(event: KeyboardEvent) {
+  if (event.key === "Enter" || event.key === " ") activatedByKey = true;
+  else clearActivationKey();
 }
 
 function isKeyboardActivation(event?: MouseEvent): boolean {

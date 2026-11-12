@@ -2103,6 +2103,19 @@ describe("ONavGroup", () => {
       expect(flyout().exists()).toBe(false);
     });
 
+    it("a later non-activating key drops an earlier Enter, so the next click is a mouse choice", async () => {
+      wrapper = mountGroup(true);
+      await hoverOpen();
+      const item = firstItem();
+      (item.element as HTMLElement).focus();
+      await item.trigger("keydown", { key: "Enter" });
+      await item.trigger("keydown", { key: "ArrowDown" });
+      click(item.element, 1);
+      await flushPromises();
+      expect(flyout().exists()).toBe(false);
+      expect(document.activeElement).not.toBe(tile());
+    });
+
     it("a mouse click after an arrow-key move is still a mouse choice", async () => {
       wrapper = mountGroup(true);
       await hoverOpen();
