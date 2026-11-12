@@ -152,12 +152,6 @@ struct StreamState {
     scrub_carry: String,
     pending_tool_calls: HashMap<String, CallInfo>,
     last_tools_call_info: Option<CallInfo>,
-    /// 2.x only: chars emitted per `<message id>:<text ordinal>`.
-    text_streamed: HashMap<String, usize>,
-    /// 2.x only: the tool name of each call id.
-    tool_names: HashMap<String, String>,
-    tools_called: HashSet<String>,
-    tools_done: HashSet<String>,
 }
 
 impl StreamState {
@@ -366,18 +360,7 @@ impl StreamState {
         frames.push(Value::Object(event));
     }
 
-    /// o2-ai's `session.text.ended`: the part of a 2.x text item not streamed yet.
-    fn text_ended(&mut self, key: String, text: &str, frames: &mut Vec<Value>) {
-        let len = text.chars().count();
-        let seen = self.text_streamed.get(&key).copied().unwrap_or(0);
-        self.text_streamed.insert(key, seen.max(len));
-        if len > seen {
-            let rest: String = text.chars().skip(seen).collect();
-            self.emit_text_delta(&rest, frames);
-        }
-    }
-
-    /// o2-ai's tool events of one settled 2.x tool item, each emitted once per call id.
+    /// o2-ai's tool events of one settled 2.x tool item; history projects each message once.
     fn v2_tool(&mut self, item: &Map<String, Value>, frames: &mut Vec<Value>) {
         let call_id = item
             .get("id")
@@ -388,22 +371,16 @@ impl StreamState {
             .get("name")
             .filter(|v| truthy(v))
             .map_or_else(|| "unknown".to_string(), py_str);
-        self.tool_names.insert(call_id.clone(), name.clone());
         let empty = Map::new();
         let state = obj(item.get("state")).unwrap_or(&empty);
         let status = state.get("status").and_then(Value::as_str);
         if !matches!(status, Some("running" | "completed" | "error")) {
             return;
         }
-        if call_id.is_empty() || self.tools_called.insert(call_id.clone()) {
-            self.tool_running(&call_id, &name, state, frames);
-        }
-        if status == Some("running")
-            || !(call_id.is_empty() || self.tools_done.insert(call_id.clone()))
-        {
+        self.tool_running(&call_id, &name, state, frames);
+        if status == Some("running") {
             return;
         }
-        let name = self.tool_names.get(&call_id).cloned().unwrap_or(name);
         if status == Some("error") {
             let error = state
                 .get("error")
@@ -556,15 +533,9 @@ impl Turn {
 
     /// Run one settled 2.x message through the live mapper, as o2-ai's `messages_to_events`.
     fn project_v2_message(&mut self, message: &Map<String, Value>) {
-        let msg_id = message
-            .get("id")
-            .filter(|v| truthy(v))
-            .map(py_str)
-            .unwrap_or_default();
         let kind = message.get("type").and_then(Value::as_str);
         if kind == Some("assistant") {
             let content = message.get("content").and_then(Value::as_array);
-            let mut ordinal = 0;
             for item in content.into_iter().flatten().filter_map(Value::as_object) {
                 match item.get("type").and_then(Value::as_str) {
                     Some("text") => {
@@ -574,12 +545,10 @@ impl Turn {
                             _ => Some(""),
                         };
                         if let Some(text) = text {
-                            let key = format!("{msg_id}:{ordinal}");
-                            self.state.text_ended(key, text, &mut self.frames);
+                            self.state.emit_text_delta(text, &mut self.frames);
                         }
                         // One text item is one block: never carry its tail into the next.
                         self.state.flush_text_buffer(&mut self.frames);
-                        ordinal += 1;
                     }
                     Some("tool") => self.state.v2_tool(item, &mut self.frames),
                     _ => {}
@@ -596,7 +565,10 @@ impl Turn {
         };
         match (kind, message.get("outcome").and_then(Value::as_str), error) {
             (Some("idle"), Some("interrupted"), _) => self.aborted = true,
-            (Some("idle"), Some("failed"), Some(error)) => self.error = Some(said(error)),
+            // A failure without an error object still fails the turn, as the live stream does.
+            (Some("idle"), Some("failed"), error) => {
+                self.error = Some(error.map(said).unwrap_or_default());
+            }
             (Some("assistant"), _, Some(error)) => {
                 if error.get("type").and_then(Value::as_str) == Some("aborted") {
                     self.aborted = true;
@@ -693,7 +665,7 @@ impl Folded {
         };
         for event in events {
             folded.last_seq = folded.last_seq.max(event.seq);
-            if is_v2_record(&event.event_type) {
+            if is_v2_record(event) {
                 continue;
             }
             let empty = Map::new();
@@ -774,7 +746,7 @@ pub fn project(events: &[DurableEvent]) -> Value {
     let folded = Folded::fold_v1(events);
     let mut turns = project_v1(&folded);
     let mut title = folded.title.clone();
-    if events.iter().any(|e| is_v2_record(&e.event_type)) {
+    if events.iter().any(is_v2_record) {
         let (v2_turns, v2_title) = project_v2(events, &folded.infos);
         turns.extend(v2_turns);
         title = v2_title.or(title);
@@ -877,7 +849,9 @@ fn project_v1(folded: &Folded) -> Vec<Turn> {
 /// The 2.x turns and generated title; `held` is the 1.x messages, whose 2.x copies are skipped.
 fn project_v2(events: &[DurableEvent], held: &Map<String, Value>) -> (Vec<Turn>, Option<String>) {
     let mut title = None;
-    let mut messages: Map<String, Value> = Map::new();
+    // As o2-ai's dict: a re-recorded message keeps its first position and takes its latest record.
+    let mut messages: Vec<(String, &Map<String, Value>)> = Vec::new();
+    let mut slots: HashMap<String, usize> = HashMap::new();
     let mut spans: HashMap<String, (i64, i64)> = HashMap::new();
     for event in events {
         let Value::Object(data) = &event.data else {
@@ -903,14 +877,17 @@ fn project_v2(events: &[DurableEvent], held: &Map<String, Value>) -> (Vec<Turn>,
             .entry(msg_id.clone())
             .or_insert((event.seq, event.seq));
         *span = (span.0.min(event.seq), span.1.max(event.seq));
-        messages.insert(msg_id, Value::Object(message.clone()));
+        match slots.get(&msg_id) {
+            Some(&slot) => messages[slot].1 = message,
+            None => {
+                slots.insert(msg_id.clone(), messages.len());
+                messages.push((msg_id, message));
+            }
+        }
     }
 
     let mut turns: Vec<Turn> = Vec::new();
-    for (msg_id, message) in &messages {
-        let Some(message) = message.as_object() else {
-            continue;
-        };
+    for (msg_id, message) in messages {
         if message.get("type").and_then(Value::as_str) == Some("user") {
             let mut turn = Turn {
                 user_message_id: Value::String(msg_id.clone()),
@@ -928,7 +905,7 @@ fn project_v2(events: &[DurableEvent], held: &Map<String, Value>) -> (Vec<Turn>,
             continue;
         }
         if let Some(turn) = turns.last_mut() {
-            turn.cover(spans.get(msg_id));
+            turn.cover(spans.get(&msg_id));
         }
     }
     (turns, title)
@@ -1526,7 +1503,7 @@ pub(crate) fn extract_error_message(error: &Value) -> String {
 }
 
 /// o2-ai's 2.x error message: [`extract_error_message`], falling back to the error's `type`.
-fn v2_error_message(error: &Value) -> String {
+pub(crate) fn v2_error_message(error: &Value) -> String {
     let said = |m: &Map<String, Value>, keys: [&str; 2]| {
         keys.iter().any(|k| m.get(*k).is_some_and(truthy))
     };
@@ -1776,6 +1753,26 @@ mod tests {
                 panic!("{name}: {diff}");
             }
         }
+    }
+
+    #[test]
+    fn a_failed_idle_without_an_error_fails_the_turn() {
+        let record = |seq: i64, message: Value| DurableEvent {
+            id: format!("evt_{seq}"),
+            aggregate_id: "ses_F".into(),
+            seq,
+            event_type: MESSAGE_UPDATED.into(),
+            data: json!({"message": message}),
+        };
+        let events = [
+            record(0, json!({"id": "msg_u", "type": "user", "text": "hi"})),
+            record(
+                1,
+                json!({"id": "msg_i", "type": "idle", "outcome": "failed"}),
+            ),
+        ];
+        let projected = project(&events);
+        assert_eq!(projected["turns"][0]["error"], DEFAULT_TURN_ERROR);
     }
 
     /// A `record_step` part is stored in full but projects to no tool frame.
