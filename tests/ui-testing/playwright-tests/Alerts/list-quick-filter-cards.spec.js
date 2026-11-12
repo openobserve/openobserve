@@ -33,7 +33,7 @@ test.describe('List quick filter cards', { tag: ['@quickFilterCards', '@all'] },
       await pm.apiCleanup.deleteStream(created.alertSeed.streamName);
     }
     if (created.pipelines) {
-      for (const p of created.pipelines.pipelines) await pm.apiCleanup.deletePipeline(p.id);
+      await pm.apiCleanup.deletePipelinesByName(created.pipelines.pipelines.map((p) => p.name));
       for (const stream of created.pipelines.streams) await pm.apiCleanup.deleteStream(stream);
     }
     for (const link of created.links) await pm.apiCleanup.deletePublicLink(link.dashboardId, link.id);

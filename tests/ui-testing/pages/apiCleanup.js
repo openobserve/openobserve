@@ -968,14 +968,23 @@ class APICleanup {
             streams.push(source);
             await this.ingestData(source, [{ message: 'quick filter cards seed row' }]);
             await this.waitForStreamSchema(source);
+            const entry = { id: null, name, enabled: i < activeCount };
+            // Registered by name before the create, so cleanup finds it even if the id lookup fails.
+            pipelines.push(entry);
             await this.createPlainPipeline(name, source);
             const created = (await this.listPipelinesStrict()).find((p) => p.name === name);
             if (!created) throw new Error(`seedPipelinesMix: pipeline ${name} missing after create`);
-            const enabled = i < activeCount;
-            pipelines.push({ id: created.pipeline_id, name, enabled });
-            if (!enabled) await this.setPipelineEnabled(created.pipeline_id, false);
+            entry.id = created.pipeline_id;
+            if (!entry.enabled) await this.setPipelineEnabled(entry.id, false);
         }
         return sink;
+    }
+
+    async deletePipelinesByName(names) {
+        const wanted = new Set(names);
+        for (const p of await this.listPipelinesStrict()) {
+            if (wanted.has(p.name)) await this.deletePipeline(p.pipeline_id);
+        }
     }
 
     /** Pipelines of the org; throws instead of returning [] so a count oracle never reads a failed call as empty. */
