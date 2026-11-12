@@ -1486,7 +1486,7 @@ export default defineComponent({
     };
 
     const submitAttempted = alertForm.form.useStore((s) => s.submissionAttempts > 0);
-    // The cron check runs in Save, not in the form schema, so its failure is counted here.
+    // The cron and SQL checks run in Save, not in the form schema, so their failures are counted here.
     const cronSaveProblem = computed(() => {
       const tc = alertForm.formData.value?.trigger_condition;
       if (tc?.frequency_type !== "cron") return false;
@@ -1500,8 +1500,18 @@ export default defineComponent({
         return true;
       }
     });
+    const querySaveProblem = computed(() => {
+      const fd = alertForm.formData.value;
+      if (fd?.is_real_time !== "false") return false;
+      const qc = fd.query_condition ?? {};
+      if (qc.type === "sql")
+        return !String(qc.sql ?? "").trim() || !!alertForm.sqlQueryErrorMsg.value?.trim();
+      if (qc.type === "promql") return !String(qc.promql ?? "").trim();
+      return false;
+    });
     const { items: sectionItems } = useAlertFormSections({
       extraErrors: computed(() => ({
+        condition: submitAttempted.value && querySaveProblem.value ? 1 : 0,
         schedule: submitAttempted.value && cronSaveProblem.value ? 1 : 0,
       })),
       fieldMeta: alertForm.form.useStore((s) => s.fieldMeta as FieldMetaMap),
