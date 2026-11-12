@@ -22,7 +22,7 @@ const { t } = useI18nTyped();
 
 <template>
   <div
-    class="border-border-default mt-3 flex flex-wrap items-baseline gap-x-2 gap-y-0.5 border-t pt-4 pb-1"
+    class="border-border-default mt-2 flex flex-wrap items-baseline gap-x-2 gap-y-0.5 border-t pt-3 pb-1"
     data-test="add-alert-optional-heading"
   >
     <span class="text-text-heading text-sm font-medium">{{
