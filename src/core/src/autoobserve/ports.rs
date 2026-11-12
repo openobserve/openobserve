@@ -28,7 +28,10 @@ use config::{
     ider,
     meta::{
         search::{Query, Request},
-        stream::{StreamParams, StreamPartition, StreamSettings, StreamStats, StreamType},
+        stream::{
+            PartitionTimeLevel, StreamParams, StreamPartition, StreamSettings, StreamStats,
+            StreamType,
+        },
         triggers::{Trigger, TriggerModule},
     },
 };
@@ -37,10 +40,13 @@ use o2_enterprise::enterprise::autoobserve::{
     contract::DAY_US,
     engine::MAX_HOOK_TIMEOUT,
     job::MODULE_KEY,
+    names::streams::STREAM_PRESENCE,
     ports::{
-        AiPermit, AiUsagePort, KvWritePort, Ports, QueryRejected, SearchPage, SearchPort,
-        StreamSinkPort, StreamStat, StreamStatsPort, TriggerPort, stats_refresh_us,
+        AiPermit, AiUsagePort, HourRecords, KvWritePort, Ports, QueryRejected, SearchPage,
+        SearchPort, StreamHistory, StreamSinkPort, StreamStat, StreamStatsPort, TriggerPort,
+        stats_refresh_us,
     },
+    stream_silence::PRESENCE_RETENTION_DAYS,
 };
 use serde_json::Value;
 
@@ -57,6 +63,10 @@ const STREAM_TYPES: [StreamType; 6] = [
 const META_RETENTION_DAYS: i64 = 35;
 /// Every engine read filters one `org_id`, so it opens one bucket of files, not every org's.
 const ORG_BUCKETS: u64 = 32;
+/// Streams per file-list read, so one statement's key list stays small.
+const RECORDS_BATCH: usize = 500;
+/// The file list's hour partition key, `YYYY/MM/DD/HH`.
+const DATE_KEY: &str = "%Y/%m/%d/%H";
 
 pub struct SearchAdapter;
 
@@ -311,6 +321,54 @@ impl StreamStatsPort for StreamStatsAdapter {
         *self.index.write() = Some(Arc::new(index));
     }
 
+    async fn history(&self, org: &str) -> anyhow::Result<Vec<StreamHistory>> {
+        let default_days = config::get_config().compact.data_retention_days;
+        let mut out = Vec::new();
+        for s in self.streams(org).await? {
+            let stream_type = stream_type_of(&s.stream_type)?;
+            let stats = infra::cache::stats::get_stream_stats(org, &s.name, stream_type);
+            let settings = infra::schema::get_settings(org, &s.name, stream_type).await;
+            let days = settings
+                .as_ref()
+                .map(|x| x.data_retention)
+                .filter(|d| *d > 0)
+                .unwrap_or(default_days);
+            out.push(StreamHistory {
+                doc_time_min: (stats.doc_time_min > 0).then_some(stats.doc_time_min),
+                retention_days: (days > 0).then_some(days),
+                daily: settings.is_some_and(|x| {
+                    matches!(
+                        x.partition_time_level
+                            .level_at(config::utils::time::now_micros()),
+                        Some(PartitionTimeLevel::Daily)
+                    )
+                }),
+                name: s.name,
+                stream_type: s.stream_type,
+            });
+        }
+        Ok(out)
+    }
+
+    async fn hourly_records(
+        &self,
+        org: &str,
+        streams: &[(String, String)],
+        (from, to): (i64, i64),
+    ) -> anyhow::Result<Vec<HourRecords>> {
+        let range = (date_key(from)?, date_key(to)?);
+        let keys: Vec<String> = streams
+            .iter()
+            .map(|(t, n)| format!("{org}/{t}/{n}"))
+            .collect();
+        let mut out = Vec::new();
+        for batch in keys.chunks(RECORDS_BATCH) {
+            let rows = infra::file_list::records_by_date(batch, range.clone()).await?;
+            out.extend(rows.into_iter().filter_map(hour_records));
+        }
+        Ok(out)
+    }
+
     async fn has_field(
         &self,
         org: &str,
@@ -434,10 +492,13 @@ fn stream_type_of(s: &str) -> anyhow::Result<StreamType> {
 }
 
 /// Leaves an operator's explicit retention and partitions alone; returns whether it changed any.
-fn engine_settings(settings: &mut StreamSettings) -> bool {
-    let retention = settings.data_retention == 0;
+fn engine_settings(stream: &str, settings: &mut StreamSettings) -> bool {
+    let days = retention_days(stream);
+    // The rollup's old engine default is the engine's own, so it moves to the new one.
+    let retention = settings.data_retention == 0
+        || (days != META_RETENTION_DAYS && settings.data_retention == META_RETENTION_DAYS);
     if retention {
-        settings.data_retention = META_RETENTION_DAYS;
+        settings.data_retention = days;
     }
     let partition = settings.partition_keys.is_empty();
     if partition {
@@ -448,6 +509,15 @@ fn engine_settings(settings: &mut StreamSettings) -> bool {
     retention || partition
 }
 
+/// The presence rollup holds a quiet stream as long as the stream watch does, past the others.
+fn retention_days(stream: &str) -> i64 {
+    if stream == STREAM_PRESENCE {
+        PRESENCE_RETENTION_DAYS
+    } else {
+        META_RETENTION_DAYS
+    }
+}
+
 /// The settings cache decides, not a node-local flag: deleting a stream drops its settings.
 async fn keep_bounded<'a, F, Fut>(stream: &'a str, bound: F) -> anyhow::Result<()>
 where
@@ -456,7 +526,7 @@ where
 {
     let key = format!("{META_ORG_ID}/{}/{stream}", StreamType::Logs);
     let cached = infra::schema::get_stream_settings_atomic(&key);
-    if cached.is_some_and(|s| !engine_settings(&mut (*s).clone())) {
+    if cached.is_some_and(|s| !engine_settings(stream, &mut (*s).clone())) {
         return Ok(());
     }
     bound(stream).await
@@ -468,7 +538,7 @@ async fn bound_retention(stream: &str) -> anyhow::Result<()> {
         .await
         .map(|s| (*s).clone())
         .unwrap_or_default();
-    if engine_settings(&mut settings) {
+    if engine_settings(stream, &mut settings) {
         schema::save_stream_settings(META_ORG_ID, stream, StreamType::Logs, settings).await?;
     }
     Ok(())
@@ -528,6 +598,32 @@ fn stream_stat(name: String, stream_type: StreamType, stats: &StreamStats) -> St
     }
 }
 
+/// The hour partition key holding `at_us`.
+fn date_key(at_us: i64) -> anyhow::Result<String> {
+    let at = chrono::DateTime::from_timestamp_micros(at_us)
+        .ok_or_else(|| anyhow::anyhow!("{at_us} is not a time"))?;
+    Ok(at.format(DATE_KEY).to_string())
+}
+
+/// One `{org}/{type}/{name}` partition row as the engine reads it; an unparsable key is dropped.
+fn hour_records(
+    (stream, date, records, daily): (String, String, i64, bool),
+) -> Option<HourRecords> {
+    let mut parts = stream.splitn(3, '/');
+    let (_, stream_type, name) = (parts.next()?, parts.next()?, parts.next()?);
+    let hour = chrono::NaiveDateTime::parse_from_str(&format!("{date}:00"), "%Y/%m/%d/%H:%M")
+        .ok()?
+        .and_utc()
+        .timestamp_micros();
+    Some(HourRecords {
+        stream_type: stream_type.to_string(),
+        name: name.to_string(),
+        hour_us: hour,
+        records: u64::try_from(records).ok()?,
+        daily,
+    })
+}
+
 /// A super cluster's remotes each sleep 100 ms per batch of 10 orgs; one cluster sleeps per org.
 fn cache_waits(orgs: usize, super_cluster: bool) -> usize {
     if super_cluster {
@@ -579,24 +675,45 @@ mod tests {
     #[test]
     fn engine_streams_get_a_bounded_retention_and_an_org_partition_unless_set() {
         let mut unset = StreamSettings::default();
-        assert!(engine_settings(&mut unset));
+        assert!(engine_settings("_o2_autoobserve_x", &mut unset));
         assert_eq!(unset.data_retention, META_RETENTION_DAYS);
         assert_eq!(
             unset.partition_keys,
             vec![StreamPartition::new_hash("org_id", ORG_BUCKETS)]
         );
-        assert!(!engine_settings(&mut unset));
+        assert!(!engine_settings("_o2_autoobserve_x", &mut unset));
         let operator = vec![StreamPartition::new("cluster")];
         let mut chosen = StreamSettings {
             data_retention: 400,
             partition_keys: operator.clone(),
             ..Default::default()
         };
-        assert!(!engine_settings(&mut chosen));
+        assert!(!engine_settings("_o2_autoobserve_x", &mut chosen));
+        assert!(!engine_settings(STREAM_PRESENCE, &mut chosen));
         assert_eq!(
             (chosen.data_retention, chosen.partition_keys),
             (400, operator)
         );
+    }
+
+    /// A stream quiet for weeks is still held by the watch, so its stored days must outlive it.
+    #[test]
+    fn the_presence_rollup_keeps_what_the_stream_watch_holds() {
+        use o2_enterprise::enterprise::autoobserve::{
+            plugins::stream::MAX_TRAINING_DAYS, stream_silence::kept_since,
+        };
+        let deepest = -kept_since(-MAX_TRAINING_DAYS * DAY_US) / DAY_US;
+        assert!(PRESENCE_RETENTION_DAYS > deepest, "{deepest} days are held");
+        let mut unset = StreamSettings::default();
+        assert!(engine_settings(STREAM_PRESENCE, &mut unset));
+        assert_eq!(unset.data_retention, PRESENCE_RETENTION_DAYS);
+        let mut old_default = StreamSettings {
+            data_retention: META_RETENTION_DAYS,
+            ..Default::default()
+        };
+        assert!(engine_settings(STREAM_PRESENCE, &mut old_default));
+        assert_eq!(old_default.data_retention, PRESENCE_RETENTION_DAYS);
+        assert!(!engine_settings(STREAM_PRESENCE, &mut old_default));
     }
 
     /// Plans each SQL the engine builds as search does, then opens files with what the plan kept.
@@ -604,7 +721,7 @@ mod tests {
     async fn every_engine_read_is_planned_onto_its_orgs_bucket_only() {
         infra::db_init().await.unwrap();
         let mut settings = StreamSettings::default();
-        engine_settings(&mut settings);
+        engine_settings("_o2_autoobserve_x", &mut settings);
         let key = &settings.partition_keys[0];
         let bucket = |org: &str| key.get_partition_value(org);
         let other = (0..100)
@@ -882,7 +999,7 @@ mod tests {
             let key = key.clone();
             async move {
                 let mut settings = StreamSettings::default();
-                engine_settings(&mut settings);
+                engine_settings(stream, &mut settings);
                 infra::schema::put_stream_settings(key, Arc::new(settings)).await;
                 anyhow::Ok(())
             }
@@ -1028,5 +1145,29 @@ mod tests {
             .await;
             assert!(written.is_err(), "{stream} took a user write");
         }
+    }
+
+    #[test]
+    fn a_file_list_partition_reads_back_as_its_hour_and_a_bad_key_is_dropped() {
+        let hour = 1_767_225_600_000_000 + 13 * 3_600_000_000;
+        assert_eq!(date_key(hour + 59 * 60_000_000).unwrap(), "2026/01/01/13");
+        let row =
+            |stream: &str, date: &str, n: i64| (stream.to_string(), date.to_string(), n, false);
+        assert_eq!(
+            hour_records(row("acme/logs/web/app", "2026/01/01/13", 42)),
+            Some(HourRecords {
+                stream_type: "logs".into(),
+                name: "web/app".into(),
+                hour_us: hour,
+                records: 42,
+                daily: false,
+            })
+        );
+        assert_eq!(hour_records(row("acme/logs", "2026/01/01/13", 1)), None);
+        assert_eq!(hour_records(row("acme/logs/web", "2026-01-01", 1)), None);
+        assert_eq!(
+            hour_records(row("acme/logs/web", "2026/01/01/13", -1)),
+            None
+        );
     }
 }

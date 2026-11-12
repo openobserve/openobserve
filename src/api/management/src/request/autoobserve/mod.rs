@@ -42,6 +42,7 @@ use o2_enterprise::enterprise::autoobserve::{
         STORAGE_FAILED, SuggestionFilter,
     },
     contract::EntityRef,
+    coverage_scope::CoverageReader,
     marks::MarkSource,
     names::{dims, kinds},
 };
@@ -79,6 +80,17 @@ pub struct HistoryQuery {
     /// Start of the first day, in microseconds.
     pub from: i64,
     /// Start of the last day, in microseconds; at most 90 days after `from`.
+    pub to: i64,
+}
+
+#[derive(Debug, Deserialize, IntoParams)]
+#[into_params(parameter_in = Query)]
+pub struct VolumeQuery {
+    /// Comma-separated `stream_type/stream_name` ids, 1 to 50, e.g. `logs/default`.
+    pub ids: String,
+    /// Range start, in microseconds.
+    pub from: i64,
+    /// Range end, in microseconds; at most 7 days after `from`.
     pub to: i64,
 }
 
@@ -163,6 +175,35 @@ impl<'a> Subject<'a> {
     }
 }
 
+/// The coverage caller's rights as RBAC grants them; with RBAC off every check passes.
+struct LiveReader<'a> {
+    org_id: &'a str,
+    user_id: &'a str,
+}
+
+#[async_trait]
+impl CoverageReader for LiveReader<'_> {
+    async fn all_streams(&self, types: Vec<String>) -> bool {
+        if !rbac_enforced().await {
+            return true;
+        }
+        for t in &types {
+            if !org_wide_allows(self.org_id, self.user_id, t, "GET").await {
+                return false;
+            }
+        }
+        true
+    }
+
+    async fn streams(&self, ids: Vec<(String, String)>) -> Vec<bool> {
+        readable_streams(self.org_id, self.user_id, ids).await
+    }
+
+    async fn monitors(&self, subjects: Vec<EntityRef>) -> Vec<bool> {
+        readable_subjects(self.org_id, self.user_id, subjects).await
+    }
+}
+
 /// The calibration digest, searched only through calibration's protected reader (P5b-D-read).
 struct LiveDigest;
 
@@ -228,7 +269,7 @@ pub async fn entity_types(Path(_org_id): Path<String>) -> Response {
     tag = "AutoObserve",
     operation_id = "AutoObserveCoverage",
     summary = "Get the coverage matrix",
-    description = "This region's newest coverage matrix: one row per watched service with the evidence for each signal class. `pass_at`, `refreshed_at` and `quality` are null, and `rows` is empty, when the engine has written no pass in the last day. `learning` is present unless the learning state could not be read, in which case it and every `learning_until` are left out: how many of the org's streams the stream watches still learn and how many have the `history_days_needed` days they need, with `next_ready_at` (microseconds) the soonest a learning stream is ready, null when none learns. Each listed stream's `learning_until` is when its history will be enough, null once it is or when no stream watch applies.",
+    description = "This region's newest coverage matrix: one row per watched service with the evidence for each signal class. `pass_at`, `refreshed_at` and `quality` are null, and `rows` is empty, when the engine has written no pass in the last day. `learning` is present unless the learning state could not be read, in which case it and every `learning_until` are left out: how many of the org's streams the stream watches still learn and how many have the `history_days_needed` days they need, with `next_ready_at` (microseconds) the soonest a learning stream is ready, null when none learns. Each listed stream's `learning_until` is when its history will be enough, null once it is or when no stream watch applies. Streams and monitors the caller may not read are left out, with each cell judged again from the monitors left, and a service with no readable stream is left out.",
     security(("Authorization" = [])),
     params(("org_id" = String, Path, description = "Organization name"), CoverageQuery),
     responses(
@@ -246,6 +287,7 @@ pub async fn entity_types(Path(_org_id): Path<String>) -> Response {
 )]
 pub async fn coverage(
     Path(org_id): Path<String>,
+    Headers(user): Headers<UserEmail>,
     query: Result<Query<CoverageQuery>, QueryRejection>,
 ) -> Response {
     if let Some(disabled) = deployment_disabled() {
@@ -261,7 +303,11 @@ pub async fn coverage(
     };
     serve(|deps| async move {
         let service = query.service.as_deref().filter(|s| !s.is_empty());
-        api::coverage(&deps, &org_id, view, service, now_micros()).await
+        let reader = LiveReader {
+            org_id: &org_id,
+            user_id: &user.user_id,
+        };
+        api::coverage_for(&deps, &org_id, view, service, now_micros(), &reader).await
     })
     .await
 }
@@ -302,6 +348,58 @@ pub async fn coverage_history(
     };
     serve(|deps| async move { api::coverage_history(&deps, &org_id, query.from, query.to).await })
         .await
+}
+
+#[utoipa::path(
+    get,
+    path = "/v2/{org_id}/autoobserve/streams/volume",
+    context_path = "/api",
+    tag = "AutoObserve",
+    operation_id = "AutoObserveStreamVolume",
+    summary = "Get stream volume series",
+    description = "Each named stream's ingested records over [from, to) as the stream watch judged them, rebuilt from its stored daily presence and today's usage. Per stream: `status` (`volume`, `presence_only`, `warmup`, `irregular` for a trained stream too irregular to judge, or `no_data`), `width_secs`, `rows_per_day`, `exact` (false when a stored day was missing or a finding's stamped baseline differs), `days` (each UTC day with the `trained_day` that judged it and its `resolution` in seconds), `buckets` (`t`, `actual`, `expected`, `lower`, `upper`, `expected_present`, `class`: one of `low`, `high`, `normal`, `spread`, `quiet`, `missing`, `busy_missing`; null where unjudged), `forecast` for buckets after now, and `markers` for the stream's silence, drop and rise findings. Streams the caller may not read are listed in `denied` instead.",
+    security(("Authorization" = [])),
+    params(("org_id" = String, Path, description = "Organization name"), VolumeQuery),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "A malformed or unknown id, more than 50 ids, from not before to, or a span over 7 days", content_type = "application/json", body = Object),
+        (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
+        (status = 404, description = "AutoObserve is disabled for this deployment", content_type = "application/json", body = Object),
+        (status = 500, description = "Internal Server Error", content_type = "application/json", body = Object),
+        (status = 503, description = "The engine is not running on this node", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "AutoObserve", "operation": "get"})),
+        ("x-o2-mcp" = json!({"description": "Get AutoObserve stream volume series with their usual level", "category": "autoobserve"}))
+    )
+)]
+pub async fn stream_volume(
+    Path(org_id): Path<String>,
+    Headers(user): Headers<UserEmail>,
+    query: Result<Query<VolumeQuery>, QueryRejection>,
+) -> Response {
+    if let Some(disabled) = deployment_disabled() {
+        return disabled;
+    }
+    let query = match parse_query(query) {
+        Ok(query) => query,
+        Err(refused) => return refused,
+    };
+    if let Err(e) = api::check_series_request(&query.ids, query.from, query.to) {
+        return failed(&e);
+    }
+    serve(|deps| async move {
+        let readable = |ids| readable_streams(&org_id, &user.user_id, ids);
+        api::stream_volume_series(
+            &deps,
+            &org_id,
+            (&query.ids, query.from, query.to),
+            now_micros(),
+            readable,
+        )
+        .await
+    })
+    .await
 }
 
 #[utoipa::path(
@@ -639,6 +737,44 @@ async fn readable_subjects(org_id: &str, user_id: &str, subjects: Vec<EntityRef>
     readable_mask(&LiveAuthority { org_id, user_id }, &subjects).await
 }
 
+/// Each stream needs the read right a search of it needs; one org-wide check per type comes first.
+async fn readable_streams(org_id: &str, user_id: &str, ids: Vec<(String, String)>) -> Vec<bool> {
+    if !rbac_enforced().await {
+        return vec![true; ids.len()];
+    }
+    let mut org_wide: HashMap<&str, bool> = HashMap::new();
+    let mut out = Vec::with_capacity(ids.len());
+    for (stream_type, name) in &ids {
+        let wide = match org_wide.get(stream_type.as_str()) {
+            Some(wide) => *wide,
+            None => {
+                let wide = org_wide_allows(org_id, user_id, stream_type, "GET").await;
+                org_wide.insert(stream_type, wide);
+                wide
+            }
+        };
+        if wide {
+            out.push(true);
+            continue;
+        }
+        out.push(
+            check_permissions(
+                &config::utils::str::into_ofga_supported_format(name),
+                org_id,
+                user_id,
+                stream_type,
+                "GET",
+                None,
+                false,
+                true,
+                false,
+            )
+            .await,
+        );
+    }
+    out
+}
+
 /// One org-wide check per resource, then one grant listing and one folder read for the alerts left.
 async fn readable_mask<A: AlertAuthority>(auth: &A, subjects: &[Subject<'_>]) -> Vec<bool> {
     let mut org_wide: HashMap<&'static str, bool> = HashMap::new();
@@ -749,6 +885,10 @@ mod tests {
             .route(
                 "/v2/{org_id}/autoobserve/suggestions",
                 routing::get(suggestions),
+            )
+            .route(
+                "/v2/{org_id}/autoobserve/streams/volume",
+                routing::get(stream_volume),
             )
             .route("/v2/{org_id}/autoobserve/marks", routing::get(list_marks))
             .route(
@@ -1066,6 +1206,12 @@ mod tests {
             ("GET", "/v2/o/autoobserve/coverage?view=loose", ""),
             ("GET", "/v2/o/autoobserve/coverage/history?from=0&to=1", ""),
             ("GET", "/v2/o/autoobserve/suggestions?limit=abc", ""),
+            (
+                "GET",
+                "/v2/o/autoobserve/streams/volume?ids=logs/a&from=0&to=1",
+                "",
+            ),
+            ("GET", "/v2/o/autoobserve/streams/volume?ids=bad", ""),
             ("GET", "/v2/o/autoobserve/marks", ""),
             ("PUT", mark, ""),
             ("DELETE", mark, r#"{"group_key":"host=a"}"#),
@@ -1108,6 +1254,11 @@ mod tests {
             ("GET", "/v2/o/autoobserve/coverage", ""),
             ("GET", "/v2/o/autoobserve/coverage/history?from=0&to=1", ""),
             ("GET", "/v2/o/autoobserve/suggestions?limit=5&offset=5", ""),
+            (
+                "GET",
+                "/v2/o/autoobserve/streams/volume?ids=logs/a,metrics/b&from=0&to=3600000000",
+                "",
+            ),
             ("GET", "/v2/o/autoobserve/marks", ""),
             ("PUT", mark, ""),
             ("DELETE", mark, ""),
@@ -1130,6 +1281,27 @@ mod tests {
             ("GET", "/v2/o/autoobserve/suggestions?limit=abc", ""),
             ("GET", "/v2/o/autoobserve/marks?offset=-3", ""),
             ("GET", "/v2/o/autoobserve/coverage/history?from=1", ""),
+            ("GET", "/v2/o/autoobserve/streams/volume?from=0&to=1", ""),
+            (
+                "GET",
+                "/v2/o/autoobserve/streams/volume?ids=a&from=0&to=1",
+                "",
+            ),
+            (
+                "GET",
+                "/v2/o/autoobserve/streams/volume?ids=files/a&from=0&to=1",
+                "",
+            ),
+            (
+                "GET",
+                "/v2/o/autoobserve/streams/volume?ids=logs/a&from=5&to=5",
+                "",
+            ),
+            (
+                "GET",
+                "/v2/o/autoobserve/streams/volume?ids=logs/a&from=0&to=604800000001",
+                "",
+            ),
         ] {
             let response = send(method, uri, body).await;
             assert_eq!(response.status(), StatusCode::BAD_REQUEST, "{method} {uri}");

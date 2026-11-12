@@ -77,6 +77,25 @@ impl InvestigationPort for IncidentInvestigation {
         let resolve = async move { resolve_finding_firing(&org, &subject, at, back).await };
         Ok(tokio::spawn(resolve).await??)
     }
+
+    /// Two reads for all of a pass's recoveries, so paging off costs no query per stream.
+    async fn open_incidents(&self, recoveries: &[Recovery]) -> anyhow::Result<Vec<bool>> {
+        let Some(org) = recoveries.first().map(|r| r.org.clone()) else {
+            return Ok(Vec::new());
+        };
+        if !incidents_enabled() {
+            return Ok(vec![false; recoveries.len()]);
+        }
+        let subjects: Vec<String> = recoveries.iter().map(recovery_subject).collect();
+        let open =
+            infra::table::alert_incidents::find_open_incidents_containing_alerts(&org, &subjects)
+                .await?;
+        Ok(recoveries
+            .iter()
+            .zip(&subjects)
+            .map(|(r, s)| r.org == org && open.contains_key(s))
+            .collect())
+    }
 }
 
 /// The body of `GET /api/v2/{org}/autoobserve/incidents`; every key is present, null when unknown.
