@@ -95,7 +95,11 @@ fn open_hour_batches(files: &[FileKey], limits: &BatchLimits<'_>) -> Vec<Planned
         .filter(|f| MetricsFileLayout::of(&f.key) == Some(MetricsFileLayout::HashSorted))
         .cloned()
         .collect();
-    capped_batches(pending, OPEN_HOUR_MERGE_FILES, limits.max_merge_groups)
+    // too few pending files: wait for more flushes before rewriting them
+    if pending.len() < OPEN_HOUR_MERGE_FILES {
+        return Vec::new();
+    }
+    mergeable_chunks(pending, limits.max_merge_groups)
         .into_iter()
         .map(|pending| (pending, MergeMode::MetricsHashMerged))
         .collect()
@@ -135,21 +139,14 @@ async fn closed_hour_batches(
     }
 }
 
-/// `files`, once `min_files` piled up, in batches of at most `max_groups`.
-pub(super) fn capped_batches(
-    files: Vec<FileKey>,
-    min_files: usize,
-    max_groups: usize,
-) -> Vec<Vec<FileKey>> {
-    if files.len() < min_files {
-        return Vec::new();
-    }
-    if max_groups == 0 {
+/// `files` in chunks of at most `max_files` (0: one chunk); a lone trailing file is left out.
+pub(super) fn mergeable_chunks(files: Vec<FileKey>, max_files: usize) -> Vec<Vec<FileKey>> {
+    if max_files == 0 {
         return vec![files];
     }
     // a lone trailing file has nothing to merge with and waits for the next round
     files
-        .chunks(max_groups)
+        .chunks(max_files)
         .filter(|chunk| chunk.len() > 1)
         .map(<[FileKey]>::to_vec)
         .collect()

@@ -24,7 +24,7 @@ use config::meta::stream::FileKey;
 use metrics_index::MetricsFileLayout;
 use search::merge::{MergeMode, hash_ordered_chains};
 
-use super::plan::{PlannedBatch, capped_batches};
+use super::plan::{PlannedBatch, mergeable_chunks};
 
 /// Extra indexed files tolerated before rewriting the closed hour.
 const METRICS_INDEX_REWRITE_SLACK: usize = 4;
@@ -114,7 +114,10 @@ fn split_into_pre_merge_groups(
 ) -> Vec<Vec<FileKey>> {
     let Some(chains) = hash_merged_chains else {
         // chains of unknown width are never rewritten: only fewer ingester files surely shrink it
-        return capped_batches(ingester, max_groups + 1, max_groups);
+        if ingester.len() <= max_groups {
+            return Vec::new();
+        }
+        return mergeable_chunks(ingester, max_groups);
     };
 
     // every ingester file spans the whole hash range, so each is a group of its own
