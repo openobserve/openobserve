@@ -241,6 +241,61 @@ describe("OTime", () => {
       },
     );
 
+    it("shows HH:MM until the seconds are set, and reads a typed HH:MM with zero seconds, with optionalSeconds", async () => {
+      wrapper = mount(OTime, {
+        attachTo: document.body,
+        props: { format24: true, withSeconds: true, optionalSeconds: true, modelValue: "09:30:00" },
+      });
+      const input = wrapper.find('input[type="text"]');
+      expect((input.element as HTMLInputElement).value).toBe("09:30");
+
+      (input.element as HTMLInputElement).value = "10:15";
+      await input.trigger("change");
+      expect(wrapper.emitted("update:modelValue")?.at(-1)).toEqual(["10:15:00"]);
+      expect((input.element as HTMLInputElement).value).toBe("10:15");
+
+      await wrapper.setProps({ modelValue: "10:15:42" });
+      expect((input.element as HTMLInputElement).value).toBe("10:15:42");
+
+      (input.element as HTMLInputElement).value = "99:99";
+      await input.trigger("change");
+      expect(wrapper.get('[role="alert"]').text()).toBe("Enter a time as HH:MM.");
+    });
+
+    it("widens a prefixed optionalSeconds field as seconds and milliseconds are typed", async () => {
+      wrapper = mount(OTime, {
+        attachTo: document.body,
+        props: {
+          format24: true,
+          withSeconds: true,
+          optionalSeconds: true,
+          prefix: "Nov 6,",
+          modelValue: "09:00:00",
+        },
+      });
+      const input = wrapper.find('input[type="text"]');
+      expect(input.attributes("size")).toBe("5");
+      expect(input.attributes("maxlength")).toBe("12");
+
+      (input.element as HTMLInputElement).value = "09:00:45";
+      await input.trigger("input");
+      expect(input.attributes("size")).toBe("8");
+
+      (input.element as HTMLInputElement).value = "09:00:45.250";
+      await input.trigger("input");
+      expect(input.attributes("size")).toBe("12");
+    });
+
+    it("keeps showing seconds without optionalSeconds", () => {
+      wrapper = mount(OTime, {
+        attachTo: document.body,
+        props: { format24: true, withSeconds: true, modelValue: "09:30:00" },
+      });
+      expect((wrapper.find('input[type="text"]').element as HTMLInputElement).value).toBe(
+        "09:30:00",
+      );
+    });
+
     it("tells the caller while a typed entry is unreadable (V-N3)", async () => {
       wrapper = mount(OTime, {
         attachTo: document.body,
@@ -283,6 +338,82 @@ describe("OTime", () => {
       expect(input.attributes("aria-describedby")).toBe(
         wrapper.get('[role="alert"]').attributes("id"),
       );
+    });
+
+    it("shows the model again when the parent refuses a typed value, if asked to", async () => {
+      wrapper = mount(OTime, {
+        attachTo: document.body,
+        props: { format24: true, withSeconds: true, modelValue: "09:00:00", revertRefused: true },
+      });
+      const input = wrapper.find('input[type="text"]');
+      (input.element as HTMLInputElement).value = "08:00:00";
+      await input.trigger("change");
+      await flushPromises();
+
+      expect(wrapper.emitted("update:modelValue")?.at(-1)).toEqual(["08:00:00"]);
+      expect((input.element as HTMLInputElement).value).toBe("09:00:00");
+    });
+
+    it("puts the clock back on the model after a refusal", async () => {
+      wrapper = mount(OTime, {
+        attachTo: document.body,
+        props: { format24: true, withSeconds: true, modelValue: "09:00:00", revertRefused: true },
+      });
+      await openPopup(wrapper);
+      const input = wrapper.find('input[type="text"]');
+      (input.element as HTMLInputElement).value = "08:30:00";
+      await input.trigger("change");
+      await flushPromises();
+
+      const shown = Array.from(
+        document.body.querySelectorAll('[data-test="otime-popup"] button.tabular-nums'),
+      ).map((b) => b.textContent?.trim());
+      expect(shown.slice(0, 2)).toEqual(["09", "00"]);
+    });
+
+    it("keeps showing the model after a refusal when the field re-renders", async () => {
+      wrapper = mount(OTime, {
+        attachTo: document.body,
+        props: { format24: true, withSeconds: true, modelValue: "09:00:00", revertRefused: true },
+      });
+      const input = wrapper.find('input[type="text"]');
+      (input.element as HTMLInputElement).value = "08:00:00";
+      await input.trigger("change");
+      await flushPromises();
+      await wrapper.setProps({ errorMessage: "Start must be before end" });
+
+      expect((input.element as HTMLInputElement).value).toBe("09:00:00");
+    });
+
+    it("keeps the typed value in the field by default, for a parent that updates its model later", async () => {
+      wrapper = mount(OTime, {
+        attachTo: document.body,
+        props: { format24: true, withSeconds: true, modelValue: "09:00:00" },
+      });
+      const input = wrapper.find('input[type="text"]');
+      (input.element as HTMLInputElement).value = "08:00:00";
+      await input.trigger("change");
+      await flushPromises();
+
+      expect((input.element as HTMLInputElement).value).toBe("08:00:00");
+    });
+
+    it("keeps a typed value the parent accepts", async () => {
+      wrapper = mount(OTime, {
+        attachTo: document.body,
+        props: {
+          format24: true,
+          withSeconds: true,
+          modelValue: "09:00:00",
+          "onUpdate:modelValue": (value: string) => wrapper.setProps({ modelValue: value }),
+        },
+      });
+      const input = wrapper.find('input[type="text"]');
+      (input.element as HTMLInputElement).value = "8:00";
+      await input.trigger("change");
+      await flushPromises();
+
+      expect((input.element as HTMLInputElement).value).toBe("08:00:00");
     });
 
     it("hides the AM/PM toggle in the popup", async () => {
@@ -331,5 +462,85 @@ describe("OTime", () => {
       expect(face.querySelectorAll("text")).toHaveLength(12);
       expect(document.body.querySelector('[aria-label="AM"]')).toBeTruthy();
     });
+  });
+
+  it("shows a read-only prefix before the time only when one is given", () => {
+    wrapper = mount(OTime, {
+      props: { modelValue: "14:02:11", withSeconds: true, prefix: "Nov 6," },
+      attrs: { "data-test": "t" },
+      attachTo: document.body,
+    });
+    expect(wrapper.find('[data-test="t-prefix"]').text()).toBe("Nov 6,");
+    wrapper.unmount();
+    wrapper = mount(OTime, { attrs: { "data-test": "t" }, attachTo: document.body });
+    expect(wrapper.find('[data-test="t-prefix"]').exists()).toBe(false);
+  });
+
+  it("keeps the clock button unless hideIcon is set", () => {
+    wrapper = mount(OTime, { props: { modelValue: "14:02:11" }, attachTo: document.body });
+    expect(wrapper.findAll("button")).toHaveLength(1);
+    wrapper.unmount();
+    wrapper = mount(OTime, {
+      props: { modelValue: "14:02:11", hideIcon: true },
+      attachTo: document.body,
+    });
+    expect(wrapper.findAll("button")).toHaveLength(0);
+    expect(wrapper.find("input").element.value).toBe("14:02:11");
+  });
+
+  it("lets a prefix ellipsize while the time keeps its width", () => {
+    wrapper = mount(OTime, {
+      props: { modelValue: "14:02:11", withSeconds: true, prefix: "Nov 6, 2025,", hideIcon: true },
+      attrs: { "data-test": "t" },
+      attachTo: document.body,
+    });
+    const prefix = wrapper.find('[data-test="t-prefix"]');
+    expect(prefix.classes()).toEqual(expect.arrayContaining(["min-w-0", "truncate", "ps-2"]));
+    expect(prefix.classes()).not.toContain("shrink-0");
+    expect(wrapper.find("input").classes()).toEqual(
+      expect.arrayContaining(["min-w-max", "shrink-0", "flex-auto", "ps-1"]),
+    );
+    expect(wrapper.find("input").classes()).not.toContain("min-w-0");
+  });
+
+  it("sizes the 24h text field to its value so a prefix cannot squeeze it", () => {
+    wrapper = mount(OTime, {
+      props: { modelValue: "14:02:11", withSeconds: true, format24: true, prefix: "Nov 6," },
+      attachTo: document.body,
+    });
+    expect(wrapper.find("input").attributes("size")).toBe("8");
+  });
+
+  it("leaves the 24h text field's width to its layout without a prefix", () => {
+    wrapper = mount(OTime, {
+      props: { modelValue: "14:02:11", withSeconds: true, format24: true },
+      attachTo: document.body,
+    });
+    expect(wrapper.find("input").attributes("size")).toBeUndefined();
+  });
+
+  it("draws no box of its own when embedded and shows the label as a caption over the time", () => {
+    wrapper = mount(OTime, {
+      props: {
+        modelValue: "14:02:11",
+        withSeconds: true,
+        format24: true,
+        hideIcon: true,
+        prefix: "Nov 6,",
+        label: "Start",
+        embedded: true,
+      },
+      attrs: { "data-test": "t" },
+      attachTo: document.body,
+    });
+    const field = wrapper.find('[role="group"]');
+    expect(field.classes()).not.toContain("border");
+    expect(field.classes().some((name) => name.startsWith("bg-"))).toBe(false);
+    expect(wrapper.find("label").classes()).toEqual(
+      expect.arrayContaining(["text-2xs", "text-text-secondary"]),
+    );
+    expect(wrapper.find('[data-test="t-prefix"]').classes()).toContain("text-text-secondary");
+    expect(wrapper.classes()).toContain("focus-within:ring-2");
+    expect(wrapper.find("input").element.value).toBe("14:02:11");
   });
 });

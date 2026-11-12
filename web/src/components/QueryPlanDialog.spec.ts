@@ -333,7 +333,7 @@ describe("QueryPlanDialog", () => {
       await selectMode(wrapper, "analyze");
       expect(mockStreamingSearch).toHaveBeenCalledTimes(1);
       expect(find(wrapper, "query-plan-analyze-fact-stream").text()).toContain("app_logs");
-      expect(find(wrapper, "query-plan-analyze-fact-range").text()).toContain("Past 15 Minutes");
+      expect(find(wrapper, "query-plan-analyze-fact-range").text()).toContain("Last 15 minutes");
       expect(find(wrapper, "query-plan-analyze-fact-took").text()).toContain("1.84s");
       expect(find(wrapper, "query-plan-analyze-fact-nodes").text()).toContain("All nodes");
       expect(find(wrapper, "query-plan-analyze-run").text()).toBe("Run EXPLAIN ANALYZE");

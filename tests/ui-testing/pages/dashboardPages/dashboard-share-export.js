@@ -1,5 +1,6 @@
 //Dashboard Share and Export Page Object
 //Methods: Share dashboard, Export dashboard
+import { openDateFields } from '../generalPages/relativePeriod.js';
 
 const { expect } = require("@playwright/test");
 const {
@@ -32,7 +33,6 @@ export default class DashboardShareExportPage {
     );
     this.toastMessage = page.locator('[data-test="o-toast-message"]');
     this.dateTimeBtn = page.locator('[data-test="date-time-btn"]');
-    this.absoluteTab = page.locator('[data-test="date-time-absolute-tab"]');
     this.settingsTabTab = page.locator('[data-test="dashboard-settings-tab-tab"]');
     this.tabListContainer = page.locator(
       '[data-test="dashboard-tab-list-container"]'
@@ -148,7 +148,7 @@ export default class DashboardShareExportPage {
   //Open the date-time picker and switch to the Absolute tab
   async openAbsoluteDateTime() {
     await this.dateTimeBtn.click();
-    await this.absoluteTab.click();
+    await openDateFields(this.page);
   }
 
   //Open settings drawer and switch to the Tab section

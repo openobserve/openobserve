@@ -1,5 +1,6 @@
 // Backs dashboard-panel-live-preview.spec.js (openobserve#15214).
 import { expect } from "@playwright/test";
+import { pickRelativePeriod } from "../generalPages/relativePeriod.js";
 import {
   ORG,
   createDashboard,
@@ -23,13 +24,9 @@ export default class DashboardLivePreview {
     this.streamSelect = page.locator('[data-test="index-dropdown-stream"]');
     this.chartRenderer = page.locator('[data-test="chart-renderer"]');
     this.dateTimeBtn = page.locator('[data-test="date-time-btn"]');
-    this.relativeTab = page.locator('[data-test="date-time-relative-tab"]');
+    this.relativeTab = page.locator('#date-time-menu');
     this.pickerApplyBtn = page.locator('[data-test="date-time-apply-btn"]');
     this.panelRuns = null;
-  }
-
-  relativeOption(value, unit) {
-    return this.page.locator(`[data-test="date-time-relative-${value}-${unit}-btn"]`);
   }
 
   async pinAutoQuery(enabled) {
@@ -193,8 +190,7 @@ export default class DashboardLivePreview {
   async pickRelativeTime(value, unit) {
     await this.dateTimeBtn.click();
     await this.relativeTab.waitFor({ state: "visible", timeout: 10000 });
-    await this.relativeTab.click();
-    await this.relativeOption(value, unit).click();
+    await pickRelativePeriod(this.page, value, unit);
   }
 
   async expectNoPickerApply() {
@@ -202,7 +198,8 @@ export default class DashboardLivePreview {
   }
 
   async closeTimePicker() {
-    await this.page.keyboard.press("Escape");
+    // A pick closes the picker itself; Escape then would reach the panel editor underneath.
+    if (await this.relativeTab.isVisible()) await this.page.keyboard.press("Escape");
     await expect(this.relativeTab).toBeHidden({ timeout: 5000 });
   }
 

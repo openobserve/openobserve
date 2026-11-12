@@ -1,9 +1,10 @@
 import { expect } from '@playwright/test';
 import { confirmDraftSignOut } from '../generalPages/draftSignOut.js';
 import {
-  dateTimeButtonLocator, relative30SecondsButtonLocator, absoluteTabLocator,
+  dateTimeButtonLocator,
   Past30SecondsValue, openNavFlyoutChild
 } from '../commonActions.js';
+import { openDateFields, pickRelativePeriod } from '../generalPages/relativePeriod.js';
 
 export class ReportsPage {
   constructor(page) {
@@ -99,8 +100,6 @@ export class ReportsPage {
 
     // Common time-range locators (used by Logs/Reports/Dashboards screens, exported as data-test)
     this.dateTimeButton = dateTimeButtonLocator;
-    this.relative30SecondsButton = page.locator(relative30SecondsButtonLocator);
-    this.absoluteTab = absoluteTabLocator;
 
     // Header / profile / logout
     this.profileButton = page.locator('[data-test="header-my-account-profile-icon"]');
@@ -131,9 +130,6 @@ export class ReportsPage {
 
     // Date/Time locators wrapped as Locator (the constants are CSS selector strings)
     this.dateTimeButtonLocator = page.locator(dateTimeButtonLocator);
-    this.absoluteTabLocator = page.locator(absoluteTabLocator);
-    this.absoluteStartTimeField = page.locator('[data-test="date-time-absolute-start-time-field"]');
-    this.absoluteEndTimeField = page.locator('[data-test="date-time-absolute-end-time-field"]');
   }
 
   // Returns the search-input locator preferring the inner -field variant when present
@@ -456,26 +452,19 @@ export class ReportsPage {
   async setTimeToPast30Seconds() {
     // Set the time filter to the last 30 seconds
     await this.dateTimeButtonLocator.click({ force: true });
-    await this.relative30SecondsButton.click({ force: true });
+    await pickRelativePeriod(this.page, '30', 's');
   }
 
   async verifyTimeSetTo30Seconds() {
-    // Verify that the time filter displays "Past 30 Seconds"
+    // Verify that the time filter displays "Last 30 seconds"
     await expect(this.dateTimeButtonLocator).toContainText(Past30SecondsValue);
   }
 
   async setDateTime() {
     await expect(this.dateTimeButtonLocator).toBeVisible();
     await this.dateTimeButtonLocator.click({ force: true });
-    await this.absoluteTabLocator.click({ force: true });
+    await openDateFields(this.page);
     await this.page.waitForTimeout(1000);
-  }
-
-  async fillTimeRange(startTime, endTime) {
-    // Absolute-tab calendar — first day cell, then access_time input (left untouched: this method isn't used by reportsScheduleNow)
-    await this.absoluteTabLocator.click({ force: true });
-    await this.absoluteStartTimeField.fill(startTime);
-    await this.absoluteEndTimeField.fill(endTime);
   }
 
   async verifyDateTime(startTime, endTime) {

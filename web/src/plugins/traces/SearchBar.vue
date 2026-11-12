@@ -311,13 +311,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             searchObj.meta.searchMode !== 'service-graph' &&
             searchObj.meta.searchMode !== 'services-catalog'
           "
-          class="flex items-center gap-2 max-lg:w-full max-lg:flex-wrap max-lg:justify-end max-lg:gap-y-1"
+          class="flex min-w-0 items-center gap-2 max-lg:w-full max-lg:flex-wrap max-lg:justify-end max-lg:gap-y-1"
         >
           <OPageHeaderStatus />
           <DateTime
             ref="dateTimeRef"
             auto-apply
             menu-align="end"
+            shortcuts
             :default-type="searchObj.data.datetime.type"
             :default-absolute-time="{
               startTime: searchObj.data.datetime.startTime,
@@ -328,6 +329,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             calendar-presets
             :queryRangeRestrictionInHour="searchObj.data.datetime.queryRangeRestrictionInHour"
             :queryRangeRestrictionMsg="searchObj.data.datetime.queryRangeRestrictionMsg"
+            :retention-days="tracesStreamLimits.retentionDays"
             class="h-8.5! max-lg:me-auto max-md:[&_.date-time-label]:hidden"
             @on:date-change="updateDateTime"
             @on:timezone-change="updateTimezone"
@@ -444,6 +446,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <ShareButton
             data-test="logs-search-bar-share-link-btn"
             :url="tracesShareURL"
+            :live-url="shareRollingURL"
+            :fixed-label="shareFixedLabel"
+            :fixed-copy-label="shareFixedCopyLabel"
+            :live-label="shareRollingLabel"
+            :range-context="shareRangeContext"
             variant="outline"
             size="icon-md"
             shortcut-id="tracesCopyUrl"
@@ -530,7 +537,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Service Graph right toolbar: DateTime, Refresh, Tree/Graph tabs, Layout -->
-        <div v-if="searchObj.meta.searchMode === 'service-graph'" class="ms-auto max-lg:ms-0">
+        <div
+          v-if="searchObj.meta.searchMode === 'service-graph'"
+          class="ms-auto min-w-0 max-lg:ms-0"
+        >
           <div class="flex items-center gap-2 max-lg:w-full max-lg:justify-end max-lg:gap-1.5">
             <OPageHeaderStatus />
             <DateTime
@@ -583,7 +593,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Services Catalog right toolbar: DateTime, Refresh -->
-        <div v-if="searchObj.meta.searchMode === 'services-catalog'" class="ms-auto">
+        <div v-if="searchObj.meta.searchMode === 'services-catalog'" class="ms-auto min-w-0">
           <div class="flex items-center gap-2">
             <OPageHeaderStatus />
             <DateTime
@@ -770,6 +780,9 @@ import { useStore } from "vuex";
 
 import DateTime from "@/components/DateTime.vue";
 import ShareButton from "@/components/common/ShareButton.vue";
+import { fixedShareLabel, withRollingPeriod } from "@/utils/shareTimeRange";
+import { useStreamTimeLimits } from "@/composables/useStreamTimeLimits";
+import { formatPeriodLabel } from "@/utils/timeRangeRail";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -924,6 +937,32 @@ export default defineComponent({
     const store = useStore();
 
     const { searchObj, tracesShareURL, tracesParser } = useTraces();
+    const tracesStreamLimits = useStreamTimeLimits(() => [
+      { name: String(searchObj.data.stream.selectedStream?.value ?? ""), type: "traces" },
+    ]);
+
+    // A rolling range can also be shared as its period; the default click still copies the fixed window.
+    const shareRollingURL = computed(() => {
+      const date = searchObj.data.datetime;
+      if (date.type !== "relative") return "";
+      return withRollingPeriod(tracesShareURL.value, date.relativeTimePeriod) ?? "";
+    });
+    const shareFixedLabel = computed(() => {
+      const { startTime, endTime } = searchObj.data.datetime;
+      return fixedShareLabel(Number(startTime), Number(endTime), store.state.timezone);
+    });
+    const shareFixedCopyLabel = computed(() => {
+      const { startTime, endTime } = searchObj.data.datetime;
+      return fixedShareLabel(Number(startTime), Number(endTime), "UTC");
+    });
+    const shareRangeContext = computed(() =>
+      [t("menu.traces"), searchObj.data.stream.selectedStream?.value].filter(Boolean).join(" · "),
+    );
+    const shareRollingLabel = computed(() => {
+      const date = searchObj.data.datetime;
+      if (date.type !== "relative" || !date.relativeTimePeriod) return "";
+      return String(formatPeriodLabel(date.relativeTimePeriod, store.state.timezone, t));
+    });
     const queryEditorRef = ref(null);
 
     const nlpMode = ref(false);
@@ -1814,6 +1853,12 @@ export default defineComponent({
       onErrorOnlyToggle,
       updateNewDateTime,
       tracesShareURL,
+      shareRollingURL,
+      shareFixedLabel,
+      shareFixedCopyLabel,
+      shareRangeContext,
+      tracesStreamLimits,
+      shareRollingLabel,
       config,
       applyFilters,
       removeFilterByField,

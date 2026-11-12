@@ -107,31 +107,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             {{ timeString }} ({{ store.state.timezone }})
           </div>
-          <!-- do not show date time picker for print mode -->
-          <DateTimePickerDashboard
-            v-if="selectedDate"
-            v-show="store.state.printMode === false"
-            ref="dateTimePicker"
-            class="dashboard-icons max-md:[&_.date-time-label]:hidden"
-            size="sm"
-            :modelValue="pickedDate ?? selectedDate"
-            :auto-apply-dashboard="true"
-            :initialTimezone="initialTimezone"
-            :disable="arePanelsLoading"
-            calendar-presets
-            @update:modelValue="timeGate.onPick"
-            @show="timeGate.onShow"
-            @hide="onTimePickerHide"
-            @timezone-change="timeGate.flush"
-            data-test="dashboard-global-date-time-picker"
-          />
+          <span id="dashboard-header-time" class="contents" />
           <!-- Kiosk keeps this mounted on every width: it owns the refresh value and its URL sync. -->
           <AutoRefreshInterval
             v-if="!isMobile || kioskMode"
             v-model="refreshInterval"
             trigger
             :min-refresh-interval="store.state?.zoConfig?.min_auto_refresh_interval || 5"
+            :range-end-us="refreshRangeEndUs"
+            :range-start-us="refreshRangeStartUs"
             @trigger="onAutoRefreshTick"
+            @live="goLiveRange"
             class="dashboard-icons hideOnPrintMode"
             size="sm"
           />
@@ -318,7 +304,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model="refreshInterval"
             trigger
             :min-refresh-interval="store.state?.zoConfig?.min_auto_refresh_interval || 5"
+            :range-end-us="refreshRangeEndUs"
+            :range-start-us="refreshRangeStartUs"
             @trigger="onAutoRefreshTick"
+            @live="goLiveRange"
             class="dashboard-icons hideOnPrintMode"
             size="sm"
           />
@@ -327,6 +316,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButtonGroup v-if="!isFullscreen" v-show="store.state.printMode !== true">
               <ShareButton
                 :url="dashboardShareURL"
+                :live-url="dashboardRollingURL"
+                default-kind="live"
+                :fixed-label="dashboardFixedLabel"
+                :live-label="dashboardRollingLabel"
+                :range-context="dashboardShareContext"
                 @copy:success="onDashboardShared"
                 variant="outline"
                 :size="isMobile ? 'icon-toolbar' : 'sm-toolbar'"
@@ -536,6 +530,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </template>
 
+        <!-- A phone gives the picker its own row, so its label is never hidden. -->
+        <div
+          v-show="hasTimeRow"
+          id="dashboard-time-row"
+          class="border-border-default px-page-edge flex min-w-0 shrink-0 items-center border-b py-2"
+          data-test="dashboard-time-row"
+        />
+        <!-- One instance on every width, since a remount re-applies the opening URL's zone. -->
+        <!-- Both targets are always in the DOM, so a move never waits on another component's render. -->
+        <Teleport defer :to="hasTimeRow ? '#dashboard-time-row' : '#dashboard-header-time'">
+          <DateTimePickerDashboard
+            v-if="selectedDate"
+            v-show="store.state.printMode === false"
+            ref="dateTimePicker"
+            shortcuts
+            class="dashboard-icons"
+            :class="{ 'min-w-0 flex-1': hasTimeRow }"
+            size="sm"
+            :modelValue="timeGate.picked.value ?? selectedDate"
+            :auto-apply-dashboard="true"
+            :initialTimezone="initialTimezone"
+            :disable="arePanelsLoading"
+            :retention-days="dashboardStreamLimits.retentionDays"
+            :query-range-restriction-in-hour="dashboardStreamLimits.queryRangeRestrictionInHour"
+            calendar-presets
+            preset="dashboard"
+            zone-badge="always"
+            @update:modelValue="timeGate.onApply"
+            @show="timeGate.onShow"
+            @hide="onTimePickerHide"
+            @timezone-change="timeGate.flush"
+            data-test="dashboard-global-date-time-picker"
+          />
+        </Teleport>
         <KioskStrip
           v-if="kioskMode && !playlistEmbed"
           :title="currentDashboardData.data?.title"
@@ -724,6 +752,10 @@ import { useStore } from "vuex";
 import { useI18nTyped } from "@/types/i18n";
 import { ANNOTATION_PREVIEW_CONTEXT_KEY } from "@/composables/dashboard/useDashboardAnnotationSources";
 import ShareButton from "@/components/common/ShareButton.vue";
+import { dashboardTimeUs, fixedShareLabel, withRollingPeriod } from "@/utils/shareTimeRange";
+import { useStreamTimeLimits } from "@/composables/useStreamTimeLimits";
+import { fixedRangeEnd } from "@/utils/autoRefreshPause";
+import { formatPeriodLabel } from "@/utils/timeRangeRail";
 import analytics from "@/services/product_analytics";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import {
@@ -908,6 +940,9 @@ export default defineComponent({
       store.dispatch("setKioskMode", true);
     }
     const kioskMode = computed(() => store.state.kioskMode === true);
+    const hasTimeRow = computed(
+      () => isMobile.value && !kioskMode.value && store.state.printMode !== true,
+    );
     const kioskFit = computed(() => isFitEnabled(route.query.fit));
     const { active: kioskPointerActive } = useIdleReveal(kioskMode);
 
@@ -1026,7 +1061,7 @@ export default defineComponent({
 
     const dateTimePicker = ref(null); // holds a reference to the date time picker
 
-    // The applied range: what panels, the URL and the Share link use. The picker's own value is `pickedDate`.
+    // The applied range: what panels, the URL and the Share link use. The picker's own value is `timeGate.picked`.
     const selectedDate = ref(null);
 
     // holds the current time for the dashboard
@@ -2573,6 +2608,65 @@ export default defineComponent({
       return urlObj?.href;
     });
 
+    // Dashboards share as rolling by default (P3), so a link opened later shows the same period.
+    const dashboardPeriod = computed(() => {
+      const period = route.query.period;
+      return typeof period === "string" && period ? period : null;
+    });
+    const dashboardRollingURL = computed(
+      () => withRollingPeriod(dashboardShareURL.value, dashboardPeriod.value) ?? "",
+    );
+    const dashboardRollingLabel = computed(() =>
+      dashboardPeriod.value
+        ? String(formatPeriodLabel(dashboardPeriod.value, store.state.timezone, t))
+        : "",
+    );
+    const dashboardFixedLabel = computed(() => {
+      const bounds = dashboardTimeUs(
+        currentTimeObj.value as { start_time?: Date; end_time?: Date },
+      );
+      return bounds
+        ? fixedShareLabel(bounds.startUs, bounds.endUs, store.state.timezone, "dashboard")
+        : "";
+    });
+    // Every panel's stream bounds the picker: the longest retention greys, the smallest query limit caps.
+    const dashboardStreamLimits = useStreamTimeLimits(() =>
+      (currentDashboardData.data?.tabs ?? []).flatMap((tab: any) =>
+        (tab?.panels ?? []).flatMap((panel: any) =>
+          (panel?.queries ?? []).map((query: any) => ({
+            name: String(query?.fields?.stream ?? ""),
+            type: String(query?.fields?.stream_type ?? "logs"),
+          })),
+        ),
+      ),
+    );
+
+    const dashboardShareContext = computed(() => {
+      const title = currentDashboardData.data?.title;
+      return title ? `${t("menu.dashboard")} · ${title}` : "";
+    });
+    // selectedDate keeps a default relativeTimePeriod on absolute ranges, so only type and end decide.
+    const refreshRangeEndUs = computed(() =>
+      fixedRangeEnd({
+        valueType: (selectedDate.value as { valueType?: string } | null)?.valueType,
+        endTime: dashboardTimeUs(currentTimeObj.value as { start_time?: Date; end_time?: Date })
+          ?.endUs,
+      }),
+    );
+    const refreshRangeStartUs = computed(() =>
+      refreshRangeEndUs.value === null
+        ? null
+        : (dashboardTimeUs(currentTimeObj.value as { start_time?: Date; end_time?: Date })
+            ?.startUs ?? null),
+    );
+    // Live may land while auto-run is off, so apply it here rather than leave it waiting.
+    const goLiveRange = async () => {
+      const picker = dateTimePicker.value as { dateTimePicker?: { goLive?: () => void } } | null;
+      picker?.dateTimePicker?.goLive?.();
+      await nextTick();
+      timeGate.apply();
+    };
+
     // Fullscreen
     const fullscreenDiv = ref(null);
     const isFullscreen = ref(false);
@@ -2965,6 +3059,7 @@ export default defineComponent({
 
     return {
       isMobile,
+      hasTimeRow,
       currentDashboardData,
       dashboardRemountKey,
       toggleFullscreen,
@@ -3000,7 +3095,6 @@ export default defineComponent({
       isRefreshPending,
       refreshTooltip,
       timeGate,
-      pickedDate: timeGate.picked,
       onTimePickerHide,
       refreshedVariablesDataUpdated,
       onDeletePanel,
@@ -3022,6 +3116,14 @@ export default defineComponent({
       getQueryParamsForDuration,
       onDataZoom,
       dashboardShareURL,
+      dashboardRollingURL,
+      dashboardRollingLabel,
+      dashboardFixedLabel,
+      dashboardShareContext,
+      dashboardStreamLimits,
+      refreshRangeEndUs,
+      refreshRangeStartUs,
+      goLiveRange,
       onDashboardShared,
       exportDashboard,
       kioskSetupOpen,

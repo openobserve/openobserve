@@ -25,6 +25,20 @@ describe("OPopover", () => {
     expect(wrapper.find('[data-testid="trigger"]').exists()).toBe(true);
   });
 
+  it("keeps its trigger working when the content is anchored to another element", async () => {
+    const group = document.createElement("div");
+    document.body.appendChild(group);
+    const wrapper = mount(OPopover, {
+      props: { anchor: group },
+      slots: { trigger: '<button data-testid="trigger">Open</button>' },
+      attachTo: group,
+    });
+    await wrapper.find('[data-testid="trigger"]').trigger("click");
+    expect(wrapper.emitted("update:open")?.[0]).toEqual([true]);
+    wrapper.unmount();
+    group.remove();
+  });
+
   it("is closed by default", () => {
     const wrapper = mount(OPopover, {
       slots: {

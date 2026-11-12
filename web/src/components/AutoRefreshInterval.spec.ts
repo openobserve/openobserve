@@ -1,4 +1,5 @@
 import { mount } from "@vue/test-utils";
+import { defineComponent } from "vue";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import i18n from "@/locales";
@@ -491,6 +492,163 @@ describe("AutoRefreshInterval", () => {
       expect(wrapper.find('[data-test="auto-refresh-footer"]').text()).toBe(
         "Applies to relative time ranges only",
       );
+    });
+  });
+
+  describe("paused states (S12)", () => {
+    let visibility: DocumentVisibilityState = "visible";
+    const setVisibility = (state: DocumentVisibilityState) => {
+      visibility = state;
+      document.dispatchEvent(new Event("visibilitychange"));
+    };
+    const triggers = () => (wrapper.emitted("trigger") ?? []).length;
+    const label = () => wrapper.find('[data-test="auto-refresh-trigger-label"]').text();
+    const liveBtn = () => wrapper.find('[data-test="auto-refresh-go-live-btn"]');
+    const running = async (props: Record<string, unknown> = {}) => {
+      wrapper = createWrapper({ trigger: true, ...props });
+      await wrapper.setProps({ modelValue: 10 });
+    };
+
+    beforeEach(() => {
+      visibility = "visible";
+      Object.defineProperty(document, "visibilityState", {
+        configurable: true,
+        get: () => visibility,
+      });
+    });
+
+    afterEach(() => {
+      delete (document as { visibilityState?: unknown }).visibilityState;
+    });
+
+    it("an ended fixed range shows the paused label, a warning pause icon and Go live, and never ticks", async () => {
+      await running({ rangeEndUs: (Date.now() - 60_000) * 1000 });
+      expect(label()).toBe("Paused · range ended");
+      const btn = wrapper.find('[data-test="logs-search-bar-refresh-interval-btn-dropdown"]');
+      expect(btn.find(".OIcon").attributes("data-icon")).toBe("pause");
+      expect(btn.find(".OIcon").classes()).toContain("text-status-warning-text");
+      expect(btn.attributes("aria-label")).toBe("Auto refresh, paused: range ended");
+      expect(liveBtn().exists()).toBe(true);
+      expect(liveBtn().text()).toContain("Go live");
+      vi.advanceTimersByTime(60_000);
+      expect(triggers()).toBe(0);
+      await liveBtn().trigger("click");
+      expect(wrapper.emitted("live")).toHaveLength(1);
+    });
+
+    it("Go live names the length it switches to", async () => {
+      const endUs = (Date.now() - 60_000) * 1000;
+      await running({ rangeEndUs: endUs, rangeStartUs: endUs - 15 * 60 * 1_000_000 });
+      expect(wrapper.vm.goLiveTooltip).toBe("Switch to Last 15m and resume refresh");
+      await wrapper.setProps({ rangeStartUs: null });
+      expect(wrapper.vm.goLiveTooltip).toBe("Follow now and resume refresh");
+    });
+
+    it("a rolling range or an Off interval never shows the paused state", async () => {
+      await running({ rangeEndUs: null });
+      expect(liveBtn().exists()).toBe(false);
+      await wrapper.setProps({ modelValue: 0, rangeEndUs: (Date.now() - 1000) * 1000 });
+      expect(liveBtn().exists()).toBe(false);
+      expect(label()).toBe("Auto: Off");
+    });
+
+    it("a fixed range that ends mid-run stops at the first tick past its end", async () => {
+      await running({ rangeEndUs: (Date.now() + 15_000) * 1000 });
+      vi.advanceTimersByTime(10_000);
+      expect(triggers()).toBe(1);
+      vi.advanceTimersByTime(30_000);
+      await wrapper.vm.$nextTick();
+      expect(triggers()).toBe(1);
+      expect(liveBtn().exists()).toBe(true);
+    });
+
+    it("switching back to a rolling range resumes the timer", async () => {
+      await running({ rangeEndUs: (Date.now() - 1000) * 1000 });
+      await wrapper.setProps({ rangeEndUs: null });
+      expect(liveBtn().exists()).toBe(false);
+      vi.advanceTimersByTime(10_000);
+      expect(triggers()).toBe(1);
+    });
+
+    it("a hidden tab stops ticking and runs exactly one catch-up on return", async () => {
+      await running();
+      setVisibility("hidden");
+      vi.advanceTimersByTime(60_000);
+      expect(triggers()).toBe(0);
+      setVisibility("visible");
+      expect(triggers()).toBe(1);
+      await wrapper.setProps({ isCompact: true });
+      expect(wrapper.vm.compactTooltip).toBe("Paused while the tab was hidden · caught up");
+      vi.advanceTimersByTime(10_000);
+      expect(triggers()).toBe(2);
+      expect(wrapper.vm.caughtUp).toBe(false);
+    });
+
+    it("returning before a tick fell due owes no catch-up", async () => {
+      await running();
+      vi.advanceTimersByTime(4_000);
+      setVisibility("hidden");
+      vi.advanceTimersByTime(3_000);
+      setVisibility("visible");
+      expect(triggers()).toBe(0);
+    });
+
+    it("an ended range owes no catch-up on return", async () => {
+      await running({ rangeEndUs: (Date.now() + 5_000) * 1000 });
+      setVisibility("hidden");
+      vi.advanceTimersByTime(60_000);
+      setVisibility("visible");
+      expect(triggers()).toBe(0);
+    });
+
+    it("stays stopped while kept alive in the background, through tab switches and range changes", async () => {
+      const Host = defineComponent({
+        components: { AutoRefreshInterval },
+        props: {
+          shown: { type: Boolean, default: true },
+          rangeEndUs: { type: Number, default: null },
+        },
+        template: `<KeepAlive><AutoRefreshInterval v-if="shown" :model-value="10" trigger :range-end-us="rangeEndUs" /><div v-else /></KeepAlive>`,
+      });
+      const host = mount(Host, { global: { plugins: [i18n, mockRouter] } });
+      await host.vm.$nextTick();
+      const inner = host.findComponent(AutoRefreshInterval);
+      const emitted = () => (inner.emitted("trigger") ?? []).length;
+      vi.advanceTimersByTime(10_000);
+      const before = emitted();
+
+      await host.setProps({ shown: false });
+      vi.advanceTimersByTime(60_000);
+      setVisibility("hidden");
+      setVisibility("visible");
+      await host.setProps({ rangeEndUs: (Date.now() + 3_600_000) * 1000 });
+      vi.advanceTimersByTime(60_000);
+      expect(emitted()).toBe(before);
+
+      await host.setProps({ shown: true });
+      vi.advanceTimersByTime(10_000);
+      expect(emitted()).toBe(before + 1);
+      host.unmount();
+    });
+
+    it("leaves focus off the trigger after a pick, but returns it after a dismissal", async () => {
+      wrapper = createWrapper({ trigger: true });
+      wrapper.vm.onPick({ value: 10 });
+      const afterPick = new Event("focus", { cancelable: true });
+      wrapper.vm.onCloseAutoFocus(afterPick);
+      expect(afterPick.defaultPrevented).toBe(true);
+      const afterEscape = new Event("focus", { cancelable: true });
+      wrapper.vm.onCloseAutoFocus(afterEscape);
+      expect(afterEscape.defaultPrevented).toBe(false);
+    });
+
+    it("stops listening for visibility changes once unmounted", async () => {
+      await running();
+      wrapper.unmount();
+      setVisibility("hidden");
+      setVisibility("visible");
+      expect(triggers()).toBe(0);
+      wrapper = null;
     });
   });
 });

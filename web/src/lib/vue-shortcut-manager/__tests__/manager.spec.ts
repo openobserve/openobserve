@@ -923,3 +923,64 @@ describe("scope ownership sequences (4a §3.6)", () => {
     wrapper.unmount();
   });
 });
+
+describe("time range keys across layouts and modals", () => {
+  let manager: ShortcutManager;
+
+  beforeEach(() => {
+    resetManager();
+    manager = new ShortcutManager();
+    document.body.innerHTML = "";
+  });
+
+  it("fires a code binding on the bare physical key when the layout types another symbol there", () => {
+    const handler = vi.fn();
+    manager.register({ key: "[", handler });
+    manager.register({ key: "code:BracketLeft", handler, hidden: true });
+
+    manager.handleKeyDown(fakeEvent({ key: "ü", code: "BracketLeft" }));
+    expect(handler).toHaveBeenCalledOnce();
+
+    manager.handleKeyDown(fakeEvent({ key: "[", code: "BracketLeft" }));
+    expect(handler).toHaveBeenCalledTimes(2);
+  });
+
+  it("never fires a code binding with a modifier held", () => {
+    const handler = vi.fn();
+    manager.register({ key: "code:BracketLeft", handler });
+    manager.handleKeyDown(fakeEvent({ key: "Ü", code: "BracketLeft", shiftKey: true }));
+    manager.handleKeyDown(fakeEvent({ key: "[", code: "Digit8", ctrlKey: true, altKey: true }));
+    expect(handler).not.toHaveBeenCalled();
+  });
+
+  it("keeps a skip-under-modal key quiet while a modal hides the page", () => {
+    const handler = vi.fn();
+    manager.register({ key: "t", handler, skipUnderModal: true });
+    const hidden = document.createElement("main");
+    hidden.setAttribute("data-aria-hidden", "true");
+    document.body.appendChild(hidden);
+
+    manager.handleKeyDown(fakeEvent({ key: "t", target: document.body }));
+    expect(handler).not.toHaveBeenCalled();
+
+    hidden.remove();
+    manager.handleKeyDown(fakeEvent({ key: "t", target: document.body }));
+    expect(handler).toHaveBeenCalledOnce();
+  });
+
+  it("registers the registry's physical-key twin for [ and ], hidden from the cheatsheet", () => {
+    const handler = vi.fn();
+    const Comp = defineComponent({
+      setup() {
+        useShortcuts([{ id: "timeRangePrevious", handler }]);
+        return () => h("div");
+      },
+    });
+    const wrapper = mount(Comp);
+    const twin = getManager()!.getById("timeRangePrevious-code");
+    expect(twin?.key).toBe("code:bracketleft");
+    expect(twin?.hidden).toBe(true);
+    expect(twin?.skipUnderModal).toBe(true);
+    wrapper.unmount();
+  });
+});

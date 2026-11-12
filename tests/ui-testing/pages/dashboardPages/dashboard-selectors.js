@@ -108,7 +108,6 @@ const DASHBOARD = {
 
   // Date/Time
   DATE_TIME_BTN: '[data-test="date-time-btn"]',
-  DATE_TIME_RELATIVE_6H: '[data-test="date-time-relative-6-h-btn"]',
 };
 
 /**

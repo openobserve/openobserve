@@ -175,14 +175,14 @@ describe("ConfigPanel panel-specific time range (real picker)", { timeout: 30_00
       )!
       .click();
     await flushPromises();
-    el("date-time-rail-calendar-last-week")!.click();
+    el("date-time-list-calendar-last-week")!.click();
     await flushPromises();
 
     expect(panel.data.config.panel_time_range).toEqual({
       type: "relative",
       relativeTimePeriod: "calendar:week:-1",
     });
-    expect(pickerLabel()).toBe("Last week");
+    expect(pickerLabel()).toBe("Previous week");
   });
 
   it("shows a saved calendar range in the panel picker when the panel is edited again", async () => {
@@ -192,6 +192,6 @@ describe("ConfigPanel panel-specific time range (real picker)", { timeout: 30_00
     });
     await flushPromises();
 
-    expect(pickerLabel()).toBe("Last week");
+    expect(pickerLabel()).toBe("Previous week");
   });
 });

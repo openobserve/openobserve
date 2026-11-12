@@ -10,7 +10,7 @@
   OCombobox / nested dropdowns) opening INSIDE the popover never dismiss it.
 
   Props: open (v-model) | anchor | side | align | flipAlign | sideOffset | arrow | hideWhenDetached | closeOnScroll | modal | ariaLabel | contentClass | collisionPadding
-  Slots: trigger (unused when `anchor` is set) | default | arrow (paths in a 12x6 viewBox)
+  Slots: trigger (with `anchor` it still opens the popover; the content aligns to the anchor) | default | arrow (paths in a 12x6 viewBox)
   Emits: update:open | open-auto-focus
 -->
 <script lang="ts">
@@ -62,7 +62,7 @@ const { lgUp } = useBreakpoint();
 const props = withDefaults(
   defineProps<{
     open?: boolean;
-    /** Positions against this element instead of a trigger, for a popover opened by code rather than a click on its own control. */
+    /** Positions against this element instead of the trigger, e.g. a popover opened by code, or a trigger inside a wider group. */
     anchor?: Element | null;
     /** Trap focus + block outside pointer events. Popovers are non-modal by default. */
     modal?: boolean;
@@ -104,6 +104,8 @@ const emit = defineEmits<{
   "pointer-down-outside": [Event];
   /** Forwards reka's outside focus; `preventDefault()` keeps the popover open. */
   "focus-outside": [Event];
+  /** Forwards reka's return of focus to the trigger on close; `preventDefault()` leaves focus where it is. */
+  "close-auto-focus": [Event];
 }>();
 
 // Vue boolean-casts an absent `open` prop to `false`, which would lock
@@ -257,7 +259,7 @@ onBeforeUnmount(() => {
 <template>
   <PopoverRoot :open="internalOpen" :modal="modal" @update:open="handleOpenChange">
     <PopoverAnchor v-if="anchor" :reference="anchor" class="hidden" />
-    <PopoverTrigger v-else ref="triggerRef" as-child>
+    <PopoverTrigger v-if="!anchor || $slots.trigger" ref="triggerRef" as-child>
       <slot name="trigger" />
     </PopoverTrigger>
 
@@ -275,6 +277,7 @@ onBeforeUnmount(() => {
         @pointer-down-outside="handlePointerDownOutside"
         @focus-outside="handleFocusOutside"
         @open-auto-focus="(e) => emit('open-auto-focus', e)"
+        @close-auto-focus="(e) => emit('close-auto-focus', e)"
         :class="[
           'outline-none max-lg:max-w-[calc(100vw-1rem)]',
           'max-lg:max-h-[var(--reka-popper-available-height,75vh)] max-lg:overflow-y-auto',

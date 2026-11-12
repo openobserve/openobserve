@@ -24,6 +24,7 @@ import ArrowDownward from "~icons/material-symbols/arrow-downward";
 import ArrowDropDown from "~icons/material-symbols/arrow-drop-down";
 import ArrowDropUp from "~icons/material-symbols/arrow-drop-up";
 import ArrowForward from "~icons/material-symbols/arrow-forward";
+import ArrowRange from "~icons/material-symbols/arrow-range";
 import ArrowUpward from "~icons/material-symbols/arrow-upward";
 import Article from "~icons/material-symbols/article-outline";
 import Attachment from "~icons/material-symbols/attachment";
@@ -384,6 +385,7 @@ export const iconRegistry = {
   "arrow-drop-down": ArrowDropDown,
   "arrow-drop-up": ArrowDropUp,
   "arrow-forward": ArrowForward,
+  "arrow-range": ArrowRange,
   "arrow-upward": ArrowUpward,
   article: Article,
   attachment: Attachment,

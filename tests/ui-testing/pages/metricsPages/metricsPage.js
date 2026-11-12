@@ -1,6 +1,7 @@
 // metricsPage.js
 import { expect } from '@playwright/test';
 import { gotoMetricsVisualize } from '../commonActions.js';
+import { pickRelativePeriod } from '../generalPages/relativePeriod.js';
 const { isCloudEnvironment } = require('../cloudPages/cloud-env.js');
 const { getOrgIdentifier } = require('../../playwright-tests/utils/cloud-auth.js');
 
@@ -57,7 +58,6 @@ export class MetricsPage {
         // Date/time picker (shared metrics control)
         this.dateTimePicker = page.locator('[data-test="metrics-date-picker"]');
         // Relative tab inside DateTime popover
-        this.dateTimeRelativeTab = page.locator('[data-test="date-time-relative-tab"]');
         // Datetime start/end input (absolute mode)
         this.dateTimeStartInput = page.locator('[data-test="datetime-start-time"]');
         // Auto-refresh button (toggles dropdown)
@@ -80,8 +80,8 @@ export class MetricsPage {
         // Chart-area error rendered by PanelSchemaRenderer when errorDetail.message is set
         this.chartErrorMessage = page.locator('[data-test="panel-schema-renderer-error-message"]');
 
-        // Date-time relative buttons (data-test pattern: date-time-relative-{value}-{unit}-btn)
-        this.dateTimeRelative15m = page.locator('[data-test="date-time-relative-15-m-btn"]');
+        // Date-time chips (data-test pattern: date-time-chip-{value}{unit})
+        this.dateTimeRelative15m = page.locator('[data-test="date-time-chip-15m"]');
 
         // Query editor / mode buttons
         this.customQueryTypeButton = page.locator('[data-test="dashboard-custom-query-type"]');
@@ -990,7 +990,7 @@ export class MetricsPage {
 
     async selectLast15Minutes() {
         await this.openDatePicker();
-        // Date-picker relative buttons have data-test="date-time-relative-15-m-btn"
+        // The picker's 15m chip has data-test="date-time-chip-15m"
         const last15Min = this.dateTimeRelative15m.first();
         if (await last15Min.isVisible({ timeout: 3000 }).catch(() => false)) {
           // Popover portal animates in — ensure the button is enabled (animations settled)
@@ -1396,13 +1396,8 @@ export class MetricsPage {
             };
             const unit = unitMap[unitRaw] || 'm';
 
-            // Use the actual data-test selector pattern from DateTime.vue
-            // Pattern: [data-test="date-time-relative-{value}-{unit}-btn"]
-            const dateTimeSelector = `[data-test="date-time-relative-${value}-${unit}-btn"]`;
-            const dateTimeBtn = this.page.locator(dateTimeSelector);
-
-            if (await dateTimeBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-                await dateTimeBtn.click();
+            if (await this.page.locator('#date-time-menu').first().isVisible({ timeout: 3000 }).catch(() => false)) {
+                await pickRelativePeriod(this.page, value, unit);
                 await this.closeDateTimePickerIfOpen();
                 return true;
             }
@@ -1603,9 +1598,7 @@ export class MetricsPage {
     }
 
     async getCustomRangeOption() {
-        // The DateTime popover opens onto the Relative tab by default; click it
-        // to expose the relative-period preset buttons.
-        return this.dateTimeRelativeTab;
+        return this.page.locator('#date-time-menu [data-test="date-time-pick-dates-btn"]');
     }
 
     async getDateInput() {
@@ -1614,13 +1607,12 @@ export class MetricsPage {
     }
 
     async getPresetOption(preset) {
-        // Build a data-test value from preset shorthand like "15m" or "1h".
-        // Returns a locator that may or may not match — caller checks visibility.
+        // Only 15m 1h 4h 24h 7d 30d have a chip; others match nothing and the caller checks visibility.
         const match = String(preset).match(/^(\d+)\s*([smhdwM])$/);
         if (!match) {
-            return this.page.locator('[data-test="date-time-relative-preset-unknown"]');
+            return this.page.locator('[data-test="date-time-chip-unknown"]');
         }
-        return this.page.locator(`[data-test="date-time-relative-${match[1]}-${match[2]}-btn"]`);
+        return this.page.locator(`[data-test="date-time-chip-${match[1]}${match[2]}"]`);
     }
 
     // ===== REFRESH BUTTON METHODS =====
@@ -1800,9 +1792,7 @@ export class MetricsPage {
     }
 
     async getDatePickerDropdown() {
-        // The DateTime popover renders the "Relative" tab as a sentinel data-test;
-        // when the popover is open, this element is in the DOM.
-        return this.page.locator('[data-test="date-time-relative-tab"]');
+        return this.page.locator('#date-time-menu');
     }
 
     async getCollapsibleToggle() {
@@ -2223,18 +2213,14 @@ export class MetricsPage {
     // ============================================
 
     // Preset selection method
-    // Maps human-readable preset labels to the DateTime component's data-test attributes
-    // (format: date-time-relative-{value}-{period}-btn, e.g. date-time-relative-15-m-btn).
+    // Maps human-readable preset labels to the DateTime component's chips; labels without a chip match nothing.
     async getPresetOptionByText(presetText) {
         const map = {
-            'Last 5 minutes': '[data-test="date-time-relative-5-m-btn"]',
-            'Last 15 minutes': '[data-test="date-time-relative-15-m-btn"]',
-            'Last 30 minutes': '[data-test="date-time-relative-30-m-btn"]',
-            'Last 1 hour': '[data-test="date-time-relative-1-h-btn"]',
-            'Last 6 hours': '[data-test="date-time-relative-6-h-btn"]',
-            'Last 1 day': '[data-test="date-time-relative-1-d-btn"]',
+            'Last 15 minutes': '[data-test="date-time-chip-15m"]',
+            'Last 1 hour': '[data-test="date-time-chip-1h"]',
+            'Last 1 day': '[data-test="date-time-chip-24h"]',
         };
-        const selector = map[presetText] || '[data-test="date-time-relative-preset-unknown"]';
+        const selector = map[presetText] || '[data-test="date-time-chip-unknown"]';
         return this.page.locator(selector);
     }
 

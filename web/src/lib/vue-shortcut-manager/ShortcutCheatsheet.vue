@@ -306,7 +306,9 @@ const PAGE_TITLE_PARAMS: Partial<Record<string, Record<string, I18nText>>> = {
  * `ctrl`→`⌘` on Mac, so we never need the explicit `keyForMac` here.
  */
 function entryDisplay(e: ShortcutEntry): string {
-  return e.display ?? e.keyForWindows ?? e.key ?? "";
+  // A mac combo that is not the ctrl→⌘ swap (alt off macOS) has to be shown as bound.
+  const platform = isMacOS() && e.keyForMac ? e.keyForMac : e.keyForWindows;
+  return e.display ?? platform ?? e.key ?? "";
 }
 
 const allModules = computed<DisplayModule[]>(() => {

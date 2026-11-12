@@ -1451,10 +1451,20 @@ describe("ViewDashboard", () => {
 
     const mountWithPicker = async () => {
       wrapper = createWrapper({
+        attachTo: document.body,
         global: {
           plugins: [i18n, store],
           stubs: {
-            OPageLayout: { template: '<div><slot name="actions" /></div>' },
+            OPageLayout: { template: '<div><slot name="actions" /><slot /></div>' },
+            RenderDashboardCharts: {
+              methods: {
+                syncAllPanelDateTimePickers: vi.fn(),
+                commitAllVariables: vi.fn(),
+                getUrlParams: () => ({}),
+              },
+              template: "<div />",
+            },
+            teleport: false,
           },
         },
       });

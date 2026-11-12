@@ -221,7 +221,7 @@ describe("kiosk helpers", () => {
   });
 
   it("labels a calendar period by its name", () => {
-    expect(formatRelativePeriod("calendar:month:-1", t)).toBe("common.lastMonth");
+    expect(formatRelativePeriod("calendar:month:-1", t)).toBe("dateTime.previousMonth");
     expect(formatRelativePeriod("calendar:day:0", t)).toBe("common.today");
   });
 

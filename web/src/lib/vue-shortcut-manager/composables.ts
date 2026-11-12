@@ -71,8 +71,21 @@ function resolveShortcuts(
           allowInInput: def.allowInInput,
           skipInInput: def.skipInInput,
           allowInDialog: def.allowInDialog,
+          skipUnderModal: def.skipUnderModal,
         });
       });
+      if (def.code) {
+        toRegister.push({
+          id: `${def.id}-code`,
+          key: `code:${def.code}`,
+          scope: def.scope,
+          description: raw(def.descriptionKey),
+          handler: input.handler,
+          whenFocused: input.whenFocused,
+          hidden: true,
+          skipUnderModal: def.skipUnderModal,
+        });
+      }
     } else {
       if (input.scope && inferredScope === undefined) inferredScope = input.scope;
       const key = (mac ? input.keyForMac : input.keyForWindows) ?? input.key;

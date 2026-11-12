@@ -81,7 +81,7 @@ describe("ODateTimeRange", () => {
         relativeAmount: 3,
       },
     });
-    expect(wrapper.find('[data-test="datetimerange-trigger"]').text()).toContain("Past 3 Days");
+    expect(wrapper.find('[data-test="datetimerange-trigger"]').text()).toContain("Last 3 days");
   });
 
   it("should show absolute date range in trigger when mode=absolute", () => {

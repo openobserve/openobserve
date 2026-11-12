@@ -68,7 +68,7 @@ test.describe('Profiles query controls', () => {
     await pm.profilesPage.expectSelected(pm.profilesPage.typeSelect, 'CPU time');
   });
 
-  test('An unseeded open picks the first stream, CPU and Past 15 minutes and writes the URL', { tag: ['@all', '@profiles', '@P1'] }, async () => {
+  test('An unseeded open picks the first stream, CPU and Last 15 minutes and writes the URL', { tag: ['@all', '@profiles', '@P1'] }, async () => {
     await pm.profilesPage.mockStreamList([ref.stream, bare.stream].sort());
     await pm.profilesPage.gotoProfiles();
     const first = [ref.stream, bare.stream].sort()[0];
@@ -301,7 +301,7 @@ test.describe('Profiles query controls', () => {
     await pm.profilesPage.expectUrlParam('view', 'top');
     await pm.profilesPage.gotoSeeded({ stream: ref.stream, from: ref.window.to, to: ref.window.from, service: 'checkout' });
     await pm.profilesPage.expectUrlParam('period', '15m');
-    await pm.profilesPage.expectDateButtonText('Past 15 Minutes');
+    await pm.profilesPage.expectDateButtonText('Last 15 minutes');
     await pm.profilesPage.mockStreamList([ref.stream]);
     await pm.profilesPage.gotoSeeded({ stream: 'e2e_prof_nope', ...ref.window, service: 'checkout' });
     await pm.profilesPage.expectSelected(pm.profilesPage.streamSelect, ref.stream);

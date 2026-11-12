@@ -157,7 +157,7 @@ describe("TracesNoEventsState", () => {
       wrapper.unmount();
       mockSearchObj.data.datetime.relativeTimePeriod = "calendar:month:-1";
       wrapper = mountComponent();
-      expect(wrapper.text()).toContain("Last month");
+      expect(wrapper.text()).toContain("Previous month");
       expect(wrapper.text()).not.toContain("NaN");
     });
 

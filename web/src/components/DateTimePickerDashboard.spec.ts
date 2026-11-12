@@ -582,13 +582,13 @@ describe("DateTimePickerDashboard", () => {
 
       await openPicker(wrapper);
       expect(inMenu("date-time-apply-btn")).toBeNull();
-      inMenu("date-time-relative-1-h-btn")!.click();
+      inMenu("date-time-chip-1h")!.click();
       await flushPromises();
 
       expect(gate.picked.value.relativeTimePeriod).toBe("1h");
       expect(gate.applied.value.relativeTimePeriod).toBe("15m");
       expect(gate.needsRefresh.value).toBe(true);
-      expect(wrapper.find('[data-test="date-time-btn"]').text()).toContain("Past 1 Hour");
+      expect(wrapper.find('[data-test="date-time-btn"]').text()).toContain("Last 1 hour");
     });
 
     it("shows the applied range again after closing on a range that ends before it starts", async () => {
@@ -601,17 +601,17 @@ describe("DateTimePickerDashboard", () => {
       await flushPromises();
       const label = () => wrapper.find('[data-test="date-time-btn"]').text();
       const realPicker = wrapper.findComponent(DateTime);
-      expect(label()).toContain("2026/10/13 10:00:00 - 2026/10/13 10:30:00");
+      expect(label()).toContain("Oct 13, 10:00 – 10:30");
 
       realPicker.vm.onMenuOpenChange(true);
       realPicker.vm.selectedTime = { startTime: "18:50:30", endTime: "18:25:22" };
       await flushPromises();
-      expect(label()).toContain("2026/10/13 18:50:30 - 2026/10/13 18:25:22");
+      expect(label()).toContain("Oct 13, 18:50:30");
 
       realPicker.vm.onMenuOpenChange(false);
       await flushPromises();
 
-      expect(label()).toContain("2026/10/13 10:00:00 - 2026/10/13 10:30:00");
+      expect(label()).toContain("Oct 13, 10:00 – 10:30");
       expect((wrapper.vm as any).gate.needsRefresh.value).toBe(false);
     });
 
@@ -624,8 +624,29 @@ describe("DateTimePickerDashboard", () => {
       await flushPromises();
 
       await openPicker(wrapper);
+      inMenu("date-time-pick-dates-btn")!.click();
+      await flushPromises();
 
       expect(inMenu("date-time-apply-btn")).not.toBeNull();
+    });
+  });
+
+  describe("time-range keys", () => {
+    it("passes the page's shortcuts opt-in to its picker, and panels leave it off", async () => {
+      const toolbar = mount(DateTimePickerDashboard, {
+        props: defaultProps,
+        attrs: { shortcuts: true },
+        global: { plugins: [i18n, store] },
+      });
+      const panel = mount(DateTimePickerDashboard, {
+        props: defaultProps,
+        global: { plugins: [i18n, store] },
+      });
+      await flushPromises();
+      expect(toolbar.findComponent(DateTime).props("shortcuts")).toBe(true);
+      expect(panel.findComponent(DateTime).props("shortcuts")).toBe(false);
+      toolbar.unmount();
+      panel.unmount();
     });
   });
 });

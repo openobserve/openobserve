@@ -1,4 +1,5 @@
 import { expect } from "@playwright/test";
+import { DATE_TIME_INPUT, isChipPeriod, periodChip, splitPeriodCode, typeRelativePeriod } from "../generalPages/relativePeriod.js";
 
 //methods : setRelativeTimeRange
 
@@ -54,7 +55,12 @@ export default class DateTimeHelper {
   async setRelativeTimeRange(rangeCode) {
     // Minutes= m	Hours= h	Days= d	Weeks= w	Months= M
 
-    const relBtn = this.page.locator(`[data-test="date-time-relative-${rangeCode}-btn"]`);
+    const [value, unit] = splitPeriodCode(rangeCode) ?? [];
+    const isChip = isChipPeriod(value, unit);
+    // A period without a chip is typed into the bar, so the bar is what to wait for.
+    const relBtn = isChip
+      ? periodChip(this.page, value, unit)
+      : this.page.locator(`#date-time-menu ${DATE_TIME_INPUT}`);
 
     // ViewDashboard binds the picker's :disable to arePanelsLoading, so a click can land just after it goes disabled and silently never open the popover.
     await expect(async () => {
@@ -66,7 +72,8 @@ export default class DateTimeHelper {
     }).toPass({ timeout: 45000, intervals: [250, 500, 1000, 2000] });
 
     // Use JS click — the dropdown can extend outside the viewport in the new layout
-    await relBtn.evaluate((el) => el.click());
+    if (isChip) await relBtn.evaluate((el) => el.click());
+    else await typeRelativePeriod(this.page, value, unit);
     await applyPickedDateTime(this.page);
   }
 }

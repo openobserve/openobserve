@@ -55,6 +55,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :model-value="state.datetime"
         menu-align="end"
         data-test="rum-analytics-date-picker"
+        :retention-days="rumStreamLimits.retentionDays"
+        :query-range-restriction-in-hour="rumStreamLimits.queryRangeRestrictionInHour"
         @update:model-value="onDateChange"
       />
       <OButton
@@ -364,6 +366,7 @@ let enteredOrg = "";
 import { computed, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
+import { useStreamTimeLimits } from "@/composables/useStreamTimeLimits";
 import { formatInTimeZone } from "date-fns-tz";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -427,6 +430,7 @@ const { t } = useI18nTyped();
 const route = useRoute();
 const router = useRouter();
 const store = useStore();
+const rumStreamLimits = useStreamTimeLimits(() => [{ name: "_rumdata", type: "logs" }]);
 const { shareUrl } = useRum();
 const pa = useProductAnalytics();
 const namedEvents = useNamedEvents();

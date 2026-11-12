@@ -63,7 +63,7 @@ describe("DateTime pickerTimezone and hideClipboard", () => {
   });
 
   /// A zone picked here changes this range only, never the timezone every other page reads.
-  it("re-reads the shown times in a newly picked zone without touching the app's", async () => {
+  it("redraws the same instants in a newly picked zone without touching the app's", async () => {
     const dispatch = store.dispatch;
     const calls: unknown[][] = [];
     store.dispatch = ((...args: unknown[]) => {
@@ -77,7 +77,8 @@ describe("DateTime pickerTimezone and hideClipboard", () => {
       await wrapper!.vm.onTimezoneChange();
       await flushPromises();
 
-      expect(lastEmit().startTime).toBe(START + 5.5 * 3_600_000_000);
+      expect(wrapper!.vm.getConsumableDateTime().startTime).toBe(START);
+      expect(wrapper!.vm.selectedTime.startTime).toBe("00:00:00");
       expect(wrapper!.emitted("on:timezone-change")!.at(-1)).toEqual(["UTC"]);
       expect(store.state.timezone).toBe("UTC");
       expect(calls.some((call) => call[0] === "setTimezone")).toBe(false);
@@ -86,13 +87,15 @@ describe("DateTime pickerTimezone and hideClipboard", () => {
     }
   });
 
-  it("drops the copy and paste row but keeps the zone select and the hint", async () => {
+  it("drops the text input, copy and paste but keeps the zone select and the resolved range", async () => {
     createWrapper({ pickerTimezone: "Asia/Calcutta", hideClipboard: true, defaultOpen: true });
     await flushPromises();
+    expect(inMenu("date-time-input")).toBeNull();
     expect(inMenu("date-time-copy-btn")).toBeNull();
     expect(inMenu("date-time-paste-btn")).toBeNull();
     expect(inMenu("datetime-timezone-select")).not.toBeNull();
-    expect(document.body.textContent).toContain("You can choose multiple dates");
+    expect(inMenu("date-time-resolved")).not.toBeNull();
+    expect(document.body.textContent).not.toContain("You can choose multiple dates");
   });
 
   it("keeps copy and paste and reads the app's zone by default", async () => {

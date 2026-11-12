@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { toZonedTime } from "date-fns-tz";
 import { searchState } from "@/composables/useLogs/searchState";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { b64EncodeUnicode, generateTraceContext } from "@/utils/zincutils";
@@ -35,6 +36,15 @@ import {
   SearchAroundError,
   TraceContext,
 } from "@/ts/interfaces";
+
+/** Chart-style values for `DateTime.setCustomDate`: their browser-local fields read the app-zone wall clock. */
+export const searchAroundPickerRange = (
+  range: { startUs: number; endUs: number },
+  timezone: string,
+): { start: number; end: number } => ({
+  start: toZonedTime(range.startUs / 1000, timezone).getTime(),
+  end: toZonedTime(range.endUs / 1000, timezone).getTime(),
+});
 
 export const useSearchAround = () => {
   // Safe only because useSearchAround() runs inside component setup (SearchResult.vue).

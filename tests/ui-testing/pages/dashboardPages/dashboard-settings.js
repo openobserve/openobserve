@@ -4,6 +4,7 @@
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
 const { getTabSelector, SELECTORS, clickDashboardMenuItem } = require('./dashboard-selectors.js');
 const { selectStreamFromDropdown, selectFieldFromDropdown } = require('./dashboard-stream-field-utils.js');
+import { pickRelativePeriod, waitForDateTimePanel } from "../generalPages/relativePeriod.js";
 
 export default class DashboardSetting {
   constructor(page) {
@@ -48,7 +49,6 @@ export default class DashboardSetting {
       '[data-test="dashboard-settings-drawer"] [data-test="o-drawer-close-btn"]'
     );
     this.timeBtn = page.locator('[data-test="date-time-btn"]');
-    this.relativeTime = page.locator('[data-test="date-time-relative-tab"]');
 
     this.addTabCancel = page.locator(
       '[data-test="dashboard-tab-settings-add-tab-dialog"] [data-test="o-dialog-secondary-btn"]'
@@ -124,11 +124,8 @@ export default class DashboardSetting {
 
     // The picker renders in a portal that mounts on click — clicking the option
     // in the same tick lands before it exists (or on a node still animating in).
-    const relativeBtn = this.page.locator(
-      `[data-test="date-time-relative-${date}-${time}-btn"]`
-    );
-    await relativeBtn.waitFor({ state: "visible", timeout: 10000 });
-    await relativeBtn.click();
+    await waitForDateTimePanel(this.page);
+    await pickRelativePeriod(this.page, date, time);
   }
 
   // Toast message locator scoped to a given text (assert visibility in the spec)

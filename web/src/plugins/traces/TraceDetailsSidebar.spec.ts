@@ -3206,3 +3206,71 @@ describe("TraceDetailsSidebar — logs license lock", () => {
     w.unmount();
   });
 });
+
+describe("span search around", () => {
+  const spanStartUs = Math.floor(mockSpan.start_time / 1000);
+  const minuteUs = 60_000_000;
+  let w: any;
+
+  beforeEach(() => {
+    window.localStorage.clear();
+    mockNavigateToLogs.mockClear();
+    mockBuildQueryDetails.mockReturnValue({
+      stream: "app_logs",
+      from: 1,
+      to: 2,
+      refresh: 0,
+      query: "c3Bhbl9pZD0neCc=",
+      orgIdentifier: "default",
+    });
+  });
+
+  afterEach(() => {
+    w?.unmount();
+    mockBuildQueryDetails.mockReturnValue({});
+  });
+
+  it("offers only the time windows, defaulting to ± 5 min", () => {
+    w = mountSidebar({ parentMode: "standalone" });
+    expect(w.vm.spanSearchAroundChoice).toBe("t5");
+    expect(w.vm.spanSearchAroundOptions.map((o: any) => [o.label, o.value])).toEqual([
+      ["± 5 s", "s5"],
+      ["± 30 s", "s30"],
+      ["± 1 min", "t1"],
+      ["± 5 min", "t5"],
+      ["± 15 min", "t15"],
+    ]);
+    expect(w.find('[data-test="trace-details-sidebar-search-around-btn"]').exists()).toBe(true);
+  });
+
+  it("opens logs for the span start ± the window with no span filter", async () => {
+    w = mountSidebar({ parentMode: "standalone" });
+    w.vm.setSpanSearchAroundChoice("t15");
+    await w.find('[data-test="trace-details-sidebar-search-around-btn"]').trigger("click");
+
+    expect(mockNavigateToLogs).toHaveBeenCalledWith({
+      stream: "app_logs",
+      from: spanStartUs - 15 * minuteUs,
+      to: spanStartUs + 15 * minuteUs,
+      refresh: 0,
+      query: "",
+      orgIdentifier: "default",
+    });
+  });
+
+  it("keeps a remembered time choice but not a records one", async () => {
+    window.localStorage.setItem("o2.searchAroundChoice.", "t1");
+    w = mountSidebar({ parentMode: "standalone" });
+    expect(w.vm.spanSearchAroundChoice).toBe("t1");
+    w.unmount();
+
+    window.localStorage.setItem("o2.searchAroundChoice.", "r50");
+    w = mountSidebar({ parentMode: "standalone" });
+    expect(w.vm.spanSearchAroundChoice).toBe("t5");
+  });
+
+  it("is not offered outside the standalone trace page", () => {
+    w = mountSidebar({ parentMode: "embedded" });
+    expect(w.find('[data-test="trace-details-sidebar-search-around-btn"]').exists()).toBe(false);
+  });
+});

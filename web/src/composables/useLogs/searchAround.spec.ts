@@ -18,7 +18,7 @@ import { defineComponent } from "vue";
 import { mount, flushPromises } from "@vue/test-utils";
 import i18n from "@/locales";
 import { b64EncodeUnicode } from "@/utils/zincutils";
-import { useSearchAround } from "./searchAround";
+import { searchAroundPickerRange, useSearchAround } from "./searchAround";
 import { useLogsAutoRun } from "./logsAutoRun";
 
 const searchAroundMock = vi.hoisted(() => vi.fn());
@@ -249,5 +249,25 @@ describe("useSearchAround", () => {
     expect(request.is_multistream).toBe(false);
     expect(decodeSql(request.query_context[0])).toContain('FROM "stream1"');
     expect(searchObj.value.data.queryResults.hits).toEqual([{ _timestamp: 1 }, { _timestamp: 2 }]);
+  });
+});
+
+describe("searchAroundPickerRange", () => {
+  const startUs = Date.UTC(2026, 10, 11, 7, 6, 57) * 1000;
+  const endUs = startUs + 10 * 60_000_000;
+
+  it("reads the UTC wall clock when the app zone is UTC", () => {
+    const range = searchAroundPickerRange({ startUs, endUs }, "UTC");
+    const start = new Date(range.start);
+    expect([start.getHours(), start.getMinutes(), start.getSeconds()]).toEqual([7, 6, 57]);
+    expect(range.end - range.start).toBe(10 * 60_000);
+  });
+
+  it("gives values whose browser-local fields read the app-zone wall clock", () => {
+    const range = searchAroundPickerRange({ startUs, endUs }, "Asia/Kolkata");
+    const start = new Date(range.start);
+    const end = new Date(range.end);
+    expect([start.getHours(), start.getMinutes(), start.getSeconds()]).toEqual([12, 36, 57]);
+    expect([end.getHours(), end.getMinutes()]).toEqual([12, 46]);
   });
 });

@@ -219,7 +219,7 @@ export default class DashboardTvPlaylistPage {
 
   async expectDefaultSettings() {
     await expect(this.intervalTrigger).toHaveText("1 min");
-    await expect(this.periodTrigger).toHaveText("Past 1 Hour");
+    await expect(this.periodTrigger).toHaveText("Last 1 hour");
     await expect(this.getThemeItem("current")).toHaveAttribute("aria-pressed", "true");
     await expect(this.fitSwitch).toHaveAttribute("aria-checked", "false");
   }
