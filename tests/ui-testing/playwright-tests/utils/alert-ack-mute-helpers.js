@@ -152,7 +152,8 @@ async function ackAs(page, user, alertId, body) {
 // Cleanup never fails the test, so a refused call is logged by path and status to make a leak traceable.
 async function cleanupCall(page, method, p) {
   const r = await api(page, method, v2(p)).catch((e) => {
-    testLogger.warn('alert mute cleanup: request failed', { method, path: p, error: e.message });
+    // The thrown message carries Playwright's call log with the Authorization header, so only its first line is kept.
+    testLogger.warn('alert mute cleanup: request failed', { method, path: p, reason: String(e?.message ?? e).split('\n')[0] });
     return null;
   });
   if (r && !r.ok()) testLogger.warn('alert mute cleanup: non-ok response', { method, path: p, status: r.status() });
