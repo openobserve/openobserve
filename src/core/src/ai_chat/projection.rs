@@ -15,10 +15,7 @@
 
 //! Port of o2-ai's `project_events`; model names are not redacted (unknown here).
 
-use std::{
-    collections::{HashMap, HashSet},
-    sync::LazyLock,
-};
+use std::collections::{HashMap, HashSet};
 
 use config::{
     meta::oncall::confidence::strip_call_ref,
@@ -30,6 +27,11 @@ use config::{
 use o2_enterprise::enterprise::ai::chat::batcher::DurableEvent;
 use regex::{NoExpand, Regex};
 
+use super::record_v2::{
+    LegacyMessage, MESSAGE_UPDATED, SESSION_CREATED, SESSION_UPDATED, is_v2_record, record_message,
+    tool_output_text, user_text,
+};
+
 const PLACEHOLDER_TITLE_PREFIXES: [&str; 2] = ["New session - ", "Child session - "];
 const INJECTED_KEY: &str = "o2_injected";
 // o2-ai's metadata on the user's own part: the asked window (ms) and the entry the turn came from.
@@ -37,6 +39,8 @@ const ASKED_WINDOW_KEY: &str = "o2_window";
 const ASKED_ENTRY_KEY: &str = "o2_entry_kind";
 const ABORTED_ERROR: &str = "MessageAbortedError";
 const DEFAULT_TURN_ERROR: &str = "The assistant failed to respond";
+/// The 2.x tool error type of a permission o2-ai denied.
+const PERMISSION_REJECTED: &str = "permission.rejected";
 
 const FLUSH_CHARS: usize = 80;
 const FLUSH_BREAKS: [char; 4] = ['.', '!', '?', '\n'];
@@ -214,6 +218,9 @@ const TOOL_DESCRIPTIONS: [(&str, &str); 37] = [
     ("testFunction", "Validating VRL"),
 ];
 
+/// opencode 2.x names of built-in tools; o2-ai hides them in chat history only, not in RCA threads.
+const HIDDEN_V2_TOOLS: [&str; 4] = ["shell", "subagent", "question", "apply_patch"];
+
 const PERMISSION_REJECTION_MARKERS: [&str; 5] = [
     "rejected permission",
     "permission to use this",
@@ -283,18 +290,12 @@ struct StreamState {
     scrub_carry: String,
     pending_tool_calls: HashMap<String, CallInfo>,
     last_tools_call_info: Option<CallInfo>,
-    /// The last character shown, so a fence opening a part is judged like the live stream.
-    shown_tail: Option<char>,
-    /// The body of the turn's last findings block that made a valid frame.
-    findings_raw: Option<String>,
-    /// The next questions of the turn's last follow-ups block.
-    follow_ups: Vec<String>,
-    turn_call_ids: Vec<String>,
-    step_call_ids: HashSet<String>,
-    /// Where the answer's code is, since `[^...]` inside code is not a marker.
-    code: CodeSpan,
-    /// Whether the answer's current line already shows more than indentation.
-    mid_line: bool,
+    /// 2.x only: chars emitted per `<message id>:<text ordinal>`.
+    text_streamed: HashMap<String, usize>,
+    /// 2.x only: the tool name of each call id.
+    tool_names: HashMap<String, String>,
+    tools_called: HashSet<String>,
+    tools_done: HashSet<String>,
 }
 
 impl StreamState {
@@ -544,35 +545,18 @@ impl StreamState {
         is_error: bool,
         frames: &mut Vec<Value>,
     ) {
-        let matched = if call_id.is_empty() {
-            None
-        } else {
-            self.pending_tool_calls.remove(call_id)
-        }
-        .or_else(|| self.last_tools_call_info.clone());
-
-        let result = if is_error {
+        if is_error {
             let err = tool_state
                 .get("error")
                 .filter(|v| truthy(v))
                 .cloned()
                 .unwrap_or_else(|| Value::Object(Map::new()));
             let message = extract_error_message(&err);
-            // o2-ai denies some permissions on purpose; their failures are not shown.
-            if is_permission_rejection(&message) {
-                self.pending_tool_calls.remove(call_id);
-                self.last_tools_call_info = None;
-                return;
-            }
             let error_type = match &err {
                 Value::Object(m) => m.get("name").cloned().unwrap_or(Value::Null),
                 _ => Value::String("ToolError".into()),
             };
-            let mut result = Map::new();
-            result.insert("error".into(), Value::Bool(true));
-            result.insert("error_type".into(), error_type);
-            result.insert("message".into(), Value::String(message));
-            result
+            self.tool_failed(call_id, tool_name, message, error_type, false, frames);
         } else {
             let metadata = tool_state
                 .get("metadata")
@@ -580,22 +564,72 @@ impl StreamState {
                 .cloned()
                 .unwrap_or_else(|| Value::Object(Map::new()));
             let result = coerce_tool_output(tool_state.get("output"), metadata);
-            if let Some(confirmation) = delete_confirmation_frame(&result, tool_name, call_id) {
-                self.last_tools_call_info = None;
-                frames.push(confirmation);
-                return;
-            }
-            if let Some(navigation) = navigation_frame(&result, tool_name) {
-                self.last_tools_call_info = None;
-                frames.push(navigation);
-                return;
-            }
-            result
-        };
+            self.tool_completed(call_id, tool_name, result, frames);
+        }
+    }
 
-        let Some(mut event) =
-            format_tool_result_event(tool_name, &result, is_error, matched.as_ref())
-        else {
+    /// The call a result answers: its own, else the last call announced.
+    fn take_call(&mut self, call_id: &str) -> Option<CallInfo> {
+        if call_id.is_empty() {
+            None
+        } else {
+            self.pending_tool_calls.remove(call_id)
+        }
+        .or_else(|| self.last_tools_call_info.clone())
+    }
+
+    fn tool_failed(
+        &mut self,
+        call_id: &str,
+        tool_name: &str,
+        message: String,
+        error_type: Value,
+        rejected: bool,
+        frames: &mut Vec<Value>,
+    ) {
+        let matched = self.take_call(call_id);
+        // o2-ai denies some permissions on purpose; their failures are not shown.
+        if rejected || is_permission_rejection(&message) {
+            self.last_tools_call_info = None;
+            return;
+        }
+        let mut result = Map::new();
+        result.insert("error".into(), Value::Bool(true));
+        result.insert("error_type".into(), error_type);
+        result.insert("message".into(), Value::String(message));
+        self.push_result(call_id, tool_name, &result, true, matched.as_ref(), frames);
+    }
+
+    fn tool_completed(
+        &mut self,
+        call_id: &str,
+        tool_name: &str,
+        result: Map<String, Value>,
+        frames: &mut Vec<Value>,
+    ) {
+        let matched = self.take_call(call_id);
+        if is_delete_confirmation(&result, tool_name) {
+            self.last_tools_call_info = None;
+            return;
+        }
+        if let Some(navigation) = navigation_frame(&result, tool_name) {
+            self.last_tools_call_info = None;
+            frames.push(navigation);
+            return;
+        }
+        self.push_result(call_id, tool_name, &result, false, matched.as_ref(), frames);
+    }
+
+    fn push_result(
+        &mut self,
+        call_id: &str,
+        tool_name: &str,
+        result: &Map<String, Value>,
+        is_error: bool,
+        matched: Option<&CallInfo>,
+        frames: &mut Vec<Value>,
+    ) {
+        let Some(mut event) = format_tool_result_event(tool_name, result, is_error, matched) else {
             return;
         };
         if !call_id.is_empty() {
@@ -603,6 +637,64 @@ impl StreamState {
         }
         self.last_tools_call_info = None;
         frames.push(Value::Object(event));
+    }
+
+    /// o2-ai's `session.text.ended`: the part of a 2.x text item not streamed yet.
+    fn text_ended(&mut self, key: String, text: &str, frames: &mut Vec<Value>) {
+        let len = text.chars().count();
+        let seen = self.text_streamed.get(&key).copied().unwrap_or(0);
+        self.text_streamed.insert(key, seen.max(len));
+        if len > seen {
+            let rest: String = text.chars().skip(seen).collect();
+            self.emit_text_delta(&rest, frames);
+        }
+    }
+
+    /// o2-ai's tool events of one settled 2.x tool item, each emitted once per call id.
+    fn v2_tool(&mut self, item: &Map<String, Value>, frames: &mut Vec<Value>) {
+        let call_id = item
+            .get("id")
+            .filter(|v| truthy(v))
+            .map(py_str)
+            .unwrap_or_default();
+        let name = item
+            .get("name")
+            .filter(|v| truthy(v))
+            .map_or_else(|| "unknown".to_string(), py_str);
+        self.tool_names.insert(call_id.clone(), name.clone());
+        let empty = Map::new();
+        let state = obj(item.get("state")).unwrap_or(&empty);
+        let status = state.get("status").and_then(Value::as_str);
+        if !matches!(status, Some("running" | "completed" | "error")) {
+            return;
+        }
+        if call_id.is_empty() || self.tools_called.insert(call_id.clone()) {
+            self.tool_running(&call_id, &name, state, frames);
+        }
+        if status == Some("running")
+            || !(call_id.is_empty() || self.tools_done.insert(call_id.clone()))
+        {
+            return;
+        }
+        let name = self.tool_names.get(&call_id).cloned().unwrap_or(name);
+        if status == Some("error") {
+            let error = state
+                .get("error")
+                .filter(|v| truthy(v))
+                .cloned()
+                .unwrap_or_else(|| Value::Object(Map::new()));
+            let rejected = obj(Some(&error))
+                .and_then(|e| e.get("type"))
+                .is_some_and(|t| t == PERMISSION_REJECTED);
+            let message = v2_error_message(&error);
+            let error_type = Value::String("ToolError".into());
+            self.tool_failed(&call_id, &name, message, error_type, rejected, frames);
+        } else {
+            let metadata = Value::Object(obj(state.get("metadata")).cloned().unwrap_or_default());
+            let output = tool_output_text(state.get("content")).map(Value::String);
+            let result = coerce_tool_output(output.as_ref(), metadata);
+            self.tool_completed(&call_id, &name, result, frames);
+        }
     }
 }
 
@@ -741,22 +833,89 @@ impl Turn {
         }
     }
 
-    fn keep_asked(&mut self, part: &Map<String, Value>) {
-        let Some(meta) = obj(part.get("metadata")) else {
-            return;
-        };
-        if let Some(window) = obj(meta.get(ASKED_WINDOW_KEY))
-            && window.get("from").is_some_and(Value::is_i64)
-            && window.get("to").is_some_and(Value::is_i64)
-        {
-            let mut kept = json!({"from": window["from"], "to": window["to"]});
-            if let Some(relative) = window.get("relative").and_then(Value::as_str) {
-                kept["relative"] = relative.chars().take(16).collect::<String>().into();
+    fn collect_v2_user(&mut self, message: &Map<String, Value>) {
+        self.user_parts.push((user_text(message), false));
+        let files = message.get("files").and_then(Value::as_array);
+        for (index, file) in files.into_iter().flatten().enumerate() {
+            let Some(file) = file.as_object() else {
+                continue;
+            };
+            let mime = file
+                .get("mime")
+                .filter(|v| truthy(v))
+                .map(py_str)
+                .unwrap_or_default();
+            let Some(data) = file.get("data").filter(|v| truthy(v)) else {
+                continue;
+            };
+            if !mime.starts_with("image/") {
+                continue;
             }
-            self.window = Some(kept);
+            let filename = file
+                .get("name")
+                .filter(|v| truthy(v))
+                .cloned()
+                .unwrap_or_else(|| Value::String(format!("image-{}", index + 1)));
+            let url = format!("data:{mime};base64,{}", py_str(data));
+            self.images
+                .push(json!({"filename": filename, "mime": mime, "url": url}));
         }
-        if let Some(entry) = meta.get(ASKED_ENTRY_KEY).and_then(Value::as_str) {
-            self.entry_kind = Some(entry.chars().take(32).collect());
+    }
+
+    /// Run one settled 2.x message through the live mapper, as o2-ai's `messages_to_events`.
+    fn project_v2_message(&mut self, message: &Map<String, Value>) {
+        let msg_id = message
+            .get("id")
+            .filter(|v| truthy(v))
+            .map(py_str)
+            .unwrap_or_default();
+        let kind = message.get("type").and_then(Value::as_str);
+        if kind == Some("assistant") {
+            let content = message.get("content").and_then(Value::as_array);
+            let mut ordinal = 0;
+            for item in content.into_iter().flatten().filter_map(Value::as_object) {
+                match item.get("type").and_then(Value::as_str) {
+                    Some("text") => {
+                        let text = match item.get("text") {
+                            Some(Value::String(text)) => Some(text.as_str()),
+                            Some(other) if truthy(other) => None,
+                            _ => Some(""),
+                        };
+                        if let Some(text) = text {
+                            let key = format!("{msg_id}:{ordinal}");
+                            self.state.text_ended(key, text, &mut self.frames);
+                        }
+                        // One text item is one block: never carry its tail into the next.
+                        self.state.flush_text_buffer(&mut self.frames);
+                        ordinal += 1;
+                    }
+                    Some("tool") => self.state.v2_tool(item, &mut self.frames),
+                    _ => {}
+                }
+            }
+        }
+        let error = obj(message.get("error"));
+        let said = |e: &Map<String, Value>| {
+            e.get("message")
+                .filter(|v| truthy(v))
+                .or_else(|| e.get("type").filter(|v| truthy(v)))
+                .map(py_str)
+                .unwrap_or_default()
+        };
+        match (kind, message.get("outcome").and_then(Value::as_str), error) {
+            (Some("idle"), Some("interrupted"), _) => self.aborted = true,
+            (Some("idle"), Some("failed"), Some(error)) => self.error = Some(said(error)),
+            (Some("assistant"), _, Some(error)) => {
+                if error.get("type").and_then(Value::as_str) == Some("aborted") {
+                    self.aborted = true;
+                } else {
+                    self.error = Some(said(error));
+                }
+            }
+            _ => {}
+        }
+        if self.error.as_deref() == Some("") {
+            self.error = Some(DEFAULT_TURN_ERROR.to_string());
         }
     }
 
@@ -821,13 +980,44 @@ pub(crate) struct Folded {
 }
 
 impl Folded {
+    /// Both record generations, a 2.x message as its 1.x view unless the 1.x events hold it.
     pub(crate) fn fold(events: &[DurableEvent]) -> Self {
+        let mut folded = Self::fold_v1(events);
+        let held: HashSet<String> = folded.infos.keys().cloned().collect();
+        for event in events {
+            let Some(message) = record_message(event) else {
+                continue;
+            };
+            let Some(legacy) = LegacyMessage::of(message, None) else {
+                continue;
+            };
+            if held.contains(&legacy.id) {
+                continue;
+            }
+            let parts = legacy.parts.into_iter().filter_map(|part| {
+                let id = part.get("id").and_then(Value::as_str)?.to_string();
+                Some((id, Value::Object(part)))
+            });
+            folded.parts.insert(legacy.id.clone(), parts.collect());
+            folded
+                .infos
+                .insert(legacy.id.clone(), Value::Object(legacy.info));
+            folded.cover(&legacy.id, event.seq);
+        }
+        folded
+    }
+
+    /// The 1.x events only; `last_seq` still covers every event.
+    fn fold_v1(events: &[DurableEvent]) -> Self {
         let mut folded = Folded {
             last_seq: -1,
             ..Default::default()
         };
         for event in events {
             folded.last_seq = folded.last_seq.max(event.seq);
+            if is_v2_record(&event.event_type) {
+                continue;
+            }
             let empty = Map::new();
             let data = match &event.data {
                 Value::Object(m) => m,
@@ -920,48 +1110,18 @@ pub struct ReaderView<'a> {
 
 /// o2-ai's `project_events` output for ascending events, plus each turn's `first_seq`/`last_seq`.
 pub fn project(events: &[DurableEvent]) -> Value {
-    let folded = Folded::fold(events);
-    let empty = Map::new();
-    let mut turns: Map<String, Value> = Map::new();
-    let mut projected: Vec<Turn> = Vec::new();
-    for (msg_id, info) in &folded.infos {
-        let Some(info) = info.as_object() else {
-            continue;
-        };
-        if info.get("role").and_then(Value::as_str) != Some("user") {
-            continue;
-        }
-        let mut turn = Turn {
-            user_message_id: info.get("id").cloned().unwrap_or(Value::Null),
-            created: obj(info.get("time"))
-                .and_then(|t| t.get("created"))
-                .cloned()
-                .unwrap_or(Value::Null),
-            ..Default::default()
-        };
-        turn.cover(folded.spans.get(msg_id));
-        turn.collect_user_parts(folded.parts.get(msg_id).unwrap_or(&empty));
-        turns.insert(msg_id.clone(), Value::from(projected.len()));
-        projected.push(turn);
+    let folded = Folded::fold_v1(events);
+    let mut turns = project_v1(&folded);
+    let mut title = folded.title.clone();
+    if events.iter().any(|e| is_v2_record(&e.event_type)) {
+        let (v2_turns, v2_title) = project_v2(events, &folded.infos);
+        turns.extend(v2_turns);
+        title = v2_title.or(title);
+        // Only a log holding 2.x records is ordered by creation, so a 1.x chat projects as before.
+        turns.sort_by(|a, b| created_order(&a.created, &b.created));
     }
-
-    for (msg_id, info) in &folded.infos {
-        let Some(info) = info.as_object() else {
-            continue;
-        };
-        if info.get("role").and_then(Value::as_str) != Some("assistant") {
-            continue;
-        }
-        let parent = truthy_key(info.get("parentID")).unwrap_or_default();
-        if let Some(index) = turns.get(&parent).and_then(Value::as_u64) {
-            let turn = &mut projected[index as usize];
-            turn.cover(folded.spans.get(msg_id));
-            turn.project_assistant_message(info, folded.parts.get(msg_id).unwrap_or(&empty));
-        }
-    }
-
-    let turns: Vec<Value> = projected.into_iter().map(Turn::into_value).collect();
-    json!({"turns": turns, "title": folded.title, "last_seq": folded.last_seq})
+    let turns: Vec<Value> = turns.into_iter().map(Turn::into_value).collect();
+    json!({"turns": turns, "title": title, "last_seq": folded.last_seq})
 }
 
 /// [`redact_turns`] on a projection (`{"turns": [...]}`) or a bare list of turns.
@@ -1010,229 +1170,121 @@ pub fn keep_inline_images(turn: &mut Value) {
     }
 }
 
-/// The call id (maybe empty) of a delete the agent asked the user to confirm in this event.
-pub fn delete_confirmation_call(event_type: &str, data: &Value) -> Option<String> {
-    if live_type(event_type) != "message.part.updated" {
-        return None;
-    }
-    let part = obj(data.get("part"))?;
-    let state = obj(part.get("state"))?;
-    if state.get("status").and_then(Value::as_str) != Some("completed") {
-        return None;
-    }
-    let tool = part.get("tool").and_then(Value::as_str).unwrap_or_default();
-    let metadata = state
-        .get("metadata")
-        .filter(|v| truthy(v))
-        .cloned()
-        .unwrap_or_else(|| Value::Object(Map::new()));
-    let result = coerce_tool_output(state.get("output"), metadata);
-    is_delete_confirmation(&result, tool).then(|| {
-        [part.get("callID"), part.get("id")]
-            .into_iter()
-            .flatten()
-            .find(|v| truthy(v))
-            .map(py_str)
-            .unwrap_or_default()
-    })
-}
-
-/// The stored turns as `audience` reads them; every viewer audience is model-name scrubbed.
-pub fn for_audience(turns: &mut [Value], audience: Audience, view: &ReaderView<'_>) {
-    if audience == Audience::Owner {
-        return;
-    }
-    if audience == Audience::ViewerRedacted {
-        redact_turns(turns);
-    }
-    for turn in turns.iter_mut() {
-        keep_inline_images(turn);
-        if view.hide_attachments {
-            hide_attachments(turn);
-        }
-        let Some(Value::Array(frames)) = turn.get_mut("frames") else {
-            scrub_value(turn, 0);
+/// The 1.x turns: each user message, answered by the assistant messages naming it as parent.
+fn project_v1(folded: &Folded) -> Vec<Turn> {
+    let empty = Map::new();
+    let mut turns: HashMap<&str, usize> = HashMap::new();
+    let mut projected: Vec<Turn> = Vec::new();
+    for (msg_id, info) in &folded.infos {
+        let Some(info) = info.as_object() else {
             continue;
         };
-        for frame in frames.iter_mut() {
-            let hidden = frame
-                .get("call_id")
-                .and_then(Value::as_str)
-                .is_some_and(|id| view.hidden.is_some_and(|h| h.contains_key(id)));
-            if hidden {
-                redact_frame(frame);
+        if info.get("role").and_then(Value::as_str) != Some("user") {
+            continue;
+        }
+        let mut turn = Turn {
+            user_message_id: info.get("id").cloned().unwrap_or(Value::Null),
+            created: obj(info.get("time"))
+                .and_then(|t| t.get("created"))
+                .cloned()
+                .unwrap_or(Value::Null),
+            ..Default::default()
+        };
+        turn.cover(folded.spans.get(msg_id));
+        turn.collect_user_parts(folded.parts.get(msg_id).unwrap_or(&empty));
+        turns.insert(msg_id, projected.len());
+        projected.push(turn);
+    }
+
+    for (msg_id, info) in &folded.infos {
+        let Some(info) = info.as_object() else {
+            continue;
+        };
+        if info.get("role").and_then(Value::as_str) != Some("assistant") {
+            continue;
+        }
+        let parent = truthy_key(info.get("parentID")).unwrap_or_default();
+        if let Some(&index) = turns.get(parent.as_str()) {
+            let turn = &mut projected[index];
+            turn.cover(folded.spans.get(msg_id));
+            turn.project_assistant_message(info, folded.parts.get(msg_id).unwrap_or(&empty));
+        }
+    }
+    projected
+}
+
+/// The 2.x turns and generated title; `held` is the 1.x messages, whose 2.x copies are skipped.
+fn project_v2(events: &[DurableEvent], held: &Map<String, Value>) -> (Vec<Turn>, Option<String>) {
+    let mut title = None;
+    let mut messages: Map<String, Value> = Map::new();
+    let mut spans: HashMap<String, (i64, i64)> = HashMap::new();
+    for event in events {
+        let Value::Object(data) = &event.data else {
+            continue;
+        };
+        let kind = event.event_type.as_str();
+        if let (SESSION_CREATED | SESSION_UPDATED, Some(info)) = (kind, obj(data.get("info"))) {
+            if let Some(generated) = info.get("title").and_then(generated_title) {
+                title = Some(generated);
             }
-            keep_decision_only(frame);
-        }
-        scrub_value(turn, 0);
-    }
-}
-
-/// `text` with model ids replaced the way viewer transcripts read them.
-pub fn scrub_model_names(text: &str) -> String {
-    let (pattern, replacement) = &*MODEL_NAME;
-    pattern
-        .replace_all(text, NoExpand(replacement.as_str()))
-        .into_owned()
-}
-
-/// A user message's typed text and its attachment block names, as the web client splits them.
-pub fn split_attachment_blocks(text: &str) -> (String, Vec<String>) {
-    let nonced = split_nonced_blocks(text);
-    if !nonced.1.is_empty() {
-        return nonced;
-    }
-    let names: Vec<String> = LEGACY_BLOCK
-        .captures_iter(text)
-        .filter_map(|c| c.get(1).map(|m| m.as_str().trim().to_string()))
-        .collect();
-    let rest = LEGACY_BLOCK.replace_all(text, "");
-    (rest.trim().to_string(), names)
-}
-
-/// `text` with every attachment block, parsed or not, replaced by `[Attached {kind} hidden]`.
-pub fn hide_attachment_blocks(text: &str) -> String {
-    let (typed, mut names) = split_attachment_blocks(text);
-    let (typed, unparsed) = cut_at_block_opener(&typed);
-    if let Some(name) = unparsed {
-        names.insert(0, name);
-    }
-    if names.is_empty() {
-        return text.to_string();
-    }
-    let markers: Vec<String> = names
-        .iter()
-        .map(|name| {
-            let kind = name.strip_suffix(TRUNCATED_SUFFIX).unwrap_or(name);
-            format!("[Attached {} hidden]", kind.to_lowercase())
-        })
-        .collect();
-    [typed, markers.join("\n")]
-        .into_iter()
-        .filter(|part| !part.is_empty())
-        .collect::<Vec<_>>()
-        .join("\n\n")
-}
-
-/// `(call_id, (type, stream))` per stream a data step reads; `None` when it cannot be told.
-pub fn step_streams(turns: &[Value]) -> Vec<(String, Option<(String, String)>)> {
-    let mut steps = Vec::new();
-    for frame in turns
-        .iter()
-        .filter_map(|t| t.get("frames").and_then(Value::as_array))
-        .flatten()
-        .filter(|f| f.get("type").and_then(Value::as_str) == Some("tool_call"))
-    {
-        let Some(call_id) = frame.get("call_id").and_then(Value::as_str) else {
-            continue;
-        };
-        let tool = frame
-            .get("tool")
-            .and_then(Value::as_str)
-            .unwrap_or_default();
-        if STREAMLESS_TOOLS.contains(&tool) {
             continue;
         }
-        let places = obj(frame.get("context"))
-            .map(step_places)
-            .unwrap_or_default();
-        if places.is_empty() {
-            steps.push((call_id.to_string(), None));
-        }
-        steps.extend(places.into_iter().map(|p| (call_id.to_string(), Some(p))));
-    }
-    steps
-}
-
-/// Inserts a `confirmation_resolved` frame after the request each recorded decision answers.
-pub fn attach_decisions(turn: &mut Value, decisions: &[Value]) {
-    let Some(Value::Array(frames)) = turn.get_mut("frames") else {
-        return;
-    };
-    for (n, decision) in decisions.iter().filter_map(Value::as_object).enumerate() {
-        let id = decision
-            .get("id")
-            .and_then(Value::as_str)
-            .filter(|id| !id.is_empty());
-        let resolved: Vec<&str> = frames
-            .iter()
-            .filter(|f| frame_type(f) == CONFIRMATION_RESOLVED)
-            .filter_map(|f| f.get("id").and_then(Value::as_str))
-            .collect();
-        let unanswered = |f: &Value| {
-            frame_type(f) == CONFIRMATION_REQUIRED
-                && f.get("id")
-                    .and_then(Value::as_str)
-                    .is_none_or(|fid| !resolved.contains(&fid))
+        let Some(message) = obj(data.get("message")).filter(|_| kind == MESSAGE_UPDATED) else {
+            continue;
         };
-        // Live ids may differ from projected ones, so an unmatched id takes the oldest open one.
-        let asked = id
-            .and_then(|id| {
-                frames.iter().position(|f| {
-                    frame_type(f) == CONFIRMATION_REQUIRED
-                        && f.get("id").and_then(Value::as_str) == Some(id)
-                })
-            })
-            .or_else(|| frames.iter().position(unanswered));
-        let at = match asked {
-            Some(i) => {
-                i + 1
-                    + frames[i + 1..]
-                        .iter()
-                        .take_while(|f| frame_type(f) == CONFIRMATION_RESOLVED)
-                        .count()
-            }
-            None => frames.len() - trailing_terminal(frames),
+        let Some(msg_id) = message.get("id").filter(|v| truthy(v)).map(py_str) else {
+            continue;
         };
-        let frame = resolved_frame(decision, asked.map(|i| &mut frames[i]), n);
-        frames.insert(at, frame);
-    }
-}
-
-pub fn attach_card_outcomes(turn: &mut Value, cards: &[Value], now: i64) {
-    let Some(Value::Array(frames)) = turn.get_mut("frames") else {
-        return;
-    };
-    for frame in frames.iter_mut().filter_map(Value::as_object_mut) {
-        if frame.get("error_type").and_then(Value::as_str) != Some(APPROVAL_PENDING) {
+        if held.contains_key(&msg_id) {
             continue;
         }
-        let id = frame.get("approval_id").and_then(Value::as_str);
-        let Some(card) = cards
-            .iter()
-            .find(|c| id.is_some() && c["id"].as_str() == id)
-        else {
-            continue;
-        };
-        let Some((success, error_type, message)) = card_outcome(card, now) else {
-            continue;
-        };
-        let tool = frame
-            .get("tool")
-            .and_then(Value::as_str)
-            .unwrap_or_default();
-        let message = message.unwrap_or_else(|| format!("{tool} completed successfully"));
-        frame.insert("success".into(), success.into());
-        frame.insert("message".into(), redact_internal_details(&message).into());
-        match error_type {
-            Some(error_type) => frame.insert("error_type".into(), error_type.into()),
-            None => frame.shift_remove("error_type"),
-        };
+        let span = spans
+            .entry(msg_id.clone())
+            .or_insert((event.seq, event.seq));
+        *span = (span.0.min(event.seq), span.1.max(event.seq));
+        messages.insert(msg_id, Value::Object(message.clone()));
     }
+
+    let mut turns: Vec<Turn> = Vec::new();
+    for (msg_id, message) in &messages {
+        let Some(message) = message.as_object() else {
+            continue;
+        };
+        if message.get("type").and_then(Value::as_str) == Some("user") {
+            let mut turn = Turn {
+                user_message_id: Value::String(msg_id.clone()),
+                created: obj(message.get("time"))
+                    .and_then(|t| t.get("created"))
+                    .cloned()
+                    .unwrap_or(Value::Null),
+                ..Default::default()
+            };
+            turn.collect_v2_user(message);
+            turns.push(turn);
+        } else if let Some(turn) = turns.last_mut() {
+            turn.project_v2_message(message);
+        } else {
+            continue;
+        }
+        if let Some(turn) = turns.last_mut() {
+            turn.cover(spans.get(msg_id));
+        }
+    }
+    (turns, title)
 }
 
-/// Rebuilds a query builder turn's end frame, which o2-ai only streams and never stores.
-pub fn attach_query_frame(turn: &mut Value) {
-    let Some(Value::Array(frames)) = turn.get_mut("frames") else {
-        return;
+/// o2-ai's turn order: by the user message's creation, turns without one last.
+fn created_order(a: &Value, b: &Value) -> std::cmp::Ordering {
+    let key = |created: &Value| {
+        let at = if truthy(created) {
+            created.as_f64().unwrap_or(0.0)
+        } else {
+            0.0
+        };
+        (created.is_null(), at)
     };
-    if frames.iter().any(|f| frame_type(f) == QUERY_FRAME) {
-        return;
-    }
-    let Some(frame) = query_frame(frames) else {
-        return;
-    };
-    frames.insert(frames.len() - trailing_terminal(frames), frame);
+    let ((a_null, a_at), (b_null, b_at)) = (key(a), key(b));
+    a_null.cmp(&b_null).then(a_at.total_cmp(&b_at))
 }
 
 fn redact_frame(frame: &mut Value) {
@@ -1775,12 +1827,16 @@ pub(crate) fn strip_mcp_prefix(tool_name: &str) -> &str {
     }
 }
 
+fn hidden_in_chat(tool_name: &str) -> bool {
+    HIDDEN_TOOLS.contains(&tool_name) || HIDDEN_V2_TOOLS.contains(&tool_name)
+}
+
 fn resolve_tool_call(
     tool_name: &str,
     args: &Map<String, Value>,
 ) -> Option<(String, Map<String, Value>)> {
     let tool_name = strip_mcp_prefix(tool_name);
-    if HIDDEN_TOOLS.contains(&tool_name) {
+    if hidden_in_chat(tool_name) {
         return None;
     }
     if tool_name == "tools_call" {
@@ -1843,7 +1899,7 @@ fn format_tool_result_event(
     call_info: Option<&CallInfo>,
 ) -> Option<Map<String, Value>> {
     let tool_name = strip_mcp_prefix(tool_name);
-    if HIDDEN_TOOLS.contains(&tool_name) {
+    if hidden_in_chat(tool_name) {
         return None;
     }
     if is_error
@@ -2400,6 +2456,20 @@ pub(crate) fn extract_error_message(error: &Value) -> String {
     }
 }
 
+/// o2-ai's 2.x error message: [`extract_error_message`], falling back to the error's `type`.
+fn v2_error_message(error: &Value) -> String {
+    let said = |m: &Map<String, Value>, keys: [&str; 2]| {
+        keys.iter().any(|k| m.get(*k).is_some_and(truthy))
+    };
+    let type_only = error
+        .as_object()
+        .filter(|m| !said(m, ["message", "name"]))
+        .filter(|m| !obj(m.get("data")).is_some_and(|d| said(d, ["message", "error"])))
+        .and_then(|m| m.get("type"))
+        .filter(|t| truthy(t));
+    type_only.map_or_else(|| extract_error_message(error), py_str)
+}
+
 /// Char index up to which streamed text can be emitted without splitting a redacted term.
 fn stream_split(text: &[char]) -> usize {
     let mut cut = text.len();
@@ -2458,7 +2528,7 @@ fn py_num_eq(value: &Value, n: i64) -> bool {
 }
 
 /// Python `str(value)` for a JSON value.
-fn py_str(value: &Value) -> String {
+pub(crate) fn py_str(value: &Value) -> String {
     match value {
         Value::String(s) => s.clone(),
         Value::Null => "None".into(),
@@ -2904,805 +2974,53 @@ mod tests {
     }
 
     #[test]
-    fn a_delete_confirmation_sentinel_names_its_call() {
-        let sentinel = json!({"type": "delete_confirmation", "resource_type": "alert", "id": "a1"});
-        let part = |tool: &str, status: &str| {
-            json!({"part": {"id": "prt_1", "callID": "call_9", "tool": tool,
-                "state": {"status": status, "output": sentinel.to_string()}}})
-        };
-        let updated = "message.part.updated.1";
+    fn a_2x_shell_call_is_hidden_in_chat_but_stays_an_rca_row() {
+        let mut events =
+            crate::ai_chat::record_v2::tests::golden_events("v2_user_text_and_tools.json");
+        let projected = project(&events).to_string();
+        assert!(projected.contains("tool_call"), "{projected}");
+        events[2].data["message"]["content"][0]["name"] = json!("shell");
+        let projected = project(&events).to_string();
+        assert!(!projected.contains("tool_call"), "{projected}");
         assert_eq!(
-            delete_confirmation_call(updated, &part("o2_delete", "completed")).as_deref(),
-            Some("call_9")
-        );
-        assert_eq!(
-            delete_confirmation_call(updated, &part("o2_delete", "running")),
-            None
-        );
-        assert_eq!(
-            delete_confirmation_call(updated, &part("SearchSQL", "completed")),
-            None
-        );
-        assert_eq!(
-            delete_confirmation_call("message.updated.1", &part("o2_delete", "completed")),
-            None
+            crate::ai_chat::rca_thread::ThreadPart::of("shell", "completed", None),
+            crate::ai_chat::rca_thread::ThreadPart::Row
         );
     }
 
-    /// What the web client's rendered record and the server's frames must agree on.
-    #[derive(Debug, Default, PartialEq)]
-    struct Transcript {
-        user: Vec<String>,
-        answers: Vec<String>,
-        steps: Vec<(String, String, bool)>,
-        approvals: Vec<(Option<String>, bool, Option<u64>)>,
-        decisions: Vec<(String, bool)>,
-        links: usize,
-    }
-
-    impl Transcript {
-        fn of_frames(turns: &[Value]) -> Self {
-            let mut out = Self::default();
-            for turn in turns {
-                if let Some(text) = turn["user"]["text"].as_str() {
-                    out.user.push(text.to_string());
-                }
-                let mut answer = String::new();
-                for frame in turn["frames"].as_array().unwrap() {
-                    out.add_frame(frame, &mut answer);
-                }
-                if !answer.is_empty() {
-                    out.answers.push(answer);
-                }
-            }
-            out
-        }
-
-        fn add_frame(&mut self, frame: &Value, answer: &mut String) {
-            let call_id = frame["call_id"].as_str().unwrap_or_default().to_string();
-            let tool = frame["tool"].as_str().unwrap_or_default().to_string();
-            match frame_type(frame) {
-                "message_delta" => answer.push_str(frame["content"].as_str().unwrap()),
-                "tool_call" | "tool_result" if !self.steps.iter().any(|s| s.0 == call_id) => {
-                    let context = frame["context"].as_object().is_some_and(|c| !c.is_empty());
-                    self.steps.push((call_id, tool, context));
-                }
-                CONFIRMATION_REQUIRED => self.approvals.push((
-                    frame["id"].as_str().map(str::to_string),
-                    frame.get("args").is_some(),
-                    frame["total"].as_u64(),
-                )),
-                CONFIRMATION_RESOLVED => self.decisions.push((
-                    frame["id"].as_str().unwrap().to_string(),
-                    frame["approved"].as_bool().unwrap(),
-                )),
-                "navigation_action" => self.links += 1,
-                _ => {}
-            }
-        }
-
-        fn of_messages(messages: &[Value]) -> Self {
-            let mut out = Self::default();
-            for message in messages {
-                let content = message["content"].as_str().unwrap_or_default().to_string();
-                match message["role"].as_str() {
-                    Some("user") => out.user.push(content),
-                    _ if !content.is_empty() => out.answers.push(content),
-                    _ => {}
-                }
-                for block in message["contentBlocks"].as_array().into_iter().flatten() {
-                    out.add_block(block);
-                }
-            }
-            out
-        }
-
-        fn add_block(&mut self, block: &Value) {
-            match block["type"].as_str().unwrap_or_default() {
-                "tool_call" => self.steps.push((
-                    block["call_id"].as_str().unwrap_or_default().to_string(),
-                    block["tool"].as_str().unwrap_or_default().to_string(),
-                    block["context"].as_object().is_some_and(|c| !c.is_empty()),
-                )),
-                "approval" => self.approvals.push((
-                    block["approval"]["id"].as_str().map(str::to_string),
-                    block["approval"].get("args").is_some(),
-                    block["approval"]["total"].as_u64(),
-                )),
-                "approval_result" => self.decisions.push((
-                    block["resolved"]["id"].as_str().unwrap().to_string(),
-                    block["resolved"]["approved"].as_bool().unwrap(),
-                )),
-                "link" => self.links += 1,
-                _ => {}
-            }
-        }
-    }
-
-    fn assistant_web_dir() -> std::path::PathBuf {
-        std::env::var_os("O2_ASSISTANT_WEB_DIR").map_or_else(
-            || {
-                std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-                    .join("../../web/src/composables/assistant")
-            },
-            Into::into,
-        )
-    }
-
-    fn read_json(path: &std::path::Path) -> Value {
-        let text = std::fs::read_to_string(path).unwrap_or_else(|e| panic!("{path:?}: {e}"));
-        config::utils::json::from_str(&text).unwrap_or_else(|e| panic!("{path:?}: {e}"))
-    }
-
+    /// A log without 2.x records keeps log order even where creation times disagree.
     #[test]
-    fn every_record_fixture_projects_like_the_web_client() {
-        let root = assistant_web_dir().join("__fixtures__/record");
-        let Ok(entries) = std::fs::read_dir(&root) else {
-            assert!(
-                std::env::var_os("CI").is_none(),
-                "no record fixtures at {root:?}"
-            );
-            eprintln!("skipped: no record fixtures at {root:?} (set O2_ASSISTANT_WEB_DIR)");
-            return;
-        };
-        let mut cases: Vec<_> = entries
-            .filter_map(Result::ok)
-            .filter(|e| e.path().is_dir())
-            .map(|e| e.path())
-            .collect();
-        cases.sort();
-        assert!(cases.len() >= 9, "{cases:?}");
-        let audiences = [
-            ("owner.json", Audience::Owner, false),
-            ("viewer.json", Audience::Viewer, true),
-            ("viewer-redacted.json", Audience::ViewerRedacted, true),
-            ("export.json", Audience::Viewer, false),
-        ];
-        for case in &cases {
-            let input = read_json(&case.join("frames.json"));
-            for (file, audience, with_hidden) in audiences {
-                let mut turns = input["turns"].as_array().unwrap().clone();
-                let view = ReaderView {
-                    hidden: input["hidden"].as_object().filter(|_| with_hidden),
-                    hide_attachments: false,
-                };
-                for_audience(&mut turns, audience, &view);
-                let mut actual = Transcript::of_frames(&turns);
-                let messages = read_json(&case.join(file));
-                let mut expected = Transcript::of_messages(messages.as_array().unwrap());
-                // Request ids the server never had are the client's own.
-                for (want, got) in expected.approvals.iter_mut().zip(&actual.approvals) {
-                    if got.0.is_none() {
-                        want.0 = None;
-                    }
-                }
-                if audience == Audience::ViewerRedacted {
-                    let links = turns
-                        .iter()
-                        .flat_map(|t| t["frames"].as_array().unwrap())
-                        .filter(|f| frame_type(f) == NAVIGATION_ACTION);
-                    for link in links {
-                        let keys = link.as_object().unwrap().keys();
-                        let allowed = ["type", "resource_type", "action", "label"];
-                        assert!(
-                            keys.clone().all(|k| allowed.contains(&k.as_str())),
-                            "{case:?}"
-                        );
-                    }
-                } else {
-                    for approval in expected.approvals.iter_mut().chain(&mut actual.approvals) {
-                        approval.2 = None;
-                    }
-                }
-                assert_eq!(actual, expected, "{case:?} {file}");
-                if audience == Audience::ViewerRedacted {
-                    let approvals = turns
-                        .iter()
-                        .flat_map(|t| t["frames"].as_array().unwrap())
-                        .filter(|f| frame_type(f) == CONFIRMATION_REQUIRED);
-                    for approval in approvals {
-                        let keys = approval.as_object().unwrap().keys();
-                        let allowed = ["type", "id", "kind", "total"];
-                        assert!(
-                            keys.clone().all(|k| allowed.contains(&k.as_str())),
-                            "{case:?}"
-                        );
-                    }
-                }
-                if audience != Audience::Owner {
-                    let dumped = Value::Array(turns).to_string();
-                    assert!(!MODEL_NAME.0.is_match(&dumped), "{case:?} {file}: {dumped}");
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn scrub_terms_match_the_web_client() {
-        let path = assistant_web_dir().join("record.ts");
-        let Ok(source) = std::fs::read_to_string(&path) else {
-            assert!(std::env::var_os("CI").is_none(), "no {path:?}");
-            eprintln!("skipped: no {path:?} (set O2_ASSISTANT_WEB_DIR)");
-            return;
-        };
-        let start = source.find(r"/\b(?:").expect("MODEL_NAME in record.ts") + 6;
-        let end = start + source[start..].find(r")\b/gi").expect("MODEL_NAME end");
-        let terms: Value = config::utils::json::from_str(SCRUB_TERMS_JSON).unwrap();
-        let ours: Vec<&str> = terms["patterns"]
+    fn only_a_log_with_2x_records_is_ordered_by_creation() {
+        let (events, expected) = load("structure.json");
+        let created: Vec<&Value> = expected["turns"]
             .as_array()
             .unwrap()
             .iter()
-            .map(|p| p.as_str().unwrap())
+            .map(|t| &t["created"])
             .collect();
-        assert_eq!(
-            source[start..end],
-            ours.join("|"),
-            "scrub_terms.json drifted"
+        assert!(
+            created.windows(2).any(|w| w[0].as_i64() > w[1].as_i64()),
+            "{created:?}"
         );
-    }
-
-    #[test]
-    fn viewers_read_no_model_names_and_owners_read_them_as_stored() {
-        let stored = json!([{
-            "user": {"text": "Is claude-3-5-sonnet better than GPT-4o?"},
-            "frames": [
-                {"type": "usage", "usage": {"tokens_in": 1}, "model": "gpt-4o-mini"},
-                {"type": "message_delta", "content": "I run on gemini-1.5-pro."},
-                {"type": "tool_call", "tool": "llama_tool", "call_id": "gpt-4o", "message": "o3-mini"},
-            ],
-        }]);
-        let mut owner = stored.as_array().unwrap().clone();
-        for_audience(&mut owner, Audience::Owner, &ReaderView::default());
-        assert_eq!(Value::Array(owner), stored);
-        let mut viewer = stored.as_array().unwrap().clone();
-        for_audience(&mut viewer, Audience::Viewer, &ReaderView::default());
-        assert_eq!(
-            viewer[0]["user"]["text"],
-            "Is the model better than the model?"
-        );
-        assert_eq!(viewer[0]["frames"][0].get("model"), None);
-        assert_eq!(viewer[0]["frames"][1]["content"], "I run on the model.");
-        assert_eq!(viewer[0]["frames"][2]["tool"], "llama_tool");
-        assert_eq!(viewer[0]["frames"][2]["call_id"], "gpt-4o");
-        assert_eq!(viewer[0]["frames"][2]["message"], "the model");
-        assert_eq!(
-            scrub_model_names("o11y and mistralai"),
-            "o11y and the model"
-        );
-    }
-
-    #[test]
-    fn a_delete_awaiting_approval_is_kept_as_its_request() {
-        let (events, _) = load("tool_heavy.json");
-        let projected = project(&events);
-        let asked: Vec<&Value> = projected["turns"]
+        let mut mixed = events.clone();
+        mixed.push(DurableEvent {
+            id: "evt_x".into(),
+            aggregate_id: events[0].aggregate_id.clone(),
+            seq: events.last().unwrap().seq + 1,
+            event_type: SESSION_UPDATED.into(),
+            data: json!({"info": {"title": "Pool exhaustion"}}),
+        });
+        let sorted = project(&mixed);
+        let created: Vec<Option<i64>> = sorted["turns"]
             .as_array()
             .unwrap()
             .iter()
-            .flat_map(|t| t["frames"].as_array().unwrap())
-            .filter(|f| f["type"] == CONFIRMATION_REQUIRED)
-            .collect();
-        assert_eq!(asked.len(), 1, "{asked:?}");
-        assert_eq!(asked[0]["tool"], O2_DELETE_TOOL);
-        assert_eq!(asked[0]["args"]["items"][0]["id"], "a1");
-        assert_eq!(
-            asked[0]["message"],
-            "Do you really want to delete the \"A\" alert?"
-        );
-        let mut redacted = projected["turns"].as_array().unwrap().clone();
-        for_audience(
-            &mut redacted,
-            Audience::ViewerRedacted,
-            &ReaderView::default(),
-        );
-        let kept = redacted
-            .iter()
-            .flat_map(|t| t["frames"].as_array().unwrap())
-            .find(|f| f["type"] == CONFIRMATION_REQUIRED)
-            .unwrap();
-        let id = asked[0]["id"].clone();
-        assert_eq!(
-            kept,
-            &json!({"type": CONFIRMATION_REQUIRED, "id": id, "kind": "delete", "total": 1})
-        );
-        let mut update = json!({"type": CONFIRMATION_REQUIRED, "id": "apr_2", "tool": "o2_update",
-            "kind": "update", "operation": "Update 1 alert", "message": "Update checkout?",
-            "targets": [{"type": "alert", "id": "a_1", "name": "checkout"}], "diff": "x",
-            "before": {"t": 1}, "after": {"t": 2}});
-        redact_frame(&mut update);
-        assert_eq!(
-            update,
-            json!({"type": CONFIRMATION_REQUIRED, "id": "apr_2", "kind": "update", "total": 1})
-        );
-    }
-
-    #[test]
-    fn a_reloaded_queued_or_refused_write_never_reads_as_completed() {
-        let queued = "This change needs the user's approval. It was shown to them as a card. \
-                      [approval apr_0123456789abcdef0123]";
-        let result = |text: &str| {
-            let mut m = Map::new();
-            m.insert("output".into(), text.into());
-            m
-        };
-        let event = format_tool_result_event("UpdateAlert", &result(queued), false, None).unwrap();
-        assert_eq!(event["success"], false);
-        assert_eq!(event["error_type"], APPROVAL_PENDING);
-        assert_eq!(event["approval_id"], "apr_0123456789abcdef0123");
-        let refused = format!("{REFUSED_PREFIX}: writes are off.{REFUSED_ADVICE}");
-        let event =
-            format_tool_result_event("UpdateAlert", &result(&refused), false, None).unwrap();
-        assert_eq!(
-            (&event["success"], &event["error_type"], &event["message"]),
-            (
-                &json!(false),
-                &json!(POLICY_REFUSED),
-                &json!(format!("{REFUSED_PREFIX}: writes are off."))
-            )
-        );
-
-        let frame = |id: &str| {
-            json!({"type": "tool_result", "tool": "UpdateAlert", "success": false,
-                   "error_type": APPROVAL_PENDING, "approval_id": id, "message": "Waiting"})
-        };
-        let mut turn = json!({"frames": [frame("apr_d"), frame("apr_f"), frame("apr_ok"), frame("apr_x"), frame("apr_p")]});
-        let cards = [
-            json!({"id": "apr_d", "status": "denied", "resolved": {"outcome": "denied", "detail": "Declined. Nothing was changed."}}),
-            json!({"id": "apr_f", "status": "approved", "resolved": {"outcome": "failed", "detail": "Alert not found"}}),
-            json!({"id": "apr_ok", "status": "approved", "resolved": {"outcome": "approved"}}),
-            json!({"id": "apr_x", "status": "expired", "resolved": null}),
-            json!({"id": "apr_p", "status": "pending", "resolved": null}),
-        ];
-        attach_card_outcomes(&mut turn, &cards, 0);
-        let seen: Vec<(bool, &str, &str)> = turn["frames"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .map(|f| {
-                (
-                    f["success"].as_bool().unwrap(),
-                    f["error_type"].as_str().unwrap_or(""),
-                    f["message"].as_str().unwrap(),
-                )
-            })
+            .map(|t| t["created"].as_i64())
             .collect();
         assert_eq!(
-            seen,
-            [
-                (false, "approval_denied", "Declined. Nothing was changed."),
-                (false, "approval_failed", "Alert not found"),
-                (true, "", "UpdateAlert completed successfully"),
-                (
-                    false,
-                    "approval_expired",
-                    "The approval expired. Nothing was changed."
-                ),
-                (false, APPROVAL_PENDING, "Waiting"),
-            ]
+            created,
+            [Some(1), Some(1), Some(1), Some(1), Some(99), None]
         );
-
-        let card = [json!({"id": "apr_p", "status": "pending", "expires_at": 100})];
-        let settled = |now: i64| {
-            let mut turn = json!({"frames": [frame("apr_p")]});
-            attach_card_outcomes(&mut turn, &card, now);
-            turn["frames"][0]["error_type"].clone()
-        };
-        assert_eq!(settled(99), APPROVAL_PENDING);
-        assert_eq!(settled(100), "approval_expired");
-    }
-
-    #[test]
-    fn decisions_reattach_after_the_request_they_answer() {
-        let mut turn = json!({"frames": [
-            {"type": "confirmation_required", "id": "apr_1", "tool": "o2_delete"},
-            {"type": "confirmation_required", "tool": "UpdateDashboard"},
-            {"type": "message_delta", "content": "done"},
-            {"type": "complete"},
-        ]});
-        let decisions = [
-            json!({"id": "unknown-live-id", "approved": false, "by": "a@x", "at": 5}),
-            json!({"id": "apr_1", "approved": true, "by": "a@x", "at": 4, "scope": "once"}),
-            json!({"approved": true, "by": "a@x", "at": 6}),
-        ];
-        attach_decisions(&mut turn, &decisions);
-        let kinds: Vec<(&str, &str)> = turn["frames"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .map(|f| (frame_type(f), f["id"].as_str().unwrap_or_default()))
-            .collect();
-        assert_eq!(
-            kinds,
-            [
-                (CONFIRMATION_REQUIRED, "apr_1"),
-                (CONFIRMATION_RESOLVED, "apr_1"),
-                (CONFIRMATION_RESOLVED, "apr_1"),
-                (CONFIRMATION_REQUIRED, "decision-2"),
-                (CONFIRMATION_RESOLVED, "decision-2"),
-                ("message_delta", ""),
-                ("complete", ""),
-            ]
-        );
-        assert_eq!(turn["frames"][2]["scope"], "once");
-        let mut viewer = vec![turn];
-        for_audience(&mut viewer, Audience::Viewer, &ReaderView::default());
-        let keys: Vec<&String> = viewer[0]["frames"][2].as_object().unwrap().keys().collect();
-        assert_eq!(keys, ["type", "id", "approved", "at"]);
-        let mut empty = json!({"frames": [{"type": "complete"}]});
-        attach_decisions(&mut empty, &[json!({"id": "x", "approved": true})]);
-        assert_eq!(empty["frames"][0]["type"], CONFIRMATION_RESOLVED);
-    }
-
-    #[test]
-    fn hidden_steps_and_attachments_never_reach_the_reader() {
-        let text = "Why?\n\n--- Log rows [abcdefgh] ---\n\"card 4111\"\n--- end [abcdefgh] ---\n--- Span (truncated) [abcdefgh] ---\n{}\n--- end [abcdefgh] ---";
-        assert_eq!(
-            split_attachment_blocks(text),
-            (
-                "Why?".to_string(),
-                vec!["Log rows".to_string(), "Span (truncated)".to_string()]
-            )
-        );
-        let mut turns = vec![json!({
-            "user": {"text": text, "images": [{"filename": "a.png", "url": "data:image/png;base64,AA"}]},
-            "frames": [
-                {"type": "tool_call", "tool": "SearchSQL", "call_id": "c1", "context": {"sql": "SELECT * FROM payments_audit"}},
-                {"type": "tool_result", "tool": "SearchSQL", "call_id": "c1", "success": true, "summary": "3 rows about card 4111"},
-                {"type": "tool_call", "tool": "SearchSQL", "call_id": "c2", "context": {"stream_name": "default", "stream_type": "traces"}},
-            ],
-        })];
-        let place = |t: &str, s: &str| Some((t.to_string(), s.to_string()));
-        assert_eq!(
-            step_streams(&turns),
-            [
-                ("c1".to_string(), place("logs", "payments_audit")),
-                ("c2".to_string(), place("traces", "default")),
-            ]
-        );
-        let hidden = json!({"c1": {"reason": "stream_forbidden", "stream": "payments_audit"}});
-        let view = ReaderView {
-            hidden: hidden.as_object(),
-            hide_attachments: true,
-        };
-        for_audience(&mut turns, Audience::Viewer, &view);
-        let dumped = Value::Array(turns.clone()).to_string();
-        assert!(
-            !dumped.contains("4111") && !dumped.contains("payments_audit"),
-            "{dumped}"
-        );
-        assert_eq!(
-            turns[0]["user"]["text"],
-            "Why?\n\n[Attached log rows hidden]\n[Attached span hidden]"
-        );
-        assert_eq!(turns[0]["user"]["images"], json!([]));
-        assert_eq!(turns[0]["frames"][2]["context"]["stream_name"], "default");
-        let legacy = "See\n--- Log Entry ---\n{\"a\":1}\n--- end ---";
-        assert_eq!(
-            hide_attachment_blocks(legacy),
-            "See\n\n[Attached log entry hidden]"
-        );
-        assert_eq!(hide_attachment_blocks("plain"), "plain");
-        let unclosed = "Why?\n--- Log rows [abcdefgh] ---\nrow 1\nrow 2 card 4111";
-        assert_eq!(
-            hide_attachment_blocks(unclosed),
-            "Why?\n\n[Attached log rows hidden]"
-        );
-        let multi_line = "See\n--- Span ---\n{\n}\n--- end ---\nthen\n--- Log rows ---\nsecret";
-        let hidden = hide_attachment_blocks(multi_line);
-        assert!(
-            !hidden.contains("secret") && hidden.starts_with("See"),
-            "{hidden}"
-        );
-    }
-
-    #[test]
-    fn a_named_stream_does_not_hide_the_tables_its_sql_reads() {
-        let turns = vec![json!({"frames": [
-            {"type": "tool_call", "tool": "SearchSQL", "call_id": "c1", "context": {"stream_name": "public", "sql": "SELECT * FROM secret"}},
-            {"type": "tool_call", "tool": "SearchSQL", "call_id": "c2", "context": {"stream_name": "public", "sql": "SELEC nonsense ((("}},
-        ]})];
-        let place = |s: &str| Some(("logs".to_string(), s.to_string()));
-        assert_eq!(
-            step_streams(&turns),
-            [
-                ("c1".to_string(), place("public")),
-                ("c1".to_string(), place("secret")),
-                ("c2".to_string(), None),
-            ]
-        );
-    }
-
-    #[test]
-    fn steps_whose_streams_cannot_be_told_are_unplaced() {
-        let turns = vec![json!({"frames": [
-            {"type": "tool_call", "tool": "PrometheusQuery", "call_id": "p1", "context": {"query": "rate(http_requests_total[5m])"}},
-            {"type": "tool_call", "tool": "correlate_streams", "call_id": "k1", "context": {"service": "checkout"}},
-            {"type": "tool_call", "tool": "SearchSQL", "call_id": "s1", "context": {"sql": "SELEC nonsense ((("}},
-            {"type": "tool_call", "tool": "SearchSQL", "call_id": "s2", "context": {"stream_name": "e1", "stream_type": "enrichment_tables"}},
-            {"type": "tool_call", "tool": "SearchSQL", "call_id": "s3"},
-            {"type": "tool_call", "tool": "StreamSchema", "call_id": "m1", "context": {"stream_name": "cpu", "type": "metrics"}},
-            {"type": "tool_call", "tool": "StreamList", "call_id": "l1", "context": {}},
-            {"type": "tool_call", "tool": "ListAlerts", "call_id": "l2"},
-        ]})];
-        let steps = step_streams(&turns);
-        let unplaced: Vec<&str> = steps
-            .iter()
-            .filter(|(_, p)| p.is_none())
-            .map(|(id, _)| id.as_str())
-            .collect();
-        assert_eq!(unplaced, ["p1", "k1", "s1", "s2", "s3"]);
-        assert!(steps.contains(&(
-            "m1".to_string(),
-            Some(("metrics".to_string(), "cpu".to_string()))
-        )));
-        assert!(!steps.iter().any(|(id, _)| id.starts_with('l')));
-    }
-
-    /// A stored session's events with `answer` as its last assistant text.
-    fn session_answering(answer: &str, agent: &str, error: Value) -> Vec<DurableEvent> {
-        let (events, _) = load("findings.json");
-        events
-            .into_iter()
-            .map(|mut event| {
-                let is_text = event.data["part"]["type"] == "text";
-                if is_text
-                    && event.data["part"]["text"]
-                        .as_str()
-                        .unwrap_or("")
-                        .contains(FINDINGS_FENCE)
-                {
-                    event.data["part"]["text"] = answer.into();
-                }
-                if event.data["info"]["role"] == "assistant" {
-                    event.data["info"]["agent"] = agent.into();
-                    event.data["info"]["error"] = error.clone();
-                }
-                event
-            })
-            .collect()
-    }
-
-    fn last_frames(events: &[DurableEvent]) -> Vec<Value> {
-        let projected = project(events);
-        let turns = projected["turns"].as_array().unwrap();
-        turns.last().unwrap()["frames"].as_array().unwrap().clone()
-    }
-
-    fn answer_text(frames: &[Value]) -> String {
-        frames
-            .iter()
-            .filter(|f| f["type"] == "message_delta")
-            .filter_map(|f| f["content"].as_str())
-            .collect()
-    }
-
-    const FINDINGS_BLOCK: &str = r#"{"likely_cause": "pool", "confidence": "low", "evidence": [], "ruled_out": [], "unknowns": [], "next_steps": []}"#;
-
-    #[test]
-    fn a_reopened_chat_shows_a_findings_card_and_never_the_block() {
-        let (events, _) = load("findings.json");
-        let frames = last_frames(&events);
-        let text = answer_text(&frames);
-        assert!(
-            !text.contains("likely_cause") && !text.contains(CODE_FENCE),
-            "{text}"
-        );
-        let cards: Vec<&Value> = frames.iter().filter(|f| f["type"] == "findings").collect();
-        assert_eq!(cards.len(), 1);
-        assert_eq!(frames[frames.len() - 2]["type"], "findings");
-        let evidence = cards[0]["evidence"].as_array().unwrap();
-        assert!(
-            frames
-                .iter()
-                .any(|f| f["call_id"] == evidence[0]["call_id"] && f["type"] == "tool_call")
-        );
-        assert_eq!(
-            evidence[1],
-            json!({"text": "beyond the calls of this turn", "kind": "inferred"})
-        );
-    }
-
-    #[test]
-    fn a_reopened_answer_cites_steps_by_call_id_like_the_live_one() {
-        let first = last_frames(&session_answering("Done.", "sre", Value::Null));
-        let step = first
-            .iter()
-            .find(|f| f["type"] == "tool_call")
-            .and_then(|f| f["call_id"].as_str())
-            .unwrap()
-            .to_string();
-        let answer = format!(
-            "The pool is full [^{step}]. Not [^99] or [^zz_unknown].\n```\nre.sub(r\"[^1]\", x)\n```\n"
-        );
-        let text = answer_text(&last_frames(&session_answering(
-            &answer,
-            "sre",
-            Value::Null,
-        )));
-        let (prose, code) = text.split_once(CODE_FENCE).unwrap();
-        assert!(prose.contains(&format!("[^{step}]")), "{text}");
-        assert!(
-            !prose.contains("[^99]") && !prose.contains("zz_unknown"),
-            "{text}"
-        );
-        assert!(code.contains("[^1]"), "{text}");
-    }
-
-    #[test]
-    fn a_reopened_answer_leaves_inline_code_and_tilde_fences_alone() {
-        let first = last_frames(&session_answering("Done.", "sre", Value::Null));
-        let step = first
-            .iter()
-            .find(|f| f["type"] == "tool_call")
-            .and_then(|f| f["call_id"].as_str())
-            .unwrap()
-            .to_string();
-        let answer = format!(
-            "Use `re.sub(r\"[^1]\", \"\", value)` here [^{step}].\n~~~python\nx = \"[^99]\"\n~~~\n\
-             Wrapped `re.sub(\nr\"[^1]\", \"\", value)` too [^{step}].\n\
-             A `stray tick [^99]\n\nthen [^{step}][^99] and ``a`[^1]`` done.\n"
-        );
-        let text = answer_text(&last_frames(&session_answering(
-            &answer,
-            "sre",
-            Value::Null,
-        )));
-        assert!(
-            text.contains(&format!("`re.sub(r\"[^1]\", \"\", value)` here [^{step}].")),
-            "{text}"
-        );
-        assert!(text.contains("x = \"[^99]\"\n~~~"), "{text}");
-        assert!(
-            text.contains(&format!("then [^{step}] and ``a`[^1]`` done.")),
-            "{text}"
-        );
-        assert!(text.contains("`stray tick [^99]\n\n"), "{text}");
-        assert!(
-            text.contains(&format!(
-                "`re.sub(\nr\"[^1]\", \"\", value)` too [^{step}]."
-            )),
-            "{text}"
-        );
-        assert_eq!(
-            StreamState::default().rewrite_claim_markers("a ~~~ b [^1]"),
-            "a ~~~ b "
-        );
-    }
-
-    #[test]
-    fn a_follow_ups_block_stays_hidden_and_comes_back_as_its_frame() {
-        let answer =
-            "Done.\n```follow_ups\n[\"Why?\", \"Why?\", \"a\\n  b\", 3, \"c\", \"d\"]\n```\n";
-        let frames = last_frames(&session_answering(answer, "o2-ai", Value::Null));
-        assert!(answer_text(&frames).ends_with("Done.\n\n"));
-        let frame = frames.iter().find(|f| f["type"] == "follow_ups").unwrap();
-        assert_eq!(frame["items"], json!(["Why?", "a b", "c"]));
-
-        let bad = "Done.\n```follow_ups\nnot json\n```\n";
-        let frames = last_frames(&session_answering(bad, "o2-ai", Value::Null));
-        assert!(answer_text(&frames).ends_with("Done.\n\n"));
-        assert!(frames.iter().all(|f| f["type"] != "follow_ups"));
-    }
-
-    #[test]
-    fn a_reopened_follow_up_is_scrubbed_like_the_live_one() {
-        let answer = concat!(
-            "Done.\n```follow_ups\n[",
-            r#""Check nats://user:secret@nats:4222", "#,
-            r#""Read /home/appuser/work/state.json", "#,
-            r#""Is http://127.0.0.1:4096/session up?""#,
-            "]\n```\n"
-        );
-        let frames = last_frames(&session_answering(answer, "o2-ai", Value::Null));
-        let frame = frames.iter().find(|f| f["type"] == "follow_ups").unwrap();
-        assert_eq!(
-            frame["items"],
-            json!([
-                "Check [internal endpoint]",
-                "Read [internal path]",
-                "Is [internal endpoint] up?"
-            ])
-        );
-    }
-
-    #[test]
-    fn a_handoff_block_stays_hidden_and_a_bad_findings_block_stays_text() {
-        let handoff = "Done.\n```handoff\n{\"agent\": \"sre\", \"reason\": \"dig\"}\n```\n";
-        let frames = last_frames(&session_answering(handoff, "o2-ai", Value::Null));
-        assert!(answer_text(&frames).ends_with("Done.\n\n"));
-        assert!(frames.iter().all(|f| f["type"] != "findings"));
-
-        let bad = "See.\n```findings\n{\"likely_cause\": \"no other keys\"}\n```\nMore.";
-        let frames = last_frames(&session_answering(bad, "o2-ai", Value::Null));
-        assert!(answer_text(&frames).ends_with(bad));
-        assert!(frames.iter().all(|f| f["type"] != "findings"));
-
-        let unclosed = format!("See.\n```findings\n{FINDINGS_BLOCK}");
-        let frames = last_frames(&session_answering(&unclosed, "o2-ai", Value::Null));
-        assert!(answer_text(&frames).ends_with("See.\n"));
-        assert_eq!(frames.iter().filter(|f| f["type"] == "findings").count(), 1);
-
-        let quoted = format!("Write it like this: ```findings\n{FINDINGS_BLOCK}\n```");
-        let frames = last_frames(&session_answering(&quoted, "o2-ai", Value::Null));
-        assert!(
-            answer_text(&frames).ends_with(&quoted),
-            "mid-line is plain text"
-        );
-    }
-
-    #[test]
-    fn findings_become_a_card_only_on_turns_that_ended_well_outside_query_mode() {
-        let block = format!("Why.\n```findings\n{FINDINGS_BLOCK}\n```\n");
-        let query = last_frames(&session_answering(&block, QUERY_AGENT, Value::Null));
-        assert!(answer_text(&query).ends_with("Why.\n\n"));
-        assert!(query.iter().all(|f| f["type"] != "findings"));
-        let aborted = json!({"name": ABORTED_ERROR});
-        let frames = last_frames(&session_answering(&block, "o2-ai", aborted));
-        assert!(frames.iter().all(|f| f["type"] != "findings"));
-    }
-
-    #[test]
-    fn a_failed_turn_never_shows_the_providers_json_body() {
-        for (message, shown) in [
-            (
-                r#"{"type":"error","error":{"type":"overloaded_error"}}"#,
-                DEFAULT_TURN_ERROR,
-            ),
-            (
-                r#"AI_APICallError: {"error":{"code":429}}"#,
-                DEFAULT_TURN_ERROR,
-            ),
-            (r#"[{"error":"quota"}]"#, DEFAULT_TURN_ERROR),
-            (
-                "The model is overloaded {try later}",
-                "The model is overloaded {try later}",
-            ),
-        ] {
-            let error = json!({"name": "APIError", "data": {"message": message}});
-            let events = session_answering("Partial.", "o2-ai", error);
-            let projected = project(&events);
-            assert_eq!(
-                projected["turns"].as_array().unwrap().last().unwrap()["error"],
-                shown
-            );
-        }
-    }
-
-    #[test]
-    fn the_findings_schema_matches_the_web_client() {
-        let path = assistant_web_dir().join("findings.schema.json");
-        let Ok(source) = std::fs::read_to_string(&path) else {
-            assert!(std::env::var_os("CI").is_none(), "no {path:?}");
-            eprintln!("skipped: no {path:?} (set O2_ASSISTANT_WEB_DIR)");
-            return;
-        };
-        assert_eq!(source, FINDINGS_SCHEMA_JSON, "findings.schema.json drifted");
-    }
-
-    #[test]
-    fn the_findings_schema_check_enforces_each_rule() {
-        let frame = |changes: Value| {
-            let mut body: Value = config::utils::json::from_str(FINDINGS_BLOCK).unwrap();
-            for (key, value) in changes.as_object().unwrap() {
-                body[key] = value.clone();
-            }
-            findings_body(&body.to_string()).is_some()
-        };
-        assert!(frame(json!({})));
-        assert!(frame(json!({"changed_since": ["new deploy"]})));
-        assert!(!frame(json!({"confidence": "certain"})));
-        assert!(!frame(json!({"extra": 1})));
-        assert!(!frame(json!({"ruled_out": [""]})));
-        assert!(!frame(json!({"ruled_out": [1]})));
-        assert!(!frame(json!({"likely_cause": "x".repeat(501)})));
-        assert!(!frame(json!({"evidence": [{"text": "no kind"}]})));
-        assert!(!frame(json!({"next_steps": vec!["x"; 21]})));
-        assert!(findings_body("[1]").is_none() && findings_body("not json").is_none());
-    }
-
-    #[test]
-    fn an_asked_question_leaves_no_step_in_history() {
-        let call = format_tool_call_event("ask_user", &Map::new());
-        assert!(call.is_none());
+        assert_eq!(sorted["title"], "Pool exhaustion");
     }
 }
