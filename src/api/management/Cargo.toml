@@ -83,6 +83,7 @@ opentelemetry.workspace = true
 promql-service.workspace = true
 regex.workspace = true
 reqwest.workspace = true
+schema.workspace = true
 search.workspace = true
 search_service.workspace = true
 sea-orm.workspace = true

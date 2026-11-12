@@ -526,6 +526,18 @@ describe("TemplateList pagination persistence", () => {
     expect(pushedQuery.clone).toBe("Template2");
   });
 
+  it("cuts a clone name to the 256-character server limit", async () => {
+    (router as any).currentRoute.value.query = {};
+    wrapper = mountComponent();
+    await flushPromises();
+
+    (wrapper.vm as any).cloneTemplate({ name: "é".repeat(250) });
+
+    const name = (wrapper.vm as any).editingTemplate.name as string;
+    expect(Array.from(name)).toHaveLength(256);
+    expect(name.startsWith("Copy_of_")).toBe(true);
+  });
+
   it("importTemplate preserves the page query param", async () => {
     (router as any).currentRoute.value.query = {};
     wrapper = mountComponent();

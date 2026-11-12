@@ -782,7 +782,8 @@ const openClone = (template: Template) => {
   // reserved characters (':', '#', '?', '&', '%', '/', quotes).
   editingTemplate.value = {
     ...template,
-    name: `Copy_of_${template.name}`,
+    // The server refuses names over 256 characters, so cut the copy to fit.
+    name: Array.from(`Copy_of_${template.name}`).slice(0, 256).join(""),
   };
   cloningTemplate.value = true;
   cloningSource.value = template.name;

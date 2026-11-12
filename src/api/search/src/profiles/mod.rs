@@ -606,6 +606,7 @@ fn queryable_field_names(schema: &Schema) -> Vec<String> {
     let defined_schema_fields = infra::schema::unwrap_stream_settings(schema)
         .map(|settings| settings.defined_schema_fields)
         .unwrap_or_default();
+    let uds_fields = schema::effective_uds_fields(StreamType::Profiles, &defined_schema_fields);
     let column_all = &get_config().common.column_all;
     // `_all` outlives a cleared UDS in the schema, so it is never a filter key
     schema
@@ -616,7 +617,7 @@ fn queryable_field_names(schema: &Schema) -> Vec<String> {
             *name != column_all
                 && (defined_schema_fields.is_empty()
                     || *name == TIMESTAMP_COL_NAME
-                    || defined_schema_fields.contains(name))
+                    || uds_fields.contains(*name))
         })
         .cloned()
         .collect()
@@ -894,6 +895,31 @@ mod tests {
                 "stack",
                 "value"
             ]
+        );
+    }
+
+    #[test]
+    fn queryable_field_names_include_required_columns_missing_from_saved_list() {
+        use arrow_schema::{DataType, Field};
+        use config::meta::stream::StreamSettings;
+
+        let fields = [TIMESTAMP_COL_NAME, "service_name", "trace_id", "span_id"]
+            .map(|name| Field::new(name, DataType::Utf8, true));
+        let settings = StreamSettings {
+            defined_schema_fields: vec!["service_name".to_string()],
+            ..Default::default()
+        };
+        let metadata = std::collections::HashMap::from([(
+            "settings".to_string(),
+            json::to_string(&settings).unwrap(),
+        )]);
+
+        let mut names =
+            queryable_field_names(&Schema::new_with_metadata(fields.to_vec(), metadata));
+        names.sort();
+        assert_eq!(
+            names,
+            [TIMESTAMP_COL_NAME, "service_name", "span_id", "trace_id"]
         );
     }
 }

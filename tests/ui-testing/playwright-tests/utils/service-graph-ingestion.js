@@ -53,6 +53,9 @@ const ConnectionType = {
   MESSAGING: 'messaging',
 };
 
+// Default v4 cadence: 300 s cache delay + 60 s window + 60 s tick + 300 s identity learning + 60 s admission tick.
+const SERVICE_GRAPH_READY_FLOOR_MS = (300 + 60 + 60 + 300 + 60) * 1000;
+
 // Production-grade service configuration matching telemetry-generator.py
 const SERVICES = {
   'frontend-app':           { version: '2.1.0', environment: 'production' },
@@ -2290,6 +2293,7 @@ module.exports = {
   StatusCode,
   ConnectionType,
   SERVICES,
+  SERVICE_GRAPH_READY_FLOOR_MS,
 
   // Core utilities
   generateHexId,
