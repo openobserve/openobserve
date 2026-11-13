@@ -181,3 +181,33 @@ class TestQueryRegressions:
             logger.info("#9664 stable order across 6 runs: %s", baseline[:15])
         finally:
             _drop(session, base_url, stream)
+
+    def test_regexp_match_to_fields_extracts_each_rows_own_values(
+        self, create_session, base_url, random_string
+    ):
+        """#16022: regexp_match_to_fields broadcast row 0's captures to every row."""
+        session = create_session
+        stream = f"ovn_b_16022_{random_string(6).lower()}"
+        now = int(time.time() * 1_000_000)
+        rows = [
+            {"_timestamp": now - i * 1_000_000, "seq": i, "message": f"GET /api/item/{i * 11} code={200 + i}"}
+            for i in range(1, 6)
+        ]
+        resp = session.post(f"{base_url}api/{ORG_ID}/{stream}/_json", json=rows)
+        assert resp.status_code == 200, f"ingest failed: {resp.status_code} {resp.text}"
+        try:
+            for _ in range(30):
+                if len(_search(session, base_url, f'SELECT seq FROM "{stream}"').get("hits", [])) >= len(rows):
+                    break
+                time.sleep(1)
+            sql = (
+                f"SELECT seq, regexp_match_to_fields(message, 'GET /api/item/(?P<item>\\d+) code=(?P<code>\\d+)') AS f "
+                f'FROM "{stream}" ORDER BY seq ASC'
+            )
+            hits = _search(session, base_url, sql).get("hits", [])
+            logger.info("#16022 hits: %s", hits)
+            got = [(h["seq"], h["f"]) for h in hits]
+            expected = [(i, {"item": str(i * 11), "code": str(200 + i)}) for i in range(1, 6)]
+            assert got == expected, f"#16022: each row must carry its own captures, got {got}"
+        finally:
+            _drop(session, base_url, stream)
