@@ -8,7 +8,8 @@ on:
   pull_request_target:
     types: [opened, ready_for_review]
 
-permissions: {}
+permissions:
+  contents: read
 
 env:
   PROJECT_NUMBER: "19"
@@ -52,41 +53,25 @@ jobs:
             && echo "Assigned $CREATOR to PR #$NUMBER" \
             || echo "::warning::Could not assign $CREATOR to PR #$NUMBER"
 
-      # ── PR: add lowest open milestone (skip drafts) ──
+      # ── Checkout the milestone script from the default branch, never the PR head ──
+      - name: Checkout milestone script
+        if: (github.event_name == 'pull_request_target' && steps.classify.outputs.category == 'team' && github.event.pull_request.draft == false && (github.event.pull_request.base.ref == 'main' || startsWith(github.event.pull_request.base.ref, 'branch-v'))) || (github.event_name == 'issues' && steps.classify.outputs.category == 'team')
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          sparse-checkout: .github/scripts/assign-milestone.sh
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+
+      # ── PR: milestone by release freeze; backports also link their main PRs ──
       - name: Add milestone to PR
-        if: github.event_name == 'pull_request_target' && steps.classify.outputs.category == 'team' && github.event.pull_request.draft == false && github.event.pull_request.base.ref == 'main'
+        if: github.event_name == 'pull_request_target' && steps.classify.outputs.category == 'team' && github.event.pull_request.draft == false && (github.event.pull_request.base.ref == 'main' || startsWith(github.event.pull_request.base.ref, 'branch-v'))
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
           GH_REPO: ${{ github.repository }}
           NUMBER: ${{ github.event.pull_request.number }}
-        run: |
-          CURRENT=$(gh api "repos/$GH_REPO/pulls/$NUMBER" --jq '.milestone.title // empty')
-          if [ -n "$CURRENT" ]; then
-            echo "Milestone already set to '$CURRENT' — skipping"
-            exit 0
-          fi
-
-          MILESTONE=$(gh api "repos/$GH_REPO/milestones?state=open&per_page=100" --jq '
-            [.[] | select(.title != "Backlog")] |
-            map({
-              title: .title,
-              due_ts: (if .due_on then (.due_on | fromdateiso8601) else null end),
-              sort_key: ([.title | scan("[0-9]+")] | map(tonumber))
-            }) |
-            map(select(.sort_key | length > 0)) |
-            sort_by(.sort_key) |
-            if length == 0 then empty
-            elif (.[0].due_ts != null and .[0].due_ts < now) then (.[1].title // .[0].title)
-            else .[0].title
-            end')
-
-          if [ -n "$MILESTONE" ]; then
-            gh pr edit "$NUMBER" -m "$MILESTONE" \
-              && echo "Set milestone: $MILESTONE" \
-              || echo "::warning::Could not set milestone $MILESTONE"
-          else
-            echo "::warning::No open milestones found"
-          fi
+        run: bash .github/scripts/assign-milestone.sh pr "$NUMBER"
 
       # ── PR: add to project ──
       - name: Add PR to project
@@ -128,41 +113,15 @@ jobs:
             echo "Issue already has assignees — skipping"
           fi
 
-      # ── Issue: add lowest open milestone ──
+      # ── Issue: milestone by release freeze ──
       - name: Add milestone to issue
         if: github.event_name == 'issues' && steps.classify.outputs.category == 'team'
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
           GH_REPO: ${{ github.repository }}
           NUMBER: ${{ github.event.issue.number }}
-        run: |
-          CURRENT=$(gh api "repos/$GH_REPO/issues/$NUMBER" --jq '.milestone.title // empty')
-          if [ -n "$CURRENT" ]; then
-            echo "Milestone already set to '$CURRENT' — skipping"
-            exit 0
-          fi
-
-          MILESTONE=$(gh api "repos/$GH_REPO/milestones?state=open&per_page=100" --jq '
-            [.[] | select(.title != "Backlog")] |
-            map({
-              title: .title,
-              due_ts: (if .due_on then (.due_on | fromdateiso8601) else null end),
-              sort_key: ([.title | scan("[0-9]+")] | map(tonumber))
-            }) |
-            map(select(.sort_key | length > 0)) |
-            sort_by(.sort_key) |
-            if length == 0 then empty
-            elif (.[0].due_ts != null and .[0].due_ts < now) then (.[1].title // .[0].title)
-            else .[0].title
-            end')
-
-          if [ -n "$MILESTONE" ]; then
-            gh issue edit "$NUMBER" -m "$MILESTONE" \
-              && echo "Set milestone: $MILESTONE" \
-              || echo "::warning::Could not set milestone $MILESTONE"
-          else
-            echo "::warning::No open milestones found"
-          fi
+        run: bash .github/scripts/assign-milestone.sh issue "$NUMBER"
 
       # ── Issue: add to project ──
       - name: Add issue to project
