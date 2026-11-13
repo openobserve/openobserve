@@ -75,18 +75,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
           <div class="flex min-w-0 flex-1 flex-col gap-1">
             <span class="text-text-secondary text-xs font-medium">
-              {{ t(LABEL[request.kind]) }}
+              {{ request.copy ? request.copy.label : t(LABEL[request.kind]) }}
             </span>
             <h3
               class="text-text-heading text-sm leading-snug font-semibold text-pretty"
+              :class="request.copy ? 'break-words' : ''"
               :data-test="`autoobserve2-request-headline-${testId}`"
             >
-              {{ t(copyKey("headline")) }}
+              {{ request.copy ? request.copy.headline : t(copyKey("headline")) }}
             </h3>
           </div>
         </div>
         <p class="text-text-secondary text-sm leading-relaxed text-pretty">
-          {{ t(copyKey("why")) }}
+          {{ request.copy ? request.copy.why : t(copyKey("why")) }}
           <button
             type="button"
             class="text-accent focus-visible:ring-focus-ring-accent rounded-default inline-flex items-center gap-0.5 font-medium whitespace-nowrap hover:underline focus-visible:ring-2 focus-visible:outline-none"
@@ -107,7 +108,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ say(t, request.body) }}
         </p>
       </template>
-      <div class="flex flex-wrap items-center gap-1.5">
+      <div v-if="request.copy" class="flex flex-wrap items-center gap-1.5">
+        <OTag
+          v-for="tag in request.copy.tags"
+          :key="tag.label"
+          :variant="tag.variant"
+          size="xs"
+          :label="tag.label"
+        />
+      </div>
+      <div v-else class="flex flex-wrap items-center gap-1.5">
         <p
           class="bg-surface-base border-border-subtle rounded-default inline-flex max-w-full flex-wrap items-center gap-x-1.5 border px-2 py-0.5 text-xs leading-5"
           :data-test="`autoobserve2-request-shift-${testId}`"
@@ -128,7 +138,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </span>
       </div>
-      <div class="flex items-center gap-2 pt-1" :class="inline ? 'flex-wrap' : ''">
+      <!-- Live findings have no decision route yet, so a click would only change local state. -->
+      <div
+        v-if="!request.copy"
+        class="flex items-center gap-2 pt-1"
+        :class="inline ? 'flex-wrap' : ''"
+      >
         <OButton
           variant="primary"
           size="sm"
@@ -185,7 +200,7 @@ const expanded = ref(false);
 const rootEl = ref<HTMLElement | null>(null);
 const announcement = ref<I18nText>(raw(""));
 
-const look = computed(() => KIND_LOOK[CHANGE_KIND[props.request.kind]]);
+const look = computed(() => KIND_LOOK[props.request.copy?.look ?? CHANGE_KIND[props.request.kind]]);
 
 // Fix-now copy is per problem, mirroring how fixtures key each request's body.
 const copyKey = (part: string) =>
@@ -198,9 +213,11 @@ const entryKey = (part: string) =>
 
 // Fix-now requests other than search carry their problem, so each ask has a distinct test id.
 const testId = computed(() =>
-  props.request.problem && props.request.problem !== "search"
-    ? `${props.request.kind}-${props.request.problem}`
-    : props.request.kind,
+  props.request.copy
+    ? props.request.id
+    : props.request.problem && props.request.problem !== "search"
+      ? `${props.request.kind}-${props.request.problem}`
+      : props.request.kind,
 );
 
 const doneText = computed(() => {

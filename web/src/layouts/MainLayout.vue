@@ -272,6 +272,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <CommunitySlackInvite v-if="!focusMode" />
     <PredefinedThemes />
     <ShortcutCheatsheet v-model:open="showShortcuts" />
+    <VersionCompareDrawerHost />
     <PaidOverageConsentDialog v-if="config.isCloud == 'true'" />
     <DashboardSaveConflictDialog
       v-if="dashboardSaveConflict.mounted"
@@ -322,7 +323,8 @@ import {
 } from "vue";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
-import { useRoute, useRouter, RouterView } from "vue-router";
+import { useRoute, useRouter, RouterView, isNavigationFailure } from "vue-router";
+import { orgSwitchListRoute, orgSwitchPending } from "@/utils/orgScopedRoutes";
 import { solutionModeForPath } from "@/utils/security/solutionMode";
 import { useSecurityAccess } from "@/composables/security/useSecurityAccess";
 import config from "../aws-exports";
@@ -430,6 +432,9 @@ export default defineComponent({
     EditorDraftSignOutDialog,
     FeatureLockBoundary,
     SecurityPageGate,
+    VersionCompareDrawerHost: defineAsyncComponent(
+      () => import("@/enterprise/components/ServiceVersions/VersionCompareDrawerHost.vue"),
+    ),
     DashboardSaveConflictDialog: defineAsyncComponent(
       () => import("@/components/dashboards/DashboardSaveConflictDialog.vue"),
     ),
@@ -533,6 +538,7 @@ export default defineComponent({
       chipName?: string;
       newChat?: boolean;
       context?: Record<string, unknown> | null;
+      prompt?: string;
     } | null>(null);
     let customOrganization = Object.prototype.hasOwnProperty.call(
       router.currentRoute.value.query,
@@ -1320,21 +1326,45 @@ export default defineComponent({
     }
 
     const updateOrganization = async () => {
+      const targetOrg = { ...selectedOrg.value };
+      const orgIdentifier = targetOrg.identifier;
+      const listRoute = orgSwitchListRoute(
+        router.currentRoute.value.name,
+        router.currentRoute.value.query,
+      );
+      if (listRoute) {
+        if (orgIdentifier === store.state.selectedOrganization?.identifier) return;
+        // leave before anything resets: the page's id is org-scoped and would fail to load in the new org
+        orgSwitchPending.value = true;
+        const failure = await router
+          .replace({ name: listRoute, query: { org_identifier: orgIdentifier } })
+          .finally(() => {
+            orgSwitchPending.value = false;
+          });
+        if (isNavigationFailure(failure)) {
+          // the leave was blocked (e.g. the unsaved-changes prompt was declined), so the user stays in the current org
+          selectedOrg.value = { ...store.state.selectedOrganization };
+          return;
+        }
+      }
       resetStreams();
       store.dispatch("logs/resetLogs");
       store.dispatch("setIsDataIngested", false);
-      const orgIdentifier = selectedOrg.value.identifier;
-      const queryParams =
-        router.currentRoute.value.path.indexOf(".logs") > -1 ? router.currentRoute.value.query : {};
-      router.push({
-        path: router.currentRoute.value.path,
-        query: {
-          ...queryParams,
-          org_identifier: orgIdentifier,
-        },
-      });
-      useLocalOrganization(selectedOrg.value);
-      store.dispatch("setSelectedOrganization", { ...selectedOrg.value });
+      if (!listRoute) {
+        const queryParams =
+          router.currentRoute.value.path.indexOf(".logs") > -1
+            ? router.currentRoute.value.query
+            : {};
+        router.push({
+          path: router.currentRoute.value.path,
+          query: {
+            ...queryParams,
+            org_identifier: orgIdentifier,
+          },
+        });
+      }
+      useLocalOrganization(targetOrg);
+      store.dispatch("setSelectedOrganization", targetOrg);
       // setSelectedOrganization();
       // if (
       //   config.isCloud &&
@@ -1363,7 +1393,7 @@ export default defineComponent({
         store.state.zoConfig.restricted_routes_on_empty_data == true &&
         store.state.organizationData.isDataIngested == false
       ) {
-        await verifyStreamExist(selectedOrg.value);
+        await verifyStreamExist(targetOrg);
       }
     };
 
@@ -1867,6 +1897,7 @@ export default defineComponent({
         chipName: string;
         newChat: boolean;
         context: Record<string, unknown> | null;
+        prompt?: string;
       } | null = null;
       if (value && typeof value === "object" && "query" in value) {
         text = value.query;
@@ -1876,6 +1907,7 @@ export default defineComponent({
             chipName: value.chipName,
             newChat: !!value.newChat,
             context: value.context && typeof value.context === "object" ? value.context : null,
+            ...(typeof value.prompt === "string" && value.prompt ? { prompt: value.prompt } : {}),
           };
         }
       }

@@ -21,11 +21,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div
         ref="toolbarLeftRef"
-        class="flex min-w-0 flex-1 flex-row items-center gap-1.5 max-lg:w-full max-lg:flex-none max-lg:flex-wrap max-lg:gap-y-1"
+        class="flex min-w-0 flex-1 flex-row items-center gap-2 max-lg:w-full max-lg:flex-none max-lg:flex-wrap max-lg:gap-y-1"
       >
         <!-- Clips its overflow so More, a shrink-0 sibling, is never clipped. -->
         <div
-          class="flex min-w-0 flex-initial flex-row items-center gap-1.5 overflow-hidden max-lg:flex-wrap max-lg:gap-y-1 max-lg:overflow-visible"
+          class="flex min-w-0 flex-initial flex-row items-center gap-2 overflow-hidden max-lg:flex-wrap max-lg:gap-y-1 max-lg:overflow-visible"
         >
           <!-- Unified View Toggle: Service Graph / Traces / Spans -->
           <OToggleGroup
@@ -119,7 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="!toolbarMoveResetToMenu"
               data-test="traces-search-bar-reset-filters-btn"
               variant="outline"
-              size="xs"
+              size="sm-toolbar"
               @click="resetFilters"
             >
               <template #icon-left>
@@ -132,9 +132,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             v-if="showPinnedMetrics"
             data-test="traces-search-bar-metrics-pinned-btn"
-            size="xs"
+            size="sm-toolbar"
             variant="outline"
-            class="gap-1.5"
             @click="searchObj.meta.showHistogram = !searchObj.meta.showHistogram"
           >
             <OSwitch v-model="searchObj.meta.showHistogram" size="md" @click.stop />
@@ -145,7 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButtonGroup
             v-if="showPinnedSavedViews"
             data-test="traces-search-bar-saved-views"
-            class="border-button-outline-border shrink-0 border p-0"
+            class="border-button-outline-border h-8.5 shrink-0 border p-0"
           >
             <ODropdown
               :open="savedViewsDropdownOpen"
@@ -158,6 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="traces-search-bar-saved-views-btn"
                   variant="ghost"
                   size="xs-grouped"
+                  class="h-full!"
                 >
                   <OIcon name="saved-search" size="sm" />
                   <OIcon name="arrow-drop-down" size="sm" />
@@ -182,6 +182,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="traces-search-bar-saved-views-create-btn"
               variant="ghost"
               size="icon-panel"
+              class="h-full!"
               @click="openSaveViewDialog"
             >
               <OIcon name="save" size="sm" />
@@ -200,7 +201,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               data-test="traces-search-bar-more-menu-btn"
               variant="outline"
-              size="xs"
+              size="sm-toolbar"
               icon-left="more-horiz"
               class="shrink-0 max-lg:ms-auto"
             >
@@ -310,7 +311,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             searchObj.meta.searchMode !== 'service-graph' &&
             searchObj.meta.searchMode !== 'services-catalog'
           "
-          class="flex items-center gap-1.5 max-lg:w-full max-lg:flex-wrap max-lg:justify-end max-lg:gap-y-1"
+          class="flex items-center gap-2 max-lg:w-full max-lg:flex-wrap max-lg:justify-end max-lg:gap-y-1"
         >
           <OPageHeaderStatus />
           <DateTime
@@ -327,7 +328,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             calendar-presets
             :queryRangeRestrictionInHour="searchObj.data.datetime.queryRangeRestrictionInHour"
             :queryRangeRestrictionMsg="searchObj.data.datetime.queryRangeRestrictionMsg"
-            class="h-8 max-lg:me-auto max-md:[&_.date-time-label]:hidden"
+            class="h-8.5! max-lg:me-auto max-md:[&_.date-time-label]:hidden"
             @on:date-change="updateDateTime"
             @on:timezone-change="updateTimezone"
           />
@@ -342,8 +343,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="ghost"
                 aria-busy="true"
                 data-test="traces-search-bar-cancel-btn"
+                size="sm-toolbar"
                 :title="t('search.cancel')"
-                class="bg-cancel-query-bg! text-button-primary-foreground! h-[1.875rem]! w-[5.875rem]! ![border-radius:0.375rem_0_0_0.375rem] p-0 px-1! py-0! text-center text-xs! leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,_opacity_0.2s_ease]"
+                class="bg-cancel-query-bg! text-button-primary-foreground! rounded-s-default! min-w-[5.875rem] rounded-e-none! [transition:box-shadow_0.3s_ease,_opacity_0.2s_ease]"
                 @click="cancelQueryData"
                 >{{ t("search.cancel") }}</OButton
               >
@@ -354,11 +356,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-cy="search-bar-refresh-button"
                 :data-run-pending="showRunQueryPending ? 'true' : undefined"
                 :aria-label="showRunQueryPending ? t('search.runQueryPendingLabel') : undefined"
+                size="sm-toolbar"
                 :title="t('search.runQuery')"
-                class="h-[1.875rem]! w-[5.875rem]! p-0 px-1! py-0! text-center text-xs! leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,_opacity_0.2s_ease]"
+                class="min-w-[5.875rem] [transition:box-shadow_0.3s_ease,_opacity_0.2s_ease]"
                 :class="[
                   store.state.zoConfig.auto_query_enabled
-                    ? '![border-radius:0.375rem_0_0_0.375rem]'
+                    ? 'rounded-s-default! rounded-e-none!'
                     : 'rounded-default',
                   showRunQueryPending
                     ? ''
@@ -384,13 +387,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
                 {{ t("search.runQuery") }}
               </OButton>
-              <OSeparator v-if="!showRunQueryPending" class="h-[1.875rem]! w-px" vertical />
+              <OSeparator
+                v-if="!showRunQueryPending && store.state.zoConfig.auto_query_enabled"
+                class="h-8.5! w-px"
+                vertical
+              />
               <ODropdown v-if="store.state.zoConfig.auto_query_enabled" side="bottom" align="end">
                 <template #trigger>
                   <OButton
                     :aria-label="t('common.moreOptions')"
                     :variant="showRunQueryPending && !isLoading ? 'pending' : 'ghost'"
-                    size="icon-xs"
+                    size="icon-toolbar"
                     :disabled="isLoading"
                     :class="[
                       config.isEnterprise == 'true' && isLoading
@@ -398,7 +405,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         : showRunQueryPending
                           ? 'border-s-0'
                           : 'bg-button-primary! text-button-primary-foreground! hover:ring-button-primary/70 hover:opacity-90 hover:ring-2',
-                      '![border-radius:0_0.375rem_0.375rem_0]',
+                      'rounded-e-default! rounded-s-none!',
                     ]"
                   >
                     <OIcon name="arrow-drop-down" size="sm" />
@@ -438,7 +445,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="logs-search-bar-share-link-btn"
             :url="tracesShareURL"
             variant="outline"
-            size="icon-toolbar"
+            size="icon-md"
             shortcut-id="tracesCopyUrl"
           />
           <ODropdown side="bottom" align="end">
@@ -537,14 +544,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :default-relative-time="searchObj.data.datetime.relativeTimePeriod"
               data-test="service-graph-date-time-picker"
               calendar-presets
-              class="h-8!"
+              class="h-8.5!"
               @on:date-change="updateDateTime"
             />
             <OButton
               data-test="service-graph-refresh-btn"
               variant="outline"
-              size="icon-toolbar"
-              class="min-w-[1.875rem]!"
+              size="icon-md"
               @click="$emit('service-graph-refresh')"
             >
               <OIcon name="refresh" size="sm" />
@@ -569,7 +575,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-model="searchObj.meta.serviceGraphLayoutType"
               :options="serviceGraphLayoutOptions"
               :searchable="false"
-              class="h-8! min-h-8! w-[7.5rem] max-lg:w-24!"
+              class="h-[2.125rem]! min-h-[2.125rem]! w-[7.5rem] max-lg:w-24!"
               :disabled="searchObj.meta.serviceGraphVisualizationType === 'graph'"
               @update:model-value="onServiceGraphLayoutChange"
             />
@@ -592,7 +598,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :default-relative-time="searchObj.data.datetime.relativeTimePeriod"
               data-test="services-catalog-date-time-picker"
               calendar-presets
-              class="me-1.5 h-8!"
+              class="h-8.5!"
               @on:date-change="updateDateTime"
             />
           </div>

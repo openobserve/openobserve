@@ -75,6 +75,26 @@
           :downtime="headerDowntime"
           data-test="alerts-alertdetail-muted-chip"
         />
+        <ODropdown v-if="isAnomalyAlert && headerDowntime && downtimesEnabled" align="start">
+          <template #trigger>
+            <OButton
+              variant="ghost"
+              size="icon-sm"
+              icon-left="more-vert"
+              :aria-label="t('alerts.downtimes.mute.rowActions')"
+              data-test="alerts-alertdetail-anomaly-mute-menu"
+            />
+          </template>
+          <RowMuteMenu
+            :downtime="headerDowntime"
+            extend-test-prefix="alerts-alertdetail-anomaly-extend"
+            end-test="alerts-alertdetail-anomaly-end-mute"
+            muted-by-test="alerts-alertdetail-anomaly-muted-by"
+            @preset="onAnomalyExtend"
+            @until="anomalyMuteActions.openExtendUntil(headerDowntime)"
+            @end="onAnomalyEndMute"
+          />
+        </ODropdown>
         <CompositeReferencesDrawer
           v-if="(alert?.referenced_by_composite_count ?? 0) > 0"
           :open="referenceDrawerOpen"
@@ -372,11 +392,19 @@
           <OTabPanel name="configuration" stretch>
             <OContent class="h-full overflow-y-auto py-4">
               <AlertConfigSummary v-if="alert" :alert="alert" :slo-name="sloName" />
+              <AlertCalibrationHeadroomCard v-if="alert && !isAnomalyAlert" :alert-id="alertId" />
             </OContent>
           </OTabPanel>
         </OTabPanels>
       </template>
     </div>
+    <ExtendDowntimeDialog
+      v-if="isAnomalyAlert && downtimesEnabled"
+      v-model:open="anomalyMuteActions.extendUntilOpen.value"
+      :downtime="anomalyMuteActions.extendUntilRow.value"
+      :submit="anomalyMuteActions.extendUntil"
+      @settled="onAckMuteChanged"
+    />
   </OPageLayout>
 </template>
 
@@ -388,6 +416,7 @@ import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 
 import AlertConfigSummary from "@/components/alerts/AlertConfigSummary.vue";
+import AlertCalibrationHeadroomCard from "@/components/alert_calibration/AlertCalibrationHeadroomCard.vue";
 import AlertEvaluationHistory from "@/components/alerts/AlertEvaluationHistory.vue";
 import AlertGroupChart from "@/components/alerts/AlertGroupChart.vue";
 import AlertGroupHistory from "@/components/alerts/AlertGroupHistory.vue";
@@ -395,6 +424,11 @@ import AlertGroupsTable from "@/components/alerts/AlertGroupsTable.vue";
 import AlertHeaderActions from "@/components/alerts/AlertHeaderActions.vue";
 import AckChip from "@/components/alerts/AckChip.vue";
 import MutedChip from "@/components/alerts/downtimes/MutedChip.vue";
+import RowMuteMenu from "@/components/alerts/downtimes/RowMuteMenu.vue";
+import ExtendDowntimeDialog from "@/components/alerts/downtimes/ExtendDowntimeDialog.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import { useDowntimeRowActions } from "@/composables/downtimes/useDowntimeRowActions";
+import type { MuteActionResult } from "@/utils/downtimes/muteResult";
 import AnomalyDetectionChart from "@/components/alerts/AnomalyDetectionChart.vue";
 import CompositeAlertDetail from "@/components/alerts/composite/CompositeAlertDetail.vue";
 import CompositeReferencesDrawer from "@/components/alerts/composite/CompositeReferencesDrawer.vue";
@@ -818,6 +852,25 @@ const acknowledgedGroups = computed(() =>
 const onAckMuteChanged = async () => {
   await Promise.all([listQuery.refetch(), acksQuery.refetch()]);
   if (isMultiAlert.value) await fetchGroups();
+};
+
+// An anomaly config has no alert-scoped mute routes, so its own mute ends through the downtime.
+const anomalyMuteActions = useDowntimeRowActions();
+
+const afterAnomalyMute = async (result: MuteActionResult) => {
+  if (result !== "failed") await onAckMuteChanged();
+};
+
+const onAnomalyExtend = async (seconds: number) => {
+  if (headerDowntime.value) {
+    await afterAnomalyMute(await anomalyMuteActions.extendBy(headerDowntime.value, seconds));
+  }
+};
+
+const onAnomalyEndMute = async () => {
+  if (headerDowntime.value) {
+    await afterAnomalyMute(await anomalyMuteActions.end(headerDowntime.value));
+  }
 };
 
 const fetchAlert = async () => {

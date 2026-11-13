@@ -557,6 +557,7 @@ import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import syntheticsService from "@/services/synthetics";
 import analytics from "@/services/product_analytics";
 import { locationDisplayLabel } from "@/utils/synthetics/format";
+import { statusFromRunClass } from "@/utils/synthetics/runClass";
 import {
   syntheticsCreateRoute,
   syntheticsEditRoute,
@@ -602,6 +603,10 @@ interface ApiMonitor {
   locations: string[];
   enabled: boolean;
   status: string;
+  /** Class of the newest finalized run (0 unknown … 5 misconfigured); absent on older servers. */
+  last_run_class?: number;
+  /** When the current class began, in microseconds. */
+  last_run_class_at?: number;
   created_at: number;
   updated_at: number;
   last_triggered_at: number;
@@ -672,7 +677,9 @@ function mapMonitor(m: ApiMonitor) {
     url: m.target,
     type: m.type.toUpperCase(),
     interval: formatFrequency(m.frequency),
-    status: normalizeMonitorStatus(m.status),
+    status: statusFromRunClass(m.last_run_class, normalizeMonitorStatus(m.status)),
+    // When the current run class began: drives "Not measured since 10:36 UTC".
+    statusSince: m.last_run_class_at || null,
     responseTime: m.last_response_ms,
     locations: m.locations,
     lastCheck: m.last_check_at !== null ? formatTimeAgo(m.last_check_at) : "—",
@@ -1412,6 +1419,45 @@ const summaryStats = computed<StatItem[]>(() => {
       dataTest: "synthetics-summary-passed",
     },
   ];
+  // Run classes an older server never sends: a tile only once a check is in one.
+  const classTiles: StatItem[] = [
+    {
+      key: "misconfigured",
+      label: t("synthetics.filters.misconfigured"),
+      value: v(count("misconfigured")),
+      icon: "error-outline",
+      tone: "error",
+      max: share,
+      dataTest: "synthetics-summary-misconfigured",
+    },
+    {
+      key: "partial",
+      label: t("synthetics.filters.partial"),
+      value: v(count("partial")),
+      icon: "warning-amber",
+      tone: "warning",
+      max: share,
+      dataTest: "synthetics-summary-partial",
+    },
+    {
+      key: "not_measured",
+      label: t("synthetics.filters.notMeasured"),
+      value: v(count("not_measured")),
+      icon: "help-outline",
+      tone: "neutral",
+      max: share,
+      dataTest: "synthetics-summary-not-measured",
+    },
+  ];
+  // Attention-first: misconfigured after failed, partial before warning, not measured last.
+  const after: Record<string, string> = {
+    misconfigured: "failed",
+    partial: "error",
+    not_measured: "passed",
+  };
+  for (const tile of classTiles.filter((c) => count(c.key) > 0)) {
+    tiles.splice(tiles.findIndex((x) => x.key === after[tile.key]) + 1, 0, tile);
+  }
   // "Unknown" only means something once a monitor has never reported.
   if (count("unknown") > 0) {
     tiles.push({

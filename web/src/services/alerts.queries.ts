@@ -18,7 +18,7 @@ import { quantizeRange } from "@/composables/query/queryClient";
 import alerts from "./alerts";
 import analytics from "./product_analytics";
 import search from "./search";
-import type { AlertHistoryQuery } from "./alerts";
+import type { AlertHistoryQuery, AlertHistorySummaryQuery } from "./alerts";
 import { alertKeys, oneAckScopes } from "./alerts.querykeys";
 import { oncallKeys } from "./oncall.querykeys";
 import { anomalyKeys } from "./anomaly_detection.querykeys";
@@ -49,23 +49,27 @@ export const alertsListQuery = (
   folderId: string,
   query?: string,
   alertType?: string,
+  options?: { silentForbidden?: boolean },
 ) =>
   queryOptions({
     queryKey: alertKeys.list(org, folderId, query, alertType),
-    queryFn: async (): Promise<any[]> =>
-      (
-        await alerts.listByFolderId(
-          1,
-          1000,
-          "name",
-          false,
-          "",
-          org,
-          folderId,
-          query ?? "",
-          alertType ?? "",
-        )
-      ).data?.list ?? [],
+    queryFn: async (): Promise<any[]> => {
+      const args = [
+        1,
+        1000,
+        "name",
+        false,
+        "",
+        org,
+        folderId,
+        query ?? "",
+        alertType ?? "",
+      ] as const;
+      const res = await (options
+        ? alerts.listByFolderId(...args, undefined, options)
+        : alerts.listByFolderId(...args));
+      return res.data?.list ?? [];
+    },
     staleTime: LIVE_STALE_TIME,
   });
 
@@ -105,17 +109,36 @@ export const firingAlertsQuery = (org: string) =>
     staleTime: LIVE_STALE_TIME,
   });
 
-export const alertDetailQuery = (org: string, id: string, folderId?: string) =>
+export const alertDetailQuery = (
+  org: string,
+  id: string,
+  folderId?: string,
+  options?: { silentForbidden?: boolean },
+) =>
   queryOptions({
     queryKey: [...alertKeys.detail(org, id), ...(folderId ? [folderId] : [])],
-    queryFn: async () => (await alerts.get_by_alert_id(org, id, folderId)).data,
+    queryFn: async () =>
+      (
+        await (options
+          ? alerts.get_by_alert_id(org, id, folderId, options)
+          : alerts.get_by_alert_id(org, id, folderId))
+      ).data,
     staleTime: LIVE_STALE_TIME,
   });
 
 /** The SQL a builder alert runs; an alert written as SQL already carries it. */
 export const alertSqlQuery = (org: string, id: string, alert: AlertSqlSource | null) =>
   queryOptions({
-    queryKey: [...alertKeys.detail(org, id), "sql"],
+    // The SQL follows the conditions, so a refreshed definition must not reuse an older answer.
+    queryKey: [
+      ...alertKeys.detail(org, id),
+      "sql",
+      {
+        stream_name: alert?.stream_name,
+        stream_type: alert?.stream_type,
+        query_condition: alert?.query_condition,
+      },
+    ],
     queryFn: async (): Promise<string> => {
       const { data } = await alerts.generate_sql(org, {
         stream_name: alert?.stream_name,
@@ -135,13 +158,14 @@ export const alertAcksQuery = (org: string, id: string, folderId?: string) =>
     staleTime: LIVE_STALE_TIME,
   });
 
-export const alertHistoryQuery = (org: string, query: AlertHistoryQuery) => {
+/** `exact` keys one firing's own lookup by its exact window, so nearby firings never share it. */
+export const alertHistoryQuery = (org: string, query: AlertHistoryQuery, exact = false) => {
   // Callers anchor start/end to a raw `now`, so without quantizing, every open
   // mints a new key and the cache never hits.
   const start = Number(query.start_time);
   const end = Number(query.end_time);
   const q: AlertHistoryQuery = { ...query };
-  if (Number.isFinite(start) && Number.isFinite(end)) {
+  if (!exact && Number.isFinite(start) && Number.isFinite(end)) {
     const bucketed = quantizeRange(start, end);
     q.start_time = bucketed.start;
     q.end_time = bucketed.end;
@@ -150,6 +174,27 @@ export const alertHistoryQuery = (org: string, query: AlertHistoryQuery) => {
     queryKey: alertKeys.history(org, q),
     // Only the key buckets: a bucketed `end` would hide every evaluation from the current minute.
     queryFn: async () => (await alerts.getHistory(org, query)).data ?? {},
+    staleTime: LIVE_STALE_TIME,
+  });
+};
+
+/** One row per bucket, alert and outcome, as the history summary returns them. */
+export interface AlertHistorySummaryRow {
+  bucket: number;
+  alert_id: string;
+  outcome: string;
+  n: number;
+  silenced?: number;
+}
+
+export const alertHistorySummaryQuery = (org: string, query: AlertHistorySummaryQuery) => {
+  const bucketed = quantizeRange(query.start_time, query.end_time);
+  const q = { ...query, start_time: bucketed.start, end_time: bucketed.end };
+  return queryOptions({
+    queryKey: alertKeys.historySummary(org, q),
+    // Only the key buckets: a bucketed `end` would hide every evaluation from the current minute.
+    queryFn: async (): Promise<AlertHistorySummaryRow[]> =>
+      (await alerts.getHistorySummary(org, query)).data?.rows ?? [],
     staleTime: LIVE_STALE_TIME,
   });
 };
@@ -308,8 +353,12 @@ export const extendAlertMuteMutation = (org: string) =>
 
 export const cancelAlertMuteMutation = (org: string) =>
   mutationOptions({
-    mutationFn: (vars: { alertId: string; downtimeId: string; folderId?: string }) =>
-      alerts.cancelAlertMute(org, vars.alertId, vars.downtimeId, vars.folderId),
+    mutationFn: (vars: {
+      alertId: string;
+      downtimeId: string;
+      folderId?: string;
+      version?: number;
+    }) => alerts.cancelAlertMute(org, vars.alertId, vars.downtimeId, vars.folderId, vars.version),
     meta: {
       invalidates: [alertKeys.all(org), downtimeKeys.all(org), announcementKeys.all(org)],
       silentError: true,

@@ -391,7 +391,11 @@ export const getAlertPayload = (formData: PayloadFormData, context: PayloadConte
   return payload;
 };
 
-export const prepareAndSaveAlert = async (data: any, context: SaveAlertContext): Promise<void> => {
+/** Saves the JSON editor's alert; true once the server accepted it. */
+export const prepareAndSaveAlert = async (
+  data: any,
+  context: SaveAlertContext,
+): Promise<boolean> => {
   const { store, t, props, emit, router, isAggregationEnabled, activeFolderId, handleAlertError } =
     context;
 
@@ -470,7 +474,9 @@ export const prepareAndSaveAlert = async (data: any, context: SaveAlertContext):
       });
     }
     dismiss();
+    return true;
   } catch (err: any) {
     handleAlertError(err);
+    return false;
   }
 };

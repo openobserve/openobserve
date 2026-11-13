@@ -1029,6 +1029,7 @@ pub async fn handle_triggers(
         db::scheduler::TriggerModule::OncallSlackSync => {
             handle_oncall_slack_sync_triggers(trigger).await
         }
+        db::scheduler::TriggerModule::AutoObserve => handle_autoobserve_triggers(trigger).await,
     }
 }
 
@@ -1084,6 +1085,26 @@ async fn handle_fleet_rollout_triggers(
     infra::scheduler::delete(
         &trigger.org,
         db::scheduler::TriggerModule::FleetRollout,
+        &trigger.module_key,
+    )
+    .await?;
+    Ok(())
+}
+
+/// Region-local: its row lives only in `infra::scheduler`, which never replicates.
+#[cfg(feature = "enterprise")]
+async fn handle_autoobserve_triggers(trigger: db::scheduler::Trigger) -> Result<(), anyhow::Error> {
+    // The tick re-arms its own row, fenced by this claim; while the engine is off the claim lapses.
+    o2_enterprise::enterprise::autoobserve::job::tick(trigger).await?;
+    Ok(())
+}
+
+#[cfg(not(feature = "enterprise"))]
+async fn handle_autoobserve_triggers(trigger: db::scheduler::Trigger) -> Result<(), anyhow::Error> {
+    // No OSS lane pulls this module, so only a direct call lands here; it cannot run the row.
+    infra::scheduler::delete(
+        &trigger.org,
+        db::scheduler::TriggerModule::AutoObserve,
         &trigger.module_key,
     )
     .await?;
@@ -10741,5 +10762,33 @@ mod tests {
             Some(&(PARK_NOW + UNREADABLE_ORG_RECHECK_MICROS)),
             "{written:?}"
         );
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    #[tokio::test]
+    async fn test_an_oss_build_deletes_the_autoobserve_row_it_cannot_run() {
+        let cfg = config::get_config();
+        if !(cfg.common.meta_store.is_empty() || cfg.common.meta_store == "sqlite") {
+            return;
+        }
+        std::fs::create_dir_all(&cfg.common.data_db_dir).unwrap();
+        infra::scheduler::init().await.unwrap();
+        let module = db::scheduler::TriggerModule::AutoObserve;
+        let org = format!("ao_stub_{}", now_micros());
+        let row = db::scheduler::Trigger {
+            org: org.clone(),
+            module: module.clone(),
+            module_key: "engine".to_string(),
+            next_run_at: 1,
+            ..Default::default()
+        };
+        infra::scheduler::push(row.clone()).await.unwrap();
+        assert!(
+            infra::scheduler::get(&org, module.clone(), "engine")
+                .await
+                .is_ok()
+        );
+        handle_triggers("t", row).await.unwrap();
+        assert!(infra::scheduler::get(&org, module, "engine").await.is_err());
     }
 }

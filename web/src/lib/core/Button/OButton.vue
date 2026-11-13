@@ -339,6 +339,15 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
     "enabled:hover:border-accent enabled:hover:text-accent enabled:hover:bg-button-ghost-hover-bg",
     "disabled:opacity-60",
   ].join(" "),
+  "section-chip": [
+    "bg-transparent text-text-body border border-border-default whitespace-nowrap",
+    "!rounded-full !h-auto !py-1 !px-3 !text-sm",
+    "enabled:hover:bg-button-ghost-hover-bg",
+    "aria-[current=location]:bg-surface-accent-active aria-[current=location]:border-button-outline-hover-border",
+    "aria-[current=location]:text-text-heading aria-[current=location]:font-semibold",
+    "focus-visible:ring-3 focus-visible:ring-button-ghost-focus-ring",
+    "disabled:opacity-60",
+  ].join(" "),
   // tint-*: soft categorical badge fill for tiles that identify an entity by colour, e.g. a cluster code.
   "tint-teal": [
     "bg-badge-teal-soft-bg text-badge-teal-soft-text border-0",
@@ -367,6 +376,7 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
 };
 
 const disabledVariantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
+  "section-chip": "opacity-60",
   primary: "bg-button-primary-disabled text-button-primary-foreground",
   secondary: "bg-button-secondary-disabled text-text-disabled",
   outline: "opacity-50",
@@ -428,20 +438,23 @@ const unavailableClasses = computed(() => {
 });
 
 const sizeClasses: Record<NonNullable<ButtonProps["size"]>, string> = {
-  xs: "h-7 ps-2.5 pe-2.5 text-xs gap-1.5 rounded-default",
+  xs: "h-7 ps-3 pe-3 max-[85.5rem]:ps-2.5 max-[85.5rem]:pe-2.5 text-xs gap-1.5 rounded-default",
   // 34px control height — the workhorse compact button that pairs with 34px
   // inputs in toolbars/headers. (radius 8 = rounded-default.)
-  sm: "h-[2.125rem] ps-3 pe-3 text-sm gap-2 rounded-default",
-  // 30px labeled — matches icon-toolbar height for labeled outline buttons in toolbars
-  "sm-toolbar": "h-[1.875rem] ps-2 pe-2 text-xs gap-1.5 rounded-default",
-  "xs-grouped": "h-6.5 ps-2 pe-2 text-xs gap-1.5 rounded-default",
+  sm: "h-[2.125rem] ps-3.5 pe-3.5 max-[85.5rem]:ps-3 max-[85.5rem]:pe-3 text-sm gap-2 rounded-default",
+  // Every toolbar control shares this box so a bar never mixes heights or padding.
+  "sm-toolbar":
+    "h-8.5 ps-3 pe-3 max-[85.5rem]:ps-2.5 max-[85.5rem]:pe-2.5 text-xs gap-1.5 rounded-default",
+  "xs-grouped":
+    "h-6.5 ps-2.5 pe-2.5 max-[85.5rem]:ps-2 max-[85.5rem]:pe-2 text-xs gap-1.5 rounded-default",
   // Compact labeled size for inline field chips (axis items) — ~28px, matches the dense button size
   // Extra-compact chip size — 24px height for axis field chips in query builder
   chip: "h-6 ps-2 pe-1.5 text-xs gap-1 rounded-default leading-none",
   // Same as chip but with fixed 12px font — for dashboard query builder axis field chips
   // (needed because the html font-size is 14px, making text-xs = 10.5px instead of 12px)
   "chip-12": "h-6 ps-2 pe-1.5 !text-xs gap-1 rounded-default leading-none",
-  "sm-action": "h-[2.125rem] ps-3 pe-3 min-w-20 text-sm gap-2 rounded-default",
+  "sm-action":
+    "h-[2.125rem] ps-3.5 pe-3.5 max-[85.5rem]:ps-3 max-[85.5rem]:pe-3 min-w-20 text-sm gap-2 rounded-default",
   // h-8.5 sorts before h-9 and up, so a caller's own plain height class still overrides md.
   md: "h-8.5 ps-4 pe-4 text-sm gap-2 rounded-default",
   cta: "h-10 ps-4 pe-4 text-sm gap-2 rounded-default",
@@ -460,8 +473,8 @@ const sizeClasses: Record<NonNullable<ButtonProps["size"]>, string> = {
   "icon-lg": "h-12 w-12 shrink-0 p-0 rounded-default gap-x-0",
   "icon-circle": "size-8 shrink-0 p-0 rounded-full gap-x-0",
   "icon-circle-sm": "size-7 shrink-0 p-0 rounded-full gap-x-0",
-  // 30×30px square — for toolbar icon buttons (auto-refresh, share, hamburger)
-  "icon-toolbar": "size-[1.875rem] shrink-0 p-0 rounded-default gap-x-0",
+  // Square twin of sm-toolbar for icon-only toolbar controls.
+  "icon-toolbar": "size-8.5 shrink-0 p-0 rounded-default gap-x-0",
   // 26px rounded-default — compact modern icon button for panel header collapse/expand
   "icon-panel": "size-6.5 shrink-0 p-0 rounded-default gap-x-0",
   // Tall narrow vertical rectangle — 32px × 20px for splitter collapse/expand buttons

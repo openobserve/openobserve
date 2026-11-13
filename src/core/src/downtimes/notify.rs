@@ -210,17 +210,29 @@ async fn send(
     (summarize(&results), templates)
 }
 
-/// The started message to `requested` (or every destination of the row), one result each.
+/// Sends the `[TEST] `-marked started message to `requested` (or every row destination).
+/// Charges `user_id`'s test-send limit once, just before the first send.
 pub async fn send_test(
     row: &Downtime,
+    user_id: &str,
     window: DowntimeWindow,
     requested: &[String],
     now: i64,
-) -> Vec<config::meta::downtimes::DowntimeTestResult> {
+) -> Result<
+    Vec<config::meta::downtimes::DowntimeTestResult>,
+    crate::alerts::notifications::TestSendError,
+> {
     use config::meta::downtimes::DowntimeTestResult;
 
-    use crate::alerts::notifications::notify::{NotifyError, notify};
+    use crate::alerts::notifications::{
+        notify::{NotifyError, resolve, route, send},
+        test_send,
+    };
 
+    let names = test_destinations(row, requested);
+    if names.is_empty() {
+        return Ok(Vec::new());
+    }
     let due = DueEvent::of_window(NotificationEvent::Started, window);
     let counts = super::match_counts(row).await.ok();
     let vars = variables(
@@ -230,11 +242,31 @@ pub async fn send_test(
         counts.as_ref(),
         &get_config().common.web_url,
     );
-    let ctx = downtime_context(row, &due, now, vars);
+    let ctx = mark_test(downtime_context(row, &due, now, vars));
     let mut results = Vec::new();
-    for name in test_destinations(row, requested) {
+    let mut charged = false;
+    for name in names {
         let mut ctx = ctx.clone();
-        let sent = notify(&row.org, &name, &[], None, &mut ctx).await;
+        let sent = match resolve(&row.org, &name, &[], ctx.kind).await {
+            Ok(resolved) => match route(&resolved, &ctx) {
+                Ok(_) => {
+                    match test_send::email_reaches_a_member(&row.org, &resolved.destination_type)
+                        .await
+                    {
+                        Ok(()) => {
+                            if !charged {
+                                crate::alerts::notifications::check_rate_limit(user_id)?;
+                                charged = true;
+                            }
+                            send(&row.org, &resolved, None, &mut ctx).await
+                        }
+                        Err(e) => Err(NotifyError::from_send(e)),
+                    }
+                }
+                Err(e) => Err(e),
+            },
+            Err(e) => Err(e),
+        };
         results.push(match sent {
             Ok(_) => DowntimeTestResult {
                 destination: name,
@@ -255,7 +287,7 @@ pub async fn send_test(
                     row.id
                 );
                 DowntimeTestResult {
-                    error: Some(outcome_summary(&e)),
+                    error: Some(test_reason(&e)),
                     destination: name,
                     ok: false,
                     unsupported: false,
@@ -263,7 +295,27 @@ pub async fn send_test(
             }
         });
     }
-    results
+    Ok(results)
+}
+
+/// Marks a test send: Content titles and Custom subjects through the render hint, and the legacy
+/// webhook body's `text` here, since that body bypasses rendering.
+fn mark_test(
+    mut ctx: crate::alerts::notifications::NotificationContext,
+) -> crate::alerts::notifications::NotificationContext {
+    use crate::alerts::notifications::{LegacyPayload, TEST_MARKER};
+
+    ctx.render_hints.test_marker = true;
+    if let Some(legacy) = ctx.legacy_payload.take() {
+        ctx.legacy_payload = Some(LegacyPayload::new(move || {
+            let mut body = legacy.build();
+            if let Some(serde_json::Value::String(text)) = body.get_mut("text") {
+                text.insert_str(0, TEST_MARKER);
+            }
+            body
+        }));
+    }
+    ctx
 }
 
 /// Only the row's own destinations take a test, so the endpoint cannot post anywhere else.
@@ -299,6 +351,32 @@ fn summarize(
         .iter()
         .any(|(_, r)| matches!(r, Err(e) if !matches!(e, NotifyError::Skipped(_))));
     if failed { Err(summary) } else { Ok(summary) }
+}
+
+/// Longest reason a test result shows.
+const MAX_TEST_REASON_CHARS: usize = 200;
+
+/// A test result's reason: the HTTP status, or the server text for a lookup, render or block error.
+/// A transport error can hold the URL and its secret, so it stays in the log.
+fn test_reason(e: &crate::alerts::notifications::notify::NotifyError) -> String {
+    use crate::alerts::notifications::notify::NotifyError;
+
+    match e {
+        NotifyError::DestinationNotFound(_)
+        | NotifyError::NotAlertDestination(_)
+        | NotifyError::TemplateNotFound { .. }
+        | NotifyError::Render(_)
+        | NotifyError::Blocked(_) => {
+            let text = e.to_string();
+            if text.chars().count() <= MAX_TEST_REASON_CHARS {
+                text
+            } else {
+                let cut: String = text.chars().take(MAX_TEST_REASON_CHARS).collect();
+                format!("{cut}…")
+            }
+        }
+        _ => outcome_summary(e),
+    }
 }
 
 /// One destination's stored outcome: its HTTP status or skip reason, never the reply body.
@@ -386,6 +464,7 @@ fn downtime_context(
         render_hints: RenderHints {
             fallback_subject: Some(subject),
             escape_email_attributes: true,
+            ..Default::default()
         },
         ..Default::default()
     }
@@ -775,6 +854,96 @@ mod tests {
             "Downtime Nightly \"deploy\" <db>: ends soon. 1970-01-01 10:00 UTC to 1970-01-01 12:00 UTC, muting 2 alerts, 1 synthetics check. https://o2.example.com/web/downtimes/2f9KQe4b7Nq1vH3sT0mLzXpRcWd?org_identifier=acme"
         );
         assert_eq!(route(&resolved_for("slack"), &ctx).unwrap(), Route::Render);
+    }
+
+    #[test]
+    fn a_test_send_marks_the_content_title_and_the_legacy_text_but_a_live_send_does_not() {
+        use crate::alerts::notifications::{
+            default_template::compiled_default_content,
+            notify::{Route, route},
+            resolve_content,
+        };
+
+        let vars = || {
+            variables(
+                &row(None),
+                NotificationEvent::Started,
+                &window(),
+                None,
+                "https://o2.example.com",
+            )
+        };
+        let live = downtime_context(&row(None), &due(NotificationEvent::Started), 7, vars());
+        let test = mark_test(downtime_context(
+            &row(None),
+            &due(NotificationEvent::Started),
+            7,
+            vars(),
+        ));
+
+        let title = |ctx| resolve_content(&compiled_default_content(), ctx, "slack").title;
+        assert_eq!(title(&live), "🔵 Nightly \"deploy\" <db> started");
+        assert_eq!(title(&test), "[TEST] 🔵 Nightly \"deploy\" <db> started");
+
+        let text = |ctx| {
+            let Route::Legacy(json) = route(&resolved_for(""), ctx).unwrap() else {
+                panic!("a generic webhook gets the legacy body");
+            };
+            json["text"].as_str().unwrap().to_string()
+        };
+        assert!(
+            text(&live).starts_with("Downtime Nightly"),
+            "{}",
+            text(&live)
+        );
+        assert!(
+            text(&test).starts_with("[TEST] Downtime Nightly"),
+            "{}",
+            text(&test)
+        );
+        assert!(!live.render_hints.test_marker);
+    }
+
+    #[test]
+    fn a_test_result_names_a_render_or_block_reason_but_never_a_reply_body_or_transport_error() {
+        use crate::alerts::notifications::notify::NotifyError;
+
+        assert_eq!(
+            test_reason(&NotifyError::Render("unknown variable".into())),
+            "render failed: unknown variable"
+        );
+        assert_eq!(
+            test_reason(&NotifyError::Blocked(
+                "Destination URL blocked by SSRF guard".into()
+            )),
+            "Destination URL blocked by SSRF guard"
+        );
+        assert_eq!(
+            test_reason(&NotifyError::Rejected {
+                status: 405,
+                body: "<!doctype html>secret".into(),
+            }),
+            "HTTP 405"
+        );
+        assert_eq!(
+            test_reason(&NotifyError::Transport(
+                "error sending request for url (https://hooks.example/T0/secret)".into()
+            )),
+            RESULT_FAILED
+        );
+        let long = test_reason(&NotifyError::Blocked("x".repeat(500)));
+        assert_eq!(long.chars().count(), MAX_TEST_REASON_CHARS + 1);
+    }
+
+    #[tokio::test]
+    async fn a_test_naming_no_destination_of_the_row_sends_nothing() {
+        let mut r = row(None);
+        r.notifications =
+            Some(serde_json::from_value(serde_json::json!({"destinations": ["hook"]})).unwrap());
+        let results = send_test(&r, "u@example.com", window(), &["nope".into()], 7)
+            .await
+            .unwrap();
+        assert!(results.is_empty());
     }
 
     #[test]

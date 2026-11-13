@@ -7,7 +7,7 @@ import type { I18nText } from "@/types/i18n";
 import type { AcceptableValue } from "reka-ui";
 
 /** Size controls padding and font-size — height is determined by content */
-export type ToggleGroupItemSize = "md" | "sm" | "xs";
+export type ToggleGroupItemSize = "md" | "sm" | "toolbar" | "xs";
 
 export interface ToggleGroupItemProps {
   /** Unique value for this option — required */

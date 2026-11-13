@@ -17,6 +17,7 @@ import { infiniteQueryOptions, mutationOptions, queryOptions } from "@tanstack/v
 import slack, { type SlackRequestOptions } from "./slack";
 import { slackKeys } from "./slack.querykeys";
 import { destinationKeys } from "./alert_destination.querykeys";
+import { queryClient } from "@/composables/query/queryClient";
 import {
   LIVE_STALE_TIME,
   MEDIUM_STALE_TIME,
@@ -31,6 +32,7 @@ import type {
   SlackCredentialsRequest,
   SlackInstallExchangeRequest,
   SlackInstallSource,
+  SlackInsightsSettingsRequest,
   SlackInstallStartRequest,
   SlackLinkingUpdateRequest,
   SlackManifestParams,
@@ -109,6 +111,13 @@ export const slackOrgAccessQuery = (org: string, id: string) =>
   queryOptions({
     queryKey: slackKeys.orgAccess(org, id),
     queryFn: async () => (await slack.getOrgAccess(org, id)).data,
+    staleTime: NORMAL_STALE_TIME,
+  });
+
+export const slackInsightsSettingsQuery = (org: string) =>
+  queryOptions({
+    queryKey: slackKeys.insightsSettings(org),
+    queryFn: async () => (await slack.getInsightsSettings(org)).data,
     staleTime: NORMAL_STALE_TIME,
   });
 
@@ -251,6 +260,15 @@ export const putHelpContactMutation = (org: string, id: string) =>
     mutationFn: async (helpContact: string) =>
       (await slack.putHelpContact(org, id, { help_contact: helpContact })).data,
     meta: { invalidates: [slackKeys.helpContact(org, id)] },
+  });
+
+// The answer carries the new revision, so the form resets to it without a second read.
+export const putInsightsSettingsMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: async (body: SlackInsightsSettingsRequest) =>
+      (await slack.putInsightsSettings(org, body)).data,
+    onSuccess: (data) => queryClient.setQueryData(slackKeys.insightsSettings(org), data),
+    meta: { silentError: true },
   });
 
 export const putOrgAccessMutation = (org: string, id: string) =>

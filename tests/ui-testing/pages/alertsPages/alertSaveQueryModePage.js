@@ -152,6 +152,15 @@ export class AlertSaveQueryModePage {
     await this.page.locator(this.locators.submit).click();
   }
 
+  /** Clicks Save on an existing alert and resolves with the PUT it sends. */
+  async saveAndWaitForUpdate() {
+    const saved = this.page.waitForResponse(
+      (r) => r.request().method() === 'PUT' && /\/api\/v2\/[^/]+\/alerts\//.test(r.url()),
+    );
+    await this.clickSave();
+    return saved;
+  }
+
   /**
    * Monaco auto-closes quotes, so typing a query key by key turns `FROM "x"`
    * into `FROM "x""` and the parser gives up — which silently kills the stream
@@ -168,7 +177,8 @@ export class AlertSaveQueryModePage {
     const table = (sql.match(/FROM\s+"([^"]+)"/i) || [])[1];
     await expect(async () => {
       await editor.locator('.view-lines').click();
-      await input.fill(sql);
+      // Firefox renders Monaco's textarea 0px wide, so the fill must skip the visibility check.
+      await input.fill(sql, { force: true });
       await expect(editor).toContainText(table, { timeout: 5000 });
     }).toPass({ timeout: 40000 });
     // Click away afterwards: the stream-name sync runs off the committed value,

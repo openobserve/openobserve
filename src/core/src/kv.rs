@@ -20,9 +20,59 @@ pub async fn get(org_id: &str, key: &str) -> Result<bytes::Bytes, anyhow::Error>
     Ok(val)
 }
 
+pub async fn get_optional(org_id: &str, key: &str) -> Result<Option<bytes::Bytes>, anyhow::Error> {
+    kv::get_optional(org_id, key).await
+}
+
 pub async fn set(org_id: &str, key: &str, val: bytes::Bytes) -> Result<(), anyhow::Error> {
     kv::set(org_id, key, val).await?;
     Ok(())
+}
+
+pub async fn compare_and_set(
+    org_id: &str,
+    key: &str,
+    expected: Option<&[u8]>,
+    val: bytes::Bytes,
+) -> Result<bool, anyhow::Error> {
+    kv::compare_and_set(org_id, key, expected, val).await
+}
+
+#[cfg(feature = "enterprise")]
+pub async fn compare_and_delete(
+    org_id: &str,
+    key: &str,
+    expected: &[u8],
+) -> Result<bool, anyhow::Error> {
+    kv::compare_and_delete(org_id, key, expected).await
+}
+
+#[cfg(feature = "enterprise")]
+pub async fn compare_and_mutate_guarded(
+    org_id: &str,
+    key: &str,
+    expected: Option<&[u8]>,
+    value: Option<Vec<u8>>,
+    guard_key: &str,
+    guard: &[u8],
+) -> Result<bool, anyhow::Error> {
+    kv::compare_and_mutate_guarded(
+        org_id,
+        key,
+        expected,
+        value.map(bytes::Bytes::from),
+        guard_key,
+        guard,
+    )
+    .await
+}
+
+pub async fn compare_and_delete_in_region(
+    org_id: &str,
+    key: &str,
+    expected: &[u8],
+) -> Result<bool, anyhow::Error> {
+    kv::compare_and_delete_in_region(org_id, key, expected).await
 }
 
 pub async fn delete(org_id: &str, key: &str) -> Result<(), anyhow::Error> {

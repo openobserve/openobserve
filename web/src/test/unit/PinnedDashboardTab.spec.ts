@@ -22,6 +22,8 @@ import { mount, flushPromises } from "@vue/test-utils";
 // A plain stub template reads the ref at the wrong render tick under VTU;
 // watchEffect observes the settled reactive value instead.
 const injectedTabIds: string[] = [];
+const commitAllVariables = vi.fn();
+const injectedAutoRun: unknown[] = [];
 // Captures the dashboardData prop that actually reaches RenderDashboardCharts,
 // so a test can assert it is the PROCESSED dashboard (tabs[].panels present),
 // not the raw versioned API envelope.
@@ -52,6 +54,10 @@ const globalStubs = {
       watchEffect(() => {
         if (selectedTabId.value != null) injectedTabIds.push(selectedTabId.value);
       });
+      const autoRun = inject<Ref<unknown>>("dashboardAutoRun", ref("not-provided"));
+      watchEffect(() => {
+        injectedAutoRun.push(autoRun.value);
+      });
       return { selectedTabId };
     },
     created() {
@@ -60,6 +66,7 @@ const globalStubs = {
     updated() {
       lastDashboardData = (this as any).dashboardData;
     },
+    methods: { commitAllVariables },
     template: "<div class='render-stub' />",
   }),
   // Stub exposes getConsumableDateTime() (via ref) and can emit @hide so the
@@ -106,7 +113,9 @@ describe("PinnedDashboardTab", () => {
     localStorage.clear();
     vi.clearAllMocks();
     injectedTabIds.length = 0;
+    injectedAutoRun.length = 0;
     lastDashboardData = null;
+    commitAllVariables.mockClear();
     store.state.selectedOrganization = {
       label: "Test Organization",
       id: 159,
@@ -121,6 +130,7 @@ describe("PinnedDashboardTab", () => {
       wrapper.unmount();
     }
     localStorage.clear();
+    store.state.zoConfig = { ...store.state.zoConfig, auto_query_enabled: undefined };
   });
 
   it("loads via getDashboard and renders RenderDashboardCharts with view-only", async () => {
@@ -169,6 +179,31 @@ describe("PinnedDashboardTab", () => {
     wrapper = factory();
     await flushPromises();
     expect(injectedTabIds[injectedTabIds.length - 1]).toBe("default");
+  });
+
+  it("commits the live variable selections when Refresh is clicked", async () => {
+    (getDashboard as any).mockResolvedValue(processedDashboard());
+    wrapper = factory();
+    await flushPromises();
+    expect(commitAllVariables).not.toHaveBeenCalled();
+    await wrapper.find('[data-test="pinned-dashboard-refresh-btn"]').trigger("click");
+    expect(commitAllVariables).toHaveBeenCalledTimes(1);
+  });
+
+  it("applies variable changes live when Auto Run is on, like the Dashboards view", async () => {
+    store.state.zoConfig = { ...store.state.zoConfig, auto_query_enabled: true };
+    (getDashboard as any).mockResolvedValue(processedDashboard());
+    wrapper = factory();
+    await flushPromises();
+    expect(injectedAutoRun[injectedAutoRun.length - 1]).toBe(true);
+  });
+
+  it("keeps variable changes manual when auto query is not enabled", async () => {
+    store.state.zoConfig = { ...store.state.zoConfig, auto_query_enabled: false };
+    (getDashboard as any).mockResolvedValue(processedDashboard());
+    wrapper = factory();
+    await flushPromises();
+    expect(injectedAutoRun[injectedAutoRun.length - 1]).toBe(false);
   });
 
   it("emits update-label with the live title", async () => {

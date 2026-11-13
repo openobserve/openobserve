@@ -22,7 +22,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="autoobserve2-history-drawer"
     @update:open="(v) => emit('update:open', v)"
   >
-    <div class="flex flex-col gap-4 pb-8">
+    <slot v-if="$slots.empty && !entries.length" name="empty" />
+    <div v-else class="flex flex-col gap-4 pb-8">
       <OToggleGroup
         :model-value="filter"
         mobile-dropdown

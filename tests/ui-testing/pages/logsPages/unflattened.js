@@ -1,4 +1,5 @@
 import { expect } from '@playwright/test';
+import MonacoEditorHelper from '../../playwright-tests/utils/MonacoEditorHelper.js';
 
 class UnflattenedPage {
     constructor(page) {
@@ -188,13 +189,9 @@ class UnflattenedPage {
             ? `SELECT ${allFields.join(',')} FROM "${stream}" ORDER BY ${timestamp} DESC`
             : `SELECT * FROM "${stream}"`;
 
-        // Write the SQL into the Monaco editor via the .inputarea
         await this.logsSearchBarQueryEditor.waitFor({ state: 'visible', timeout: 10000 });
         await this.logsSearchBarQueryEditor.click();
-        const inputArea = this.logsSearchBarQueryEditor.locator('.inputarea');
-        await inputArea.waitFor({ state: 'visible', timeout: 5000 });
-        await this.page.keyboard.press(process.platform === 'darwin' ? 'Meta+A' : 'Control+A');
-        await inputArea.fill(sql);
+        await new MonacoEditorHelper(this.page).fillInputArea(this.logsSearchBarQueryEditor, sql);
         await this.page.waitForTimeout(600);
     }
 

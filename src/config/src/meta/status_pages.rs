@@ -315,10 +315,13 @@ pub struct NoticeUpdateRequest {
 
 #[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
 pub struct MarkFalsePositiveRequest {
-    /// Hours to snooze the underlying check org-wide (default 6, per mockup
-    /// B1's "snooze 6h").
+    /// Ignored: a false alarm no longer snoozes the check. Kept so older
+    /// clients that send it still decode.
     #[serde(default = "default_snooze_hours")]
     pub snooze_hours: i64,
+    /// Why the incident was not real. Stored with who marked it and when.
+    #[serde(default)]
+    pub reason: String,
 }
 
 /// Admin view of a notice: unlike [`PublicNotice`], this carries the internal
@@ -338,8 +341,19 @@ pub struct NoticeAdminView {
     pub resolved_at: Option<i64>,
     pub excluded_from_uptime: bool,
     pub component_ids: Vec<String>,
+    /// Set when an owner marked this auto-incident as a false alarm.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub false_alarm: Option<FalseAlarm>,
     pub created_at: i64,
     pub updated_at: i64,
+}
+
+/// Who marked an auto-incident as a false alarm, when, and why.
+#[derive(Debug, Clone, Serialize, PartialEq, utoipa::ToSchema)]
+pub struct FalseAlarm {
+    pub by: String,
+    pub at: i64,
+    pub reason: String,
 }
 
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
@@ -385,6 +399,14 @@ pub struct CurrentComponent {
     pub key: String,
     pub name: String,
     pub status: ComponentStatus,
+    /// `scheduled_ts` of the newest finalized run that tested the site, floored to the minute.
+    /// None until a mapped check tests it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_checked_at: Option<i64>,
+    /// Age in seconds past which `last_checked_at` reads as stale: three check intervals. None
+    /// for cron checks, which have no fixed interval.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stale_after_secs: Option<i64>,
 }
 
 /// The hot snapshot half: rewritten on state change (~1-2KB).
@@ -593,8 +615,9 @@ pub fn incident_actions_with(
 }
 
 /// True once the failing streak clears either the run-count or the time-based
-/// confirmation bar.
-fn is_confirmed_failing(check: &EngineCheck, th: &Thresholds, now: i64) -> bool {
+/// confirmation bar. The status page snapshot shares it, so a muted check shows
+/// Maintenance exactly when the engine would have opened a notice for it.
+pub fn is_confirmed_failing(check: &EngineCheck, th: &Thresholds, now: i64) -> bool {
     if check.down_runs >= th.confirm_failures {
         return true;
     }
@@ -1170,11 +1193,15 @@ mod tests {
                 key: "c0".into(),
                 name: "A".into(),
                 status: ComponentStatus::NoData,
+                last_checked_at: None,
+                stale_after_secs: None,
             },
             CurrentComponent {
                 key: "c1".into(),
                 name: "B".into(),
                 status: ComponentStatus::PartialOutage,
+                last_checked_at: None,
+                stale_after_secs: None,
             },
         ];
         assert_eq!(overall_status(&comps), ComponentStatus::PartialOutage);
@@ -1203,6 +1230,8 @@ mod tests {
                 key: "c0".into(),
                 name: "API".into(),
                 status: ComponentStatus::PartialOutage,
+                last_checked_at: None,
+                stale_after_secs: None,
             }],
             notices: vec![PublicNotice {
                 kind: NoticeKind::Incident,

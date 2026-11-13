@@ -36,6 +36,7 @@ import { useFailedRefreshHold } from "./panelFailedRefreshHold";
 import { isEqual, omit } from "lodash-es";
 
 import { useAnnotations } from "./useAnnotations";
+import { deployMarkerScope } from "./deployMarkerScope";
 import useHttpStreamingSearch from "../useStreamingSearch";
 import { checkIfConfigChangeRequiredApiCallOrNot } from "@/utils/dashboard/checkConfigChangeApiCall";
 import { usePanelPromQLExecutor } from "./usePanelPromQLExecutor";
@@ -117,6 +118,7 @@ export const usePanelDataLoader = (
     dashboardId?.value,
     panelSchema.value.id,
     allowAnnotationsAPI?.value,
+    () => deployMarkerScope(panelSchema.value, variablesData?.value, store),
   );
 
   const shouldFetchAnnotations = () => {

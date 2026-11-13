@@ -57,6 +57,8 @@ const ODialogStub = defineComponent({
 
 // Create a persistent mock for router push
 const mockRouterPush = vi.fn();
+const mockRouterReplace = vi.fn();
+const mockRoute = reactive({ query: {} as Record<string, string> });
 
 // Shared reactive searchObj so Vue watchers inside the component fire when
 // tests mutate datetime or meta fields directly.
@@ -101,8 +103,10 @@ vi.mock("@/composables/useTraces", () => ({
 }));
 
 vi.mock("vue-router", () => ({
+  useRoute: () => mockRoute,
   useRouter: () => ({
     push: mockRouterPush,
+    replace: mockRouterReplace,
   }),
 }));
 
@@ -229,6 +233,7 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockRoute.query = {};
     // Clear persisted stream filter so localStorage does not bleed between tests.
     // Without this, a previous test that wrote "stream2" to localStorage causes
     // the next component instance to initialise streamFilter = "stream2", which
@@ -2245,6 +2250,15 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
     const topologyWith = (nodes: Record<string, unknown>[]) =>
       ({ data: { nodes, edges: [] } }) as any;
 
+    // A node click opens the panel through the route, so the route must carry what the router was given.
+    beforeEach(() => {
+      const follow = ({ query }: { query: Record<string, string> }) => {
+        mockRoute.query = query;
+      };
+      mockRouterPush.mockImplementation(follow);
+      mockRouterReplace.mockImplementation(follow);
+    });
+
     it("gives the open panel the refreshed node instead of the click-time snapshot", async () => {
       wrapper = createWrapper();
       await flushPromises();
@@ -2283,6 +2297,63 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
       await wrapper.vm.loadServiceGraph();
       await flushPromises();
 
+      expect(wrapper.vm.showSidePanel).toBe(false);
+    });
+  });
+
+  describe("panel deep link", () => {
+    const deferTopology = () => {
+      const pending: Array<() => void> = [];
+      const hits = {
+        data: {
+          hits: [
+            { client: null, server: "service-a", total_requests: 1000, errors: 10 },
+            { client: "service-a", server: "service-b", total_requests: 1000, errors: 10 },
+          ],
+        },
+      };
+      vi.mocked(searchService.search).mockImplementation(
+        () => new Promise((resolve) => pending.push(() => resolve(hits as any))) as any,
+      );
+      vi.mocked(serviceGraphService.getCurrentTopology).mockImplementation(
+        () => new Promise((resolve) => pending.push(() => resolve(mockApiResponse as any))) as any,
+      );
+      return () => pending.splice(0).forEach((release) => release());
+    };
+
+    it("opens the panel from a refreshed panel=versions link once the nodes load", async () => {
+      mockRoute.query = { panel: "versions", panelSvc: "service-b", panelWhere: "k8s:c1/shop" };
+      const release = deferTopology();
+      wrapper = createWrapper();
+      await flushPromises();
+      expect(wrapper.vm.graphData.nodes).toEqual([]);
+      expect(wrapper.vm.showSidePanel).toBe(false);
+
+      release();
+      await flushPromises();
+      release();
+      await flushPromises();
+
+      expect(wrapper.vm.showSidePanel).toBe(true);
+      expect(wrapper.vm.selectedNode.id).toBe("service-b");
+      expect(wrapper.findComponent({ name: "ServiceGraphSidePanel" }).props("visible")).toBe(true);
+    });
+
+    it("closes the panel route when the open node is clicked again, so a reload keeps it closed", async () => {
+      mockRouterReplace.mockImplementation(({ query }: { query: Record<string, string> }) => {
+        mockRoute.query = query;
+      });
+      mockRoute.query = { panel: "versions", panelSvc: "service-b", tab: "service-graph" };
+      wrapper = createWrapper();
+      await flushPromises();
+      const node = wrapper.vm.selectedNode;
+
+      wrapper.vm.handleNodeClick({ dataType: "node", data: node });
+      await flushPromises();
+      expect(mockRoute.query).toEqual({ tab: "service-graph" });
+
+      wrapper.vm.graphData = { nodes: [...wrapper.vm.graphData.nodes], edges: [] };
+      await flushPromises();
       expect(wrapper.vm.showSidePanel).toBe(false);
     });
   });

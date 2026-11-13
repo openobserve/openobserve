@@ -51,6 +51,14 @@ withDefaults(
     removeDataTest?: string;
     /** Colour override for a condition that is not a user-picked dimension (an insight filter). */
     variant?: BadgeVariant;
+    /** Third segment naming how the value was derived; a removable chip shows its dismiss affordance instead. */
+    qualifier?: I18nText;
+    /** `data-test` for the qualifier segment. */
+    qualifierDataTest?: string;
+    /** Secondary text and a lighter value, for a chip that names an absence rather than a value. */
+    muted?: boolean;
+    /** Leave out the key segment where a column header or label already names the dimension. */
+    hideKey?: boolean;
   }>(),
   {
     tooltip: false,
@@ -59,6 +67,10 @@ withDefaults(
     removeLabel: undefined,
     removeDataTest: undefined,
     variant: undefined,
+    qualifier: undefined,
+    qualifierDataTest: undefined,
+    muted: false,
+    hideKey: false,
   },
 );
 
@@ -73,12 +85,19 @@ const emit = defineEmits<{ (e: "remove"): void }>();
       class="min-w-0 overflow-hidden !p-0"
     >
       <span class="inline-flex min-w-0 items-stretch">
-        <span class="shrink-0 bg-current/8 py-1.5 ps-2.5 pe-1 whitespace-nowrap opacity-90">{{
-          keyLabel ?? dimKey
-        }}</span>
+        <span
+          v-if="!hideKey"
+          class="shrink-0 bg-current/8 py-1.5 ps-2.5 pe-1 whitespace-nowrap opacity-90"
+          :class="muted ? 'text-text-secondary' : undefined"
+          >{{ keyLabel ?? dimKey }}</span
+        >
         <OTruncatedText
-          class="py-1.5 ps-1 font-semibold"
-          :class="removable ? 'pe-1' : 'pe-2.5'"
+          class="py-1.5"
+          :class="[
+            hideKey ? 'ps-2.5' : 'ps-1',
+            muted ? 'text-text-secondary font-medium' : 'font-semibold',
+            removable ? 'pe-1' : qualifier ? 'pe-1.5' : 'pe-2.5',
+          ]"
           :tooltip="tooltip || !valueTooltip ? false : undefined"
           >{{ value }}</OTruncatedText
         >
@@ -92,6 +111,12 @@ const emit = defineEmits<{ (e: "remove"): void }>();
         >
           <OIcon name="close" size="xs" />
         </button>
+        <span
+          v-else-if="qualifier"
+          class="shrink-0 border-s border-current/20 bg-current/8 py-1.5 ps-1.5 pe-2 font-medium whitespace-nowrap opacity-90"
+          :data-test="qualifierDataTest"
+          >{{ qualifier }}</span
+        >
       </span>
     </OTag>
     <OTooltip v-if="tooltip" :delay="300" :content="raw(`${dimKey}=${value}`)" />

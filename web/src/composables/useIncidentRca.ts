@@ -19,7 +19,6 @@ import incidentsService, {
   type RcaSteering,
   type RcaSummary,
   type RcaThread,
-  type RcaVerdictDetails,
 } from "@/services/incidents";
 import { incidentKeys } from "@/services/incidents.querykeys";
 import {
@@ -29,7 +28,11 @@ import {
 } from "@/composables/useRcaTrigger";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { isLiveRca } from "@/utils/incidents/rcaCell";
-import { rcaVerdictDetails } from "@/utils/incidents/rcaSummary";
+import {
+  rcaPageRecommendation,
+  rcaVerdictDetails,
+  type RcaVerdictView,
+} from "@/utils/incidents/rcaSummary";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 
 /** How a part of the shown run reads: its data, or why there is none. */
@@ -155,13 +158,18 @@ export function useIncidentRca(
 
   // Report text per run id. A completed run's report never changes.
   const reports = ref<Record<string, string>>({});
-  // Impacted services and proposed actions of each loaded run's stored verdict.
-  const verdicts = shallowRef<Record<string, RcaVerdictDetails | null>>({});
-  // The run whose report is being fetched; only the displayed one counts as loading.
-  const loadingRunId = ref<string | null>(null);
-  const reportLoading = computed(
-    () => loadingRunId.value !== null && loadingRunId.value === displayedRunId.value,
+  // Impacted services, proposed actions and paging advice of each loaded run's stored verdict.
+  const verdicts = shallowRef<Record<string, RcaVerdictView | null>>({});
+  // Runs whose report read failed; Retry clears the run before reading it again.
+  const failedRunIds = ref<string[]>([]);
+  const reportFailed = computed(
+    () => !!displayedRunId.value && failedRunIds.value.includes(displayedRunId.value),
   );
+  // Loading until the displayed run's report arrives, so nothing reads as "no report" before it.
+  const reportLoading = computed(() => {
+    const id = displayedRunId.value;
+    return !!id && !(id in reports.value) && !reportFailed.value;
+  });
   const reportText = computed(() => {
     const id = displayedRunId.value;
     return id ? (reports.value[id] ?? "") : "";
@@ -183,20 +191,29 @@ export function useIncidentRca(
     const incident = incidentRef.value;
     if (!incident || runId in reports.value) return;
     const org = orgRef.value;
-    loadingRunId.value = runId;
+    failedRunIds.value = failedRunIds.value.filter((id) => id !== runId);
     try {
       const response = await incidentsService.getRcaRun(org, incident.id, runId);
       if (!isCurrentIncident(org, incident.id)) return;
+      failedRunIds.value = failedRunIds.value.filter((id) => id !== runId);
       reports.value = { ...reports.value, [runId]: response.data.report ?? "" };
-      verdicts.value = { ...verdicts.value, [runId]: rcaVerdictDetails(response.data.result) };
+      const details = rcaVerdictDetails(response.data.result);
+      const verdict = details
+        ? { ...details, pageRecommendation: rcaPageRecommendation(response.data.result) }
+        : null;
+      verdicts.value = { ...verdicts.value, [runId]: verdict };
     } catch (error) {
       console.error("Failed to load RCA report:", error);
-      if (isCurrentIncident(org, incident.id)) {
-        toast({ variant: "error", message: t("alerts.incidents.rcaRun.reportLoadFailed") });
-      }
-    } finally {
-      if (loadingRunId.value === runId) loadingRunId.value = null;
+      if (isCurrentIncident(org, incident.id)) failedRunIds.value = [...failedRunIds.value, runId];
     }
+  };
+
+  /** Reads the displayed run's report again after a failed read. */
+  const retryReport = () => {
+    const runId = displayedRunId.value;
+    if (!runId) return;
+    failedRunIds.value = failedRunIds.value.filter((id) => id !== runId);
+    void loadReport(runId);
   };
 
   watch(
@@ -215,6 +232,7 @@ export function useIncidentRca(
       viewedRunId.value = null;
       reports.value = {};
       verdicts.value = {};
+      failedRunIds.value = [];
       triggering.value = false;
       cancelling.value = false;
       resuming.value = false;
@@ -582,6 +600,8 @@ export function useIncidentRca(
     reportText,
     reportVerdict,
     reportLoading,
+    reportFailed,
+    retryReport,
     triggering,
     cancelling,
     resuming,

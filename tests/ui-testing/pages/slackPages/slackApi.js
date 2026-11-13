@@ -1,5 +1,6 @@
 // O2 reaches the Slack mock through O2_SLACK_API_BASE_URL; ids and names here are synthetic (T0PW*, U0DANA, acme.test).
 
+const { expect } = require('@playwright/test');
 const { getAuthHeaders } = require('../../playwright-tests/utils/cloud-auth.js');
 
 const BASE = () => process.env.ZO_BASE_URL || 'http://localhost:5080';
@@ -221,7 +222,100 @@ async function waitForLinkRequest(request, since, timeoutMs = 30000) {
   throw new Error('no link request URL reached the Slack mock');
 }
 
+/** Registers a workspace and its channels with the mock; anything but 200 means the mock is not running. */
+async function addMockTeam(request, { teamId, teamName }, channels) {
+  const r = await request.post(`${MOCK()}/_mock/teams`, { data: { team_id: teamId, team_name: teamName, channels } });
+  if (r.status() !== 200) throw new Error(`the Slack stand-in must be running: POST /_mock/teams -> ${r.status()}`);
+}
+
+/** A fresh org with an HTTP-mode install, a slack_app destination on `channel`, and a stream holding three error rows. */
+async function alertPostFixture(playwright, channel) {
+  const request = await playwright.request.newContext();
+  try {
+    const team = { teamId: `T0PWREG${uniq().toUpperCase()}`, teamName: 'Acme PW Regression' };
+    await addMockTeam(request, team, [{ ...channel, is_private: false, is_member: true, is_shared: false }]);
+    const { id: org } = await createOrg(request, 'slack_reg');
+    const { installation } = await storedHttpInstall(request, org, team);
+    const destination = `slack_reg_app_${uniq()}`;
+    await ok(request, 'post', `/api/${org}/alerts/destinations`, {
+      name: destination,
+      type: 'slack_app',
+      installation_id: installation.id,
+      channel_id: channel.id,
+      channel_name: channel.name,
+      buttons: true,
+      mention: 'default',
+      refire_reuse_minutes: 30,
+      auto_investigate: 'off',
+      shared_channel_confirmed: false,
+      oncall_room_confirmed: false,
+    });
+    const stream = `slack_reg_${uniq()}`;
+    await ok(request, 'post', `/api/${org}/${stream}/_json`, [
+      { level: 'error' },
+      { level: 'error' },
+      { level: 'error' },
+    ]);
+    return { request, org, destination, stream, channelId: channel.id, alertIds: [] };
+  } catch (error) {
+    await request.dispose();
+    throw error;
+  }
+}
+
+async function disposeAlertPostFixture({ request, org, destination }) {
+  await call(request, 'delete', `/api/${org}/alerts/destinations/${encodeURIComponent(destination)}`);
+  await request.dispose();
+}
+
+/** Creates a v2 alert in the fixture org's default folder, tracks it for deleteFixtureAlerts, and returns its id. */
+async function createFixtureAlert(fx, payload) {
+  await ok(fx.request, 'post', `/api/v2/${fx.org}/alerts?folder=default`, payload);
+  const { list } = await ok(fx.request, 'get', `/api/v2/${fx.org}/alerts?folder=default&page_size=1000`);
+  const id = list.find((row) => row.name === payload.name)?.alert_id;
+  if (!id) throw new Error(`${payload.name} must be listable`);
+  fx.alertIds.push(id);
+  return id;
+}
+
+/** Deletes the fixture's alerts newest first, so a composite goes before the children it references. */
+async function deleteFixtureAlerts(fx) {
+  for (const id of fx.alertIds.splice(0).reverse()) {
+    await call(fx.request, 'delete', `/api/v2/${fx.org}/alerts/${id}?folder=default`);
+  }
+}
+
+/** Top-level chat.postMessage calls in `channelId` that the mock answered and whose text names `name`. */
+async function channelPostsNaming(request, channelId, name) {
+  const calls = await mockRequests(request, 'chat.postMessage');
+  return calls.filter(
+    (c) =>
+      c.response &&
+      c.form.channel === channelId &&
+      !c.form.thread_ts &&
+      `${c.form.text}${c.form.attachments}`.includes(name),
+  );
+}
+
+/** Polls until every name in `names` has at least one top-level post in `channelId`. */
+async function expectEveryAlertPosted(request, channelId, names, { timeout, message }) {
+  const unposted = async () => {
+    const posted = await Promise.all(
+      names.map(async (name) => (await channelPostsNaming(request, channelId, name)).length > 0),
+    );
+    return names.filter((_, i) => !posted[i]);
+  };
+  await expect.poll(unposted, { message, timeout, intervals: [3000] }).toEqual([]);
+}
+
 module.exports = {
+  addMockTeam,
+  alertPostFixture,
+  disposeAlertPostFixture,
+  createFixtureAlert,
+  deleteFixtureAlerts,
+  channelPostsNaming,
+  expectEveryAlertPosted,
   storedHttpInstall,
   sendSlackEvent,
   waitForLinkRequest,

@@ -59,6 +59,12 @@ pub mod scheduler;
 pub mod schema;
 pub mod search_job;
 pub mod service_graph;
+pub mod service_identity;
+pub mod service_identity_resync;
+pub mod service_identity_sync;
+pub mod service_signals;
+#[cfg(feature = "enterprise")]
+pub mod service_versions;
 pub mod session;
 pub mod short_url;
 pub mod sourcemaps;

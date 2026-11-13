@@ -47,6 +47,7 @@ const props = withDefaults(defineProps<QueryFilterBarProps>(), {
   extraSuggestions: undefined,
   issues: undefined,
   valueHint: undefined,
+  valueLabel: undefined,
   fieldsLoading: false,
   placeholder: undefined,
   disabled: false,
@@ -86,6 +87,7 @@ const editor = useFilterBarEditor({
   config,
   loadValues: toRef(props, "loadValues"),
   extraValues: toRef(props, "extraValueSuggestions"),
+  valueLabel: toRef(props, "valueLabel"),
   extraSuggestions: toRef(props, "extraSuggestions"),
   selectExtra: (key, event) => emit("extra-select", key, event),
   t,
@@ -133,6 +135,7 @@ const showAddOrGroup = computed(
 provide(FILTER_BAR_CHIP_CONTEXT, {
   fieldLabel: (field) => props.fields.find((f) => f.name === field)?.label,
   valueHint: (field, values) => props.valueHint?.(field, values),
+  valueLabel: (field, value) => props.valueLabel?.(field, value),
   issueMessage: (nodeId) => props.issues?.find((issue) => issue.nodeId === nodeId)?.message,
   operatorName: (id) => operatorName(id, dialect.value, t, config.value.operatorNames),
 });

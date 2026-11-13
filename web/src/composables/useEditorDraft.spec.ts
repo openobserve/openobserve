@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { orgSwitchPending } from "@/utils/orgScopedRoutes";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import { defineComponent, h, nextTick, reactive } from "vue";
@@ -165,6 +166,31 @@ describe("useEditorDraft", () => {
   });
 
   describe("baseline and autosave", () => {
+    it("applyProgrammaticChange counts a change made before any input", async () => {
+      const draft = await startHost();
+      await draft.applyProgrammaticChange(() => {
+        form.name = "suggested";
+      });
+      expect(draft.hasUnsavedChanges()).toBe(true);
+
+      const result = leave();
+      await flushPromises();
+      expect(byTest("editor-draft-leave-dialog")).not.toBeNull();
+      draft.chooseLeave("stay");
+      expect(await result).toBe(false);
+      flushAutosave();
+      expect(readEditorDraft<Form>(editScope)?.data.name).toBe("suggested");
+
+      // A later load before the first input is still absorbed by the first-input baseline only when no change was applied.
+      wrapper!.unmount();
+      wrapper = null;
+      localStorage.clear();
+      form.name = "saved";
+      const plain = await startHost();
+      await edit({ name: "loaded later" });
+      expect(plain.hasUnsavedChanges()).toBe(false);
+    });
+
     it("ignores changes made before the user's first input", async () => {
       const draft = await startHost();
       await edit({ name: "loaded later" });
@@ -363,6 +389,19 @@ describe("useEditorDraft", () => {
       await nextTick();
       expect(readEditorDraft(editScope)).not.toBeNull();
       expect(await leave()).toBe(true);
+    });
+
+    it("leaves without a prompt while an org switch is leaving the page", async () => {
+      await startHost();
+      userInput();
+      await edit({ name: "typed" });
+      orgSwitchPending.value = true;
+      try {
+        expect(await leave()).toBe(true);
+      } finally {
+        orgSwitchPending.value = false;
+      }
+      expect(readEditorDraft(editScope)).not.toBeNull();
     });
   });
 

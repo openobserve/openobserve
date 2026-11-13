@@ -366,7 +366,7 @@ fn compute_all() -> BTreeMap<String, Value> {
             }
             for (layout, record) in json_layouts(attrs, kind) {
                 let mut after = record.clone();
-                let dbm = super::enrich_json_record(&mut after, true, &opts);
+                let dbm = super::enrich_json_record(&mut after, true, &opts, false);
                 let after: BTreeMap<String, Value> = after.into_iter().collect();
                 out.insert(
                     format!("{id}|{layout}|k{kind}"),

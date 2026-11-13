@@ -2311,13 +2311,13 @@ const fieldWidthClass = computed(() => {
       v-if="effectiveError && effectiveError.trim()"
       :id="errorId"
       :data-test="parentDataTest ? `${parentDataTest}-error` : undefined"
-      class="text-select-error-text text-xs leading-none"
+      class="text-select-error-text text-xs leading-snug"
       role="alert"
     >
       {{ effectiveError }}
     </span>
     <!-- Help text -->
-    <span v-else-if="helpText" class="text-input-help-text text-xs leading-none">
+    <span v-else-if="helpText" class="text-input-help-text text-xs leading-snug">
       {{ helpText }}
     </span>
   </div>

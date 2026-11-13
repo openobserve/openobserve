@@ -35,6 +35,8 @@ mod agent_signals;
 mod ai_chat_retention;
 mod alert_eval_ledger_reaper;
 mod alert_group_reaper;
+#[cfg(feature = "enterprise")]
+mod alert_transitions_reaper;
 #[cfg(feature = "cloud")]
 mod cloud;
 mod compactor;
@@ -80,6 +82,8 @@ mod red_insights;
 mod scheduler;
 #[cfg(feature = "enterprise")]
 mod service_graph;
+#[cfg(feature = "enterprise")]
+mod service_signals;
 mod session_cleanup;
 #[cfg(feature = "enterprise")]
 pub mod slack_hooks;
@@ -743,6 +747,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(db::compact::retention::watch());
     tokio::task::spawn(db::metrics::watch_prom_cluster_leader());
     tokio::task::spawn(db::model_pricing::watch());
+    #[cfg(feature = "enterprise")]
+    openobserve_core::service_identity::display_feed::init();
+    #[cfg(feature = "enterprise")]
+    tokio::task::spawn(db::service_identity::watch());
     tokio::task::spawn(openobserve_core::prompts::watch_invalidation());
     tokio::task::spawn(db::alerts::templates::watch());
     tokio::task::spawn(db::alerts::destinations::watch());
@@ -928,6 +936,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
     if let Err(e) = alerts::alert_calibration::backfill_org_configs().await {
         log::error!("[alert_calibration] default config backfill failed: {e}");
     }
+    #[cfg(feature = "enterprise")]
+    if let Err(e) = openobserve_core::autoobserve::init().await {
+        log::error!("[autoobserve] engine start-up failed: {e}");
+    }
 
     // cache alerts (this will include the system templates we just created)
     db::alerts::templates::cache()
@@ -957,6 +969,12 @@ pub async fn init() -> Result<(), anyhow::Error> {
             openobserve_core::synthetics::downtime_may_mute,
         );
     }
+    // A run a confirm job kept open can finalize in the reaper or the dispatcher, where no ack
+    // sends its alert.
+    #[cfg(feature = "enterprise")]
+    openobserve_synthetics::job_api::register_run_notifier(
+        openobserve_core::synthetics::notify_finalized_run,
+    );
     // Warm the cache on queriers (UI APIs) and on whichever node role is the configured
     // processing node so that get_coverage_deficit returns accurate data from startup
     // rather than always returning (0, 0) until files happen to be processed.
@@ -1002,6 +1020,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(flatten_compactor::run());
     #[cfg(feature = "enterprise")]
     tokio::task::spawn(agent_signals::run());
+    #[cfg(feature = "enterprise")]
+    tokio::task::spawn(service_signals::run());
     #[cfg(feature = "enterprise")]
     tokio::task::spawn(service_graph::run());
     // No cfg, unlike service_graph above: parts of DBM's read API are
@@ -1472,6 +1492,25 @@ pub async fn init() -> Result<(), anyhow::Error> {
     );
     #[cfg(feature = "enterprise")]
     spawn_pausable_job!(
+        "service_versions_flush",
+        o2_enterprise::enterprise::common::config::SERVICE_VERSIONS_BATCH_FLUSH_INTERVAL_SECS,
+        {
+            // flush_all logs each failed org; the next tick retries it
+            let _ = db::service_versions::flush_all().await;
+        },
+        pause_if: !config::get_config().service_versions.enabled
+    );
+    #[cfg(feature = "enterprise")]
+    spawn_pausable_job!(
+        "service_display_rebuild",
+        3600,
+        {
+            openobserve_core::service_identity::display_feed::rebuild_all().await;
+        },
+        sleep_after
+    );
+    #[cfg(feature = "enterprise")]
+    spawn_pausable_job!(
         "service_streams_cleanup",
         get_o2_config().service_streams.cleanup_interval_mins * 60, // convert minutes to seconds
         {
@@ -1557,6 +1596,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
     // gated: retention deletes do not replicate, so every region reaps its own
     // copy or it grows without bound.
     alert_eval_ledger_reaper::run();
+    // Not job-cluster gated for the same reason; OSS builds keep every level change.
+    #[cfg(feature = "enterprise")]
+    alert_transitions_reaper::run();
     query_history_reaper::run();
     public_dashboards_outbox::run();
     // Reconciliation is what makes the rolling window actually roll: the

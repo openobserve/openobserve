@@ -76,6 +76,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         max-height="18rem"
         data-test="downtime-resource-picker-table"
       >
+        <template #cell-value="{ row }">
+          <span class="min-w-0" :data-test="`downtime-resource-picker-label-${row.value}`"
+            ><ServiceNameLabel
+              v-if="row.label || refineBy === SERVICE_DIMENSION"
+              :service-key="row.value"
+              :display-name="row.label"
+            /><template v-else>{{ row.value }}</template></span
+          >
+        </template>
         <template #cell-last_seen="{ row }">
           <OTimeCell v-if="row.last_seen" :value="row.last_seen" unit="us" />
         </template>
@@ -140,13 +149,17 @@ import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import ServiceNameLabel from "@/components/shared/ServiceNameLabel.vue";
 
 const MAX_VALUES = 500;
 const DEFAULT_DIMENSION = "host";
+const SERVICE_DIMENSION = "service";
 
 /** One pickable value: a suggestion carries `items`, a loaded resource carries `streams`. */
 interface PickerRow {
   value: string;
+  /** Display name of a service value; selection and the applied condition use `value`. */
+  label?: string;
   items?: number;
   last_seen?: number;
   streams?: string[];

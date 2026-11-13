@@ -399,6 +399,7 @@ import ServiceGraphNoDataState from "./ServiceGraphNoDataState.vue";
 import ChartZoomControls from "@/components/traces/ChartZoomControls.vue";
 import useChartZoom from "@/composables/traces/useChartZoom";
 import { getEffectiveTimeRange } from "@/utils/date";
+import { useServicePanelRoute } from "./composables/useServicePanelRoute";
 
 export default defineComponent({
   name: "ServiceGraph",
@@ -538,6 +539,7 @@ export default defineComponent({
     // Node side panel state
     const selectedNode = ref<any>(null);
     const showSidePanel = ref(false);
+    const panelRoute = useServicePanelRoute();
     // Stored relative start/end go stale, so "now" is resolved on each call.
     const effectiveTimeRange = () =>
       props.timeRange && props.timeRange.startTime && props.timeRange.endTime
@@ -610,6 +612,25 @@ export default defineComponent({
       nodes: [],
       edges: [],
     });
+
+    // A refreshed deep link arrives before the graph nodes load, so the panel opens once its node appears.
+    watch(
+      () => [panelRoute.state.value, graphData.value.nodes] as const,
+      ([state, nodes]) => {
+        if (!state.open) {
+          if (!selectedNode.value?.service_type) showSidePanel.value = false;
+          return;
+        }
+        const node = nodes.find((node: { id: string; name?: string; label?: string }) =>
+          [node.name, node.label, node.id].includes(state.service),
+        );
+        if (node && (!showSidePanel.value || selectedNode.value?.id !== node.id)) {
+          selectedNode.value = node;
+          showSidePanel.value = true;
+        }
+      },
+      { immediate: true },
+    );
 
     // Adaptive-collapse state: when the graph is large, inferred dependency kinds
     // (database/queue/external/rpc) collapse into per-kind boundary nodes so the
@@ -1829,11 +1850,17 @@ export default defineComponent({
       if (params.dataType === "node" && params.data) {
         // Check if clicking the same node - if so, close the panel
         if (selectedNode.value && selectedNode.value.id === params.data.id) {
+          if (panelRoute.state.value.open) void panelRoute.close();
           showSidePanel.value = false;
           selectedNode.value = null;
         } else {
           selectedNode.value = params.data;
           showSidePanel.value = true;
+          if (!params.data.service_type)
+            void panelRoute.open(
+              params.data.name || params.data.label || params.data.id,
+              params.data.where_key || "",
+            );
         }
       }
       // For tree visualization, check if it's a tree node
@@ -1846,11 +1873,17 @@ export default defineComponent({
         if (nodeData) {
           // Check if clicking the same node - if so, close the panel
           if (selectedNode.value && selectedNode.value.id === nodeData.id) {
+            if (panelRoute.state.value.open) void panelRoute.close();
             showSidePanel.value = false;
             selectedNode.value = null;
           } else {
             selectedNode.value = nodeData;
             showSidePanel.value = true;
+            if (!nodeData.service_type)
+              void panelRoute.open(
+                nodeData.name || nodeData.label || nodeData.id,
+                nodeData.where_key || "",
+              );
           }
         } else {
           console.warn("[ServiceGraph] Could not find node data for:", params.data.name);
@@ -1859,6 +1892,7 @@ export default defineComponent({
     };
 
     const handleCloseSidePanel = () => {
+      if (panelRoute.state.value.open) void panelRoute.close();
       showSidePanel.value = false;
       // Don't clear selectedNode immediately to allow smooth close animation
       setTimeout(() => {

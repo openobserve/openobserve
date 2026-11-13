@@ -24,6 +24,8 @@ pub mod alerts;
 pub mod anomaly_detection;
 pub mod auth;
 pub mod authz;
+#[cfg(feature = "enterprise")]
+pub mod autoobserve;
 #[cfg(any(feature = "enterprise", test))]
 pub mod background_access;
 pub mod bootstrap;
@@ -76,6 +78,7 @@ use search_service as search;
 pub mod self_profiles;
 pub mod self_reporting;
 pub mod service;
+pub mod service_identity;
 pub mod session;
 pub mod short_url;
 pub mod slo;

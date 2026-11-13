@@ -479,7 +479,7 @@ describe("RecentSearchesDrawer", () => {
         await flushPromises();
         await deleteOld(wrapper);
         const record = toastRecords.find((r) => r.open);
-        expect(record?.message).toBe("Query old deleted");
+        expect(record?.message).toBe("query old deleted");
         record?.action?.handler();
         await flushPromises();
         expect(rowShown(wrapper)).toBe(true);

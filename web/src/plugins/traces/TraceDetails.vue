@@ -814,7 +814,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- DAG View - only for LLM traces -->
             <div v-if="hasLLMSpans && activeTab === 'dag'" class="flex min-h-0 flex-1">
               <div
-                class="h-[calc(100vh-12.5rem)] min-w-[12.5rem] overflow-hidden p-4"
+                class="h-full min-h-0 min-w-[12.5rem] overflow-hidden p-4"
                 :style="{
                   width:
                     isSidebarOpen && (selectedSpanId || showTraceDetails)
@@ -844,7 +844,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div
                 v-if="isSidebarOpen && (selectedSpanId || showTraceDetails)"
-                class="h-[calc(100vh-12.5rem)] min-h-0 min-w-[18.75rem] overflow-x-hidden overflow-y-auto"
+                class="h-full min-h-0 min-w-[18.75rem] overflow-x-hidden overflow-y-auto"
                 :style="{
                   width: `${100 - dagLeftWidth}%`,
                 }"

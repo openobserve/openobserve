@@ -59,6 +59,22 @@ describe("ODrawer", () => {
     expect(wrapper.text()).toContain("My Drawer");
   });
 
+  it("announces its title once: no description repeats it", () => {
+    const wrapper = mount(ODrawer, { props: { open: true, title: "Orders" } });
+    const dialog = wrapper.get("[data-o2-drawer]");
+    expect(dialog.attributes("aria-describedby")).toBeUndefined();
+    expect(wrapper.get(`[id="${dialog.attributes("aria-labelledby")}"]`).text()).toBe("Orders");
+  });
+
+  it("is described by its visible subtitle, not a hidden copy of it", () => {
+    const wrapper = mount(ODrawer, { props: { open: true, title: "Orders", subTitle: "2 of 5" } });
+    const dialog = wrapper.get("[data-o2-drawer]");
+    const described = wrapper.get(`[id="${dialog.attributes("aria-describedby")}"]`);
+    expect(described.text()).toBe("2 of 5");
+    expect(described.classes()).not.toContain("sr-only");
+    expect(wrapper.html().split("2 of 5")).toHaveLength(2);
+  });
+
   it("renders the header slot when provided", () => {
     const wrapper = mount(ODrawer, {
       props: { open: true },

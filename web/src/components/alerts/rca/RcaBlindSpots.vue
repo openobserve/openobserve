@@ -41,69 +41,81 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-else
       class="rounded-default border-border-default bg-surface-base divide-border-default m-0 list-none divide-y border p-0"
     >
-      <li
+      <RcaFoldRow
         v-for="spot in blindSpots"
         :key="spot.id"
         data-test="rca-blind-spot"
-        class="grid grid-cols-[1.25rem_minmax(0,1fr)_auto] items-center gap-x-2.5 px-3.5 py-2.5"
+        :open="opened.has(spot.id)"
+        @update:open="toggle(spot.id)"
       >
-        <OIcon name="visibility-off" size="sm" class="text-status-warning-text self-start pt-0.5" />
-        <div class="min-w-0">
-          <div class="text-text-heading text-sm font-semibold">{{ spot.title }}</div>
-          <div class="text-text-secondary text-compact [text-wrap:pretty]">{{ spot.why }}</div>
-        </div>
-        <OTooltip v-if="actions[spot.id]?.lockedReason" :content="actions[spot.id]!.lockedReason!">
-          <span class="inline-flex">
-            <OButton
-              data-test="rca-blind-spot-action"
-              :data-fix="spot.fix"
-              variant="outline"
-              size="sm"
-              disabled
-            >
-              <template #icon-left>
-                <OIcon
-                  name="lock"
-                  class="lock-chip"
-                  size="sm"
-                  data-test="rca-blind-spot-action-lock"
-                />
-              </template>
-              {{ actions[spot.id]!.label }}
-            </OButton>
-          </span>
-        </OTooltip>
-        <OButton
-          v-else-if="actions[spot.id]"
-          data-test="rca-blind-spot-action"
-          :data-fix="spot.fix"
-          variant="outline"
-          size="sm"
-          :icon-left="actions[spot.id]!.icon"
-          @click="router.push(actions[spot.id]!.route)"
-        >
-          {{ actions[spot.id]!.label }}
-        </OButton>
-        <OButton
-          v-else-if="spot.fix === 'resume_run' && canResume"
-          data-test="rca-blind-spot-action"
-          data-fix="resume_run"
-          variant="outline"
-          size="sm"
-          icon-left="play-arrow"
-          :loading="resuming"
-          :disabled="triggering"
-          @click="$emit('resume')"
-        >
-          {{ t("alerts.incidents.rcaSummary.fix.resumeRun") }}
-        </OButton>
-      </li>
+        <template #lead>
+          <OIcon name="visibility-off" size="sm" class="text-status-warning-text shrink-0" />
+        </template>
+        <span data-test="rca-blind-spot-title">{{ spot.title }}</span>
+        <template #actions>
+          <OTooltip
+            v-if="actions[spot.id]?.lockedReason"
+            :content="actions[spot.id]!.lockedReason!"
+          >
+            <span class="inline-flex shrink-0">
+              <OButton
+                data-test="rca-blind-spot-action"
+                :data-fix="spot.fix"
+                variant="outline"
+                size="sm"
+                disabled
+              >
+                <template #icon-left>
+                  <OIcon
+                    name="lock"
+                    class="lock-chip"
+                    size="sm"
+                    data-test="rca-blind-spot-action-lock"
+                  />
+                </template>
+                {{ actions[spot.id]!.label }}
+              </OButton>
+            </span>
+          </OTooltip>
+          <OButton
+            v-else-if="actions[spot.id]"
+            data-test="rca-blind-spot-action"
+            :data-fix="spot.fix"
+            class="shrink-0"
+            variant="outline"
+            size="sm"
+            :icon-left="actions[spot.id]!.icon"
+            @click="router.push(actions[spot.id]!.route)"
+          >
+            {{ actions[spot.id]!.label }}
+          </OButton>
+          <OButton
+            v-else-if="spot.fix === 'resume_run' && canResume"
+            data-test="rca-blind-spot-action"
+            data-fix="resume_run"
+            class="shrink-0"
+            variant="outline"
+            size="sm"
+            icon-left="play-arrow"
+            :loading="resuming"
+            :disabled="triggering"
+            @click="$emit('resume')"
+          >
+            {{ t("alerts.incidents.rcaSummary.fix.resumeRun") }}
+          </OButton>
+        </template>
+        <template #body>
+          <p class="text-text-secondary text-compact m-0 ps-8 [text-wrap:pretty]">
+            {{ spot.why }}
+          </p>
+        </template>
+      </RcaFoldRow>
     </ul>
   </section>
 </template>
 
 <script setup lang="ts">
-import { computed, useId } from "vue";
+import { computed, ref, useId } from "vue";
 import { useRouter, type RouteLocationRaw } from "vue-router";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -113,6 +125,7 @@ import type { RcaBlindSpot, RcaBlindSpotFix } from "@/services/incidents";
 import { rcaBlindSpotFeature, rcaBlindSpotRoute } from "@/utils/incidents/rcaEvidenceLinks";
 import { useLicenseLock } from "@/composables/useFeatureLock";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import RcaFoldRow from "./RcaFoldRow.vue";
 
 const props = withDefaults(
   defineProps<{
@@ -140,6 +153,13 @@ const headingId = useId();
 const featureLocks = {
   ai_toolsets: useLicenseLock("ai_toolsets"),
   pipelines: useLicenseLock("pipelines"),
+};
+
+const opened = ref(new Set<string>());
+const toggle = (id: string) => {
+  const next = new Set(opened.value);
+  if (!next.delete(id)) next.add(id);
+  opened.value = next;
 };
 
 const actionLabel = (fix: RcaBlindSpotFix): { label: I18nText; icon: IconName } | null => {

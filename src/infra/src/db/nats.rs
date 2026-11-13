@@ -293,6 +293,43 @@ impl super::Db for NatsDb {
             .map_err(|e| Error::Message(format!("[NATS:get_if_exists] bucket.get error: {e}")))
     }
 
+    async fn get_with_revision(&self, key: &str) -> Result<Option<(Bytes, u64)>> {
+        let (bucket, new_key) = get_bucket_by_key(&self.prefix, key).await?;
+        let entry = bucket
+            .entry(key_encode(new_key))
+            .await
+            .map_err(|e| Error::Message(format!("[NATS:get_with_revision] {e}")))?;
+        Ok(entry
+            .filter(|entry| entry.operation == jetstream::kv::Operation::Put)
+            .map(|entry| (entry.value, entry.revision)))
+    }
+
+    async fn put_if_revision(
+        &self,
+        key: &str,
+        value: Bytes,
+        revision: Option<u64>,
+    ) -> Result<bool> {
+        let (bucket, new_key) = get_bucket_by_key(&self.prefix, key).await?;
+        let key = key_encode(new_key);
+        match revision {
+            Some(revision) => match bucket.update(&key, value, revision).await {
+                Ok(_) => Ok(true),
+                Err(error) if error.kind() == jetstream::kv::UpdateErrorKind::WrongLastRevision => {
+                    Ok(false)
+                }
+                Err(error) => Err(Error::Message(format!("[NATS:put_if_revision] {error}"))),
+            },
+            None => match bucket.create(&key, value).await {
+                Ok(_) => Ok(true),
+                Err(error) if error.kind() == jetstream::kv::CreateErrorKind::AlreadyExists => {
+                    Ok(false)
+                }
+                Err(error) => Err(Error::Message(format!("[NATS:put_if_revision] {error}"))),
+            },
+        }
+    }
+
     async fn put(
         &self,
         key: &str,
@@ -712,6 +749,30 @@ impl Locker {
         *self.keep_alive.lock().await = Some(handle);
 
         Ok(())
+    }
+
+    pub(crate) async fn owned_revision(&self) -> Result<u64> {
+        let cfg = get_config();
+        let (bucket, new_key) = get_bucket_by_key(&cfg.nats.prefix, &self.key).await?;
+        let entry = bucket.entry(key_encode(new_key)).await?;
+        let revision = revision_if_held(
+            entry
+                .as_ref()
+                .map(|e| (&e.value[..], e.revision, e.operation)),
+            &self.lock_id,
+        );
+        let live = entry.as_ref().is_some_and(|entry| {
+            entry
+                .value
+                .split(|b| *b == b':')
+                .next_back()
+                .and_then(|value| std::str::from_utf8(value).ok())
+                .and_then(|value| value.parse::<i64>().ok())
+                .is_some_and(|expires| expires > now_micros())
+        });
+        revision
+            .filter(|_| live)
+            .ok_or_else(|| Error::Message("service signals lease lost".to_string()))
     }
 
     pub(crate) async fn unlock(&self) -> Result<()> {
@@ -1206,6 +1267,187 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(keys, ["/nodes/new", "/nodes/old"]);
+    }
+
+    #[tokio::test]
+    async fn takeover_with_suspended_renewal_rejects_stale_writer() {
+        if std::env::var("O2_TEST_NATS_URL").is_err() {
+            return;
+        }
+        let key = format!("/service_signals/takeover_{}", ider::generate());
+        let mut a = Locker::new(&key);
+        a.lock(1).await.unwrap();
+        let old_generation = a.owned_revision().await.unwrap();
+        let stale = config::meta::service_identity::AliasRow {
+            alias_key: "same-window".into(),
+            org_id: "fence".into(),
+            canonical: "z-old".into(),
+            origin: "learned".into(),
+            status: "active".into(),
+            updated_at: 300,
+            writer_cluster: "same-region".into(),
+            fencing_token: old_generation as i64,
+            ..Default::default()
+        };
+        let rename = config::meta::service_identity::AliasRow {
+            alias_key: "absent-rename".into(),
+            kind: "rename".into(),
+            alias: "old".into(),
+            canonical: "z".into(),
+            ..stale.clone()
+        };
+        assert_eq!(a.owned_revision().await.unwrap(), old_generation);
+        let handle = a.keep_alive.lock().await.take().unwrap();
+        handle.abort();
+        let _ = handle.await;
+        let cfg = get_config();
+        let (bucket, new_key) = get_bucket_by_key(&cfg.nats.prefix, &a.key).await.unwrap();
+        let encoded = key_encode(new_key);
+        // Expiring the stored deadline avoids a wall-clock wait while renewal stays suspended.
+        bucket
+            .update(
+                &encoded,
+                Bytes::from(format!("{}:{}:0", a.lock_id, cluster::LOCAL_NODE.uuid)),
+                old_generation,
+            )
+            .await
+            .unwrap();
+        assert!(a.owned_revision().await.is_err());
+        let mut b = Locker::new(&key);
+        b.lock(1).await.unwrap();
+        let generation = b.owned_revision().await.unwrap();
+        assert!(generation > old_generation);
+        for conn in
+            crate::table::service_versions::sqlite_and_postgres_for_tests("alias_fence_takeover")
+                .await
+        {
+            crate::table::service_versions::create_tables_for_tests(&conn)
+                .await
+                .unwrap();
+            let fresh = config::meta::service_identity::AliasRow {
+                canonical: "a-new".into(),
+                status: "proposed".into(),
+                evidence: Some("later telemetry".into()),
+                fencing_token: generation as i64,
+                ..stale.clone()
+            };
+            use crate::table::service_name_aliases::{
+                list, put_learned_batch, upsert, upsert_learned,
+            };
+            put_learned_batch(
+                &conn,
+                "same-region",
+                generation as i64,
+                std::slice::from_ref(&fresh),
+            )
+            .await
+            .unwrap();
+            assert!(
+                put_learned_batch(
+                    &conn,
+                    "same-region",
+                    old_generation as i64,
+                    &[rename.clone(), stale.clone()]
+                )
+                .await
+                .is_err()
+            );
+            assert_eq!(list(&conn, "fence").await.unwrap(), vec![fresh.clone()]);
+            assert!(upsert_learned(&conn, &rename).await.unwrap());
+            crate::table::service_name_aliases::delete_by_org(&conn, "fence")
+                .await
+                .unwrap();
+            assert!(upsert_learned(&conn, &fresh).await.unwrap());
+            assert!(!upsert_learned(&conn, &stale).await.unwrap());
+            assert_eq!(list(&conn, "fence").await.unwrap(), vec![fresh.clone()]);
+            // The old unfenced conflict ranking lets the paused owner's canonical win the tie.
+            assert!(upsert(&conn, &stale).await.unwrap());
+            assert_eq!(list(&conn, "fence").await.unwrap()[0].canonical, "z-old");
+            crate::table::service_name_aliases::delete_by_org(&conn, "fence")
+                .await
+                .unwrap();
+            assert!(upsert_learned(&conn, &fresh).await.unwrap());
+            let older_same_token = config::meta::service_identity::AliasRow {
+                updated_at: 299,
+                ..fresh.clone()
+            };
+            assert!(!upsert_learned(&conn, &older_same_token).await.unwrap());
+            let newer_token_older_window = config::meta::service_identity::AliasRow {
+                fencing_token: generation as i64 + 1,
+                updated_at: 298,
+                ..fresh
+            };
+            assert!(
+                upsert_learned(&conn, &newer_token_older_window)
+                    .await
+                    .unwrap()
+            );
+        }
+
+        assert!(!*a.lost_signal().borrow());
+        let mut stale_writes = 0;
+        for _ in ["signals", "detail", "pods", "aliases", "offset"] {
+            if a.owned_revision().await.is_ok() {
+                stale_writes += 1;
+            }
+        }
+        assert_eq!(stale_writes, 0);
+        let old_watch_only_writes = usize::from(!*a.lost_signal().borrow());
+        assert_eq!(old_watch_only_writes, 1);
+        b.unlock().await.unwrap();
+        a.unlock().await.unwrap();
+        println!(
+            "suspended renewal takeover executed; watch-only negative control admitted stale writes"
+        );
+    }
+
+    #[tokio::test]
+    async fn native_revision_cas_refuses_stale_owner_and_handles_missing_key() {
+        use crate::db::Db;
+        if std::env::var("O2_TEST_NATS_URL").is_err() {
+            return;
+        }
+        let store = NatsDb::new("service_signals_cas_test");
+        let key = format!("/service_signals/{}", ider::generate());
+        assert!(store.get_with_revision(&key).await.unwrap().is_none());
+        assert!(
+            store
+                .put_if_revision(&key, Bytes::from("100;old"), None)
+                .await
+                .unwrap()
+        );
+        let (_, revision) = store.get_with_revision(&key).await.unwrap().unwrap();
+        assert!(
+            !store
+                .put_if_revision(&key, Bytes::from("0;stale"), None)
+                .await
+                .unwrap()
+        );
+        assert!(
+            store
+                .put_if_revision(&key, Bytes::from("200;new"), Some(revision))
+                .await
+                .unwrap()
+        );
+        assert!(
+            !store
+                .put_if_revision(&key, Bytes::from("150;old"), Some(revision))
+                .await
+                .unwrap()
+        );
+        let (value, next_revision) = store.get_with_revision(&key).await.unwrap().unwrap();
+        assert_eq!(value, Bytes::from("200;new"));
+        assert!(next_revision > revision);
+        store.delete(&key, false, false, None).await.unwrap();
+        assert!(store.get_with_revision(&key).await.unwrap().is_none());
+        assert!(
+            store
+                .put_if_revision(&key, Bytes::from("300;new"), None)
+                .await
+                .unwrap()
+        );
+        store.delete(&key, false, false, None).await.unwrap();
+        println!("native NATS revision fencing executed");
     }
 
     #[test]

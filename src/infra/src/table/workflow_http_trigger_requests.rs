@@ -30,6 +30,8 @@ use crate::table::entity::{
 pub const ERR_RUN_TIMEOUT: &str = "run_timeout";
 pub const ERR_WORKER_LOST: &str = "worker_lost";
 pub const ERR_WORKFLOW_DISABLED: &str = "workflow_disabled";
+pub const ERR_ENDPOINT_DISABLED: &str = "endpoint_disabled";
+pub const ERR_CREDENTIAL_REVOKED: &str = "credential_revoked";
 pub const IDEM_KEY_TTL_US: i64 = 24 * 3600 * 1_000_000;
 const DELETE_BATCH: usize = 500;
 
@@ -126,7 +128,7 @@ pub struct RunningCounts {
     pub by_org: HashMap<String, u64>,
 }
 
-/// The reaping node and the ledger ids its own tasks still run.
+/// The reaping node, the ids its own tasks still run, and the claim time a run is overdue at.
 #[derive(Clone, Copy, Debug)]
 pub struct LocalClaims<'a> {
     pub node_uuid: &'a str,
@@ -294,7 +296,7 @@ pub async fn finish<C: ConnectionTrait>(
     Ok(updated.rows_affected == 1)
 }
 
-/// Fails rows whose claimer left `live_nodes`, and own overdue rows no local task runs any more.
+/// Fails overdue rows whose claimer left `live_nodes`, or, if claimed here, no local task runs.
 pub async fn reap<C: ConnectionTrait>(
     db: &C,
     live_nodes: &HashSet<String>,
@@ -312,14 +314,17 @@ pub async fn reap<C: ConnectionTrait>(
         .await?;
     let mut reaped = 0;
     for (id, claimed_by, claimed_at) in running {
-        let claimer_gone = claimed_by
-            .as_ref()
-            .is_none_or(|node| !live_nodes.contains(node));
+        // A claimer missing from a lagging node view may still run it until `run_timeout` cancels.
+        let overdue = claimed_at.is_none_or(|at| at < local.stale_before_us);
         // A live peer's overdue run may still be draining after its cancel, holding its slot.
-        let abandoned_here = claimed_by.as_deref() == Some(local.node_uuid)
-            && !local.in_flight.contains(&id)
-            && claimed_at.is_none_or(|at| at < local.stale_before_us);
-        if !claimer_gone && !abandoned_here {
+        let lost = if claimed_by.as_deref() == Some(local.node_uuid) {
+            !local.in_flight.contains(&id)
+        } else {
+            claimed_by
+                .as_ref()
+                .is_none_or(|node| !live_nodes.contains(node))
+        };
+        if !overdue || !lost {
             continue;
         }
         reaped += finished(HookRunStatus::Failed, Some(ERR_WORKER_LOST), now_us)
@@ -330,6 +335,20 @@ pub async fn reap<C: ConnectionTrait>(
             .rows_affected;
     }
     Ok(reaped)
+}
+
+/// Fails every row this node still runs, for a shutdown whose exit kills those runs.
+pub async fn fail_running_claimed_by<C: ConnectionTrait>(
+    db: &C,
+    node_uuid: &str,
+    now_us: i64,
+) -> Result<u64, DbErr> {
+    let updated = finished(HookRunStatus::Failed, Some(ERR_WORKER_LOST), now_us)
+        .filter(requests::Column::Status.eq(HookRunStatus::Running.as_str()))
+        .filter(requests::Column::ClaimedBy.eq(node_uuid))
+        .exec(db)
+        .await?;
+    Ok(updated.rows_affected)
 }
 
 pub async fn read_payload<C: ConnectionTrait>(
@@ -446,6 +465,23 @@ pub async fn delete_queued_for_trigger<C: ConnectionTrait>(
         .exec(db)
         .await?;
     Ok(deleted.rows_affected)
+}
+
+/// A deleted endpoint revived later keeps its id, so its old keys must not replay into it.
+pub async fn free_idem_keys_for_trigger<C: ConnectionTrait>(
+    db: &C,
+    trigger_id: &str,
+) -> Result<u64, DbErr> {
+    let freed = requests::Entity::update_many()
+        .col_expr(
+            requests::Column::IdemKey,
+            Expr::value(Option::<String>::None),
+        )
+        .filter(requests::Column::TriggerId.eq(trigger_id))
+        .filter(requests::Column::IdemKey.is_not_null())
+        .exec(db)
+        .await?;
+    Ok(freed.rows_affected)
 }
 
 pub async fn delete_by_org<C: ConnectionTrait>(db: &C, org_id: &str) -> Result<u64, DbErr> {
@@ -772,7 +808,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn reap_fails_rows_claimed_by_a_node_missing_from_nodes() {
+    async fn reap_fails_rows_claimed_by_a_node_missing_from_nodes_once_overdue() {
         let db = db().await;
         let id = enqueue_one(&db, "run-1", NOW).await;
         assert!(claim(&db, id, "gone-node", NOW).await.unwrap());
@@ -781,8 +817,21 @@ mod tests {
             reap(
                 &db,
                 &live,
-                local("live-node", &HashSet::new(), NOW - 1),
+                local("live-node", &HashSet::new(), NOW),
                 NOW + 1
+            )
+            .await
+            .unwrap(),
+            0,
+            "a claimer missing from the node view may still be running it"
+        );
+        assert_eq!(status_of(&db, "run-1").await.0, "running");
+        assert_eq!(
+            reap(
+                &db,
+                &live,
+                local("live-node", &HashSet::new(), NOW + 1),
+                NOW + 2
             )
             .await
             .unwrap(),
@@ -851,8 +900,8 @@ mod tests {
             reap(
                 &db,
                 &HashSet::new(),
-                local("node-b", &HashSet::new(), NOW - 1),
-                NOW + 1
+                local("node-b", &HashSet::new(), NOW + 1),
+                NOW + 2
             )
             .await
             .unwrap(),
@@ -888,6 +937,54 @@ mod tests {
             "a live peer may still be draining the run"
         );
         assert_eq!(status_of(&db, "run-1").await.0, "running");
+    }
+
+    #[tokio::test]
+    async fn a_shutdown_fails_only_this_nodes_running_rows() {
+        let db = db().await;
+        for (run_id, node) in [("mine", "node-a"), ("peer", "node-b")] {
+            let id = enqueue_one(&db, run_id, NOW).await;
+            assert!(claim(&db, id, node, NOW).await.unwrap());
+        }
+        enqueue_one(&db, "queued", NOW).await;
+        assert_eq!(
+            fail_running_claimed_by(&db, "node-a", NOW + 1)
+                .await
+                .unwrap(),
+            1
+        );
+        assert_eq!(
+            status_of(&db, "mine").await,
+            ("failed".to_string(), Some(ERR_WORKER_LOST.to_string()))
+        );
+        assert_eq!(status_of(&db, "peer").await.0, "running");
+        assert_eq!(status_of(&db, "queued").await.0, "queued");
+    }
+
+    #[tokio::test]
+    async fn freeing_a_triggers_keys_keeps_its_rows_and_other_triggers_keys() {
+        let db = db().await;
+        for (run_id, key) in [("running", "k1"), ("queued", "k2")] {
+            enqueue(&db, request(run_id, Some(key), NOW), "p".into())
+                .await
+                .unwrap();
+        }
+        let running = get_run(&db, "t1", "running").await.unwrap().unwrap().id;
+        assert!(claim(&db, running, "node-a", NOW).await.unwrap());
+        let mut other = request("other", Some("k1"), NOW);
+        other.trigger_id = "t2".to_string();
+        enqueue(&db, other, "p".into()).await.unwrap();
+        assert_eq!(free_idem_keys_for_trigger(&db, "t1").await.unwrap(), 2);
+        for run_id in ["running", "queued"] {
+            let row = get_run(&db, "t1", run_id).await.unwrap().unwrap();
+            assert_eq!(row.idem_key, None, "{run_id}");
+        }
+        assert_eq!(status_of(&db, "running").await.0, "running");
+        assert!(find_by_idem_key(&db, "t2", "k1").await.unwrap().is_some());
+        let reused = enqueue(&db, request("new", Some("k1"), NOW + 1), "p".into())
+            .await
+            .unwrap();
+        assert!(matches!(reused, LedgerInsert::Inserted));
     }
 
     #[tokio::test]

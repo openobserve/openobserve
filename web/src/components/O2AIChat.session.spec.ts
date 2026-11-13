@@ -1199,6 +1199,37 @@ describe("O2AIChat session, persistence and lifecycle", () => {
       expect(vm.chatMessages).toHaveLength(0);
     });
 
+    it("prefills the request before the chip when the hand-off carries one, and still sends nothing", async () => {
+      const prepended: string[] = [];
+      wrapper?.unmount();
+      wrapper = mountO2AIChat(
+        {},
+        {
+          ...handoffStubs,
+          RichTextInput: {
+            ...handoffStubs.RichTextInput,
+            methods: {
+              ...handoffStubs.RichTextInput.methods,
+              prependText(text: string) {
+                prepended.push(text);
+              },
+            },
+          },
+        },
+      );
+      vm = wrapper.vm;
+      await flushPromises();
+      await wait(150);
+
+      await deliver(handoff({ prompt: "Draft a no-data alert and don't save it." }));
+      await wait(120);
+      await flushPromises();
+
+      expect(insertedChips).toHaveLength(1);
+      expect(prepended).toEqual(["Draft a no-data alert and don't save it."]);
+      expect(mockFetchAiChat).not.toHaveBeenCalled();
+    });
+
     it("never sends even when the payload asks for autoSend", async () => {
       await deliver(handoff({ autoSend: true }));
       await wait(120);

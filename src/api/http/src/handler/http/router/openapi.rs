@@ -18,8 +18,8 @@ use config::{get_config, meta::stream::StreamType};
 use o2_ratelimit::dataresource::default_rules::OpenapiInfo;
 use openobserve_api_ingest::request::{clusters, logs, metrics, rum};
 use openobserve_api_management::request::{
-    gen_ai, keys, kv, rum_analytics, service_accounts, service_streams, short_url, status, stream,
-    synthetics,
+    gen_ai, keys, kv, rum_analytics, service_accounts, service_identity, service_streams,
+    service_versions, short_url, status, stream, synthetics,
 };
 use openobserve_api_pipelines::request::{enrichment_table, functions, pipeline, pipelines};
 use openobserve_api_search::search::patterns;
@@ -190,6 +190,7 @@ use crate::{
         openobserve_api_management::request::alerts::history::get_alert_history,
         openobserve_api_management::request::alerts::auto_investigate::list_auto_investigate_decisions,
         openobserve_api_management::request::alerts::incidents::list_incidents,
+        openobserve_api_management::request::alerts::incidents::create_incident,
         openobserve_api_management::request::alerts::incidents::get_incident,
         openobserve_api_management::request::alerts::incidents::update_incident,
         openobserve_api_management::request::alerts::incidents::get_incident_stats,
@@ -311,6 +312,23 @@ use crate::{
         openobserve_api_management::request::db_monitoring::handler::get_dbm_instances,
         openobserve_api_management::request::db_monitoring::handler::get_dbm_instance_metrics,
         openobserve_api_management::request::db_monitoring::handler::get_dbm_badges,
+        service_versions::list,
+        service_versions::deploys,
+        service_versions::verdicts,
+        service_versions::services,
+        service_versions::compare,
+        service_versions::delete,
+        service_identity::envs,
+        service_identity::unresolved,
+        service_identity::overrides,
+        service_identity::put_override,
+        service_identity::delete_override,
+        service_identity::list_aliases,
+        service_identity::create_alias,
+        service_identity::update_alias,
+        service_identity::delete_alias,
+        service_identity::bulk_aliases,
+        service_identity::undo_aliases,
         service_streams::list_services,
         service_streams::get_dimension_analytics,
         service_streams::correlate_streams,
@@ -554,6 +572,7 @@ use crate::{
         openobserve_api_management::request::status_pages::admin::list_page_notices,
         openobserve_api_management::request::status_pages::admin::list_pages,
         openobserve_api_management::request::status_pages::admin::mark_false_positive,
+        openobserve_api_management::request::status_pages::admin::undo_false_positive,
         openobserve_api_management::request::status_pages::admin::preview,
         openobserve_api_management::request::status_pages::admin::rotate_slug,
         openobserve_api_management::request::status_pages::admin::set_components,
@@ -1058,6 +1077,7 @@ use crate::{
         (name = "Product Analytics", description = "RUM Product Analytics named events and saved funnels"),
         (name = "Metrics", description = "Metrics data ingestion operations"),
         (name = "Traces", description = "Traces data ingestion operations"),
+        (name = "Service Versions", description = "Service identity, versions, deploys and verdicts"),
         (name = "Profiles", description = "Profiles query and discovery operations"),
         (name = "Clusters", description = "Super cluster operations"),
         (name = "Short Url", description = "Short Url Service"),
@@ -1148,6 +1168,8 @@ pub struct ApiDoc;
     openobserve_api_management::request::security::sigma::compile,
     openobserve_api_management::request::security::sigma::get_mitre_coverage,
     openobserve_api_management::request::security::sigma::get_detection_evidence,
+    openobserve_api_management::request::slack::insights::get_insights_settings,
+    openobserve_api_management::request::slack::insights::put_insights_settings,
     openobserve_api_management::request::prompts::list_prompts,
     openobserve_api_management::request::prompts::create_prompt,
     openobserve_api_management::request::prompts::match_prompts,
@@ -1216,6 +1238,9 @@ pub struct ApiDoc;
     openobserve_api_management::request::alert_calibration::digests::list_runs_for_alert,
     openobserve_api_management::request::alert_calibration::digests::get_run_records,
     openobserve_api_management::request::alert_calibration::digests::count_findings_by_rule,
+    openobserve_api_management::request::alert_calibration::dismissals::list_dismissals,
+    openobserve_api_management::request::alert_calibration::dismissals::dismiss_finding,
+    openobserve_api_management::request::alert_calibration::dismissals::reopen_dismissal,
     openobserve_api_management::request::db_monitoring::handler::get_dbm_deadlocks,
     openobserve_api_management::request::db_monitoring::handler::get_dbm_blocking,
     openobserve_api_management::request::db_monitoring::handler::get_dbm_table_health,
@@ -1432,6 +1457,25 @@ pub struct ApiDoc;
     openobserve_core::traces::agent_signals::api::compare_agent_versions,
     openobserve_core::traces::agent_signals::api::get_agent_signals,
     openobserve_core::traces::service_graph::api::get_edge_history,
+    openobserve_api_management::request::autoobserve::entity_types,
+    openobserve_api_management::request::autoobserve::coverage,
+    openobserve_api_management::request::autoobserve::coverage_history,
+    openobserve_api_management::request::autoobserve::suggestions,
+    openobserve_api_management::request::autoobserve::decisions::preview_decision,
+    openobserve_api_management::request::autoobserve::decisions::decide,
+    openobserve_api_management::request::autoobserve::decisions::undo_decision,
+    openobserve_api_management::request::autoobserve::decisions::list_decisions,
+    openobserve_api_management::request::autoobserve::list_marks,
+    openobserve_api_management::request::autoobserve::put_mark,
+    openobserve_api_management::request::autoobserve::delete_mark,
+    openobserve_api_management::request::autoobserve::incidents::list_incidents,
+    openobserve_api_management::request::autoobserve::review::get_review,
+    openobserve_api_management::request::autoobserve::review::put_verdict,
+    openobserve_api_management::request::autoobserve::paging::get_paging_settings,
+    openobserve_api_management::request::autoobserve::paging::put_paging_settings,
+))]
+#[openapi(tags(
+    (name = "AutoObserve", description = "Monitoring coverage, suggestions and entity marks from the AutoObserve engine (enterprise)"),
 ))]
 #[openapi(components(schemas(
     openobserve_api_management::models::experiments::ExperimentResultRowSortBody,
@@ -1510,7 +1554,14 @@ pub struct SecurityAddon;
 impl Modify for SecurityAddon {
     fn modify(&self, openapi: &mut utoipa::openapi::OpenApi) {
         #[cfg(feature = "enterprise")]
-        overlay_doc(openapi, EnterpriseExperimentApiDoc::openapi());
+        {
+            let mut enterprise = EnterpriseExperimentApiDoc::openapi();
+            openapi
+                .tags
+                .get_or_insert_with(Vec::new)
+                .extend(enterprise.tags.take().unwrap_or_default());
+            overlay_doc(openapi, enterprise);
+        }
         #[cfg(all(feature = "enterprise", not(feature = "cloud")))]
         overlay_doc(openapi, WorkflowHttpTriggerApiDoc::openapi());
         #[cfg(feature = "cloud")]
@@ -2213,6 +2264,80 @@ mod tests {
         }
     }
 
+    #[cfg(not(feature = "enterprise"))]
+    #[test]
+    fn a_build_without_enterprise_publishes_no_autoobserve_path_or_tag() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let paths: Vec<&String> = spec["paths"]
+            .as_object()
+            .unwrap()
+            .keys()
+            .filter(|p| p.contains("autoobserve"))
+            .collect();
+        assert!(paths.is_empty(), "{paths:?}");
+        let tags = spec["tags"].to_string();
+        assert!(!tags.contains("AutoObserve"), "{tags}");
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn autoobserve_paths_are_rate_limited_mcp_tagged_and_delete_has_no_body() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let tags = spec["tags"].as_array().unwrap();
+        assert!(tags.iter().any(|t| t["name"] == "AutoObserve"), "{tags:?}");
+        let paths = &spec["paths"];
+        let mark = "/api/v2/{org_id}/autoobserve/marks/{mark}/{entity_type}/{entity_id}";
+        let base = "/api/v2/{org_id}/autoobserve";
+        for (path, method, operation) in [
+            (format!("{base}/entity_types"), "get", "list"),
+            (format!("{base}/coverage"), "get", "get"),
+            (format!("{base}/coverage/history"), "get", "list"),
+            (format!("{base}/suggestions"), "get", "list"),
+            (format!("{base}/incidents"), "get", "list"),
+            (format!("{base}/marks"), "get", "list"),
+            (mark.to_string(), "put", "update"),
+            (mark.to_string(), "delete", "delete"),
+            (format!("{base}/review"), "get", "list"),
+            (
+                format!("{base}/review/{{decision_kind}}/{{cohort_id}}"),
+                "put",
+                "update",
+            ),
+        ] {
+            let op = &paths[path.as_str()][method];
+            assert_eq!(
+                op["x-o2-ratelimit"]["module"], "AutoObserve",
+                "{method} {path}"
+            );
+            assert_eq!(
+                op["x-o2-ratelimit"]["operation"], operation,
+                "{method} {path}"
+            );
+            assert_eq!(op["x-o2-mcp"]["category"], "autoobserve", "{method} {path}");
+            let responses = &op["responses"];
+            assert_eq!(
+                responses["403"]["description"], "Forbidden",
+                "{method} {path}"
+            );
+            assert!(
+                responses["404"]["description"]
+                    .as_str()
+                    .is_some_and(|d| d.contains("disabled")),
+                "{method} {path}: a switched-off deployment is a 404"
+            );
+        }
+        let delete = &paths[mark]["delete"];
+        assert_eq!(delete["x-o2-mcp"]["requires_confirmation"], true);
+        assert!(delete.get("requestBody").is_none(), "{delete}");
+        let params = delete["parameters"].as_array().unwrap();
+        assert!(
+            params
+                .iter()
+                .any(|p| p["name"] == "group_key" && p["in"] == "query"),
+            "{params:?}"
+        );
+    }
+
     #[test]
     fn slack_paths_are_rate_limited_and_hidden_from_mcp() {
         let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
@@ -2243,6 +2368,13 @@ mod tests {
             .iter()
             .map(|(m, p)| (m.to_string(), p.to_string()))
             .collect();
+        #[cfg(feature = "enterprise")]
+        want.extend(["get", "put"].map(|m| {
+            (
+                m.to_string(),
+                "/api/{org_id}/slack/insights-settings".to_string(),
+            )
+        }));
         want.sort();
         assert_eq!(documented, want);
     }
@@ -2317,6 +2449,125 @@ mod tests {
         for name in ["RecentRejections", "IngestRejection", "RejectionReason"] {
             assert!(schemas.contains_key(name), "schema {name} missing");
         }
+    }
+
+    /// The schema with every object closed, so an undeclared key, a missing required key or a
+    /// wrong type fails.
+    fn closed(mut schema: serde_json::Value) -> serde_json::Value {
+        if let Some(object) = schema.as_object_mut() {
+            let object_type = |kind: &serde_json::Value| {
+                kind == "object"
+                    || kind
+                        .as_array()
+                        .is_some_and(|kinds| kinds.contains(&"object".into()))
+            };
+            let is_object =
+                object.contains_key("properties") || object.get("type").is_some_and(object_type);
+            if is_object && !object.contains_key("additionalProperties") {
+                object.insert("additionalProperties".into(), false.into());
+            }
+            for value in object.values_mut() {
+                *value = closed(value.take());
+            }
+        } else if let Some(items) = schema.as_array_mut() {
+            for value in items {
+                *value = closed(value.take());
+            }
+        }
+        schema
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    async fn compare_payload() -> serde_json::Value {
+        let user = openobserve_api_common::extractors::Headers(openobserve_core::auth::UserEmail {
+            user_id: "reader@example.com".into(),
+        });
+        let request = serde_json::json!({"signals": ["traces", "rum"]});
+        let response = super::service_versions::compare(
+            axum::extract::Path("org".into()),
+            user,
+            axum::Json(request),
+        )
+        .await;
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        serde_json::from_slice(&body).unwrap()
+    }
+
+    #[cfg(feature = "enterprise")]
+    async fn compare_payload() -> serde_json::Value {
+        openobserve_core::service_identity::signals::api::representative_compare()
+    }
+
+    #[tokio::test]
+    async fn service_version_paths_document_their_inputs_and_results() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let params = spec["paths"]["/api/{org_id}/service_versions"]["get"]["parameters"].clone();
+        let service = params
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|p| p["name"] == "service");
+        assert_eq!(service.unwrap()["required"], true, "{params}");
+        let schemas = &spec["components"]["schemas"];
+        assert_eq!(
+            schemas["VersionCompareRequest"]["required"],
+            serde_json::json!(["service", "where", "a", "signals"])
+        );
+        assert_eq!(
+            schemas["VersionCompareArm"]["required"],
+            serde_json::json!(["version"])
+        );
+        for (schema, field, refers_to) in [
+            ("CompareResponse", "arms", "VersionCompareArms"),
+            ("CompareResponse", "live_verdict", "VersionVerdict"),
+            ("VersionCompareArms", "b", "VersionBaselineArmResult"),
+            ("VersionCompareArmResult", "coverage", "ArmCoverage"),
+            ("DeployList", "deploys", "DeployMarker"),
+            ("DeployMarker", "verdict", "VersionVerdict"),
+            ("VerdictList", "verdicts", "VersionVerdict"),
+            ("VersionVerdict", "metrics", "VerdictMetric"),
+            ("CatalogService", "where", "CatalogWhere"),
+            ("CatalogService", "newest_verdict", "VersionVerdict"),
+        ] {
+            let property = schemas[schema]["properties"][field].to_string();
+            let target = format!("#/components/schemas/{refers_to}");
+            assert!(property.contains(&target), "{schema}.{field}: {property}");
+        }
+        for field in [
+            "where_key",
+            "env",
+            "no_env",
+            "current_version",
+            "tracking_started",
+        ] {
+            let catalog = &schemas["CatalogService"]["properties"];
+            assert!(catalog.get(field).is_some(), "CatalogService.{field}");
+        }
+        let versions = serde_json::json!({
+            "$ref": "#/components/schemas/ServiceVersionList",
+            "components": closed(spec["components"].clone()),
+        });
+        let validator = jsonschema::draft202012::new(&versions).unwrap();
+        for count in [0, 3] {
+            let payload = serde_json::json!({"service":"checkout", "aliases_applied":[],
+                "versions":[], "total":0, "purged_versions":count,
+                "tracking":{"epoch":null,"warmup_ends_at":null}});
+            assert!(validator.is_valid(&payload), "{payload}");
+        }
+        // Every key a compare emits must be declared, so the schema cannot drift from its builders.
+        let root = serde_json::json!({
+            "$ref": "#/components/schemas/CompareResponse",
+            "components": closed(spec["components"].clone()),
+        });
+        let payload = compare_payload().await;
+        let errors: Vec<_> = jsonschema::draft202012::new(&root)
+            .unwrap()
+            .iter_errors(&payload)
+            .map(|error| format!("{error} at {}", error.instance_path()))
+            .collect();
+        assert!(errors.is_empty(), "{errors:#?}");
     }
 
     #[cfg(not(feature = "enterprise"))]

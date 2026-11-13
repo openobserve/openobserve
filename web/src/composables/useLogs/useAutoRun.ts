@@ -575,6 +575,7 @@ export function createAutoRun(deps: AutoRunDeps) {
   const pending: Record<"grid" | "patterns", PendingEntry | null> = { grid: null, patterns: null };
   let deferredRefresh = false;
   let missedTick = false;
+  let userCancels = 0;
   let invalidation: string | null = null;
   let hitsTraceId: string | null = null;
   const pausePredicates = new Set<() => boolean>();
@@ -710,7 +711,10 @@ export function createAutoRun(deps: AutoRunDeps) {
       clearAllPending();
       deferredRefresh = false;
     }
-    if (cause === "user") missedTick = false;
+    if (cause === "user") {
+      missedTick = false;
+      userCancels += 1;
+    }
     deps.resetLoading?.();
   }
 
@@ -1535,6 +1539,7 @@ export function createAutoRun(deps: AutoRunDeps) {
     tick,
     checkRefreshResume,
     onRefreshIntervalChanged,
+    userCancelCount: () => userCancels,
     hasMissedTick: () => missedTick,
     hasDeferredRefresh: () => deferredRefresh,
     hasPendingRequest: () => !!pending.grid || !!pending.patterns,

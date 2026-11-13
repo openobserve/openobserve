@@ -19,6 +19,7 @@ import { flushPromises } from "@vue/test-utils";
 import config from "@/aws-exports";
 import { useMetricDrilldown } from "./useMetricDrilldown";
 import { b64DecodeUnicode } from "@/utils/zincutils";
+import { labelRows } from "@/components/shared/ServiceNameLabel.fixtures";
 
 const api = vi.hoisted(() => ({
   getIdentityConfig: vi.fn(),
@@ -379,6 +380,20 @@ describe("useMetricDrilldown", () => {
           expect.objectContaining({ name: "blank_logs", openable: false }),
         ],
         traces: [expect.objectContaining({ name: "default", openable: true })],
+      });
+    });
+
+    it("keeps the service key and carries the display fields of the answer", async () => {
+      const row = labelRows.qualified;
+      const answer = correlated([], []);
+      Object.assign(answer.data, row);
+      const { drilldown } = await opened(answer);
+      expect(drilldown.menu.value).toMatchObject({
+        kind: "streams",
+        service: row.service_name,
+        display_name: row.display_name,
+        display_source: row.display_source,
+        display_qualifier: row.display_qualifier,
       });
     });
 

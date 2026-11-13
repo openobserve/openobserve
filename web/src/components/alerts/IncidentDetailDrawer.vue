@@ -74,14 +74,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </span>
 
-          <span class="inline-flex cursor-default">
-            <OTag type="countChip" value="alerts"
-              >{{ triggers.length }} {{ t("alerts.incidents.alertCount") }}</OTag
-            >
-            <OTooltip
-              :content="t('alerts.incidents.correlatedAlertsCount', { count: triggers.length })"
-            />
-          </span>
+          <OTag type="countChip" value="alerts" data-test="incident-detail-firings-chip">{{
+            firingsChip
+          }}</OTag>
 
           <span v-if="externalSources.length" class="inline-flex cursor-default">
             <OTag variant="default-outline" data-test="incident-external-source-badge">
@@ -93,6 +88,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 raw(t('alerts.incidents.externalSourceTooltip') + ': ' + externalSources.join(', '))
               "
             />
+          </span>
+
+          <!-- Last in the row, so its skeleton growing into the chip moves nothing after it. -->
+          <OSkeleton
+            v-if="liveChip === 'loading'"
+            animation="none"
+            class="h-5 w-36 rounded-full"
+            :aria-label="t('common.loading')"
+          />
+          <span
+            v-else-if="liveChip"
+            class="inline-flex cursor-default"
+            data-test="incident-detail-live-chip"
+          >
+            <OTag
+              :variant="liveChip.firing ? 'warning-soft' : 'default-soft'"
+              :dot="liveChip.firing"
+              size="sm"
+              :label="liveChip.label"
+            />
+            <OTooltip v-if="liveChip.tooltip" :content="liveChip.tooltip" />
           </span>
         </template>
       </template>
@@ -160,7 +176,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   type="countChip"
                   value="neutral"
                   data-test="incident-alert-triggers-count"
-                  >{{ triggers.length }}</OTag
+                  >{{ triggerRowCount }}</OTag
                 >
               </div>
             </template>
@@ -199,7 +215,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="flex min-w-0 flex-1 flex-col overflow-hidden">
             <!-- Incident Analysis tab: its own analysis column + thread column (02 E5) -->
             <IncidentRCAAnalysis
-              v-if="activeTab === 'incidentAnalysis'"
+              v-if="activeTab === 'incidentAnalysis' || activeTab === 'report'"
+              :view="activeTab === 'report' ? 'report' : 'analysis'"
               :org-id="incidentOrgId"
               :incident-id="incidentDetails?.id || ''"
               :rca="rcaSummary"
@@ -211,6 +228,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :report-text="rcaReportText"
               :report-verdict="rcaReportVerdict"
               :report-loading="rcaReportLoading"
+              :report-failed="rcaReportFailed"
               :thread-run-id="rcaThreadRunId"
               :thread-live="rcaThreadLive"
               :thread-run-is-v1="rcaThreadRunIsV1"
@@ -228,12 +246,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :refusal="rcaRefusal"
               :analyze-credit-cost="aiCreditCosts?.incident ?? null"
               :reanalyze-credit-cost="aiCreditCosts?.incident_reanalysis ?? null"
+              :firings="triggers"
+              :alerts-now="rcaAlertsNow"
+              :incident-events="rcaIncidentEvents"
               @trigger-rca="triggerRca"
               @cancel-rca="cancelRca"
               @view-run="viewRcaRun"
               @retry-live="retryRcaLive"
               @resume-rca="resumeRca"
               @ask-ai="askAboutRca"
+              @open-report="activeTab = 'report'"
+              @open-analysis="activeTab = 'incidentAnalysis'"
+              @retry-report="retryRcaReport"
             />
 
             <!-- Tab Content Area -->
@@ -367,7 +391,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </div>
 
-                <!-- SECTION 2: Main Content (2:1 Ratio Layout) with calc(100vh - 236px) height (was 276px) -->
                 <div class="flex h-[calc(100vh-23.75rem)] flex-1 gap-3">
                   <!-- PART 1: Primary Content (66.67% width) -->
                   <div class="flex w-2/3 flex-col gap-3">
@@ -880,25 +903,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="flex flex-col"
                         >
                           <div
-                            v-for="(value, key) in incidentDetails.group_values"
-                            :key="key"
+                            v-for="(dim, index) in dimensionRows"
+                            :key="dim.key"
                             class="border-border-default flex gap-2 border-b py-2.5"
-                            :class="{
-                              'border-b-0':
-                                key ===
-                                Object.keys(incidentDetails.group_values)[
-                                  Object.keys(incidentDetails.group_values).length - 1
-                                ],
-                            }"
+                            :class="{ 'border-b-0': index === dimensionRows.length - 1 }"
+                            data-test="incident-dimension-row"
                           >
                             <div
                               :class="'text-text-secondary'"
                               class="min-w-fit text-xs font-medium capitalize"
                             >
-                              {{ getSemanticGroupDisplayName(key) }}:
+                              {{ dim.label }}:
                             </div>
                             <div :class="'text-text-body'" class="flex-1 text-xs break-words">
-                              {{ value }}
+                              <span
+                                v-if="dim.key === 'service'"
+                                data-test="incident-detail-dimension-service"
+                                ><ServiceNameLabel
+                                  :service-key="incidentDetails.group_values[dim.key]"
+                                  :display-name="incidentDetails.group_values_display?.service"
+                              /></span>
+                              <template v-else>{{ dim.value }}</template>
                             </div>
                           </div>
                         </div>
@@ -969,12 +994,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :visible="activeTab === 'activity'"
                 :refresh-trigger="timelineRefreshTrigger"
               />
-              <!-- Service Graph Tab Content -->
-              <div v-if="activeTab === 'serviceGraph'" class="absolute inset-0">
-                <IncidentServiceGraph
-                  v-if="incidentDetails"
-                  :topology-context="incidentDetails.topology_context"
-                />
+              <div v-if="activeTab === 'serviceGraph'" class="absolute inset-0 flex flex-col">
+                <IncidentUnfoldGraph :incident="incidentDetails" />
               </div>
 
               <!-- Alert Triggers Tab Content -->
@@ -987,7 +1008,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     ]"
                   >
                     <IncidentAlertTriggersTable
-                      :triggers="triggers"
+                      :triggers="tableTriggers"
                       :isDarkMode="isDarkMode"
                       @row-click="handleTriggerRowClick"
                     />
@@ -1009,15 +1030,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       ]"
                     >
                       <OIcon name="info" size="sm" class="opacity-80" />
-                      <span :class="'text-text-secondary'" class="text-sm font-semibold">
-                        {{ t("alerts.incidents.alertDetailsHeader") }}
+                      <span
+                        :class="'text-text-secondary'"
+                        class="text-sm font-semibold"
+                        data-test="incident-trigger-details-header"
+                      >
+                        {{
+                          isFinding
+                            ? t("alerts.incidents.findingDetailsHeader")
+                            : t("alerts.incidents.alertDetailsHeader")
+                        }}
                       </span>
                     </div>
                     <!-- Content -->
-                    <div class="flex-1 overflow-auto p-3">
+                    <div class="flex-1 overflow-auto p-3" data-test="incident-trigger-details-body">
+                      <!-- A finding has no alert rule behind it, so the panel shows the finding. -->
+                      <IncidentFindingDetails
+                        v-if="isFinding && (!alerts || alerts.length === 0)"
+                        :facts="findingFactsShown"
+                      />
+
                       <!-- No alerts available -->
                       <div
-                        v-if="!alerts || alerts.length === 0"
+                        v-else-if="!alerts || alerts.length === 0"
                         :class="'text-text-muted'"
                         class="text-sm italic"
                       >
@@ -1362,6 +1397,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     mode="embedded-tabs"
                     :externalActiveTab="'metrics'"
                     :serviceName="correlationData.serviceName"
+                    :display-service-name="correlationData.displayServiceName"
+                    :service-display="correlationData.serviceDisplay"
                     :matchedDimensions="correlationData.matchedDimensions"
                     :additionalDimensions="correlationData.additionalDimensions"
                     :matched-set-id="correlationMatchedSetId"
@@ -1463,6 +1500,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     mode="embedded-tabs"
                     :externalActiveTab="'traces'"
                     :serviceName="correlationData.serviceName"
+                    :display-service-name="correlationData.displayServiceName"
+                    :service-display="correlationData.serviceDisplay"
                     :matchedDimensions="correlationData.matchedDimensions"
                     :additionalDimensions="correlationData.additionalDimensions"
                     :logStreams="correlationData.logStreams"
@@ -1521,10 +1560,26 @@ import { oncallTeamsQuery, responsesForIncidentQuery } from "@/services/oncall.q
 import type { OnCallResponse } from "@/ts/interfaces/oncall";
 import { streamSchemaQuery } from "@/services/stream.queries";
 import { queryClient } from "@/composables/query/queryClient";
-import { updateIncidentMutation, updateIncidentStatusMutation } from "@/services/incidents.queries";
+import {
+  incidentEventsQuery,
+  updateIncidentMutation,
+  updateIncidentStatusMutation,
+} from "@/services/incidents.queries";
 import type { AckAlertResponse, UnackAlertResponse } from "@/ts/interfaces/alert";
 import { incidentRefusalToast, incidentStatusToast } from "@/utils/alerts/ackState";
-import { useMutation } from "@tanstack/vue-query";
+import { useMutation, useQuery } from "@tanstack/vue-query";
+import { firingAlertsQuery } from "@/services/alerts.queries";
+import { useNowMicros } from "@/composables/downtimes/useNowMicros";
+import { FIRING_CLOCK_MS } from "@/composables/alerts/useFiringAlerts";
+import {
+  incidentFiringCounts,
+  incidentLiveSummary,
+  incidentLiveWords,
+  unfoldDuration,
+  liveRowsOf,
+  maxOf,
+} from "@/utils/incidents/incidentUnfold";
+import { getIntlLocale } from "@/locales";
 import { useOrgId } from "@/composables/query";
 import serviceStreamsApi, {
   buildChipDimensionsFromFilters,
@@ -1532,11 +1587,21 @@ import serviceStreamsApi, {
 } from "@/services/service_streams";
 import { buildConditionsString } from "@/utils/alerts/conditionsFormatter";
 import TelemetryCorrelationDashboard from "@/plugins/correlation/TelemetryCorrelationDashboard.vue";
+import ServiceNameLabel from "@/components/shared/ServiceNameLabel.vue";
 import CorrelatedLogsTable from "@/plugins/correlation/CorrelatedLogsTable.vue";
-import IncidentServiceGraph from "./IncidentServiceGraph.vue";
+import IncidentUnfoldGraph from "./IncidentUnfoldGraph.vue";
 import IncidentRCAAnalysis from "./IncidentRCAAnalysis.vue";
 import IncidentTimeline from "./IncidentTimeline.vue";
 import IncidentAlertTriggersTable from "./IncidentAlertTriggersTable.vue";
+import IncidentFindingDetails from "./IncidentFindingDetails.vue";
+import {
+  AUTOOBSERVE_TRIGGER_KIND,
+  dimensionDisplay,
+  findingFacts,
+  findingLabels,
+  isFindingIncident,
+  orderedDimensionKeys,
+} from "@/utils/incidents/findingDimensions";
 import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRenderer.vue";
 import { contextRegistry, createIncidentsContextProvider } from "@/composables/contextProviders";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -1547,6 +1612,7 @@ import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import OInlineEdit from "@/lib/forms/InlineEdit/OInlineEdit.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -1563,6 +1629,7 @@ import { useLicenseLock } from "@/composables/useFeatureLock";
 const LS_INCIDENT_TAB_ORDER_KEY = "o2_incident_detail_tab_order";
 const DEFAULT_INCIDENT_TAB_ORDER = [
   "incidentAnalysis",
+  "report",
   "overview",
   "activity",
   "serviceGraph",
@@ -1574,6 +1641,7 @@ const DEFAULT_INCIDENT_TAB_ORDER = [
 type IncidentTab = (typeof DEFAULT_INCIDENT_TAB_ORDER)[number];
 const TAB_TEST_IDS: Record<IncidentTab, string> = {
   incidentAnalysis: "incident-analysis-tab",
+  report: "incident-report-tab",
   overview: "incident-overview-tab",
   activity: "incident-activity-tab",
   serviceGraph: "incident-alert-graph-tab",
@@ -1593,12 +1661,18 @@ function isIncidentTab(name: unknown): name is IncidentTab {
   return DEFAULT_INCIDENT_TAB_ORDER.includes(name as IncidentTab);
 }
 
-/** The saved order minus unknown names, with tabs added since it was saved appended. */
+/** The saved order minus unknown names; a tab added since sits after its default neighbour, or first. */
 function loadIncidentTabOrder(): IncidentTab[] {
   try {
     const saved: unknown = JSON.parse(localStorage.getItem(LS_INCIDENT_TAB_ORDER_KEY) ?? "[]");
     if (Array.isArray(saved)) {
-      return [...new Set([...saved.filter(isIncidentTab), ...DEFAULT_INCIDENT_TAB_ORDER])];
+      const order = [...new Set(saved.filter(isIncidentTab))];
+      DEFAULT_INCIDENT_TAB_ORDER.forEach((tab, i) => {
+        if (order.includes(tab)) return;
+        const after = i > 0 ? order.indexOf(DEFAULT_INCIDENT_TAB_ORDER[i - 1]) : -1;
+        order.splice(i === 0 ? 0 : after < 0 ? order.length : after + 1, 0, tab);
+      });
+      return order;
     }
   } catch {
     /* unreadable: fall back to the default order */
@@ -1613,9 +1687,11 @@ export default defineComponent({
     OTabs,
     OTab,
     TelemetryCorrelationDashboard,
+    ServiceNameLabel,
     CorrelatedLogsTable,
-    IncidentServiceGraph,
+    IncidentUnfoldGraph,
     IncidentAlertTriggersTable,
+    IncidentFindingDetails,
     IncidentRCAAnalysis,
     IncidentTimeline,
     CustomChartRenderer,
@@ -1626,6 +1702,7 @@ export default defineComponent({
     OUserCell,
     OIcon,
     OTag,
+    OSkeleton,
     OTruncatedText,
     OInlineEdit,
     OBanner,
@@ -1710,6 +1787,72 @@ export default defineComponent({
     const oncallTeamNames = ref<Record<string, string>>({});
     const triggers = ref<IncidentAlert[]>([]);
 
+    // Firings, not trigger rows: one evaluation can write several rows.
+    const firingsChip = computed(() => {
+      const { firings, alerts } = incidentFiringCounts(triggers.value);
+      const locale = getIntlLocale();
+      return t("alerts.incidents.firingsAlerts", {
+        firings: t(
+          "alerts.incidents.unfold.firings",
+          { count: firings.toLocaleString(locale) },
+          firings,
+        ),
+        alerts: t(
+          "alerts.incidents.unfold.alerts",
+          { count: alerts.toLocaleString(locale) },
+          alerts,
+        ),
+      });
+    });
+
+    const triggerRowCount = computed(() => triggers.value.length.toLocaleString(getIntlLocale()));
+
+    const alertRows = useQuery(() =>
+      Object.assign(firingAlertsQuery(incidentOrgId.value), {
+        enabled: !!incidentOrgId.value && !!incidentDetails.value,
+        refetchInterval: incidentDetails.value?.status !== "resolved" ? FIRING_CLOCK_MS : false,
+      }),
+    );
+    const nowMicros = useNowMicros();
+    // One read with the Alert Graph's: both use the same query key.
+    const incidentEvents = useQuery(() =>
+      Object.assign(incidentEventsQuery(incidentOrgId.value, incidentDetails.value?.id ?? ""), {
+        enabled: !!incidentOrgId.value && !!incidentDetails.value?.id,
+      }),
+    );
+    const rcaIncidentEvents = computed(() => incidentEvents.data.value ?? null);
+    const rcaAlertsNow = computed(() => {
+      if (!incidentDetails.value || alertRows.data.value === undefined) {
+        return null;
+      }
+      const ids = [...new Set(triggers.value.map((tr) => tr.alert_id))];
+      const rows = liveRowsOf(alertRows.data.value);
+      const fired = triggers.value.map((tr) => tr.alert_fired_at);
+      const last = fired.length ? maxOf(fired) : undefined;
+      return incidentLiveSummary(ids, rows, nowMicros.value, last);
+    });
+    // A resolved incident needs no live state; an open one says it in the same words as the facts row.
+    const liveChip = computed(() => {
+      const incident = incidentDetails.value;
+      if (
+        !incident ||
+        incident.status === "resolved" ||
+        (alertRows.isError.value && alertRows.data.value === undefined)
+      )
+        return null;
+      if (alertRows.isPending.value) return "loading" as const;
+      const live = rcaAlertsNow.value;
+      const words = live && incidentLiveWords(t, live, getIntlLocale());
+      if (!live || !words) return null;
+      const tooltip =
+        live.lastFiring === undefined
+          ? undefined
+          : t("alerts.incidents.liveLastFired", {
+              duration: unfoldDuration(t, nowMicros.value - live.lastFiring),
+            });
+      return { ...words, tooltip };
+    });
+
     /// Newest firing wins: an incident can page more than once, and the panel
     /// answers "who has it now". A failure leaves the panel hidden rather than
     /// claiming nobody was paged.
@@ -1769,6 +1912,7 @@ export default defineComponent({
     const activeTab = ref<string>(tabOrder.value[0]);
     const tabLabels = computed<Record<IncidentTab, I18nText>>(() => ({
       incidentAnalysis: t("alerts.incidents.incidentAnalysis"),
+      report: t("alerts.incidents.reportTab"),
       overview: t("alerts.insights.tabs.overview"),
       activity: t("alerts.incidents.activityTab"),
       serviceGraph: t("alerts.incidents.alertGraph"),
@@ -1864,6 +2008,31 @@ export default defineComponent({
       return semanticGroupDisplayMap.value.get(id) || id;
     };
 
+    const isFinding = computed(() =>
+      isFindingIncident(incidentDetails.value?.group_values, triggers.value),
+    );
+    const findingFactsShown = computed(() =>
+      findingFacts(t, incidentDetails.value?.group_values, triggers.value),
+    );
+    const dimensionRows = computed(() => {
+      const groupValues = incidentDetails.value?.group_values ?? {};
+      return orderedDimensionKeys(groupValues, triggers.value).map((key) => {
+        const shown = dimensionDisplay(t, groupValues, key, groupValues[key], triggers.value);
+        return { key, label: shown.label ?? getSemanticGroupDisplayName(key), value: shown.value };
+      });
+    });
+    // The server sends a finding's trigger with no labels; the finding's own dimensions are its labels.
+    const tableTriggers = computed(() => {
+      const labels = findingLabels(t, incidentDetails.value?.group_values);
+      if (!labels) return triggers.value;
+      return triggers.value.map((trigger) =>
+        trigger.alert_kind === AUTOOBSERVE_TRIGGER_KIND &&
+        !(trigger.labels && Object.keys(trigger.labels).length)
+          ? { ...trigger, labels }
+          : trigger,
+      );
+    });
+
     // Identity set + chip dimensions powering the "View by" subject tabs in the
     // embedded TelemetryCorrelationDashboard (metrics tab). Without matchedSetId
     // the dashboard cannot build subject chips, so the toggle never renders.
@@ -1889,6 +2058,8 @@ export default defineComponent({
       reportText: rcaReportText,
       reportVerdict: rcaReportVerdict,
       reportLoading: rcaReportLoading,
+      reportFailed: rcaReportFailed,
+      retryReport: retryRcaReport,
       threadRunId: rcaThreadRunId,
       threadLive: rcaThreadLive,
       threadRunIsV1: rcaThreadRunIsV1,
@@ -1912,7 +2083,27 @@ export default defineComponent({
     } = useIncidentRca(
       incidentOrgId,
       incidentDetails,
-      computed(() => activeTab.value === "incidentAnalysis"),
+      computed(() => activeTab.value === "incidentAnalysis" || activeTab.value === "report"),
+    );
+
+    // With no analysis to read, the page opens on the Alert Graph instead, once per incident and
+    // only while the viewer is still on the default tab and no `?tab=` asked for one.
+    // The incident a `?tab=` was opened for; another incident takes its own default.
+    const tabFromUrl = ref<string | null>(null);
+    const defaultTabSettledFor = ref("");
+    watch(
+      () => incidentDetails.value?.id,
+      (id) => {
+        if (!id || defaultTabSettledFor.value === id) return;
+        defaultTabSettledFor.value = id;
+        const onAnalysis = activeTab.value === "incidentAnalysis" || activeTab.value === "report";
+        const succeeded =
+          !!rcaReportRun.value || rcaHistory.value.some((run) => run.state === "completed");
+        const running = ["running", "waiting_input"].includes(rcaSummary.value?.state ?? "");
+        if (tabFromUrl.value !== id && activeTab.value === tabOrder.value[0] && onAnalysis) {
+          if (!succeeded && !running) activeTab.value = "serviceGraph";
+        }
+      },
     );
 
     // J5: this routed page hands Ask to MainLayout; a new chat with the analysis attached.
@@ -2264,6 +2455,11 @@ export default defineComponent({
         // Build correlation response with only the source stream type
         correlationData.value = {
           serviceName: `dimension-match-${groupValues.service || "unknown"}`,
+          // The synthetic id above is internal only; titles show the service's display name.
+          displayServiceName:
+            incidentDetails.value?.group_values_display?.service ||
+            groupValues.service ||
+            undefined,
           matchedDimensions: groupValues,
           additionalDimensions: {},
           logStreams: streamType === "logs" ? [streamInfo] : [],
@@ -2588,12 +2784,13 @@ export default defineComponent({
           // Load incident from URL route parameter
           // Validate incident ID format (e.g., UUID validation)
           if (incidentIdFromUrl.trim().length > 0) {
-            // `?tab=incidentAnalysis` opens the page on the Analysis tab (the list's AI analysis cell).
+            // `?tab=<tab>` opens the page on that tab (`incidentAnalysis` from the list's AI analysis cell).
             // The key is consumed once: dropping it keeps a later reload on the tab the user chose.
             const { tab, ...restQuery } = router.currentRoute.value.query;
             if (tab !== undefined) {
-              if (tab === "incidentAnalysis") {
-                activeTab.value = "incidentAnalysis";
+              if (isIncidentTab(tab)) {
+                activeTab.value = tab;
+                tabFromUrl.value = incidentIdFromUrl;
               }
               void router.replace({ query: restQuery });
             }
@@ -3131,6 +3328,11 @@ export default defineComponent({
     };
 
     return {
+      firingsChip,
+      triggerRowCount,
+      liveChip,
+      rcaAlertsNow,
+      rcaIncidentEvents,
       licenseDenied,
       mutedBannerText,
       openMutingDowntime,
@@ -3159,6 +3361,8 @@ export default defineComponent({
       rcaReportText,
       rcaReportVerdict,
       rcaReportLoading,
+      rcaReportFailed,
+      retryRcaReport,
       rcaThreadRunId,
       rcaThreadLive,
       rcaThreadRunIsV1,
@@ -3233,6 +3437,10 @@ export default defineComponent({
       handleStatusChange,
       handleSeverityChange,
       handleTriggerRowClick,
+      isFinding,
+      findingFactsShown,
+      dimensionRows,
+      tableTriggers,
       getStatusLabel,
       formatPeriod,
       formatFrequency,

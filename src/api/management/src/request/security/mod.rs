@@ -133,37 +133,17 @@ pub async fn guard_siem_ids<'a>(
     guard_siem(org_id, user_id, method, touches_siem).await
 }
 
-/// True when the incident is a security case: its durable marker, else a live detection's firing.
+/// True when the incident carries the durable case marker; a failed read counts as a case.
 #[cfg(feature = "enterprise")]
 pub async fn incident_touches_siem(org_id: &str, incident_id: &str) -> bool {
-    use infra::table::alert_incidents;
-
-    match alert_incidents::security_case_of(org_id, incident_id).await {
-        Ok(Some(true)) => return true,
-        Ok(None) => return false,
-        Ok(Some(false)) => {}
+    // A converted alert's old firings predate its detection, so the alert's kind cannot decide.
+    match infra::table::alert_incidents::security_case_of(org_id, incident_id).await {
+        Ok(marked) => marked.unwrap_or(false),
         Err(e) => {
             log::error!("[SECURITY] reading the case marker of {org_id}/{incident_id}: {e}");
-            return true;
+            true
         }
     }
-    let fired_by_detection = match alert_incidents::get_incident_alerts(incident_id).await {
-        Ok(links) => {
-            db::alerts::alert::any_siem_alert(org_id, links.iter().map(|l| l.alert_id.as_str()))
-                .await
-        }
-        Err(e) => {
-            log::error!("[SECURITY] reading the firings of {org_id}/{incident_id}: {e}");
-            return true;
-        }
-    };
-    // Heals a case whose marker write was lost, so lists and the stale sweep agree with it.
-    if fired_by_detection
-        && let Err(e) = alert_incidents::mark_security_case(org_id, incident_id).await
-    {
-        log::error!("[SECURITY] marking {org_id}/{incident_id} a security case: {e}");
-    }
-    fired_by_detection
 }
 
 /// Which incidents a user may list: security cases need the Security read grant.
@@ -688,6 +668,10 @@ pub(crate) mod tests {
             let org = format!("gate_{}", config::ider::uuid());
             let id = plant_siem_detection(&org).await;
             let case = unmarked_case(&org, &id).await;
+            // The case's insert, or the migration for an older one, sets the marker.
+            infra::table::alert_incidents::mark_security_case(&org, &case)
+                .await
+                .unwrap();
             assert!(incident_touches_siem(&org, &case).await);
             forget_detection(&org, &id).await;
 
@@ -977,11 +961,15 @@ pub(crate) mod tests {
             );
         }
 
+        // A converted detection's old incident holds only ops firings, so only the marker decides.
         #[tokio::test]
-        async fn test_an_incident_no_detection_fired_into_is_no_case() {
+        async fn test_an_unmarked_incident_is_no_case() {
             let org = format!("gate_{}", config::ider::uuid());
-            let incident = unmarked_case(&org, "2ops").await;
+            let id = plant_siem_detection(&org).await;
+            let incident = unmarked_case(&org, &id).await;
             assert!(!incident_touches_siem(&org, &incident).await);
+            let marked = infra::table::alert_incidents::security_case_of(&org, &incident).await;
+            assert_eq!(marked.unwrap(), Some(false), "a read never marks");
             assert!(!incident_touches_siem(&org, "missing").await);
         }
     }

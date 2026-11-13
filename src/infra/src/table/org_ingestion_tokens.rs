@@ -31,6 +31,10 @@ use crate::{
 };
 
 pub const ORG_INGESTION_TOKEN_PREFIX: &str = "o2oi_";
+/// Names under this prefix belong to OpenObserve's own feature writers, like the `_o2_` streams.
+pub const WRITER_TOKEN_PREFIX: &str = "_o2_";
+/// The `created_by` of every row a feature writer makes; no user has it.
+pub const WRITER_TOKEN_CREATOR: &str = "system";
 
 /// `org_id` → its default enabled ingest token, with the time it was loaded.
 ///
@@ -76,14 +80,17 @@ pub async fn find_default_enabled(
     }
 
     let client = get_orm_client_rw().await;
+    // A feature writer's token is good for one stream only, so it is never handed out.
     let record = Entity::find()
         .filter(Column::OrgId.eq(org_id))
         .filter(Column::Enabled.eq(true))
         .order_by(Column::IsDefault, Order::Desc)
         .order_by(Column::CreatedAt, Order::Desc)
-        .one(client)
+        .all(client)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?
+        .into_iter()
+        .find(|model| !is_writer_token_name(&model.name))
         .map(OrgIngestionTokenRecord::from);
 
     DEFAULT_TOKEN_CACHE.insert(org_id.to_string(), record.clone());
@@ -161,6 +168,16 @@ where
     T: Deserialize<'de>,
 {
     T::deserialize(deserializer).map(Some)
+}
+
+/// True for a token name only an OpenObserve feature writer may hold.
+pub fn is_writer_token_name(name: &str) -> bool {
+    name.starts_with(WRITER_TOKEN_PREFIX)
+}
+
+/// False for a writer-named row a user made before the prefix was reserved.
+pub fn may_authenticate(name: &str, created_by: &str) -> bool {
+    !is_writer_token_name(name) || created_by == WRITER_TOKEN_CREATOR
 }
 
 /// Generate a new org ingestion token with the `o2oi_` prefix.
@@ -371,7 +388,9 @@ pub async fn find_enabled_token(
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
 
-    Ok(record.map(OrgIngestionTokenRecord::from))
+    Ok(record
+        .map(OrgIngestionTokenRecord::from)
+        .filter(|r| may_authenticate(&r.name, &r.created_by)))
 }
 
 /// Find a token by org_id and token value, regardless of its `enabled` state.
@@ -533,7 +552,7 @@ pub async fn set_enabled(org_id: &str, name: &str, enabled: bool) -> Result<(), 
     Ok(())
 }
 
-/// List all enabled tokens (for cache bootstrapping). Returns (org_id, token, name) tuples.
+/// List all enabled tokens that may authenticate (for cache bootstrapping), as (org, token, name).
 pub async fn list_all_enabled() -> Result<Vec<(String, String, String)>, errors::Error> {
     let client = get_orm_client_ro().await;
     let records = Entity::find()
@@ -542,12 +561,17 @@ pub async fn list_all_enabled() -> Result<Vec<(String, String, String)>, errors:
         .column(Column::OrgId)
         .column(Column::Token)
         .column(Column::Name)
-        .into_tuple::<(String, String, String)>()
+        .column(Column::CreatedBy)
+        .into_tuple::<(String, String, String, String)>()
         .all(client)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
 
-    Ok(records)
+    Ok(records
+        .into_iter()
+        .filter(|(_, _, name, created_by)| may_authenticate(name, created_by))
+        .map(|(org_id, token, name, _)| (org_id, token, name))
+        .collect())
 }
 
 #[cfg(test)]
@@ -751,5 +775,93 @@ mod tests {
         );
         assert!(left.is_empty());
         assert_eq!(kept.len(), 1, "another org's token went with this org's");
+    }
+
+    #[tokio::test]
+    async fn the_default_pick_never_hands_out_a_writer_token() {
+        if !crate::table::testing::meta_store().await {
+            return;
+        }
+        let org = crate::table::testing::unique("t_writer_pick");
+        let record =
+            |name: &str, is_default: bool, enabled: bool, at: i64| OrgIngestionTokenRecord {
+                id: config::ider::uuid(),
+                org_id: org.clone(),
+                name: name.to_string(),
+                token: format!("o2oi_{org}_{name}"),
+                description: String::new(),
+                is_default,
+                enabled,
+                created_by: "system".to_string(),
+                created_at: at,
+                updated_at: at,
+                splunk_token: Some(None),
+            };
+        add(&record("_o2_alert_calibration", false, true, 1))
+            .await
+            .unwrap();
+        assert!(find_default_enabled(&org).await.unwrap().is_none());
+
+        invalidate_default_cache(&org);
+        add(&record("default", true, false, 2)).await.unwrap();
+        add(&record("ci-collector", false, true, 3)).await.unwrap();
+        add(&record("_o2_autoobserve", false, true, 4))
+            .await
+            .unwrap();
+        let picked = find_default_enabled(&org).await.unwrap().unwrap();
+        assert_eq!(picked.name, "ci-collector");
+        delete_by_org(&org).await.unwrap();
+        invalidate_default_cache(&org);
+    }
+
+    #[tokio::test]
+    async fn a_user_made_writer_named_row_never_authenticates() {
+        if !crate::table::testing::meta_store().await {
+            return;
+        }
+        let org = crate::table::testing::unique("t_writer_foreign");
+        let record = |name: &str, created_by: &str| OrgIngestionTokenRecord {
+            id: config::ider::uuid(),
+            org_id: org.clone(),
+            name: name.to_string(),
+            token: format!("o2oi_{org}_{name}"),
+            description: String::new(),
+            is_default: false,
+            enabled: true,
+            created_by: created_by.to_string(),
+            created_at: 1,
+            updated_at: 1,
+            splunk_token: Some(None),
+        };
+        let foreign = record("_o2_alert_calibration", "admin@demo-org");
+        let system = record("_o2_autoobserve", WRITER_TOKEN_CREATOR);
+        let user = record("ci-collector", "admin@demo-org");
+        for row in [&foreign, &system, &user] {
+            add(row).await.unwrap();
+        }
+
+        let mut found = Vec::new();
+        for row in [&foreign, &system, &user] {
+            let hit = find_enabled_token(&org, &row.token).await.unwrap();
+            found.push(hit.map(|r| r.name));
+        }
+        assert_eq!(
+            found,
+            [
+                None,
+                Some("_o2_autoobserve".to_string()),
+                Some("ci-collector".to_string())
+            ]
+        );
+        let mut cached: Vec<String> = list_all_enabled()
+            .await
+            .unwrap()
+            .into_iter()
+            .filter(|(o, ..)| *o == org)
+            .map(|(_, _, name)| name)
+            .collect();
+        cached.sort();
+        assert_eq!(cached, ["_o2_autoobserve", "ci-collector"]);
+        delete_by_org(&org).await.unwrap();
     }
 }
