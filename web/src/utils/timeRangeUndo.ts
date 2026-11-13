@@ -24,6 +24,8 @@ export interface TimeRangeUndoStep {
   relativeValue: number;
   startUs: number;
   endUs: number;
+  /** The change this step reverses ran the query, so undoing it runs it too. */
+  ran?: boolean;
 }
 
 const sameStep = (a: TimeRangeUndoStep, b: TimeRangeUndoStep): boolean =>

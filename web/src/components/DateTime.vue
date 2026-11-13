@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       'w-full [&>*]:flex-1': fieldAppearance,
     }"
   >
-    <OTooltip v-if="!hideRangeShift" shortcut-id="timeRangePrevious">
+    <OTooltip v-if="!hideRangeShift" shortcut-id="timeRangePrevious" side="bottom">
       <template #content>
         <span class="flex flex-col">
           <span>{{ stepTooltip.prev.title }}</span>
@@ -86,10 +86,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #icon-left>
             <OIcon name="schedule" size="sm" :class="{ 'max-md:hidden': !fieldAppearance }" />
           </template>
-          <OTruncatedText
-            class="date-time-label flex-1 text-start tabular-nums max-md:min-w-16"
+          <span
+            class="date-time-label flex min-w-0 flex-1 text-start whitespace-pre tabular-nums max-md:min-w-16"
             :class="fieldAppearance ? 'font-normal' : 'font-semibold'"
-            >{{ triggerLabel }}</OTruncatedText
+            ><span v-if="triggerParts.name" class="min-w-0 truncate">{{ triggerParts.name }}</span
+            ><span v-if="triggerParts.dates" class="shrink-0" data-test="date-time-trigger-dates">{{
+              triggerParts.name ? ` · ${triggerParts.dates}` : triggerParts.dates
+            }}</span></span
           >
           <OIcon
             v-if="narrowedByQuery"
@@ -135,7 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 aria-autocomplete="list"
                 :aria-expanded="shownRows.length > 0"
                 :aria-controls="shownRows.length > 0 ? listId : undefined"
-                :aria-activedescendant="activeRow >= 0 ? `${listId}-${activeRow}` : undefined"
+                :aria-activedescendant="cursorRow >= 0 ? `${listId}-${cursorRow}` : undefined"
                 :placeholder="
                   isMobile ? t('dateTime.placeholderShort') : t('common.timeRangeInputPlaceholder')
                 "
@@ -176,10 +179,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               searchable
               :aria-label="t('logStream.timezone')"
               :search-placeholder="t('dateTime.searchZones')"
+              :search-debounce="0"
+              @search="zoneQuery = $event"
               :dropdown-style="{ minWidth: 'min(24rem, calc(100vw - 2rem))' }"
               @update:model-value="onTimezoneChange"
               @open="isTimezoneSelectOpen = true"
-              @close="isTimezoneSelectOpen = false"
+              @close="
+                isTimezoneSelectOpen = false;
+                zoneQuery = '';
+              "
               class="w-auto! max-w-36 min-w-0 shrink-0 [&_[role=combobox]]:h-8!"
             >
               <template #trigger>
@@ -218,11 +226,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <span
                 v-if="shownLine.name"
-                class="text-compact font-semibold"
-                :class="[
-                  shownLine.fixed ? 'shrink-0' : 'min-w-0 shrink truncate',
-                  previewLine ? 'text-toggle-item-active-text' : 'text-text-heading',
-                ]"
+                class="text-compact shrink-0 font-semibold"
+                :class="previewLine ? 'text-toggle-item-active-text' : 'text-text-heading'"
                 data-test="date-time-resolved-name"
                 >{{ shownLine.name }}</span
               >
@@ -251,14 +256,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="date-time-resolved-range"
                 >{{ shownLine.range }}</span
               >
-              <OBadge
+              <!-- The duration gives way first: once its box is narrower than the tag, the tag wraps out of sight. -->
+              <span
                 v-if="shownLine.duration"
-                variant="default-soft"
-                size="sm"
-                class="shrink-0 max-md:hidden"
-                data-test="date-time-resolved-duration"
-                >{{ shownLine.duration }}</OBadge
+                class="flex h-6 min-w-0 shrink-[64] flex-wrap items-center overflow-hidden max-md:hidden"
               >
+                <span class="h-6 w-0" aria-hidden="true" />
+                <OBadge
+                  variant="default-soft"
+                  size="sm"
+                  class="shrink-0"
+                  data-test="date-time-resolved-duration"
+                  >{{ shownLine.duration }}</OBadge
+                >
+              </span>
               <span
                 v-if="shownLine.note"
                 class="min-w-0 shrink-[4] truncate text-xs"
@@ -354,7 +365,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="border-border-subtle flex h-9 shrink-0 items-center gap-2 border-b px-3 max-md:h-11"
               data-test="date-time-chips"
             >
-              <OToggleGroup :model-value="litChip ?? undefined" @update:model-value="onChipToggle">
+              <OToggleGroup
+                :model-value="litChip ?? undefined"
+                @update:model-value="onChipToggle"
+                @reselect="onChipReselect"
+              >
                 <OToggleGroupItem
                   v-for="chip in chipItems"
                   :key="chip.value"
@@ -387,13 +402,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div class="min-h-0 flex-1">
               <DateTimeRangeList
-                v-if="shownRows.length > 0"
+                v-if="bodyRows.length > 0"
                 :id="listId"
-                :rows="shownRows"
-                :active="activeRow"
+                :rows="bodyRows"
+                :active="cursorRow"
                 :editing-id="editingPinRowId"
-                :heading="listHeading"
-                @pick="pickShownRow"
+                :heading="emptyExamples.length > 0 ? t('dateTime.noMatchYet') : listHeading"
+                @pick="pickBodyRow"
                 @cursor="setCursorRow"
                 @pin="pinRecentRow"
                 @unpin="unpinRow"
@@ -427,13 +442,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="min-w-0"
                 size="sm"
                 :aria-label="t('common.timeRangeStart')"
-                :prefix="startDayLabel"
+                :prefix="fieldsBlank ? undefined : startDayLabel"
+                :placeholder="t('common.timeRangeStart')"
                 hide-icon
                 format24
                 revert-refused
                 :error="unreadableFields.start || timeFieldError?.field === 'start'"
                 hide-message
-                :model-value="selectedTime.startTime"
+                :model-value="fieldsBlank ? '' : selectedTime.startTime"
                 with-seconds
                 optional-seconds
                 data-test="datetime-start-time"
@@ -454,13 +470,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :class="{ '[&_input]:text-text-label': calendarPreviewDay && pendingDay }"
                 size="sm"
                 :aria-label="t('common.timeRangeEnd')"
-                :prefix="endDayLabel"
+                :prefix="fieldsBlank ? undefined : endDayLabel"
+                :placeholder="t('common.timeRangeEnd')"
                 hide-icon
                 format24
                 revert-refused
                 :error="unreadableFields.end || timeFieldError?.field === 'end'"
                 hide-message
-                :model-value="selectedTime.endTime"
+                :model-value="fieldsBlank ? '' : selectedTime.endTime"
                 with-seconds
                 optional-seconds
                 data-test="datetime-end-time"
@@ -578,7 +595,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </span>
       </template>
     </OTooltip>
-    <OTooltip v-if="!hideRangeShift" shortcut-id="timeRangeNext">
+    <OTooltip v-if="!hideRangeShift" shortcut-id="timeRangeNext" side="bottom">
       <template #content>
         <span class="flex flex-col">
           <span>{{ stepTooltip.next.title }}</span>
@@ -602,6 +619,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="!hideRangeShift && !hideRelativeTime"
       :content="stepTooltip.zoom"
       shortcut-id="timeRangeZoomOut"
+      side="bottom"
     >
       <OButton
         data-test="date-time-zoom-out-btn"
@@ -615,7 +633,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click.prevent.stop="zoomOut"
       />
     </OTooltip>
-    <OTooltip v-if="showUndo" :content="undoTooltip" shortcut-id="timeRangeUndo">
+    <OTooltip v-if="showUndo" :content="undoTooltip" shortcut-id="timeRangeUndo" side="bottom">
       <OButton
         data-test="date-time-undo-btn"
         variant="ghost"
@@ -637,7 +655,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTime from "@/lib/forms/Time/OTime.vue";
@@ -674,7 +691,11 @@ import {
   sameHistoryEntry,
   type TimeRangeHistoryEntry,
 } from "@/composables/useTimeRangeHistory";
-import type { TimeRangeListRow, TimeRangePreset } from "@/utils/timeRangeList";
+import {
+  TIME_INPUT_EXAMPLES,
+  type TimeRangeListRow,
+  type TimeRangePreset,
+} from "@/utils/timeRangeList";
 import { instantFromShiftedMs } from "@/utils/timeRangeZoom";
 import {
   formatRangeCopyText,
@@ -686,6 +707,7 @@ import {
   type RangeLabelInput,
 } from "@/utils/timeRangeLabel";
 import { weekStartsOn } from "@/utils/weekStart";
+import { searchTimeZones } from "@/utils/timeZoneSearch";
 import type { DateRangeCalendarExposed } from "@/lib/forms/DateTimeRange/ODateRangeCalendar.types";
 import { parseRollingPeriod } from "@/utils/dateTimeRangeParse";
 import { copyToClipboard } from "@/utils/clipboard";
@@ -728,6 +750,7 @@ interface ConsumableDateTime {
   selectedTime?: unknown;
   valueType?: string;
   userChangedValue?: boolean;
+  rerun?: boolean;
 }
 
 export default defineComponent({
@@ -735,7 +758,6 @@ export default defineComponent({
     OButton,
     OIcon,
     OTooltip,
-    OTruncatedText,
     OInput,
     OSelect,
     OTime,
@@ -842,6 +864,16 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    /** The calendar offers days after today, so typed yearless dates may read as upcoming ones. */
+    futureAllowed: {
+      type: Boolean,
+      default: false,
+    },
+    /** Reads calendar words (yesterday, last week) as rolling periods; only for recurring forms with no calendar presets. */
+    rollingCalendarWords: {
+      type: Boolean,
+      default: false,
+    },
     /** Sizes the trigger like a form field (full width, field height and border) instead of a toolbar button. */
     fieldAppearance: {
       type: Boolean,
@@ -933,6 +965,14 @@ export default defineComponent({
     const calendarName = ref<string | null>(null);
     const appliedCalendarName = ref<string | null>(null);
     watch(calendarToken, () => (calendarName.value = null), { flush: "sync" });
+    // A typed period name (`Q4 2026`) stays only on the exact instants it was typed for; a zone redraw keeps them.
+    const namedRange = ref<{ name: string; startUs: number; endUs: number } | null>(null);
+    const absoluteLabelInput = (startUs: number, endUs: number): RangeLabelInput => {
+      const named = namedRange.value;
+      return named && named.startUs === startUs && named.endUs === endUs
+        ? { startUs, endUs, name: named.name, period: true }
+        : { startUs, endUs };
+    };
     // Type and relative selection last applied; closing without Apply restores these.
     let appliedSelection = {
       selectedType: "relative",
@@ -1091,6 +1131,40 @@ export default defineComponent({
       clearInput,
       readPastedStamp: typingBar.readPastedStamp,
     });
+    // A picker with no calendar rows and nothing recent still teaches the grammar instead of a blank body.
+    const emptyExamples = computed<TimeRangeListRow[]>(() =>
+      props.hideClipboard || inputText.value.trim() || shownRows.value.length > 0
+        ? []
+        : TIME_INPUT_EXAMPLES.map((example, index) => ({
+            id: `example-${index}`,
+            kind: "example" as const,
+            label: example.text,
+            meta: String(t(example.description)),
+            disabled: false,
+            testId: `date-time-list-example-${index}`,
+            group: 0,
+          })),
+    );
+    const bodyRows = computed(() =>
+      emptyExamples.value.length > 0 ? emptyExamples.value : shownRows.value,
+    );
+    // Typed text lights the row Enter would take: its reading, else the first list row it filtered to.
+    const cursorRow = computed(() => {
+      if (emptyExamples.value.length > 0) return -1;
+      if (activeRow.value >= 0 || !typing.value) return activeRow.value;
+      const rows = shownRows.value;
+      if (rows[0]?.id.startsWith("reading-")) return rows[0].disabled ? -1 : 0;
+      if (typingBar.inputReading.value) return -1;
+      return rows.findIndex((row) => !row.disabled && row.kind !== "example");
+    });
+    const pickBodyRow = (index: number) => {
+      const example = emptyExamples.value[index];
+      if (!example) return pickShownRow(index);
+      inputText.value = example.label;
+      onInputEdit();
+      inputBar.value?.focus();
+    };
+
     const {
       selectedTime,
       selectedDate,
@@ -1209,7 +1283,16 @@ export default defineComponent({
     const filteredTimezone: any = ref(timezoneOptions);
     const isTimezoneSelectOpen = ref(false);
 
-    const timezoneSelectOptions = computed(() =>
+    // OSelect filters by substring, so the matched zones carry the query itself and arrive in rank order.
+    const zoneQuery = ref("");
+    const timezoneSelectOptions = computed(() => {
+      const term = zoneQuery.value.trim().toLowerCase();
+      if (!term) return allTimezoneOptions.value;
+      return searchTimeZones(allTimezoneOptions.value, term, (option) =>
+        option.value === browserTime ? browserTz : option.value,
+      ).map((option) => ({ ...option, searchText: term }));
+    });
+    const allTimezoneOptions = computed(() =>
       timezoneOptions.map((tz: string) => {
         const isBrowser = tz === browserTime;
         const zone = isBrowser ? browserTz : tz;
@@ -1263,13 +1346,26 @@ export default defineComponent({
               : props.defaultAbsoluteTime?.endTime * 1000;
         }
 
-        const initialType = props.disableRelative ? "absolute" : props.defaultType;
+        // A link with an empty period and no readable from/to means the default live range, not a frozen one.
+        const given = (value: unknown) => Number.isFinite(Number(value)) && Number(value) !== 0;
+        const unreadableAbsolute =
+          props.defaultAbsoluteTime != null &&
+          !(given(props.defaultAbsoluteTime.startTime) && given(props.defaultAbsoluteTime.endTime));
+        const initialType = props.disableRelative
+          ? "absolute"
+          : props.defaultType === "absolute" && unreadableAbsolute
+            ? "relative"
+            : props.defaultType;
         selectedType.value = initialType;
 
         markProgrammaticDateChange();
-        const rangeKept = writeOutsideRange(startTime, endTime) !== "refused";
+        const rangeOutcome = writeOutsideRange(startTime, endTime);
         const periodKept = readRelativeTime(props.defaultRelativeTime) !== "refused";
-        if (initialType === "absolute" ? !rangeKept : !periodKept) fallBackToDefaultPeriod();
+        if (initialType === "absolute" ? rangeOutcome === "refused" : !periodKept) {
+          fallBackToDefaultPeriod();
+        } else if (initialType === "absolute" && rangeOutcome === "corrected") {
+          toastRangeCut();
+        }
 
         if (props.queryRangeRestrictionInHour) computeRelativePeriod();
         // Stamped programmatic, so consumers skip a refetch; the parent's own onMounted covers the first load.
@@ -1403,12 +1499,27 @@ export default defineComponent({
       selectedType.value = props.disableRelative ? "absolute" : "relative";
     };
 
+    // A silently cut range would read as the one the link asked for.
+    const toastRangeCut = () => {
+      const range = getConsumableDateTime();
+      toast({
+        variant: "warning",
+        message: t("common.timeRangeShortened", {
+          label: formatRangeLabel(
+            { startUs: range.startTime, endUs: range.endTime },
+            { ...labelOptions(), surface: "toast" },
+          ),
+        }),
+      });
+    };
+
     const setAbsoluteTime = (startTime: number, endTime: number) => {
       // Parent-invoked setter — the resulting auto-apply emit is programmatic.
       markProgrammaticDateChange();
       clearUndoForPageRange({ startTime, endTime });
       const outcome = writeOutsideRange(startTime, endTime);
       if (outcome === "refused") fallBackToDefaultPeriod();
+      else if (outcome === "corrected") toastRangeCut();
       // A parent's range set while the panel is open is what closing without Apply returns to.
       if (menuOpen.value && absoluteAtOpen !== null) absoluteAtOpen = fields.snapshotFields();
       if (outcome !== "kept") emitCorrectionLater();
@@ -1516,7 +1627,8 @@ export default defineComponent({
       writeSeededFields({ ...atOpen.date, ...atOpen.time }, atOpen.seededEnd);
     };
 
-    const saveDate = (dateType?: string | null) => {
+    // `rerun` asks the page to run the range at once, even unchanged: a lit chip again, or the undo of a run zoom.
+    const saveDate = (dateType?: string | null, rerun = false) => {
       saveCount += 1;
       savedFieldsKey = selectedType.value === "absolute" ? absoluteFieldsKey() : null;
       // The resolved line and the seeded Start/End read this clock, so they match the range emitted now.
@@ -1526,6 +1638,7 @@ export default defineComponent({
       datePayload.value = date;
       date["valueType"] = dateType || selectedType.value;
       date["userChangedValue"] = isUserInitiated;
+      if (rerun) date["rerun"] = true;
       if (isUserInitiated) nextTick(() => (appliedSpeech.value = String(triggerLabel.value)));
       if (store.state.savedViewFlag == false) {
         emittingOwnChange = true;
@@ -1556,7 +1669,7 @@ export default defineComponent({
       // A refused zoom (zero width, or past maxDate) keeps the range the user is looking at.
       if (!range) return false;
       const shownBefore = JSON.stringify([selectedType.value, absoluteFieldsKey()]);
-      captureUndo();
+      captureUndo(true);
       applyInstants(dateType, range.start, range.end);
       recordSelection();
       // Unchanged fields fire no watcher, yet the parent's search (e.g. Search around) still expects its run.
@@ -1675,7 +1788,7 @@ export default defineComponent({
         if (!range || !Number.isFinite(range.startTime) || !Number.isFinite(range.endTime)) {
           return null;
         }
-        return { startUs: range.startTime, endUs: range.endTime };
+        return absoluteLabelInput(range.startTime, range.endTime);
       }
       const period = shownApplied
         ? (appliedCalendarToken.value ?? appliedPeriod.value)
@@ -1721,6 +1834,19 @@ export default defineComponent({
         surface: labelSurface.value,
         showDates: datesShown.value,
       });
+    });
+
+    // Only a name may truncate on the trigger; its dates always show in full.
+    const triggerParts = computed<{ name: string; dates: string }>(() => {
+      const label = String(triggerLabel.value);
+      const range = triggerRange.value;
+      const name = range?.name && !props.disableRelative && !props.triggerText ? range.name : "";
+      if (name && label.startsWith(`${name} · `)) {
+        return { name, dates: label.slice(name.length + 3) };
+      }
+      return range && !range.live && !props.triggerText
+        ? { name: "", dates: label }
+        : { name: label, dates: "" };
     });
 
     // Line 1 the full stamps, line 2 zone, kind and length; the label alone can round them.
@@ -1815,6 +1941,11 @@ export default defineComponent({
       clearUndo();
       if (plan.kind === "absolute") {
         applyAbsoluteRange(plan.start, plan.end, plan.calendarPeriod);
+        const range = pendingRange.value;
+        namedRange.value =
+          plan.name && range
+            ? { name: plan.name, startUs: range.startTime, endUs: range.endTime }
+            : null;
         return;
       }
       if (plan.kind !== "rolling" && plan.kind !== "calendar") return;
@@ -1846,7 +1977,7 @@ export default defineComponent({
         return null;
       }
       if (selectedType.value !== "relative" || props.disableRelative) {
-        return { startUs: range.startTime, endUs: range.endTime };
+        return absoluteLabelInput(range.startTime, range.endTime);
       }
       const period = currentRelativePeriod();
       return {
@@ -2119,23 +2250,28 @@ export default defineComponent({
       },
     );
 
-    // Calendar labels name a day and the rail ends "so far" ranges at now, so the clock runs only while one is shown.
+    // Calendar labels name a day, the rail ends "so far" ranges at now and a live trigger shows its dates, so the clock runs only then.
     const needsClock = computed(
       () =>
         menuOpen.value ||
+        (datesShown.value && appliedType.value === "relative") ||
         (props.calendarPresets &&
           (calendarToken.value !== null || appliedCalendarToken.value !== null)),
     );
-    let clockTick: ReturnType<typeof setInterval> | null = null;
+    let clockTick: ReturnType<typeof setTimeout> | null = null;
     const stopClock = () => {
-      if (clockTick !== null) clearInterval(clockTick);
+      if (clockTick !== null) clearTimeout(clockTick);
       clockTick = null;
+    };
+    // Ticks on the minute, so minute-precision dates turn over with the page's now, not up to a minute late.
+    const tickClock = () => {
+      refreshTooltipNow();
+      clockTick = setTimeout(tickClock, 60_000 - (Date.now() % 60_000) + 50);
     };
     const syncClock = () => {
       if (!needsClock.value) return stopClock();
       if (clockTick !== null) return;
-      refreshTooltipNow();
-      clockTick = setInterval(refreshTooltipNow, 60_000);
+      tickClock();
     };
     watch(needsClock, syncClock, { immediate: true });
     onActivated(syncClock);
@@ -2251,7 +2387,7 @@ export default defineComponent({
     };
 
     // A chip applies at once, like a row, and is the only control that lights for the range it applied.
-    const pickChip = (value: string) => {
+    const pickChip = (value: string, rerun = false) => {
       const rolling = parseRollingPeriod(value);
       if (!rolling) return;
       clearUndo();
@@ -2261,16 +2397,19 @@ export default defineComponent({
       relativePeriod.value = rolling.unit;
       relativeValue.value = rolling.value;
       lastValidCustomValue.value = rolling.value;
-      saveDate("relative");
+      saveDate("relative", rerun);
       recordSelection();
       rangeKeyAtOpen = selectionKey.value;
       closeMenu();
     };
 
-    // The toggle clears on a click of the lit chip, which applies that chip again so the page re-runs it.
     const onChipToggle = (value: unknown) => {
       const chip = typeof value === "string" && value ? value : litChip.value;
       if (chip) pickChip(chip);
+    };
+    // A click on the lit chip applies it again and asks the page to re-run the same range.
+    const onChipReselect = () => {
+      if (litChip.value) pickChip(litChip.value, true);
     };
 
     const applyRecentPeriod = (period: string) => {
@@ -2402,6 +2541,8 @@ export default defineComponent({
         selectedType.value === "relative" &&
         pendingDay.value === null,
     );
+    // From a live range nothing is picked yet, so Start and End stay empty rather than echo the live dates.
+    const fieldsBlank = computed(() => needsStartDate.value);
     // The days a calendar pick would apply, and those its pointer or focus previews, against the page's limits.
     const calendarLimit = computed<{ selection: string | null; preview: string | null }>(() => {
       if (!calendarMode.value || selectedType.value !== "absolute") {
@@ -2425,13 +2566,21 @@ export default defineComponent({
       if (!inputText.value.trim()) return null;
       if (inputError.value) return inputErrorText.value;
       const plan = typingBar.inputPlan.value;
-      return plan?.kind === "refused" || plan?.kind === "restricted" ? plan.message : null;
+      if (plan?.kind === "refused" || plan?.kind === "restricted") return plan.message;
+      if (plan) return null;
+      if (typingBar.inputFuture.value) return t("common.timeRangeStartInFuture");
+      if (typingBar.inputReversed.value) return t("common.timeRangeEndBeforeStart");
+      return t("common.timeRangeInputError");
     });
+    // A readable bar is what Apply applies, so it needs no calendar pick first.
+    const barApplies = computed(
+      () => inputText.value.trim() !== "" && barBlockReason.value === null,
+    );
 
     const applyDisabled = computed(
       () =>
         barBlockReason.value !== null ||
-        needsStartDate.value ||
+        (needsStartDate.value && !barApplies.value) ||
         unreadableFields.value.start ||
         unreadableFields.value.end ||
         calendarLimit.value.selection !== null,
@@ -2439,7 +2588,7 @@ export default defineComponent({
 
     const applyBlockedReason = computed<I18nText | undefined>(() => {
       if (barBlockReason.value) return barBlockReason.value;
-      if (needsStartDate.value) return t("dateTime.pickStartDate");
+      if (needsStartDate.value && !barApplies.value) return t("dateTime.pickStartDate");
       const reason = calendarLimit.value.selection;
       return reason ? raw(reason) : undefined;
     });
@@ -2569,6 +2718,7 @@ export default defineComponent({
       relativeValue,
       displayValue,
       triggerLabel,
+      triggerParts,
       copyRange,
       pasteRange,
       onPickerPaste,
@@ -2634,6 +2784,7 @@ export default defineComponent({
       calendarMinDate,
       calendarMaxDate,
       timezoneSelectOptions,
+      zoneQuery,
       isTimezoneSelectOpen,
       listId,
       calendarMode,
@@ -2654,6 +2805,11 @@ export default defineComponent({
       chipItems,
       litChip,
       onChipToggle,
+      onChipReselect,
+      emptyExamples,
+      bodyRows,
+      cursorRow,
+      pickBodyRow,
       pickChip,
       undoRange,
       showUndo,
@@ -2670,6 +2826,7 @@ export default defineComponent({
       applyDisabled,
       applyBlockedReason,
       needsStartDate,
+      fieldsBlank,
       zoomOutBlocked,
       menuEl,
       onTimeFieldInvalid,

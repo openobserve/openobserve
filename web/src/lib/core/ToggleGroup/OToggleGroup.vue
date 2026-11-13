@@ -45,6 +45,16 @@ const asDropdown = computed(
 const dropdownTestId = computed(() =>
   attrs["data-test"] ? `${attrs["data-test"]}-dropdown-btn` : "o-toggle-group-dropdown-btn",
 );
+// Single mode never clears: a click on the lit item keeps it and reports a reselect instead.
+const onRootUpdate = (v: AcceptableValue | AcceptableValue[] | undefined) => {
+  if (v === null || v === undefined || (props.type === "single" && v === "")) {
+    if (props.type === "single" && props.modelValue !== undefined && props.modelValue !== null) {
+      emit("reselect", props.modelValue);
+    }
+    return;
+  }
+  emit("update:modelValue", v);
+};
 const isActiveValue = (value: AcceptableValue | boolean) => props.modelValue === value;
 const selectValue = (value: AcceptableValue | boolean) => emit("update:modelValue", value);
 
@@ -345,12 +355,7 @@ provide(TOGGLE_GROUP_CONTEXT_KEY, context);
         'bg-toggle-track-bg rounded-default p-0.5',
       ]"
       v-bind="dragListeners"
-      @update:model-value="
-        (v) => {
-          if (type === 'single' && (v === null || v === undefined || v === '')) return;
-          emit('update:modelValue', v);
-        }
-      "
+      @update:model-value="onRootUpdate"
     >
       <!-- Sliding active-selection indicator (opt-in via animatedSelection) -->
       <div
@@ -381,12 +386,7 @@ provide(TOGGLE_GROUP_CONTEXT_KEY, context);
         'max-md:max-w-full max-md:overflow-x-auto @max-4xl/page:max-w-full @max-4xl/page:overflow-x-auto',
     ]"
     v-bind="dragListeners"
-    @update:model-value="
-      (v) => {
-        if (type === 'single' && (v === null || v === undefined || v === '')) return;
-        emit('update:modelValue', v);
-      }
-    "
+    @update:model-value="onRootUpdate"
   >
     <!-- Sliding active-selection indicator (opt-in via animatedSelection) -->
     <div

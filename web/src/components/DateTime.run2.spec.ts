@@ -95,15 +95,27 @@ describe("DateTime QA run 2", () => {
   });
 
   describe("S1 S7 URL ranges", () => {
-    it("cuts a URL end in year 9999 to the last instant every zone can show", async () => {
+    it("cuts a URL end in year 9999 to now with a warning, as typing does", async () => {
       createWrapper(fixedProps("2026-11-12T10:00:00Z", "9999-12-31T23:00:00Z"));
       await flushPromises();
 
       expect(lastEmit()).toMatchObject({
         startTime: micros("2026-11-12T10:00:00Z"),
-        endTime: LATEST_INSTANT_US,
+        endTime: NOW.getTime() * 1000,
       });
-      expect(String(wrapper!.vm.triggerLabel)).toContain("9999");
+      expect(toastMock).toHaveBeenCalledWith(expect.objectContaining({ variant: "warning" }));
+    });
+
+    it("cuts a year-9999 end to the last instant every zone can show on a picker that books ahead", async () => {
+      createWrapper({
+        ...fixedProps("2026-11-12T10:00:00Z", "9999-12-31T23:00:00Z"),
+        disableRelative: true,
+        minDate: "2026/11/01",
+        futureAllowed: true,
+      });
+      await flushPromises();
+
+      expect(lastEmit()).toMatchObject({ endTime: LATEST_INSTANT_US });
     });
 
     it("falls back to the default for a URL range starting before 1970", async () => {

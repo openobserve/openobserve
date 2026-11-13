@@ -95,15 +95,15 @@ describe("DateTime typed text", () => {
     vi.restoreAllMocks();
   });
 
-  it("keeps the name of a typed period that has started (V6)", async () => {
+  it("keeps the name of a typed period that has started, fixed (V6, D-NAME)", async () => {
     createWrapper();
     await openMenu();
     await typeInBar("Q4");
     expect(el("date-time-resolved-name")?.textContent).toBe("Q4 2026");
 
     await pressInBar("Enter");
-    expect(lastEmit()).toMatchObject({ relativeTimePeriod: "calendar:quarter:0" });
-    expect(wrapper!.vm.triggerLabel).toBe("Q4 2026");
+    expect(lastEmit()).toMatchObject({ valueType: "absolute" });
+    expect(wrapper!.vm.triggerLabel).toBe("Q4 2026 · Oct 1 – Nov 12, 21:24");
   });
 
   it("greys a typed range over the limit and offers the longest allowed before it (V9)", async () => {

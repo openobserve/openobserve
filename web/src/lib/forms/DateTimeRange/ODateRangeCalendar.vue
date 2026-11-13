@@ -152,15 +152,20 @@ function isCellInPreview(d: DateValue): boolean {
 const isPreviewEnd = (d: DateValue): boolean =>
   isAwaitingEndClick.value && !!hoverDate.value && hoverDate.value.compare(d) === 0;
 
-// The band runs behind the day cells so the tint is continuous across a week row.
+// The band runs behind the day cells so the tint is continuous across a week row, for a picked range and a previewed one alike.
 function bandClass(d: DateValue): string {
-  const start = internalStart.value;
-  const end = internalEnd.value;
-  if (!props.bandRange || !start || !end || start.compare(end) === 0) return "";
+  if (!props.bandRange) return "";
+  const previewing = isAwaitingEndClick.value && !!hoverDate.value;
+  const [first, second] = previewing
+    ? [internalStart.value, hoverDate.value]
+    : [internalStart.value, internalEnd.value];
+  if (!first || !second || first.compare(second) === 0) return "";
+  const [start, end] = first.compare(second) < 0 ? [first, second] : [second, first];
   if (d.compare(start) < 0 || d.compare(end) > 0) return "";
   const edge =
     d.compare(start) === 0 ? "before:start-1/2" : d.compare(end) === 0 ? "before:end-1/2" : "";
-  return `before:bg-datepicker-day-range-bg before:absolute before:inset-y-0 before:start-0 before:end-0 ${edge}`;
+  const tint = previewing ? "before:bg-surface-accent-hover" : "before:bg-datepicker-day-range-bg";
+  return `${tint} before:absolute before:inset-y-0 before:start-0 before:end-0 ${edge}`;
 }
 
 // Today is a dot under the number, so it never reads as a selected or boxed day.
@@ -412,7 +417,7 @@ onMounted(async () => {
                   todayClass,
                   compact ? 'h-6.5' : 'h-8',
                 ]"
-                class="rounded-default ring-offset-surface-base text-datepicker-day-text hover:bg-datepicker-day-hover-bg focus-visible:ring-datepicker-focus-ring data-selected:bg-datepicker-day-selected-bg data-selected:text-datepicker-day-selected-text data-outside-view:text-datepicker-day-outside-text data-unavailable:text-datepicker-day-disabled-text data-disabled:text-datepicker-day-disabled-text data-highlighted:bg-datepicker-day-range-bg data-highlighted:text-datepicker-day-range-text data-selection-start:bg-datepicker-day-selected-bg data-selection-start:text-datepicker-day-selected-text data-selection-end:bg-datepicker-day-selected-bg data-selection-end:text-datepicker-day-selected-text flex cursor-pointer items-center justify-center ring-offset-1 transition-[color,background-color,border-color,box-shadow] duration-150 outline-none focus-visible:ring-2 data-disabled:pointer-events-none data-disabled:cursor-not-allowed data-unavailable:cursor-not-allowed data-unavailable:line-through"
+                class="rounded-default ring-offset-surface-base text-datepicker-day-text hover:bg-datepicker-day-hover-bg focus-visible:ring-datepicker-focus-ring data-selected:bg-datepicker-day-selected-bg data-selected:text-datepicker-day-selected-text data-outside-view:text-datepicker-day-outside-text data-unavailable:text-datepicker-day-disabled-text data-disabled:text-datepicker-day-disabled-text data-highlighted:bg-datepicker-day-range-bg data-highlighted:text-datepicker-day-range-text data-selection-start:bg-datepicker-day-selected-bg data-selection-start:text-datepicker-day-selected-text data-selection-end:bg-datepicker-day-selected-bg data-selection-end:text-datepicker-day-selected-text flex cursor-pointer items-center justify-center ring-offset-1 transition-[color,background-color,border-color,box-shadow] duration-150 outline-none focus-visible:ring-2 data-disabled:pointer-events-none data-disabled:cursor-not-allowed data-disabled:hover:bg-transparent data-unavailable:cursor-not-allowed data-unavailable:line-through data-unavailable:hover:bg-transparent"
                 >{{ dayNumber(d) }}</RangeCalendarCellTrigger
               >
             </RangeCalendarCell>
@@ -444,6 +449,11 @@ onMounted(async () => {
 .o-range-cal--awaiting :deep([data-preview]:not([data-selected])) {
   background-color: var(--color-surface-accent-hover);
   color: var(--color-datepicker-day-range-text);
+}
+/* With a band the tint sits behind the cells, so the cells between the ends stay clear. */
+.o-range-cal--band.o-range-cal--awaiting
+  :deep([data-preview]:not([data-selected]):not([data-preview-end])) {
+  background-color: transparent;
 }
 .o-range-cal--awaiting :deep([data-preview-end]:not([data-selected])) {
   /* eslint-disable-next-line local/no-hardcoded-px -- hairline: the would-be end's 1-device-pixel ring must not scale with text */

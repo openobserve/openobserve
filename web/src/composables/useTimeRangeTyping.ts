@@ -75,7 +75,7 @@ const MAX_SUGGESTIONS = 5;
 const LONE_CLOCK_RE = /^\d{1,2}:\d{2}(?::\d{2}(?:\.\d+)?)?$/;
 // An end cut by less than this is clock drift between reading and planning, not a cut worth a note.
 const CUT_NOTE_MIN_MICROS = 1_000_000;
-// A picker without calendar presets offers a typed period's length as a rolling range, so it never freezes into dates.
+// A recurring picker offers a typed calendar word's length as a rolling range, so it never freezes into dates.
 const ROLLING_EQUIVALENT: Record<CalendarUnit, string> = {
   day: "1d",
   week: "7d",
@@ -85,8 +85,8 @@ const ROLLING_EQUIVALENT: Record<CalendarUnit, string> = {
 };
 
 // What Enter would do with a reading, worked out once so the preview and Enter never disagree.
-// `cut`: a rolling count lowered to its cap, or an absolute end cut to now; `name`: a running period as typed.
-// `fromCalendar`: a calendar word offered as its rolling length where the picker has no calendar presets.
+// `cut`: a rolling count lowered to its cap, or an absolute end cut to now; `name`: a typed period name (`Q4 2026`).
+// `fromCalendar`: a calendar word offered as its rolling length on a picker that opts into it.
 export type InputPlan =
   | {
       kind: "rolling";
@@ -104,6 +104,7 @@ export type InputPlan =
       end: number;
       calendarPeriod: string | null;
       cutToNow?: boolean;
+      name?: string;
     }
   | { kind: "refused"; message: I18nText }
   | {
@@ -120,6 +121,8 @@ interface TimeInputSuggestionRow {
   label: string;
   hint: string;
   relative: boolean;
+  named?: boolean;
+  cut?: boolean;
 }
 
 // What a typed-text row stands for beyond its reading: a window around a pasted instant, or the longest range a limit allows.
@@ -130,6 +133,10 @@ export interface TimeRangeTypingProps {
   calendarPresets: boolean;
   queryRangeRestrictionInHour: number;
   maxDate?: string;
+  // Recurring pickers only: `yesterday` and `last week` become their rolling length, not that exact period.
+  rollingCalendarWords?: boolean;
+  // A yearless date may read as upcoming only where the calendar itself offers days after today.
+  futureAllowed?: boolean;
 }
 
 export interface TimeRangeTypingDeps {
@@ -266,27 +273,44 @@ export default function useTimeRangeTyping(props: TimeRangeTypingProps, deps: Ti
     };
   };
 
+  // An unbounded ceiling is kept only where the calendar offers future days; elsewhere now caps typed text.
+  const ceilingMicros = (): number => {
+    const ceiling = selectionCeilingMicros();
+    return Number.isFinite(ceiling) || props.futureAllowed ? ceiling : Date.now() * 1000;
+  };
+
   // Only the start is bounded: an end past the ceiling is cut to it.
   const planAbsolute = (
     start: number,
     rawEnd: number,
     calendarPeriod: string | null = null,
+    name?: string,
   ): InputPlan => {
     if (!Number.isFinite(start) || !Number.isFinite(rawEnd)) {
       return refusedPlan(t("common.timeRangeInputError"));
     }
+    const ceiling = ceilingMicros();
     // A start out of bounds is named first, so `since` a future date says so rather than blaming the end.
     const refusal =
-      startBoundError(start) ?? (rawEnd <= start ? t("common.timeRangeEndBeforeStart") : null);
+      startBoundError(start) ??
+      (start >= ceiling ? t("common.timeRangeStartInFuture") : null) ??
+      (rawEnd <= start ? t("common.timeRangeEndBeforeStart") : null);
     if (refusal !== null) return refusedPlan(refusal);
-    const end = Math.min(rawEnd, selectionCeilingMicros());
+    const end = Math.min(rawEnd, ceiling);
     const outside = outsideRetentionPlan(start, end);
     if (outside) return outside;
     if (exceedsRangeRestriction(start, end, props.queryRangeRestrictionInHour)) {
       return overLimitPlan(start, end);
     }
     const cutToNow = !props.maxDate && rawEnd - end > CUT_NOTE_MIN_MICROS;
-    return { kind: "absolute", start, end, calendarPeriod, ...(cutToNow ? { cutToNow } : {}) };
+    return {
+      kind: "absolute",
+      start,
+      end,
+      calendarPeriod,
+      ...(cutToNow ? { cutToNow } : {}),
+      ...(name ? { name } : {}),
+    };
   };
 
   // A running period typed by name stays its dates where the picker has no calendar presets.
@@ -302,23 +326,9 @@ export default function useTimeRangeTyping(props: TimeRangeTypingProps, deps: Ti
     return name ? { kind: "calendar", token, name } : { kind: "calendar", token };
   };
 
-  // A typed quarter or year still running is this quarter or year, live; halves have no calendar token.
-  const runningPeriodToken = (
-    reading: AbsoluteRangeResult,
-    start: number,
-    end: number,
-  ): string | null => {
-    const name = reading.name;
-    if (!name || name.startsWith("H")) return null;
-    const nowMs = Date.now();
-    if (!(start <= nowMs * 1000 && nowMs * 1000 < end)) return null;
-    const token = name.startsWith("Q") ? "calendar:quarter:0" : "calendar:year:0";
-    return resolveCalendarPeriod(token, zone.value, nowMs)?.startTime === start ? token : null;
-  };
-
   const planRelative = (period: string): InputPlan => {
     const calendar = parseCalendarToken(period);
-    if (calendar && !props.calendarPresets && !props.disableRelative) {
+    if (calendar && props.rollingCalendarWords && !props.disableRelative) {
       const plan = planRelative(ROLLING_EQUIVALENT[calendar.unit]);
       return plan.kind === "rolling" ? { ...plan, fromCalendar: true } : plan;
     }
@@ -352,15 +362,14 @@ export default function useTimeRangeTyping(props: TimeRangeTypingProps, deps: Ti
     if (reading.type === "relative") return planRelative(reading.period);
     if (reading.type === "timestamp") return planAbsolute(reading.startMicros, reading.endMicros);
     const { start, end } = zonelessToMicros(reading, asUtc);
-    const running = runningPeriodToken(reading, start, end);
-    return running ? planCalendar(running, reading.name) : planAbsolute(start, end);
+    return planAbsolute(start, end, null, reading.name);
   };
 
   // No locale: typed day/month order follows the browser's languages, as the week start does.
   const parseOptions = () => ({
     now: new Date(),
     timeZone: zone.value,
-    ceilingMs: selectionCeilingMicros() / 1000,
+    ceilingMs: ceilingMicros() / 1000,
   });
 
   // The absolute range a full stamp reads as, for a paste into Start or End; null for anything else.
@@ -606,7 +615,8 @@ export default function useTimeRangeTyping(props: TimeRangeTypingProps, deps: Ti
           : reading.type === "relative"
             ? reading.period
             : text.replace(/mo$/, "M");
-      return { key, label: String(relativeLabel(period)), hint: text, relative: true };
+      const cut = plan.kind === "rolling" && plan.cut === true;
+      return { key, label: String(relativeLabel(period)), hint: text, relative: true, cut };
     }
     if (plan.kind === "calendar") {
       const label = plan.name ?? String(relativeLabel(plan.token));
@@ -614,11 +624,24 @@ export default function useTimeRangeTyping(props: TimeRangeTypingProps, deps: Ti
     }
     const range = plan.kind === "absolute" ? plan : plan.kind === "restricted" ? plan.range : null;
     if (!range) return { key, label: text, hint: "", relative: false };
+    const name = plan.kind === "absolute" ? plan.name : undefined;
+    if (name) {
+      const dates = formatRangeDates(
+        { startUs: range.start, endUs: range.end, name, period: true },
+        { ...labelOptions(), surface: "row" },
+      );
+      return { key, label: name, hint: dates, relative: false, named: true };
+    }
+    // Zone alternatives tell their rows apart by zone; a lone reading shows its length.
     const source = reading.type === "timestamp" ? reading.sourceZone : undefined;
+    const zones = new Set(
+      inputSuggestions.value.map((other) => (other.type === "timestamp" ? other.sourceZone : "")),
+    );
+    const alternatives = zones.size > 1;
     return {
       key,
       label: rowRangeLabel(range.start, range.end, reading),
-      hint: source ?? formatRangeDuration(range.start, range.end),
+      hint: (alternatives ? source : undefined) ?? formatRangeDuration(range.start, range.end),
       relative: false,
     };
   };
@@ -635,7 +658,7 @@ export default function useTimeRangeTyping(props: TimeRangeTypingProps, deps: Ti
     return [
       {
         id: `reading-${row.key}`,
-        kind: "reading" as const,
+        kind: row.named ? ("calendar" as const) : ("reading" as const),
         label: row.label,
         hint: row.relative && reason === null ? row.hint : undefined,
         meta: reason ?? (row.relative ? "" : row.hint),
@@ -647,10 +670,10 @@ export default function useTimeRangeTyping(props: TimeRangeTypingProps, deps: Ti
     ];
   });
 
-  const suggestionKind = (index: number): TimeRangeListRow["kind"] => {
+  const suggestionKind = (index: number, named?: boolean): TimeRangeListRow["kind"] => {
     const tag = suggestionTags.value[index];
     if (tag && "anchor" in tag) return tag.anchor === "to-now" ? "to-now" : "anchor";
-    return "suggestion";
+    return named ? "calendar" : "suggestion";
   };
 
   const suggestionTestId = (index: number) => {
@@ -676,12 +699,14 @@ export default function useTimeRangeTyping(props: TimeRangeTypingProps, deps: Ti
               ? plan.reason
               : tag && "longestAllowed" in tag
                 ? String(t("dateTime.longestAllowed"))
-                : row.relative
-                  ? ""
-                  : row.hint;
+                : row.cut
+                  ? String(t("dateTime.cutToTenYears"))
+                  : row.relative
+                    ? ""
+                    : row.hint;
           return {
             id: `suggest-${row.key}`,
-            kind: suggestionKind(index),
+            kind: suggestionKind(index, row.named),
             label: row.label,
             hint: row.relative && !restricted ? row.hint : undefined,
             meta,
@@ -874,14 +899,15 @@ export default function useTimeRangeTyping(props: TimeRangeTypingProps, deps: Ti
     suggestionsDismissed.value = true;
   };
 
-  // Enter reads again against a fresh now; a list the user has not seen yet is shown before anything applies.
+  // Enter reads again against a fresh now; only alternatives of text with no reading are shown before applying.
   const commitInput = () => {
     if (!inputText.value.trim()) return;
     const pending = readTimer !== null;
     const listWasOpen = suggestionsOpen.value;
     readInputText(listWasOpen && !pending);
     lastReadText = inputText.value.trim();
-    const unseenList = pending || (!listWasOpen && !inputReading.value);
+    // Text with a reading of its own applies it at once, so a fast Enter never waits on the read delay.
+    const unseenList = !listWasOpen && !inputReading.value;
     if (inputSuggestions.value.length > 0 && unseenList && !readingOnly.value) {
       suggestionsDismissed.value = false;
       return;

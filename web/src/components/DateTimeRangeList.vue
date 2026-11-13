@@ -116,6 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :placeholder="t('dateTime.name')"
             :aria-label="t('dateTime.nameRange', { range: row.label })"
             :submit-on-enter="false"
+            fill
             data-test="date-time-list-pin-name"
             @commit="emit('rename', row.id, $event)"
             @cancel="emit('rename-cancel', row.id)"
@@ -131,9 +132,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template v-else>{{ piece.text }}</template>
           </template>
         </span>
-        <span v-if="row.hint" class="text-text-secondary shrink-0 tabular-nums">{{
-          row.hint
-        }}</span>
+        <span
+          v-if="row.hint"
+          class="shrink-0 tabular-nums"
+          data-test="date-time-list-row-hint"
+          :class="index === active ? 'text-text-body' : 'text-text-secondary'"
+          >{{ row.hint }}</span
+        >
         <span
           v-if="row.id === editingId"
           class="text-text-secondary shrink-0 text-xs tabular-nums"
@@ -143,7 +148,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span
           v-else-if="row.meta"
           class="inline-flex max-w-[60%] shrink-0 items-center gap-1 text-xs tabular-nums"
-          :class="row.reason ? 'text-text-disabled' : 'text-text-secondary'"
+          :class="index === active ? 'text-text-body' : 'text-text-secondary'"
           :data-test="row.reason ? `${row.testId}-reason` : undefined"
         >
           <OIcon v-if="row.reason" name="lock" size="xs" class="shrink-0" />
@@ -166,9 +171,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click.stop="emit('remove', row.id)"
           />
           <OShortcut
-            v-else-if="index === active && (row.id === editingId || ENTER_KINDS.includes(row.kind))"
+            v-else-if="row.id === editingId || (index === active && ENTER_KINDS.includes(row.kind))"
             keys="enter"
             size="sm"
+            class="[&_kbd]:text-text-body!"
           />
         </span>
       </div>

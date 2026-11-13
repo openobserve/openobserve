@@ -516,6 +516,7 @@ describe("ShareButton", () => {
               shareCopyLive: "Copy live link",
               shareCopyFixed: "Copy fixed link",
               shareCopyWithRange: "Copy link and range",
+              shareCopyWithRangeHint: "Adds “{line}”",
               shareLiveHint: "{name} · moves with now",
               shareKindLive: "live",
               shareKindFixed: "fixed",
@@ -526,8 +527,9 @@ describe("ShareButton", () => {
           },
         },
       });
-    const mountKinds = (props: Record<string, unknown>) =>
+    const mountKinds = (props: Record<string, unknown>, slots: Record<string, string> = {}) =>
       mount(ShareButton, {
+        slots,
         props: {
           url: FIXED,
           fixedLabel: FIXED_LABEL,
@@ -647,6 +649,25 @@ describe("ShareButton", () => {
       expect(lastCopy()[0]).toBe(
         "https://short.url/abc123\nLogs · default · Last 15 minutes · Nov 11, 06:57 – 07:12 UTC · live",
       );
+    });
+
+    it("describes the line the range copy adds", () => {
+      const wrapper = mountKinds({
+        liveUrl: LIVE,
+        rangeContext: "Logs · default",
+        fixedCopyLabel: "Nov 11, 06:57 – 07:12 UTC",
+      });
+      expect(wrapper.get('[data-test="share-button-copy-with-range"]').text()).toContain(
+        "Adds “Logs · default · Nov 11, 06:57 – 07:12 UTC · fixed”",
+      );
+    });
+
+    it("lists the caller's extra menu items after the copy kinds", () => {
+      const wrapper = mountKinds(
+        {},
+        { "menu-extra": "<div role='menuitem' data-test='extra-item'>Publish</div>" },
+      );
+      expect(itemIds(wrapper)).toEqual(["share-button-copy-fixed", "extra-item"]);
     });
 
     it("says why Share is greyed instead of naming the copy kind", () => {

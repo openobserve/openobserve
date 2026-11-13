@@ -65,6 +65,16 @@ describe("OToggleGroup", () => {
     expect(wrapper.emitted("update:modelValue")).toBeDefined();
   });
 
+  it("keeps a single selection and emits reselect when the lit item is clicked", async () => {
+    const wrapper = mountGroup({ modelValue: "left" }, [
+      { value: "left", label: "Left" },
+      { value: "right", label: "Right" },
+    ]);
+    await wrapper.findAll("button")[0].trigger("click");
+    expect(wrapper.emitted("update:modelValue")).toBeUndefined();
+    expect(wrapper.emitted("reselect")).toEqual([["left"]]);
+  });
+
   // --- v-model: active item has data-state=on ---
 
   it('marks the active item with data-state="on"', async () => {

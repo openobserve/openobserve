@@ -103,7 +103,8 @@ export const usePanelRefreshAfterRestore = <S extends PanelLoaderState>({
     if (isCalendarRange(selectedWindow)) {
       return toMs(cachedWindow?.start_time) === toMs(selectedWindow?.start_time);
     }
-    return true;
+    // A link to another relative length must query, not show the old length's data under the new label.
+    return !freshOnOpen || !cachedWindowDiffers(cachedWindow, selectedWindow, false);
   };
 
   // A restore from another window length is not fresh, even for a panel already refreshed this visit.

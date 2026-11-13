@@ -204,9 +204,10 @@ describe("DateTime calendar", () => {
     });
 
     it("runs the minute clock only while a calendar range can be on screen", async () => {
-      const minuteTimers = () => setIntervalSpy.mock.calls.filter(([, ms]) => ms === 60_000).length;
-      const setIntervalSpy = vi.spyOn(globalThis, "setInterval");
-      const clearIntervalSpy = vi.spyOn(globalThis, "clearInterval");
+      const minuteTimers = () =>
+        setTimeoutSpy.mock.calls.filter(([fn]) => (fn as () => void).name === "tickClock").length;
+      const setTimeoutSpy = vi.spyOn(globalThis, "setTimeout");
+      const clearIntervalSpy = vi.spyOn(globalThis, "clearTimeout");
 
       createWrapper({ calendarPresets: false });
       await flushPromises();
@@ -226,7 +227,7 @@ describe("DateTime calendar", () => {
       createWrapper({ defaultRelativeTime: "calendar:day:-2" });
       await flushPromises();
       expect(minuteTimers()).toBe(2);
-      setIntervalSpy.mockRestore();
+      setTimeoutSpy.mockRestore();
       clearIntervalSpy.mockRestore();
     });
 

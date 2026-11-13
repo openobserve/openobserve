@@ -46,6 +46,8 @@ export interface InlineEditProps {
   errorMessage?: I18nText;
   /** Whether Enter also submits the owning form; `false` makes Enter only commit. @default true */
   submitOnEnter?: boolean;
+  /** The editing input takes the full width of its container instead of sizing to its text. */
+  fill?: boolean;
   /** Tokens offered at the caret while editing, as in OTemplateInput; absent or empty means none. */
   suggestions?: TemplateSuggestion[];
   /** Token syntax the suggestions open on and insert. @default "double" */

@@ -563,7 +563,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div
         ref="toolbarRightRef"
-        class="flex flex-shrink-0 items-center gap-2 max-md:w-full max-md:justify-end max-[24rem]:flex-wrap max-[24rem]:gap-y-1"
+        class="flex flex-shrink-0 items-center gap-2 max-md:w-full max-md:flex-wrap max-md:justify-end max-md:gap-x-1 max-md:gap-y-1"
       >
         <OPageHeaderStatus />
         <template v-if="searchObj.meta.showTransformEditor && !shouldMoveShareToMenu">
@@ -881,7 +881,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTooltip :content="t('search.functionEditorLabel')" />
         </OButton>
 
-        <div class="order-1 min-w-0 max-md:me-auto max-[24rem]:shrink-0">
+        <div class="order-1 min-w-0 max-md:me-auto max-md:shrink-0">
           <DateTime
             ref="dateTimeRef"
             auto-apply
@@ -907,7 +907,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <div class="search-time order-2">
-          <div class="flex gap-2">
+          <div class="flex gap-2 max-md:gap-1">
             <OTooltip
               v-if="
                 config.isEnterprise == 'true' &&
@@ -976,7 +976,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </ODropdown>
             </OButtonGroup>
             <RecentSearchesButton
-              class="me-1 size-[2.125rem]!"
+              class="size-[2.125rem]! md:me-1"
               data-test="logs-search-bar-recent-searches-btn"
               @view-all="openRecentSearches"
             />
@@ -1143,7 +1143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :variant="showRunQueryPending ? 'pending' : 'primary'"
                 :title="t('search.runQuery')"
                 size="sm-toolbar"
-                class="rounded-s-default! relative min-w-[5.875rem] rounded-e-none! [transition:box-shadow_0.3s_ease,opacity_0.2s_ease]"
+                class="rounded-s-default! relative rounded-e-none! [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] md:min-w-[5.875rem]"
                 :class="[
                   showRunQueryPending
                     ? ''
@@ -1176,7 +1176,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   size="xs"
                   class="me-1"
                 />
-                {{ t("search.runQuery") }}
+                <OIcon
+                  v-if="!(searchObj.meta.liveMode && store.state.zoConfig.auto_query_enabled)"
+                  name="play-arrow"
+                  size="sm"
+                  class="md:hidden"
+                />
+                <span class="max-md:sr-only">{{ t("search.runQuery") }}</span>
               </OButton>
               <OSeparator
                 v-if="!showRunQueryPending || isRunQueryCancelShown"
@@ -1248,7 +1254,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </ODropdown>
               <!-- Compact Auto Refresh Button -->
               <AutoRefreshInterval
-                class="ms-2"
+                class="ms-1 md:ms-2"
                 v-model="searchObj.meta.refreshInterval"
                 :trigger="true"
                 :is-compact="true"
@@ -3378,7 +3384,7 @@ export default defineComponent({
       ) {
         // "run" is explicit and would execute unsaved editor edits.
         if (resumesRefresh && !searchObj.meta.editorDirty) autoRun.request("run");
-        else requestTimeRun(value.valueType, isZoom);
+        else requestTimeRun(value.valueType, isZoom || value.rerun === true);
       }
     };
 
