@@ -38,6 +38,7 @@ const mocks = vi.hoisted(() => ({
   alerts: { value: [] as unknown[] },
   listOrgRcaRuns: vi.fn(),
   railMounted: vi.fn(),
+  focusAsk: vi.fn(),
 }));
 
 vi.mock("./useAgentHomeState", async () => {
@@ -119,6 +120,7 @@ vi.mock("@/components/ai-assistant/welcome/AssistantLauncher.vue", () => ({
   default: {
     name: "AssistantLauncher",
     props: ["layout", "pageRange"],
+    methods: { focusAsk: () => mocks.focusAsk(), fill: () => undefined },
     template: '<div data-test="launcher-stub" :data-layout="layout" />',
   },
 }));
@@ -180,6 +182,7 @@ describe("AssistantHomeTab", () => {
     set(mocks.alerts, []);
     mocks.listOrgRcaRuns.mockReset();
     mocks.railMounted.mockReset();
+    mocks.focusAsk.mockReset();
     localStorage.clear();
     store.state.currentuser.role = "admin";
   });
@@ -205,6 +208,23 @@ describe("AssistantHomeTab", () => {
       expect(wrapper.find(`[data-test="${gone}"]`).exists()).toBe(false);
     }
     expect(mocks.load).toHaveBeenCalledTimes(1);
+  });
+
+  it("asks the Ask box to take focus on mount, and again on Back from Capabilities", async () => {
+    const wrapper = mountTab();
+    await flushPromises();
+    expect(mocks.focusAsk).toHaveBeenCalledTimes(1);
+    await wrapper.get('[data-test="assistant-home-capabilities"]').trigger("click");
+    await wrapper.get('[data-test="assistant-capabilities-back"]').trigger("click");
+    await flushPromises();
+    expect(mocks.focusAsk).toHaveBeenCalledTimes(2);
+  });
+
+  it("asks nothing to focus when the agent is off", async () => {
+    set(mocks.offReason, "off");
+    mountTab();
+    await flushPromises();
+    expect(mocks.focusAsk).not.toHaveBeenCalled();
   });
 
   it("on a wide screen with the agent on, lists the chats in a see-through left rail beside the column, mounted once after Home's own read", async () => {

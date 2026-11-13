@@ -194,7 +194,7 @@ export function useAssistantPlaces(input: () => AssistantPlacesInput): {
     if (input().placement === "full") return;
     trackMove("full");
     const sid = input().sid ?? store.state.shell.activeSid;
-    if (sid && store.windowOf(sid)) store.open({ kind: "full" }, { sid, focus: "none" });
+    if (sid && store.windowOf(sid)) store.open({ kind: "full" }, { sid, focus: "composer" });
     else store.moveTo({ kind: "full" });
     void router.push({ name: "assistant", params: sid ? { chatId: sid } : {} });
   }
