@@ -75,7 +75,7 @@ struct LogoUploadForm {
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "create"})),
-        ("x-o2-mcp" = json!({"description": "Create/update org settings", "category": "users"}))
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 pub async fn create(

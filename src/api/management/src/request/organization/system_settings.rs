@@ -27,7 +27,9 @@ use axum::{
 use config::{
     meta::{
         alerts::auto_investigate::{AUTO_INVESTIGATE_GATE_SETTING_KEY, GateSettings},
-        system_settings::{SettingScope, SystemSetting, SystemSettingPayload, SystemSettingQuery},
+        system_settings::{
+            SettingScope, SystemSetting, SystemSettingPayload, SystemSettingQuery, keys,
+        },
         user::UserRole,
     },
     utils::json::Value,
@@ -40,9 +42,8 @@ use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 
 /// Keys owned by endpoints with stricter authorization than the generic settings API.
 fn is_reserved_key(key: &str) -> bool {
-    key.trim()
-        .to_ascii_lowercase()
-        .starts_with(db::prompt_settings::PROMPT_SETTINGS_PREFIX)
+    let key = key.trim().to_ascii_lowercase();
+    key.starts_with(db::prompt_settings::PROMPT_SETTINGS_PREFIX) || key == keys::PASSWORD_POLICY
 }
 
 /// Keys of the retired org default templates level; nothing reads them, so they read as absent.
@@ -63,8 +64,13 @@ fn hidden_key_response() -> Response {
     MetaHttpResponse::not_found("Setting not found")
 }
 
-fn reserved_key_response() -> Response {
-    MetaHttpResponse::forbidden("This setting is managed by /prompts/settings")
+fn reserved_key_response(key: &str) -> Response {
+    let owner = if key.trim().eq_ignore_ascii_case(keys::PASSWORD_POLICY) {
+        "/settings/password_policy"
+    } else {
+        "/prompts/settings"
+    };
+    MetaHttpResponse::forbidden(format!("This setting is managed by {owner}"))
 }
 
 /// Typed keys are refused here, since their readers silently fall back to defaults on a bad value.
@@ -249,7 +255,7 @@ pub async fn set_org_setting(
     Json(payload): Json<SystemSettingPayload>,
 ) -> Response {
     if is_reserved_key(&payload.setting_key) {
-        return reserved_key_response();
+        return reserved_key_response(&payload.setting_key);
     }
     if let Some(response) = invalid_value_response(&payload.setting_key, &payload.setting_value) {
         return response;
@@ -306,7 +312,7 @@ pub async fn set_user_setting(
     Json(payload): Json<SystemSettingPayload>,
 ) -> Response {
     if is_reserved_key(&payload.setting_key) {
-        return reserved_key_response();
+        return reserved_key_response(&payload.setting_key);
     }
     if is_hidden_key(&payload.setting_key) {
         return MetaHttpResponse::bad_request("This setting is not writable here");
@@ -365,7 +371,7 @@ pub async fn set_user_setting(
 )]
 pub async fn delete_org_setting(Path((org_id, key)): Path<(String, String)>) -> Response {
     if is_reserved_key(&key) {
-        return reserved_key_response();
+        return reserved_key_response(&key);
     }
     if is_hidden_key(&key) {
         return hidden_key_response();
@@ -410,7 +416,7 @@ pub async fn delete_user_setting(
     Headers(user_email): Headers<UserEmail>,
 ) -> Response {
     if is_reserved_key(&key) {
-        return reserved_key_response();
+        return reserved_key_response(&key);
     }
     if is_hidden_key(&key) {
         return hidden_key_response();
@@ -446,17 +452,30 @@ mod tests {
         assert!(is_hidden_key("templates_renamed_pending"));
     }
 
+    #[test]
+    fn password_policy_key_is_reserved() {
+        assert!(is_reserved_key(keys::PASSWORD_POLICY));
+        assert!(is_reserved_key(" Password_Policy "));
+        assert!(!is_reserved_key("password_policy_hint"));
+    }
+
     #[tokio::test]
-    async fn generic_api_rejects_prompt_settings_writes() {
+    async fn generic_api_rejects_reserved_key_writes() {
+        for key in ["prompt_settings/default", keys::PASSWORD_POLICY] {
+            assert_reserved_writes_forbidden(key).await;
+        }
+    }
+
+    async fn assert_reserved_writes_forbidden(key: &str) {
         let payload = || {
             Json(SystemSettingPayload {
-                setting_key: "prompt_settings/default".to_string(),
+                setting_key: key.to_string(),
                 setting_value: serde_json::json!({"protectedLabels": ["x"]}),
                 setting_category: None,
                 description: None,
             })
         };
-        let key = "prompt_settings/default".to_string();
+        let key = key.to_string();
         let org = "default".to_string();
         for response in [
             set_org_setting(Path(org.clone()), payload()).await,
