@@ -33,6 +33,7 @@ import {
   isCustomQueryVariable,
   isQueryVariableAllPending,
   mapSqlRowsToOptions,
+  defaultSqlValueColumn,
   mapValuesToOptions,
   parsePromVariableQuery,
   QUERY_VARIABLE_NO_VALUES,
@@ -489,6 +490,18 @@ describe("mapSqlRowsToOptions", () => {
       { label: "search", value: "search" },
     ]);
     expect(result.capped).toBe(false);
+  });
+
+  it("defaults the value past internal columns, and to the only column when all are internal", () => {
+    const result = mapSqlRowsToOptions(
+      [
+        { _timestamp: 1, _o2_id: 9, service_name: "checkout" },
+        { _timestamp: 2, _o2_id: 8, service_name: "cart" },
+      ],
+      {},
+    );
+    expect(result.options.map((o) => o.value)).toEqual(["checkout", "cart"]);
+    expect(defaultSqlValueColumn(["_timestamp"])).toBe("_timestamp");
   });
 
   it("uses the label column and falls back to the value when the label is empty", () => {

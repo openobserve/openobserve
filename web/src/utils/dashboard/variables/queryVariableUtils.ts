@@ -585,7 +585,11 @@ export const getSqlResultColumns = (rows: Record<string, unknown>[]): string[] =
   return columns;
 };
 
-/** Turns SQL rows into deduped, capped options; value defaults to the first column, label to the value. */
+// A non-aggregate search returns `_timestamp` and other `_` internals first, which are never meant as option values.
+export const defaultSqlValueColumn = (columns: string[]): string | undefined =>
+  columns.find((column) => !column.startsWith("_")) ?? columns[0];
+
+/** Turns SQL rows into deduped, capped options; value defaults to the first non-internal column, label to the value. */
 export const mapSqlRowsToOptions = (
   rows: Record<string, unknown>[],
   {
@@ -595,9 +599,10 @@ export const mapSqlRowsToOptions = (
   }: { valueField?: string | null; labelField?: string | null; maxRecords?: number },
 ): SqlRowsOptionsResult => {
   const columns = getSqlResultColumns(rows);
-  const valueColumn = valueField && columns.includes(valueField) ? valueField : columns[0];
-  const labelColumn = labelField && columns.includes(labelField) ? labelField : valueColumn;
+  const valueColumn =
+    valueField && columns.includes(valueField) ? valueField : defaultSqlValueColumn(columns);
   if (!valueColumn) return { options: [], columns, capped: false };
+  const labelColumn = labelField && columns.includes(labelField) ? labelField : valueColumn;
 
   const seen = new Set<string>();
   const options: QueryVariableOption[] = [];

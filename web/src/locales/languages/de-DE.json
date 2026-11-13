@@ -9383,7 +9383,7 @@
       "noValuesDescription": "The query ran but returned no rows for this time range.",
       "previewFailed": "The query failed",
       "valueField": "Value column",
-      "valueFieldHelp": "Sent to panels and the URL. Defaults to the first column.",
+      "valueFieldHelp": "Sent to panels and the URL. Defaults to the first column not starting with _ (such as _timestamp).",
       "labelField": "Label column",
       "labelFieldHelp": "Shown in the dropdown. Defaults to the value.",
       "runPreviewFirst": "Run the preview to choose a column",

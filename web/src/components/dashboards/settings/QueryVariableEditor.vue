@@ -265,6 +265,7 @@ import { generateTraceContext } from "@/utils/zincutils";
 import { getConsumableRelativeTime } from "@/utils/date";
 import { extractVariableNames } from "@/utils/dashboard/variables/variablesDependencyUtils";
 import {
+  defaultSqlValueColumn,
   getQueryVariableMaxRecords,
   getUndefinedQueryVariableNames,
   substituteQueryVariables,
@@ -434,10 +435,12 @@ const runSql = (request: SqlVariableQueryRequest) => {
 
 const setField = (name: string, value: unknown) => form.setFieldValue(name, value);
 
+// An empty result names no columns, so it cannot prove the picked ones gone; they stay until a run with rows.
 const syncColumnFields = (columns: string[]) => {
   if (!columns.length) return;
   const valueField = queryData.value?.value_field;
-  if (!valueField || !columns.includes(valueField)) setField("query_data.value_field", columns[0]);
+  if (!valueField || !columns.includes(valueField))
+    setField("query_data.value_field", defaultSqlValueColumn(columns));
   const labelField = queryData.value?.label_field;
   if (labelField && !columns.includes(labelField)) setField("query_data.label_field", "");
 };

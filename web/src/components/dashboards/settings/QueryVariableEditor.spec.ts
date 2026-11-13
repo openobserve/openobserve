@@ -231,6 +231,36 @@ describe("QueryVariableEditor", () => {
     wrapper.unmount();
   });
 
+  it("skips _timestamp when it defaults the value column of a non-aggregate query", async () => {
+    streamRespondsWith([{ _timestamp: 1_794_551_852_000_000, service_name: "checkout" }]);
+    const wrapper = mountEditor({ query: "SELECT service_name FROM app_logs" });
+    await flushPromises();
+    await runPreview(wrapper);
+    expect(formOf(wrapper).state.values.query_data.value_field).toBe("service_name");
+    wrapper.unmount();
+  });
+
+  it("keeps the picked columns when a later run returns no rows", async () => {
+    streamRespondsWith([{ service_id: "svc-0", service_name: "checkout" }]);
+    const wrapper = mountEditor({
+      query: "SELECT service_id, service_name FROM logs",
+      value_field: "service_name",
+      label_field: "service_id",
+    });
+    await flushPromises();
+    await runPreview(wrapper);
+
+    streamRespondsWith([]);
+    await runPreview(wrapper);
+
+    expect(wrapper.find('[data-test="dashboard-variable-query-preview-empty"]').exists()).toBe(
+      true,
+    );
+    expect(formOf(wrapper).state.values.query_data.value_field).toBe("service_name");
+    expect(formOf(wrapper).state.values.query_data.label_field).toBe("service_id");
+    wrapper.unmount();
+  });
+
   it("flags a capped preview", async () => {
     streamRespondsWith([{ v: "a" }, { v: "b" }, { v: "c" }]);
     const wrapper = mountEditor({ query: "SELECT v FROM t", max_record_size: 2 });
