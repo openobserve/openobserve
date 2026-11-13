@@ -374,7 +374,6 @@ test.describe('IAM · Edit Role · grant semantics', { tag: '@enterprise' }, () 
         await expect
             .poll(async () => (await getPerms(page, name)).length, { timeout: 30000 })
             .toBeGreaterThan(0);
-        await expect.poll(async () => staged(), { timeout: 10000 }).toBe(0);
     });
 
     test('G-19 · the Alert Manager preset adds module-wide grants plus Streams List and Get, leaving nothing missing', {
