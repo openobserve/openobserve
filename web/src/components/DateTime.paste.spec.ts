@@ -2150,6 +2150,28 @@ describe("DateTime paste", () => {
       });
     });
 
+    it("re-emits a parent's zoom to the range already applied, so its search still runs", async () => {
+      createWrapper();
+      await flushPromises();
+      const range = {
+        start: Date.parse("2026-11-09T03:00:00Z"),
+        end: Date.parse("2026-11-09T04:00:00Z"),
+      };
+      expect(wrapper!.vm.setCustomDate("absolute", range)).toBe(true);
+      await flushPromises();
+      const before = emits().length;
+
+      expect(wrapper!.vm.setCustomDate("absolute", range)).toBe(true);
+      await flushPromises();
+
+      expect(emits()).toHaveLength(before + 1);
+      expect(lastEmit()).toMatchObject({
+        startTime: micros("2026-11-09T03:00:00Z"),
+        endTime: micros("2026-11-09T04:00:00Z"),
+        userChangedValue: false,
+      });
+    });
+
     it("keeps a parent's range set while the Apply-mode panel is open when it closes", async () => {
       createWrapper({ autoApply: false, defaultType: "absolute" });
       await flushPromises();
@@ -2172,12 +2194,13 @@ describe("DateTime paste", () => {
       await flushPromises();
       const before = emits().length;
 
-      wrapper!.vm.setCustomDate("absolute", {
+      const applied = wrapper!.vm.setCustomDate("absolute", {
         start: Date.parse("2026-11-09T04:00:00Z"),
         end: Date.parse("2026-11-09T03:00:00Z"),
       });
       await flushPromises();
 
+      expect(applied).toBe(false);
       expect(emits()).toHaveLength(before);
       expect(wrapper!.vm.getConsumableDateTime()).toMatchObject({ relativeTimePeriod: "1h" });
     });

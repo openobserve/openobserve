@@ -32,6 +32,15 @@ export const fixedRangeEnd = (datetime: {
   return Number.isFinite(end) && end > 0 ? end : null;
 };
 
+/** An ended fixed range stops refreshing once a run began at or past its end, so the tail is fetched. */
+export const fixedRangeRefreshDone = (
+  rangeEndUs: number | null | undefined,
+  lastRunMs: number | null,
+  nowMs: number,
+): boolean =>
+  fixedRangeEnded(rangeEndUs, nowMs) &&
+  (lastRunMs === null || lastRunMs * 1000 >= (rangeEndUs as number));
+
 /** An ended fixed range outranks a hidden tab, as coming back would not resume it. */
 export const autoRefreshState = (options: {
   intervalSeconds: number;

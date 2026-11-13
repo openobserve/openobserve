@@ -174,6 +174,7 @@ interface IsoSingleParsed {
   offset?: string; // set when hasOffset
   date?: string; // YYYY/MM/DD — set when !hasOffset
   time?: string; // HH:MM:SS — set when !hasOffset and a time was given
+  subMicros?: number; // µs past the time's millisecond
 }
 
 // A stamp that wrote its own offset keeps it, so the reading can name the zone it came from.
@@ -183,15 +184,15 @@ type StampedSingle =
 // One side of a range: an instant (offset, epoch, JSON), a zoneless date[+time], or a time of day that borrows the other side's date.
 type RangePoint =
   | { kind: "instant"; micros: number; date?: string; offset?: string }
-  | { kind: "civil"; date: string; time?: string }
-  | { kind: "time"; time: string; offset?: string };
+  | { kind: "civil"; date: string; time?: string; subMicros?: number }
+  | { kind: "time"; time: string; offset?: string; subMicros?: number };
 
 export const SINGLE_WINDOW_MICROS = 5 * 60 * 1_000_000;
 const ABSOLUTE_SINGLE_RE = /^(\d{4}\/\d{2}\/\d{2})(?:\s+(\d{2}:\d{2}(?::\d{2})?))?$/;
 // Only whole epoch units count; 11, 12, 14, 15, 17 and 18 digits are a typo, not a time.
 const TIMESTAMP_SINGLE_RE = /^(\d{10}|\d{13}|\d{16}|\d{19})$/;
 const ISO_SINGLE_RE =
-  /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2})(?::(\d{2}(?:\.\d{1,6})?))?)?(Z|[+-]\d{2}(?::?\d{2})?)?$/;
+  /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2})(?::(\d{2}(?:\.\d{1,6})?))?)?\s*(Z|[+-]\d{2}(?::?\d{2})?)?$/;
 const TIME_ONLY_RE = /^(\d{2}):(\d{2})(?::(\d{2}(?:\.\d{1,6})?))?(Z|[+-]\d{2}(?::?\d{2})?)?$/;
 // The app's own log/trace timestamp display format (src/utils/date.ts formatTimestamp).
 const HUMAN_LOG_SINGLE_RE =
@@ -670,6 +671,7 @@ function parseIsoSingle(raw: string): IsoSingleParsed | null {
     hasOffset: false,
     date: `${year}/${month}/${day}`,
     time: hour ? `${hour}:${minute}:${msSecond ?? "00"}` : undefined,
+    subMicros: subMillisMicros(second),
   };
 }
 
@@ -711,6 +713,7 @@ function parseHumanLogSingle(raw: string): IsoSingleParsed | null {
     hasOffset: false,
     date: `${year}/${month}/${dd}`,
     time: `${hour}:${minute}:${secWithMs}`,
+    subMicros: subMillisMicros(fraction),
   };
 }
 
@@ -723,6 +726,7 @@ function parseTimeOnly(s: string): RangePoint | null {
     kind: "time",
     time: `${hour}:${minute}:${millisSecond(second)}`,
     offset: offset ? normalizeOffset(offset) : undefined,
+    subMicros: subMillisMicros(second),
   };
 }
 
@@ -737,7 +741,8 @@ function parsePoint(raw: string): RangePoint | null {
   if (iso?.hasOffset) {
     return { kind: "instant", micros: iso.micros as number, date: iso.date, offset: offsetOf(s) };
   }
-  if (iso) return { kind: "civil", date: iso.date as string, time: iso.time };
+  if (iso)
+    return { kind: "civil", date: iso.date as string, time: iso.time, subMicros: iso.subMicros };
   if (TIMESTAMP_SINGLE_RE.test(s)) return { kind: "instant", micros: toMicros(s) };
   const absolute = parseAbsoluteSlash(s);
   if (absolute) return { kind: "civil", ...absolute };
@@ -745,8 +750,23 @@ function parsePoint(raw: string): RangePoint | null {
 }
 
 // An end earlier in the day than its start crosses midnight, so it lands on the next day.
-function endDateFor(startDate: string, startTime: string, endTime: string): string {
-  return endTime >= startTime ? startDate : nextCivilDate(startDate);
+function endDateFor(
+  start: RangePoint & { kind: "civil" },
+  end: RangePoint & { kind: "time" },
+): string {
+  const startKey = timeKey(start.time ?? "00:00:00", start.subMicros);
+  return timeKey(end.time, end.subMicros) >= startKey ? start.date : nextCivilDate(start.date);
+}
+
+// Civil times hold milliseconds, so an end with leftover µs rounds up to keep its last µs inside the range.
+function roundedUpEnd(
+  date: string,
+  time: string,
+  subMicros = 0,
+): { endDate: string; endTime: string } {
+  if (!subMicros) return { endDate: date, endTime: time };
+  const at = new Date(civilOf(date, time) + 1);
+  return { endDate: civilDate(at), endTime: civilTime(at) };
 }
 
 function nextCivilDate(date: string): string {
@@ -786,41 +806,42 @@ function combineRangePoints(
     );
   }
   if (start.kind === "civil" && end.kind === "civil") {
-    if (end.time && civilKey(end.date, end.time) <= civilKey(start.date, start.time)) {
-      return markReversed(seen);
-    }
-    // A dateless end covers its whole day, so it ends at the next midnight, as the search end is exclusive.
+    // A timeless end covers its whole day, so it ends at the next midnight, as the search end is exclusive.
+    const endKey = end.time
+      ? civilKey(end.date, end.time, end.subMicros)
+      : civilKey(nextCivilDate(end.date));
+    if (endKey <= civilKey(start.date, start.time, start.subMicros)) return markReversed(seen);
     return {
       type: "absolute",
       startDate: start.date,
       startTime: start.time ?? "00:00:00",
-      endDate: end.time ? end.date : nextCivilDate(end.date),
-      endTime: end.time ?? "00:00:00",
+      ...(end.time
+        ? roundedUpEnd(end.date, end.time, end.subMicros)
+        : { endDate: nextCivilDate(end.date), endTime: "00:00:00" }),
     };
   }
   if (end.kind !== "time") return null;
   if (start.kind === "civil" && !end.offset) {
-    const startTime = start.time ?? "00:00:00";
     return {
       type: "absolute",
       startDate: start.date,
-      startTime,
-      endDate: endDateFor(start.date, startTime, end.time),
-      endTime: end.time,
+      startTime: start.time ?? "00:00:00",
+      ...roundedUpEnd(endDateFor(start, end), end.time, end.subMicros),
     };
   }
   if (start.kind !== "instant" || !start.date || !start.offset) return null;
   const offset = end.offset ?? start.offset;
   // The end is the first time of day after the start, counted on the start's calendar day as seen in the end's offset.
   const dayInEndOffset = civilDate(new Date(start.micros / 1000 + offsetMillis(offset)));
+  const sub = end.subMicros ?? 0;
   const sameDay = instantFromOffsetParts(dayInEndOffset, end.time, offset);
-  const endMicros =
-    sameDay !== null && sameDay <= start.micros
-      ? instantFromOffsetParts(nextCivilDate(dayInEndOffset), end.time, offset)
-      : sameDay;
-  return endMicros === null
-    ? null
-    : withSourceZone({ type: "timestamp", startMicros: start.micros, endMicros }, start.offset);
+  const nextDay = () => instantFromOffsetParts(nextCivilDate(dayInEndOffset), end.time, offset);
+  const base = sameDay !== null && sameDay + sub <= start.micros ? nextDay() : sameDay;
+  if (base === null) return null;
+  return withSourceZone(
+    { type: "timestamp", startMicros: start.micros, endMicros: base + sub },
+    start.offset,
+  );
 }
 
 function markReversed(seen?: ParseContext["seen"]): null {
@@ -828,8 +849,14 @@ function markReversed(seen?: ParseContext["seen"]): null {
   return null;
 }
 
-function civilKey(date: string, time = "00:00:00"): string {
-  return `${date.replace(/-/g, "/")} ${time}`;
+function civilKey(date: string, time = "00:00:00", subMicros = 0): string {
+  return `${date.replace(/-/g, "/")} ${timeKey(time, subMicros)}`;
+}
+
+// Fixed-width `HH:MM:SS.ffffff`, so times with and without a fraction compare as strings.
+function timeKey(time: string, subMicros = 0): string {
+  const [clock, fraction = ""] = time.split(".");
+  return `${clock}.${fraction.padEnd(3, "0")}${String(subMicros).padStart(3, "0")}`;
 }
 
 function withSourceZone(range: TimestampRangeResult, offset?: string): TimestampRangeResult {
@@ -1006,7 +1033,7 @@ function readTimeInput(raw: string, ctx: ParseContext): ParsedTimeInput | null {
   const snapped = readSnap(pasted, ctx);
   if (snapped) return snapped;
   const business = readBusinessPeriod(pasted, ctx);
-  if (business) return business;
+  if (business) return isWhollyFuture(business, ctx) && !ctx.keepFuture ? null : business;
   const stamped = readQueryString(pasted, ctx.seen) ?? readLegacy(pasted, ctx.seen);
   if (stamped) return markYear(stamped);
   const natural = readNatural(pasted, ctx);

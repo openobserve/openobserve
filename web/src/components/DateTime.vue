@@ -430,7 +430,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 hide-icon
                 format24
                 revert-refused
-                :error="timeFieldError?.field === 'start'"
+                :error="unreadableFields.start || timeFieldError?.field === 'start'"
                 hide-message
                 :model-value="selectedTime.startTime"
                 with-seconds
@@ -457,7 +457,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 hide-icon
                 format24
                 revert-refused
-                :error="timeFieldError?.field === 'end'"
+                :error="unreadableFields.end || timeFieldError?.field === 'end'"
                 hide-message
                 :model-value="selectedTime.endTime"
                 with-seconds
@@ -1065,11 +1065,9 @@ export default defineComponent({
     // The panel aligns to the whole ‹ trigger › group, not the trigger alone.
     const groupEl = ref<HTMLElement | null>(null);
     // The Start or End field whose last edit was refused, and why.
-    const timeFieldError = ref<{
-      field: "start" | "end";
-      message: I18nText;
-      examples?: I18nText;
-    } | null>(null);
+    const timeFieldError = ref<{ field: "start" | "end"; message: I18nText } | null>(null);
+    // Set only by each field's own @invalid, so an edit to the other field cannot unblock Apply.
+    const unreadableFields = ref({ start: false, end: false });
     // A readable time still being typed in Start or End, previewed in the summary before the field commits it.
     const typedFieldTime = ref<{ field: "start" | "end"; time: string; ms: boolean } | null>(null);
     // The bar's current reading and its alternatives; nothing applies until Enter or a pick.
@@ -1138,11 +1136,12 @@ export default defineComponent({
         store.dispatch("setTimezone", selectedTimezone);
       }
       await nextTick();
+      // A pending live pick still closes back to the applied fixed range, so its fields redraw too.
+      redrawAbsoluteAtOpen();
       if (fixed) {
         heldInstants = null;
         writeAbsoluteFields(fixed.startUTC, fixed.endUTC);
         holdUnshownInstants(fixed.startUTC, fixed.endUTC);
-        redrawAbsoluteAtOpen();
         // After the flush in which the redrawn fields settle, or the selection watcher clears it.
         nextTick(() => (zoneRedrawn.value = true));
       } else if (props.autoApply) {
@@ -1903,7 +1902,7 @@ export default defineComponent({
     };
 
     // Parent-invoked setter for a chart drag-zoom — programmatic, but a range the user picked.
-    const setCustomDate = (dateType: string, dateobj: { start: number; end: number }) => {
+    const setCustomDate = (dateType: string, dateobj: { start: number; end: number }): boolean => {
       // Charts hand over `toZonedTime(instant, appZone)` values, so they become instants once, before any bound.
       const appZone = store.state.timezone || zone.value;
       const range = trustedRange(
@@ -1911,10 +1910,15 @@ export default defineComponent({
         instantFromShiftedMs(Math.floor(Number(dateobj.end)), appZone),
       );
       // A refused zoom (zero width, or past maxDate) keeps the range the user is looking at.
-      if (!range) return;
+      if (!range) return false;
+      const shownBefore = JSON.stringify([selectedType.value, absoluteFieldsKey()]);
       captureUndo();
       applyInstants(dateType, range.start, range.end);
       recordSelection();
+      // Unchanged fields fire no watcher, yet the parent's search (e.g. Search around) still expects its run.
+      const unchanged = shownBefore === JSON.stringify([selectedType.value, absoluteFieldsKey()]);
+      if (unchanged && props.autoApply && store.state.savedViewFlag == false) saveDate(dateType);
+      return true;
     };
 
     const onBeforeShow = () => {
@@ -2331,6 +2335,11 @@ export default defineComponent({
       if (readTimer !== null) clearTimeout(readTimer);
       readTimer = null;
       readPending.value = false;
+    };
+
+    const clearTimeFieldErrors = () => {
+      timeFieldError.value = null;
+      unreadableFields.value = { start: false, end: false };
     };
 
     const clearInput = () => {
@@ -3609,18 +3618,9 @@ export default defineComponent({
       typedFieldTime.value = time === current && !ms ? null : { field, time, ms };
     };
 
-    // Only an unreadable entry carries examples, so a refusal set by the edit handlers is left alone.
     const onTimeFieldInvalid = (field: "start" | "end", invalid: boolean) => {
-      if (invalid) {
-        typedFieldTime.value = null;
-        timeFieldError.value = {
-          field,
-          message: t("components.time.invalid", { format: raw("HH:MM") }),
-          examples: t("common.timeFieldExamples"),
-        };
-      } else if (timeFieldError.value?.field === field && timeFieldError.value.examples) {
-        timeFieldError.value = null;
-      }
+      if (invalid) typedFieldTime.value = null;
+      unreadableFields.value[field] = invalid;
     };
 
     const onTimeFieldBlur = () => {
@@ -3982,7 +3982,7 @@ export default defineComponent({
         pendingDay.value = null;
         endBeforeCut = null;
         clearInput();
-        timeFieldError.value = null;
+        clearTimeFieldErrors();
         listCursor.value = -1;
         editingPinRowId.value = null;
         calendarPreviewDay.value = null;
@@ -4070,6 +4070,7 @@ export default defineComponent({
     const closeCalendar = () => {
       calendarMode.value = false;
       typedFieldTime.value = null;
+      clearTimeFieldErrors();
       pendingDay.value = null;
       calendarPreviewDay.value = null;
       nextTick(() => inputBar.value?.focus());
@@ -4355,6 +4356,8 @@ export default defineComponent({
       shortcutPickers.value[shortcutPickers.value.length - 1]?.act[action]?.();
     onMounted(joinShortcuts);
     onActivated(joinShortcuts);
+    // Print and kiosk modes turn the page's keys off while the picker stays mounted.
+    watch(takesShortcuts, (takes) => (takes ? joinShortcuts() : leaveShortcuts()));
     onDeactivated(leaveShortcuts);
     onBeforeUnmount(leaveShortcuts);
 
@@ -4381,7 +4384,7 @@ export default defineComponent({
         pendingDay.value === null,
     );
     const applyDisabled = computed(
-      () => needsStartDate.value || Boolean(timeFieldError.value?.examples),
+      () => needsStartDate.value || unreadableFields.value.start || unreadableFields.value.end,
     );
 
     // The native change fires after keydown, so blurring commits the typed text before Apply reads it.
@@ -4401,9 +4404,12 @@ export default defineComponent({
           examples: inputRefusal.value ? undefined : t("common.timeRangeInputExamples"),
         };
       }
-      if (!timeFieldError.value) return null;
-      const { message, examples } = timeFieldError.value;
-      return { message, examples };
+      if (timeFieldError.value) return { message: timeFieldError.value.message };
+      if (!unreadableFields.value.start && !unreadableFields.value.end) return null;
+      return {
+        message: t("components.time.invalid", { format: raw("HH:MM") }),
+        examples: t("common.timeFieldExamples"),
+      };
     });
 
     const showLiveButton = computed(
@@ -4533,6 +4539,7 @@ export default defineComponent({
       onBarFocusOut,
       inputBar,
       timeFieldError,
+      unreadableFields,
       toggleAsUtc,
       asUtcLabel,
       resolvedLine,

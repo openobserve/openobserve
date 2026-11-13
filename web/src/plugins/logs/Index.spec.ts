@@ -943,6 +943,24 @@ describe("Logs Index", async () => {
     expect(setCustomDate).toHaveBeenCalledWith("absolute", date);
   });
 
+  it("drops the armed window query when the picker refuses the search-around window", async () => {
+    wrapper.vm.searchObj.meta.sqlMode = false;
+    const setCustomDate = vi.fn(() => false);
+    wrapper.vm.searchBarRef = { dateTimeRef: { setCustomDate } } as any;
+    wrapper.vm.onSearchAroundWindow({ startUs: 1_000_000, endUs: 2_000_000 });
+    expect(setCustomDate).toHaveBeenCalled();
+    expect(wrapper.vm.searchObj.data.searchAround.pendingWindowQuery).toBeNull();
+  });
+
+  it("keeps the armed window query for the run the picker's new range starts", async () => {
+    wrapper.vm.searchObj.meta.sqlMode = false;
+    const setCustomDate = vi.fn(() => true);
+    wrapper.vm.searchBarRef = { dateTimeRef: { setCustomDate } } as any;
+    wrapper.vm.onSearchAroundWindow({ startUs: 1_000_000, endUs: 2_000_000 });
+    expect(wrapper.vm.searchObj.data.searchAround.pendingWindowQuery).toBe("");
+    wrapper.vm.searchObj.data.searchAround.pendingWindowQuery = null;
+  });
+
   it("Should handle chart API error and populate errors list", async () => {
     wrapper.vm.handleChartApiError("some-error");
     expect(wrapper.vm.visualizeErrorData.errors).toEqual(["some-error"]);

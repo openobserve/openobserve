@@ -14,9 +14,11 @@ export function periodChip(page, value, unit) {
     return page.locator(`${DATE_TIME_PANEL} [data-test="date-time-chip-${value}${unit}"]`).first();
 }
 
-/** Whether the open picker shows a chip for the period; chip sets differ by page (dashboards: 24h … 1y). */
+/** Whether the open picker shows a usable chip for the period; a greyed one (past retention) gets typed instead. */
 export async function hasPeriodChip(page, value, unit) {
-    return periodChip(page, value, unit).isVisible().catch(() => false);
+    const chip = periodChip(page, value, unit);
+    if (!(await chip.isVisible().catch(() => false))) return false;
+    return chip.isEnabled().catch(() => false);
 }
 
 /** Relative and Absolute share one panel, so a former tab click only waits for the open panel. */

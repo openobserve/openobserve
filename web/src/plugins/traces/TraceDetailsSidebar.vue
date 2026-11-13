@@ -255,16 +255,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="trace-details-sidebar-search-around-window"
                 @update:model-value="setSpanSearchAroundChoice"
               />
-              <OButton
-                variant="outline"
-                size="xs"
-                class="h-full text-xs!"
-                data-test="trace-details-sidebar-search-around-btn"
-                :disabled="isViewLogsDisabled"
-                @click.stop="searchAroundSpan"
-              >
-                {{ t("dateTime.searchAroundWindow") }}
-              </OButton>
+              <span class="inline-block">
+                <OButton
+                  variant="outline"
+                  size="xs"
+                  class="h-full text-xs!"
+                  data-test="trace-details-sidebar-search-around-btn"
+                  :disabled="isSearchAroundDisabled"
+                  @click.stop="searchAroundSpan"
+                >
+                  {{ t("dateTime.searchAroundWindow") }}
+                </OButton>
+                <OTooltip :content="searchAroundTooltip" />
+              </span>
             </span>
             <OTooltip v-if="profilingLocked && spanProfileRequest" :content="profilingLockedReason">
               <span class="ms-1 inline-flex">
@@ -1770,6 +1773,14 @@ export default defineComponent({
       );
     });
 
+    // Unlike View Logs it has no correlation fallback, so it needs a picked stream even where the selector is hidden.
+    const isSearchAroundDisabled = computed(
+      () => logsLocked.value || props.selectedLogStreams.length === 0,
+    );
+    const searchAroundTooltip = computed(() =>
+      props.selectedLogStreams.length === 0 ? t("search.selectLogsStreamFirst") : undefined,
+    );
+
     // Get tooltip content based on disabled state
     const viewLogsTooltipContent = computed(() => {
       if (logsLocked.value) return logsLockedReason.value;
@@ -2182,7 +2193,7 @@ export default defineComponent({
 
     // Unfiltered on purpose: the point is what else happened in the log streams near this span.
     const searchAroundSpan = () => {
-      if (isViewLogsDisabled.value) return;
+      if (isSearchAroundDisabled.value) return;
       const choice = parseSearchAroundChoice(spanSearchAroundChoice.value);
       const spanStartUs = Math.floor(Number(props.span?.start_time) / 1000);
       if (choice?.kind !== "time" || !Number.isFinite(spanStartUs)) return;
@@ -3159,6 +3170,8 @@ export default defineComponent({
       toggleFullscreen,
       isDarkMode,
       isViewLogsDisabled,
+      isSearchAroundDisabled,
+      searchAroundTooltip,
       viewLogsTooltipContent,
       logsLocked,
       logsLockedReason,

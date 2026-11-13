@@ -803,6 +803,18 @@ describe("DateTime layout", () => {
       panel.unmount();
     });
 
+    it("drops and retakes the keys when the page turns its shortcuts off and on", async () => {
+      createWrapper({ shortcuts: true });
+      await flushPromises();
+      await wrapper!.setProps({ shortcuts: false });
+      await press("t");
+      expect(wrapper!.vm.menuOpen).toBe(false);
+
+      await wrapper!.setProps({ shortcuts: true });
+      await press("t");
+      expect(wrapper!.vm.menuOpen).toBe(true);
+    });
+
     it("binds no keys for a picker that does not own them", async () => {
       createWrapper();
       await flushPromises();

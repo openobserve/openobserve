@@ -544,7 +544,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="selectedDate"
             v-show="store.state.printMode === false"
             ref="dateTimePicker"
-            shortcuts
+            :shortcuts="!kioskMode && store.state.printMode !== true"
             class="dashboard-icons"
             :class="{ 'min-w-0 flex-1': hasTimeRow }"
             size="sm"

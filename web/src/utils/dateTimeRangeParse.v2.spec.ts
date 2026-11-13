@@ -388,3 +388,59 @@ describe("code review pass 1 [parser]", () => {
     expect(read("3 quarters ago")).toBe("calendar:quarter:-3");
   });
 });
+
+describe("parser review pass 2", () => {
+  it.each([
+    [
+      "2026-11-10 10:00:00.123456 - 2026-11-10 10:00:00.123789",
+      "A 2026/11/10 10:00:00.123..2026/11/10 10:00:00.124",
+    ],
+    [
+      "2026-11-10 10:00:00.123456 - 2026-11-10 10:00:00.124001",
+      "A 2026/11/10 10:00:00.123..2026/11/10 10:00:00.125",
+    ],
+    [
+      "2026-11-10 10:00:00.123456 - 10:00:00.123789",
+      "A 2026/11/10 10:00:00.123..2026/11/10 10:00:00.124",
+    ],
+    [
+      "2026-11-10 23:59:59.999500 - 2026-11-10 23:59:59.999900",
+      "A 2026/11/10 23:59:59.999..2026/11/11 00:00:00",
+    ],
+  ])("keeps microseconds of a zoneless range %s [#1]", (text, expected) => {
+    expect(read(text)).toBe(expected);
+  });
+
+  it("keeps microseconds of a time-only end after an instant [#1]", () => {
+    const reading = parseTimeInput("2026-11-10T10:00:00.123456Z - 10:00:00.123789", US);
+    expect(reading).toMatchObject({ endMicros: 1794304800123789 });
+  });
+
+  it.each(["2026-11-09 to 2026-11-07", "2026-11-09 10:00 to 2026-11-08"])(
+    "refuses the date-only end before its start %s [#2]",
+    (text) => {
+      expect(parseTimeInput(text, US)).toBeNull();
+      expect(explainTimeInputFailure(text, US)).toBe("reversed");
+    },
+  );
+
+  it("still reads a date-only end on the start's own day [#2]", () => {
+    expect(read("2026-11-09 10:00 to 2026-11-09")).toBe(
+      "A 2026/11/09 10:00:00..2026/11/10 00:00:00",
+    );
+  });
+
+  it("keeps sub-millisecond digits before a spaced offset [#4]", () => {
+    const reading = parseTimeInput("2026-11-10 10:00:00,123456789 +05:30", US);
+    expect(reading).toMatchObject({ centreMicros: 1794285000123456 });
+  });
+
+  it.each(["FY27", "FY50", "Q4 2027"])("does not apply the wholly future %s [#5]", (text) => {
+    expect(parseTimeInput(text, US)).toBeNull();
+    expect(explainTimeInputFailure(text, US)).toBe("future");
+  });
+
+  it("still reads the current fiscal year [#5]", () => {
+    expect(read("FY26")).toBe("A 2026/01/01 00:00:00..2027/01/01 00:00:00");
+  });
+});
