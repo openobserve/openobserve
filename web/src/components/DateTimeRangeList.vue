@@ -251,7 +251,7 @@ const pieces = (row: TimeRangeListRow) => splitLabelMatches(row.label, row.match
 // A phone has no hover, so its Recent rows always show pin and remove.
 const showsActions = (index: number) => index === props.active || isMobile.value;
 
-// The pointer moves the same cursor the arrow keys do, so only one row is ever lit (D1).
+// The pointer moves the same cursor the arrow keys do, so only one row is ever lit.
 const onRowPointer = (index: number, row: TimeRangeListRow) => {
   if (row.disabled || row.kind === "example" || index === props.active) return;
   emit("cursor", index);

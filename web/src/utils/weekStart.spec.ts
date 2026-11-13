@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { dateOrderLocale, weekStartsOn } from "./weekStart";
+import { weekStartsOn } from "./weekStart";
 
 const browserLanguages = (languages: string[]) => {
   vi.spyOn(navigator, "languages", "get").mockReturnValue(languages);
@@ -44,22 +44,5 @@ describe("weekStartsOn [#29]", () => {
 
   it("falls back to Monday for a tag Intl cannot read", () => {
     expect(weekStartsOn("not a locale!")).toBe(1);
-  });
-});
-
-describe("dateOrderLocale [#12]", () => {
-  it("follows the browser's region when it shares the UI language", () => {
-    browserLanguages(["en-GB", "en-US"]);
-    expect(dateOrderLocale("en-US")).toBe("en-GB");
-  });
-
-  it("keeps the UI locale when the browser speaks another language", () => {
-    browserLanguages(["fr-FR"]);
-    expect(dateOrderLocale("en-US")).toBe("en-US");
-  });
-
-  it("uses the browser when no UI locale is given", () => {
-    browserLanguages(["en-IN"]);
-    expect(dateOrderLocale()).toBe("en-IN");
   });
 });

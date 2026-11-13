@@ -650,7 +650,7 @@ export default class DashboardPanelTime {
   }
 
   /**
-   * Open global time picker on its calendar (the former Absolute tab)
+   * Open global time picker on its calendar
    */
   async openGlobalPickerAbsoluteTab() {
     await this.clickGlobalTimePicker();

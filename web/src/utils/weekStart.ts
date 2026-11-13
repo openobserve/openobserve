@@ -28,8 +28,6 @@ const browserLanguage = (): string | undefined => {
   return navigator.languages?.[0] ?? navigator.language;
 };
 
-const languageOf = (tag: string): string => tag.split(/[-_]/)[0].toLowerCase();
-
 /** First day of the week for a locale (default: the browser's first language); Monday when Intl has no week info. */
 export const weekStartsOn = (locale: string | undefined = browserLanguage()): WeekDay => {
   if (!locale) return MONDAY;
@@ -43,12 +41,4 @@ export const weekStartsOn = (locale: string | undefined = browserLanguage()): We
   } catch {
     return MONDAY;
   }
-};
-
-/** Locale whose numeric day/month order typed dates follow: the browser's first language when it shares the UI language, else the UI locale. */
-export const dateOrderLocale = (uiLocale?: string): string | undefined => {
-  const browser = browserLanguage();
-  if (!uiLocale) return browser;
-  // The UI ships one regional file per language, so the browser says which region's order an English user writes in.
-  return browser && languageOf(browser) === languageOf(uiLocale) ? browser : uiLocale;
 };

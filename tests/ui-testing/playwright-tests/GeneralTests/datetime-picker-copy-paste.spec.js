@@ -251,7 +251,7 @@ test.describe("DateTime Picker Copy Paste testcases", () => {
         `${ANCHOR_START_MICROS} - ${ANCHOR_END_MICROS}`
       );
 
-      // Where the old range ended no longer matters; the window centres on the pasted value.
+      // The window centres on the pasted value, wherever the previous range ended.
       const range = await pm.dateTimePickerPage.pasteAndReadBackRange(`${NEAR_END_MICROS}`);
 
       expect(range.start_date).toBe(NEAR_END_MICROS - SINGLE_WINDOW_MICROS);

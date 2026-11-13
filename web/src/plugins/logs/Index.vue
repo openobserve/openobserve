@@ -898,12 +898,11 @@ export default defineComponent({
     },
     // The setCustomDate behind setHistogramDate re-runs the search, so the unfiltered query is armed first.
     onSearchAroundWindow(range: { startUs: number; endUs: number }) {
-      this.armWindowQuery();
+      this.armWindowQuery(range);
       const applied = this.setHistogramDate(
         searchAroundPickerRange(range, this.store.state.timezone),
       );
-      // No run follows a refused window, so the armed query must not wait for the user's next one.
-      if (!applied) this.searchObj.data.searchAround.pendingWindowQuery = null;
+      if (!applied) this.searchObj.data.searchAround.windowQuery = null;
     },
     searchData() {
       this.autoRun.engine.requestRun("run");
@@ -1359,8 +1358,10 @@ export default defineComponent({
       autoRun.engine.requestRun("run");
     };
 
+    // A window run sent its own unfiltered query, so the editor's filter is not what ran.
     const showRanFilter = (generationId: number, ranQuery: string) => {
       if (searchObj.meta.sqlMode || searchObj.meta.editorDirty) return;
+      if (searchObj.data.searchAround.windowQuery) return;
       if (!autoRun.engine.isCurrent(generationId)) return;
       if (String(searchObj.data.query ?? "").trim() !== ranQuery) return;
       const ctx = buildFilterContext(searchObj, store.state.zoConfig);
@@ -2696,6 +2697,9 @@ export default defineComponent({
     watch(
       () => [searchObj?.meta?.logsVisualizeToggle],
       async () => {
+        const around = searchObj.data.searchAround;
+        if (around.windowQuery && around.windowQuery.view !== searchObj.meta.logsVisualizeToggle)
+          around.windowQuery = null;
         try {
           // Reset buildModeQueryEditorDisabled when not in build mode
           if (searchObj.meta.logsVisualizeToggle !== "build") {

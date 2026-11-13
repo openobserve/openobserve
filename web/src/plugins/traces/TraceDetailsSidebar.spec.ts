@@ -3258,6 +3258,21 @@ describe("span search around", () => {
     });
   });
 
+  it("picks the window from its select and remembers it for the next span", async () => {
+    w = mountSidebar({ parentMode: "standalone" });
+    const select = w.findComponent('[data-test="trace-details-sidebar-search-around-window"]');
+    expect(select.exists()).toBe(true);
+    expect(select.props("modelValue")).toBe("t5");
+    select.vm.$emit("update:model-value", "s30");
+    await w.vm.$nextTick();
+    expect(select.props("modelValue")).toBe("s30");
+    expect(window.localStorage.getItem("o2.searchAroundChoice.")).toBe("s30");
+
+    select.vm.$emit("update:model-value", "r50");
+    await w.vm.$nextTick();
+    expect(select.props("modelValue")).toBe("s30");
+  });
+
   it("keeps a remembered time choice but not a records one", async () => {
     window.localStorage.setItem("o2.searchAroundChoice.", "t1");
     w = mountSidebar({ parentMode: "standalone" });

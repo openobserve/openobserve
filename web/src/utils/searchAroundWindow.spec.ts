@@ -24,6 +24,11 @@ import {
   searchAroundWindow,
   SEARCH_AROUND_SECONDS,
   writeSearchAroundChoice,
+  currentSearchAroundUser,
+  searchAroundSecondsLabel,
+  searchAroundTimeOptions,
+  windowQueryForRun,
+  type WindowQuery,
 } from "./searchAroundWindow";
 
 describe("search around a row", () => {
@@ -77,5 +82,67 @@ describe("search around a row", () => {
     expect(readSearchAroundChoice("b@x")).toBe("t5");
     localStorage.setItem(searchAroundKey("a@x"), "t99");
     expect(readSearchAroundChoice("a@x")).toBe("t5");
+  });
+});
+
+describe("search-around labels", () => {
+  const t = ((key: string, named?: Record<string, unknown>) =>
+    `${key}:${named?.n}`) as unknown as Parameters<typeof searchAroundSecondsLabel>[1];
+
+  it("names seconds below a minute and minutes above", () => {
+    expect(searchAroundSecondsLabel(30, t)).toBe("dateTime.aroundSeconds:30");
+    expect(searchAroundSecondsLabel(300, t)).toBe("dateTime.aroundMinutes:5");
+  });
+
+  it("offers every time window as a stored choice", () => {
+    expect(searchAroundTimeOptions(t).map((option) => option.value)).toEqual([
+      "s5",
+      "s30",
+      "t1",
+      "t5",
+      "t15",
+    ]);
+    expect(searchAroundTimeOptions(t)[3].label).toBe("dateTime.aroundMinutes:5");
+  });
+
+  it("keys the remembered choice by the signed-in email", () => {
+    expect(currentSearchAroundUser({ userInfo: { email: "a@x" } })).toBe("a@x");
+    expect(currentSearchAroundUser({})).toBe("");
+  });
+});
+
+describe("window query bound to its window", () => {
+  const armed: WindowQuery = {
+    query: "",
+    typedQuery: "level = 'error'",
+    view: "logs",
+    startUs: 1_000_500,
+    endUs: 9_000_500,
+    pinned: false,
+  };
+  const run = { query: "level = 'error'", view: "logs", startUs: 1_000_000, endUs: 5_000_000 };
+
+  it("pins to the range the picker applied, which may be cut short at now", () => {
+    expect(windowQueryForRun(armed, run)).toEqual({
+      ...armed,
+      startUs: 1_000_000,
+      endUs: 5_000_000,
+      pinned: true,
+    });
+  });
+
+  it("keeps a pinned window only for that exact range, view and typed query", () => {
+    const pinned = windowQueryForRun(armed, run);
+    expect(windowQueryForRun(pinned, run)).toEqual(pinned);
+    expect(windowQueryForRun(pinned, { ...run, endUs: 5_000_001 })).toBeNull();
+    expect(windowQueryForRun(pinned, { ...run, view: "patterns" })).toBeNull();
+    expect(windowQueryForRun(pinned, { ...run, query: "level = 'warn'" })).toBeNull();
+    expect(windowQueryForRun(pinned, { ...run, startUs: null, endUs: null })).toBeNull();
+  });
+
+  it("refuses a first run that does not start where the window starts", () => {
+    expect(windowQueryForRun(armed, { ...run, startUs: 2_000_000 })).toBeNull();
+    expect(windowQueryForRun(armed, { ...run, endUs: 9_002_000 })).toBeNull();
+    expect(windowQueryForRun(null, run)).toBeNull();
   });
 });
