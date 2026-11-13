@@ -266,6 +266,8 @@ pub enum ErrorCodes {
     AiChatSessionBusy(String),
     /// The installed license does not entitle these features; carries the comma-joined keys.
     LicenseFeatureNotEntitled(String),
+    /// The org's contract does not entitle these features; carries the comma-joined keys.
+    ContractFeatureNotEntitled(String),
 }
 
 impl From<sea_orm::DbErr> for Error {
@@ -347,7 +349,9 @@ impl ErrorCodes {
             ErrorCodes::SearchCancelQuery(_) | ErrorCodes::RatelimitExceeded(_) => 429,
             ErrorCodes::SearchTimeout(_) => 408,
             ErrorCodes::AiSessionOwnerUnavailable(_) | ErrorCodes::AiChatSessionBusy(_) => 409,
-            ErrorCodes::LicenseFeatureNotEntitled(_) | ErrorCodes::SearchStreamProtected(_) => 403,
+            ErrorCodes::LicenseFeatureNotEntitled(_)
+            | ErrorCodes::ContractFeatureNotEntitled(_)
+            | ErrorCodes::SearchStreamProtected(_) => 403,
             ErrorCodes::ServerInternalError(_) | ErrorCodes::SearchParquetFileNotFound => 500,
             ErrorCodes::InvalidParams(_)
             | ErrorCodes::SearchSQLExecuteError(_)
@@ -381,6 +385,7 @@ impl ErrorCodes {
             ErrorCodes::AiSessionOwnerUnavailable(_) => 30001,
             ErrorCodes::AiChatSessionBusy(_) => 30002,
             ErrorCodes::LicenseFeatureNotEntitled(_) => 40001,
+            ErrorCodes::ContractFeatureNotEntitled(_) => 40002,
         }
     }
 
@@ -429,6 +434,9 @@ impl ErrorCodes {
                     names.join(", ")
                 )
             }
+            ErrorCodes::ContractFeatureNotEntitled(features) => {
+                format!("Features not included in your contract: {features}")
+            }
         }
     }
 
@@ -452,6 +460,7 @@ impl ErrorCodes {
             ErrorCodes::AiSessionOwnerUnavailable(session_id) => session_id.to_owned(),
             ErrorCodes::AiChatSessionBusy(session_id) => session_id.to_owned(),
             ErrorCodes::LicenseFeatureNotEntitled(features) => features.to_owned(),
+            ErrorCodes::ContractFeatureNotEntitled(features) => features.to_owned(),
         }
     }
 
@@ -475,6 +484,7 @@ impl ErrorCodes {
             ErrorCodes::AiSessionOwnerUnavailable(session_id) => session_id.to_owned(),
             ErrorCodes::AiChatSessionBusy(session_id) => session_id.to_owned(),
             ErrorCodes::LicenseFeatureNotEntitled(features) => features.to_owned(),
+            ErrorCodes::ContractFeatureNotEntitled(features) => features.to_owned(),
         }
     }
 
@@ -531,6 +541,7 @@ impl ErrorCodes {
             30001 => Ok(ErrorCodes::AiSessionOwnerUnavailable(message)),
             30002 => Ok(ErrorCodes::AiChatSessionBusy(message)),
             40001 => Ok(ErrorCodes::LicenseFeatureNotEntitled(message)),
+            40002 => Ok(ErrorCodes::ContractFeatureNotEntitled(message)),
             _ => Ok(ErrorCodes::ServerInternalError(json.to_string())),
         }
     }
@@ -613,6 +624,22 @@ mod tests {
         );
         match ErrorCodes::from_json(&err.to_json()).unwrap() {
             ErrorCodes::LicenseFeatureNotEntitled(keys) => assert_eq!(keys, "oncall, workflows"),
+            other => panic!("round trip lost the variant: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_contract_feature_not_entitled() {
+        let err = ErrorCodes::ContractFeatureNotEntitled("oncall".into());
+        assert_eq!(err.get_code(), 40002);
+        assert_eq!(err.http_status(), 403);
+        assert_eq!(err.get_error_detail(), "oncall");
+        assert_eq!(
+            err.get_message(),
+            "Features not included in your contract: oncall"
+        );
+        match ErrorCodes::from_json(&err.to_json()).unwrap() {
+            ErrorCodes::ContractFeatureNotEntitled(keys) => assert_eq!(keys, "oncall"),
             other => panic!("round trip lost the variant: {other:?}"),
         }
     }

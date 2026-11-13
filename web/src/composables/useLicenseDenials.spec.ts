@@ -60,6 +60,15 @@ describe("license denials", () => {
     expect(toast).toHaveBeenCalledTimes(2);
   });
 
+  it("words a contract denial apart from a license one for the same features", () => {
+    addLicenseDeniedError(["oncall"]);
+    addLicenseDeniedError(["oncall"], Date.now(), true);
+    expect(toast).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(toast).mock.calls[0][0].title).not.toEqual(
+      vi.mocked(toast).mock.calls[1][0].title,
+    );
+  });
+
   it("stays silent on a locked page", () => {
     vi.mocked(isPageLocked).mockReturnValue(true);
     addLicenseDeniedError(["workflows"]);

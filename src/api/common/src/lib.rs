@@ -29,3 +29,7 @@ pub const X_O2_ASSISTANT_SESSION_ID: axum::http::HeaderName =
 /// Browser-generated UUID of one O2 Assistant turn, so a retry does not run the model twice.
 pub const X_O2_ASSISTANT_TURN_ID: axum::http::HeaderName =
     axum::http::HeaderName::from_static("x-o2-assistant-turn-id");
+
+/// The org a route's own authentication resolved, for `require_features`.
+#[derive(Clone, Debug)]
+pub struct RequestOrg(pub String);

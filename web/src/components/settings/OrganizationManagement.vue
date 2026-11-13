@@ -22,6 +22,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :subtitle="t('settings.organizationManagementPage.subtitle')"
       bleed
     >
+      <div
+        v-if="contractStatus?.sync_active"
+        class="mt-2.5 flex flex-col gap-2 text-sm"
+        data-test="org-management-contract-sync-status"
+      >
+        <div data-test="org-management-contract-last-sync">
+          {{
+            contractStatus.last_success
+              ? t("settings.organizationManagementPage.lastContractSync", {
+                  time: formatMicrosToDateTime(contractStatus.last_success),
+                })
+              : t("settings.organizationManagementPage.contractsNeverSynced")
+          }}
+        </div>
+        <OBanner
+          v-if="contractStatus.last_error"
+          variant="error"
+          icon="error"
+          data-test="org-management-contract-last-error"
+          :content="
+            t('settings.organizationManagementPage.lastContractSyncError', {
+              time: formatMicrosToDateTime(contractStatus.last_error.at),
+              error: contractStatus.last_error.message,
+            })
+          "
+        />
+        <div v-if="contractStatus.blocked.length" data-test="org-management-contract-blocked">
+          <div class="font-semibold">
+            {{ t("settings.organizationManagementPage.blockedContractsTitle") }}
+          </div>
+          <ul>
+            <li v-for="contract in contractStatus.blocked" :key="contract.contract_id">
+              {{ contract.org_id }}: {{ contract.reason }}
+            </li>
+          </ul>
+        </div>
+      </div>
       <div class="bg-card-glass-bg mt-2.5 min-h-0 flex-1 overflow-hidden">
         <OTable
           :frame="false"
@@ -136,7 +173,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OTooltip :content="t('settings.extendTrial')" />
               </OButton>
               <OButton
-                v-if="row.billing_provider === '-'"
+                v-if="contractSyncActive"
+                variant="ghost"
+                size="icon-xs-circle"
+                icon-left="sync"
+                class="max-md:hidden"
+                data-test="org-management-sync-contract-btn"
+                @click.stop="syncContract(row)"
+              >
+                <OTooltip :content="t('settings.organizationManagementPage.syncContract')" />
+              </OButton>
+              <OButton
+                v-if="!contractSyncActive && row.billing_provider === '-'"
                 variant="ghost"
                 size="icon-xs-circle"
                 icon-left="note-add"
@@ -147,7 +195,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OTooltip :content="t('settings.organizationManagementPage.addContract')" />
               </OButton>
               <OButton
-                v-if="row.billing_provider === 'no_op'"
+                v-if="!contractSyncActive && row.billing_provider === 'no_op'"
                 variant="ghost"
                 size="icon-xs-circle"
                 icon-left="event"
@@ -158,7 +206,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OTooltip :content="t('settings.organizationManagementPage.extendContract')" />
               </OButton>
               <OButton
-                v-if="row.billing_provider === 'no_op'"
+                v-if="!contractSyncActive && row.billing_provider === 'no_op'"
                 variant="ghost-destructive"
                 size="icon-xs-circle"
                 icon-left="block"
@@ -253,7 +301,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span>{{ t("settings.extendTrial") }}</span>
                 </ODropdownItem>
                 <ODropdownItem
-                  v-if="row.billing_provider === '-'"
+                  v-if="contractSyncActive"
+                  icon-left="sync"
+                  class="md:hidden"
+                  data-test="org-management-sync-contract-btn-menu"
+                  @select="syncContract(row)"
+                >
+                  <span>{{ t("settings.organizationManagementPage.syncContract") }}</span>
+                </ODropdownItem>
+                <ODropdownItem
+                  v-if="!contractSyncActive && row.billing_provider === '-'"
                   icon-left="note-add"
                   class="md:hidden"
                   data-test="org-management-add-contract-btn-menu"
@@ -262,7 +319,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span>{{ t("settings.organizationManagementPage.addContract") }}</span>
                 </ODropdownItem>
                 <ODropdownItem
-                  v-if="row.billing_provider === 'no_op'"
+                  v-if="!contractSyncActive && row.billing_provider === 'no_op'"
                   icon-left="event"
                   class="md:hidden"
                   data-test="org-management-extend-contract-btn-menu"
@@ -271,7 +328,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span>{{ t("settings.organizationManagementPage.extendContract") }}</span>
                 </ODropdownItem>
                 <ODropdownItem
-                  v-if="row.billing_provider === 'no_op'"
+                  v-if="!contractSyncActive && row.billing_provider === 'no_op'"
                   icon-left="block"
                   variant="destructive"
                   class="md:hidden"
@@ -518,6 +575,7 @@ import { ref, onMounted, watch, defineComponent, computed } from "vue";
 import { useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OrgCleanupTasksDialog from "@/components/iam/organizations/OrgCleanupTasksDialog.vue";
 import { timestampToTimezoneDate, getImageURL } from "@/utils/zincutils";
 import { useStore } from "vuex";
@@ -558,6 +616,25 @@ import {
   type ExtendTrialForm,
 } from "./OrganizationManagement.schema";
 
+interface ContractSyncStatus {
+  sync_active: boolean;
+  last_success: number | null;
+  last_error: { at: number; message: string } | null;
+  blocked: { contract_id: string; org_id: string; ends_at: number; reason: string | null }[];
+}
+
+type ContractSyncOutcome =
+  "created" | "updated" | "unchanged" | "removed" | "legacy_kept" | "nothing";
+
+const CONTRACT_SYNC_MESSAGES: Record<ContractSyncOutcome, I18nKey> = {
+  created: "settings.organizationManagementPage.contractSyncCreated",
+  updated: "settings.organizationManagementPage.contractSyncUpdated",
+  unchanged: "settings.organizationManagementPage.contractSyncUnchanged",
+  removed: "settings.organizationManagementPage.contractSyncRemoved",
+  legacy_kept: "settings.organizationManagementPage.contractSyncLegacyKept",
+  nothing: "settings.organizationManagementPage.contractSyncNothing",
+};
+
 /** Backend TrialQuotaPool keys — also the usage-allowance dialog's tab names. */
 type QuotaPool =
   | "ai_credits"
@@ -571,6 +648,7 @@ export default defineComponent({
     OPageLayout,
     OEmptyState,
     OBadge,
+    OBanner,
     OrgCleanupTasksDialog,
     OButton,
     ODialog,
@@ -645,6 +723,8 @@ export default defineComponent({
     const contractPrompt = ref(false);
     const contractDataRow = ref<any>({});
     const contractMode = ref<"create" | "extend">("create");
+    const contractStatus = ref<ContractSyncStatus | null>(null);
+    const contractSyncActive = computed(() => !!contractStatus.value?.sync_active);
 
     // ── Form schemas (Options-API: MUST be returned from setup() or :schema
     //    resolves to undefined and validation silently no-ops). ───────────────
@@ -702,6 +782,7 @@ export default defineComponent({
     onMounted(() => {
       if (store.state.zoConfig.meta_org == store.state.selectedOrganization.identifier) {
         getData();
+        getContractStatus();
       } else {
         router.replace({
           name: "general",
@@ -895,6 +976,9 @@ export default defineComponent({
       return timestampToTimezoneDate(micros, "UTC", "yyyy-MM-dd");
     };
 
+    const formatMicrosToDateTime = (micros: number): string =>
+      `${timestampToTimezoneDate(micros, "UTC", "yyyy-MM-dd HH:mm:ss")} UTC`;
+
     const formatCredits = (credits: number | undefined): string =>
       Number(credits ?? 0).toLocaleString();
 
@@ -1085,6 +1169,58 @@ export default defineComponent({
 
     const getTimestampInMicroseconds = (weeks: number) =>
       (Date.now() + weeks * 7 * 24 * 60 * 60 * 1000) * 1000;
+
+    const getContractStatus = async () => {
+      try {
+        const res = await OrganizationServices.get_contract_sync_status(
+          store.state.selectedOrganization.identifier,
+        );
+        contractStatus.value = res.data;
+      } catch {
+        // the old buttons stay, and the server answers them with 410 if sync is on
+        contractStatus.value = null;
+      }
+    };
+
+    const syncContract = async (row: any) => {
+      const dismiss = toast({
+        variant: "loading",
+        message: t("settings.organizationManagementPage.syncingContract"),
+        timeout: 0,
+      });
+      try {
+        const res = await OrganizationServices.sync_org_contract(
+          store.state.selectedOrganization.identifier,
+          row.identifier,
+        );
+        const result = res.data;
+        // a contract that wasn't stored leaves reconcile reading the old one, so the outcome may be stale
+        const incomplete = result.store_failures > 0 || result.skipped > 0;
+        toast({
+          variant: incomplete || result.outcome === "blocked" ? "warning" : "success",
+          message: incomplete
+            ? t("settings.organizationManagementPage.contractSyncIncomplete")
+            : result.outcome === "blocked"
+              ? t("settings.organizationManagementPage.contractSyncBlocked", {
+                  reason: result.blocked_reason,
+                })
+              : t(CONTRACT_SYNC_MESSAGES[result.outcome as ContractSyncOutcome]),
+          timeout: 5000,
+        });
+        getData();
+      } catch (error: any) {
+        toast({
+          variant: "error",
+          message:
+            error.response?.data?.message ||
+            t("settings.organizationManagementPage.syncContractError"),
+          timeout: 5000,
+        });
+      } finally {
+        dismiss();
+        getContractStatus();
+      }
+    };
 
     const toggleContractDialog = (row: any, mode: "create" | "extend") => {
       contractDataRow.value = row;
@@ -1368,6 +1504,10 @@ export default defineComponent({
       contractPrompt,
       contractDataRow,
       contractMode,
+      contractStatus,
+      contractSyncActive,
+      syncContract,
+      formatMicrosToDateTime,
       toggleContractDialog,
       submitContract,
       confirmRevokeContract,

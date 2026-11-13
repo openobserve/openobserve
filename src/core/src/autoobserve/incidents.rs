@@ -57,7 +57,7 @@ pub struct IncidentInvestigation;
 #[async_trait]
 impl InvestigationPort for IncidentInvestigation {
     async fn start(&self, request: &ActionRequest) -> anyhow::Result<String> {
-        refuse_unless(incidents_enabled())?;
+        refuse_unless(incidents_enabled(&request.org))?;
         let subject = page_subject(request)
             .ok_or_else(|| anyhow::anyhow!("the finding is not on a stream"))?;
         let records = catalogue(&request.org).await;
@@ -69,7 +69,7 @@ impl InvestigationPort for IncidentInvestigation {
 
     /// Incidents off opened nothing, so there is nothing to resolve.
     async fn resolve(&self, recovery: &Recovery) -> anyhow::Result<bool> {
-        if !incidents_enabled() {
+        if !incidents_enabled(&recovery.org) {
             return Ok(false);
         }
         let (org, subject) = (recovery.org.clone(), recovery_subject(recovery));
@@ -222,7 +222,7 @@ pub fn recovery_subject(r: &Recovery) -> String {
 
 /// The org's AutoObserve incidents, newest first, with whether paging is on for it.
 pub async fn list(org: &str, page: Page) -> Result<AutoObserveIncidents, anyhow::Error> {
-    let oncall_on = o2_enterprise::enterprise::oncall::is_enabled();
+    let oncall_on = o2_enterprise::enterprise::oncall::is_enabled_for(org);
     list_with(org, page, oncall_on, config::utils::time::now_micros()).await
 }
 
@@ -554,7 +554,7 @@ mod tests {
             peers: Vec::new(),
         };
         let e = IncidentInvestigation.start(&request).await.unwrap_err();
-        let on = incidents_enabled();
+        let on = incidents_enabled(&request.org);
         assert_eq!(e.downcast_ref::<ActionRefused>().is_some(), !on, "{e}");
         if on {
             assert_eq!(e.to_string(), "the finding is not on a stream");
@@ -653,7 +653,7 @@ mod tests {
         };
         assert_ne!(recovery_subject(&drop), opened.subject_id, "per kind");
         let resolved = IncidentInvestigation.resolve(&recovery).await;
-        if incidents_enabled() {
+        if incidents_enabled(&recovery.org) {
             assert!(
                 !matches!(resolved, Ok(true)),
                 "no incident holds this firing"

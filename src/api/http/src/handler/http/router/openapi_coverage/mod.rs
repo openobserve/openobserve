@@ -372,6 +372,22 @@ const SUCCESS_CONTRACTS: &[ContractRow] = &[
     ),
     (
         "cloud",
+        "POST",
+        "/api/{org_id}/contracts/{target_org_id}/sync",
+        "200",
+        JSON,
+        "object",
+    ),
+    (
+        "cloud",
+        "GET",
+        "/api/{org_id}/contracts/status",
+        "200",
+        JSON,
+        "object",
+    ),
+    (
+        "cloud",
         "PUT",
         "/api/{org_id}/enable_org_storage",
         "200",
@@ -436,6 +452,11 @@ const REQUIRED_QUERY_PARAMS: &[(&str, &str, &str, &str)] = &[
 
 /// Handlers that take no body, so a documented one would only mislead a generated client.
 const BODYLESS_ROUTES: &[(&str, &str, &str)] = &[
+    (
+        "cloud",
+        "POST",
+        "/api/{org_id}/contracts/{target_org_id}/sync",
+    ),
     (
         "cloud",
         "POST",

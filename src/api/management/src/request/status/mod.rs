@@ -79,8 +79,8 @@ use {
         settings::{get_logo, get_logo_dark, get_logo_text},
     },
     o2_enterprise::enterprise::license::{
-        block_feature_for_report_failure, check_features, last_reported_timestamp,
-        runtime_definition,
+        Denial, block_feature_for_report_failure, check_org_features, last_reported_timestamp,
+        org_denial, runtime_definition,
     },
     o2_openfga::config::{
         get_config as get_openfga_config, refresh_config as refresh_openfga_config,
@@ -291,6 +291,8 @@ struct ConfigResponse<'a> {
     #[cfg(feature = "enterprise")]
     feature_revision: u32,
     features: HashMap<Feature, FeatureState>,
+    /// What locks each locked feature: "license" or "contract".
+    feature_locks: HashMap<Feature, &'static str>,
     feature_names: HashMap<String, String>,
 }
 
@@ -564,28 +566,30 @@ pub async fn zo_config(
     // AI needs o2-ai to answer; with no agent target its buttons could only fail, so report it off.
     let ai_enabled = enterprise_value!(
         false,
-        o2cfg.ai.enabled && o2cfg.ai.has_agent_target() && check_features(&[Feature::AiAssistant])
+        o2cfg.ai.enabled
+            && o2cfg.ai.has_agent_target()
+            && check_org_features(&org_id, &[Feature::AiAssistant])
     );
     let ai_chat_persistence_enabled =
         enterprise_value!(false, ai_enabled && o2cfg.ai.chat_persistence_enabled);
     let incidents_enabled = enterprise_value!(
         false,
-        o2cfg.incidents.enabled && check_features(&[Feature::Incidents])
+        o2cfg.incidents.enabled && check_org_features(&org_id, &[Feature::Incidents])
     );
     let downtimes_enabled = enterprise_value!(
         false,
-        o2cfg.downtimes.enabled && check_features(&[Feature::Alerts])
+        o2cfg.downtimes.enabled && check_org_features(&org_id, &[Feature::Alerts])
     );
     let alert_calibration_enabled = enterprise_value!(
         false,
-        o2cfg.alert_calibration.enabled && check_features(&[Feature::Alerts])
+        o2cfg.alert_calibration.enabled && check_org_features(&org_id, &[Feature::Alerts])
     );
     // Incident analysis needs RCA on and an agent to answer.
     let incidents_rca_enabled = enterprise_value!(
         false,
         incidents_enabled
             && o2cfg.incidents.rca_enabled
-            && openobserve_core::alerts::incidents::rca_agent_available()
+            && openobserve_core::alerts::incidents::rca_agent_available(&org_id)
     );
     let fleet_enabled = enterprise_value!(false, openobserve_core::fleet::enabled());
     let service_streams_enabled = enterprise_value!(false, o2cfg.service_streams.enabled);
@@ -596,7 +600,7 @@ pub async fn zo_config(
         config::get_config().alert_composite.writes_enabled && !super_cluster_enabled;
     let online_evals_enabled = enterprise_value!(
         false,
-        o2cfg.llm_eval_config.enabled && check_features(&[Feature::AiObservability])
+        o2cfg.llm_eval_config.enabled && check_org_features(&org_id, &[Feature::AiObservability])
     );
     let synthetics_enabled = cfg.synthetics.enabled;
     // Private agents stay enterprise, so an OSS build shows synthetics without them.
@@ -605,7 +609,7 @@ pub async fn zo_config(
     let synthetics_browser_max_steps = cfg.synthetics.browser_max_steps;
     let oncall_enabled = enterprise_value!(
         false,
-        o2cfg.oncall.enabled && check_features(&[Feature::Oncall])
+        o2cfg.oncall.enabled && check_org_features(&org_id, &[Feature::Oncall])
     );
     let incidents_page_oncall = enterprise_value!(false, incidents_page_oncall(&org_id).await);
     let slack_disabled_reason = enterprise_value!(
@@ -637,12 +641,17 @@ pub async fn zo_config(
     let billing_group_allowed_orgs = o2cfg.cloud.billing_group_allowed_orgs.clone();
 
     #[cfg(feature = "enterprise")]
-    let workflows_enabled = o2cfg.common.workflows_enabled && check_features(&[Feature::Workflows]);
+    let workflows_enabled =
+        o2cfg.common.workflows_enabled && check_org_features(&org_id, &[Feature::Workflows]);
     #[cfg(feature = "enterprise")]
     let workflow_hooks_enabled = openobserve_core::workflows::http_trigger::hooks_enabled();
     #[cfg(not(feature = "enterprise"))]
     let workflow_hooks_enabled = false;
 
+    #[cfg(feature = "enterprise")]
+    let mut feature_locks: HashMap<Feature, &'static str> = HashMap::new();
+    #[cfg(not(feature = "enterprise"))]
+    let feature_locks: HashMap<Feature, &'static str> = HashMap::new();
     #[cfg(feature = "enterprise")]
     let featuremap: HashMap<Feature, FeatureState> = Feature::all()
         .map(|variant| {
@@ -654,7 +663,7 @@ pub async fn zo_config(
                 Feature::Workflows => o2cfg.common.workflows_enabled,
                 _ => true,
             };
-            let entitled = check_features(&[variant]);
+            let denial = org_denial(&org_id, &[variant]);
             let key: &str = variant.into();
             let listed = o2cfg
                 .common
@@ -663,10 +672,15 @@ pub async fn zo_config(
                 .any(|m| m.trim() == key);
             let state = if listed || !switched_on {
                 FeatureState::Hidden
-            } else if entitled {
-                FeatureState::Enabled
-            } else {
+            } else if let Some(denial) = denial {
+                let lock = match denial {
+                    Denial::License(_) => "license",
+                    Denial::Contract(_) => "contract",
+                };
+                feature_locks.insert(variant, lock);
                 FeatureState::Locked
+            } else {
+                FeatureState::Enabled
             };
             (variant, state)
         })
@@ -819,6 +833,7 @@ pub async fn zo_config(
         #[cfg(feature = "enterprise")]
         feature_revision: runtime_definition().feature_revision,
         features: featuremap,
+        feature_locks,
         feature_names,
     })
 }
@@ -3077,9 +3092,9 @@ mod tests {
         let json = zo_config_json().await;
         assert_eq!(
             json["incidents_rca_enabled"],
-            openobserve_core::alerts::incidents::incidents_enabled()
+            openobserve_core::alerts::incidents::incidents_enabled("default")
                 && o2cfg.incidents.rca_enabled
-                && openobserve_core::alerts::incidents::rca_agent_available()
+                && openobserve_core::alerts::incidents::rca_agent_available("default")
         );
     }
 
@@ -3090,8 +3105,24 @@ mod tests {
         let json = zo_config_json().await;
         assert_eq!(
             json["online_evals_enabled"],
-            o2cfg.llm_eval_config.enabled && check_features(&[Feature::AiObservability])
+            o2cfg.llm_eval_config.enabled
+                && check_org_features("default", &[Feature::AiObservability])
         );
+    }
+
+    // Without contracts the license is the only thing that can lock a feature.
+    #[cfg(all(feature = "enterprise", not(feature = "cloud")))]
+    #[tokio::test]
+    async fn test_zo_config_names_what_locks_each_locked_feature() {
+        let json = zo_config_json().await;
+        for (key, state) in json["features"].as_object().unwrap() {
+            let lock = json["feature_locks"][key].as_str();
+            if state == "locked" {
+                assert_eq!(lock, Some("license"), "{key}");
+            } else {
+                assert_eq!(lock, None, "{key}");
+            }
+        }
     }
 
     #[cfg(feature = "enterprise")]

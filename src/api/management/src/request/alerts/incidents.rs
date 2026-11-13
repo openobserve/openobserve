@@ -677,7 +677,7 @@ pub async fn trigger_incident_rca(
         feature::Feature,
     };
     use o2_enterprise::enterprise::{
-        common::config::get_config as get_o2_config, license::check_features,
+        common::config::get_config as get_o2_config, license::org_denial,
     };
     use openobserve_core::alerts::rca_runs;
 
@@ -717,13 +717,14 @@ pub async fn trigger_incident_rca(
         return MetaHttpResponse::bad_request("RCA is not enabled");
     }
 
-    if let Some(denied) =
-        ai_license_denial(o2_cfg.ai.enabled, check_features(&[Feature::AiAssistant]))
-    {
+    if let Some(denied) = ai_license_denial(
+        o2_cfg.ai.enabled,
+        org_denial(&org_id, &[Feature::AiAssistant]),
+    ) {
         return denied;
     }
 
-    if !openobserve_core::alerts::incidents::rca_agent_available() {
+    if !openobserve_core::alerts::incidents::rca_agent_available(&org_id) {
         return rca_error_response(
             axum::http::StatusCode::BAD_REQUEST,
             "RCA agent is not available",
@@ -1261,14 +1262,22 @@ pub struct SteerRequestBody {
 }
 
 #[cfg(feature = "enterprise")]
-fn ai_license_denial(ai_enabled: bool, ai_entitled: bool) -> Option<Response> {
+fn ai_license_denial(
+    ai_enabled: bool,
+    denial: Option<o2_enterprise::enterprise::license::Denial>,
+) -> Option<Response> {
     use axum::response::IntoResponse;
+    use infra::errors::ErrorCodes;
+    use o2_enterprise::enterprise::license::Denial;
 
-    if !ai_enabled || ai_entitled {
+    if !ai_enabled {
         return None;
     }
-    let feature: &str = config::meta::feature::Feature::AiAssistant.into();
-    let err = infra::errors::ErrorCodes::LicenseFeatureNotEntitled(feature.to_string());
+    let feature = <&str>::from(config::meta::feature::Feature::AiAssistant).to_string();
+    let err = match denial? {
+        Denial::License(_) => ErrorCodes::LicenseFeatureNotEntitled(feature),
+        Denial::Contract(_) => ErrorCodes::ContractFeatureNotEntitled(feature),
+    };
     Some(
         (
             axum::http::StatusCode::FORBIDDEN,
@@ -1554,7 +1563,7 @@ async fn resume_run(
     use axum::http::StatusCode;
     use config::meta::feature::Feature;
     use o2_enterprise::enterprise::{
-        common::config::get_config as get_o2_config, license::check_features,
+        common::config::get_config as get_o2_config, license::org_denial,
     };
     use openobserve_core::alerts::rca_resume;
 
@@ -1562,12 +1571,13 @@ async fn resume_run(
     if !o2_cfg.incidents.enabled || !o2_cfg.incidents.rca_enabled {
         return MetaHttpResponse::bad_request("RCA is not enabled");
     }
-    if let Some(denied) =
-        ai_license_denial(o2_cfg.ai.enabled, check_features(&[Feature::AiAssistant]))
-    {
+    if let Some(denied) = ai_license_denial(
+        o2_cfg.ai.enabled,
+        org_denial(&org_id, &[Feature::AiAssistant]),
+    ) {
         return denied;
     }
-    if !openobserve_core::alerts::incidents::rca_agent_available() {
+    if !openobserve_core::alerts::incidents::rca_agent_available(&org_id) {
         return rca_error_response(
             StatusCode::BAD_REQUEST,
             "RCA agent is not available",
@@ -2942,18 +2952,32 @@ mod tests {
     #[cfg(feature = "enterprise")]
     #[tokio::test]
     async fn test_ai_on_but_unlicensed_is_a_403_naming_the_feature() {
-        let (status, body) = status_and_body(ai_license_denial(true, false).unwrap()).await;
-        assert_eq!(status, axum::http::StatusCode::FORBIDDEN);
-        assert_eq!(body["code"], 40001);
-        assert_eq!(body["error_detail"], "ai_assistant");
+        use o2_enterprise::enterprise::license::Denial;
+
+        let ai = || vec![config::meta::feature::Feature::AiAssistant];
+        for (denial, code) in [
+            (Denial::License(ai()), 40001),
+            (Denial::Contract(ai()), 40002),
+        ] {
+            let (status, body) =
+                status_and_body(ai_license_denial(true, Some(denial)).unwrap()).await;
+            assert_eq!(status, axum::http::StatusCode::FORBIDDEN);
+            assert_eq!(body["code"], code);
+            assert_eq!(body["error_detail"], "ai_assistant");
+        }
     }
 
     #[cfg(feature = "enterprise")]
     #[test]
     fn test_ai_off_or_licensed_is_not_a_license_denial() {
-        assert!(ai_license_denial(false, false).is_none());
-        assert!(ai_license_denial(false, true).is_none());
-        assert!(ai_license_denial(true, true).is_none());
+        let unlicensed = || {
+            Some(o2_enterprise::enterprise::license::Denial::License(vec![
+                config::meta::feature::Feature::AiAssistant,
+            ]))
+        };
+        assert!(ai_license_denial(false, unlicensed()).is_none());
+        assert!(ai_license_denial(false, None).is_none());
+        assert!(ai_license_denial(true, None).is_none());
     }
 
     #[cfg(feature = "enterprise")]

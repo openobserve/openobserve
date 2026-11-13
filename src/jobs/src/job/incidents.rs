@@ -92,10 +92,15 @@ async fn auto_resolve_stale_incidents() -> Result<(), anyhow::Error> {
     let config = get_o2_config();
     let threshold_minutes = config.incidents.auto_resolve_after_minutes;
 
+    // the tick checks the license; an org's contract can still leave incidents out
+    let skipped = o2_enterprise::enterprise::license::orgs_denied(&[
+        config::meta::feature::Feature::Incidents,
+    ]);
     let (mut resolved_count, mut resolved_ids) = if threshold_minutes > 0 {
         auto_resolve_stale(
             threshold_minutes.saturating_mul(60 * 1_000_000),
             StaleScope::Ops,
+            &skipped,
         )
         .await?
     } else {
@@ -104,6 +109,9 @@ async fn auto_resolve_stale_incidents() -> Result<(), anyhow::Error> {
 
     // Security cases never close on the global threshold, only on their org's own setting.
     for org_id in &infra::table::alert_incidents::orgs_with_open_cases().await? {
+        if skipped.contains(org_id) {
+            continue;
+        }
         let days = db::organization::read_org_setting(org_id, |s| s.security_cases.auto_close_days)
             .await
             .unwrap_or_default();
@@ -113,6 +121,7 @@ async fn auto_resolve_stale_incidents() -> Result<(), anyhow::Error> {
         let (count, cases) = auto_resolve_stale(
             i64::from(days).saturating_mul(MICROS_PER_DAY),
             StaleScope::OrgCases(org_id),
+            &skipped,
         )
         .await?;
         resolved_count += count;

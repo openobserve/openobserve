@@ -741,11 +741,14 @@ fn check_license(job: &JobModel) -> Option<Response> {
         StreamType::Profiles => Feature::ContinuousProfiling,
         _ => Feature::Logs,
     };
-    if o2_enterprise::enterprise::license::check_features(&[feature]) {
-        return None;
-    }
-    let name: &str = feature.into();
-    let err = infra::errors::ErrorCodes::LicenseFeatureNotEntitled(name.to_string());
+    use infra::errors::ErrorCodes;
+    use o2_enterprise::enterprise::license::{Denial, org_denial};
+
+    let name = <&str>::from(feature).to_string();
+    let err = match org_denial(&job.org_id, &[feature])? {
+        Denial::License(_) => ErrorCodes::LicenseFeatureNotEntitled(name),
+        Denial::Contract(_) => ErrorCodes::ContractFeatureNotEntitled(name),
+    };
     Some(
         (
             StatusCode::FORBIDDEN,

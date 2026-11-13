@@ -2718,7 +2718,7 @@ pub async fn trigger_by_id<C: ConnectionTrait>(
     // the notification. For all other cases send the direct notification.
     #[cfg(feature = "enterprise")]
     let (incident_notified, incident_paged, incident_notify_error) = if alert.creates_incident
-        && crate::alerts::incidents::incidents_enabled()
+        && crate::alerts::incidents::incidents_enabled(org_id)
     {
         let synthetic_row = manual_trigger_row(&alert);
         let notify = std::slice::from_ref(&synthetic_row);
@@ -2785,7 +2785,7 @@ pub async fn trigger_by_id<C: ConnectionTrait>(
     // somebody checks a new on-call alert pages before trusting it, and it only
     // answers that question if it pages.
     #[cfg(feature = "enterprise")]
-    if o2_enterprise::enterprise::oncall::is_enabled() && !incident_paged {
+    if o2_enterprise::enterprise::oncall::is_enabled_for(org_id) && !incident_paged {
         crate::alerts::scheduler::handlers::page_for_alert_firing(&trace_id, &alert, &rows).await;
     }
     #[cfg(feature = "enterprise")]
@@ -2810,7 +2810,7 @@ pub async fn trigger_by_id<C: ConnectionTrait>(
     // Not from `opened`: a teamless record woke nobody, and a page already open returns nothing.
     #[cfg(feature = "enterprise")]
     let paged = async {
-        o2_enterprise::enterprise::oncall::is_enabled()
+        o2_enterprise::enterprise::oncall::is_enabled_for(&alert.org_id)
             && o2_enterprise::enterprise::oncall::escalation::routes_to_a_team(
                 &alert.org_id,
                 alert.oncall_team.as_deref(),
@@ -3371,12 +3371,15 @@ impl AlertExt for Alert {
     }
 }
 
-/// Whether a workflow send was refused by the license rather than failing to run.
+/// Whether a workflow send was refused by the license or contract rather than failing to run.
 #[cfg(feature = "enterprise")]
 fn is_license_denial(error: &anyhow::Error) -> bool {
     matches!(
         error.downcast_ref::<infra::errors::ErrorCodes>(),
-        Some(infra::errors::ErrorCodes::LicenseFeatureNotEntitled(_))
+        Some(
+            infra::errors::ErrorCodes::LicenseFeatureNotEntitled(_)
+                | infra::errors::ErrorCodes::ContractFeatureNotEntitled(_)
+        )
     )
 }
 
@@ -5419,8 +5422,14 @@ mod send_path_tests {
     #[cfg(feature = "enterprise")]
     #[test]
     fn the_workflow_gate_error_is_classified_as_a_license_denial() {
-        let denied = crate::workflows::require_workflows_license(false).unwrap_err();
-        assert!(is_license_denial(&denied));
+        use config::meta::feature::Feature;
+        use o2_enterprise::enterprise::license::Denial;
+
+        let workflows = || vec![Feature::Workflows];
+        let unlicensed = crate::workflows::require_workflows(Some(Denial::License(workflows())));
+        assert!(is_license_denial(&unlicensed.unwrap_err()));
+        let uncontracted = crate::workflows::require_workflows(Some(Denial::Contract(workflows())));
+        assert!(is_license_denial(&uncontracted.unwrap_err()));
         assert!(!is_license_denial(&anyhow::anyhow!("workflow timed out")));
     }
 

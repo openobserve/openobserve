@@ -878,7 +878,7 @@ pub(crate) async fn open_responses(
 ) -> Vec<config::meta::oncall::response::Response> {
     use config::meta::oncall::subject::SubjectType;
 
-    if !o2_enterprise::enterprise::oncall::is_enabled() {
+    if !o2_enterprise::enterprise::oncall::is_enabled_for(org_id) {
         return vec![];
     }
     let mut found = Vec::new();
@@ -1960,10 +1960,10 @@ async fn marked_problem_pages(
 ) -> Result<Vec<(config::meta::oncall::response::Response, bool)>, AckError> {
     use config::meta::oncall::SubjectType;
 
-    if !o2_enterprise::enterprise::oncall::is_enabled() {
+    let org_id = p.org_id();
+    if !o2_enterprise::enterprise::oncall::is_enabled_for(org_id) {
         return Ok(vec![]);
     }
-    let org_id = p.org_id();
     let mut subjects = match p {
         Problem::Firing { target, .. } => vec![(SubjectType::Alert, target.alert_id.clone())],
         Problem::Incident { incident_id, .. } => vec![(SubjectType::Incident, incident_id.clone())],

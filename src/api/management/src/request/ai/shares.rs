@@ -1122,7 +1122,14 @@ async fn resolve(
     if !share_servable(&share, org_id, public_only, now_micros()) {
         return Ok(None);
     }
-    if public_only && db::org_status::is_blocked(&share.org_id) {
+    // a contract leaving out the assistant stops public links, as blocking the org does
+    if public_only
+        && (db::org_status::is_blocked(&share.org_id)
+            || !o2_enterprise::enterprise::license::check_org_features(
+                &share.org_id,
+                &[config::meta::feature::Feature::AiAssistant],
+            ))
+    {
         return Ok(None);
     }
     let chat = match ai_chat_sessions::get(&share.org_id, &share.session_id).await {

@@ -1544,10 +1544,12 @@ struct WorkflowHttpTriggerApiDoc;
     openobserve_api_management::request::organization::org::extend_external_contract,
     openobserve_api_management::request::organization::org::extend_trial_period,
     openobserve_api_management::request::organization::org::generate_org_invite,
+    openobserve_api_management::request::organization::org::get_contract_sync_status,
     openobserve_api_management::request::organization::org::get_org_invites,
     openobserve_api_management::request::organization::org::initiate_org_deletion,
     openobserve_api_management::request::organization::org::revoke_external_contract,
     openobserve_api_management::request::organization::org::set_quota_usage_limit,
+    openobserve_api_management::request::organization::org::sync_org_contract,
 ))]
 struct CloudQuotaApiDoc;
 

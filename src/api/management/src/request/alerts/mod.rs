@@ -95,12 +95,24 @@ pub mod slack_oauth;
 pub mod templates;
 
 /// Save warning for an alert that keeps a workflow the license does not grant.
+#[cfg_attr(not(feature = "enterprise"), allow(dead_code))]
 const WORKFLOWS_LOCKED_WARNING: &str =
     "This alert's workflow will not run: Workflows is not included in your license.";
 
+/// Save warning for an alert that keeps a workflow the org's contract does not grant.
+#[cfg_attr(not(feature = "enterprise"), allow(dead_code))]
+const WORKFLOWS_UNCONTRACTED_WARNING: &str =
+    "This alert's workflow will not run: Workflows is not included in your contract.";
+
 /// Save warning for an alert that keeps an on-call team the license does not grant.
+#[cfg_attr(not(feature = "enterprise"), allow(dead_code))]
 const ONCALL_LOCKED_WARNING: &str =
     "This alert will not page its on-call team: On-Call is not included in your license.";
+
+/// Save warning for an alert that keeps an on-call team the org's contract does not grant.
+#[cfg_attr(not(feature = "enterprise"), allow(dead_code))]
+const ONCALL_UNCONTRACTED_WARNING: &str =
+    "This alert will not page its on-call team: On-Call is not included in your contract.";
 
 /// Stripped on export: re-importing this state would claim a model the destination never trained.
 #[cfg(feature = "enterprise")]
@@ -183,39 +195,49 @@ async fn validate_oncall_team(org_id: &str, team_id: Option<&str>) -> Result<(),
     }
 }
 
-/// Operator-off is not locked: it hides the feature, and nothing was taken from this license.
-fn workflows_locked() -> bool {
+/// The save warning for this org's workflow lock; operator-off is not a lock, it hides the feature.
+fn workflows_lock(_org_id: &str) -> Option<&'static str> {
     #[cfg(feature = "enterprise")]
     {
-        o2_enterprise::enterprise::common::config::get_config()
+        use o2_enterprise::enterprise::license::{Denial, org_denial};
+        if !o2_enterprise::enterprise::common::config::get_config()
             .common
             .workflows_enabled
-            && !o2_enterprise::enterprise::license::check_features(&[
-                config::meta::feature::Feature::Workflows,
-            ])
+        {
+            return None;
+        }
+        match org_denial(_org_id, &[config::meta::feature::Feature::Workflows])? {
+            Denial::License(_) => Some(WORKFLOWS_LOCKED_WARNING),
+            Denial::Contract(_) => Some(WORKFLOWS_UNCONTRACTED_WARNING),
+        }
     }
     #[cfg(not(feature = "enterprise"))]
-    false
+    None
 }
 
-fn oncall_locked() -> bool {
+/// The save warning for this org's on-call lock, naming the license or the contract.
+fn oncall_lock(_org_id: &str) -> Option<&'static str> {
     #[cfg(feature = "enterprise")]
     {
-        o2_enterprise::enterprise::oncall::is_unlicensed()
+        use o2_enterprise::enterprise::license::Denial;
+        match o2_enterprise::enterprise::oncall::denial_for(_org_id)? {
+            Denial::License(_) => Some(ONCALL_LOCKED_WARNING),
+            Denial::Contract(_) => Some(ONCALL_UNCONTRACTED_WARNING),
+        }
     }
     #[cfg(not(feature = "enterprise"))]
-    false
+    None
 }
 
 fn locked_target_warnings(
     has_workflows: bool,
     has_oncall_team: bool,
-    workflows_locked: bool,
-    oncall_locked: bool,
+    workflows_lock: Option<&'static str>,
+    oncall_lock: Option<&'static str>,
 ) -> Vec<String> {
     [
-        (has_workflows && workflows_locked).then_some(WORKFLOWS_LOCKED_WARNING),
-        (has_oncall_team && oncall_locked).then_some(ONCALL_LOCKED_WARNING),
+        workflows_lock.filter(|_| has_workflows),
+        oncall_lock.filter(|_| has_oncall_team),
     ]
     .into_iter()
     .flatten()
@@ -227,8 +249,8 @@ fn locked_target_warnings(
 async fn save_warnings(
     _org_id: &str,
     alert: &MetaAlert,
-    workflows_locked: bool,
-    oncall_locked: bool,
+    workflows_lock: Option<&'static str>,
+    oncall_lock: Option<&'static str>,
 ) -> Vec<String> {
     let has_oncall_team = alert
         .oncall_team
@@ -238,8 +260,8 @@ async fn save_warnings(
     let mut warnings = locked_target_warnings(
         !alert.workflows.is_empty(),
         has_oncall_team,
-        workflows_locked,
-        oncall_locked,
+        workflows_lock,
+        oncall_lock,
     );
     #[cfg(feature = "enterprise")]
     {
@@ -289,10 +311,10 @@ fn known_target_names(
 }
 
 /// Operator-off counts too: the form skips its workflow fetch then, yet shows the chip by name.
-fn workflows_unusable() -> bool {
+fn workflows_unusable(_org_id: &str) -> bool {
     #[cfg(feature = "enterprise")]
     {
-        workflows_locked()
+        workflows_lock(_org_id).is_some()
             || !o2_enterprise::enterprise::common::config::get_config()
                 .common
                 .workflows_enabled
@@ -325,8 +347,8 @@ async fn locked_target_names(
     let (workflows, oncall_team) = locked_target_ids(
         workflows,
         oncall_team,
-        workflows_unusable(),
-        oncall_locked(),
+        workflows_unusable(org_id),
+        oncall_lock(org_id).is_some(),
     );
     let mut read = Vec::with_capacity(workflows.len() + 1);
     for id in workflows {
@@ -461,7 +483,8 @@ pub async fn create_alert(
     let client = get_orm_client_rw().await;
     match alert::create(client, &org_id, &folder_id, alert, overwrite).await {
         Ok(v) => {
-            let warnings = save_warnings(&org_id, &v, workflows_locked(), oncall_locked()).await;
+            let warnings =
+                save_warnings(&org_id, &v, workflows_lock(&org_id), oncall_lock(&org_id)).await;
             MetaHttpResponse::json(
                 MetaHttpResponse::message(StatusCode::OK, "Alert saved")
                     .with_id(v.id.map(|id| id.to_string()).unwrap_or_default())
@@ -503,7 +526,7 @@ async fn create_composite_alert(
     let input = composite_input(None, org_id, folder_id, user_id, req.alert, condition);
     match openobserve_core::alerts::composite::create_composite(input).await {
         Ok(definition) => {
-            let warnings = composite_save_warnings(&definition, workflows_locked());
+            let warnings = composite_save_warnings(&definition, workflows_lock(org_id));
             composite_created_response(definition.id, definition.name, warnings)
         }
         Err(error) => composite_error_response(error),
@@ -571,7 +594,7 @@ async fn update_composite_alert(
     }
     match openobserve_core::alerts::composite::update_composite(id, input).await {
         Ok(definition) => {
-            composite_updated_response(composite_save_warnings(&definition, workflows_locked()))
+            composite_updated_response(composite_save_warnings(&definition, workflows_lock(org_id)))
         }
         Err(error) => composite_error_response(error),
     }
@@ -580,10 +603,10 @@ async fn update_composite_alert(
 /// Composites have no on-call team of their own, so a locked workflow is their one warning.
 fn composite_save_warnings(
     definition: &infra::table::entity::alert_composites::Model,
-    workflows_locked: bool,
+    workflows_lock: Option<&'static str>,
 ) -> Vec<String> {
     let alert = openobserve_core::alerts::composite::notification_alert(definition);
-    locked_target_warnings(!alert.workflows.is_empty(), false, workflows_locked, false)
+    locked_target_warnings(!alert.workflows.is_empty(), false, workflows_lock, None)
 }
 
 fn composite_created_response(id: String, name: String, warnings: Vec<String>) -> Response {
@@ -2522,7 +2545,7 @@ pub async fn update_alert(
     match alert::update(client, &org_id, None, alert).await {
         Ok(v) => MetaHttpResponse::json(
             MetaHttpResponse::message(StatusCode::OK, "Alert Updated").with_warnings(
-                save_warnings(&org_id, &v, workflows_locked(), oncall_locked()).await,
+                save_warnings(&org_id, &v, workflows_lock(&org_id), oncall_lock(&org_id)).await,
             ),
         ),
         Err(AlertError::AlertNotFound) => {
@@ -4844,11 +4867,12 @@ mod tests {
 
     use super::{
         BulkDeleteRequest, GetAlertResponseBody, HashMap, Headers, Json, Ksuid,
-        ListAlertsResponseBodyItem, MetaAlert, ONCALL_LOCKED_WARNING, Path, Query, UserEmail,
-        WORKFLOWS_LOCKED_WARNING, anomaly_row_visible, composite_created_response,
-        composite_save_warnings, composite_updated_response, delete_alert_bulk, in_listable_folder,
-        known_target_names, locked_target_ids, locked_target_warnings, resolve_generate_sql,
-        save_warnings, visible_alert,
+        ListAlertsResponseBodyItem, MetaAlert, ONCALL_LOCKED_WARNING, ONCALL_UNCONTRACTED_WARNING,
+        Path, Query, UserEmail, WORKFLOWS_LOCKED_WARNING, WORKFLOWS_UNCONTRACTED_WARNING,
+        anomaly_row_visible, composite_created_response, composite_save_warnings,
+        composite_updated_response, delete_alert_bulk, in_listable_folder, known_target_names,
+        locked_target_ids, locked_target_warnings, resolve_generate_sql, save_warnings,
+        visible_alert,
     };
 
     fn row(name: &str, extra: serde_json::Value) -> ListAlertsResponseBodyItem {
@@ -5024,17 +5048,21 @@ mod tests {
     fn locked_target_warnings_name_only_what_is_locked_and_kept() {
         let workflow = WORKFLOWS_LOCKED_WARNING;
         let team = ONCALL_LOCKED_WARNING;
-        for (has_workflows, has_team, workflows_locked, oncall_locked, expected) in [
-            (true, true, true, true, vec![workflow, team]),
-            (true, false, true, true, vec![workflow]),
-            (false, true, true, true, vec![team]),
-            (true, true, false, false, vec![]),
-            (true, true, false, true, vec![team]),
-            (true, true, true, false, vec![workflow]),
-            (false, false, true, true, vec![]),
+        let contract = ONCALL_UNCONTRACTED_WARNING;
+        let wf_contract = WORKFLOWS_UNCONTRACTED_WARNING;
+        for (has_workflows, has_team, workflows_lock, oncall_lock, expected) in [
+            (true, true, Some(workflow), Some(team), vec![workflow, team]),
+            (true, false, Some(workflow), Some(team), vec![workflow]),
+            (false, true, Some(workflow), Some(team), vec![team]),
+            (true, true, None, None, vec![]),
+            (true, true, None, Some(team), vec![team]),
+            (true, true, None, Some(contract), vec![contract]),
+            (true, true, Some(workflow), None, vec![workflow]),
+            (true, false, Some(wf_contract), None, vec![wf_contract]),
+            (false, false, Some(workflow), Some(team), vec![]),
         ] {
             assert_eq!(
-                locked_target_warnings(has_workflows, has_team, workflows_locked, oncall_locked),
+                locked_target_warnings(has_workflows, has_team, workflows_lock, oncall_lock),
                 expected
             );
         }
@@ -5045,12 +5073,18 @@ mod tests {
         let mut alert = MetaAlert::default();
         alert.oncall_team = Some("tm_sre".to_string());
         assert_eq!(
-            save_warnings("org", &alert, false, true).await,
+            save_warnings("org", &alert, None, Some(ONCALL_LOCKED_WARNING)).await,
             vec![ONCALL_LOCKED_WARNING]
         );
         alert.workflows = vec!["wf".to_string()];
         assert_eq!(
-            save_warnings("org", &alert, true, true).await,
+            save_warnings(
+                "org",
+                &alert,
+                Some(WORKFLOWS_LOCKED_WARNING),
+                Some(ONCALL_LOCKED_WARNING)
+            )
+            .await,
             vec![WORKFLOWS_LOCKED_WARNING, ONCALL_LOCKED_WARNING]
         );
     }
@@ -5059,12 +5093,12 @@ mod tests {
     fn a_composite_warns_only_for_a_stored_workflow_while_locked() {
         let with_workflow = composite_definition(serde_json::json!(["wf"]));
         assert_eq!(
-            composite_save_warnings(&with_workflow, true),
+            composite_save_warnings(&with_workflow, Some(WORKFLOWS_LOCKED_WARNING)),
             vec![WORKFLOWS_LOCKED_WARNING]
         );
-        assert!(composite_save_warnings(&with_workflow, false).is_empty());
+        assert!(composite_save_warnings(&with_workflow, None).is_empty());
         let without = composite_definition(serde_json::json!([]));
-        assert!(composite_save_warnings(&without, true).is_empty());
+        assert!(composite_save_warnings(&without, Some(WORKFLOWS_LOCKED_WARNING)).is_empty());
     }
 
     #[tokio::test]

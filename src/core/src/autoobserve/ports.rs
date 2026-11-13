@@ -1012,7 +1012,7 @@ mod tests {
         };
         let e = port.start(&request).await.unwrap_err();
         // ENT defaults incidents on; then the request passes the gate into the incident path.
-        let on = crate::alerts::incidents::incidents_enabled();
+        let on = crate::alerts::incidents::incidents_enabled(&request.org);
         assert_eq!(e.downcast_ref::<ActionRefused>().is_some(), !on, "{e}");
         if on {
             assert_eq!(e.to_string(), "the finding is not on a stream");

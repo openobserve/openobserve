@@ -2053,6 +2053,7 @@ pub async fn upgrade_incident_group_values(
 pub async fn auto_resolve_stale(
     stale_threshold_micros: i64,
     scope: StaleScope<'_>,
+    skipped_orgs: &[String],
 ) -> Result<(u64, Vec<AutoResolved>), errors::Error> {
     let now = chrono::Utc::now().timestamp_micros();
     auto_resolve_stale_with(
@@ -2060,6 +2061,7 @@ pub async fn auto_resolve_stale(
         now.saturating_sub(stale_threshold_micros),
         now,
         scope,
+        skipped_orgs,
     )
     .await
 }
@@ -2070,6 +2072,7 @@ pub async fn auto_resolve_stale_with<C: ConnectionTrait>(
     cutoff: i64,
     now: i64,
     scope: StaleScope<'_>,
+    skipped_orgs: &[String],
 ) -> Result<(u64, Vec<AutoResolved>), errors::Error> {
     const PAGE_SIZE: u64 = 500;
 
@@ -2080,7 +2083,8 @@ pub async fn auto_resolve_stale_with<C: ConnectionTrait>(
     let mut resolved_ids = Vec::new();
     let mut after: Option<String> = None;
     loop {
-        let mut query = stale_incidents_query(cutoff);
+        let mut query = stale_incidents_query(cutoff)
+            .filter(alert_incidents::Column::OrgId.is_not_in(skipped_orgs.iter().cloned()));
         if let Some(condition) = case_condition(cases) {
             query = query.filter(condition);
         }
@@ -3085,12 +3089,25 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn the_bulk_auto_resolve_leaves_a_skipped_org_open() {
+        let db = incidents_db().await;
+        let incident = muted_incident(&db, "dt-skip").await;
+        let now = incident.last_alert_at + 1_000;
+
+        let skipped = [incident.org_id.clone()];
+        let (count, _) = auto_resolve_stale_with(&db, now, now, StaleScope::Ops, &skipped)
+            .await
+            .unwrap();
+        assert_eq!(count, 0);
+    }
+
+    #[tokio::test]
     async fn the_bulk_auto_resolve_clears_the_mute_and_reports_it() {
         let db = incidents_db().await;
         let incident = muted_incident(&db, "dt-1").await;
         let now = incident.last_alert_at + 1_000;
 
-        let (count, resolved) = auto_resolve_stale_with(&db, now, now, StaleScope::Ops)
+        let (count, resolved) = auto_resolve_stale_with(&db, now, now, StaleScope::Ops, &[])
             .await
             .unwrap();
         assert_eq!(count, 1);
@@ -3291,16 +3308,17 @@ mod tests {
 
         let later = chrono::Utc::now().timestamp_micros() + 1;
 
-        let (_, resolved) = auto_resolve_stale_with(&db, 10, 10, StaleScope::Ops)
+        let (_, resolved) = auto_resolve_stale_with(&db, 10, 10, StaleScope::Ops, &[])
             .await
             .unwrap();
         assert_eq!(resolved_ids(resolved), [ops]);
-        let (count, _) = auto_resolve_stale_with(&db, later, later, StaleScope::OrgCases("other"))
-            .await
-            .unwrap();
+        let (count, _) =
+            auto_resolve_stale_with(&db, later, later, StaleScope::OrgCases("other"), &[])
+                .await
+                .unwrap();
         assert_eq!(count, 0);
         let (_, resolved) =
-            auto_resolve_stale_with(&db, later, later, StaleScope::OrgCases("acme"))
+            auto_resolve_stale_with(&db, later, later, StaleScope::OrgCases("acme"), &[])
                 .await
                 .unwrap();
         assert_eq!(resolved_ids(resolved), [case]);
@@ -3317,15 +3335,16 @@ mod tests {
         }
         let ops = alert_fired_into(&db, "gc-pause", "open", 1).await;
 
-        let (count, resolved) = auto_resolve_stale_with(&db, 10, 10, StaleScope::Ops)
+        let (count, resolved) = auto_resolve_stale_with(&db, 10, 10, StaleScope::Ops, &[])
             .await
             .unwrap();
         assert_eq!(count, 1);
         assert_eq!(resolved[0].incident_id, ops);
         let later = chrono::Utc::now().timestamp_micros() + 1;
-        let (count, _) = auto_resolve_stale_with(&db, later, later, StaleScope::OrgCases("acme"))
-            .await
-            .unwrap();
+        let (count, _) =
+            auto_resolve_stale_with(&db, later, later, StaleScope::OrgCases("acme"), &[])
+                .await
+                .unwrap();
         assert_eq!(count, 501);
     }
 
@@ -3346,14 +3365,15 @@ mod tests {
         };
 
         let cutoff = opened_at - 1;
-        let (count, _) = auto_resolve_stale_with(&db, cutoff, cutoff, StaleScope::OrgCases("acme"))
-            .await
-            .unwrap();
+        let (count, _) =
+            auto_resolve_stale_with(&db, cutoff, cutoff, StaleScope::OrgCases("acme"), &[])
+                .await
+                .unwrap();
         assert_eq!(
             count, 0,
             "a case opened just now on a day-old event stays open"
         );
-        let (_, resolved) = auto_resolve_stale_with(&db, cutoff, cutoff, StaleScope::Ops)
+        let (_, resolved) = auto_resolve_stale_with(&db, cutoff, cutoff, StaleScope::Ops, &[])
             .await
             .unwrap();
         assert_eq!(
@@ -3363,9 +3383,10 @@ mod tests {
         );
 
         let idle = chrono::Utc::now().timestamp_micros() + 1;
-        let (_, resolved) = auto_resolve_stale_with(&db, idle, idle, StaleScope::OrgCases("acme"))
-            .await
-            .unwrap();
+        let (_, resolved) =
+            auto_resolve_stale_with(&db, idle, idle, StaleScope::OrgCases("acme"), &[])
+                .await
+                .unwrap();
         assert_eq!(resolved_ids(resolved), [case]);
     }
 

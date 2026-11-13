@@ -37,7 +37,7 @@ use axum::{
 };
 use common::meta::http::ERROR_HEADER;
 use config::{get_config, meta::feature::Feature};
-use openobserve_api_common::{X_O2_ASSISTANT_SESSION_ID, X_O2_ASSISTANT_TURN_ID};
+use openobserve_api_common::{RequestOrg, X_O2_ASSISTANT_SESSION_ID, X_O2_ASSISTANT_TURN_ID};
 use openobserve_api_ingest::request::{clusters, datadog, logs, metrics, profiles, rum};
 #[cfg(feature = "cloud")]
 use openobserve_api_management::request::org_domains;
@@ -75,7 +75,7 @@ use {
             config::get_config as get_o2_config,
         },
         fleet::opamp,
-        license::check_features,
+        license::{Denial, org_denial},
     },
     openobserve_api_common::auth::delegation::DelegatedCaller,
     openobserve_api_management::request::{
@@ -285,12 +285,9 @@ fn attach_mcp_www_authenticate(_org_id: &str, resp: Response) -> Response {
 }
 
 /// Rejects missing organizations and disagreements between routing and auth.
-async fn validate_routed_org(parts: &mut Parts) -> Result<(), AuthError> {
-    let Ok(params) = RawPathParams::from_request_parts(parts, &()).await else {
-        return Ok(());
-    };
-    let Some((_, routed_org)) = params.iter().find(|(name, _)| *name == "org_id") else {
-        return Ok(());
+async fn validate_routed_org(parts: &mut Parts) -> Result<Option<String>, AuthError> {
+    let Some(routed_org) = routed_org(parts).await else {
+        return Ok(None);
     };
     // The nest strip drops an empty `{org_id}` segment from the URI, so auth checks the next one.
     if routed_org.is_empty() {
@@ -298,35 +295,48 @@ async fn validate_routed_org(parts: &mut Parts) -> Result<(), AuthError> {
     }
     let path_columns: Vec<&str> = routed_path(parts.uri.path()).split('/').collect();
     // The router hands over the decoded param, so compare it with the decoded segment.
-    if !urlencoding::decode(org_from_path(&path_columns)).is_ok_and(|org| org == routed_org) {
+    if !urlencoding::decode(org_from_path(&path_columns)).is_ok_and(|org| org == *routed_org) {
         return Err(AuthError::Forbidden("Unauthorized Access".to_string()));
     }
-    Ok(())
+    Ok(Some(routed_org))
 }
 
-/// 403 naming the required features the license does not entitle.
-#[cfg(feature = "enterprise")]
-fn license_denial(required: &[Feature]) -> Option<Response> {
-    if check_features(required) {
-        return None;
-    }
-    let missing: Vec<&str> = required
+/// The decoded `{org_id}` of the matched route, if it has one.
+async fn routed_org(parts: &mut Parts) -> Option<String> {
+    let params = RawPathParams::from_request_parts(parts, &()).await.ok()?;
+    params
         .iter()
-        .filter(|f| !check_features(std::slice::from_ref(f)))
-        .map(|f| (*f).into())
-        .collect();
-    let err = infra::errors::ErrorCodes::LicenseFeatureNotEntitled(missing.join(", "));
-    Some(
-        (
-            StatusCode::FORBIDDEN,
-            axum::Json(MetaHttpResponse::error_code(err)),
-        )
-            .into_response(),
+        .find(|(name, _)| *name == "org_id")
+        .map(|(_, org)| org.to_string())
+}
+
+/// 403 naming the features the license or the org's contract does not entitle.
+#[cfg(feature = "enterprise")]
+fn entitlement_denial(org_id: &str, required: &[Feature]) -> Option<Response> {
+    org_denial(org_id, required).map(denial_response)
+}
+
+#[cfg(feature = "enterprise")]
+fn denial_response(denial: Denial) -> Response {
+    use infra::errors::ErrorCodes;
+
+    let keys = |missing: Vec<Feature>| {
+        let keys: Vec<&str> = missing.into_iter().map(Into::into).collect();
+        keys.join(", ")
+    };
+    let err = match denial {
+        Denial::License(missing) => ErrorCodes::LicenseFeatureNotEntitled(keys(missing)),
+        Denial::Contract(missing) => ErrorCodes::ContractFeatureNotEntitled(keys(missing)),
+    };
+    (
+        StatusCode::FORBIDDEN,
+        axum::Json(MetaHttpResponse::error_code(err)),
     )
+        .into_response()
 }
 
 #[cfg(not(feature = "enterprise"))]
-fn license_denial(_required: &[Feature]) -> Option<Response> {
+fn entitlement_denial(_org_id: &str, _required: &[Feature]) -> Option<Response> {
     None
 }
 
@@ -364,9 +374,10 @@ pub async fn auth_middleware(request: Request, next: Next) -> Response {
     let (mut parts, body) = request.into_parts();
     let uri = req_data.uri.clone();
     // The auth layers check one org, so the handler must serve that same org.
-    if let Err(error) = validate_routed_org(&mut parts).await {
-        return error.into_response();
-    }
+    let routed_org = match validate_routed_org(&mut parts).await {
+        Ok(routed_org) => routed_org,
+        Err(error) => return error.into_response(),
+    };
     let auth_info = match AuthExtractor::from_request_parts(&mut parts, &()).await {
         Ok(info) => info,
         Err(e) => return maybe_add_mcp_www_authenticate(&uri, e.into_response()),
@@ -376,13 +387,20 @@ pub async fn auth_middleware(request: Request, next: Next) -> Response {
     let result = match oo_validator(&req_data, &auth_info).await {
         Ok(result) => result,
         Err(e) => {
-            let denial = auth_info.feature.and_then(license_denial);
+            let org_id = routed_org.as_deref().unwrap_or_default();
+            let denial = auth_info
+                .feature
+                .and_then(|required| entitlement_denial(org_id, required));
             return maybe_add_mcp_www_authenticate(&uri, refusal_response(e, denial));
         }
     };
 
-    // Outside oo_validator so the license gate holds with OpenFGA off and on bypass routes.
-    if let Some(denied) = auth_info.feature.and_then(license_denial) {
+    // Outside oo_validator so OpenFGA-off and bypass routes, with no auth_info.org_id, are gated.
+    let org_id = routed_org.as_deref().unwrap_or_default();
+    if let Some(denied) = auth_info
+        .feature
+        .and_then(|required| entitlement_denial(org_id, required))
+    {
         return denied;
     }
 
@@ -414,15 +432,26 @@ pub async fn auth_middleware(request: Request, next: Next) -> Response {
     response
 }
 
-/// License gate for routes that authenticate outside `auth_middleware`; layer it inside the auth.
+/// Feature gate for routes that authenticate outside `auth_middleware`; layer it inside the auth.
 pub async fn require_features(
     required: &'static [Feature],
     request: Request,
     next: Next,
 ) -> Response {
-    match license_denial(required) {
+    let (mut parts, body) = request.into_parts();
+    let org_id = gated_org(&mut parts).await;
+    // Public pages have no org, so only the license applies to them.
+    match entitlement_denial(org_id.as_deref().unwrap_or_default(), required) {
         Some(denied) => denied,
-        None => next.run(request).await,
+        None => next.run(Request::from_parts(parts, body)).await,
+    }
+}
+
+// Splunk's org comes from its token; every other gated route names it in the path.
+async fn gated_org(parts: &mut Parts) -> Option<String> {
+    match parts.extensions.get::<RequestOrg>() {
+        Some(org) => Some(org.0.clone()),
+        None => routed_org(parts).await,
     }
 }
 
@@ -2326,6 +2355,14 @@ fn service_route_table() -> Router {
                 delete(organization::org::revoke_external_contract),
             )
             .route(
+                "/{org_id}/contracts/{target_org_id}/sync",
+                post(organization::org::sync_org_contract),
+            )
+            .route(
+                "/{org_id}/contracts/status",
+                get(organization::org::get_contract_sync_status),
+            )
+            .route(
                 "/{org_id}/aws-marketplace/link-subscription",
                 post(cloud::aws_marketplace::link_subscription),
             )
@@ -3821,6 +3858,75 @@ mod tests {
             audited(Method::POST, "api/org/settings/logo", "png"),
             "cG5n"
         );
+    }
+
+    async fn text(response: Response) -> String {
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        String::from_utf8(body.to_vec()).unwrap()
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn a_license_and_a_contract_denial_carry_their_own_codes() {
+        for (denial, code, keys) in [
+            (
+                Denial::License(vec![Feature::Oncall, Feature::Logs]),
+                40001,
+                "oncall, logs",
+            ),
+            (Denial::Contract(vec![Feature::Oncall]), 40002, "oncall"),
+        ] {
+            let response = denial_response(denial);
+            assert_eq!(response.status(), StatusCode::FORBIDDEN);
+            let body: Value = serde_json::from_str(&text(response).await).unwrap();
+            assert_eq!(body["code"], code);
+            assert_eq!(body["error_detail"], keys);
+        }
+    }
+
+    #[tokio::test]
+    async fn the_feature_gates_check_the_org_the_route_serves() {
+        async fn gated(request: axum::extract::Request) -> String {
+            let (mut parts, _) = request.into_parts();
+            gated_org(&mut parts).await.unwrap_or_default()
+        }
+        async fn validated(request: axum::extract::Request) -> String {
+            let (mut parts, _) = request.into_parts();
+            validate_routed_org(&mut parts)
+                .await
+                .unwrap()
+                .unwrap_or_default()
+        }
+        async fn splunk(mut request: axum::extract::Request, next: Next) -> Response {
+            request
+                .extensions_mut()
+                .insert(RequestOrg("tokenorg".to_string()));
+            next.run(request).await
+        }
+        let app = Router::new()
+            .route("/v2/{org_id}/oncall/ack", get(gated))
+            .route("/public/{slug}", get(gated))
+            .route(
+                "/services/collector",
+                get(gated).route_layer(middleware::from_fn(splunk)),
+            )
+            .route("/v2/{org_id}/alerts", get(validated))
+            .route("/health", get(validated));
+        for (uri, expected) in [
+            ("/v2/acme/oncall/ack", "acme"),
+            ("/v2/acme%20labs/oncall/ack", "acme labs"),
+            // No org means the license check alone.
+            ("/public/page", ""),
+            ("/services/collector", "tokenorg"),
+            ("/v2/acme/alerts", "acme"),
+            ("/health", ""),
+        ] {
+            let request = Request::get(uri).body(Body::empty()).unwrap();
+            let response = app.clone().oneshot(request).await.unwrap();
+            assert_eq!(text(response).await, expected, "{uri}");
+        }
     }
 
     #[tokio::test]

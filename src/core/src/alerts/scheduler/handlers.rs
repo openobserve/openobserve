@@ -1196,8 +1196,8 @@ async fn handle_oncall_escalation_triggers(
     use o2_enterprise::enterprise::oncall;
 
     let response_id = trigger.module_key.clone();
-    if !oncall::is_enabled() {
-        if oncall::is_unlicensed()
+    if !oncall::is_enabled_for(&trigger.org) {
+        if oncall::denial_for(&trigger.org).is_some()
             && let Err(e) =
                 oncall::escalation::note_unlicensed_pause(&trigger.org, &response_id, now_micros())
                     .await
@@ -1620,7 +1620,8 @@ async fn handle_composite_alert_trigger(
         #[cfg(feature = "enterprise")]
         let opens_incident = composite_opens_incident(
             has_targets,
-            definition.definition.creates_incident && crate::alerts::incidents::incidents_enabled(),
+            definition.definition.creates_incident
+                && crate::alerts::incidents::incidents_enabled(&trigger.org),
         );
         if delivery.should_deliver() && has_targets {
             let notification_alert =
@@ -1779,7 +1780,9 @@ async fn handle_composite_alert_trigger(
                 evaluated.result,
                 &evaluated.children,
             )];
-            if !composite_incident_handled && o2_enterprise::enterprise::oncall::is_enabled() {
+            if !composite_incident_handled
+                && o2_enterprise::enterprise::oncall::is_enabled_for(&trigger.org)
+            {
                 page_for_alert_firing(trace_id, &notification_alert, &rows).await;
             }
             delivery_error = crate::alerts::alert::with_unlicensed_page_reason(
@@ -2635,7 +2638,9 @@ pub(crate) async fn unlicensed_reason_for_firing(
     alert: &config::meta::alerts::alert::Alert,
     rows: &[config::utils::json::Map<String, config::utils::json::Value>],
 ) -> Option<&'static str> {
-    if !o2_enterprise::enterprise::oncall::is_unlicensed() || rows.is_empty() || alert.id.is_none()
+    if o2_enterprise::enterprise::oncall::denial_for(&alert.org_id).is_none()
+        || rows.is_empty()
+        || alert.id.is_none()
     {
         return None;
     }
@@ -2721,7 +2726,7 @@ async fn trigger_rca_for_alert_firing(
 
     let cfg = get_o2_config();
     // Must agree with the condition `analysis_at_start` used to mark these records `Pending`.
-    if !cfg.incidents.rca_enabled || !crate::alerts::incidents::rca_agent_available() {
+    if !cfg.incidents.rca_enabled || !crate::alerts::incidents::rca_agent_available(&alert.org_id) {
         release_alert_firing_hold(&alert.org_id, &opened).await;
         return;
     }
@@ -3242,7 +3247,7 @@ pub(crate) async fn correlate_muted_incident(
     let Some(first_row) = rows.first() else {
         return;
     };
-    let incidents_enabled = crate::alerts::incidents::incidents_enabled();
+    let incidents_enabled = crate::alerts::incidents::incidents_enabled(&alert.org_id);
     if !correlates_muted_firing(alert.creates_incident, incidents_enabled, downtime) {
         return;
     }
@@ -3280,7 +3285,7 @@ async fn correlate_repeated_incident(
     let Some(first_row) = rows.first() else {
         return;
     };
-    let incidents_enabled = crate::alerts::incidents::incidents_enabled();
+    let incidents_enabled = crate::alerts::incidents::incidents_enabled(&alert.org_id);
     if !correlates_repeated_firing(alert.creates_incident, incidents_enabled) {
         return;
     }
@@ -4107,7 +4112,7 @@ async fn handle_alert_triggers(
     // Every clear run: on-call pages BEFORE the send, so an undelivered page leaves it open.
     #[cfg(feature = "enterprise")]
     if matched_level.is_none()
-        && o2_enterprise::enterprise::oncall::is_enabled()
+        && o2_enterprise::enterprise::oncall::is_enabled_for(&alert.org_id)
         && let Some(alert_id) = alert.id.as_ref()
         && !crate::alerts::recovery::oncall_recovery_withheld(&alert, &folder_id, now).await
         && let Err(e) = o2_enterprise::enterprise::oncall::escalation::recover_for_alert(
@@ -4438,7 +4443,7 @@ async fn handle_alert_triggers(
         let correlation_rows = unmuted_rows.as_deref().unwrap_or(data.as_slice());
         #[cfg(feature = "enterprise")]
         let (incident_handled_notification, incident_notify_error) = if alert.creates_incident
-            && crate::alerts::incidents::incidents_enabled()
+            && crate::alerts::incidents::incidents_enabled(&alert.org_id)
             && let Some(first_row) = correlation_rows.first()
         {
             match crate::alerts::incidents::correlate_alert_to_incident(
@@ -4494,7 +4499,9 @@ async fn handle_alert_triggers(
 
         // Asked after correlation, not predicted: a prediction suppresses a page nobody made.
         #[cfg(feature = "enterprise")]
-        if o2_enterprise::enterprise::oncall::is_enabled() && !incident_handled_notification {
+        if o2_enterprise::enterprise::oncall::is_enabled_for(&alert.org_id)
+            && !incident_handled_notification
+        {
             let identity = unmuted_identity(&alert, &folder_id, &data, now).await;
             if !identity.is_empty() {
                 page_for_alert_identity(&scheduler_trace_id, &alert, &identity).await;
@@ -4502,18 +4509,20 @@ async fn handle_alert_triggers(
         }
         // Not `unlicensed_reason_for_firing`: a muted group loses no page, a zero-row match does.
         #[cfg(feature = "enterprise")]
-        let unlicensed_reason =
-            if o2_enterprise::enterprise::oncall::is_unlicensed() && alert.id.is_some() {
-                let identity = unmuted_identity(&alert, &folder_id, &data, now).await;
-                o2_enterprise::enterprise::oncall::escalation::unlicensed_page_reason(
-                    &alert.org_id,
-                    alert.oncall_team.as_deref(),
-                    &identity,
-                )
-                .await
-            } else {
-                None
-            };
+        let unlicensed_reason = if o2_enterprise::enterprise::oncall::denial_for(&alert.org_id)
+            .is_some()
+            && alert.id.is_some()
+        {
+            let identity = unmuted_identity(&alert, &folder_id, &data, now).await;
+            o2_enterprise::enterprise::oncall::escalation::unlicensed_page_reason(
+                &alert.org_id,
+                alert.oncall_team.as_deref(),
+                &identity,
+            )
+            .await
+        } else {
+            None
+        };
         #[cfg(feature = "enterprise")]
         let incident_notify_error = crate::alerts::alert::with_unlicensed_page_reason(
             incident_notify_error,
