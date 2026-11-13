@@ -20,6 +20,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use async_trait::async_trait;
 use config::meta::alerts::{incidents::AlertKind, rca_runs::RunSummaryFields};
 use infra::table::{
+    alert_incidents::CaseFilter,
     entity::{alert_incident_alerts, alert_incidents},
     oncall_ownership::Landing,
     service_streams::ServiceRecord,
@@ -87,8 +88,13 @@ impl InvestigationPort for IncidentInvestigation {
             return Ok(vec![false; recoveries.len()]);
         }
         let subjects: Vec<String> = recoveries.iter().map(recovery_subject).collect();
+        // A finding never opens a security case, so only ops incidents can hold one.
+        let wanted: HashMap<String, CaseFilter> = subjects
+            .iter()
+            .map(|s| (s.clone(), CaseFilter::NoCases))
+            .collect();
         let open =
-            infra::table::alert_incidents::find_open_incidents_containing_alerts(&org, &subjects)
+            infra::table::alert_incidents::find_open_incidents_containing_alerts(&org, &wanted)
                 .await?;
         Ok(recoveries
             .iter()
