@@ -28,13 +28,22 @@ export interface LeaveGuardOptions {
 
 // The guards of the pages on screen. A kept-alive page in the background is clean, or it could not have been left.
 const guardsOnScreen = new Set<() => Promise<boolean>>();
+const pendingYes = new Set<() => void>();
 
 /** Asks the dirty pages on screen before a change the router cannot stop. On `true` the caller must go on to navigate. */
 export async function confirmLeave(): Promise<boolean> {
   for (const ask of [...guardsOnScreen]) {
-    if (!(await ask())) return false;
+    if (!(await ask())) {
+      releaseLeave();
+      return false;
+    }
   }
   return true;
+}
+
+/** Drops the yes from `confirmLeave` when the caller does not navigate, so the next leave asks again. */
+export function releaseLeave(): void {
+  for (const release of [...pendingYes]) release();
 }
 
 /** Asks before a dirty page is left by navigation, organization switch, reload or tab close. Call once per page. */
@@ -75,6 +84,7 @@ export function useLeaveGuard(
 
   // Set when confirmLeave already got a yes, so the navigation that follows does not ask a second time.
   let answeredYes = false;
+  const release = () => (answeredYes = false);
   const askFromOutside = async () => {
     const leave = await mayLeave();
     answeredYes = leave && toValue(isDirty);
@@ -98,8 +108,13 @@ export function useLeaveGuard(
   watch(
     active,
     (onScreen) => {
-      if (onScreen) guardsOnScreen.add(askFromOutside);
-      else guardsOnScreen.delete(askFromOutside);
+      if (onScreen) {
+        guardsOnScreen.add(askFromOutside);
+        pendingYes.add(release);
+      } else {
+        guardsOnScreen.delete(askFromOutside);
+        pendingYes.delete(release);
+      }
     },
     { immediate: true, flush: "sync" },
   );
@@ -109,6 +124,7 @@ export function useLeaveGuard(
   onBeforeUnmount(() => {
     window.removeEventListener("beforeunload", onUnload);
     guardsOnScreen.delete(askFromOutside);
+    pendingYes.delete(release);
   });
 
   onBeforeRouteLeave(askOnNavigation);

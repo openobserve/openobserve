@@ -24,7 +24,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSaveBar from "@/lib/forms/SaveBar/OSaveBar.vue";
-import { confirmLeave, useLeaveGuard } from "@/lib/forms/SaveBar/useLeaveGuard";
+import { confirmLeave, releaseLeave, useLeaveGuard } from "@/lib/forms/SaveBar/useLeaveGuard";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import useIsMetaOrg from "@/composables/useIsMetaOrg";
@@ -188,11 +188,16 @@ onMounted(() => (inShell.value = !!document.querySelector(PAGE_ACTIONS_SLOT)));
 
 // These swap the workspace's forms without a navigation, so the router's guard never sees them.
 async function leaveWorkspace(go: () => void): Promise<void> {
-  if (await confirmLeave()) go();
+  if (!(await confirmLeave())) return;
+  releaseLeave();
+  go();
 }
 
 const goToReinstall = async (installationId: string): Promise<void> => {
-  if (installationId !== current.value?.id && !(await confirmLeave())) return;
+  if (installationId !== current.value?.id) {
+    if (!(await confirmLeave())) return;
+    releaseLeave();
+  }
   selectedId.value = installationId;
   await nextTick();
   const button = page.value?.querySelector<HTMLElement>(REINSTALL_BUTTONS);

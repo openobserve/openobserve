@@ -357,7 +357,7 @@ import { signOutDraftsToConfirm, signOutThroughLeaveGuards } from "@/utils/draft
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
-import { confirmLeave } from "@/lib/forms/SaveBar/useLeaveGuard";
+import { confirmLeave, releaseLeave } from "@/lib/forms/SaveBar/useLeaveGuard";
 import { switchOrganization } from "@/utils/organizationSwitch";
 import useBreakpoint from "@/composables/useBreakpoint";
 import SlackIcon from "@/components/icons/SlackIcon.vue";
@@ -1333,6 +1333,9 @@ export default defineComponent({
         selectedOrg.value =
           orgOptions.value.find((org) => org.identifier === current?.identifier) ?? current;
       };
+      // Re-picking the current org switches nothing, so it must not ask to discard the page's edits.
+      if (targetOrg.identifier === store.state.selectedOrganization?.identifier)
+        return keepCurrent();
       // Asked before anything is committed: the switch unmounts the page, and its edits cannot be brought back.
       if (!(await confirmLeave())) return keepCurrent();
       const queryParams =
@@ -1344,7 +1347,10 @@ export default defineComponent({
           org_identifier: targetOrg.identifier,
         },
       });
-      if (!switched) return keepCurrent();
+      if (!switched) {
+        releaseLeave();
+        return keepCurrent();
+      }
       // setSelectedOrganization();
       // if (
       //   config.isCloud &&
