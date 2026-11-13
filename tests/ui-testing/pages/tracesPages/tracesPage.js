@@ -3408,7 +3408,7 @@ export class TracesPage {
     }, `${this.searchBar} ${this.queryPlaceholderTypewriter}`);
   }
 
-  // An example counts once the typewriter moves off it or rests on it, so a half-typed string is never mistaken for one.
+  // A text counts once the typewriter moves off it or rests on it, so a list change mid-typing can count a partial.
   async sampleQueryPlaceholder({ restMs = 3000, timeout = 60000 } = {}) {
     const read = () => this.page.evaluate(() => ({
       texts: [...(window.__o2PlaceholderTexts ?? [])],
