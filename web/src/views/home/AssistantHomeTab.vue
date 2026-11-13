@@ -54,7 +54,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :row-meta="rowMeta"
           :empty="attentionEmpty"
           :loading="!data.nowList.state.value"
+          :timezone="data.timezone.value"
+          :assistant="!offReason"
+          :added-keys="addedKeys"
           @open="openRow"
+          @investigate="investigate"
+          @add-to-chat="toggleChat"
           @view-all="openOverview"
           @retry="() => void data.load(true)"
           @send-data="go({ name: 'ingestion', query: { org_identifier: data.org.value } })"
@@ -86,11 +91,18 @@ import {
 import { useRoute, useRouter, type RouteLocationRaw } from "vue-router";
 
 import AssistantLauncher from "@/components/ai-assistant/welcome/AssistantLauncher.vue";
-import type { ComposerState } from "@/composables/assistant";
+import {
+  contextChipFor,
+  openAssistant,
+  useAssistantRuns,
+  useAssistantStore,
+  type ComposerState,
+} from "@/composables/assistant";
 import { HOME_TAB_QUERY_KEY } from "@/composables/assistant/pure";
 import type { OverviewNowRow, OverviewNowSnapshot } from "@/composables/contextProviders/types";
-import { withHomeReturn } from "@/composables/goto/homeReturn";
+import { armHomeReturn, withHomeReturn } from "@/composables/goto/homeReturn";
 import useBreakpoint from "@/composables/useBreakpoint";
+import { toast } from "@/lib/feedback/Toast/useToast";
 import { useI18nTyped } from "@/types/i18n";
 import { b64EncodeUnicode } from "@/utils/zincutils";
 import { sqlEquals } from "@/utils/query/sqlFilterBuilder";
@@ -100,10 +112,12 @@ import AgentHomeGreeting from "./AgentHomeGreeting.vue";
 import HomeNeedsAttention, { type EmptyState } from "./HomeNeedsAttention.vue";
 import type { NowRowMeta } from "./HomeNowRow.vue";
 import { healthState } from "./homeHealth";
+import { attentionChip, attentionChipId, investigateRow } from "./homeInvestigate";
 import { HOME_RAIL_CLASS } from "./homeState";
 import { homeReturnState, readHomeUrl, writeHomeUrl } from "./homeUrl";
 import { groupNowRows, incidentService, needsYou } from "./nowGrouping";
 import { useAgentHomeState } from "./useAgentHomeState";
+import { incidentOpenedAt } from "./useHomeNow";
 import { useHomeNowData } from "./useHomeNowData";
 import { useHomeRefresh } from "./useHomeRefresh";
 
@@ -168,20 +182,31 @@ const returnState = computed(() =>
   homeReturnState({ row: data.nowList.selectedKey.value, range: data.range.value }),
 );
 
-const incidentServices = computed(() => {
+const incidentsById = computed(() => {
   const lists = data.incidents.value;
   const all = lists ? [...lists.open, ...lists.acknowledged] : [];
-  return new Map(all.map((incident) => [incident.id, incidentService(incident)]));
+  return new Map(all.map((incident) => [incident.id, incident]));
 });
 const grouped = computed(() =>
-  groupNowRows(data.nowList.snapshot.value.rows, (id) => incidentServices.value.get(id) ?? null),
+  groupNowRows(data.nowList.snapshot.value.rows, (id) => {
+    const incident = incidentsById.value.get(id);
+    return incident ? incidentService(incident) : null;
+  }),
 );
 const rowMeta = computed<Record<string, NowRowMeta>>(() =>
   Object.fromEntries(
-    grouped.value.map((item) => [
-      item.row.key,
-      { service: item.service, repeats: item.repeats, flapping: item.flapping },
-    ]),
+    grouped.value.map((item) => {
+      const incident = item.row.kind === "incident" && incidentsById.value.get(item.row.id);
+      return [
+        item.row.key,
+        {
+          service: item.service,
+          repeats: item.repeats,
+          flapping: item.flapping,
+          ...(incident && { openedAt: incidentOpenedAt(incident) }),
+        },
+      ];
+    }),
   ),
 );
 // The most urgent rows that need attention, every kind; a failed source only drops its own rows, the strip says why.
@@ -218,6 +243,57 @@ const launcher = ref<InstanceType<typeof AssistantLauncher> | null>(null);
 
 function focusAsk(): void {
   void nextTick(() => launcher.value?.focusAsk?.());
+}
+
+// A row's Add to Chat is a toggle on its chip in the Ask box, which clears its chips once it sends.
+const addedKeys = computed(() =>
+  attentionSnapshot.value.rows
+    .filter((row) => launcher.value?.hasContext?.(attentionChipId(row)))
+    .map((row) => row.key),
+);
+
+function toggleChat(row: OverviewNowRow): void {
+  const id = attentionChipId(row);
+  if (launcher.value?.hasContext?.(id)) launcher.value.removeContext(id);
+  else launcher.value?.addContext?.(attentionChip(row, attentionSnapshot.value, data.org.value, t));
+}
+
+// Home's Ask box takes the door, so a sent row opens its chat full page; a refusal says why in a toast.
+async function investigate(row: OverviewNowRow): Promise<void> {
+  selectRow(row);
+  // Read on the click, so Open Source and an agent-off Home never touch the assistant runtime.
+  const runs = useAssistantRuns();
+  const outcome = await investigateRow(row, {
+    open: openAssistant,
+    runs: { active: runs.active.value, cap: runs.cap.value },
+    creditsExhausted: state.value === "budget",
+    snapshot: attentionSnapshot.value,
+    t,
+    incidentChip: (incident) => {
+      const chip = contextChipFor(
+        "incident_id",
+        incident.id,
+        { currentPage: "home", org_id: data.org.value, incident_title: incident.title },
+        t,
+      );
+      return chip ? { ...chip, provenance: "door" } : null;
+    },
+    arm: armHomeReturn,
+    returnState: { ...returnState.value, row: row.key },
+    userOrgKey: useAssistantStore().state.userOrgKey ?? undefined,
+  });
+  if (outcome.kind === "fallback") openRow(row);
+  else if (outcome.kind === "not_sent")
+    toast({
+      variant: "warning",
+      message: outcome.note,
+      ...(outcome.showRuns && {
+        action: {
+          label: t("assistant.error.run_limit_member.action"),
+          handler: () => void runs.requestOpen(),
+        },
+      }),
+    });
 }
 
 const historyAlert = ref<{ details: unknown; id: string; type: string } | null>(null);

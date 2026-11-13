@@ -10505,6 +10505,30 @@
         "openName": "Open {row}",
         "retry": "Retry",
         "sendData": "Send Data",
+        "investigate": "Investigate",
+        "addToChat": "Add to Chat",
+        "addToChatName": "Add {row} to Chat",
+        "removeFromChat": "Remove From Chat",
+        "removeFromChatName": "Remove {row} From Chat",
+        "kind": {
+          "service": "Service",
+          "alert": "Alert",
+          "incident": "Incident",
+          "anomaly": "Anomaly"
+        },
+        "openTo": {
+          "service": "View Traces",
+          "alert": "View Alert History",
+          "incident": "Open Incident",
+          "anomaly": "View Anomaly History"
+        },
+        "since": "since {time}",
+        "p99": "p99 {value}",
+        "fired": "Fired {count} time | Fired {count} times",
+        "lastAgo": "last {age} ago",
+        "recoveredAgo": "recovered {age} ago",
+        "alerts": "{count} alert | {count} alerts",
+        "openedAgo": "opened {age} ago",
         "empty": {
           "clear": {
             "title": "All Clear",

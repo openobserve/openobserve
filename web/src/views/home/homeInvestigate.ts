@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import type { OpenAssistantCall } from "@/composables/assistant";
+import { byteSize, type OpenAssistantCall } from "@/composables/assistant";
 import type { ContextChip, OpenAssistantResult, Sid } from "@/composables/assistant/pure";
 import type { OverviewNowRow, OverviewNowSnapshot } from "@/composables/contextProviders/types";
 import type { HomeReturnState } from "@/composables/goto/homeReturn";
@@ -141,6 +141,81 @@ export function serviceFigure(row: ServiceRow, t: TranslateFn): I18nText {
     baseline: formatPercent(row.baselineErrorRate),
     hours: row.baselineHours,
   });
+}
+
+/** The id of a row's chip in Home's Ask box, so a second Add to Chat finds it. */
+export function attentionChipId(row: OverviewNowRow): string {
+  return `attention:${row.key}`;
+}
+
+/** A row as an Ask box chip: an alert as its @ mention, any other row as a Report block of its own figures. */
+export function attentionChip(
+  row: OverviewNowRow,
+  snapshot: OverviewNowSnapshot,
+  org: string,
+  t: TranslateFn,
+): ContextChip {
+  const id = attentionChipId(row);
+  const label = rowSentence(row, snapshot, t, true);
+  if (row.kind === "alert")
+    return {
+      id,
+      kind: "alert",
+      label,
+      short: raw(row.name),
+      ref: { type: "alert", id: row.alertId, org },
+      sizeBytes: label.length,
+      provenance: "mention",
+      sent: "whitelist",
+    };
+  const data = { summary: String(rowSentence(row, snapshot, t)), ...attentionFacts(row, snapshot) };
+  return {
+    id,
+    kind: "report",
+    label,
+    ref: { type: `home_${row.kind}`, id: row.id, org },
+    data,
+    sizeBytes: byteSize(data),
+    provenance: "mention",
+    sent: "serialized",
+  };
+}
+
+// Persisted English keys, never translated, so the agent reads the same block in every locale.
+function attentionFacts(row: OverviewNowRow, snapshot: OverviewNowSnapshot) {
+  if (row.kind === "incident")
+    return {
+      incident_id: row.id,
+      title: row.title,
+      severity: row.severity,
+      status: row.status,
+      alert_count: row.alertCount,
+    };
+  if (row.kind === "anomaly")
+    return {
+      anomaly_id: row.configId,
+      name: row.name,
+      stream: row.stream,
+      anomalous_points: row.anomalyCount,
+      ...(row.at > 0 && { last_at: new Date(row.at / 1000).toISOString() }),
+    };
+  if (row.kind !== "service") return {};
+  const window = investigateWindow(row, snapshot);
+  return {
+    service: row.service,
+    signal: row.signal,
+    error_rate_pct: row.errorRate,
+    baseline_error_rate_pct: row.baselineErrorRate,
+    baseline_hours: row.baselineHours,
+    p99_ms: row.p99Ms,
+    p99_ratio: row.p99Ratio,
+    requests: row.requests,
+    alert_coverage: row.coverage,
+    window: {
+      from: new Date(window.from).toISOString(),
+      to: new Date(window.to).toISOString(),
+    },
+  };
 }
 
 /** The row's sentence as people read it; `brief` is the row's own line, whose figure and state sit beside it. */

@@ -20,7 +20,15 @@ import type { OverviewNowRow, OverviewNowSnapshot } from "@/composables/contextP
 import i18n from "@/locales";
 import type { TranslateFn } from "@/types/i18n";
 
-import { investigateRow, rowSentence, type InvestigateDeps } from "./homeInvestigate";
+import { serializeBlocks } from "@/composables/assistant/context/serialize";
+
+import {
+  attentionChip,
+  attentionChipId,
+  investigateRow,
+  rowSentence,
+  type InvestigateDeps,
+} from "./homeInvestigate";
 
 const t = i18n.global.t as unknown as TranslateFn;
 
@@ -221,5 +229,56 @@ describe("investigateRow", () => {
     const d = deps({ open: vi.fn(async () => ({ ok: false, reason }) as OpenAssistantResult) });
     expect(await investigateRow(service, d)).toEqual(outcome);
     expect(d.arm).not.toHaveBeenCalled();
+  });
+});
+
+describe("attentionChip", () => {
+  it("makes an alert row the same chip an @ mention of the alert would be, labelled by its sentence", () => {
+    expect(attentionChip(alert, snapshot(), "default", t)).toMatchObject({
+      id: "attention:alert:al-1",
+      kind: "alert",
+      label: "High CPU firing",
+      short: "High CPU",
+      ref: { type: "alert", id: "al-1", org: "default" },
+      provenance: "mention",
+      sent: "whitelist",
+    });
+  });
+
+  it("sends a service row as a Report block with its rate, baseline and the trend's window", () => {
+    const made = attentionChip(service, snapshot(), "default", t);
+    expect(made).toMatchObject({
+      id: attentionChipId(service),
+      kind: "report",
+      label: "checkout-api errors at 6.1%",
+      ref: { type: "home_service", id: "checkout-api", org: "default" },
+      sent: "serialized",
+    });
+    expect(made.data).toEqual({
+      summary: "checkout-api errors at 6.1% vs 0.4% (previous 24 h)",
+      service: "checkout-api",
+      signal: "errors",
+      error_rate_pct: 6.1,
+      baseline_error_rate_pct: 0.4,
+      baseline_hours: 24,
+      p99_ms: 900,
+      p99_ratio: 1.2,
+      requests: 1000,
+      alert_coverage: "none",
+      window: { from: "1970-01-01T00:06:40.000Z", to: "1970-01-01T01:06:40.000Z" },
+    });
+    expect(serializeBlocks([made], "n0nce").text).toContain('--- Report [n0nce] ---\n{"summary"');
+  });
+
+  it("sends an incident and an anomaly row as Report blocks of their own fields", () => {
+    expect(attentionChip(incident, snapshot(), "default", t)).toMatchObject({
+      kind: "report",
+      data: { incident_id: "inc-7", title: "Checkout errors", severity: "P1", alert_count: 3 },
+    });
+    expect(attentionChip(anomaly, snapshot(), "default", t)).toMatchObject({
+      kind: "report",
+      label: "Orders: 4 anomalous points",
+      data: { anomaly_id: "an-1", name: "Orders", stream: "orders", anomalous_points: 4 },
+    });
   });
 });

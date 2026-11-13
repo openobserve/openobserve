@@ -21,7 +21,7 @@ import { contextRegistry } from "@/composables/contextProviders/registry";
 import OFile from "@/lib/forms/File/OFile.vue";
 import { requestOverviewFocus } from "@/composables/goto/goToRequests";
 
-import type { CapabilityAgent, GateCode, Starter } from "@/composables/assistant";
+import type { CapabilityAgent, ContextChip, GateCode, Starter } from "@/composables/assistant";
 import { raw } from "@/types/i18n";
 
 import { fakeAssistant, fakeRouter, fakeVuex } from "../__tests__/fakeAssistant";
@@ -223,6 +223,39 @@ describe("AssistantLauncher", () => {
     await input(wrapper).trigger("keydown", { key: "Enter" });
     expect(open.mock.calls[0][0].payload).toMatchObject({ text: "count errors", chips: [chip] });
     expect(wrapper.findAll('[data-test="assistant-launcher-mention-chip"]')).toHaveLength(0);
+  });
+
+  it("takes a chip from Home's Needs Attention once, can drop it by id, and sends it with the line", async () => {
+    const chip: ContextChip = {
+      id: "attention:service:checkout",
+      kind: "report",
+      label: raw("checkout errors at 6.1%"),
+      ref: { type: "home_service", id: "checkout", org: "default" },
+      data: { service: "checkout" },
+      sizeBytes: 20,
+      provenance: "mention",
+      sent: "serialized",
+    };
+    const { wrapper } = setupOn({ layout: "overview" });
+    await flushPromises();
+    const exposed = wrapper.vm as unknown as {
+      addContext(chip: ContextChip): void;
+      removeContext(id: string): void;
+      hasContext(id: string): boolean;
+    };
+    exposed.addContext(chip);
+    exposed.addContext(chip);
+    await flushPromises();
+    expect(wrapper.findAll('[data-test="assistant-launcher-mention-chip"]')).toHaveLength(1);
+    expect(exposed.hasContext(chip.id)).toBe(true);
+    exposed.removeContext(chip.id);
+    await flushPromises();
+    expect(exposed.hasContext(chip.id)).toBe(false);
+    expect(wrapper.find('[data-test="assistant-launcher-chip-row"]').exists()).toBe(false);
+    exposed.addContext(chip);
+    await input(wrapper).setValue("why");
+    await input(wrapper).trigger("keydown", { key: "Enter" });
+    expect(open.mock.calls[0][0].payload).toMatchObject({ text: "why", chips: [chip] });
   });
 
   it("types an @ at the caret from the + menu's Add Context and opens the @ menu", async () => {
