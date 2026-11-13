@@ -9,6 +9,7 @@ import {
   formatDuration,
   localToUtcMicros,
   parseDuration,
+  producesWindow,
   recentWindows,
   scheduleSentence,
   scheduleWithBounds,
@@ -221,6 +222,65 @@ describe("DST, as the server resolves it", () => {
   });
 });
 
+describe("a window never runs past the next start", () => {
+  const berlinDaily: DowntimeSchedule = {
+    repeat: "daily",
+    starts_at: micros("2026-03-01T00:00:00Z"),
+    ends_at: null,
+    timezone: "Europe/Berlin",
+    start_time_local: "00:00",
+    duration_secs: 23 * 3600 + 1800,
+    weekdays: [],
+  };
+
+  it("caps a daily window of 23.5 hours at the next start on spring-forward day, as the server does", () => {
+    expect(currentOrNextWindow(berlinDaily, micros("2026-03-29T12:00:00Z"))).toEqual({
+      start: micros("2026-03-28T23:00:00Z"),
+      end: micros("2026-03-29T22:00:00Z"),
+    });
+    const ordinary = currentOrNextWindow(berlinDaily, micros("2026-03-25T12:00:00Z"))!;
+    expect(ordinary.end - ordinary.start).toBe((23 * 3600 + 1800) * 1_000_000);
+  });
+
+  it("keeps the full duration of the last window of a series", () => {
+    const last = { ...berlinDaily, ends_at: micros("2026-03-29T21:59:00Z") };
+    const w = currentOrNextWindow(last, micros("2026-03-29T12:00:00Z"))!;
+    expect(w.end - w.start).toBe((23 * 3600 + 1800) * 1_000_000);
+  });
+
+  it("keeps the tail of a weekly window when the next occurrence is days away", () => {
+    const saturday: DowntimeSchedule = {
+      ...berlinDaily,
+      repeat: "weekly",
+      start_time_local: "23:30",
+      duration_secs: 86_399,
+      weekdays: [6],
+    };
+    const w = currentOrNextWindow(saturday, micros("2026-03-29T22:15:00Z"))!;
+    expect(w.start).toBe(micros("2026-03-28T22:30:00Z"));
+    expect(w.end).toBe(micros("2026-03-29T22:29:59Z"));
+  });
+});
+
+describe("a series that starts later", () => {
+  it("shows the first window of a weekly series that starts next month", () => {
+    const later = { ...weekly, starts_at: micros("2026-10-17T22:00:00Z") };
+    expect(currentOrNextWindow(later, micros("2026-09-17T12:00:00Z"))?.start).toBe(
+      micros("2026-10-18T00:00:00Z"),
+    );
+  });
+
+  it("knows a schedule that never produces a window", () => {
+    const sundayOnly: DowntimeSchedule = {
+      ...weekly,
+      starts_at: micros("2026-09-20T22:00:00Z"),
+      ends_at: micros("2026-09-25T21:59:00Z"),
+    };
+    expect(producesWindow(sundayOnly)).toBe(false);
+    expect(producesWindow({ ...sundayOnly, ends_at: micros("2026-09-27T21:59:00Z") })).toBe(true);
+  });
+});
+
 describe("scheduleSentence", () => {
   it("describes a weekly rule", () => {
     expect(scheduleSentence(weekly, gt, "en-US")).toBe(
@@ -280,6 +340,55 @@ describe("recentWindows", () => {
     };
     expect(recentWindows(once, micros("2026-09-17T00:00:00Z"), 3)).toHaveLength(1);
     expect(recentWindows(once, micros("2026-09-01T00:00:00Z"), 3)).toEqual([]);
+  });
+
+  const daily: DowntimeSchedule = {
+    repeat: "daily",
+    starts_at: micros("2026-09-01T00:00:00Z"),
+    ends_at: null,
+    timezone: "UTC",
+    start_time_local: "02:00",
+    duration_secs: 3600,
+    weekdays: [],
+  };
+
+  it("lists no window after a cancel and cuts the one that holds it", () => {
+    const now = micros("2026-09-17T12:00:00Z");
+    const cancelled = micros("2026-09-14T02:30:00Z");
+    expect(recentWindows(daily, now, 3, cancelled)).toEqual([
+      { start: micros("2026-09-12T02:00:00Z"), end: micros("2026-09-12T03:00:00Z") },
+      { start: micros("2026-09-13T02:00:00Z"), end: micros("2026-09-13T03:00:00Z") },
+      { start: micros("2026-09-14T02:00:00Z"), end: cancelled },
+    ]);
+  });
+
+  it("drops a window a cancel starts at and keeps one a cancel ends at whole", () => {
+    const now = micros("2026-09-17T12:00:00Z");
+    const atStart = recentWindows(daily, now, 1, micros("2026-09-14T02:00:00Z"));
+    expect(atStart).toEqual([
+      { start: micros("2026-09-13T02:00:00Z"), end: micros("2026-09-13T03:00:00Z") },
+    ]);
+    const atEnd = recentWindows(daily, now, 1, micros("2026-09-14T03:00:00Z"));
+    expect(atEnd).toEqual([
+      { start: micros("2026-09-14T02:00:00Z"), end: micros("2026-09-14T03:00:00Z") },
+    ]);
+    expect(recentWindows(daily, now, 3, micros("2026-08-01T00:00:00Z"))).toEqual([]);
+  });
+
+  it("cuts a one-time window at its early end", () => {
+    const once: DowntimeSchedule = {
+      repeat: "none",
+      starts_at: micros("2026-09-10T20:00:00Z"),
+      ends_at: micros("2026-09-10T23:00:00Z"),
+      timezone: "UTC",
+      duration_secs: 10800,
+      weekdays: [],
+    };
+    const now = micros("2026-09-17T00:00:00Z");
+    expect(recentWindows(once, now, 3, micros("2026-09-10T21:00:00Z"))).toEqual([
+      { start: once.starts_at, end: micros("2026-09-10T21:00:00Z") },
+    ]);
+    expect(recentWindows(once, now, 3, micros("2026-09-10T19:00:00Z"))).toEqual([]);
   });
 });
 

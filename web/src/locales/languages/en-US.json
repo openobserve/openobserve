@@ -14135,6 +14135,9 @@
         "onceFor": "Once, {duration}"
       },
       "validation": {
+        "endInPast": "The end time is in the past. Pick an end time after now.",
+        "pastSloOnly": "This window is in the past. It only corrects SLO data.",
+        "neverProducesWindow": "This schedule never produces a window.",
         "conditionRequired": "Add a condition, or remove the condition block.",
         "pairKey": "Choose a dimension for every row.",
         "pairOperator": "Use = or != in a downtime condition.",
@@ -14208,7 +14211,9 @@
       "confirmEndNow": {
         "title": "End this downtime now?",
         "message": "Notifications resume at once. The downtime stays in the list as ended early.",
+        "recurringMessage": "This downtime repeats. Ending it now also stops every future window and its extensions. Other downtimes that cover the same items keep muting. To mute future windows again, duplicate it.",
         "ok": "End now",
+        "recurringOk": "End now and stop future windows",
         "keep": "Keep running"
       },
       "extend": {
@@ -14241,6 +14246,8 @@
       "confirmCancel": {
         "title": "Cancel downtime",
         "message": "Notifications resume at once. The downtime stays in the list for history.",
+        "recurringMessage": "This downtime repeats. Cancelling it stops every future window.",
+        "bulkRecurringNote": "At least one selected downtime repeats. Cancelling it stops every future window.",
         "bulkMessage": "Cancel {count} downtime? Notifications resume at once. | Cancel {count} downtimes? Notifications resume at once.",
         "confirm": "Cancel downtime | Cancel downtimes",
         "keep": "Keep downtime | Keep downtimes"
@@ -14440,6 +14447,12 @@
         "bannerOn": "Shown to the org while active",
         "bannerOff": "No banner",
         "occurrences": "Occurrences",
+        "plannedSchedule": "Planned schedule",
+        "endedEarlyAt": "Ended early at",
+        "cancelledAt": "Cancelled at",
+        "endedEarlyAtTime": "Ended early at {time}",
+        "cancelledAtTime": "Cancelled at {time}",
+        "stoppedTime": "{time} ({zone})",
         "nextWindow": "Next window: {window}. Your time: {local}.",
         "sectionCount": "{name} · {count}",
         "matchedByHeader": "Matched by",

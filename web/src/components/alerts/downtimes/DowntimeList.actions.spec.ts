@@ -5,6 +5,7 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { createMemoryHistory, createRouter } from "vue-router";
 import store from "@/test/unit/helpers/store";
 import DowntimeList from "./DowntimeList.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
 import downtimes, { type DowntimeListItem } from "@/services/downtimes";
 import { queryClient } from "@/composables/query/queryClient";
 import {
@@ -212,6 +213,86 @@ describe("DowntimeList row actions", () => {
     ok.click();
     await flushPromises();
     expect(downtimes.cancel).toHaveBeenCalledWith("default", "active", "default", undefined);
+    wrapper.unmount();
+  });
+
+  describe("recurring rows", () => {
+    const weekly = {
+      repeat: "weekly" as const,
+      starts_at: NOW - 10 * 24 * HOUR,
+      ends_at: null,
+      timezone: "UTC",
+      start_time_local: "02:00",
+      duration_secs: 3600,
+      weekdays: [1],
+    };
+    const withRecurring = () =>
+      ROWS.map((r) => (r.id === "active" || r.id === "scheduled" ? { ...r, schedule: weekly } : r));
+
+    beforeEach(() => {
+      vi.mocked(downtimes.list).mockResolvedValue({
+        data: {
+          items: withRecurring(),
+          total: ROWS.length,
+          counts: { active: 1, scheduled: 1, recurring: 2, ended: 1, cancelled: 1, ended_early: 1 },
+        },
+      } as any);
+    });
+
+    const confirmProps = (wrapper: ReturnType<typeof mount>, title: string) =>
+      wrapper
+        .findAllComponents({ name: "ConfirmDialog" })
+        .find((c) => c.props("modelValue") && String(c.props("title")) === title)!;
+
+    it("says End now stops every future window, focused on Keep running", async () => {
+      const wrapper = await mountList();
+      await wrapper.get('[data-test="downtime-list-active-end-now"]').trigger("click");
+      await flushPromises();
+      expect(dialog()?.textContent).toContain(
+        "This downtime repeats. Ending it now also stops every future window and its extensions.",
+      );
+      const ok = dialog()!.querySelector<HTMLButtonElement>('[data-test="o-dialog-primary-btn"]')!;
+      expect(ok.textContent).toContain("End now and stop future windows");
+      const props = confirmProps(wrapper, "End this downtime now?");
+      expect(props.props("okVariant")).toBe("destructive");
+      expect(props.props("focusCancel")).toBe(true);
+      wrapper.unmount();
+    });
+
+    it("says Cancel of a scheduled series stops every future window", async () => {
+      const wrapper = await mountList();
+      await wrapper.get('[data-test="downtime-list-scheduled-cancel"]').trigger("click");
+      await flushPromises();
+      expect(dialog()?.textContent).toContain(
+        "This downtime repeats. Cancelling it stops every future window.",
+      );
+      wrapper.unmount();
+    });
+
+    it("adds the recurring note to a bulk cancel only when a selected row repeats", async () => {
+      const wrapper = await mountList();
+      wrapper.findComponent(OTable).vm.$emit("update:selectedIds", ["active", "scheduled"]);
+      await flushPromises();
+      await wrapper.get('[data-test="downtime-list-bulk-cancel"]').trigger("click");
+      await flushPromises();
+      expect(dialog()?.textContent).toContain("At least one selected downtime repeats.");
+      wrapper.unmount();
+    });
+  });
+
+  it("keeps the one-time End now and bulk cancel text", async () => {
+    const wrapper = await mountList();
+    await wrapper.get('[data-test="downtime-list-active-end-now"]').trigger("click");
+    await flushPromises();
+    expect(dialog()?.textContent).toContain("Notifications resume at once.");
+    expect(dialog()?.textContent).not.toContain("This downtime repeats.");
+    dialog()!.querySelector<HTMLButtonElement>('[data-test="o-dialog-secondary-btn"]')!.click();
+    await flushPromises();
+    wrapper.findComponent(OTable).vm.$emit("update:selectedIds", ["active", "scheduled"]);
+    await flushPromises();
+    await wrapper.get('[data-test="downtime-list-bulk-cancel"]').trigger("click");
+    await flushPromises();
+    expect(dialog()?.textContent).not.toContain("At least one selected downtime repeats.");
     wrapper.unmount();
   });
 
