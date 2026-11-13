@@ -9,6 +9,7 @@ import {
   pickAlertDestination,
   settleIntoView,
 } from './alertSectionHelpers.js';
+const { FilterBuilderDriver } = require('../generalPages/filterBuilderPage.js');
 
 /**
  * AlertSaveQueryModePage — the "Choose Query Mode" dialog Save opens when more
@@ -34,9 +35,6 @@ export class AlertSaveQueryModePage {
       nameTrigger: '[data-test="add-alert-name-input-trigger"]',
       nameInput: '[data-test="add-alert-name-input-input"]',
       streamTrigger: '[data-test="add-alert-stream-name-select-dropdown-trigger"]',
-      addCondition: '[data-test="alert-conditions-add-condition-btn"]',
-      conditionColumn: '[data-test="alert-conditions-select-column-trigger"]',
-      conditionValue: '[data-test="alert-conditions-value-input-field"]',
       threshold: '[data-test="alert-trigger-threshold-input-field"]',
       realtimeTab: '[data-test="add-alert-type-tab-true"]',
       scheduledTab: '[data-test="add-alert-type-tab-false"]',

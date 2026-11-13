@@ -161,7 +161,8 @@ export default defineComponent({
           });
         }
         templates.value = await queryClient.fetchQuery(options);
-      } catch {
+      } catch (error: unknown) {
+        if ((error as { response?: { status?: number } })?.response?.status === 403) return;
         toast({
           variant: "error",
           message: t("toastMessages.alerts.errorWhileFetchingTemplates"),

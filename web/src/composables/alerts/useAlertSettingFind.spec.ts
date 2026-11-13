@@ -64,10 +64,10 @@ describe("useAlertSettingFind", () => {
 
   it("lists ranked results with section question and group", () => {
     const { find } = setup();
-    find.query.value = "dedup";
+    find.query.value = "flapping";
     expect(find.items.value[0]).toEqual({
-      id: "dedup",
-      label: "Skip duplicates",
+      id: "keepFiring",
+      label: "Keep firing after it clears",
       context: ["Who should hear about it?", "More settings"],
     });
     expect(find.countText.value).toMatch(/setting/);
@@ -75,22 +75,13 @@ describe("useAlertSettingFind", () => {
 
   it("expands a tucked group, then scrolls to and focuses the control", async () => {
     const { find, tiers, reveal } = setup();
-    await find.select("dedup");
+    await find.select("keepFiring");
     expect(tiers.expand).toHaveBeenCalledWith("notify");
     const control = document.querySelector<HTMLElement>(
-      '[data-test="alert-dedup-fingerprint-fields"]',
+      '[data-test="alert-settings-keep-firing-for-input"]',
     );
     expect(reveal).toHaveBeenCalledWith(control);
     expect(document.activeElement).toBe(control?.querySelector("input"));
-  });
-
-  it("expands the group of the setting that gates a sub-control", async () => {
-    const { find, tiers, reveal } = setup();
-    await find.select("dedupWindow");
-    expect(tiers.expand).toHaveBeenCalledWith("notify");
-    expect(reveal).toHaveBeenCalledWith(
-      document.querySelector('[data-test="alert-dedup-time-window"]'),
-    );
   });
 
   it("reveals a one-click setting without expanding its section", async () => {

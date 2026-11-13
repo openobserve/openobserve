@@ -46,6 +46,8 @@ export interface ShortcutEntry {
   skipInInput?: boolean;
   /** Yield to dialogs, drawers, popovers, menus and fields (see `Shortcut.skipInOverlay`). */
   skipInOverlay?: boolean;
+  /** Fire even while focus is inside a dialog or drawer (see `Shortcut.allowInDialog`). */
+  allowInDialog?: boolean;
   /** Hide this entry in the cheatsheet unless the edition/config exposes it. */
   visible?: (caps: ShortcutCapabilities) => boolean;
 }
@@ -1339,6 +1341,7 @@ export interface ShortcutDef {
   allowInInput?: boolean;
   skipInInput?: boolean;
   skipInOverlay?: boolean;
+  allowInDialog?: boolean;
 }
 
 function isRegisterable(e: ShortcutEntry): boolean {
@@ -1364,6 +1367,7 @@ const DEFS: Map<string, ShortcutDef> = (() => {
         allowInInput: e.allowInInput,
         skipInInput: e.skipInInput,
         skipInOverlay: e.skipInOverlay,
+        allowInDialog: e.allowInDialog,
       });
     }
   }

@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            provides FORM_CONTEXT_KEY. The OForm* fields below bind by nested
            `name=` (trigger_condition.*, query_condition.*, logGroupBy[]) into that
            form; the composed schema in AddAlert.schema.ts validates them on save.
-           Non-form widgets (tabs / editors / VRL / FilterGroup) are bridged. -->
+           Non-form widgets (tabs / editors / VRL / condition builder) are bridged. -->
       <div :class="['box-border w-full min-w-0', sectionTargets ? '' : 'px-3 py-2']">
         <!-- Query Mode Tabs (hidden for real-time alerts) -->
         <div
@@ -914,7 +914,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                       <!-- Unit dropdown: minutes / hours / cron -->
                       <OSelect
-                        :aria-label="t('common.timeUnit')"
+                        :aria-label="
+                          t('common.unitFor', { label: t('alerts.queryConfig.checkEvery') })
+                        "
                         class="max-w-25 min-w-20"
                         :model-value="frequencyMode"
                         data-test="alert-check-every-unit-select"
@@ -1030,20 +1032,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :class="sectionTargets ? 'pb-2' : 'px-3'"
             >
               <div v-show="showFilters" ref="customPreviewRef">
-                <FilterGroup
-                  :compact-empty="!!sectionTargets"
-                  :stream-fields="columns"
-                  :stream-fields-map="streamFieldsMap"
-                  :show-sql-preview="false"
-                  :sql-query="generatedSqlQuery"
-                  :group="inputData.conditions"
-                  :depth="0"
-                  module="alerts"
-                  name-prefix="query_condition.conditions"
-                  @add-condition="updateGroup"
-                  @add-group="updateGroup"
-                  @remove-group="removeConditionGroup"
-                  @input:update="onInputUpdate"
+                <FilterBuilder
+                  ref="conditionsBuilderRef"
+                  profile="alert"
+                  :model-value="inputData.conditions"
+                  :fields="conditionFields"
+                  :load-values="conditionValueLoader"
+                  data-test="alert-conditions"
+                  @update:model-value="onConditionsChange"
+                  @update:valid="conditionsValid = $event"
                 />
                 <div
                   v-if="showConditionsError"
@@ -1396,7 +1393,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         />
                       </template>
                       <OSelect
-                        :aria-label="t('common.timeUnit')"
+                        :aria-label="
+                          t('common.unitFor', { label: t('alerts.queryConfig.checkEvery') })
+                        "
                         class="max-w-25 min-w-20"
                         :model-value="frequencyMode"
                         data-test="alert-check-every-unit-select"
@@ -1948,7 +1947,9 @@ import { savedBrowserTimezone } from "@/utils/timezoneAliases";
 import { useTypewriterPlaceholder } from "@/components/ai-assistant/welcome/useTypewriterPlaceholder";
 import { alertPromqlSamples } from "@/utils/alerts/promqlSamples";
 import AlertQueryPreview from "@/components/alerts/AlertQueryPreview.vue";
-import FilterGroup from "@/components/alerts/FilterGroup.vue";
+import FilterBuilder from "@/components/filterBar/FilterBuilder.vue";
+import { streamValuesLoader } from "@/components/filterBar/streamValues";
+import { toFilterFieldType, type FilterField } from "@/utils/query/filterBar";
 import type { AlertSectionTargets } from "@/components/alerts/alertFormSections";
 import QueryEditorDialog from "@/components/alerts/QueryEditorDialog.vue";
 import CustomConfirmDialog from "@/components/alerts/CustomConfirmDialog.vue";
