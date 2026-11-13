@@ -55,7 +55,7 @@
       "alerts-15096-query-mode-regressions.spec.js",
       "alerts-15636-cross-type-join.spec.js",
       "alerts-15497-clone-composite-load-races.spec.js",
-      "alerts-529-988-list-search.spec.js",
+      "alerts-529-list-search.spec.js",
       "alerts-15951-destination-auth-header.spec.js"
     ],
     "disabled": []

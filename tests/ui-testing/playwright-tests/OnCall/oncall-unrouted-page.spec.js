@@ -4,9 +4,10 @@ const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const {
-  api, baseUrl, orgId, uniqueName, isOnCallAvailable, getRoutingConfig,
+  orgId, uniqueName, isOnCallAvailable, getRoutingConfig,
   seedOnCallStream, createPagingAlert, waitForPages, createTeam, deleteTeamById,
 } = require('../utils/oncall-seed.js');
+const { deleteAlertInDefaultFolder, deleteLogStream, resolveOnCallResponse } = require('../utils/regression-alert-fixtures.js');
 
 test.describe('On-call: an unrouted page opens cleanly (ENT#3151)', {
   tag: ['@oncall', '@enterprise', '@regression'],
@@ -38,10 +39,10 @@ test.describe('On-call: an unrouted page opens cleanly (ENT#3151)', {
   test.afterAll(async ({ browser }) => {
     const page = await browser.newPage();
     try {
-      if (created.alertId) await api(page, 'delete', `${baseUrl()}/api/v2/${orgId()}/alerts/${created.alertId}?folder=default`);
-      if (created.pageId) await api(page, 'post', `${baseUrl()}/api/${orgId()}/oncall/responses/${created.pageId}/resolve`, {});
+      if (created.alertId) await deleteAlertInDefaultFolder(page, created.alertId);
+      if (created.pageId) await resolveOnCallResponse(page, created.pageId);
       if (created.teamId) await deleteTeamById(page, created.teamId);
-      if (created.stream) await api(page, 'delete', `${baseUrl()}/api/${orgId()}/streams/${created.stream}?type=logs`);
+      if (created.stream) await deleteLogStream(page, created.stream);
     } finally {
       await page.close();
     }
