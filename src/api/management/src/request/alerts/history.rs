@@ -55,7 +55,7 @@ const LIKE_PREDICATE_MAX_IDS: usize = 20;
 /// Latest accepted end time (9999-12-31); search adds offsets to it and overflows near `i64::MAX`.
 const MAX_END_TIME_MICROS: i64 = 253_402_300_799_999_999;
 
-/// Alert-only columns read after [HISTORY_COLUMNS], each once the stream has it.
+/// Read after [HISTORY_COLUMNS], each only once the stream has it.
 const ALERT_HISTORY_COLUMNS: [&str; 19] = [
     "level",
     "actual_value",

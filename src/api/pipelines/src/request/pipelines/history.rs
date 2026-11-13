@@ -47,7 +47,7 @@ use crate::common::{
     meta::http::HttpResponse as MetaHttpResponse, utils::http::get_or_create_trace_id,
 };
 
-/// Pipeline-only columns read after the shared history columns, each once the stream has it.
+/// Read after the shared history columns, each only once the stream has it.
 const PIPELINE_HISTORY_COLUMNS: [&str; 6] = [
     "delay_in_secs",
     "evaluation_took_in_secs",

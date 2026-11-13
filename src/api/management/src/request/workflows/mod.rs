@@ -63,7 +63,6 @@ use crate::{
 /// Bounded because a move runs one OpenFGA check per id before authorizing anything.
 const MAX_MOVE_WORKFLOWS: usize = 100;
 
-/// The triggers stream columns the workflow history reads.
 const HISTORY_COLUMNS: [&str; 9] = [
     "_timestamp",
     "org",

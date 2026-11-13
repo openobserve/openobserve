@@ -84,7 +84,6 @@ pub const OPTIONAL_COLUMNS: [&str; 38] = [
     "scheduled_for",
 ];
 
-/// The run columns every scheduled-run history list shows.
 pub const HISTORY_COLUMNS: [&str; 9] = [
     "_timestamp",
     "org",
