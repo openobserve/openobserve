@@ -22,11 +22,10 @@ import {
 } from "@/utils/query/sqlCompletion";
 import { mergeServerFunctions } from "@/utils/query/serverFunctions";
 import { type ServerQueryFunction } from "@/services/query_functions";
-import { MAX_VALUE_LENGTH } from "@/utils/fieldValueUtils";
+import { MAX_VALUE_LENGTH, needsPrefixLookup } from "@/utils/fieldValueUtils";
 
 // Under the editor's 1 s value budget, so local values still beat the still-loading row.
 const LOCAL_VALUES_SERVER_WAIT_MS = 800;
-const PREFIX_ENOUGH_MATCHES = 3;
 
 const useSqlSuggestions = () => {
   // Both lists come from the shared catalog (web/src/utils/query/sqlCompletion.ts).
@@ -186,14 +185,6 @@ const useSqlSuggestions = () => {
       timer = setTimeout(() => resolve(null), Math.max(0, ms));
     });
     return Promise.race([lookup, wait]).finally(() => clearTimeout(timer));
-  };
-
-  // Only a truncated top list can be hiding matches, and a few matches already make a useful menu.
-  const needsPrefixLookup = (prefix: string, truncated: boolean, merged: string[]) => {
-    if (!truncated) return false;
-    const lower = prefix.toLowerCase();
-    const matches = merged.filter((v) => v.toLowerCase().startsWith(lower)).length;
-    return matches < PREFIX_ENOUGH_MATCHES;
   };
 
   /** Field values for one column: in-session first, then stored, then the server's, deduplicated. */
