@@ -154,6 +154,33 @@ describe("loadQueryVariableValues — PromQL", () => {
     expect(result.options.map((o) => o.value)).toEqual(["node_cpu", "node_memory"]);
   });
 
+  it("widens label_names() and metrics() past the stream-stats lag before answering none", async () => {
+    const end = 1_794_552_452;
+    const window = { startTime: end - 3600, endTime: end };
+    const lagged =
+      (data: unknown[]) =>
+      async ({ start_time }: any) =>
+        promOk(start_time <= end - 24 * 3600 ? data : []);
+    labels.mockImplementation(lagged(["cluster", "job"]));
+    labelValues.mockImplementation(lagged(["up", "kube_pod_info"]));
+
+    const names = await loadQueryVariableValues(baseParams({ query: "label_names()", ...window }));
+    expect(names.options.map((o) => o.value)).toEqual(["cluster", "job"]);
+    expect(labels.mock.calls.map(([args]) => args.start_time)).toEqual([
+      end - 3600,
+      end - 24 * 3600,
+    ]);
+
+    const metrics = await loadQueryVariableValues(baseParams({ query: "metrics(.*)", ...window }));
+    expect(metrics.options.map((o) => o.value)).toEqual(["up", "kube_pod_info"]);
+
+    labels.mockResolvedValue(promOk([]));
+    labels.mockClear();
+    const none = await loadQueryVariableValues(baseParams({ query: "label_names()", ...window }));
+    expect(none.options).toEqual([]);
+    expect(labels).toHaveBeenCalledTimes(3);
+  });
+
   it("metrics with an invalid regex fails with a readable message", async () => {
     labelValues.mockResolvedValue(promOk([]));
     await expect(loadQueryVariableValues(baseParams({ query: "metrics([)" }))).rejects.toThrow(

@@ -38,6 +38,7 @@ const METRIC_SCAN_LIMIT = 200;
 const MICROS_THRESHOLD = 1e14;
 const MILLIS_THRESHOLD = 1e11;
 const METRIC_SCAN_BATCH = 8;
+const DAY_SECONDS = 24 * 3600;
 
 export interface SqlVariableQueryRequest {
   sql: string;
@@ -177,13 +178,38 @@ export const toPromSeconds = (time: number): number => {
   return Math.floor(time);
 };
 
+// Names come from stream stats, which lag fresh ingestion; widen like the metrics explorer instead of answering none.
+const withIndexLagWindows = async (
+  range: PromRange,
+  load: (window: PromRange) => Promise<unknown[]>,
+): Promise<unknown[]> => {
+  const windows = [
+    range,
+    ...[1, 30].map((days) => ({
+      ...range,
+      start_time: Math.min(range.start_time, range.end_time - days * DAY_SECONDS),
+    })),
+  ];
+  let values: unknown[] = [];
+  for (const window of windows) {
+    values = await load(window);
+    if (values.length) break;
+  }
+  return values;
+};
+
+const loadMetricNames = (range: PromRange): Promise<unknown[]> =>
+  withIndexLagWindows(range, async (window) =>
+    promValues(await metricsService.labelValues({ ...window, label: "__name__" })),
+  );
+
 // The backend answers label values only for one metric, so an unscoped lookup unions them across metrics.
 const labelValuesAcrossMetrics = async (
   range: PromRange,
   label: string,
   maxRecords: number,
 ): Promise<unknown[]> => {
-  const names = promValues(await metricsService.labelValues({ ...range, label: "__name__" }));
+  const names = await loadMetricNames(range);
   const values = new Set<string>();
   const scanned = names.slice(0, METRIC_SCAN_LIMIT);
   for (let i = 0; i < scanned.length && values.size <= maxRecords; i += METRIC_SCAN_BATCH) {
@@ -211,6 +237,7 @@ const loadLabelValues = async (
   maxRecords: number,
 ): Promise<unknown[]> => {
   if (match) return promValues(await metricsService.labelValues({ ...range, label, match }));
+  if (label === "__name__") return loadMetricNames(range);
   try {
     return promValues(await metricsService.labelValues({ ...range, label }));
   } catch {
@@ -231,7 +258,9 @@ const loadPromValues = async (params: QueryVariableLoadParams): Promise<unknown[
     case "label_values":
       return loadLabelValues(range, parsed.label, parsed.match, params.maxRecords);
     case "label_names":
-      return promValues(await metricsService.labels({ ...range, match: parsed.match }));
+      return withIndexLagWindows(range, async (window) =>
+        promValues(await metricsService.labels({ ...window, match: parsed.match })),
+      );
     case "metrics": {
       let matcher: RegExp;
       try {
@@ -239,7 +268,7 @@ const loadPromValues = async (params: QueryVariableLoadParams): Promise<unknown[
       } catch {
         throw new Error(gt("dashboard.queryVariable.invalidRegex", { regex: parsed.regex }));
       }
-      const names = promValues(await metricsService.labelValues({ ...range, label: "__name__" }));
+      const names = await loadMetricNames(range);
       return names.filter((name) => matcher.test(String(name)));
     }
     case "query_result": {
