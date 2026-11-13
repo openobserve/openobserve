@@ -13,7 +13,20 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import type { AssistantSession } from "@/composables/assistant";
 import type { Incident } from "@/services/incidents";
+
+export type TrayState = "needsYou" | "working" | "failed" | "idle";
+
+/** The chat's state: waiting for the person, answering, failed, or quiet. */
+export function trayState(session: AssistantSession | undefined): TrayState {
+  if (!session) return "idle";
+  if (session.pendingApproval || session.pendingConsent) return "needsYou";
+  const state = session.turn.state;
+  if (state === "failed" || state === "refused") return "failed";
+  if (state === "done" || state === "stopped") return "idle";
+  return state === "idle" ? "idle" : "working";
+}
 
 /** The bar reads the first page of open incidents; the list API pages at this size. */
 export const INCIDENT_PAGE = 50;

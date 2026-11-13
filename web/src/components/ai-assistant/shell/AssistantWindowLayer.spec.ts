@@ -89,7 +89,7 @@ async function setup(path = "/logs") {
 
 const windows = () => document.body.querySelectorAll('[data-test="assistant-window"]');
 
-const tray = () => document.body.querySelector('[data-test="assistant-tray"]');
+const tray = () => document.body.querySelector('[data-test="threads-bar"]');
 
 const status = () =>
   document.body.querySelector('[data-test="assistant-window-status"]')?.textContent ?? "";
@@ -111,7 +111,7 @@ afterEach(() => {
 });
 
 describe("AssistantWindowLayer", () => {
-  it("renders one window per open chat, each with its own chat, and a bar per minimised one", async () => {
+  it("renders one window per open chat, each with its own chat, and a badge counting the minimised one", async () => {
     const { store } = fake.current;
     const [a, b, c] = [newChat(), newChat(), newChat()];
     for (const sid of [a, b, c]) store.floatChat(sid, { focus: "none" });
@@ -119,7 +119,9 @@ describe("AssistantWindowLayer", () => {
     expect(windows()).toHaveLength(2);
     const shown = [...windows()].map((w) => (w as HTMLElement).dataset.assistantWindow);
     expect(shown.sort()).toEqual([b, c].sort());
-    expect(document.body.querySelectorAll('[data-test="assistant-tray-bar"]')).toHaveLength(1);
+    expect(
+      document.body.querySelector('[data-test="assistant-launcher-badge"]')?.textContent?.trim(),
+    ).toBe("1");
   });
 
   it("shows nothing below lg or on the full view, and keeps the windows for when they return", async () => {
@@ -130,9 +132,20 @@ describe("AssistantWindowLayer", () => {
     expect(windows()).toHaveLength(0);
     expect(store.windowOf(sid)?.state).toBe("open");
     mounted.splice(0).forEach((wrapper) => wrapper.unmount());
+    store.minimiseWindow(sid, "button");
     lg.value = false;
     await setup();
     expect(windows()).toHaveLength(0);
+    expect(tray()).not.toBeNull();
+  });
+
+  it("hides the launcher on the full thread view", async () => {
+    const { store } = fake.current;
+    const sid = newChat();
+    store.floatChat(sid, { focus: "none" });
+    store.minimiseWindow(sid, "button");
+    await setup("/?thread=");
+    expect(tray()).toBeNull();
   });
 
   it("minimises on Escape from inside a window (rung g) and reports the reason", async () => {
@@ -221,14 +234,31 @@ describe("AssistantWindowLayer", () => {
     expect(el.hasAttribute("data-collapsed")).toBe(false);
   });
 
-  it("keeps the Threads bar shown while a keyboard user is on its toggle", async () => {
+  it("hides the launcher while another chat window is open and shows it when none is", async () => {
+    const { store } = fake.current;
+    const parked = newChat();
+    store.floatChat(parked, { focus: "none" });
+    store.minimiseWindow(parked, "button");
+    const open = newChat();
+    store.floatChat(open, { focus: "none" });
+    await setup();
+    const bar = () => document.body.querySelector<HTMLElement>('[data-test="threads-bar"]');
+    expect(bar()?.style.display).toBe("none");
+    store.minimiseWindow(open, "button");
+    await flushPromises();
+    expect(bar()?.style.display).not.toBe("none");
+  });
+
+  it("keeps the Threads bar shown while a keyboard user is on its icon", async () => {
     const { store } = fake.current;
     const sid = newChat();
     store.floatChat(sid, { focus: "none" });
     store.minimiseWindow(sid, "button");
     await setup();
     const bar = document.body.querySelector<HTMLElement>('[data-test="threads-bar"]')!;
-    const toggle = document.body.querySelector<HTMLElement>('[data-test="threads-bar-toggle"]')!;
+    const toggle = document.body.querySelector<HTMLElement>(
+      '[data-test="assistant-launcher-toggle"]',
+    )!;
     const box = { left: 0, right: 500, top: 0, bottom: 500 } as DOMRect;
     bar.getBoundingClientRect = () => box;
     toggle.getBoundingClientRect = () => box;
