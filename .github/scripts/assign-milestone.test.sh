@@ -16,10 +16,12 @@ cat >"$WORK/fake-gh" <<'FAKE'
 set -euo pipefail
 [ "$1" = api ] || { echo "fake gh: unsupported command $1" >&2; exit 2; }
 shift
-method=GET path="" fields=""
+method=GET path="" fields="" ext=json
 while [ $# -gt 0 ]; do
   case $1 in
     -X) method=$2; shift 2 ;;
+    -H) [ "$2" = "Accept: application/vnd.github.diff" ] || { echo "fake gh: header $2" >&2; exit 2; }
+      ext=diff; shift 2 ;;
     --paginate) shift ;;
     -f | -F) fields="$fields $2"; shift 2 ;;
     -*) echo "fake gh: unsupported flag $1" >&2; exit 2 ;;
@@ -31,8 +33,8 @@ count_file="$FIX/.count_${key//\//_}"
 n=$(( $(cat "$count_file" 2>/dev/null || echo 0) + 1 ))
 echo "$n" >"$count_file"
 [ "$method" = GET ] || echo "$method $path$fields" >>"$FIX/writes.log"
-body="$FIX/$key.json"
-[ -f "$FIX/$key.$n.json" ] && body="$FIX/$key.$n.json"
+body="$FIX/$key.$ext"
+[ -f "$FIX/$key.$n.$ext" ] && body="$FIX/$key.$n.$ext"
 if [ -f "$body" ]; then
   cat "$body"
   if [ -f "$FIX/$key.exit" ]; then
@@ -68,6 +70,23 @@ all_ms() { fixture GET "repos/$R/milestones?state=all&per_page=100" "$1"; }
 tags() { fixture GET "repos/$R/git/matching-refs/tags/$1" "$2"; }
 pr() { fixture GET "repos/$R/pulls/$1" "$2"; }
 issue() { fixture GET "repos/$R/issues/$1" "$2"; }
+commits() { fixture GET "repos/$R/pulls/$1/commits?per_page=100" "$2"; }
+commit_prs() { fixture GET "repos/$R/commits/$1/pulls" "$2"; }
+commit_diff() { fixture GET "repos/$R/commits/$1" "$2" .diff; }
+
+# Usage: mkdiff FILE TAG N [LAST]; a valid one-hunk diff, LAST replaces the final added line.
+mkdiff() {
+  local f=$1 tag=$2 n=$3 last=${4:-} i
+  printf 'diff --git a/%s b/%s\nindex 1111111..2222222 100644\n--- a/%s\n+++ b/%s\n@@ -1,%d +1,%d @@\n' \
+    "$f" "$f" "$f" "$f" "$n" "$n"
+  for ((i = 1; i <= n; i++)); do echo "-old $tag line $i"; done
+  for ((i = 1; i < n; i++)); do echo "+new $tag line $i"; done
+  echo "+${last:-new $tag line $n}"
+}
+
+commit_json() {
+  jq -cn --arg sha "$1" --arg msg "$2" '{sha: $sha, parents: [{}], commit: {message: $msg}}'
+}
 
 run_case() {
   local name=$1 kind=$2 number=$3 want_writes=$4 want_out=$5 dry=${6:-0} out rc=0 got
@@ -186,32 +205,85 @@ scenario_branch_closed_milestone() {
   new_case branch_closed
   all_ms '[{"number":40,"title":"v1.1.0","state":"closed"},{"number":50,"title":"v1.2.0","state":"open"}]'
   pr 300 '{"number":300,"base":{"ref":"branch-v1.1.0"},"milestone":null,"title":"t","body":""}'
+  commits 300 '[]'
   run_case "PR into branch-v1.1.0 with closed milestone: skipped with notice" pr 300 \
     "" "::notice::Milestone v1.1.0 is closed"
 }
 
-scenario_branch_backport_links() {
-  new_case backport
+MAIN_16499='{"number":16499,"merged_at":"2026-11-01T00:00:00Z","base":{"ref":"main"},"labels":[],
+  "merge_commit_sha":"m16499","title":"fix: thing","body":"Fixes #910"}'
+MAIN_16502='{"number":16502,"merged_at":"2026-11-01T00:00:00Z","base":{"ref":"main"},"labels":[],
+  "merge_commit_sha":"m16502","title":"other","body":""}'
+PICK="fix: thing (#16499)
+
+(cherry picked from commit aaaa111)"
+
+# Usage: backport_case NAME BODY COMMIT_MSG BACKPORT_DIFF; source of the pick is aaaa111 (PR 16499).
+backport_case() {
+  new_case "$1"
   all_ms "[$MS_120]"
+  pr 300 "$(jq -cn --arg b "$2" '{number: 300, base: {ref: "branch-v1.2.0"}, milestone: null,
+    title: "fix: thing [v1.2]", body: $b}')"
+  commits 300 "[$(commit_json b0000001 "$3")]"
+  commit_diff b0000001 "$4"
+  commit_prs aaaa111 "[$MAIN_16499]"
+  commit_diff aaaa111 "$(mkdiff src/a.rs a 10)"
+  commit_diff m16499 "$(mkdiff src/a.rs a 10)"
+  commit_diff m16502 "$(mkdiff src/b.rs b 4)"
+  pr 16499 "$MAIN_16499"
+  pr 16502 "$MAIN_16502"
   open_ms "[$MS_120,{\"number\":51,\"title\":\"v1.3.0\",\"state\":\"open\"}]"
   tags v1.2.0 "$TAGS_120_RC"
   tags v1.3.0 '[]'
-  pr 300 '{"number":300,"base":{"ref":"branch-v1.2.0"},"milestone":null,
-    "title":"fix: thing (#16499) [v1.2]",
-    "body":"Backport of #16500 and o/r#16501. Paired with o/other#7.\nFixes #900. Closes #901.\nResolves https://github.com/o/r/issues/902\nprefixes #903"}'
-  pr 16499 '{"number":16499,"merged_at":"2026-11-01T00:00:00Z","base":{"ref":"main"},"labels":[]}'
-  pr 16500 '{"number":16500,"merged_at":"2026-11-01T00:00:00Z","base":{"ref":"main"},"labels":[{"name":"backport:v1.2.0"}]}'
-  pr 16501 '{"number":16501,"merged_at":null,"base":{"ref":"main"},"labels":[]}'
+  issue 910 '{"number":910,"milestone":{"title":"v1.1.0"}}'
+}
+
+LABEL_WRITES="POST repos/$R/labels name=backport:v1.2.0 color=C5DEF5 description=Backported to v1.2.0
+POST repos/$R/issues/16499/labels labels[]=backport:v1.2.0"
+
+scenario_backport_cherry_pick_same_patch() {
+  backport_case cp_same "Backport of #16499, context in #16502.
+Fixes #900. Closes #901.
+Resolves https://github.com/o/r/issues/902
+prefixes #903" "$PICK" "$(mkdiff src/a.rs a 10)"
   issue 900 '{"number":900,"milestone":null}'
   issue 901 '{"number":901,"milestone":{"title":"v1.1.0"}}'
   issue 902 '{"number":902,"milestone":{"title":"v1.3.0"}}'
   issue 903 '{"number":903,"milestone":null}'
-  run_case "backport PR: milestone, main PR label, closed issues moved" pr 300 \
+  issue 910 '{"number":910,"milestone":null}'
+  run_case "cherry-pick line + same patch: labels it, moves its and the main PR's issues" pr 300 \
     "PATCH repos/$R/issues/300 milestone=50
-POST repos/$R/labels name=backport:v1.2.0 color=C5DEF5 description=Backported to v1.2.0
-POST repos/$R/issues/16499/labels labels[]=backport:v1.2.0
+$LABEL_WRITES
 PATCH repos/$R/issues/900 milestone=50
-PATCH repos/$R/issues/902 milestone=50" "Issue #901 keeps milestone v1.1.0"
+PATCH repos/$R/issues/902 milestone=50
+PATCH repos/$R/issues/910 milestone=50" "#16499 (cherry-pick line, same patch-id)"
+}
+
+scenario_backport_cherry_pick_overlap() {
+  backport_case cp_overlap "Backport." "$PICK" "$(mkdiff src/a.rs a 10 "resolved conflict line")"
+  run_case "cherry-pick line + conflict-resolved change (19 of 21 lines shared): labels it" pr 300 \
+    "PATCH repos/$R/issues/300 milestone=50
+$LABEL_WRITES" "#16499 (cherry-pick line, 90% of changed lines shared)"
+}
+
+scenario_backport_cherry_pick_unrelated() {
+  backport_case cp_unrelated "Backport of #16499." "$PICK" "$(mkdiff src/a.rs zzz 10)"
+  run_case "cherry-pick line to an unrelated change: no label, notice" pr 300 \
+    "PATCH repos/$R/issues/300 milestone=50" "cherry-picks aaaa111 but shares only 0% of its changed lines"
+}
+
+scenario_backport_patch_id_only() {
+  backport_case pid_only "Backport of #16502 and #16499." "fix: thing" "$(mkdiff src/a.rs a 10)"
+  run_case "no cherry-pick line, exact patch-id of a named PR: labels only that one" pr 300 \
+    "PATCH repos/$R/issues/300 milestone=50
+$LABEL_WRITES" "#16499 (no cherry-pick line, same patch-id as its merge commit)"
+}
+
+scenario_backport_mention_only() {
+  backport_case mention_only "Backport of #16499, on top of #16502." "fix: thing" \
+    "$(mkdiff src/a.rs a 10 "resolved conflict line")"
+  run_case "number only mentioned in the text: no label, notice" pr 300 \
+    "PATCH repos/$R/issues/300 milestone=50" "its patch-id matches none of #16499 #16502"
 }
 
 scenario_self_check() {
@@ -231,7 +303,9 @@ scenario_self_check() {
 }
 
 for s in pre_rc1 post_rc1_creates_next post_rc1_dry_run renamed_next old_frozen_open \
-  create_race existing_milestone branch_closed_milestone branch_backport_links self_check; do
+  create_race existing_milestone branch_closed_milestone backport_cherry_pick_same_patch \
+  backport_cherry_pick_overlap backport_cherry_pick_unrelated backport_patch_id_only \
+  backport_mention_only self_check; do
   "scenario_$s" || true
 done
 
