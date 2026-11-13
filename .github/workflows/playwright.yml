@@ -558,6 +558,8 @@ jobs:
           ZO_QUICK_MODE_ENABLED: ${{ matrix.quick_mode_enabled || 'false' }}
           # Same per-shard rule: /api/{org}/synthetics* routes register only when true at start ("synthetics_enabled").
           ZO_SYNTHETICS_ENABLED: ${{ matrix.synthetics_enabled || 'false' }}
+          # Same per-shard rule: the empty-data onboarding pages need it on ("restricted_routes_on_empty_data").
+          ZO_RESTRICTED_ROUTES_ON_EMPTY_DATA: ${{ matrix.restricted_routes_on_empty_data || 'false' }}
           # Same per-shard rule: how far back (hours) ingestion accepts a record.
           # The workflow default of 5 DROPS older rows while still answering 200,
           # so a suite that seeds history (SLO measures a rolling 7-day window)
@@ -590,6 +592,13 @@ jobs:
 
       - name: Ensure we are getting a reply from the server
         run: curl http://localhost:5080/web/login
+
+      - name: Create the empty onboarding org
+        # home-first-data.spec.js needs an org that never receives data.
+        if: matrix.restricted_routes_on_empty_data == 'true'
+        run: |
+          curl -sSf -u "${ZO_ROOT_USER_EMAIL}:${ZO_ROOT_USER_PASSWORD}" -H 'Content-Type: application/json' \
+            -d '{"name":"onboarding_test"}' http://localhost:5080/api/organizations
 
       - uses: actions/setup-node@v7
         with:
