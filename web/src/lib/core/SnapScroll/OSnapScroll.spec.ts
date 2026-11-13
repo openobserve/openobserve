@@ -35,9 +35,11 @@ const layOut = (wrapper: VueWrapper, scrollTop = 0) => {
   return { root, scrollTo };
 };
 
-const wheel = (target: Element, deltaY: number, timeStamp: number) => {
+type Paging = { pageStop: (d: 1 | -1) => void; pageSection: (d: 1 | -1) => void };
+const paging = (wrapper: VueWrapper) => wrapper.vm as unknown as Paging;
+
+const wheel = (target: Element, deltaY: number) => {
   const event = new WheelEvent("wheel", { deltaY, bubbles: true, cancelable: true });
-  Object.defineProperty(event, "timeStamp", { value: timeStamp });
   target.dispatchEvent(event);
   return event;
 };
@@ -49,17 +51,28 @@ describe("OSnapScroll", () => {
     wrapper = null;
   });
 
-  it("moves one stop per wheel gesture and swallows the native scroll", () => {
+  it("leaves the wheel and trackpad to the browser", () => {
     wrapper = mountScroll();
     const { root, scrollTo } = layOut(wrapper);
-    const first = wheel(root, 40, 1000);
-    wheel(root, 40, 1050);
-    wheel(root, 40, 1100);
-    expect(first.defaultPrevented).toBe(true);
-    expect(scrollTo).toHaveBeenCalledTimes(1);
-    expect(scrollTo).toHaveBeenCalledWith({ top: 400, behavior: "smooth" });
-    wheel(root, 40, 1600);
-    expect(scrollTo).toHaveBeenCalledTimes(2);
+    for (const deltaY of [3, 40, 400, -40])
+      expect(wheel(root, deltaY).defaultPrevented).toBe(false);
+    expect(scrollTo).not.toHaveBeenCalled();
+  });
+
+  it("does not force-snap scroll positions", () => {
+    wrapper = mountScroll();
+    const classes = wrapper.find('[data-test="o-snap-scroll"]').classes();
+    expect(classes.some((c) => /snap-(y|mandatory|proximity|start)/.test(c))).toBe(false);
+  });
+
+  it("pages one stop at a time", () => {
+    wrapper = mountScroll();
+    const { root, scrollTo } = layOut(wrapper);
+    paging(wrapper).pageStop(1);
+    expect(scrollTo).toHaveBeenLastCalledWith({ top: 400, behavior: "smooth" });
+    root.scrollTop = 400;
+    paging(wrapper).pageStop(-1);
+    expect(scrollTo).toHaveBeenLastCalledWith({ top: 0, behavior: "smooth" });
   });
 
   it("stops at the end of a section taller than the view before moving on", () => {
@@ -69,33 +82,31 @@ describe("OSnapScroll", () => {
       configurable: true,
       value: 700,
     });
-    wheel(root, 40, 1000);
+    paging(wrapper).pageStop(1);
     expect(scrollTo).toHaveBeenLastCalledWith({ top: 200, behavior: "smooth" });
 
     root.scrollTop = 200;
-    wheel(root, 40, 2000);
+    paging(wrapper).pageStop(1);
     expect(scrollTo).toHaveBeenLastCalledWith({ top: 400, behavior: "smooth" });
 
     root.scrollTop = 400;
-    wheel(root, -40, 3000);
+    paging(wrapper).pageStop(-1);
     expect(scrollTo).toHaveBeenLastCalledWith({ top: 200, behavior: "smooth" });
   });
 
-  it("tries the next stop when snapping pulls the page back to where it was", () => {
-    wrapper = mountScroll();
-    const { root, scrollTo } = layOut(wrapper);
-    Object.defineProperty(root.querySelector("#one"), "offsetHeight", {
-      configurable: true,
-      value: 700,
-    });
-    wheel(root, 40, 1000);
-    expect(scrollTo).toHaveBeenLastCalledWith({ top: 200, behavior: "smooth" });
-
-    root.dispatchEvent(new Event("scrollend"));
-    expect(scrollTo).toHaveBeenLastCalledWith({ top: 400, behavior: "smooth" });
+  it("never pages past more than one view of content", () => {
+    tops.two = 900;
+    try {
+      wrapper = mountScroll();
+      const { scrollTo } = layOut(wrapper);
+      paging(wrapper).pageStop(1);
+      expect(scrollTo).toHaveBeenLastCalledWith({ top: 500, behavior: "smooth" });
+    } finally {
+      tops.two = 400;
+    }
   });
 
-  it("spends no wheel gesture on a stop right at the section start", () => {
+  it("spends no key press on a stop right at the section start", () => {
     wrapper = mount(OSnapScroll, {
       attachTo: document.body,
       props: { snap: true },
@@ -121,23 +132,17 @@ describe("OSnapScroll", () => {
     place("near", 9, 100);
     place("far", 300, 100);
     root.scrollTo = vi.fn() as unknown as typeof root.scrollTo;
-    wheel(root, 40, 1000);
+    paging(wrapper).pageStop(1);
     expect(root.scrollTo).toHaveBeenCalledWith({ top: 300, behavior: "smooth" });
   });
 
-  it("pages up to the previous section start", () => {
+  it("jumps whole sections with section paging", () => {
     wrapper = mountScroll();
-    const { root, scrollTo } = layOut(wrapper, 400);
-    wheel(root, -40, 1000);
-    expect(scrollTo).toHaveBeenCalledWith({ top: 0, behavior: "smooth" });
-  });
-
-  it("leaves the wheel alone when snapping is off", () => {
-    wrapper = mountScroll(false);
-    const { root, scrollTo } = layOut(wrapper);
-    const event = wheel(root, 40, 1000);
-    expect(event.defaultPrevented).toBe(false);
-    expect(scrollTo).not.toHaveBeenCalled();
+    const { scrollTo } = layOut(wrapper, 400);
+    paging(wrapper).pageSection(1);
+    expect(scrollTo).toHaveBeenLastCalledWith({ top: 700, behavior: "smooth" });
+    paging(wrapper).pageSection(-1);
+    expect(scrollTo).toHaveBeenLastCalledWith({ top: 0, behavior: "smooth" });
   });
 
   it("scrolls a section's start to the top on request", () => {

@@ -1,17 +1,17 @@
 // Copyright 2026 OpenObserve Inc.
 
 /**
- * OSnapScroll — a vertical scroller that snaps to section starts.
+ * OSnapScroll — a vertical scroller that pages between section starts.
  *
  * Children mark sections with `data-snap-section="<id>"` and optional
  * intermediate stops with `data-snap-stop` (a `scroll-margin-top` on a stop
- * keeps it clear of a sticky header). A stop only snaps while its
- * section is taller than the scroller. While snapping, every section is at
- * least one view tall, so one section shows at a time. One wheel gesture or one
- * PageDown/Space moves one stop; Alt+Down/Up moves a whole section.
+ * keeps it clear of a sticky header). A stop only counts while its
+ * section is taller than the scroller. Every section is at least one view
+ * tall, so one section fills the view. The wheel and trackpad scroll freely;
+ * PageDown/Space moves one stop and Alt+Down/Up a whole section.
  */
 export interface OSnapScrollProps {
-  /** Snap, page and intercept the wheel. When false the content flows and the page scrolls. Default: true */
+  /** Scroll in its own box with keyboard paging between stops. When false the content flows and the page scrolls. Default: true */
   snap?: boolean;
   /** Id of the section currently in view (v-model:active). */
   active?: string;
