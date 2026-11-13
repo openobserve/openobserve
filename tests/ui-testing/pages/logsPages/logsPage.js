@@ -13970,4 +13970,20 @@ export class LogsPage {
     fieldValueCheckbox(field, text) {
         return this.fieldValueRow(field, text).locator('input[type="checkbox"], [role="checkbox"]').first();
     }
+    runQueryPrompt() {
+        return this.page.locator('[data-test="logs-search-apply-search-text"]');
+    }
+
+    async expectRunQueryPromptVisible(timeout = 30000) {
+        await expect(this.runQueryPrompt()).toBeVisible({ timeout });
+    }
+
+    async expectNoSearchResultGrid() {
+        await expect(this.page.locator('[data-test="logs-search-search-result"]')).toHaveCount(0);
+    }
+
+    async clickRunQueryPromptAction() {
+        await this.runQueryPrompt().locator('[data-test^="o2-empty-state-action-"]').first().click();
+    }
+
 }

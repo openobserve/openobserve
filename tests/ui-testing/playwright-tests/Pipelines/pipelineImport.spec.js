@@ -20,6 +20,32 @@ test.use({
   }
 });
 
+// 3 pipelines x 12 function nodes that name functions which do not exist (ENT#1447).
+function pipelinesWithMissingFunctions(run) {
+  const node = (id, data, io_type, y) => ({ id, data, position: { x: 100, y }, io_type });
+  const edge = (source, target) => ({ id: `e${source}-${target}`, source, target, type: 'custom' });
+  return [0, 1, 2].map((p) => {
+    const src = `p${p}-src`;
+    const out = `p${p}-out`;
+    const fns = Array.from({ length: 12 }, (_, i) => `p${p}-fn${i}`);
+    const chain = [src, ...fns, out];
+    return {
+      version: 3,
+      enabled: false,
+      org: 'default',
+      name: `ovnb1447_${run}_${p}`,
+      description: '',
+      source: { source_type: 'realtime', org_id: 'default', stream_name: 'e2e_automate', stream_type: 'logs' },
+      nodes: [
+        node(src, { node_type: 'stream', org_id: 'default', stream_name: 'e2e_automate', stream_type: 'logs' }, 'input', 0),
+        ...fns.map((id, i) => node(id, { node_type: 'function', name: `ovnb1447_missing_${run}_${p}_${i}`, after_flatten: false, num_args: 0 }, 'default', 60 * (i + 1))),
+        node(out, { node_type: 'stream', org_id: 'default', stream_name: `ovnb1447_out_${run}`, stream_type: 'logs' }, 'output', 800),
+      ],
+      edges: chain.slice(1).map((target, i) => edge(chain[i], target)),
+    };
+  });
+}
+
 test.describe("Pipeline Import", { tag: ['@enterprise', '@pipelines', '@pipelinesImport'] }, () => {
     let pipelinesEP, ingestionPage, pipelineDestinations, importPrerequisites;
 
@@ -207,4 +233,34 @@ test.describe("Pipeline Import", { tag: ['@enterprise', '@pipelines', '@pipeline
 
     });
 
+    test("Import with many missing-function errors keeps the error list scrolling and Import/Cancel reachable (ENT#1447)", {
+        tag: ['@bug-ent1447', '@P3', '@regression'],
+    }, async ({ page }) => {
+        const pageErrors = [];
+        page.on('pageerror', (e) => pageErrors.push(e.message));
+        const run = Date.now().toString(36);
+
+        await pipelinesEP.gotoPipelinesPageEP();
+        await pipelinesEP.importPipeline();
+        await pipelinesEP.setFileInput({
+            name: `ovnb1447_${run}.json`,
+            mimeType: 'application/json',
+            buffer: Buffer.from(JSON.stringify(pipelinesWithMissingFunctions(run))),
+        });
+        await pipelinesEP.waitForImportEditorToContain(`ovnb1447_${run}_0`);
+        await pipelinesEP.importJsonButtonPipeline();
+        await pipelinesEP.expectImportErrorsShown(2);
+
+        // Pre-fix the error list grew the page instead of scrolling inside its panel, pushing the actions away.
+        const { scrollHeight, clientHeight } = await pipelinesEP.getImportErrorReportScroll();
+        expect(scrollHeight, 'the error list must overflow its own panel').toBeGreaterThan(clientHeight);
+        const pageOverflow = await pipelinesEP.getPageOverflow();
+        expect(pageOverflow.x, 'page must not scroll sideways').toBeLessThanOrEqual(0);
+        expect(pageOverflow.y, 'page must not grow with the error list').toBeLessThanOrEqual(0);
+        await pipelinesEP.expectImportActionsUsableInViewport();
+
+        await pipelinesEP.cancelImportPipeline();
+        await pipelinesEP.expectImportPipelineButtonVisible();
+        expect(pageErrors, 'no uncaught page errors').toEqual([]);
+    });
 });

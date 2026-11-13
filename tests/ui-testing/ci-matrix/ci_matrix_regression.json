@@ -4,6 +4,10 @@
     "actual_folder": "RegressionSet/Logs",
     "browser": "chrome",
     "run_files": [
+      "logs-16076-saved-views-more-menu.spec.js",
+      "logs-3086-11220-include-filter-shape.spec.js",
+      "logs-16429-recent-searches-drawer.spec.js",
+      "logs-16430-auto-refresh-popover.spec.js",
       "logs-bugs.spec.js",
       "logs-query-editor-resize-bounds.spec.js",
       "logs-result-display.spec.js",
@@ -16,7 +20,8 @@
       "logs-11966-value-multiselect-quotes.spec.js",
       "logs-explain-sql-mode.spec.js",
       "logs-3322-field-filter-similar-names.spec.js",
-      "logs-723-custom-range-sql-limit.spec.js"
+      "logs-723-custom-range-sql-limit.spec.js",
+      "logs-730-live-mode-org-switch.spec.js"
     ],
     "disabled": []
   },
@@ -54,7 +59,8 @@
       "alerts-15091-alert-edit-flow.spec.js",
       "alerts-15096-query-mode-regressions.spec.js",
       "alerts-15636-cross-type-join.spec.js",
-      "alerts-15497-clone-composite-load-races.spec.js"
+      "alerts-15497-clone-composite-load-races.spec.js",
+      "alerts-834-835-promql-editor.spec.js"
     ],
     "disabled": []
   },
@@ -99,6 +105,7 @@
     "actual_folder": "RegressionSet/Traces",
     "browser": "chrome",
     "run_files": [
+      "traces-15476-flame-graph-zoom.spec.js",
       "traces-regression.spec.js",
       "traces-12603-refresh-and-placeholder.spec.js",
       "traces-bugs.spec.js",

@@ -23,6 +23,7 @@ export class ServiceGraphPage {
     this.dateTimePicker = '[data-test="service-graph-date-time-picker"]';
     this.refreshButton = '[data-test="service-graph-refresh-btn"]';
     this.chartContainer = '[data-test="service-graph-chart"]';
+    this.streamSelector = '[data-test="service-graph-stream-selector"]';
 
     // ===== VIEW TOGGLE BUTTONS (page header #subnav — button with .selected class) =====
     this.graphViewTab = '[data-test="service-graph-graph-view-btn"]';
@@ -708,4 +709,13 @@ export class ServiceGraphPage {
       path: `test-results/screenshots/${name}-${Date.now()}.png`,
     });
   }
+  async expectStreamSelectorVisible(timeout = 30000) {
+    await expect(this.page.locator(this.streamSelector)).toBeVisible({ timeout });
+  }
+
+  async selectStreamFromDropdown(streamName) {
+    await this.page.locator(this.streamSelector).click();
+    await this.page.getByRole('option', { name: streamName, exact: true }).click();
+  }
+
 }
