@@ -222,7 +222,9 @@ test.describe("Report Bulk Operations", () => {
       const result = await apiCleanup.deleteReport(report.name);
       testLogger.info(`Deleted/already gone test report: ${report.name} (${result.code})`);
     }
-    await apiCleanup.cleanupReportFolders(['bulk_test_folder_', 'cancel_folder_']);
+    // A folder left behind is removed by the next run's pre-run cleanup, so it must not fail this run's last test.
+    await apiCleanup.cleanupReportFolders(['bulk_test_folder_', 'cancel_folder_'])
+      .catch(e => testLogger.warn(`Report folder cleanup incomplete: ${e.message}`));
     const dashboards = await apiCleanup.fetchDashboardsInFolder('default');
     for (const dash of dashboards.filter(d => d.title && d.title.startsWith(DASH_PREFIX))) {
       await apiCleanup.deleteDashboard(dash.dashboard_id, dash.folder_id || 'default');
