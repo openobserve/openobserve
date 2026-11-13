@@ -31,9 +31,10 @@
 // Literal braces/at-signs must be escaped as {'{'}, {'}'}, {'@'}.
 
 import { describe, expect, it } from "vitest";
-import { readdirSync, readFileSync } from "node:fs";
+import { readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { compile } from "@intlify/core-base";
+import { readLocaleMessages } from "@/test/unit/helpers/localeFiles";
 
 const LANGUAGES_DIR = resolve(__dirname, "./languages");
 const SOURCE_LOCALE = "en-US";
@@ -56,7 +57,7 @@ function flatten(node: unknown, path = "", out: [string, string][] = []): [strin
 }
 
 function loadLocale(stem: string): [string, string][] {
-  return flatten(JSON.parse(readFileSync(resolve(LANGUAGES_DIR, `${stem}.json`), "utf8")));
+  return flatten(readLocaleMessages(stem));
 }
 
 /**

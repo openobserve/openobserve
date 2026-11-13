@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { ref, watch } from "vue";
 import { createI18n } from "vue-i18n"; // import from runtime only
 import { getLanguage } from "../utils/cookies";
 import { setBadgeTranslator } from "@/lib/core/Badge/badgeI18n";
@@ -87,12 +88,15 @@ const i18n = createI18n({
 // without coupling the low-level OTag component to this module graph.
 setBadgeTranslator((key: string) => i18n.global.t(key as never));
 
-/** BCP 47 tag of the active UI language, for Intl date formatting outside a component. */
-export const getIntlLocale = (): string => {
+const activeLocale = (): string => {
   const active: unknown = i18n.global.locale;
-  const code = typeof active === "string" ? active : (active as { value?: unknown } | null)?.value;
-  return localeFileMap[String(code)] ?? "en-US";
+  return String(
+    typeof active === "string" ? active : (active as { value?: unknown } | null)?.value,
+  );
 };
+
+/** BCP 47 tag of the active UI language, for Intl date formatting outside a component. */
+export const getIntlLocale = (): string => localeFileMap[activeLocale()] ?? "en-US";
 
 type LocaleMessageSchema = Parameters<typeof i18n.global.setLocaleMessage>[1];
 
@@ -117,7 +121,8 @@ export const loadLocaleMessages = async (locale: string): Promise<void> => {
     return;
   }
   const messages = await loader();
-  i18n.global.setLocaleMessage(locale, messages.default);
+  // Merge, not set: a Security load may have merged its namespace into this locale first.
+  i18n.global.mergeLocaleMessage(locale, messages.default);
 };
 
 /** Merges the en-US blocks the entry chunk leaves out; the app awaits it before the first render. */
@@ -125,5 +130,46 @@ export const loadLazyLocaleBlocks = async (): Promise<void> => {
   const serviceVersions = await import("./languages/en-US.json?block=serviceVersions");
   i18n.global.mergeLocaleMessage("en-us", { serviceVersions: serviceVersions.default });
 };
+
+// The `siem` namespace ships as its own chunk per locale so the entry does not carry it.
+const securityLoaders = import.meta.glob<{ default: LocaleMessageSchema }>(
+  "./languages/security/*.json",
+);
+const securityLoads = new Map<string, Promise<void>>();
+let securityRequested = false;
+
+/** Bumped after each Security merge, so a computed that resolves `siem.*` outside render re-runs. */
+export const securityMessagesRevision = ref(0);
+
+const loadSecurityLocale = (locale: string): Promise<void> => {
+  const cached = securityLoads.get(locale);
+  if (cached) return cached;
+  const file = localeFileMap[locale];
+  const loader = file && securityLoaders[`./languages/security/${file}.json`];
+  if (!loader) return Promise.resolve();
+  // The base locale goes first: merging into an unloaded locale would make loadLocaleMessages skip it.
+  const pending = loadLocaleMessages(locale)
+    .then(loader)
+    .then((messages) => {
+      i18n.global.mergeLocaleMessage(locale, messages.default);
+      securityMessagesRevision.value += 1;
+    })
+    .catch((error: unknown) => {
+      securityLoads.delete(locale);
+      throw error;
+    });
+  securityLoads.set(locale, pending);
+  return pending;
+};
+
+/** Loads the Security (`siem.*`) messages for the locale and the en-us fallback; cached per locale. */
+export const loadSecurityMessages = async (locale: string = activeLocale()): Promise<void> => {
+  securityRequested = true;
+  await Promise.all([loadSecurityLocale("en-us"), loadSecurityLocale(locale)]);
+};
+
+watch(activeLocale, (locale) => {
+  if (securityRequested) loadSecurityMessages(locale).catch(() => {});
+});
 
 export default i18n;

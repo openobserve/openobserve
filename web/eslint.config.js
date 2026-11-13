@@ -734,6 +734,7 @@ export default [
         localeDir: [
           "./src/locales/languages/en-US.json",
           "./src/components/autoobserve/mock/locale/en-US.json",
+          "./src/locales/languages/security/en-US.json",
         ],
         messageSyntaxVersion: "^11.0.0",
       },

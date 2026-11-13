@@ -4,10 +4,10 @@
 
 import { describe, expect, it } from "vitest";
 import { createHash } from "node:crypto";
-import { readdirSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { localeStems, readLocaleMessages } from "@/test/unit/helpers/localeFiles";
 
-const LANGUAGES_DIR = resolve(__dirname, "./languages");
 const STATE_FILE = resolve(__dirname, "../../../scripts/translations/.translation_state.json");
 const SOURCE_LOCALE = "en-US";
 
@@ -73,7 +73,7 @@ function pluralForms(message: string): number {
 const sourceHash = (text: string): string =>
   createHash("sha256").update(text, "utf8").digest("hex").slice(0, 16);
 
-const source = loadJson(resolve(LANGUAGES_DIR, `${SOURCE_LOCALE}.json`));
+const source = flatten(readLocaleMessages(SOURCE_LOCALE));
 const state = loadJson(STATE_FILE);
 
 // A key whose English changed since the last pipeline run is pending, and the pipeline re-translates it.
@@ -82,10 +82,7 @@ const settled = [...source].filter(
     typeof entry[1] === "string" && state.get(entry[0]) === sourceHash(entry[1]),
 );
 
-const locales = readdirSync(LANGUAGES_DIR)
-  .map((name) => name.replace(/\.json$/, ""))
-  .filter((code) => code !== SOURCE_LOCALE)
-  .sort();
+const locales = localeStems().filter((code) => code !== SOURCE_LOCALE);
 
 describe("tokens and pluralForms", () => {
   it("count placeholders and forms but not literal escapes", () => {
@@ -100,7 +97,7 @@ describe("tokens and pluralForms", () => {
 });
 
 describe.each(locales)("%s matches en-US placeholders and plural forms", (code) => {
-  const target = loadJson(resolve(LANGUAGES_DIR, `${code}.json`));
+  const target = flatten(readLocaleMessages(code));
   const known = new Set(KNOWN_MISMATCHES[code] ?? []);
   const mismatched = settled
     .filter(([key, en]) => {

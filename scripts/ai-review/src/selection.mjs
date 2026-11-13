@@ -59,7 +59,7 @@ export function isDocsPath(filePath) {
 // What update-translations.yml commits; en-US.json is the English source a person writes, so it is still reviewed.
 export function isTranslationPath(filePath) {
   if (filePath === "scripts/translations/.translation_state.json") return true;
-  return /^web\/src\/locales\/languages\/[^/]+\.json$/.test(filePath) && !filePath.endsWith("/en-US.json");
+  return /^web\/src\/locales\/languages\/(?:security\/)?[^/]+\.json$/.test(filePath) && !filePath.endsWith("/en-US.json");
 }
 
 // A listing is whole only when it matches the PR's own counts below each endpoint's cap; anything else may hide a file or commit.
