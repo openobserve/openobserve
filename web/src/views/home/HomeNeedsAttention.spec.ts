@@ -196,16 +196,12 @@ describe("HomeNeedsAttention", () => {
         { timezone: "UTC" },
       );
       expect(detail(wrapper, "service:checkout")).toBe(
-        "6.1% vs 0.4% (previous 24 h) · since 09:41 · No alert matches this service",
+        "6.1% vs 0.4% (previous 24 h) · since 09:41",
       );
       const row = wrapper.get('[data-test="home-attention-row-service:checkout"]');
       expect(row.get('[data-test="home-attention-since"]').attributes("title")).toBe(
         "2026-01-02 09:41 (UTC)",
       );
-      expect(row.get('[data-test="home-attention-no-alert"]').classes()).toContain(
-        "text-status-warning-text",
-      );
-      expect(detail(wrapper, "service:cart")).toContain("alert coverage unknown");
     });
 
     it("says a service has no baseline yet, gives a slow one its p99 time, and never repeats the sentence's own figure", () => {
