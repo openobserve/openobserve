@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("alerts.incidents.rcaSummary.whatHappened") }}
       </h3>
       <span v-if="!live" class="text-text-secondary text-xs">
-        {{ t("alerts.incidents.rcaSummary.linkCount", { count: entries.length }, entries.length) }}
+        {{ t("alerts.incidents.rcaSummary.eventCount", { count: entries.length }, entries.length) }}
       </span>
       <span class="flex-1" />
       <span
@@ -46,78 +46,102 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       {{ t("alerts.incidents.rcaSummary.timelineEmpty") }}
     </p>
-    <ol v-else class="m-0 list-none p-0">
-      <li
-        v-for="(entry, idx) in entries"
-        :key="idx"
-        data-test="rca-timeline-entry"
-        :data-status="entry.status"
-        class="grid grid-cols-[7.5rem_1rem_minmax(0,1fr)] gap-x-3"
-      >
-        <span class="text-text-secondary pt-0.5 font-mono text-xs whitespace-nowrap">{{
-          formatTimestampInTimezone(entry.at, "MMM D, HH:mm:ss", "UTC")
-        }}</span>
-        <span class="relative flex justify-center" aria-hidden="true">
+    <ol v-else class="m-0 flex list-none flex-col p-0">
+      <template v-for="(entry, idx) in entries" :key="idx">
+        <li
+          v-if="dayHeaders[idx]"
+          data-test="rca-timeline-day"
+          class="text-text-secondary list-none pt-1 pb-1.5 text-xs font-semibold"
+        >
+          {{ dayHeaders[idx] }}
+        </li>
+        <RcaFoldRow
+          data-test="rca-timeline-entry"
+          :data-status="statusOf(idx)"
+          flush
+          :open="expanded.has(idx) || open?.row === idx"
+          @update:open="setExpanded(idx, $event)"
+        >
+          <template #lead>
+            <span
+              data-test="rca-timeline-time"
+              class="text-text-secondary w-10 shrink-0 font-mono text-xs"
+              >{{ clock(entry.at) }}</span
+            >
+            <span
+              class="size-2.5 shrink-0 rounded-full"
+              :class="MARKER[statusOf(idx)].dot"
+              aria-hidden="true"
+            />
+          </template>
           <span
-            v-if="idx < entries.length - 1"
-            class="bg-border-default absolute top-4 bottom-0 w-px"
-          />
-          <span class="relative mt-1.5 size-2.75 rounded-full" :class="MARKER[entry.status].dot" />
-        </span>
-        <div class="min-w-0 pb-3.5">
-          <div class="flex flex-wrap items-center gap-2">
+            class="min-w-0 font-normal wrap-anywhere"
+            data-test="rca-timeline-text"
+            :class="entry.status === 'refuted' ? 'text-text-secondary line-through' : ''"
+          >
+            <RcaInlineText :text="entry.text" />
+          </span>
+          <template #meta>
             <span
-              class="min-w-0 text-sm wrap-anywhere"
-              data-test="rca-timeline-text"
-              :class="
-                entry.status === 'refuted'
-                  ? 'text-text-secondary line-through'
-                  : 'text-text-heading'
-              "
-            >
-              <RcaInlineText :text="entry.text" />
-            </span>
-            <span
-              v-if="entry.status !== 'confirmed'"
+              v-if="statusOf(idx) !== 'confirmed'"
               data-test="rca-timeline-marker"
-              class="text-3xs font-bold"
-              :class="MARKER[entry.status].tag"
+              class="text-3xs shrink-0 font-bold"
+              :class="MARKER[statusOf(idx)].tag"
             >
-              {{ markerLabel(entry.status) }}
+              {{ markerLabel(statusOf(idx)) }}
             </span>
-            <span class="inline-flex gap-1">
-              <button
-                v-for="number in entry.evidence_numbers"
-                :key="number"
-                type="button"
-                data-test="rca-timeline-chip"
-                class="rounded-default text-3xs inline-grid h-5 min-w-5.5 cursor-pointer place-items-center border px-1.5 font-mono font-semibold"
-                :class="
-                  isOpen(idx, number)
-                    ? 'bg-accent text-text-inverse border-transparent'
-                    : 'border-border-control bg-surface-base text-text-heading hover:bg-surface-subtle-hover'
-                "
-                :aria-expanded="isOpen(idx, number)"
-                :aria-controls="isOpen(idx, number) ? cardId(idx) : undefined"
-                :aria-label="t('alerts.incidents.rcaSummary.openEvidence', { number })"
-                @click="toggle(idx, number)"
+          </template>
+          <template #actions>
+            <span class="flex h-7 min-w-24 items-center justify-end">
+              <span v-if="entry.evidence_numbers.length" class="inline-flex shrink-0 gap-1">
+                <button
+                  v-for="number in entry.evidence_numbers"
+                  :key="number"
+                  type="button"
+                  data-test="rca-timeline-chip"
+                  class="rounded-default text-3xs inline-grid h-5 min-w-5.5 cursor-pointer place-items-center border px-1.5 font-mono font-semibold"
+                  :class="
+                    isOpen(idx, number)
+                      ? 'bg-accent text-text-inverse border-transparent'
+                      : 'border-border-control bg-surface-base text-text-heading hover:bg-surface-subtle-hover'
+                  "
+                  :aria-expanded="isOpen(idx, number)"
+                  :aria-controls="isOpen(idx, number) ? cardId(idx) : undefined"
+                  :aria-label="t('alerts.incidents.rcaSummary.openEvidence', { number })"
+                  @click="toggle(idx, number)"
+                >
+                  {{ number }}
+                </button>
+              </span>
+              <span
+                v-else-if="fromIncident[idx]"
+                data-test="rca-timeline-from-incident"
+                class="text-text-secondary shrink-0 text-xs"
               >
-                {{ number }}
-              </button>
+                {{ t("alerts.incidents.rcaLight.fromIncident") }}
+              </span>
+              <span
+                v-else
+                data-test="rca-timeline-no-evidence"
+                class="text-text-secondary shrink-0 text-xs"
+              >
+                {{ t("alerts.incidents.rcaLight.noEvidence") }}
+              </span>
             </span>
-          </div>
-          <RcaEvidenceCard
-            v-if="openEntry && open?.row === idx"
-            :id="cardId(idx)"
-            class="mt-2 max-w-215"
-            :entry="openEntry"
-            :hypotheses="hypotheses"
-            @open-hypothesis="$emit('open-hypothesis', $event)"
-            :org="org"
-            with-header
-          />
-        </div>
-      </li>
+          </template>
+          <template v-if="openEntry && open?.row === idx" #body>
+            <RcaEvidenceCard
+              :id="cardId(idx)"
+              class="max-w-215"
+              :entry="openEntry"
+              :hypotheses="hypotheses"
+              :org="org"
+              with-header
+              @open-hypothesis="$emit('open-hypothesis', $event)"
+            />
+          </template>
+        </RcaFoldRow>
+      </template>
     </ol>
   </section>
 </template>
@@ -126,6 +150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, ref, useId } from "vue";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import type {
+  IncidentAlert,
   RcaEvidenceEntry,
   RcaSummaryHypothesis,
   RcaSummaryTimelineEntry,
@@ -133,17 +158,26 @@ import type {
 } from "@/services/incidents";
 import { sortedRcaTimeline } from "@/utils/incidents/rcaSummary";
 import { formatTimestampInTimezone } from "@/utils/date";
+import { timezoneAbbr } from "@/utils/formatters";
 import RcaEvidenceCard from "./RcaEvidenceCard.vue";
+import RcaFoldRow from "./RcaFoldRow.vue";
 import RcaInlineText from "./RcaInlineText.vue";
 
-const props = defineProps<{
-  timeline: RcaSummaryTimelineEntry[];
-  evidence: RcaEvidenceEntry[];
-  hypotheses: RcaSummaryHypothesis[];
-  org: string;
-  /** The run is live: the timeline comes with the report. */
-  live: boolean;
-}>();
+const props = withDefaults(
+  defineProps<{
+    timeline: RcaSummaryTimelineEntry[];
+    evidence: RcaEvidenceEntry[];
+    hypotheses: RcaSummaryHypothesis[];
+    org: string;
+    /** The run is live: the timeline comes with the report. */
+    live: boolean;
+    /** The app's time zone; the day headers name it. */
+    timezone?: string;
+    /** This incident's own firings; a row that is one of them needs no evidence. */
+    firings?: Pick<IncidentAlert, "alert_name" | "alert_fired_at">[];
+  }>(),
+  { timezone: "UTC", firings: () => [] },
+);
 
 defineEmits<{
   /** A citation's hypothesis link was clicked. */
@@ -179,13 +213,126 @@ const markerLabel = (status: RcaTimelineStatus): I18nText => {
 
 const entries = computed(() => sortedRcaTimeline(props.timeline));
 
+const FIRING_MATCH_US = 60_000_000;
+
+// Detections are named `<rule>__<stream>` (detectionAlertName); the analysis names the rule only.
+const withoutStream = (name: string) => {
+  const cut = name.lastIndexOf("__");
+  return cut > 0 && cut < name.length - 2 ? name.slice(0, cut) : name;
+};
+
+// A parenthetical may only count the triggers; any other remark is a claim the firing record cannot back.
+const isTriggerRemark = (part: string) =>
+  /^(?:single|only|first|last|\d+)(?: and (?:first|last))? (?:trigger|alert|firing)s?$/i.test(part);
+
+const FIRING_STATEMENT =
+  /^(?:alert\s+)?`?([\w.:-]+(?:…|\.\.\.)?)`?\s+(?:fired|fires|triggered)(?: at (\d{1,2}):(\d{2})(?::(\d{2}))?( UTC)?)?(?:\s+\(([^()]*)\))?[.!]?$/i;
+const DAY_S = 86_400;
+
+// "3 triggers" and "single" claim how often the alert fired; "first" and "last" claim which firing this is.
+const remarkHolds = (part: string, name: string, firedAt: number) => {
+  const times = [
+    ...new Set(
+      props.firings.filter((f) => f.alert_name.toLowerCase() === name).map((f) => f.alert_fired_at),
+    ),
+  ];
+  return part
+    .toLowerCase()
+    .split(" ")
+    .every((word) => {
+      if (/^\d+$/.test(word)) return Number(word) === times.length;
+      if (word === "single" || word === "only") return times.length === 1;
+      if (word === "first") return firedAt === Math.min(...times);
+      if (word === "last") return firedAt === Math.max(...times);
+      return true;
+    });
+};
+
+// A clock time in the text, read in the zone it names, must sit within the match window of the firing.
+const clockMatches = (match: RegExpMatchArray, firedAt: number) => {
+  if (match[2] === undefined) return true;
+  const zone = match[5] ? "UTC" : props.timezone;
+  const [h, m, sec] = formatTimestampInTimezone(firedAt, "HH:mm:ss", zone).split(":").map(Number);
+  const fired = (h * 60 + m) * 60 + sec;
+  const from = (Number(match[2]) * 60 + Number(match[3])) * 60 + Number(match[4] ?? 0);
+  const to = from + (match[4] === undefined ? 59 : 0);
+  const gap = (a: number, b: number) => {
+    const d = Math.abs(a - b) % DAY_S;
+    return Math.min(d, DAY_S - d);
+  };
+  const off = fired >= from && fired <= to ? 0 : Math.min(gap(fired, from), gap(fired, to));
+  return off * 1_000_000 <= FIRING_MATCH_US;
+};
+
+// Only a complete firing statement, whose time and count agree with the incident's record, is backed by it.
+const namesFiring = (text: string, name: string, firedAt: number) => {
+  const match = text.match(FIRING_STATEMENT);
+  const remark = match?.[6]?.split(/\s*,\s*/);
+  if (!match || (remark && !remark.every(isTriggerRemark)) || !clockMatches(match, firedAt)) {
+    return false;
+  }
+  if (remark && !remark.every((part) => remarkHolds(part, name, firedAt))) return false;
+  const claimed = match[1];
+  if (claimed === name) return true;
+  const names = [...new Set(props.firings.map((firing) => firing.alert_name.toLowerCase()))];
+  if (claimed === withoutStream(name)) {
+    return names.filter((n) => withoutStream(n) === claimed).length === 1;
+  }
+  if (!/(?:…|\.\.\.)$/.test(claimed)) return false;
+  const prefix = claimed.replace(/(?:…|\.\.\.)$/, "");
+  return name.startsWith(prefix) && names.filter((n) => n.startsWith(prefix)).length === 1;
+};
+
+const fromIncident = computed(() =>
+  entries.value.map((entry) => {
+    const text = entry.text.toLowerCase();
+    return (
+      entry.status !== "refuted" &&
+      props.firings.some(
+        (firing) =>
+          Math.abs(entry.at - firing.alert_fired_at) <= FIRING_MATCH_US &&
+          namesFiring(text, firing.alert_name.toLowerCase(), firing.alert_fired_at),
+      )
+    );
+  }),
+);
+const statusOf = (idx: number): RcaTimelineStatus =>
+  fromIncident.value[idx] ? "confirmed" : entries.value[idx].status;
+
+const clock = (us: number) => formatTimestampInTimezone(us, "HH:mm", props.timezone);
+
+/** "Oct 9 · UTC" before the first row of each day. */
+const dayHeaders = computed(() => {
+  let last = "";
+  return entries.value.map((entry) => {
+    const day = formatTimestampInTimezone(entry.at, "MMM D", props.timezone);
+    if (day === last) return null;
+    last = day;
+    return t("alerts.incidents.rcaLight.dayZone", {
+      day,
+      zone: timezoneAbbr(props.timezone, new Date(entry.at / 1000)),
+    });
+  });
+});
+
+const expanded = ref(new Set<number>());
+const setExpanded = (row: number, value: boolean) => {
+  const next = new Set(expanded.value);
+  if (value) next.add(row);
+  else {
+    next.delete(row);
+    if (open.value?.row === row) open.value = null;
+  }
+  expanded.value = next;
+};
+
 /** Confirmed and Likely always; the other two only when a row uses them. */
 const legend = computed<RcaTimelineStatus[]>(() =>
   (["confirmed", "likely", "unverified", "refuted"] as const).filter(
     (status) =>
       status === "confirmed" ||
       status === "likely" ||
-      entries.value.some((entry) => entry.status === status),
+      entries.value.some((_, idx) => statusOf(idx) === status),
   ),
 );
 

@@ -135,6 +135,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="dashboard-icons hideOnPrintMode"
             size="sm"
           />
+          <DeployMarkersUnavailable
+            v-if="
+              (config.isEnterprise == 'true' || config.isCloud == 'true') && !store.state.printMode
+            "
+            @retry="refreshData()"
+          />
           <OButtonGroup v-show="store.state.printMode !== true">
             <OTooltip
               v-if="config.isEnterprise == 'true' && arePanelsLoading"
@@ -754,6 +760,7 @@ import config from "@/aws-exports";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 import { useAutoRunToggle } from "@/composables/dashboard/useAutoRunToggle";
 import { useDashboardTimeGate } from "@/composables/dashboard/useDashboardTimeGate";
+import { useDeployMarkerClicks } from "@/composables/dashboard/deployMarkerScope";
 import {
   createDashboardFreshOnOpen,
   DASHBOARD_FRESH_ON_OPEN,
@@ -849,6 +856,9 @@ const DashboardSettings = defineAsyncComponent(() => {
 const ScheduledDashboards = defineAsyncComponent(() => {
   return import("./ScheduledDashboards.vue");
 });
+const DeployMarkersUnavailable = defineAsyncComponent(
+  () => import("@/enterprise/components/ServiceVersions/DeployMarkersUnavailable.vue"),
+);
 
 export default defineComponent({
   name: "ViewDashboard",
@@ -862,6 +872,7 @@ export default defineComponent({
     AutoRefreshInterval,
     DashboardSettings,
     RenderDashboardCharts,
+    DeployMarkersUnavailable,
     ScheduledDashboards,
     PanelLayoutSettings,
     DashboardJsonEditor,
@@ -889,6 +900,7 @@ export default defineComponent({
     const currentDashboardData = reactive({
       data: {},
     });
+    useDeployMarkerClicks(() => currentDashboardData.data);
     const showScheduledReportsDialog = ref(false);
     const { locked: reportsLocked, lockedReason: reportsLockedReason } = useLicenseLock("reports");
 

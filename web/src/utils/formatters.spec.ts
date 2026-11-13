@@ -20,6 +20,7 @@ import {
   b64DecodeStandard,
   convertToTitleCase,
   truncateText,
+  identifierBreaks,
   formatLargeNumber,
   formatCompactCount,
   formatEventCount,
@@ -948,5 +949,15 @@ describe("assistant formatters", () => {
       expect(formatBytes(1024)).toBe("1 KB");
       expect(formatBytes(-5)).toBe("—");
     });
+  });
+});
+
+describe("identifierBreaks", () => {
+  it.each([
+    ["VPC_Flow_Rejected__vpc.log", ["VPC_", "Flow_", "Rejected_", "_", "vpc.", "log"]],
+    ["k8s/pod:cpu-high", ["k8s/", "pod:", "cpu-", "high"]],
+    ["plain", ["plain"]],
+  ])("breaks %s only after its separators", (name, parts) => {
+    expect(identifierBreaks(name)).toEqual(parts);
   });
 });

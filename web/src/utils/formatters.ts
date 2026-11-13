@@ -116,6 +116,9 @@ export const truncateText = (text: string, maxLength: number): string => {
   return `${text.slice(0, Math.max(maxLength - 1, 0))}…`;
 };
 
+/** Splits an identifier after `_ . / : -`, so a long name can break there (`<wbr>`), not mid-word. */
+export const identifierBreaks = (name: string): string[] => name.split(/(?<=[_./:-])/);
+
 // True when `num / divisor` would print as 1000.0 or more at one decimal, so the
 // value belongs in the next unit up (999 950 is "1.0M", not "1000.0K").
 const roundsToNextUnit = (num: number, divisor: number) =>

@@ -28,6 +28,7 @@ import {
   rcaStatusHistoryLine,
   rcaUtcRange,
   sortedRcaTimeline,
+  rcaPageRecommendation,
   rcaVerdictDetails,
 } from "./rcaSummary";
 import {
@@ -251,5 +252,17 @@ describe("RCA_HYPOTHESIS_TONE", () => {
     expect(RCA_PILL_TONE_CLASS[RCA_HYPOTHESIS_TONE.root_cause]).toContain(
       "text-status-success-text",
     );
+  });
+});
+
+describe("rcaPageRecommendation (the agent's paging advice)", () => {
+  it("reads the agent's paging advice from a stored result", () => {
+    expect(
+      rcaPageRecommendation({
+        verdict: { page_recommendation: { action: "downgrade", reason: "Baseline volume." } },
+      }),
+    ).toEqual({ action: "downgrade", reason: "Baseline volume." });
+    expect(rcaPageRecommendation({ verdict: {} })).toBeNull();
+    expect(rcaPageRecommendation(null)).toBeNull();
   });
 });

@@ -49,6 +49,7 @@ import {
 
 // ODropdown renders its menu only when open; the stubs render every item in order.
 const stubs = {
+  OPopover: { template: "<div><slot name='trigger' /><slot /></div>" },
   ODropdown: { template: "<div><slot name='trigger' /><slot /></div>" },
   ODropdownItem: {
     emits: ["select"],
@@ -446,10 +447,13 @@ describe("RcaVerdictCard", () => {
       expect(byTest(wrapper, "rca-verdict-band").exists()).toBe(false);
     });
 
-    it("in the thread the verdict is one body-size semibold callout, never the page's 24 px heading", () => {
+    it("in the thread an ungraded verdict is one body-size semibold callout, never the page's bold heading", () => {
+      const base = rcaRunSummary();
       const wrapper = mountCard({
         cardState: "analyzed",
-        summary: rcaRunSummary(),
+        summary: rcaRunSummary({
+          card: { ...base.card, outcome: undefined, outcome_reason: undefined },
+        }),
         inThread: true,
       });
 
@@ -470,24 +474,23 @@ describe("RcaVerdictCard", () => {
       );
       const band = byTest(wrapper, "rca-verdict-band");
       expect(band.attributes("data-band")).toBe("high");
-      expect(band.text()).toContain("High");
+      expect(band.text()).toBe("High confidence");
       expect(text(wrapper, "rca-confidence-claimed")).toBe("High");
       expect(text(wrapper, "rca-confidence-evidence")).toBe(
         "High · 2 decisive sources (traces + change), 1 alternative ruled out",
       );
       expect(byTest(wrapper, "rca-confidence-caps").exists()).toBe(false);
       expect(text(wrapper, "rca-verdict-unverified-count")).toBe("1 citation not verified");
-      expect(text(wrapper, "rca-verdict-blind-link")).toBe("2 blind spots below");
       expect(text(wrapper, "rca-verdict-suspect")).toBe("Deploy 4f2c1e · 08:53 UTC");
-      expect(text(wrapper, "rca-verdict-impact")).toBe(
-        "3 services · peak 4.1% 5xx · 08:55:20–09:22:20 UTC",
-      );
+      const impact = byTest(wrapper, "rca-fact-impact");
+      expect(impact.find('[data-test="rca-fact-value"]').text()).toBe("3 services");
+      expect(impact.text()).toContain("Peak 4.1% 5xx");
       expect(byTest(wrapper, "rca-verdict-qualifier").exists()).toBe(false);
       expect(byTest(wrapper, "rca-stage-stepper").exists()).toBe(false);
 
-      // The band chip opens "Cited but not verified"; the blind-spot link scrolls to them.
-      await band.trigger("click");
-      await byTest(wrapper, "rca-verdict-blind-link").trigger("click");
+      // The unverified count opens "Cited but not verified"; the blind-spots fact scrolls to them.
+      await byTest(wrapper, "rca-verdict-unverified-count").trigger("click");
+      await byTest(wrapper, "rca-fact-blind").find("button").trigger("click");
       expect(wrapper.emitted("show-unverified")).toHaveLength(1);
       expect(wrapper.emitted("show-blind-spots")).toHaveLength(1);
     });
@@ -503,8 +506,11 @@ describe("RcaVerdictCard", () => {
         verdictDetails,
       });
 
-      expect(text(wrapper, "rca-verdict-services")).toBe("service=checkout-api, service=orders-db");
-      expect(wrapper.text()).not.toContain("Roll back 4f2c1e");
+      expect(byTest(wrapper, "rca-fact-impact").find('[data-test="rca-fact-value"]').text()).toBe(
+        "service=checkout-api and service=orders-db",
+      );
+      // The first action is a fact; the list itself is its own section.
+      expect(byTest(wrapper, "rca-fact-action").text()).toContain("Roll back 4f2c1e");
     });
 
     it("a run that is not graded shows no services", () => {
@@ -518,7 +524,7 @@ describe("RcaVerdictCard", () => {
         verdictDetails,
       });
 
-      expect(byTest(wrapper, "rca-verdict-services").exists()).toBe(false);
+      expect(byTest(wrapper, "rca-fact-impact").exists()).toBe(false);
     });
 
     it("the breakdown names the caps that lowered the band and what the next level needs (CG §5.3.4)", async () => {
@@ -546,8 +552,9 @@ describe("RcaVerdictCard", () => {
         next_level: "High needs a second decisive source and a ruled-out alternative",
         caps: [],
       });
-      expect(text(limited, "rca-confidence-evidence")).toBe(
-        "Medium · 1 decisive source (logs) · High needs a second decisive source and a ruled-out alternative",
+      expect(text(limited, "rca-confidence-evidence")).toBe("Medium · 1 decisive source (logs)");
+      expect(limited.find('[data-test="rca-verdict-confidence-why"]').text()).toMatch(
+        /^Why Medium\s*Agent claimed\s*High\s*Evidence allows\s*Medium.*Next level\s*High needs a second decisive source and a ruled-out alternative$/,
       );
       expect(byTest(limited, "rca-confidence-caps").exists()).toBe(false);
     });
@@ -639,7 +646,7 @@ describe("RcaVerdictCard", () => {
       const cause = byTest(wrapper, "rca-verdict-cause");
       expect(cause.text()).not.toContain("`");
       expect(cause.find("code").text()).toBe("GET /api/data");
-      expect(byTest(wrapper, "rca-verdict-impact").find("code").text()).toBe("frontend");
+      expect(byTest(wrapper, "rca-fact-impact").find("code").text()).toBe("frontend");
     });
 
     it("C: Inconclusive, 'Suspected, not confirmed' with the subject statement, band Low, '(diff not read)' (VE17, VE35)", () => {

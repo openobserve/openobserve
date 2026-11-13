@@ -1078,6 +1078,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             mode="embedded-tabs"
             external-active-tab="metrics"
             :service-name="correlationProps.serviceName"
+            :display-service-name="correlationProps.displayServiceName"
+            :service-display="correlationProps.serviceDisplay"
             :matched-dimensions="correlationProps.matchedDimensions"
             :additional-dimensions="correlationProps.additionalDimensions"
             :matched-set-id="correlationProps.matchedSetId"
@@ -1178,6 +1180,7 @@ import JsonPreview from "@/components/JsonPreview.vue";
 import CorrelatedLogsTable from "@/plugins/correlation/CorrelatedLogsTable.vue";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 import { buildChipDimensionsFromFilters } from "@/services/service_streams";
+import { correlationDisplayProps } from "@/types/serviceRef";
 import { buildWorkloadChipDimensions } from "@/composables/useMetricSubjectButtons";
 import { normalizeSeverity } from "@/utils/sourceEventSeverity";
 import type { TelemetryContext } from "@/utils/telemetryCorrelation";
@@ -2811,6 +2814,7 @@ export default defineComponent({
 
           correlationProps.value = {
             serviceName: correlationData.service_name,
+            ...correlationDisplayProps(correlationData),
             matchedDimensions: actualMatchedDimensions,
             additionalDimensions: {},
             matchedSetId: correlationData.matched_set_id,

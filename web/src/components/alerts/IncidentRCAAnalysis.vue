@@ -28,7 +28,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :retrying="triggering"
       @retry="$emit('trigger-rca', refusal.retry ?? { buildOnPrevious: false })"
     />
+    <RcaFailedNotice
+      v-if="failedAnalyses"
+      class="max-w-215"
+      :failed="failedAnalyses"
+      :timezone="timezone"
+      :short="view === 'report'"
+      :retrying="triggering"
+      :start-locked-reason="startLockedReason"
+      @retry="$emit('trigger-rca', { buildOnPrevious: false })"
+      @open-analysis="$emit('open-analysis')"
+    />
     <section
+      v-else
       data-test="rca-trigger-section"
       class="rounded-default border-border-default bg-surface-base flex max-w-215 flex-col items-start gap-2 border p-6"
     >
@@ -66,6 +78,101 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </div>
 
   <div
+    v-else-if="view === 'report'"
+    data-test="rca-report-container"
+    class="flex min-h-0 flex-1 flex-col gap-4 overflow-auto px-7 pt-4 pb-10"
+  >
+    <RcaAnalysisBar
+      variant="report"
+      :runs="history"
+      :latest-run-id="rca.run_id"
+      :selected-run-id="cardRunId"
+      :live="live"
+      :subtitle="subtitle"
+      :has-report="!!ownReport"
+      :has-thread="!threadRunIsV1"
+      :timezone="timezone"
+      :copy-preview="copyPreview"
+      @select-run="$emit('view-run', $event)"
+      @copy-report="copyReport(true)"
+      @download-report="downloadReport"
+      @open-thread="openThread"
+      @close-preview="copyPreview = null"
+    />
+    <p
+      v-if="ownReportLoading && !ownReport"
+      data-test="rca-report-tab-loading"
+      role="status"
+      class="text-text-secondary m-0 flex items-center gap-2 text-sm"
+    >
+      <OSpinner variant="dots" size="xs" />
+      {{ t("alerts.incidents.rcaRun.loadingReport") }}
+    </p>
+    <RcaReportLoadError v-else-if="ownReportFailed && !ownReport" @retry="$emit('retry-report')" />
+    <RcaReportIndex
+      v-else-if="ownReport"
+      data-test="rca-report-tab-content"
+      :html="formattedReport"
+      :is-dark-mode="isDark"
+    />
+    <RcaFailedNotice
+      v-else-if="failedAnalyses && cardState === 'failed'"
+      class="max-w-215"
+      :failed="failedAnalyses"
+      :timezone="timezone"
+      short
+      @open-analysis="$emit('open-analysis')"
+    />
+    <section
+      v-else
+      :data-test="
+        cardState === 'investigating' ? 'rca-report-pending-panel' : 'rca-report-none-panel'
+      "
+      class="rounded-default border-border-default bg-surface-base flex max-w-215 flex-col items-start gap-2 border p-6"
+    >
+      <RcaPill
+        v-if="cardState === 'investigating'"
+        :tone="waitingInput ? 'warn' : 'neutral'"
+        :icon="waitingInput ? 'block' : null"
+        :spinner="!waitingInput"
+      >
+        {{
+          waitingInput
+            ? t("alerts.incidents.rcaRun.state.waitingInput")
+            : t("alerts.incidents.rcaRun.state.investigating")
+        }}
+      </RcaPill>
+      <h2 class="text-text-heading m-0 text-base font-bold">
+        {{
+          cardState === "investigating"
+            ? t("alerts.incidents.rcaRun.reportAfterRun")
+            : t("alerts.incidents.rcaRun.noReportTitle")
+        }}
+      </h2>
+      <p class="text-text-body text-compact m-0">
+        {{
+          cardState === "investigating"
+            ? t("alerts.incidents.rcaRun.reportAfterRunText")
+            : t("alerts.incidents.rcaRun.noReportText")
+        }}
+      </p>
+      <OButton
+        data-test="rca-report-follow-thread"
+        variant="outline"
+        size="sm"
+        icon-left="forum"
+        @click="$emit('open-analysis')"
+      >
+        {{
+          cardState === "investigating"
+            ? t("alerts.incidents.rcaRun.followInThread")
+            : t("alerts.incidents.rcaRun.openAnalysisTab")
+        }}
+      </OButton>
+    </section>
+  </div>
+
+  <div
     v-else
     data-test="rca-analysis-container"
     :data-layout="layout"
@@ -92,16 +199,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :triggering="triggering"
         :resuming="resuming"
         :start-locked-reason="startLockedReason"
+        :timezone="timezone"
         @select-run="$emit('view-run', $event)"
         @cancel="requestCancel"
         @reanalyze="openGuidance('')"
-        @copy-report="copyReport"
+        @copy-report="copyReport(false)"
         @download-report="downloadReport"
         @copy-thread="copyThread"
         @ask="ask"
       />
 
+      <div
+        v-if="failedAnalyses && cardState === 'failed' && !recordSummary && !resumeRunId"
+        class="grid max-w-215"
+      >
+        <RcaFailedNotice
+          class="col-start-1 row-start-1"
+          :class="{ invisible: !!refusal }"
+          :inert="!!refusal"
+          :failed="failedAnalyses"
+          :timezone="timezone"
+          :retrying="triggering"
+          :start-locked-reason="startLockedReason"
+          @retry="$emit('trigger-rca', { buildOnPrevious: false })"
+        />
+        <RcaBlockedBanner
+          v-if="refusal"
+          class="col-start-1 row-start-1"
+          :refusal="refusal"
+          :retrying="triggering"
+          @retry="$emit('trigger-rca', refusal.retry ?? { buildOnPrevious: false })"
+        />
+      </div>
       <RcaVerdictCard
+        v-else
         :card-state="cardState"
         :run-id="cardRunId"
         :waiting-input="waitingInput"
@@ -116,6 +247,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :has-earlier-report="hasEarlierReport"
         :error="cardError"
         :verdict-details="ownVerdict"
+        :report-text="ownReport"
+        :firing-scope="firingScope"
+        :alerts-now="alertsNow"
+        :timezone="timezone"
         :cancelled-text="cancelledText"
         :triggering="triggering"
         :cancelling="cancelling"
@@ -139,9 +274,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @show-blind-spots="showBlindSpots"
         @tell-agent="threadColumn?.focusComposer()"
         @resume="resumeLatest"
+        @open-hypothesis="hypothesesSection?.showHypothesis($event)"
       />
 
       <template v-if="recordSummary">
+        <RcaProposedActions v-if="proposedActions.length" :actions="proposedActions" />
         <RcaWhatHappened
           v-if="cardState === 'investigating' || cardState === 'analyzed'"
           :timeline="recordSummary.timeline"
@@ -149,6 +286,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :hypotheses="recordSummary.hypotheses"
           :org="orgId"
           :live="cardState === 'investigating'"
+          :timezone="timezone"
+          :firings="firings"
           @open-hypothesis="hypothesesSection?.showHypothesis($event)"
         />
         <RcaHypotheses
@@ -181,40 +320,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :triggering="triggering"
           @resume="resumeLatest"
         />
-        <RcaProposedActions v-if="proposedActions.length" :actions="proposedActions" />
-        <!-- The shown run's markdown, collapsed under its structured record. -->
-        <OCollapsible
+        <p
           v-if="showFullReport"
           data-test="rca-full-report"
-          trigger-class="-mx-2 w-[calc(100%+1rem)]!"
+          class="border-border-default m-0 border-t pt-4"
         >
-          <template #trigger="{ open }">
-            <span class="text-text-heading flex-1 text-base font-bold">
-              {{ t("alerts.incidents.rcaRun.fullReport") }}
-            </span>
-            <OIcon
-              name="expand-more"
-              size="md"
-              class="text-collapsible-icon transition-transform duration-200"
-              :class="open ? 'rotate-180' : 'rotate-0'"
-            />
-          </template>
-          <p
-            v-if="ownReportLoading && !ownReport"
-            data-test="rca-full-report-loading"
-            class="text-text-secondary m-0 flex items-center gap-2 pt-2 text-sm"
+          <OButton
+            data-test="rca-open-report-tab"
+            variant="ghost-primary"
+            size="sm"
+            icon-right="arrow-forward"
+            @click="$emit('open-report')"
           >
-            <OSpinner variant="dots" size="xs" />
-            {{ t("alerts.incidents.rcaRun.loadingReport") }}
-          </p>
-          <RcaReportContent
-            v-else
-            data-test="rca-full-report-content"
-            class="max-w-215 pt-2"
-            :html="formattedReport"
-            :is-dark-mode="isDark"
-          />
-        </OCollapsible>
+            {{ t("alerts.incidents.rcaRun.readFullReport") }}
+          </OButton>
+        </p>
       </template>
       <p
         v-else-if="summaryStatus === 'loading' && !showReport"
@@ -234,6 +354,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OSpinner variant="dots" size="xs" />
           {{ t("alerts.incidents.rcaRun.loadingReport") }}
         </p>
+        <RcaReportLoadError
+          v-else-if="ownReportFailed && !ownReport"
+          @retry="$emit('retry-report')"
+        />
         <RcaReportContent
           v-else-if="ownReport"
           data-test="rca-existing-container"
@@ -265,6 +389,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :run-stats="threadRunStats"
       :no-transcript="threadRunIsV1"
       :evidence-numbers="evidenceNumbers"
+      :timezone="timezone"
       :steering="steering"
       :steering-status="steeringStatus"
       :can-steer="canSteer"
@@ -308,11 +433,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, onUnmounted, ref, toRef, watch } from "vue";
+import { computed, nextTick, onUnmounted, ref, toRef, watch } from "vue";
+import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -328,14 +452,16 @@ import type {
   RcaSteering,
   RcaSummary,
   RcaThread,
-  RcaVerdictDetails,
 } from "@/services/incidents";
 import type { RcaReadStatus, RcaRefusal } from "@/composables/useIncidentRca";
 import { useLicenseLock } from "@/composables/useFeatureLock";
 import { useRcaSteering } from "@/composables/useRcaSteering";
 import { isAssistantV2 } from "@/composables/assistant/flags";
 import { useViewerTimezone } from "@/composables/downtimes/useViewerTimezone";
+import { serverNowMs } from "@/composables/useAnnouncementBanners";
 import { formatTimestampInTimezone } from "@/utils/date";
+import { copyToClipboard } from "@/utils/clipboard";
+import { getIntlLocale } from "@/locales";
 import {
   formatRcaLocalClock,
   humanizeElapsed,
@@ -343,7 +469,12 @@ import {
   rcaIncidentNumber,
   userLocalPart,
 } from "@/utils/incidents/rcaCell";
-import { renderRcaReport } from "@/utils/incidents/rcaReportMarkdown";
+import {
+  rcaRenumberCitations,
+  rcaReportExecutiveFirst,
+  renderRcaReport,
+} from "@/utils/incidents/rcaReportMarkdown";
+import { RCA_OUTCOME_PILL } from "@/utils/incidents/rcaSummary";
 import {
   finishedStepCount,
   formatRcaClock,
@@ -353,7 +484,12 @@ import {
   rcaTriggerLabel,
   type RcaCardState,
 } from "@/utils/incidents/rcaThread";
-import { rcaEvidenceNumbers } from "@/utils/incidents/rcaSummary";
+import {
+  rcaEvidenceClaim,
+  rcaEvidenceNumbers,
+  rcaHypothesisStatusWord,
+  type RcaVerdictView,
+} from "@/utils/incidents/rcaSummary";
 import {
   rcaNeedSubject,
   rcaPendingHypothesisActions,
@@ -372,6 +508,18 @@ import RcaGuidanceDialog from "./rca/RcaGuidanceDialog.vue";
 import RcaVerdictCard from "./rca/RcaVerdictCard.vue";
 import RcaWhatHappened from "./rca/RcaWhatHappened.vue";
 import RcaReportContent from "./rca/RcaReportContent.vue";
+import RcaReportIndex from "./rca/RcaReportIndex.vue";
+import RcaReportLoadError from "./rca/RcaReportLoadError.vue";
+import RcaFailedNotice from "./rca/RcaFailedNotice.vue";
+import type { IncidentUnfoldInput } from "@/utils/incidents/incidentUnfold";
+import {
+  rcaFailedAnalyses,
+  rcaFiringScope,
+  rcaOpenFindings,
+  type RcaAlertsNow,
+  type RcaIncidentEvent,
+} from "./rca/rcaLight";
+import RcaPill from "./rca/RcaPill.vue";
 import { useTheme } from "@/composables/useTheme";
 import { buildRcaAskAttachment, type RcaAskPayload } from "@/utils/incidents/rcaAskAttachment";
 import { buildFeatureGateContext, checkFeatureAccess } from "@/utils/enterpriseFeatures";
@@ -394,9 +542,11 @@ const props = withDefaults(
     error?: RcaRunError | null;
     /** Markdown of the shown report. */
     reportText?: string;
-    /** Impacted services and proposed actions of the shown report's stored verdict. */
-    reportVerdict?: RcaVerdictDetails | null;
+    /** Impacted services, proposed actions and paging advice of the shown report's stored verdict. */
+    reportVerdict?: RcaVerdictView | null;
     reportLoading?: boolean;
+    /** The shown report could not be read; Retry reads it again. */
+    reportFailed?: boolean;
     /** The run whose thread shows: the picked run, else the latest. */
     threadRunId?: string | null;
     /** The thread's run is the latest and live. */
@@ -423,8 +573,20 @@ const props = withDefaults(
     reanalyzeCreditCost?: number | null;
     /** `page` is the incident's Analysis tab; `assistant` is one column inside the assistant. */
     layout?: "page" | "assistant";
+    /** `report`: the Report tab, which shows the shown run's report alone. */
+    view?: "analysis" | "report";
+    /** This incident's own firings (its trigger rows). */
+    firings?: IncidentUnfoldInput["triggers"];
+    /** The live state of the incident's alerts; null while unknown. */
+    alertsNow?: RcaAlertsNow | null;
+    /** The incident's events, for analyses that failed before any run was stored. */
+    incidentEvents?: RcaIncidentEvent[] | null;
   }>(),
   {
+    view: "analysis",
+    firings: () => [],
+    alertsNow: null,
+    incidentEvents: null,
     reportRun: null,
     viewedRun: null,
     history: () => [],
@@ -433,6 +595,7 @@ const props = withDefaults(
     reportText: "",
     reportVerdict: null,
     reportLoading: false,
+    reportFailed: false,
     threadRunId: null,
     threadLive: false,
     threadRunIsV1: false,
@@ -464,12 +627,25 @@ const emit = defineEmits<{
   "resume-rca": [runId: string];
   /** "Ask about this analysis" (J5): the hand-off payload for a new AI chat. */
   "ask-ai": [payload: RcaAskPayload];
+  /** "Open the Report tab" under the record. */
+  "open-report": [];
+  /** The Report tab's way back to the analysis and its thread. */
+  "open-analysis": [];
+  /** Read the shown report again after a failed read. */
+  "retry-report": [];
 }>();
 
 const { t } = useI18nTyped();
 const { isDark } = useTheme();
 const store = useStore();
+const router = useRouter();
 const timezone = useViewerTimezone();
+
+const firingScope = computed(() => rcaFiringScope(props.firings));
+/** Every attempt failed and none succeeded; null once any analysis completed. */
+const failedAnalyses = computed(() =>
+  props.reportRun ? null : rcaFailedAnalyses(props.incidentEvents, props.history),
+);
 
 /** AI chat is on for this user: the edition offers it and the server enabled it. */
 const aiEnabled = computed(
@@ -536,7 +712,7 @@ const showReport = computed(() => {
   );
 });
 
-/** A finished run with a record keeps its markdown in a collapsed "Full report". */
+/** A finished run with a record links to its markdown on the Report tab. */
 const showFullReport = computed(
   () =>
     cardState.value === "analyzed" &&
@@ -553,15 +729,15 @@ const showBlindSpots = () =>
     behavior: "smooth",
   });
 
-// Ticks so the ages in the bar stay current: every second while live, else every 30 s.
-const now = ref(Date.now());
+// The server clock the header and graph read, ticked every second while live for the elapsed time.
+const now = ref(serverNowMs());
 let tickTimer: number | null = null;
 watch(
   live,
   (isLive) => {
     if (tickTimer !== null) clearInterval(tickTimer);
-    now.value = Date.now();
-    tickTimer = window.setInterval(() => (now.value = Date.now()), isLive ? 1_000 : 30_000);
+    now.value = serverNowMs();
+    tickTimer = window.setInterval(() => (now.value = serverNowMs()), isLive ? 1_000 : 30_000);
   },
   { immediate: true },
 );
@@ -599,6 +775,7 @@ const cardRunId = computed(() => props.viewedRun?.run_id ?? props.rca?.run_id ??
 const ownsReport = computed(() => (props.viewedRun ?? props.reportRun)?.run_id === cardRunId.value);
 const ownReport = computed(() => (ownsReport.value ? props.reportText : ""));
 const ownReportLoading = computed(() => ownsReport.value && props.reportLoading);
+const ownReportFailed = computed(() => ownsReport.value && props.reportFailed);
 /** The shown completed run's impacted services and proposed actions (inert text). */
 const ownVerdict = computed(() =>
   ownsReport.value && cardState.value === "analyzed" ? props.reportVerdict : null,
@@ -693,7 +870,25 @@ const cancelledText = computed<I18nText | null>(() => {
     : t("alerts.incidents.rcaRun.cancelledAtChecks", values);
 });
 
-const formattedReport = computed(() => (ownReport.value ? renderRcaReport(ownReport.value) : ""));
+/** Evidence numbers of the shown run's record, for its report's citations. */
+const reportEvidenceNumbers = computed(() =>
+  recordSummary.value?.run_id === cardRunId.value ? evidenceNumbers.value : null,
+);
+
+/** The report as shown and copied: Executive Summary first, citations as the page numbers them. */
+const readableReport = computed(() =>
+  ownReport.value
+    ? rcaRenumberCitations(
+        rcaReportExecutiveFirst(ownReport.value),
+        reportEvidenceNumbers.value,
+        () => t("alerts.incidents.rcaLight.notVerifiedCite"),
+      )
+    : "",
+);
+
+const formattedReport = computed(() =>
+  readableReport.value ? renderRcaReport(readableReport.value) : "",
+);
 
 // The thread column describes the thread's run, which is not always the latest.
 const threadRunState = computed<RcaRunState | null>(() => {
@@ -742,6 +937,22 @@ const requestCancel = () => {
   if (legacyControls.value) emit("cancel-rca");
   else cancelConfirmOpen.value = true;
 };
+
+// "Open thread" on the Report tab: the thread takes focus once the analysis shows.
+const focusThreadOnShow = ref(false);
+const openThread = () => {
+  focusThreadOnShow.value = true;
+  emit("open-analysis");
+};
+watch(
+  () => props.view,
+  async (view) => {
+    if (view !== "analysis" || !focusThreadOnShow.value) return;
+    focusThreadOnShow.value = false;
+    await nextTick();
+    threadColumn.value?.focusThread();
+  },
+);
 
 // Steering: the rows, the open question and `can_steer` of the thread's run.
 // A sent row and a resumed run arrive on the live stream.
@@ -826,28 +1037,115 @@ const openGuidance = (text: string) => {
   guidanceOpen.value = true;
 };
 
-const copyText = async (text: string, success: I18nText, failure: I18nText) => {
+// One pattern on both tabs: the shared clipboard helper, which confirms on the control or by toast.
+const copyText = (text: string, success: I18nText, failure: I18nText) =>
+  copyToClipboard(text, t, { successMessage: success, errorMessage: failure });
+
+// The agent writes its report in UTC, so the copy states its own times in UTC too, once.
+const COPY_ZONE = "UTC";
+const runLabelOf = (runId: string): string => {
+  const index = props.history.findIndex((run) => run.run_id === runId);
+  const run = props.history[index];
+  if (!run) return "";
+  const time = formatTimestampInTimezone(run.started_at, "MMM D, HH:mm", COPY_ZONE);
+  return t("alerts.incidents.rcaLight.runAt", { number: props.history.length - index, time });
+};
+
+const incidentLink = (): string => {
   try {
-    await navigator.clipboard.writeText(text);
-    toast({ variant: "success", message: success });
-  } catch (error) {
-    console.error("Failed to copy to the clipboard:", error);
-    toast({ variant: "error", message: failure });
+    const href = router.resolve({
+      name: "incidentDetail",
+      params: { id: props.incidentId },
+      query: { org_identifier: props.orgId },
+    }).href;
+    return new URL(href, window.location.origin).toString();
+  } catch {
+    return window.location.href;
   }
 };
 
-const copyReport = () => {
-  if (!ownReport.value) return;
-  void copyText(
-    ownReport.value,
+/** What Copy report and Download save: the verdict lines first, then the readable report. */
+const reportMarkdown = computed(() => {
+  if (!readableReport.value) return "";
+  const lines = [
+    `# ${t("alerts.incidents.rcaLight.copyHeading", { title: props.incidentTitle || props.incidentId })}`,
+    t("alerts.incidents.rcaLight.copyLink", { url: incidentLink() }),
+  ];
+  const card = recordSummary.value?.run_id === cardRunId.value ? recordSummary.value.card : null;
+  const verdict: string[] = [runLabelOf(cardRunId.value)];
+  if (card?.outcome) verdict.push(t(RCA_OUTCOME_PILL[card.outcome].key));
+  if (card?.band && card.confidence) {
+    verdict.push(
+      t("alerts.incidents.rcaLight.copyConfidence", {
+        band: t(`alerts.incidents.aiAnalysis.band.${card.band}`),
+        reason: card.confidence.evidence_reason,
+      }),
+    );
+  }
+  lines.push(verdict.filter(Boolean).join(" · "));
+  const advice = ownVerdict.value?.pageRecommendation;
+  if (advice) {
+    lines.push(
+      t("alerts.incidents.rcaLight.copySuggests", {
+        action: t(`alerts.incidents.rcaLight.pageAction.${advice.action}`),
+      }),
+    );
+  }
+  const record = recordSummary.value?.run_id === cardRunId.value ? recordSummary.value : null;
+  const open = record ? rcaOpenFindings(record.hypotheses)[0] : undefined;
+  if (open) {
+    lines.push(
+      t("alerts.incidents.rcaLight.copyOpenFinding", {
+        status: rcaHypothesisStatusWord(open.status),
+        statement: open.statement,
+      }),
+    );
+  }
+  const spots = record?.blind_spots ?? [];
+  if (spots.length > 0 && card) {
+    lines.push(
+      t("alerts.incidents.rcaLight.copyBlindSpots", {
+        list: new Intl.ListFormat(getIntlLocale()).format(spots.map((spot) => spot.title)),
+      }),
+    );
+  }
+  lines.push(t("alerts.incidents.rcaLight.copyTimes", { zone: COPY_ZONE }));
+  const body = readableReport.value.replace(/^#\s[^\n]*\n+/, "");
+  const evidence = record?.evidence ?? [];
+  const list = evidence.length
+    ? `\n\n## ${t("alerts.incidents.rcaLight.copyEvidence")}\n\n${evidence
+        .map((entry) => `${entry.number}. ${rcaEvidenceClaim(entry)}`)
+        .join("\n")}`
+    : "";
+  return `${lines.join("\n")}\n\n${body.replace(/\n+$/, "")}${list}`;
+});
+
+const copyPreview = ref<string | null>(null);
+let copyGeneration = 0;
+watch(
+  [cardRunId, () => props.incidentId],
+  () => {
+    copyGeneration++;
+    copyPreview.value = null;
+  },
+  { flush: "sync" },
+);
+
+const copyReport = async (preview: boolean) => {
+  const text = reportMarkdown.value;
+  const generation = copyGeneration;
+  if (!text) return;
+  const copied = await copyText(
+    text,
     t("alerts.incidents.rcaCopied"),
     t("alerts.incidents.rcaCopyFailed"),
   );
+  if (copied && preview && generation === copyGeneration) copyPreview.value = text;
 };
 
 const downloadReport = () => {
-  if (!ownReport.value) return;
-  const blob = new Blob([ownReport.value], { type: "text/markdown;charset=utf-8" });
+  if (!reportMarkdown.value) return;
+  const blob = new Blob([reportMarkdown.value], { type: "text/markdown;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;

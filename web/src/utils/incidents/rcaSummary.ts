@@ -173,7 +173,8 @@ const STATUS_LABEL: Record<RcaHypothesisStatus, I18nKey> = {
 };
 
 /** Status word of a hypothesis or of a history entry. */
-const rcaHypothesisStatusWord = (status: RcaHypothesisStatus): I18nText => gt(STATUS_LABEL[status]);
+export const rcaHypothesisStatusWord = (status: RcaHypothesisStatus): I18nText =>
+  gt(STATUS_LABEL[status]);
 
 /** Status pill text of a hypothesis. */
 export function rcaHypothesisStatusLabel(
@@ -285,6 +286,11 @@ export function rcaUtcRange(startUs?: number, endUs?: number): I18nText {
 }
 
 /** "Logs · checkout_api": the one-line title of an evidence entry. */
+/** The claim an entry supports, else its source and result. */
+export const rcaEvidenceClaim = (entry: RcaEvidenceEntry): string =>
+  entry.citations.find((citation) => citation.observation)?.observation ??
+  `${rcaEvidenceTitle(entry)} · ${entry.result_summary}`;
+
 export function rcaEvidenceTitle(entry: RcaEvidenceEntry): I18nText {
   const target = rcaSignalLabel(entry.target);
   return entry.link.streams.length > 0
@@ -314,6 +320,34 @@ export function rcaVerdictDetails(result: unknown): RcaVerdictDetails | null {
   if (!parsed.success) return null;
   const { impacted_services, proposed_actions } = parsed.data.verdict;
   return { impactedServices: impacted_services, proposedActions: proposed_actions };
+}
+
+export type RcaPageAction = "page" | "downgrade" | "suppress";
+
+/** `verdict.page_recommendation`: the agent's paging advice and why. */
+export interface RcaPageRecommendation {
+  action: RcaPageAction;
+  reason: string;
+}
+
+/** A run's stored verdict as the page reads it: services, actions and paging advice. */
+export type RcaVerdictView = RcaVerdictDetails & {
+  pageRecommendation?: RcaPageRecommendation | null;
+};
+
+const StoredPageRecommendation = z.object({
+  verdict: z.object({
+    page_recommendation: z.object({
+      action: z.enum(["page", "downgrade", "suppress"]),
+      reason: z.string().default(""),
+    }),
+  }),
+});
+
+/** The stored paging advice of a run's result; null when the run has none. */
+export function rcaPageRecommendation(result: unknown): RcaPageRecommendation | null {
+  const parsed = StoredPageRecommendation.safeParse(result);
+  return parsed.success ? parsed.data.verdict.page_recommendation : null;
 }
 
 /** "Rollback", "Scale", … for a proposed action's kind. */

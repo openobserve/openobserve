@@ -125,7 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="t('assistant.message.copyAnswer')"
             :icon="assistantGlyph.copy"
             data-test="assistant-rca-thread-copy"
-            @click="analysis?.copyReport()"
+            @click="analysis?.copyReport(false)"
           />
           <AssistantIconButton
             :label="t('assistant.message.shareAnswer')"

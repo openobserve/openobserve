@@ -983,6 +983,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="shouldShowInlineDialog"
       mode="dialog"
       :service-name="correlationDashboardProps.serviceName"
+      :display-service-name="correlationDashboardProps.displayServiceName"
+      :service-display="correlationDashboardProps.serviceDisplay"
       :matched-dimensions="correlationDashboardProps.matchedDimensions"
       :additional-dimensions="correlationDashboardProps.additionalDimensions"
       :matched-set-id="correlationDashboardProps.matchedSetId"
@@ -1075,6 +1077,7 @@ import LogLineLinkPopover from "@/plugins/logs/LogLineLinkPopover.vue";
 import { traceDetailsLocation } from "@/composables/useLogs/useViewTraceAction";
 import { matchDetailRow, trustworthyFields } from "@/utils/logs/detailRowMatch";
 import { acceptsPageLoad, type PageLoad, type PendingPageSelection } from "@/utils/pageCrossing";
+import { correlationDisplayProps } from "@/types/serviceRef";
 import type { TelemetryContext } from "@/utils/telemetryCorrelation";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 import { useLicenseLock } from "@/composables/useFeatureLock";
@@ -2075,6 +2078,7 @@ export default defineComponent({
 
         correlationDashboardProps.value = {
           serviceName: result.correlationData.service_name,
+          ...correlationDisplayProps(result.correlationData),
           matchedDimensions: actualMatchedDimensions,
           additionalDimensions: {},
           matchedSetId: result.correlationData.matched_set_id,
@@ -2118,7 +2122,7 @@ export default defineComponent({
           toast({
             variant: "info",
             message: t("logs.searchResult.noMetricStreams", {
-              service: result.correlationData.service_name,
+              service: result.correlationData.display_name || result.correlationData.service_name,
             }),
           });
         }

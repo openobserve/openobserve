@@ -415,6 +415,9 @@ pub struct ResourceValue {
     pub last_seen: i64,
     /// Flattened from `ServiceStreams` as `<type>/<name>`.
     pub streams: Vec<String>,
+    /// Display name for a `service` value; `value` stays the key a condition stores.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize, ToSchema)]
@@ -447,6 +450,9 @@ pub struct ValueSuggestion {
     /// Newest sighting in microseconds, when a source knows one.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub last_seen: Option<i64>,
+    /// Display name for a `service` value; `value` stays the key a condition stores.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, ToSchema)]
@@ -1144,5 +1150,24 @@ mod tests {
         assert_eq!(json["end_here"], true);
         let back: ActiveDowntime = serde_json::from_value(json).unwrap();
         assert_eq!(back, new);
+    }
+
+    #[test]
+    fn value_suggestion_label_skipped_when_absent() {
+        let mut v = ValueSuggestion {
+            value: "checkoutservice".to_string(),
+            source: "registry".to_string(),
+            items: 0,
+            last_seen: None,
+            label: None,
+        };
+        assert_eq!(
+            serde_json::to_string(&v).unwrap(),
+            r#"{"value":"checkoutservice","source":"registry","items":0}"#
+        );
+        v.label = Some("CheckoutService".to_string());
+        let json = serde_json::to_value(&v).unwrap();
+        assert_eq!(json["label"], "CheckoutService");
+        assert_eq!(json["value"], "checkoutservice");
     }
 }

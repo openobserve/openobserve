@@ -50,6 +50,9 @@ export const MODULE_SHORT_KEYS: Record<TargetModule, I18nKey> = {
 /** Resolves a folder id of a module's own folder type to its display name. */
 export type FolderNameFn = (module: TargetModule, folderId: string) => string | undefined;
 
+/** Resolves a stored dimension value to its display name, e.g. a service key to its trace name. */
+export type ValueLabelFn = (key: string, value: string) => string | undefined;
+
 export interface TargetChip {
   module: TargetModule;
   icon: IconName;
@@ -61,8 +64,6 @@ type Pair = Extract<DimensionCondition, { type: "pair" }>;
 
 const isEqPair = (c: DimensionCondition): c is Pair => c.type === "pair" && c.operator === "=";
 
-const pairText = (p: Pair) => `${p.key}${p.operator}${p.value}`;
-
 /** An OR group of `=` pairs on one key, the shape the resource picker writes. */
 const orGroupKey = (c: DimensionCondition): string | null => {
   if (c.type !== "group" || c.op !== "or" || c.items.length === 0) return null;
@@ -71,23 +72,33 @@ const orGroupKey = (c: DimensionCondition): string | null => {
   return keys.size === 1 ? [...keys][0] : null;
 };
 
-const partText = (c: DimensionCondition, t: TranslateFn): string | null => {
-  if (isEqPair(c)) return pairText(c);
+const partText = (
+  c: DimensionCondition,
+  t: TranslateFn,
+  valueLabel?: ValueLabelFn,
+): string | null => {
+  if (isEqPair(c)) return pairText(c.key, c.value, valueLabel);
   const key = orGroupKey(c);
   if (key === null || c.type !== "group") return null;
   return t("alerts.downtimes.summary.valuesOfKey", { count: c.items.length, key }, c.items.length);
 };
 
+/** One `=` pair: `env=prod`, or `service=CheckoutService` when the value has a display name. */
+export function pairText(key: string, value: string, valueLabel?: ValueLabelFn): string {
+  return `${key}=${valueLabel?.(key, value) ?? value}`;
+}
+
 /** `service=payments · env=prod`, `service=kafka · 3 hosts`, or "condition" for any other tree. */
 export function conditionSummary(
   condition: DimensionCondition | undefined | null,
   t: TranslateFn,
+  valueLabel?: ValueLabelFn,
 ): I18nText | null {
   if (!condition) return null;
   const parts =
     condition.type === "group" && condition.op === "and"
-      ? condition.items.map((c) => partText(c, t))
-      : [partText(condition, t)];
+      ? condition.items.map((c) => partText(c, t, valueLabel))
+      : [partText(condition, t, valueLabel)];
   if (parts.length === 0 || parts.some((p) => p === null)) {
     return t("alerts.downtimes.summary.condition");
   }

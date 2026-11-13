@@ -58,6 +58,38 @@ const SAVED = {
 };
 
 describe("RcaThreadColumn", () => {
+  it("labels historical clocks with the first event's offset across a DST change", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-11-13T12:00:00Z"));
+    try {
+      const wrapper = mountColumn({
+        timezone: "America/New_York",
+        thread: rcaThread({
+          started: { at: Date.parse("2026-10-31T12:00:00Z") * 1000, prompt: "Investigate" },
+          steps: [rcaStep({ started_at: Date.parse("2026-11-02T12:00:00Z") * 1000 })],
+        }),
+      });
+      expect(byTest(wrapper, "rca-thread-zone").text()).toBe("times in EDT");
+      expect(wrapper.text()).toContain("08:00:00");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  describe("conclusion", () => {
+    it("a submitted run's last step shows its note as the conclusion", () => {
+      const wrapper = mountColumn(SAVED);
+      const steps = wrapper.findAllComponents({ name: "RcaThreadStep" });
+
+      expect(steps.map((step) => step.props("conclusion"))).toEqual([false, true]);
+    });
+
+    it("a live run has no conclusion yet", () => {
+      const steps = mountColumn().findAllComponents({ name: "RcaThreadStep" });
+      expect(steps.every((step) => step.props("conclusion") === false)).toBe(true);
+    });
+  });
+
   describe("TH37: stats line", () => {
     it('shows "9 checks · 27 tool calls · 4m12s" and no credits', () => {
       const wrapper = mountColumn();
@@ -122,13 +154,19 @@ describe("RcaThreadColumn", () => {
       expect(byTest(wrapper, "rca-thread-step-count").text()).toBe("2 steps");
     });
 
-    it('starts with "Analysis started": trigger, time and prompt', () => {
+    it('starts with "Analysis started": trigger, time and prompt', async () => {
       const wrapper = mountColumn({ triggerLabel: "Auto on incident open" });
 
       const start = byTest(wrapper, "rca-thread-start");
       expect(start.text()).toContain("Analysis started");
       expect(byTest(wrapper, "rca-thread-start-trigger").text()).toBe("Auto on incident open");
       expect(start.text()).toContain("08:53:20");
+      // The agent's input folds behind its toggle.
+      expect(byTest(wrapper, "rca-thread-start-prompt").exists()).toBe(false);
+      const toggle = byTest(wrapper, "rca-thread-start-prompt-toggle");
+      expect(toggle.text()).toBe("Show agent input");
+      await toggle.trigger("click");
+      expect(toggle.text()).toBe("Hide agent input");
       expect(byTest(wrapper, "rca-thread-start-prompt").text()).toBe(
         "Analyze incident checkout-errors (3 alerts, P1).",
       );
@@ -169,7 +207,7 @@ describe("RcaThreadColumn", () => {
       expect(byTest(wrapper, "rca-thread-context-toggle").exists()).toBe(false);
     });
 
-    it("renders one entry per step; the running step shows the running text", () => {
+    it("renders one entry per step; the running step shows the running text", async () => {
       const wrapper = mountColumn();
 
       const steps = wrapper.findAll('[data-test="rca-thread-step"]');
@@ -177,6 +215,7 @@ describe("RcaThreadColumn", () => {
         "Load incident context",
         "Map the checkout dependencies",
       ]);
+      await steps[0].get('[data-test="rca-thread-step-note-toggle"]').trigger("click");
       expect(steps[0].findAll('[data-test="rca-citation-chip"]')).toHaveLength(2);
       expect(steps[1].find('[data-test="rca-thread-step-working"]').text()).toBe(
         "Working. Messages sent now are read after this turn.",
@@ -428,10 +467,11 @@ describe("RcaThreadColumn", () => {
       const wrapper = mountColumn({ ...SAVED, evidenceNumbers: new Map([["e3", 1]]) });
 
       const step = wrapper.findAll('[data-test="rca-thread-step"]')[0];
+      await step.get('[data-test="rca-thread-step-note-toggle"]').trigger("click");
       expect(step.findAll('[data-test="rca-citation-chip"]').map((chip) => chip.text())).toEqual([
         "1",
       ]);
-      expect(step.find('[data-test="rca-citation-unverified"]').text()).toBe("e7 · not verified");
+      expect(step.find('[data-test="rca-citation-unverified"]').text()).toBe("not verified");
 
       await step.find('[data-test="rca-citation-chip"]').trigger("click");
       expect(wrapper.emitted("open-evidence")).toEqual([[1]]);

@@ -147,7 +147,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- On a phone the switcher is the one item that may give way, so the assistant and account stay on screen -->
     <div
       v-if="securityAccess.canOpen.value"
-      class="ms-3 flex shrink-0 items-center max-md:ms-1 max-md:min-w-0 max-md:shrink max-md:overflow-hidden"
+      class="ms-3 flex shrink-0 items-center max-md:ms-1 max-md:min-w-0 max-md:shrink max-md:overflow-hidden md:max-xl:min-w-0 md:max-xl:shrink"
       data-test="header-solution-switcher-slot"
     >
       <SolutionSwitcher :security-locked="securityAccess.licenseLocked.value" />
@@ -217,7 +217,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               : 'primary'
           "
           size="xs"
-          class="max-lg:hidden"
+          class="max-lg:hidden md:max-xl:min-w-0"
           data-test="upgrade-to-enterprise-btn"
           @click="openEnterpriseDialog"
         >
@@ -231,7 +231,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="sm"
             />
           </template>
-          {{ enterpriseButtonText }}
+          <span class="md:max-xl:truncate">{{ enterpriseButtonText }}</span>
+          <OTooltip :content="enterpriseButtonText" />
         </OButton>
 
         <!-- ORGANIZATION SELECTOR: Dropdown to switch between organizations -->

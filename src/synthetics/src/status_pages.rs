@@ -41,7 +41,10 @@ struct TickData {
     components: Vec<infra::table::entity::status_page_components::Model>,
     mappings: Vec<infra::table::entity::status_page_component_checks::Model>,
     states: Vec<table::CheckStateRow>,
+    /// Manual snoozes and downtime mutes: the engine opens no notice for these.
     snoozed: HashSet<String>,
+    /// Downtime mutes only; a muted check that fails shows Maintenance (D2).
+    muted: HashSet<String>,
     notices: Vec<status_page_notices::Model>,
     /// False alarm holds apply only while every node runs this build. See
     /// [`infra::cluster::all_online_nodes_run_this_build`].
@@ -103,12 +106,15 @@ pub async fn preview_snapshot(
         .into_iter()
         .collect();
     let (states, _) = table::get_check_states(conn, &preview_check_ids, None).await?;
+    // The same mutes as the tick, so the admin preview matches the public page.
+    let muted = muted_checks(conn, &mappings).await;
     let data = TickData {
         pages: vec![page.clone()],
         components,
         mappings,
         states,
         snoozed: HashSet::new(),
+        muted,
         notices: notices.clone(),
         // A preview renders the snapshot only. It runs no engine actions, so it holds nothing.
         holds_allowed: false,
@@ -415,15 +421,43 @@ async fn load(
         .into_iter()
         .map(|s| s.synthetics_id)
         .collect();
-    snoozed.extend(muted_checks(conn, &mappings).await);
+    let muted = muted_checks(conn, &mappings).await;
+    snoozed.extend(muted.iter().cloned());
     Ok(TickData {
         pages,
         components,
         mappings,
         states,
         snoozed,
+        muted,
         notices,
         holds_allowed,
+    })
+}
+
+/// The engine's view of a check: per-run verdict streaks written at run
+/// finalization, never the badge.
+fn engine_check(s: &table::CheckStateRow) -> engine::EngineCheck {
+    engine::EngineCheck {
+        id: s.id.clone(),
+        down_runs: s.down_runs,
+        up_runs: s.up_runs,
+        first_fail_at: None,
+        failing_since: None,
+    }
+}
+
+/// A mapped check that a downtime mutes and that meets the open condition of the
+/// rendered page. A passing muted check changes nothing, so a quick mute of a
+/// flaky check never announces maintenance while the service works.
+fn muted_and_failing(mapped: &[&str], data: &TickData, th: &engine::Thresholds, now: i64) -> bool {
+    mapped.iter().any(|id| {
+        data.muted.contains(*id)
+            && data
+                .states
+                .iter()
+                .find(|s| s.id == *id)
+                .is_some_and(|s| engine::is_confirmed_failing(&engine_check(s), th, now))
     })
 }
 
@@ -464,18 +498,7 @@ async fn apply_engine_actions(
     data: &TickData,
     now: i64,
 ) -> Result<(), infra::errors::Error> {
-    let checks: Vec<engine::EngineCheck> = data
-        .states
-        .iter()
-        .map(|s| engine::EngineCheck {
-            id: s.id.clone(),
-            // Per-run verdict streaks written at run finalization; never the badge.
-            down_runs: s.down_runs,
-            up_runs: s.up_runs,
-            first_fail_at: None,
-            failing_since: None,
-        })
-        .collect();
+    let checks: Vec<engine::EngineCheck> = data.states.iter().map(engine_check).collect();
 
     let mut open_by_check = HashMap::new();
     let mut recently_resolved = HashMap::new();
@@ -845,6 +868,11 @@ fn build_page_snapshot(
             // service is up, so show "no data" rather than plain Operational.
             status = engine::ComponentStatus::NoData;
         }
+        // A downtime-muted check that fails opens no notice, so without this the
+        // component would read Operational during a muted outage (D2).
+        if muted_and_failing(&mapped, data, &page_thresholds(page), now) {
+            status = status.max(engine::ComponentStatus::Maintenance);
+        }
         let (last_checked_at, stale_after_secs) = last_checked(&mapped, &data.states);
         current_components.push(engine::CurrentComponent {
             key: key.clone(),
@@ -1114,6 +1142,7 @@ mod fast_pass_tests {
             mappings: vec![],
             states: states.to_vec(),
             snoozed: HashSet::from(["snoozed".to_string()]),
+            muted: HashSet::new(),
             notices,
             holds_allowed: false,
         };
@@ -1210,6 +1239,206 @@ mod fast_pass_tests {
         let mut up = row("a", e);
         up.up_runs = 1;
         assert!(!all_checks_in_error(&["a"], &[up]));
+    }
+
+    const NOW: i64 = 1_800_000_000_000_000;
+
+    fn page(id: &str, confirm_failures: i32) -> infra::table::entity::status_pages::Model {
+        infra::table::entity::status_pages::Model {
+            id: id.into(),
+            org_id: "org".into(),
+            name: id.into(),
+            slug: format!("{id}-slug"),
+            description: None,
+            visibility: 1,
+            password_hash: None,
+            noindex: false,
+            show_uptime_percent: true,
+            show_timeline_bars: true,
+            show_response_time: false,
+            confirm_failures,
+            confirm_recovery: 2,
+            confirm_after_secs: None,
+            brand_name: None,
+            accent_color: None,
+            logo_img: None,
+            favicon_img: None,
+            tracking_since: Some(NOW - 86_400_000_000),
+            owner: None,
+            created_at: 0,
+            updated_at: 0,
+        }
+    }
+
+    fn component(page_id: &str) -> infra::table::entity::status_page_components::Model {
+        infra::table::entity::status_page_components::Model {
+            id: format!("{page_id}-comp"),
+            status_page_id: page_id.into(),
+            org_id: "org".into(),
+            name: "Checkout API".into(),
+            description: None,
+            sort_order: 0,
+            backfill_days: None,
+            created_at: 0,
+            updated_at: 0,
+        }
+    }
+
+    fn mapping(
+        page_id: &str,
+        check: &str,
+    ) -> infra::table::entity::status_page_component_checks::Model {
+        infra::table::entity::status_page_component_checks::Model {
+            id: format!("{page_id}-map"),
+            component_id: format!("{page_id}-comp"),
+            synthetics_id: check.into(),
+            org_id: "org".into(),
+        }
+    }
+
+    fn state(id: &str, badge: i32, down_runs: i32, up_runs: i32) -> table::CheckStateRow {
+        table::CheckStateRow {
+            down_runs,
+            up_runs,
+            ..row(id, badge)
+        }
+    }
+
+    fn tick(pages: &[&str], states: Vec<table::CheckStateRow>, muted: &[&str]) -> TickData {
+        TickData {
+            pages: pages.iter().map(|p| page(p, 3)).collect(),
+            components: pages.iter().map(|p| component(p)).collect(),
+            mappings: pages.iter().map(|p| mapping(p, "chk")).collect(),
+            states,
+            snoozed: muted.iter().map(|s| s.to_string()).collect(),
+            muted: muted.iter().map(|s| s.to_string()).collect(),
+            notices: vec![],
+            holds_allowed: false,
+        }
+    }
+
+    fn status_of(
+        page: &infra::table::entity::status_pages::Model,
+        data: &TickData,
+        notices: &HashMap<&str, Vec<&status_page_notices::Model>>,
+    ) -> engine::ComponentStatus {
+        build_page_snapshot(page, data, notices, NOW).0.components[0].status
+    }
+
+    const DOWN: i32 = engine::CHECK_STATUS_DOWN;
+    const ERROR: i32 = engine::CHECK_STATUS_ERROR;
+
+    #[test]
+    fn a_muted_check_that_meets_the_open_condition_shows_maintenance() {
+        let data = tick(&["p1"], vec![state("chk", DOWN, 3, 0)], &["chk"]);
+        assert_eq!(
+            status_of(&data.pages[0], &data, &HashMap::new()),
+            engine::ComponentStatus::Maintenance
+        );
+    }
+
+    #[test]
+    fn a_muted_check_that_passes_or_errors_keeps_todays_status() {
+        // One failing location of three: the badge is Down, the quorum verdict Up.
+        let quorum_up = tick(&["p1"], vec![state("chk", DOWN, 0, 1)], &["chk"]);
+        assert_eq!(
+            status_of(&quorum_up.pages[0], &quorum_up, &HashMap::new()),
+            engine::ComponentStatus::Operational
+        );
+        let up = tick(&["p1"], vec![state("chk", 1, 0, 5)], &["chk"]);
+        assert_eq!(
+            status_of(&up.pages[0], &up, &HashMap::new()),
+            engine::ComponentStatus::Operational
+        );
+        let error = tick(&["p1"], vec![state("chk", ERROR, 0, 0)], &["chk"]);
+        assert_eq!(
+            status_of(&error.pages[0], &error, &HashMap::new()),
+            engine::ComponentStatus::NoData
+        );
+        let below = tick(&["p1"], vec![state("chk", DOWN, 2, 0)], &["chk"]);
+        assert_eq!(
+            status_of(&below.pages[0], &below, &HashMap::new()),
+            engine::ComponentStatus::Operational,
+            "a streak below the threshold keeps the current status"
+        );
+    }
+
+    #[test]
+    fn a_confirmed_down_streak_counts_after_a_no_verdict_run_and_with_an_error_badge() {
+        // Two failed locations and one error: a Down verdict with an Error badge.
+        let data = tick(&["p1"], vec![state("chk", ERROR, 4, 0)], &["chk"]);
+        assert_eq!(
+            status_of(&data.pages[0], &data, &HashMap::new()),
+            engine::ComponentStatus::Maintenance
+        );
+    }
+
+    #[test]
+    fn a_manual_snooze_without_a_downtime_keeps_todays_status() {
+        let mut data = tick(&["p1"], vec![state("chk", DOWN, 3, 0)], &[]);
+        data.snoozed.insert("chk".into());
+        assert_eq!(
+            status_of(&data.pages[0], &data, &HashMap::new()),
+            engine::ComponentStatus::Operational
+        );
+        data.muted.clear();
+        assert!(!muted_and_failing(
+            &["chk"],
+            &data,
+            &page_thresholds(&data.pages[0]),
+            NOW
+        ));
+    }
+
+    #[test]
+    fn an_open_major_outage_notice_wins_over_maintenance() {
+        let data = tick(&["p1"], vec![state("chk", DOWN, 3, 0)], &["chk"]);
+        let notice: status_page_notices::Model = serde_json::from_value(serde_json::json!({
+            "id": "n1", "org_id": "org", "kind": 0, "impact": 3, "source": 0,
+            "title": "Down", "body": "", "state": 1, "starts_at": NOW - 1,
+            "resolved_at": null, "segments": "[]", "excluded_from_uptime": false,
+            "deleted_at": null, "auto_check_id": "chk", "auto_recovery_streak": 0,
+            "owner": null, "created_at": 0, "updated_at": 0
+        }))
+        .unwrap();
+        let notices = HashMap::from([("p1-comp", vec![&notice])]);
+        assert_eq!(
+            status_of(&data.pages[0], &data, &notices),
+            engine::ComponentStatus::MajorOutage
+        );
+    }
+
+    #[test]
+    fn each_page_uses_its_own_thresholds() {
+        let mut data = tick(&["p1", "p2"], vec![state("chk", DOWN, 3, 0)], &["chk"]);
+        data.pages[0].confirm_failures = 2;
+        data.pages[1].confirm_failures = 5;
+        assert_eq!(
+            status_of(&data.pages[0], &data, &HashMap::new()),
+            engine::ComponentStatus::Maintenance
+        );
+        let p2: Vec<_> = build_page_snapshot(&data.pages[1], &data, &HashMap::new(), NOW)
+            .0
+            .components;
+        assert_eq!(p2[0].status, engine::ComponentStatus::Operational);
+    }
+
+    #[test]
+    fn the_status_follows_the_current_rules_once_the_mute_ends() {
+        let mut data = tick(&["p1"], vec![state("chk", DOWN, 3, 0)], &["chk"]);
+        let before = build_page_snapshot(&data.pages[0], &data, &HashMap::new(), NOW).1;
+        data.muted.clear();
+        data.snoozed.clear();
+        let (current, after, _) = build_page_snapshot(&data.pages[0], &data, &HashMap::new(), NOW);
+        assert_eq!(
+            current.components[0].status,
+            engine::ComponentStatus::Operational
+        );
+        assert_eq!(
+            serde_json::to_value(&before).unwrap(),
+            serde_json::to_value(&after).unwrap(),
+            "the uptime history does not change"
+        );
     }
 }
 

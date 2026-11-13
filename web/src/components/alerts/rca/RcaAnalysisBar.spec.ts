@@ -22,6 +22,11 @@ import { RCA_T0, rcaRunItem, sec } from "@/test/unit/fixtures/rcaThread";
 // ODropdown renders its menu only when open; the stubs render every item so the
 // menu contents can be asserted and selected directly.
 const stubs = {
+  OPopover: {
+    props: ["open"],
+    template:
+      "<div data-test='popover-stub' :data-open='open'><slot name='trigger' /><slot v-if='open' /></div>",
+  },
   ODropdown: { template: "<div><slot name='trigger' /><slot /></div>" },
   ODropdownGroup: {
     props: ["label"],
@@ -91,6 +96,49 @@ const mountBar = (props: Record<string, unknown> = {}) =>
 const byTest = (wrapper: VueWrapper, id: string) => wrapper.find(`[data-test="${id}"]`);
 
 describe("RcaAnalysisBar (contract E5)", () => {
+  describe("report variant", () => {
+    it("shows Copy report and Download as Markdown as buttons, and no analysis actions", async () => {
+      const wrapper = mountBar({ variant: "report", live: false, selectedRunId: "run-4" });
+
+      for (const id of ["rca-reanalyze-btn", "rca-ask-btn", "rca-more-btn", "rca-cancel-btn"]) {
+        expect(byTest(wrapper, id).exists()).toBe(false);
+      }
+      await byTest(wrapper, "rca-report-copy-btn").trigger("click");
+      await byTest(wrapper, "rca-report-download-btn").trigger("click");
+      expect(wrapper.emitted("copy-report")).toHaveLength(1);
+      expect(wrapper.emitted("download-report")).toHaveLength(1);
+    });
+
+    it("previews the copied Markdown in a popover that floats over the page", async () => {
+      const wrapper = mountBar({
+        variant: "report",
+        live: false,
+        copyPreview: "# Title · incident analysis\nLink: x",
+      });
+
+      const preview = byTest(wrapper, "rca-copy-preview");
+      expect(preview.text()).toContain("Copied to clipboard");
+      expect(preview.text()).toContain(
+        "Preview of the copied Markdown · Download as Markdown saves the same text",
+      );
+      expect(byTest(wrapper, "rca-copy-preview-text").text()).toBe(
+        "# Title · incident analysis\nLink: x",
+      );
+      await byTest(wrapper, "rca-copy-preview-close").trigger("click");
+      expect(wrapper.emitted("close-preview")).toHaveLength(1);
+      expect(
+        byTest(mountBar({ variant: "report", live: false }), "rca-copy-preview").exists(),
+      ).toBe(false);
+    });
+
+    it("hides the report buttons while the shown run is live", () => {
+      const wrapper = mountBar({ variant: "report" });
+
+      expect(byTest(wrapper, "rca-report-copy-btn").exists()).toBe(false);
+      expect(byTest(wrapper, "rca-run-selector").exists()).toBe(true);
+    });
+  });
+
   describe("run selector", () => {
     it("lists the history runs, newest first, with their trigger labels", () => {
       const wrapper = mountBar();
