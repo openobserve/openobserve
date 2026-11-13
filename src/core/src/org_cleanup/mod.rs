@@ -1446,9 +1446,15 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     infra::storage::del_org_prefix_strict(org_id, &format!("synthetics/{org_id}/"))
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/synthetics_artifacts: {e}"))?;
-    infra::storage::del_org_prefix_strict(org_id, &format!("rum_replay_resources/{org_id}/"))
-        .await
-        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/rum_replay_resources: {e}"))?;
+    infra::storage::del_org_prefix_strict(
+        org_id,
+        &format!(
+            "{}/{org_id}/",
+            config::meta::stream::RUM_REPLAY_RESOURCE_PREFIX
+        ),
+    )
+    .await
+    .map_err(|e| anyhow::anyhow!("step_delete_db_resources/rum_replay_resources: {e}"))?;
     delete_org_workflow_http_triggers(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/workflow_http_triggers: {e}"))?;
@@ -5179,6 +5185,7 @@ mod tests {
     fn test_storage_providers_go_only_after_the_last_drain() {
         assert!(!db_resources_step().contains("org_storage::delete_by_org"));
         position_of("del_org_prefix_strict(org_id, &format!(\"synthetics/{org_id}/\"))");
+        position_of("config::meta::stream::RUM_REPLAY_RESOURCE_PREFIX");
         position_of("storage::delete_org_models(org_id)");
         const { assert!(ORDER_DELETE_DB_RESOURCES < ORDER_DRAIN_DELETED_FILES_FINAL) };
         const { assert!(ORDER_DELETE_FILE_LIST_FINAL < ORDER_DRAIN_DELETED_FILES_FINAL) };

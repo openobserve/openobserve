@@ -33,6 +33,7 @@ import {
   type MobileTimeline,
   type Wireframe,
 } from "@/composables/rum/useMobileSessionReplay";
+import { apiOriginOf } from "@/utils/apiOrigin";
 import { MAX_ATTEMPTS } from "@/utils/rum/sessionReplayLoader";
 import {
   canResume,
@@ -190,12 +191,21 @@ const canvasStyle = computed(() => ({
   "transform-origin": "top left",
 }));
 
+const failedResourceIds = ref(new Set<string>());
+
+// A 404 for a not-yet-uploaded image must get another try once a later batch lands.
+watch(
+  () => props.timeline,
+  () => failedResourceIds.value.clear(),
+);
+
 function imageSrc(w: Wireframe): string | undefined {
   if (w.base64) return `data:image/png;base64,${w.base64}`;
   if (!w.resourceId || !props.applicationId) return undefined;
+  if (failedResourceIds.value.has(w.resourceId)) return undefined;
   const org = encodeURIComponent(store.state.selectedOrganization.identifier);
   const app = encodeURIComponent(props.applicationId);
-  return `${store.state.API_ENDPOINT}/api/${org}/rum/replay_resources/${app}/${encodeURIComponent(w.resourceId)}`;
+  return `${apiOriginOf(store.state.API_ENDPOINT)}/api/${org}/rum/replay_resources/${app}/${encodeURIComponent(w.resourceId)}`;
 }
 
 // ---- event timeline markers (error highlight) ----------------------------
@@ -551,6 +561,7 @@ defineExpose({ seekTo, play, pause, togglePlay, playbackState });
               :style="wireframeStyle(wf)"
               :src="imageSrc(wf)"
               alt=""
+              @error="wf.resourceId && failedResourceIds.add(wf.resourceId)"
             />
             <!-- text/placeholder text is rendered as a text node (never v-html). -->
             <div v-else :style="wireframeStyle(wf)">

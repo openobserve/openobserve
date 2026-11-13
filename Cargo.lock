@@ -8174,11 +8174,13 @@ dependencies = [
  "config",
  "db",
  "flate2",
+ "futures",
  "hashbrown 0.17.1",
  "http-body-util",
  "infra",
  "ingestion-common",
  "log",
+ "md5",
  "o2_enterprise",
  "object_store",
  "openobserve-api-common",
@@ -8191,6 +8193,7 @@ dependencies = [
  "snap",
  "tokio",
  "tower",
+ "urlencoding",
  "utoipa",
 ]
 

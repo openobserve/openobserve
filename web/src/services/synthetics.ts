@@ -15,27 +15,12 @@
 import http from "./http";
 import store from "@/stores";
 import analytics from "./product_analytics";
+import { apiOriginOf } from "@/utils/apiOrigin";
 
 const STREAM_NAME = "synthetics_results";
 
-/**
- * The API origin, for URLs that do NOT go through the axios wrapper.
- *
- * Everything else in this file is issued by `http()`, which sets
- * `baseURL: store.state.API_ENDPOINT`. Artifact URLs are different: they are
- * handed to `<img src>` and `fetch()` directly, so they carry no baseURL and
- * resolve against whatever origin serves the page. In dev that is the Vite
- * server on :8081, which has no `/api` route and no proxy — so every screenshot
- * and every evidence bundle 404s until the origin is spelled out here.
- *
- * Returns "" when the app is served from the API's own origin (`API_ENDPOINT`
- * is "/" or unset). Prefixing "/" would yield `//api/...`, which the browser
- * reads as protocol-relative — a request to a host literally named "api".
- */
 function apiOrigin(): string {
-  const base = store.state.API_ENDPOINT;
-  if (!base || base === "/") return "";
-  return base.endsWith("/") ? base.slice(0, -1) : base;
+  return apiOriginOf(store.state.API_ENDPOINT);
 }
 
 export interface SyntheticsVariablePayload {

@@ -1238,6 +1238,64 @@ describe("SessionViewer.vue — geo fields in the session lookup (o2-enterprise#
   });
 });
 
+describe("SessionViewer.vue — application_id in the session lookup", () => {
+  const lookupSql = () =>
+    vi
+      .mocked(searchService.search)
+      .mock.calls.map((call: any[]) => String(call[0]?.query?.query?.sql ?? ""))
+      .find((sql) => sql.includes("min(start)")) ?? "";
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetStreaming(rowsResponder(fixtureRows));
+  });
+
+  afterEach(() => {
+    replaySchema.fields = { geo_info_country: true, geo_info_city: true };
+  });
+
+  it("selects min(application_id) when the _sessionreplay schema has it", async () => {
+    replaySchema.fields = { application_id: true };
+    const wrapper = await mountLoaded();
+
+    expect(lookupSql()).toContain("min(application_id) as application_id,");
+    wrapper.unmount();
+  });
+
+  it("omits application_id when the _sessionreplay schema lacks it", async () => {
+    replaySchema.fields = { geo_info_country: true };
+    const wrapper = await mountLoaded();
+
+    expect(lookupSql()).toContain("min(start)");
+    expect(lookupSql()).not.toContain("application_id");
+    wrapper.unmount();
+  });
+
+  it("passes the looked-up application_id to the mobile player", async () => {
+    replaySchema.fields = { application_id: true };
+    vi.mocked(searchService.search).mockResolvedValueOnce({
+      data: { hits: [{ ...sessionLookupRow, source: "android", application_id: "app-42" }] },
+    } as any);
+    resetStreaming(
+      rowsResponder(fixtureRows, (row: any) => ({
+        ...row,
+        segment: JSON.stringify({
+          records: [
+            { type: 10, timestamp: row.start, data: { wireframes: [] } },
+            { type: 11, timestamp: row.end, data: {} },
+          ],
+        }),
+      })),
+    );
+    const wrapper = await mountLoaded();
+
+    const player = wrapper.find('[data-test="stub-mobile-player"]');
+    expect(player.exists()).toBe(true);
+    expect(player.attributes("application-id")).toBe("app-42");
+    wrapper.unmount();
+  });
+});
+
 describe("SessionViewer.vue — segment manifest and windowed fetch", () => {
   beforeEach(() => {
     vi.clearAllMocks();
