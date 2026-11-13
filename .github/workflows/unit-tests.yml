@@ -313,15 +313,37 @@ jobs:
           path: web/node_modules
           key: node-modules-${{ runner.os }}-node24-${{ hashFiles('web/package-lock.json', 'web/package.json', 'web/patches/**') }}
 
+      # Size the pool from this pod's cgroup CPU and memory limits, which Node's CPU count ignores;
+      # shards past them time out under load or get OOM-killed ("runner lost communication").
+      - name: Size the vitest pool to this pod
+        id: pool
+        run: |
+          { read -r quota period < /sys/fs/cgroup/cpu.max; } 2>/dev/null || quota=max
+          mem=$(cat /sys/fs/cgroup/memory.max 2>/dev/null || echo max)
+          node_cpus=$(node -p 'require("os").availableParallelism()')
+          cpus=$node_cpus
+          if [ "$quota" != "max" ]; then q=$(( (quota + period - 1) / period )); if [ "$q" -lt "$cpus" ]; then cpus=$q; fi; fi
+          workers=$(( cpus - 1 ))
+          if [ "$mem" != "max" ]; then by_mem=$(( mem / (2 * 1024 * 1024 * 1024) - 1 )); if [ "$by_mem" -lt "$workers" ]; then workers=$by_mem; fi; fi
+          if [ "$workers" -lt 1 ]; then workers=1; fi
+          echo "nproc=$(nproc) node_cpus=$node_cpus cpu.max=$quota/${period:-} memory.max=$mem -> workers=$workers"
+          echo "workers=$workers" >> "$GITHUB_OUTPUT"
+
       - name: Run this shard with coverage
         working-directory: web
         env:
           UI_SHARD_BALANCE: '1'
         run: |
-          npx vitest run --coverage --shard=${{ matrix.shard }}/4 --reporter=default --reporter=blob \
+          npx vitest run --coverage --maxWorkers=${{ steps.pool.outputs.workers }} \
+            --shard=${{ matrix.shard }}/4 --reporter=default --reporter=blob \
             --coverage.reportOnFailure --coverage.reporter=json \
             --coverage.thresholds.lines=0 --coverage.thresholds.functions=0 \
             --coverage.thresholds.branches=0 --coverage.thresholds.statements=0
+
+      - name: Report this pod's memory and CPU pressure
+        if: always()
+        run: |
+          for f in memory.peak memory.events cpu.stat; do echo "== $f"; cat "/sys/fs/cgroup/$f" 2>/dev/null || echo "(none)"; done
 
       - uses: actions/upload-artifact@v4
         if: always()
