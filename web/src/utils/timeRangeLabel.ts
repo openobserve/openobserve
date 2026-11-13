@@ -75,8 +75,6 @@ interface Shape {
   wholeDays: boolean;
   withYear: boolean;
   precision: Precision;
-  /** Full stamps name the year on both bounds. */
-  repeatYear?: boolean;
   /** A named period cut short shows its first day alone: `Oct 1 – Nov 12, 21:24`. */
   startDayOnly?: boolean;
 }
@@ -117,23 +115,24 @@ export const formatRangeDuration = (startUs: number, endUs: number): string => {
     .join(" ");
 };
 
-/** Full stamps for the tooltip: "Nov 12, 2026, 21:08:49.948 – 21:18:49.948"; a whole-day end shows its last millisecond. */
+/** Full stamps for the tooltip: "Nov 12, 2026 21:08:49.948 – 21:18:49.948"; an end the label shows as the day before shows its last millisecond. */
 export const formatRangeStamps = (range: RangeLabelInput, opts: RangeLabelOptions = {}): string => {
   const base = shapeOf(range, opts);
-  const exclusiveEnd = base.wholeDays && (isMidnight(base.end) || isLegacyDayEnd(base.end));
-  const endUs = exclusiveEnd
+  const stored = civilOf(range.endUs, base.zone);
+  const shownAsDayBefore = base.wholeDays
+    ? isMidnight(stored) || isLegacyDayEnd(stored)
+    : isMidnight(stored) && base.end.time !== stored.time;
+  const endUs = shownAsDayBefore
     ? Math.ceil(range.endUs / MICROS_PER_MS) * MICROS_PER_MS - MICROS_PER_MS
     : range.endUs;
-  const shape: Shape = {
-    ...base,
-    end: civilOf(endUs, base.zone),
-    wholeDays: false,
-    withYear: true,
-    precision: "ms",
-    repeatYear: true,
-    startDayOnly: false,
-  };
-  return datesOf(shape);
+  const end = civilOf(endUs, base.zone);
+  const day = new Intl.DateTimeFormat(base.locale, dayOptions(true));
+  const clock = new Intl.DateTimeFormat(base.locale, { ...clockOptions("ms"), timeZone: "UTC" });
+  const stamp = (civil: Civil, withDay: boolean) =>
+    clean(
+      `${withDay ? `${day.format(utcDateOf(civil, false))} ` : ""}${clock.format(utcDateOf(civil, true))}`,
+    );
+  return `${stamp(base.start, true)}${DASH}${stamp(end, end.date !== base.start.date)}`;
 };
 
 /** The zone's offset at an instant as "UTC+05:30", or "UTC". */
@@ -287,7 +286,7 @@ const shapeOf = (range: RangeLabelInput, opts: RangeLabelOptions): Shape => {
 };
 
 const datesOf = (shape: Shape): string => {
-  const { locale, start, lastDay, end, wholeDays, withYear, precision, repeatYear } = shape;
+  const { locale, start, lastDay, end, wholeDays, withYear, precision } = shape;
   const day = (civil: Civil) => utcDateOf(civil, false);
   if (wholeDays) {
     const format = new Intl.DateTimeFormat(locale, dayOptions(withYear));
@@ -302,7 +301,7 @@ const datesOf = (shape: Shape): string => {
     new Intl.DateTimeFormat(locale, { ...dayOptions(year), ...clockOptions(precision) });
   if (start.date !== end.date) {
     // One year, on the end, when both bounds share it.
-    const startYear = withYear && (repeatYear || start.year !== end.year);
+    const startYear = withYear && start.year !== end.year;
     const startText = shape.startDayOnly
       ? clean(new Intl.DateTimeFormat(locale, dayOptions(startYear)).format(day(start)))
       : clean(dated(startYear).format(at(start)));

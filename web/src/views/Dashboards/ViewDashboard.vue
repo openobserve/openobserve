@@ -744,6 +744,7 @@ import { dashboardTimeUs, fixedShareLabel, withRollingPeriod } from "@/utils/sha
 import { useStreamTimeLimits } from "@/composables/useStreamTimeLimits";
 import { fixedRangeEnd } from "@/utils/autoRefreshPause";
 import { formatPeriodLabel } from "@/utils/timeRangeRail";
+import { urlTimeToMicros } from "@/utils/dashboard/urlTimeParams";
 import analytics from "@/services/product_analytics";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import { useHeaderTitleRoom } from "@/composables/dashboard/useHeaderTitleRoom";
@@ -1037,8 +1038,8 @@ export default defineComponent({
      */
     const getSelectedDateFromQueryParams = (params) => ({
       valueType: params.period ? "relative" : params.from && params.to ? "absolute" : "relative",
-      startTime: params.from ? params.from : null,
-      endTime: params.to ? params.to : null,
+      startTime: params.from ? urlTimeToMicros(params.from) : null,
+      endTime: params.to ? urlTimeToMicros(params.to) : null,
       relativeTimePeriod: params.period ? params.period : "15m",
     });
 

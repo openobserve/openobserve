@@ -210,7 +210,7 @@ describe("formatRangeLabel", () => {
     };
     expect(formatRangeLabel(h2, OPTS)).toBe("H2 2026 · Jul 1 – Nov 12, 21:24");
     expect(formatRangeStamps(h2, OPTS)).toBe(
-      "Jul 1, 2026, 00:00:00.000 – Nov 12, 2026, 21:24:10.500",
+      "Jul 1, 2026 00:00:00.000 – Nov 12, 2026 21:24:10.500",
     );
   });
 
@@ -261,13 +261,28 @@ describe("formatRangeStamps [#6]", () => {
       startUs: ist("2026-11-12T21:08:49.948"),
       endUs: ist("2026-11-12T21:18:49.948"),
     };
-    expect(formatRangeStamps(range, OPTS)).toBe("Nov 12, 2026, 21:08:49.948 – 21:18:49.948");
+    expect(formatRangeStamps(range, OPTS)).toBe("Nov 12, 2026 21:08:49.948 – 21:18:49.948");
   });
 
   it("shows a whole-day end as its last millisecond", () => {
     const range = { startUs: ist("2026-11-04T00:00:00"), endUs: ist("2026-11-07T00:00:00") };
     expect(formatRangeStamps(range, OPTS)).toBe(
-      "Nov 4, 2026, 00:00:00.000 – Nov 6, 2026, 23:59:59.999",
+      "Nov 4, 2026 00:00:00.000 – Nov 6, 2026 23:59:59.999",
+    );
+  });
+
+  it("shows a timed range's exclusive midnight end as the day before, like its label [fresh#9]", () => {
+    const range = { startUs: ist("2026-11-05T09:30:00"), endUs: ist("2026-11-08T00:00:00") };
+    expect(formatRangeLabel(range, OPTS)).toBe("Nov 5, 09:30 – Nov 7, 23:59");
+    expect(formatRangeStamps(range, OPTS)).toBe(
+      "Nov 5, 2026 09:30:00.000 – Nov 7, 2026 23:59:59.999",
+    );
+  });
+
+  it("keeps a sub-minute midnight end as stored, like its label", () => {
+    const range = { startUs: ist("2026-11-07T23:59:30"), endUs: ist("2026-11-08T00:00:00") };
+    expect(formatRangeStamps(range, OPTS)).toBe(
+      "Nov 7, 2026 23:59:30.000 – Nov 8, 2026 00:00:00.000",
     );
   });
 });

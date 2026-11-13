@@ -66,6 +66,17 @@ describe("searchTimeZones [fresh#6]", () => {
     expect(zoneSearchRank("Asia/Karachi", "+5", AT)).toBe(3);
   });
 
+  it.each([
+    ["kolk", "Asia/Calcutta"],
+    ["calc", "Asia/Kolkata"],
+    ["beng", "Asia/Calcutta"],
+    ["new y", "America/New_York"],
+    ["san fr", "America/Los_Angeles"],
+  ])("finds the zone a partial city %s names, under either name", (query, zone) => {
+    const zones = ["UTC", "America/Indiana/Knox", zone];
+    expect(searchTimeZones(zones, query, undefined, AT)[0]).toBe(zone);
+  });
+
   it("keeps every option, in order, for an empty query", () => {
     expect(search("  ")).toEqual(ZONES);
   });

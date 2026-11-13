@@ -86,6 +86,9 @@ const ZONE_ALIASES: Record<string, readonly string[]> = {
   brazil: ["America/Sao_Paulo"],
 };
 
+// Shorter prefixes of a city or country name would match too many aliases to help.
+const MIN_ALIAS_PREFIX = 3;
+
 // `+5`, `-8`, `5:30`, `+05:30`, `UTC+5`, `GMT-3:30`: a sign is optional, minutes narrow the hour.
 const OFFSET_QUERY_RE = /^(?:utc|gmt)?\s*([+-])?\s*(\d{1,2})(?::?(\d{2}))?$/;
 
@@ -116,7 +119,12 @@ const offsetMatches = (query: string, offset: string): boolean => {
   return minutes === undefined || minutes === zoneMinutes;
 };
 
-/** How well a zone matches typed text: 0 alias, 1 name word start, 2 name substring, 3 offset; null for none. */
+const aliasPrefixMatches = (term: string, zone: string): boolean =>
+  Object.entries(ZONE_ALIASES).some(
+    ([alias, zones]) => alias.startsWith(term) && zones.includes(zone),
+  );
+
+/** How well a zone matches typed text: 0 alias, 1 name word start or alias prefix, 2 name substring, 3 offset; null for none. */
 export const zoneSearchRank = (zone: string, query: string, atMs = Date.now()): number | null => {
   const term = query.trim().toLowerCase().replace(/\s+/g, " ");
   if (!term) return 0;
@@ -129,6 +137,7 @@ export const zoneSearchRank = (zone: string, query: string, atMs = Date.now()): 
   if (name.split(/[/\s-]/).some((word) => word.startsWith(term)) || name.startsWith(term)) {
     return 1;
   }
+  if (term.length >= MIN_ALIAS_PREFIX && aliasPrefixMatches(term, zone)) return 1;
   return name.includes(term) ? 2 : null;
 };
 

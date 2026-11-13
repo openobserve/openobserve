@@ -539,6 +539,22 @@ describe("DateTime calendar", () => {
       });
     });
 
+    it("shows a picked day's end as 23:59 in the End field, like the label, and applies the whole day", async () => {
+      createWrapper({ autoApply: false });
+      await flushPromises();
+      await openMenu();
+
+      calendar().vm.$emit("update:pendingDate", "2026/10/03");
+      await flushPromises();
+      const end = document.querySelector<HTMLInputElement>(
+        '[data-test="datetime-end-time"] input',
+      )!;
+      expect(end.value).toBe("23:59");
+      wrapper!.vm.applyAndClose();
+      await flushPromises();
+      expect(lastEmit()).toMatchObject({ endTime: micros("2026-10-03T18:30:00Z") });
+    });
+
     const closeMenu = async () => {
       wrapper!.vm.onMenuOpenChange(false);
       wrapper!.vm.menuOpen = false;

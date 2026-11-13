@@ -84,13 +84,14 @@ export default function useTimeRangeLimits(props: TimeRangeLimitProps, clock: Ti
     return Number.isFinite(ceiling) ? ceiling : LATEST_INSTANT_US;
   };
 
+  const floorMicros = () => convertToUtcTimestamp(`${calendarMinDate.value} 00:00:00`, zone.value);
+
   // The calendar's own bounds for a start, named so a refusal says which one it hit.
   const startBoundError = (startMicros: number): I18nText | null => {
     if (!Number.isFinite(startMicros)) return null;
     const civilDay = (date: string) =>
       formatCivilDay(date, zone.value, tooltipNow.value, intlLocale.value);
-    const floor = convertToUtcTimestamp(`${calendarMinDate.value} 00:00:00`, zone.value);
-    if (startMicros < floor) {
+    if (startMicros < floorMicros()) {
       return t("common.timeRangeBeforeMin", { date: civilDay(calendarMinDate.value) });
     }
     if (startMicros < selectionCeilingMicros()) return null;
@@ -168,6 +169,7 @@ export default function useTimeRangeLimits(props: TimeRangeLimitProps, clock: Ti
     calendarMaxDate,
     forwardCeilingMicros,
     selectionCeilingMicros,
+    floorMicros,
     startBoundError,
     boundedRange,
     trustedRange,

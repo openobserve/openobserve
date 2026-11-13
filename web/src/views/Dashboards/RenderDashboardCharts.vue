@@ -402,6 +402,7 @@ import {
 import { useLoading } from "@/composables/useLoading";
 import { GridStack } from "gridstack";
 import { computeFitCellHeight } from "@/utils/dashboard/kiosk";
+import { urlTimeToMicros } from "@/utils/dashboard/urlTimeParams";
 import {
   arePickerValuesEqual,
   convertTimeObjToPickerFormat,
@@ -1879,8 +1880,8 @@ export default defineComponent({
         return {
           type: "absolute",
           valueType: "absolute",
-          startTime: parseInt(route.query.from as string),
-          endTime: parseInt(route.query.to as string),
+          startTime: urlTimeToMicros(route.query.from),
+          endTime: urlTimeToMicros(route.query.to),
         };
       }
 

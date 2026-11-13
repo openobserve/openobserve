@@ -262,5 +262,19 @@ describe("DateTime typed text, run 3", () => {
       await pressInBar("Enter");
       expect(emits().length).toBe(before);
     });
+
+    it("says a typed future date is in the future, not before the first day", async () => {
+      createWrapper({
+        disableRelative: true,
+        hideRelativeTime: true,
+        minDate: "2026/11/09",
+      });
+      await openMenu();
+      const before = emits().length;
+      await typeInBar("Nov 20");
+      await pressInBar("Enter");
+      expect(emits().length).toBe(before);
+      expect(text("date-time-input-error")).toBe(tr("common.timeRangeStartInFuture"));
+    });
   });
 });

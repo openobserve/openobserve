@@ -89,10 +89,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span
             class="date-time-label flex min-w-0 flex-1 text-start whitespace-pre tabular-nums max-md:min-w-16"
             :class="fieldAppearance ? 'font-normal' : 'font-semibold'"
-            ><span v-if="triggerParts.name" class="min-w-0 truncate">{{ triggerParts.name }}</span
-            ><span v-if="triggerParts.dates" class="shrink-0" data-test="date-time-trigger-dates">{{
-              triggerParts.name ? ` · ${triggerParts.dates}` : triggerParts.dates
-            }}</span></span
+            ><span v-if="triggerParts.name" class="shrink-0" data-test="date-time-trigger-name">{{
+              triggerParts.name
+            }}</span
+            ><span
+              v-if="triggerParts.dates"
+              class="min-w-0 overflow-hidden text-ellipsis whitespace-pre"
+              data-test="date-time-trigger-dates"
+              >{{ triggerParts.name ? ` · ${triggerParts.dates}` : triggerParts.dates }}</span
+            ></span
           >
           <OIcon
             v-if="narrowedByQuery"
@@ -477,7 +482,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 revert-refused
                 :error="unreadableFields.end || timeFieldError?.field === 'end'"
                 hide-message
-                :model-value="fieldsBlank ? '' : selectedTime.endTime"
+                :model-value="fieldsBlank ? '' : endFieldShown"
                 with-seconds
                 optional-seconds
                 data-test="datetime-end-time"
@@ -1197,6 +1202,11 @@ export default defineComponent({
       endDayLabel,
     } = fields;
 
+    // A 23:59:59 end stands for the exclusive midnight, which the label shows as 23:59.
+    const endFieldShown = computed(() =>
+      selectedTime.value.endTime === "23:59:59" ? "23:59" : selectedTime.value.endTime,
+    );
+
     // The pending selection as microseconds, including a clicked day still waiting for its end.
     const pendingRange = computed<{ startTime: number; endTime: number } | null>(() => {
       if (selectedType.value === "relative" && !props.disableRelative) {
@@ -1836,7 +1846,7 @@ export default defineComponent({
       });
     });
 
-    // Only a name may truncate on the trigger; its dates always show in full.
+    // The name never truncates on the trigger; its dates give way first.
     const triggerParts = computed<{ name: string; dates: string }>(() => {
       const label = String(triggerLabel.value);
       const range = triggerRange.value;
@@ -2758,6 +2768,7 @@ export default defineComponent({
       applySuggestion,
       startDayLabel,
       endDayLabel,
+      endFieldShown,
       inputErrorId,
       onCalendarStartDate,
       onCalendarEndDate,

@@ -204,7 +204,15 @@ describe("DateTime QA run 3", () => {
       await flushPromises();
 
       expect(String(wrapper!.vm.triggerLabel)).toContain("21:25");
-      expect(el("date-time-trigger-dates")!.className).toContain("shrink-0");
+    });
+
+    it("never truncates the dashboard name; the dates give way first", async () => {
+      createWrapper({ defaultRelativeTime: "24h", preset: "dashboard" });
+      await flushPromises();
+      expect(el("date-time-trigger-name")!.textContent).toBe("Last 24 hours");
+      expect(el("date-time-trigger-name")!.className).toContain("shrink-0");
+      expect(el("date-time-trigger-name")!.className).not.toContain("truncate");
+      expect(el("date-time-trigger-dates")!.className).toContain("text-ellipsis");
     });
   });
 

@@ -29,6 +29,14 @@ export interface SelectedDate {
 export type TimeQueryParams =
   { period: string } | { from: number | string; to: number | string } | Record<string, never>;
 
+// Links carry epoch numbers in any unit, which the picker reads, or an ISO stamp, which only Date.parse reads.
+export const urlTimeToMicros = (value: unknown): number => {
+  const text = String(value ?? "").trim();
+  if (/^\d+$/.test(text)) return Number(text);
+  const ms = Date.parse(text);
+  return Number.isFinite(ms) ? ms * 1000 : NaN;
+};
+
 // URL params -> selectedDate (period wins, else from/to, else relative 15m).
 export const queryParamsToSelectedDate = (
   params: LocationQuery | Record<string, any>,
