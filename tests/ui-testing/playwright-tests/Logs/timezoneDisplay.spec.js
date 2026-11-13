@@ -112,6 +112,7 @@ test.describe("Logstream Timezone Display testcases", () => {
 
     // Capture the initial state from the Schema Settings tab (default)
     await pm.schemaPage.expectTimelineChipVisible();
+    await pm.schemaPage.expectDocTimeRangePopulated();
     const initialTz = await pm.schemaPage.getTimezoneLabelText();
     const initialRange = await pm.schemaPage.getDocTimeRangeText();
     testLogger.debug('Initial timeline state', { tz: initialTz, range: initialRange });
