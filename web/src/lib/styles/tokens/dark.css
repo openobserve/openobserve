@@ -241,6 +241,8 @@
   --color-toggle-item-active-bg: var(--color-primary-900);
   --color-toggle-item-active-text: var(--color-white);
   --color-toggle-item-active-border: var(--color-primary-400);
+  /* The item also dims to 60%, which makes --color-text-disabled vanish on the dark track. */
+  --color-toggle-item-disabled: var(--color-grey-500);
   /* Accent lightens on dark so the insertion line stays visible on the track */
   --color-toggle-drop-indicator: var(--color-primary-400);
 
@@ -541,9 +543,8 @@
   --color-pagination-item-active-text: var(--color-button-primary-foreground);
 
   /* Timeline */
-  --color-timeline-dot-primary: var(--color-primary-500);
   --color-timeline-dot-destructive: var(--color-error-500);
-  --color-timeline-dot-info: var(--color-primary-400);
+  --color-timeline-dot-info: var(--color-primary-600);
   --color-timeline-dot-muted: var(--color-grey-500);
 
   /* Stepper */

@@ -44,6 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="ghost-muted"
           size="icon-circle-sm"
           @click="scrollToTop"
+          :aria-label="scrollTopTooltip"
           :data-test="dataTestScrollTop"
           ><OIcon name="keyboard-arrow-up" size="sm" /><OTooltip :content="scrollTopTooltip"
         /></OButton>
@@ -51,6 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="ghost-muted"
           size="icon-circle-sm"
           @click="scrollToBottom"
+          :aria-label="scrollBottomTooltip"
           :data-test="dataTestScrollBottom"
           ><OIcon name="keyboard-arrow-down" size="sm" /><OTooltip :content="scrollBottomTooltip"
         /></OButton>
@@ -213,6 +215,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :disabled="!commentText.trim() || submitting"
               :loading="submitting"
               @click="onSubmit"
+              :aria-label="sendTooltip"
               :data-test="dataTestCommentSend"
               ><OIcon name="send" size="sm" /><OTooltip :content="sendTooltip"
             /></OButton>

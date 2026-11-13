@@ -191,6 +191,31 @@ describe("IncidentTimeline - getUserId", () => {
     expect((w.vm as any).getUserId({ data: {} })).toBe("System");
   });
 
+  it("names an actor through the page's label, such as the server's own account", async () => {
+    const w = await mountComp({
+      actorLabel: (id: string) => (id === "system@openobserve.ai" ? "AutoObserve" : id),
+    });
+    await flushPromises();
+    expect((w.vm as any).getUserId({ data: { user_id: "system@openobserve.ai" } })).toBe(
+      "AutoObserve",
+    );
+    expect((w.vm as any).getUserId({ data: { user_id: "alice" } })).toBe("alice");
+  });
+
+  it("a page can give its own clock and draw alert names in body ink; the incident page keeps both", async () => {
+    const alert = { type: "Alert", data: { alert_name: "pay_api stopped", count: 1 } };
+    const page = await mountComp({ formatTime: () => "4:45 PM", plainNames: true });
+    await flushPromises();
+    const timeline = page.findComponent({ name: "ActivityTimeline" });
+    expect(timeline.props("formatRelativeTime")(0)).toBe("4:45 PM");
+    expect((page.vm as any).getSanitizedInlineHtml(alert)).toContain("var(--color-text-heading)");
+    const plain = await mountComp();
+    await flushPromises();
+    expect((plain.vm as any).getSanitizedInlineHtml(alert)).not.toContain(
+      "var(--color-text-heading)",
+    );
+  });
+
   it("returns System when data is absent", async () => {
     const w = await mountComp();
     await flushPromises();

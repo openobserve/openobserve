@@ -32,10 +32,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="sm"
           shape="rounded"
           data-test="alert-calibration-skip-group-count"
-          >{{ rows.length }}</OBadge
+          >{{ countOrDash(rows.length, locale) }}</OBadge
         >
       </div>
-      <OText variant="meta" as="p">{{ t(whyKey, { count: rows.length }, rows.length) }}</OText>
+      <OText variant="meta" as="p">{{
+        t(whyKey, { count: countOrDash(rows.length, locale) }, rows.length)
+      }}</OText>
     </OCardSection>
     <OCardSection
       v-for="group in groups"
@@ -78,7 +80,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="alert-calibration-skip-group-more-line"
         >
           <OText variant="meta" as="span">{{
-            t("alertCalibration.notChecked.andMore", { count: hiddenCount(group) })
+            t("alertCalibration.notChecked.andMore", {
+              count: countOrDash(hiddenCount(group), locale),
+            })
           }}</OText>
           {{ " " }}
           <OButton
@@ -87,7 +91,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="alert-calibration-skip-group-more"
             @click="expand(group.key)"
           >
-            {{ t("alertCalibration.notChecked.showAll", { count: group.rows.length }) }}
+            {{
+              t("alertCalibration.notChecked.showAll", {
+                count: countOrDash(group.rows.length, locale),
+              })
+            }}
           </OButton>
         </div>
       </div>
@@ -121,6 +129,7 @@ import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import { useI18nTyped, type I18nKey } from "@/types/i18n";
+import { countOrDash } from "./digests";
 
 /** The insight rule's cap: many skipped alerts show the first five per cause (spec P2b W4). */
 const FIRST_SHOWN = 5;
@@ -133,7 +142,7 @@ const props = defineProps<{
   ctaFor: (row: SkipGroupRow) => SkipGroupCta;
 }>();
 
-const { t } = useI18nTyped();
+const { t, locale } = useI18nTyped();
 
 interface Group {
   key: string;

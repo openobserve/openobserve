@@ -18,7 +18,7 @@ import "@/locales";
 import { gt } from "@/types/i18n";
 import type { AutoObserveCoverage, AutoObserveSuggestion } from "@/services/autoobserve";
 import { toCoverageSource, toRequests, toSuggestionRows } from "./liveAdapter";
-import { detectorsOf } from "../fixtures";
+import { detectorsOf } from "../aoTypes";
 import { KIND_LOOK } from "../v2/changes";
 
 const DAY_US = 86_400_000_000;
@@ -245,7 +245,7 @@ describe("toCoverageSource", () => {
     expect(found.rows).toHaveLength(0);
   });
 
-  it("names every alert that falls short the same way, not only the first (T2-20)", () => {
+  it("names every alert that falls short the same way, not only the first", () => {
     const ev = (name: string) => ({
       monitor_kind: "alert",
       monitor_id: name,
@@ -282,14 +282,14 @@ describe("toCoverageSource", () => {
     );
   });
 
-  it("labels a service with the two live state words", () => {
+  it("labels a fully watched service and a gap with the live state words", () => {
     const cell = (state: string) => ({ state, evidence: [], counts: {} });
-    const row = (name: string, errors: string) => ({
+    const row = (name: string, state: string) => ({
       service_name: name,
       cluster: "prod-eu",
       namespace: "billing",
       streams: [],
-      cells: { errors: cell(errors), latency: cell("none"), absence: cell("none") },
+      cells: { errors: cell(state), latency: cell(state), absence: cell(state) },
     });
     const source = toCoverageSource(
       gt,
@@ -301,6 +301,72 @@ describe("toCoverageSource", () => {
     expect(api.status).toMatchObject({ state: "watched", label: "Watched" });
     expect(web.status).toEqual({ state: "gap", label: "Coverage gap" });
     expect(source.totals).toMatchObject({ total: 2, gaps: 1, fullyWatched: 1, learning: 0 });
+  });
+
+  it("is watched only when every check is; one or two of three read partly watched", () => {
+    const cell = (state: string) => ({ state, evidence: [], counts: {} });
+    const row = (name: string, states: [string, string, string]) => ({
+      service_name: name,
+      cluster: "prod-eu",
+      namespace: "billing",
+      streams: [],
+      cells: { errors: cell(states[0]), latency: cell(states[1]), absence: cell(states[2]) },
+    });
+    const source = toCoverageSource(
+      gt,
+      coverage({
+        rows: [
+          row("all", ["covered", "covered", "covered"]),
+          row("two", ["covered", "covered", "none"]),
+          row("one", ["covered", "blind", "none"]),
+          row("none", ["none", "none", "none"]),
+        ] as never,
+      }),
+      { status: "ready", retry },
+      "en-US",
+    );
+    expect(source.rows.map((r) => r.status)).toEqual([
+      { state: "watched", label: "Watched" },
+      { state: "partial", label: "Partly watched" },
+      { state: "partial", label: "Partly watched" },
+      { state: "gap", label: "Coverage gap" },
+    ]);
+    expect(source.totals).toMatchObject({
+      total: 4,
+      fullyWatched: 1,
+      partial: 2,
+      gaps: 1,
+      learning: 0,
+    });
+  });
+
+  it("a service with no watched check whose streams are still learning reads learning, not a gap", () => {
+    const now = Date.UTC(2026, 10, 12, 12);
+    const cell = (state: string) => ({ state, evidence: [], counts: {} });
+    const row = (name: string, errors: string, learning_until: number | null) => ({
+      service_name: name,
+      cluster: "prod-eu",
+      namespace: "billing",
+      streams: [{ type: "logs", name, learning_until, history_days_found: 3, reason: "young" }],
+      cells: { errors: cell(errors), latency: cell("none"), absence: cell("none") },
+    });
+    const later = now * 1000 + 5 * DAY_US;
+    const source = toCoverageSource(
+      gt,
+      coverage({
+        rows: [
+          row("young", "none", later),
+          row("young-partial", "covered", later),
+          row("ready", "none", null),
+        ] as never,
+      }),
+      { status: "ready", retry },
+      "en-US",
+      now,
+    );
+    expect(source.rows.map((r) => r.status?.state)).toEqual(["learning", "partial", "gap"]);
+    expect(source.rows[0].status?.label).toBe("Learning");
+    expect(source.totals).toMatchObject({ total: 3, learning: 1, partial: 1, gaps: 1 });
   });
 
   it("gives each service the engine's three checks, and its state agrees with them", () => {
@@ -328,11 +394,11 @@ describe("toCoverageSource", () => {
     for (const r of source.rows) {
       const checks = r.checks ?? {};
       expect(Object.keys(checks)).toEqual(["errors", "latency", "absence"]);
-      const covered = Object.values(checks).some((c) => c.engine?.stateKey === "covered");
-      expect(r.status?.state).toBe(covered ? "watched" : "gap");
+      const covered = Object.values(checks).filter((c) => c.engine?.stateKey === "covered");
+      expect(r.status?.state).toBe(covered.length ? "partial" : "gap");
     }
     const byName = Object.fromEntries(source.rows.map((r) => [r.service, r]));
-    expect(byName.cart.status?.state).toBe("watched");
+    expect(byName.cart.status?.state).toBe("partial");
     expect(byName.db.status?.state).toBe("gap");
     expect(byName.db.checks?.latency.engine?.stateKey).toBe("silent");
     expect(byName.db.checks?.absence.engine?.stateKey).toBe("none");

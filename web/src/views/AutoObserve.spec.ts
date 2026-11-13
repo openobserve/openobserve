@@ -22,20 +22,20 @@ import autoobserve, {
   type AutoObserveIncidentList,
 } from "@/services/autoobserve";
 import fixture from "@/components/autoobserve/live/__fixtures__/autoobserveIncidents.json";
-import AutoObserveIssuesTab from "@/components/autoobserve/AutoObserveIssuesTab.vue";
-import AutoObserveIssueDrawer from "@/components/autoobserve/AutoObserveIssueDrawer.vue";
 import LiveIssues from "@/components/autoobserve/live/LiveIssues.vue";
 import AutoObserveActivityTab from "@/components/autoobserve/AutoObserveActivityTab.vue";
-import AutoObservePolicyTab from "@/components/autoobserve/AutoObservePolicyTab.vue";
+import AutoObserveCoverageTab from "@/components/autoobserve/AutoObserveCoverageTab.vue";
+import LivePolicy from "@/components/autoobserve/detailed/LivePolicy.vue";
 import AllSuggestionsDrawer from "@/components/autoobserve/live/AllSuggestionsDrawer.vue";
 import HowItWorksDrawer from "@/components/autoobserve/v2/HowItWorksDrawer.vue";
 import AutoObserve from "./AutoObserve.vue";
 
 const routeQuery: Record<string, string> = {};
 const replace = vi.fn();
+const push = vi.fn();
 vi.mock("vue-router", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
-  useRouter: () => ({ replace, push: vi.fn(), back: vi.fn() }),
+  useRouter: () => ({ replace, push, back: vi.fn() }),
   useRoute: () => ({ query: routeQuery }),
 }));
 
@@ -73,11 +73,9 @@ const mountNerd = () => {
       plugins: [i18n, store],
       stubs: {
         LiveIssues: true,
-        AutoObserveIssuesTab: true,
         AutoObserveCoverageTab: true,
         AutoObserveActivityTab: true,
-        AutoObservePolicyTab: true,
-        AutoObserveIssueDrawer: true,
+        LivePolicy: true,
         AllSuggestionsDrawer: true,
         HowItWorksDrawer: true,
         ViewSwitch: true,
@@ -100,6 +98,7 @@ describe("AutoObserve Nerd view", () => {
     vi.setSystemTime(NOW);
     for (const key of Object.keys(routeQuery)) delete routeQuery[key];
     replace.mockReset();
+    push.mockReset();
     api.mockReset();
     api.mockReturnValue(pending());
     vi.mocked(autoobserve.coverage).mockReturnValue(pending());
@@ -114,51 +113,71 @@ describe("AutoObserve Nerd view", () => {
     store.commit("setSelectedOrganization", originalOrg);
   });
 
-  it("live mode keeps all four tabs and lists live issues, never the fixture table", () => {
+  it("keeps all four tabs and lists live issues", () => {
     const wrapper = mountNerd();
     expect(tabNames(wrapper)).toEqual(["issues", "coverage", "activity", "policy"]);
     const issues = wrapper.findComponent(LiveIssues);
     expect(issues.exists()).toBe(true);
     expect(issues.props("range")).toBe("30d");
-    expect(wrapper.findComponent(AutoObserveIssuesTab).exists()).toBe(false);
-    expect(wrapper.findComponent(AutoObserveIssueDrawer).props("open")).toBe(false);
   });
 
-  it("live Activity is an honest empty state whose action opens the suggestions", async () => {
+  it("is live whatever the query says: a fixture flag shows the same live tabs", () => {
+    Object.assign(routeQuery, { fixture: "1", tab: "coverage" });
+    const wrapper = mountNerd();
+    const coverage = wrapper.findComponent(AutoObserveCoverageTab);
+    expect(coverage.exists()).toBe(true);
+    expect(coverage.props("source")).toBeDefined();
+    expect(wrapper.text()).not.toContain("Sample scenarios");
+  });
+
+  it("Activity is the live ledger, and its empty action opens the suggestions by URL", async () => {
     Object.assign(routeQuery, { tab: "activity" });
     const wrapper = mountNerd();
     await flushPromises();
     expect(replace).not.toHaveBeenCalled();
-    expect(wrapper.findComponent(AutoObserveActivityTab).exists()).toBe(false);
-    expect(wrapper.find('[data-test="autoobserve-tab-activity"]').text()).not.toMatch(/\d/);
-    const empty = wrapper.find('[data-test="autoobserve-live-empty-changes"]');
-    expect(empty.text()).toContain("No changes yet");
+    const ledger = wrapper.findComponent(AutoObserveActivityTab);
+    expect(ledger.props("requests")).toEqual([]);
+    expect(wrapper.find('[data-test="autoobserve-tab-activity-badge"]').exists()).toBe(false);
     expect(wrapper.findComponent(AllSuggestionsDrawer).props("open")).toBe(false);
-    await wrapper.find('[data-test="autoobserve-live-empty-changes-action"]').trigger("click");
-    expect(wrapper.findComponent(AllSuggestionsDrawer).props("open")).toBe(true);
+    ledger.vm.$emit("see-suggestions");
+    await flushPromises();
+    expect(push).toHaveBeenCalledWith({
+      query: expect.objectContaining({ drawer: "suggestions" }),
+    });
   });
 
-  it("live Policy is an honest empty state whose action opens How it works", async () => {
+  it("Policy is the live policy page, and How it works opens by URL", async () => {
     Object.assign(routeQuery, { tab: "policy" });
     const wrapper = mountNerd();
     await flushPromises();
-    expect(replace).not.toHaveBeenCalled();
-    expect(wrapper.findComponent(AutoObservePolicyTab).exists()).toBe(false);
-    const empty = wrapper.find('[data-test="autoobserve-live-empty-settings"]');
-    expect(empty.text()).toContain("Nothing to set here yet");
-    await wrapper.find('[data-test="autoobserve-live-empty-settings-action"]').trigger("click");
-    expect(wrapper.findComponent(HowItWorksDrawer).props("open")).toBe(true);
+    wrapper.findComponent(LivePolicy).vm.$emit("how-it-works");
+    await flushPromises();
+    expect(push).toHaveBeenCalledWith({ query: expect.objectContaining({ drawer: "howItWorks" }) });
   });
 
-  it("a fixture issue link is dropped in live mode", async () => {
-    Object.assign(routeQuery, { issue: "INC-1051" });
+  it("a shared drawer link opens it, and closing drops it by replace, so Back never reopens it", async () => {
+    for (const [name, comp] of [
+      ["howItWorks", HowItWorksDrawer],
+      ["suggestions", AllSuggestionsDrawer],
+    ] as const) {
+      for (const key of Object.keys(routeQuery)) delete routeQuery[key];
+      Object.assign(routeQuery, { tab: "policy", drawer: name });
+      const wrapper = mountNerd();
+      const drawer = wrapper.findComponent(comp);
+      expect(drawer.props("open"), name).toBe(true);
+      drawer.vm.$emit("update:open", false);
+      await flushPromises();
+      const query = replace.mock.calls.at(-1)?.[0].query;
+      expect(query.drawer, name).toBeUndefined();
+      expect(query.tab, name).toBe("policy");
+    }
+  });
+
+  it("an unknown drawer value opens nothing", () => {
+    Object.assign(routeQuery, { drawer: "problem", issue: "INC-1051" });
     const wrapper = mountNerd();
-    await flushPromises();
-    expect(replace).toHaveBeenCalledTimes(1);
-    expect(replace.mock.calls[0][0].query.issue).toBeUndefined();
-    const drawer = wrapper.findComponent(AutoObserveIssueDrawer);
-    expect(drawer.props("open")).toBe(false);
-    expect(drawer.props("issue")).toBeNull();
+    expect(wrapper.findComponent(HowItWorksDrawer).props("open")).toBe(false);
+    expect(wrapper.findComponent(AllSuggestionsDrawer).props("open")).toBe(false);
   });
 
   it("the Issues badge counts open live rows, with a plus when more exist", async () => {
@@ -187,25 +206,6 @@ describe("AutoObserve Nerd view", () => {
     await vi.waitFor(() => expect(api).toHaveBeenCalled());
     await flushPromises();
     expect(wrapper.find('[data-test="autoobserve-tab-issues-badge"]').exists()).toBe(false);
-  });
-
-  it("fixture=1 in a test build keeps the four fixture tabs and table", () => {
-    Object.assign(routeQuery, { fixture: "1" });
-    const wrapper = mountNerd();
-    expect(tabNames(wrapper)).toEqual(["issues", "coverage", "activity", "policy"]);
-    expect(wrapper.findComponent(AutoObserveIssuesTab).exists()).toBe(true);
-    expect(wrapper.findComponent(LiveIssues).exists()).toBe(false);
-    expect(api).not.toHaveBeenCalled();
-  });
-
-  it("fixture=1 keeps the fixture Activity and Policy tabs", () => {
-    for (const tab of ["activity", "policy"]) {
-      Object.assign(routeQuery, { fixture: "1", tab });
-      const wrapper = mountNerd();
-      const fixtureTab = tab === "activity" ? AutoObserveActivityTab : AutoObservePolicyTab;
-      expect(wrapper.findComponent(fixtureTab).exists(), tab).toBe(true);
-      expect(wrapper.find('[data-test^="autoobserve-live-empty-"]').exists(), tab).toBe(false);
-    }
   });
 
   it("a picked tab is kept in the URL, so reload and Back return to it", async () => {

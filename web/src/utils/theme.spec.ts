@@ -133,6 +133,18 @@ describe("applyThemeColors button-primary-foreground contrast", () => {
       document.documentElement.style.getPropertyValue("--color-button-primary-foreground"),
     ).toBe("");
   });
+
+  it.each([
+    ["a light brand takes dark text", "#8B8DF0", false, "#171717"],
+    ["a saturated brand keeps white text", "#3F7994", false, "#FFFFFF"],
+    ["the stylesheet default clears the override", "#8B8DF0", true, ""],
+  ])("timeline pill text: %s", (_name, color, isDefault, expected) => {
+    applyThemeColors("#8B8DF0", "dark", false);
+    applyThemeColors(color, "dark", isDefault);
+    expect(document.documentElement.style.getPropertyValue("--color-timeline-dot-primary-fg")).toBe(
+      expected,
+    );
+  });
 });
 
 describe("pickReadableForeground", () => {

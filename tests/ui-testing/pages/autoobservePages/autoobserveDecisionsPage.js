@@ -15,7 +15,6 @@ class AutoObserveDecisionsPage {
     this.dialog = page.locator('[data-test="decision-dismiss-dialog"]');
     this.effect = page.locator('[data-test="decision-dismiss-effect"]');
     this.notice = page.locator('[data-test="decision-dismiss-notice"]');
-    this.locked = page.locator('[data-test="decision-dismiss-locked"]');
     this.submit = page.locator('[data-test="decision-dismiss-submit"]');
     this.until = page.locator('[data-test="decision-dismiss-until"]');
     this.duration = page.locator('[data-test="decision-dismiss-duration"]');
