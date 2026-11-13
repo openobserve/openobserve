@@ -452,471 +452,75 @@ mod tests {
         assert!(events.iter().all(|f| f.selection.is_none()));
     }
 
-    #[test]
-    fn test_sort_by_time_range_edge_case_adjacent_files() {
-        let files = vec![
-            create_file_key("file1.parquet", 1000, 2000, 1024),
-            create_file_key("file2.parquet", 2000, 3000, 1024), // exactly adjacent
-            create_file_key("file3.parquet", 3000, 4000, 1024), // exactly adjacent
-        ];
-        let result = sort_by_time_range(files);
-        assert_eq!(result.len(), 3);
-
-        // Adjacent files should be able to be in the same group
-        assert_eq!(result[0].key, "file1.parquet");
-        assert_eq!(result[1].key, "file2.parquet");
-        assert_eq!(result[2].key, "file3.parquet");
-    }
-
-    // Test helper function creation
-    #[test]
-    fn test_create_file_key_helper() {
-        let file_key = create_file_key("test.parquet", 1000, 2000, 1024);
-        assert_eq!(file_key.key, "test.parquet");
-        assert_eq!(file_key.meta.min_ts, 1000);
-        assert_eq!(file_key.meta.max_ts, 2000);
-        assert_eq!(file_key.meta.original_size, 1024);
-        assert_eq!(file_key.meta.compressed_size, 512); // 50% compression
-        assert_eq!(file_key.meta.records, 100);
-        assert!(!file_key.meta.flattened);
-        assert_eq!(file_key.id, 0);
-        assert_eq!(file_key.account, "test_account");
-        assert!(!file_key.deleted);
-        assert!(file_key.selection.is_none());
-    }
-
-    // Boundary tests for sort_by_time_range
-    #[test]
-    fn test_sort_by_time_range_negative_timestamps() {
-        let files = vec![
-            create_file_key("file1.parquet", -2000, -1000, 1024),
-            create_file_key("file2.parquet", -1000, 0, 1024),
-            create_file_key("file3.parquet", 0, 1000, 1024),
-        ];
-        let result = sort_by_time_range(files);
-        assert_eq!(result.len(), 3);
-        assert_eq!(result[0].key, "file1.parquet");
-        assert_eq!(result[1].key, "file2.parquet");
-        assert_eq!(result[2].key, "file3.parquet");
+    /// Sorts files named by their input position; returns the positions in output order.
+    fn sorted_positions(ranges: &[(i64, i64)]) -> Vec<usize> {
+        let files = ranges
+            .iter()
+            .enumerate()
+            .map(|(i, (min_ts, max_ts))| create_file_key(&i.to_string(), *min_ts, *max_ts, 1024))
+            .collect();
+        sort_by_time_range(files)
+            .iter()
+            .map(|f| f.key.parse().unwrap())
+            .collect()
     }
 
     #[test]
-    fn test_sort_by_time_range_large_timestamps() {
-        let files = vec![
-            create_file_key("file1.parquet", i64::MAX - 2000, i64::MAX - 1000, 1024),
-            create_file_key("file2.parquet", i64::MAX - 1000, i64::MAX, 1024),
-        ];
-        let result = sort_by_time_range(files);
-        assert_eq!(result.len(), 2);
-        assert_eq!(result[0].key, "file1.parquet");
-        assert_eq!(result[1].key, "file2.parquet");
-    }
-
-    // Edge case where min_ts equals max_ts (point in time)
-    #[test]
-    fn test_sort_by_time_range_point_in_time() {
-        let files = vec![
-            create_file_key("file1.parquet", 1000, 1000, 1024), // Point in time
-            create_file_key("file2.parquet", 1000, 2000, 1024), // Overlaps with file1
-            create_file_key("file3.parquet", 2000, 2000, 1024), // Point in time, adjacent
-        ];
-        let result = sort_by_time_range(files);
-        assert_eq!(result.len(), 3);
-
-        // Verify all files are present
-        let keys: Vec<&String> = result.iter().map(|f| &f.key).collect();
-        assert!(keys.contains(&&"file1.parquet".to_string()));
-        assert!(keys.contains(&&"file2.parquet".to_string()));
-        assert!(keys.contains(&&"file3.parquet".to_string()));
-    }
-
-    #[test]
-    fn test_sort_by_time_range_many_files_random_order() {
-        let files = vec![
-            create_file_key("file_f.parquet", 6000, 7000, 1024),
-            create_file_key("file_b.parquet", 2000, 3000, 1024),
-            create_file_key("file_d.parquet", 4000, 5000, 1024),
-            create_file_key("file_a.parquet", 1000, 2000, 1024),
-            create_file_key("file_c.parquet", 3000, 4000, 1024),
-            create_file_key("file_e.parquet", 5000, 6000, 1024),
-        ];
-        let result = sort_by_time_range(files);
-        assert_eq!(result.len(), 6);
-
-        // Should be sorted by min_ts (all adjacent files)
-        assert_eq!(result[0].key, "file_a.parquet");
-        assert_eq!(result[1].key, "file_b.parquet");
-        assert_eq!(result[2].key, "file_c.parquet");
-        assert_eq!(result[3].key, "file_d.parquet");
-        assert_eq!(result[4].key, "file_e.parquet");
-        assert_eq!(result[5].key, "file_f.parquet");
-    }
-
-    #[test]
-    fn test_sort_by_time_range_gaps_between_files() {
-        let files = vec![
-            create_file_key("file1.parquet", 1000, 2000, 1024),
-            create_file_key("file2.parquet", 5000, 6000, 1024), // gap after file1
-            create_file_key("file3.parquet", 3000, 4000, 1024), // fits in gap
-        ];
-        let result = sort_by_time_range(files);
-        assert_eq!(result.len(), 3);
-
-        // Should be sorted by min_ts
-        assert_eq!(result[0].key, "file1.parquet");
-        assert_eq!(result[1].key, "file3.parquet");
-        assert_eq!(result[2].key, "file2.parquet");
-    }
-
-    #[test]
-    fn test_sort_by_time_range_empty_list() {
-        let files = vec![];
-        let result = sort_by_time_range(files);
-        assert_eq!(result.len(), 0);
-    }
-
-    #[test]
-    fn test_sort_by_time_range_unsorted_non_overlapping() {
-        let files = vec![
-            create_file_key("file3.parquet", 3000, 4000, 1024),
-            create_file_key("file1.parquet", 1000, 2000, 1024),
-            create_file_key("file2.parquet", 2000, 3000, 1024),
-        ];
-        let result = sort_by_time_range(files);
-        assert_eq!(result.len(), 3);
-        // Should be sorted by min_ts
-        assert_eq!(result[0].key, "file1.parquet");
-        assert_eq!(result[1].key, "file2.parquet");
-        assert_eq!(result[2].key, "file3.parquet");
-    }
-
-    #[test]
-    fn test_sort_by_time_range_overlapping_files() {
-        let files = vec![
-            create_file_key("file1.parquet", 1000, 2500, 1024), // overlaps with file2
-            create_file_key("file2.parquet", 2000, 3000, 1024), // overlaps with file1
-            create_file_key("file3.parquet", 3500, 4000, 1024), // non-overlapping
-        ];
-        let result = sort_by_time_range(files);
-        assert_eq!(result.len(), 3);
-
-        // First file should be file1 (min_ts = 1000)
-        assert_eq!(result[0].key, "file1.parquet");
-
-        // Due to overlapping, file3 should come next (can fit in same group as file1)
-        // file2 would be in a separate group since it overlaps with file1
-        let mut found_file2 = false;
-        let mut found_file3 = false;
-        for file in &result {
-            if file.key == "file2.parquet" {
-                found_file2 = true;
-            }
-            if file.key == "file3.parquet" {
-                found_file3 = true;
-            }
-        }
-        assert!(found_file2);
-        assert!(found_file3);
-    }
-
-    #[test]
-    fn test_sort_by_time_range_complex_overlapping() {
-        let files = vec![
-            create_file_key("file1.parquet", 1000, 1500, 1024),
-            create_file_key("file2.parquet", 1200, 1800, 1024), // overlaps with file1
-            create_file_key("file3.parquet", 1600, 2000, 1024), // overlaps with file2
-            create_file_key("file4.parquet", 2000, 2500, 1024), // adjacent to file3
-            create_file_key("file5.parquet", 3000, 3500, 1024), // separate group
-        ];
-        let result = sort_by_time_range(files);
-        assert_eq!(result.len(), 5);
-
-        // Verify all files are present
-        let keys: Vec<&String> = result.iter().map(|f| &f.key).collect();
-        assert!(keys.contains(&&"file1.parquet".to_string()));
-        assert!(keys.contains(&&"file2.parquet".to_string()));
-        assert!(keys.contains(&&"file3.parquet".to_string()));
-        assert!(keys.contains(&&"file4.parquet".to_string()));
-        assert!(keys.contains(&&"file5.parquet".to_string()));
-    }
-
-    #[test]
-    fn test_sort_by_time_range_identical_timestamps() {
-        let files = vec![
-            create_file_key("file1.parquet", 1000, 2000, 1024),
-            create_file_key("file2.parquet", 1000, 2000, 512),
-            create_file_key("file3.parquet", 1000, 2000, 2048),
-        ];
-        let result = sort_by_time_range(files);
-        assert_eq!(result.len(), 3);
-
-        // All files have same timestamp, so they should all be in separate groups
-        // due to overlap, but ordering should be maintained based on original order after sorting
-        let keys: Vec<&String> = result.iter().map(|f| &f.key).collect();
-        assert_eq!(keys.len(), 3);
-        assert!(keys.contains(&&"file1.parquet".to_string()));
-        assert!(keys.contains(&&"file2.parquet".to_string()));
-        assert!(keys.contains(&&"file3.parquet".to_string()));
-    }
-
-    // ── Additional sort_by_time_range edge-case tests ────────────────────────
-
-    /// Two files share the same min_ts but have different max_ts values.
-    /// The file with the smaller max_ts ends first; the second file starts at
-    /// the same time and thus overlaps → they must land in different groups.
-    #[test]
-    fn test_sort_by_time_range_same_min_ts_different_max_ts() {
-        let files = vec![
-            create_file_key("file_a.parquet", 1000, 3000, 1024),
-            create_file_key("file_b.parquet", 1000, 2000, 1024),
-        ];
-        let result = sort_by_time_range(files);
-        assert_eq!(result.len(), 2);
-        let keys: Vec<&str> = result.iter().map(|f| f.key.as_str()).collect();
-        assert!(keys.contains(&"file_a.parquet"));
-        assert!(keys.contains(&"file_b.parquet"));
-        // Both share min_ts=1000, so they overlap: each ends up in its own group.
-        // Consecutive elements in the output must not have a later file whose
-        // min_ts < the predecessor's max_ts within the same group-chain.
-        // We just verify the invariant: result preserves all files.
-        assert_eq!(result.len(), 2);
-    }
-
-    /// All files are completely overlapping (same time range).
-    /// Every file goes into a separate group; total count must be preserved.
-    #[test]
-    fn test_sort_by_time_range_all_identical_ranges() {
-        let files = vec![
-            create_file_key("file1.parquet", 500, 1500, 1024),
-            create_file_key("file2.parquet", 500, 1500, 512),
-            create_file_key("file3.parquet", 500, 1500, 2048),
-            create_file_key("file4.parquet", 500, 1500, 768),
-        ];
-        let result = sort_by_time_range(files);
-        assert_eq!(result.len(), 4);
-        let keys: Vec<&str> = result.iter().map(|f| f.key.as_str()).collect();
-        assert!(keys.contains(&"file1.parquet"));
-        assert!(keys.contains(&"file2.parquet"));
-        assert!(keys.contains(&"file3.parquet"));
-        assert!(keys.contains(&"file4.parquet"));
-    }
-
-    /// Files whose min_ts == max_ts == 0 (zero timestamps).
-    #[test]
-    fn test_sort_by_time_range_zero_timestamps() {
-        let files = vec![
-            create_file_key("file1.parquet", 0, 0, 1024),
-            create_file_key("file2.parquet", 0, 1000, 1024),
-        ];
-        let result = sort_by_time_range(files);
-        assert_eq!(result.len(), 2);
-        // First file is whichever has min_ts=0; both should survive.
-        let keys: Vec<&str> = result.iter().map(|f| f.key.as_str()).collect();
-        assert!(keys.contains(&"file1.parquet"));
-        assert!(keys.contains(&"file2.parquet"));
-    }
-
-    /// Two non-overlapping groups: group A has files [1000,2000] and [2000,3000];
-    /// group B has files [1500,2500] and [2500,3500].  The algorithm must
-    /// produce exactly 4 files in the output.
-    #[test]
-    fn test_sort_by_time_range_two_interleaved_groups() {
-        // After sort by min_ts:
-        //   A1: [1000,2000], B1: [1500,2500], A2: [2000,3000], B2: [2500,3500]
-        // A1 opens group-0.  B1 overlaps A1 (1500 < 2000) → opens group-1.
-        // A2: min_ts=2000 >= group-0's last max=2000 → fits group-0.
-        // B2: min_ts=2500 >= group-1's last max=2500 → fits group-1.
-        let files = vec![
-            create_file_key("A1.parquet", 1000, 2000, 1024),
-            create_file_key("B1.parquet", 1500, 2500, 1024),
-            create_file_key("A2.parquet", 2000, 3000, 1024),
-            create_file_key("B2.parquet", 2500, 3500, 1024),
-        ];
-        let result = sort_by_time_range(files);
-        assert_eq!(result.len(), 4);
-        let keys: Vec<&str> = result.iter().map(|f| f.key.as_str()).collect();
-        assert!(keys.contains(&"A1.parquet"));
-        assert!(keys.contains(&"A2.parquet"));
-        assert!(keys.contains(&"B1.parquet"));
-        assert!(keys.contains(&"B2.parquet"));
-        // Group-0 chain: A1 then A2 (adjacent).  Verify they appear consecutively.
-        let a1_pos = result.iter().position(|f| f.key == "A1.parquet").unwrap();
-        let a2_pos = result.iter().position(|f| f.key == "A2.parquet").unwrap();
+    fn test_sort_by_time_range_orders_non_overlapping_files_by_time() {
+        assert!(sorted_positions(&[]).is_empty());
+        assert_eq!(sorted_positions(&[(42, 42)]), [0]);
+        // a file starting where the previous one ends does not overlap it
         assert_eq!(
-            a2_pos,
-            a1_pos + 1,
-            "A1 and A2 should be in the same group (consecutive)"
+            sorted_positions(&[(1000, 2000), (2000, 3000), (3000, 4000)]),
+            [0, 1, 2]
+        );
+        assert_eq!(
+            sorted_positions(&[(4000, 5000), (3000, 4000), (2000, 3000), (1000, 2000)]),
+            [3, 2, 1, 0]
+        );
+        assert_eq!(
+            sorted_positions(&[(1000, 2000), (5000, 6000), (3000, 4000)]),
+            [0, 2, 1]
+        );
+        assert_eq!(
+            sorted_positions(&[(-2000, -1000), (-1000, 0), (0, 1000)]),
+            [0, 1, 2]
+        );
+        assert_eq!(
+            sorted_positions(&[(1000, 1000), (1000, 2000), (2000, 2000)]),
+            [0, 1, 2]
+        );
+        assert_eq!(
+            sorted_positions(&[
+                (i64::MAX - 1000, i64::MAX),
+                (i64::MIN, i64::MIN),
+                (i64::MIN, 0)
+            ]),
+            [1, 2, 0]
         );
     }
 
-    /// A chain of files where each one's min_ts equals the previous file's max_ts
-    /// (strictly adjacent, no gap).  All should end up in one group.
     #[test]
-    fn test_sort_by_time_range_strictly_adjacent_chain() {
-        let files = vec![
-            create_file_key("f1.parquet", 100, 200, 512),
-            create_file_key("f3.parquet", 300, 400, 512),
-            create_file_key("f2.parquet", 200, 300, 512),
-            create_file_key("f4.parquet", 400, 500, 512),
-        ];
-        let result = sort_by_time_range(files);
-        assert_eq!(result.len(), 4);
-        // All are adjacent (min_ts == prev max_ts) so they chain into one group.
-        assert_eq!(result[0].key, "f1.parquet");
-        assert_eq!(result[1].key, "f2.parquet");
-        assert_eq!(result[2].key, "f3.parquet");
-        assert_eq!(result[3].key, "f4.parquet");
-    }
-
-    /// A single file where min_ts == max_ts (point-in-time, zero-width range).
-    #[test]
-    fn test_sort_by_time_range_single_point_file() {
-        let files = vec![create_file_key("point.parquet", 42, 42, 256)];
-        let result = sort_by_time_range(files);
-        assert_eq!(result.len(), 1);
-        assert_eq!(result[0].key, "point.parquet");
-        assert_eq!(result[0].meta.min_ts, 42);
-        assert_eq!(result[0].meta.max_ts, 42);
-    }
-
-    // ── sort_by_time_range: additional branch-coverage tests ─────────────────
-
-    /// Two files that don't overlap and have a gap between them.  The second
-    /// file's min_ts is strictly greater than the first file's max_ts, so both
-    /// land in the same chain (group-0) and appear in order.
-    #[test]
-    fn test_sort_by_time_range_two_non_overlapping_with_gap() {
-        let files = vec![
-            create_file_key("early.parquet", 1000, 2000, 512),
-            create_file_key("late.parquet", 5000, 6000, 512),
-        ];
-        let result = sort_by_time_range(files);
-        assert_eq!(result.len(), 2);
-        assert_eq!(result[0].key, "early.parquet");
-        assert_eq!(result[1].key, "late.parquet");
-    }
-
-    /// Files presented in strictly descending min_ts order.  After the internal
-    /// sort by min_ts the algorithm must produce the same output as if they had
-    /// been given in ascending order.
-    #[test]
-    fn test_sort_by_time_range_descending_input_order() {
-        let files = vec![
-            create_file_key("f4.parquet", 4000, 5000, 512),
-            create_file_key("f3.parquet", 3000, 4000, 512),
-            create_file_key("f2.parquet", 2000, 3000, 512),
-            create_file_key("f1.parquet", 1000, 2000, 512),
-        ];
-        let result = sort_by_time_range(files);
-        assert_eq!(result.len(), 4);
-        // Adjacent chain: all files should appear sorted by min_ts.
-        assert_eq!(result[0].key, "f1.parquet");
-        assert_eq!(result[1].key, "f2.parquet");
-        assert_eq!(result[2].key, "f3.parquet");
-        assert_eq!(result[3].key, "f4.parquet");
-    }
-
-    /// File where min_ts == max_ts == i64::MIN (boundary value).
-    #[test]
-    fn test_sort_by_time_range_min_i64_timestamps() {
-        let files = vec![
-            create_file_key("a.parquet", i64::MIN, i64::MIN, 256),
-            create_file_key("b.parquet", i64::MIN, 0, 256),
-        ];
-        let result = sort_by_time_range(files);
-        assert_eq!(result.len(), 2);
-        let keys: Vec<&str> = result.iter().map(|f| f.key.as_str()).collect();
-        assert!(keys.contains(&"a.parquet"));
-        assert!(keys.contains(&"b.parquet"));
-    }
-
-    /// A file whose min_ts is greater than its max_ts (malformed / inverted range).
-    /// The algorithm must still return all files without panicking.
-    #[test]
-    fn test_sort_by_time_range_inverted_range_no_panic() {
-        let files = vec![
-            create_file_key("good.parquet", 1000, 3000, 512),
-            create_file_key("bad.parquet", 5000, 2000, 512), // inverted: min > max
-        ];
-        let result = sort_by_time_range(files);
-        assert_eq!(result.len(), 2);
-        let keys: Vec<&str> = result.iter().map(|f| f.key.as_str()).collect();
-        assert!(keys.contains(&"good.parquet"));
-        assert!(keys.contains(&"bad.parquet"));
-    }
-
-    /// Many fully-overlapping files create as many groups as there are files.
-    /// Verify that the total count is always preserved regardless of input size.
-    #[test]
-    fn test_sort_by_time_range_ten_fully_overlapping_files() {
-        let files: Vec<FileKey> = (0..10)
-            .map(|i| create_file_key(&format!("f{i}.parquet"), 0, 1000, 256))
-            .collect();
-        let result = sort_by_time_range(files);
-        assert_eq!(result.len(), 10, "All files must be preserved");
-    }
-
-    /// Non-overlapping files interleaved with overlapping ones.
-    /// Ensures multiple groups can be built simultaneously and
-    /// files correctly land in the first group that can accept them.
-    #[test]
-    fn test_sort_by_time_range_mixed_overlap_and_gaps() {
-        // After sort by min_ts:
-        //  A: [100, 200], B: [150, 300], C: [200, 400], D: [300, 500], E: [600, 700]
-        // Group-0 starts with A.
-        // B (min=150 < A.max=200) → new group-1.
-        // C (min=200 >= A.max=200) → fits group-0 (A chain extends to max=400).
-        // D (min=300 < C.max=400) in group-0 fails; min=300 >= B.max=300 → fits group-1.
-        // E (min=600 >= C.max=400) → fits group-0.
-        let files = vec![
-            create_file_key("A.parquet", 100, 200, 512),
-            create_file_key("B.parquet", 150, 300, 512),
-            create_file_key("C.parquet", 200, 400, 512),
-            create_file_key("D.parquet", 300, 500, 512),
-            create_file_key("E.parquet", 600, 700, 512),
-        ];
-        let result = sort_by_time_range(files);
-        assert_eq!(result.len(), 5);
-        let keys: Vec<&str> = result.iter().map(|f| f.key.as_str()).collect();
-        assert!(keys.contains(&"A.parquet"));
-        assert!(keys.contains(&"B.parquet"));
-        assert!(keys.contains(&"C.parquet"));
-        assert!(keys.contains(&"D.parquet"));
-        assert!(keys.contains(&"E.parquet"));
-    }
-
-    /// Verify `sort_by_time_range` with exactly two files where the second
-    /// file's min_ts equals the first file's max_ts — the boundary condition
-    /// `min_ts >= max_ts` in the group-fit predicate.
-    #[test]
-    fn test_sort_by_time_range_exact_boundary_two_files() {
-        let files = vec![
-            create_file_key("first.parquet", 1000, 2000, 512),
-            create_file_key("second.parquet", 2000, 3000, 512), // min == prev max
-        ];
-        let result = sort_by_time_range(files);
-        assert_eq!(result.len(), 2);
-        // min_ts(second) == max_ts(first), so `file.meta.min_ts >= f.meta.max_ts`
-        // evaluates to true → second file joins first file's group.
-        assert_eq!(result[0].key, "first.parquet");
-        assert_eq!(result[1].key, "second.parquet");
-    }
-
-    /// A file whose min_ts is one less than the previous group's max_ts must
-    /// NOT join that group (it overlaps by 1 microsecond).
-    #[test]
-    fn test_sort_by_time_range_one_unit_overlap() {
-        let files = vec![
-            create_file_key("first.parquet", 1000, 2000, 512),
-            create_file_key("overlap.parquet", 1999, 3000, 512), // 1999 < 2000
-        ];
-        let result = sort_by_time_range(files);
-        assert_eq!(result.len(), 2);
-        // overlap.parquet must be in a different group from first.parquet.
-        // The first element should be first.parquet (lower min_ts).
-        assert_eq!(result[0].key, "first.parquet");
-        // Both files must appear; overlap.parquet goes to a new group.
-        let keys: Vec<&str> = result.iter().map(|f| f.key.as_str()).collect();
-        assert!(keys.contains(&"overlap.parquet"));
+    fn test_sort_by_time_range_chains_overlapping_files() {
+        // one unit of overlap opens a second chain; the next file rejoins the first
+        assert_eq!(
+            sorted_positions(&[(1000, 2000), (1999, 3000), (2000, 2500)]),
+            [0, 2, 1]
+        );
+        // two interleaved chains come out one after the other
+        assert_eq!(
+            sorted_positions(&[(1000, 2000), (1500, 2500), (2000, 3000), (2500, 3500)]),
+            [0, 2, 1, 3]
+        );
+        // a file joins the first chain it fits
+        assert_eq!(
+            sorted_positions(&[(100, 200), (150, 300), (200, 400), (300, 500), (600, 700)]),
+            [0, 2, 4, 1, 3]
+        );
+        // files of one range are a chain each, in input order
+        assert_eq!(sorted_positions(&[(500, 1500); 4]), [0, 1, 2, 3]);
+        assert_eq!(sorted_positions(&[(1000, 3000), (1000, 2000)]), [0, 1]);
+        // an inverted range is kept, not dropped
+        assert_eq!(sorted_positions(&[(1000, 3000), (5000, 2000)]), [0, 1]);
     }
 }

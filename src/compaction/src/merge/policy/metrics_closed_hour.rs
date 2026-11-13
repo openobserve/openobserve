@@ -211,6 +211,16 @@ mod tests {
         key
     }
 
+    async fn closed_hour_batches(
+        files: Vec<FileKey>,
+        strategy: MergeStrategy,
+    ) -> Vec<PlannedBatch> {
+        MergePolicy::MetricsClosedHour
+            .plan(files, &limits(&strategy, 0, false), &schema(), "test")
+            .await
+            .batches
+    }
+
     #[test]
     fn test_metrics_index_merge_scope() {
         let max_file_size = 100_usize;
@@ -311,15 +321,7 @@ mod tests {
             metrics_file("3.parquet", 300),
             metrics_file("hash-sorted-v1-4.parquet", 300),
         ];
-        let batches = MergePolicy::MetricsClosedHour
-            .plan(
-                files,
-                &limits(&MergeStrategy::FileSize, 0, false),
-                &schema(),
-                "test",
-            )
-            .await
-            .batches;
+        let batches = closed_hour_batches(files, MergeStrategy::FileSize).await;
         assert_eq!(batches.len(), 2, "{batches:?}");
         let (legacy, mode) = &batches[0];
         assert!(matches!(mode, MergeMode::Classic), "{mode}");
@@ -341,15 +343,7 @@ mod tests {
             metrics_file("2.parquet", 10),
             metrics_file("hash-sorted-v1-3.parquet", 300),
         ];
-        let batches = MergePolicy::MetricsClosedHour
-            .plan(
-                files,
-                &limits(&MergeStrategy::FileTime, 0, false),
-                &schema(),
-                "test",
-            )
-            .await
-            .batches;
+        let batches = closed_hour_batches(files, MergeStrategy::FileTime).await;
         assert_eq!(batches.len(), 1, "{batches:?}");
         assert!(matches!(batches[0].1, MergeMode::MetricsIndexed));
         assert_eq!(names(&batches[0].0), ["hash-sorted-v1-3.parquet"]);
@@ -364,15 +358,7 @@ mod tests {
             metrics_file("7.parquet", 300),
             metrics_file("8.parquet", 300),
         ];
-        let batches = MergePolicy::MetricsClosedHour
-            .plan(
-                files,
-                &limits(&MergeStrategy::FileSize, 0, false),
-                &schema(),
-                "test",
-            )
-            .await
-            .batches;
+        let batches = closed_hour_batches(files, MergeStrategy::FileSize).await;
         // the indexed files are left alone; the legacy pair still merges classic
         assert_eq!(batches.len(), 1, "{batches:?}");
         assert!(matches!(batches[0].1, MergeMode::Classic));
@@ -385,15 +371,7 @@ mod tests {
             metrics_file("indexed-v1-1.parquet", 300),
             metrics_file("hash-sorted-v1-2.parquet", 300),
         ];
-        let batches = MergePolicy::MetricsClosedHour
-            .plan(
-                files,
-                &limits(&MergeStrategy::FileSize, 0, false),
-                &schema(),
-                "test",
-            )
-            .await
-            .batches;
+        let batches = closed_hour_batches(files, MergeStrategy::FileSize).await;
         assert_eq!(batches.len(), 1);
         assert!(matches!(batches[0].1, MergeMode::MetricsIndexed));
         assert_eq!(names(&batches[0].0), ["hash-sorted-v1-2.parquet"]);
@@ -407,12 +385,7 @@ mod tests {
             hash_file("hash-merged-v1-round2.parquet", 420),
             hash_file("hash-sorted-v1-late.parquet", 30),
         ];
-        let strategy = MergeStrategy::FileTime;
-        let limits = limits(&strategy, 0, false);
-        let batches = MergePolicy::MetricsClosedHour
-            .plan(files, &limits, &schema(), "s")
-            .await
-            .batches;
+        let batches = closed_hour_batches(files, MergeStrategy::FileTime).await;
         assert_eq!(batches.len(), 1, "{batches:?}");
         assert!(matches!(batches[0].1, MergeMode::MetricsIndexed));
         assert_eq!(
