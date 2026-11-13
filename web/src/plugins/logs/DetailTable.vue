@@ -728,12 +728,12 @@ import { isSafeNavigableUrl } from "@/utils/safeUrl";
 import { isFilterableLogField, STREAM_NAME_FIELD } from "@/utils/logs/streamNameColumn";
 import { scopeHighlightQuery } from "@/composables/useTextHighlighter";
 import {
+  currentSearchAroundUser,
   parseSearchAroundChoice,
   readSearchAroundChoice,
   searchAroundWindow,
   SEARCH_AROUND_RECORDS,
-  SEARCH_AROUND_SECONDS,
-  searchAroundTimeChoice,
+  searchAroundTimeOptions as searchAroundTimeOptionsFor,
   writeSearchAroundChoice,
   type SearchAroundChoice,
 } from "@/utils/searchAroundWindow";
@@ -970,20 +970,12 @@ export default defineComponent({
       }),
     });
 
-    const searchAroundUser = () => String(store.state.userInfo?.email ?? "");
+    const searchAroundUser = () => currentSearchAroundUser(store.state);
     const searchAroundChoice = ref<SearchAroundChoice>(readSearchAroundChoice(searchAroundUser()));
     const SEARCH_AROUND_MENU_STYLE = {
       maxHeight: "min(30rem, var(--reka-select-content-available-height, 30rem))",
     };
-    const searchAroundTimeOptions = computed(() =>
-      SEARCH_AROUND_SECONDS.map((seconds) => ({
-        label:
-          seconds < 60
-            ? t("dateTime.aroundSeconds", { n: seconds })
-            : t("dateTime.aroundMinutes", { n: seconds / 60 }),
-        value: searchAroundTimeChoice(seconds),
-      })),
-    );
+    const searchAroundTimeOptions = computed(() => searchAroundTimeOptionsFor(t));
     const searchAroundRecordOptions = computed(() =>
       SEARCH_AROUND_RECORDS.map((count) => ({
         label: t("dateTime.recordsCount", { count }),

@@ -17,7 +17,7 @@ import { toZonedTime } from "date-fns-tz";
 
 import { raw, type I18nKey, type I18nText, type TranslateFn } from "@/types/i18n";
 import { formatCalendarLabel, safeTimezone } from "@/utils/dashboard/calendarPeriods";
-import { formatRangeDates, formatRangeDuration } from "@/utils/timeRangeLabel";
+import { formatRangeDuration } from "@/utils/timeRangeLabel";
 
 const MICROS_PER_SECOND = 1_000_000;
 
@@ -85,15 +85,6 @@ const civilParts = (date: string): { year: number; month: number; day: number } 
 
 const currentYearIn = (nowMs: number, zone: string): number =>
   toZonedTime(nowMs, zone).getFullYear();
-
-/** The dates of a fixed range; kept for callers of the v1 name, see formatRangeDates. */
-export const formatRecentRangeLabel = (
-  startUs: number,
-  endUs: number,
-  timezone: string | null | undefined,
-  nowMs: number = Date.now(),
-  locale: string = "en-US",
-): string => formatRangeDates({ startUs, endUs }, { timezone, nowMs, locale });
 
 /** "Nov 1", or "Jan 1, 1999" outside the current year, for a yyyy/MM/dd day. */
 export const formatCivilDay = (

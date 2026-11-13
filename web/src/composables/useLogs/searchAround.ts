@@ -25,6 +25,7 @@ import useStreamFields from "@/composables/useLogs/useStreamFields";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { STREAM_NAME_FIELD } from "@/utils/logs/streamNameColumn";
 import { useLogsAutoRun } from "@/composables/useLogs/logsAutoRun";
+import { WINDOW_QUERY_VIEWS } from "@/utils/searchAroundWindow";
 import {
   bindSeverityRequest,
   type SeverityRequestSnapshot,
@@ -338,13 +339,26 @@ export const useSearchAround = () => {
   };
 
   // Like the records path, only the request drops the filter; unparsable SQL runs as typed.
-  const armWindowQuery = (): void => {
+  // A dirty editor's next Run must send what it shows, and other views never read the query.
+  const armWindowQuery = (range: { startUs: number; endUs: number }): void => {
+    const view = String(searchObj.meta.logsVisualizeToggle ?? "");
     const query =
-      searchObj.meta.sqlMode === true
-        ? unfilteredWindowQuery(searchObj.data.query, fnParsedSQL, fnUnparsedSQL)
-        : "";
-    if (query === null) return;
-    searchObj.data.searchAround.pendingWindowQuery = query;
+      searchObj.meta.editorDirty || !WINDOW_QUERY_VIEWS.includes(view)
+        ? null
+        : searchObj.meta.sqlMode === true
+          ? unfilteredWindowQuery(searchObj.data.query, fnParsedSQL, fnUnparsedSQL)
+          : "";
+    searchObj.data.searchAround.windowQuery =
+      query === null
+        ? null
+        : {
+            query,
+            typedQuery: String(searchObj.data.query ?? ""),
+            view,
+            startUs: range.startUs,
+            endUs: range.endUs,
+            pinned: false,
+          };
   };
 
   return {

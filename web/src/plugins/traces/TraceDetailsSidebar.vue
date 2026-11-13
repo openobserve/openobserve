@@ -210,7 +210,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OButton
                   variant="outline"
                   size="xs"
-                  class="h-full text-xs!"
+                  class="text-xs!"
                   disabled
                   icon-left="lock"
                   data-test="trace-details-sidebar-header-toolbar-view-logs-btn"
@@ -224,7 +224,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 ref="viewLogsBtnRef"
                 variant="outline"
                 size="xs"
-                class="h-full text-xs!"
+                class="text-xs!"
                 :disabled="isViewLogsDisabled"
                 :loading="viewLogsBusy"
                 :spinner="false"
@@ -259,7 +259,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OButton
                   variant="outline"
                   size="xs"
-                  class="h-full text-xs!"
+                  class="text-xs!"
                   data-test="trace-details-sidebar-search-around-btn"
                   :disabled="isSearchAroundDisabled"
                   @click.stop="searchAroundSpan"
@@ -274,7 +274,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OButton
                   variant="outline"
                   size="xs"
-                  class="h-full text-xs!"
+                  class="text-xs!"
                   disabled
                   data-test="trace-details-sidebar-header-toolbar-view-profile-btn"
                 >
@@ -289,7 +289,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-else-if="spanProfileMatch"
               variant="outline"
               size="xs"
-              class="ms-1 h-full text-xs!"
+              class="ms-1 text-xs!"
               data-test="trace-details-sidebar-header-toolbar-view-profile-btn"
               @click.stop="viewSpanProfile"
             >
@@ -1144,11 +1144,11 @@ import type { TraceIssue } from "./traceIssues";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import {
+  currentSearchAroundUser,
   parseSearchAroundChoice,
   readSearchAroundChoice,
   searchAroundWindow,
-  SEARCH_AROUND_SECONDS,
-  searchAroundTimeChoice,
+  searchAroundTimeOptions,
   writeSearchAroundChoice,
   DEFAULT_SEARCH_AROUND,
   type SearchAroundChoice,
@@ -2170,21 +2170,13 @@ export default defineComponent({
       }
     };
 
-    const searchAroundUser = () => String(store.state.userInfo?.email ?? "");
+    const searchAroundUser = () => currentSearchAroundUser(store.state);
     const rememberedTimeChoice = (): SearchAroundChoice => {
       const stored = readSearchAroundChoice(searchAroundUser());
       return parseSearchAroundChoice(stored)?.kind === "time" ? stored : DEFAULT_SEARCH_AROUND;
     };
     const spanSearchAroundChoice = ref<SearchAroundChoice>(rememberedTimeChoice());
-    const spanSearchAroundOptions = computed(() =>
-      SEARCH_AROUND_SECONDS.map((seconds) => ({
-        label:
-          seconds < 60
-            ? t("dateTime.aroundSeconds", { n: seconds })
-            : t("dateTime.aroundMinutes", { n: seconds / 60 }),
-        value: searchAroundTimeChoice(seconds),
-      })),
-    );
+    const spanSearchAroundOptions = computed(() => searchAroundTimeOptions(t));
     const setSpanSearchAroundChoice = (value: unknown) => {
       if (parseSearchAroundChoice(value)?.kind !== "time") return;
       spanSearchAroundChoice.value = value as SearchAroundChoice;

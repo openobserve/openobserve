@@ -66,6 +66,7 @@ import {
   type FilterResolveContext,
 } from "@/composables/useLogs/freeTextSearch";
 import { closeDrawerForQuery } from "@/composables/useLogs/logsRowNav";
+import { windowQueryForRun, type WindowQueryRun } from "@/utils/searchAroundWindow";
 
 export { appendConjunct, materializeFreeText, planStreamsFilter, type FilterResolveContext };
 
@@ -363,6 +364,19 @@ export const useSearchQuery = (t: TranslateFn) => {
     unparse: (ast: any) => fnUnparsedSQL(ast),
   });
 
+  const runWindow = (): WindowQueryRun => {
+    const { type, startTime, endTime } = searchObj.data.datetime;
+    const start = Number(startTime);
+    const end = Number(endTime);
+    const absolute = type === "absolute" && Number.isFinite(start) && Number.isFinite(end);
+    return {
+      query: String(searchObj.data.query ?? ""),
+      view: String(searchObj.meta.logsVisualizeToggle ?? ""),
+      startUs: absolute ? start : null,
+      endUs: absolute ? end : null,
+    };
+  };
+
   const getQueryReq = (isPagination: boolean): SearchRequestPayload | null => {
     searchObj.data.highlightQuery = "";
     searchObj.data.freeTextBlocked = null;
@@ -393,11 +407,9 @@ export const useSearchQuery = (t: TranslateFn) => {
       searchObj.data.datetime.startTime = "Invalid Date";
 
     const around = searchObj.data.searchAround;
-    if (around && !isPagination) {
-      around.windowQuery = around.pendingWindowQuery ?? null;
-      around.pendingWindowQuery = null;
-    }
-    const windowQuery = around?.windowQuery ?? undefined;
+    if (around && !isPagination)
+      around.windowQuery = windowQueryForRun(around.windowQuery, runWindow());
+    const windowQuery = around?.windowQuery?.query;
     const queryReq: SearchRequestPayload | null = buildSearch(false, false, windowQuery);
     if (queryReq) {
       recordSeverityRequest(

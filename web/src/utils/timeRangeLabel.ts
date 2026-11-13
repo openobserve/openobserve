@@ -172,25 +172,6 @@ export const formatRangeCopyText = (
   return range.live && range.name ? `${range.name} (${stamps})` : stamps;
 };
 
-/** A DST repeated-hour reading: "01:30 EDT (UTC-04:00)". */
-export const formatFoldLabel = (micros: number, timezone: string, locale = "en-US"): string => {
-  const zone = safeTimezone(timezone);
-  const ms = Math.floor(micros / MICROS_PER_MS);
-  const clock = clean(
-    new Intl.DateTimeFormat(locale, {
-      hour: "2-digit",
-      minute: "2-digit",
-      hourCycle: "h23",
-      timeZone: zone,
-    }).format(ms),
-  );
-  const short =
-    new Intl.DateTimeFormat("en-US", { timeZone: zone, timeZoneName: "short" })
-      .formatToParts(ms)
-      .find((part) => part.type === "timeZoneName")?.value ?? zone;
-  return `${clock} ${short} (${formatZoneOffset(zone, ms)})`;
-};
-
 const clean = (text: string): string => text.replace(THIN_SPACES, " ");
 
 const civilOf = (micros: number, zone: string): Civil => {

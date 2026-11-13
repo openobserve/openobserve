@@ -1092,22 +1092,74 @@ describe("useSearchQuery › getQueryReq › search-around window query", () => 
     vi.clearAllMocks();
   });
 
-  it("sends the window query for one run and its pages, never writing it into the editor", () => {
+  const userQuery = `SELECT * FROM "my-stream" WHERE level = 'error'`;
+  const windowSql = 'SELECT * FROM "my-stream"';
+
+  const arm = () => {
     mockState.searchObj.meta.sqlMode = true;
-    const userQuery = `SELECT * FROM "my-stream" WHERE level = 'error'`;
     mockState.searchObj.data.query = userQuery;
     (mockState.searchObj.data as any).editorValue = userQuery;
+    Object.assign(mockState.searchObj.data.datetime, {
+      type: "absolute",
+      startTime: 1_000_000,
+      endTime: 5_000_000,
+    });
     (mockState.searchObj.data as any).searchAround = {
-      pendingWindowQuery: 'SELECT * FROM "my-stream"',
-      windowQuery: null,
+      windowQuery: {
+        query: windowSql,
+        typedQuery: userQuery,
+        view: "logs",
+        startUs: 1_000_000,
+        endUs: 9_000_000,
+        pinned: false,
+      },
     };
-    const { getQueryReq } = useSearchQuery(gt);
+    return useSearchQuery(gt).getQueryReq;
+  };
 
-    expect(getQueryReq(false)?.query.sql).toBe('SELECT * FROM "my-stream"');
-    expect(getQueryReq(true)?.query.sql).toBe('SELECT * FROM "my-stream"');
+  it("sends the window query for its window's runs and pages, never writing it into the editor", () => {
+    const getQueryReq = arm();
+
+    expect(getQueryReq(false)?.query.sql).toBe(windowSql);
+    expect(getQueryReq(true)?.query.sql).toBe(windowSql);
     expect(mockState.searchObj.data.query).toBe(userQuery);
     expect((mockState.searchObj.data as any).editorValue).toBe(userQuery);
+  });
+
+  it("keeps the window query when auto-refresh re-runs the same window", () => {
+    const getQueryReq = arm();
+
+    expect(getQueryReq(false)?.query.sql).toBe(windowSql);
+    expect(getQueryReq(false)?.query.sql).toBe(windowSql);
+    expect(getQueryReq(false)?.query.sql).toBe(windowSql);
+  });
+
+  it("drops the window query for good once the range changes", () => {
+    const getQueryReq = arm();
+    getQueryReq(false);
+
+    mockState.searchObj.data.datetime.endTime = 4_000_000;
     expect(getQueryReq(false)?.query.sql).toBe(userQuery);
+    mockState.searchObj.data.datetime.endTime = 5_000_000;
+    expect(getQueryReq(false)?.query.sql).toBe(userQuery);
+  });
+
+  it("runs the editor's new filter, not the window query, after the user changes the query", () => {
+    const getQueryReq = arm();
+    getQueryReq(false);
+
+    const edited = `SELECT * FROM "my-stream" WHERE level = 'warn'`;
+    mockState.searchObj.data.query = edited;
+    expect(getQueryReq(false)?.query.sql).toBe(edited);
+    expect((mockState.searchObj.data as any).searchAround.windowQuery).toBeNull();
+  });
+
+  it("never sends the window query outside the view it was armed in", () => {
+    const getQueryReq = arm();
+    mockState.searchObj.meta.logsVisualizeToggle = "patterns";
+
+    expect(getQueryReq(false)?.query.sql).toBe(userQuery);
+    expect((mockState.searchObj.data as any).searchAround.windowQuery).toBeNull();
   });
 });
 

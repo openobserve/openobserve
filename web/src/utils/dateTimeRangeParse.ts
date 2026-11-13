@@ -1114,7 +1114,7 @@ function nextCivilUnit(civil: number, unit: string): number {
   return civil + UNIT_SECONDS[unit] * 1000;
 }
 
-// A whole calendar period becomes its token (P5); any other snapped range is fixed when read (D6).
+// A whole calendar period becomes its token; any other snapped range is fixed when read.
 function snapRange(start: SnapPoint, end: SnapPoint | null, ctx: ParseContext): ParsedTimeInput {
   const endCivil =
     end === null

@@ -21,12 +21,12 @@ import {
   formatCivilDay,
   formatCivilDayPrefix,
   formatRecentDuration,
-  formatRecentRangeLabel,
   formatDurationMicros,
   formatKnownPeriod,
   formatZoneAbbreviation,
 } from "./timeRangeRail";
 import type { TranslateFn } from "@/types/i18n";
+import { formatRangeDates } from "./timeRangeLabel";
 import { parseCalendarToken } from "./dashboard/calendarPeriods";
 
 const us = (iso: string) => Date.parse(iso) * 1000;
@@ -45,10 +45,10 @@ describe("timeRangeRail", () => {
     });
   });
 
-  describe("formatRecentRangeLabel", () => {
+  describe("formatRangeDates for a fixed range", () => {
     const NOW = Date.parse("2026-11-04T12:00:00Z");
     const compact = (start: string, end: string, zone = "UTC") =>
-      formatRecentRangeLabel(us(start), us(end), zone, NOW);
+      formatRangeDates({ startUs: us(start), endUs: us(end) }, { timezone: zone, nowMs: NOW });
 
     it("names the hours of a range inside one day", () => {
       expect(compact("2026-10-02T08:00:00Z", "2026-10-02T09:00:00Z")).toBe("Oct 2, 08:00 – 09:00");
@@ -92,7 +92,10 @@ describe("timeRangeRail", () => {
       const start = us("2026-10-02T00:00:00Z");
       const end = us("2026-10-03T23:59:59Z");
       expect(
-        formatRecentRangeLabel(start, end, "UTC", Date.parse("2026-11-04T12:00:00Z"), "de-DE"),
+        formatRangeDates(
+          { startUs: start, endUs: end },
+          { timezone: "UTC", nowMs: Date.parse("2026-11-04T12:00:00Z"), locale: "de-DE" },
+        ),
       ).toBe("2.–3. Okt.");
     });
   });

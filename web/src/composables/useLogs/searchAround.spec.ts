@@ -66,7 +66,13 @@ const buildSearchObj = (selectedStream: string[], sqlMode = false) => ({
   organizationIdentifier: "default",
   loading: false,
   loadingProgressPercentage: 0,
-  meta: { sqlMode, quickMode: false, showHistogram: false },
+  meta: {
+    sqlMode,
+    quickMode: false,
+    showHistogram: false,
+    editorDirty: false,
+    logsVisualizeToggle: "logs",
+  },
   data: {
     query: "",
     errorCode: 0,
@@ -116,13 +122,22 @@ describe("useSearchAround", () => {
     vi.clearAllMocks();
   });
 
-  it("arms an unfiltered query for the next run and leaves the user's query and editor alone", () => {
+  const range = { startUs: 1_000_000, endUs: 9_000_000 };
+  const armedWindow = () => searchObj.value.data.searchAround.windowQuery;
+
+  it("binds an unfiltered query to the window and leaves the user's query and editor alone", () => {
     searchObj.value = buildSearchObj(["stream1"]);
     searchObj.value.data.query = "level = 'error'";
     searchObj.value.data.editorValue = "level = 'error'";
     wrapper = mount(TestComponent, { global: { plugins: [i18n] } });
-    wrapper.vm.armWindowQuery();
-    expect(searchObj.value.data.searchAround.pendingWindowQuery).toBe("");
+    wrapper.vm.armWindowQuery(range);
+    expect(armedWindow()).toEqual({
+      query: "",
+      typedQuery: "level = 'error'",
+      view: "logs",
+      ...range,
+      pinned: false,
+    });
     expect(searchObj.value.data.query).toBe("level = 'error'");
     expect(searchObj.value.data.editorValue).toBe("level = 'error'");
     wrapper.unmount();
@@ -131,9 +146,34 @@ describe("useSearchAround", () => {
     const sql = `SELECT * FROM "stream1" WHERE level = 'error'`;
     searchObj.value.data.query = sql;
     wrapper = mount(TestComponent, { global: { plugins: [i18n] } });
-    wrapper.vm.armWindowQuery();
-    expect(searchObj.value.data.searchAround.pendingWindowQuery).toBe('SELECT * FROM "stream1"');
+    wrapper.vm.armWindowQuery(range);
+    expect(armedWindow()?.query).toBe('SELECT * FROM "stream1"');
     expect(searchObj.value.data.query).toBe(sql);
+  });
+
+  it("does not arm while the editor holds an unrun edit, so the next Run sends what it shows", () => {
+    searchObj.value = buildSearchObj(["stream1"]);
+    searchObj.value.meta.editorDirty = true;
+    searchObj.value.data.searchAround.windowQuery = { query: "" } as any;
+    wrapper = mount(TestComponent, { global: { plugins: [i18n] } });
+    wrapper.vm.armWindowQuery(range);
+    expect(armedWindow()).toBeNull();
+  });
+
+  it("does not arm outside the logs and drilldown views, whose runs never read it", () => {
+    for (const view of ["patterns", "visualize"]) {
+      searchObj.value = buildSearchObj(["stream1"]);
+      searchObj.value.meta.logsVisualizeToggle = view;
+      wrapper = mount(TestComponent, { global: { plugins: [i18n] } });
+      wrapper.vm.armWindowQuery(range);
+      expect(armedWindow() ?? null).toBeNull();
+      wrapper.unmount();
+    }
+    searchObj.value = buildSearchObj(["stream1"]);
+    searchObj.value.meta.logsVisualizeToggle = "drilldown";
+    wrapper = mount(TestComponent, { global: { plugins: [i18n] } });
+    wrapper.vm.armWindowQuery(range);
+    expect(armedWindow()?.view).toBe("drilldown");
   });
 
   it("searches around the hit's own stream when several streams are selected", async () => {

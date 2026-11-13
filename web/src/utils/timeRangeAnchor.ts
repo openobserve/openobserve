@@ -15,6 +15,7 @@
 
 import type { I18nText, TranslateFn } from "@/types/i18n";
 import { resolveZonedCivil, type ParsedTimeInput } from "@/utils/dateTimeRangeParse";
+import { searchAroundSecondsLabel } from "@/utils/searchAroundWindow";
 
 const MICROS_PER_SECOND = 1_000_000;
 
@@ -56,12 +57,9 @@ export const readingAnchorMicros = (reading: ParsedTimeInput, timezone: string):
   return resolveZonedCivil(reading.centre.date, reading.centre.time, timezone).micros;
 };
 
-/** "± 5 min", "± 30 s", "From here to now". */
 export const anchorWindowLabel = (id: AnchorRow["id"], t: TranslateFn): I18nText => {
   if (id === "to-now") return t("dateTime.fromHereToNow");
   const seconds =
     (ANCHOR_WINDOWS.find((window) => window.id === id)?.halfWidthUs ?? 0) / MICROS_PER_SECOND;
-  return seconds >= 60
-    ? t("dateTime.aroundMinutes", { n: seconds / 60 })
-    : t("dateTime.aroundSeconds", { n: seconds });
+  return searchAroundSecondsLabel(seconds, t);
 };

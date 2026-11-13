@@ -15,7 +15,6 @@
 
 import { describe, it, expect } from "vitest";
 import {
-  formatFoldLabel,
   formatRangeCopyText,
   formatRangeDates,
   formatRangeDuration,
@@ -273,13 +272,6 @@ describe("rolling labels read back as the same rolling period [#32]", () => {
     const opts = { now: new Date(NOW_MS), timeZone: IST };
     expect(parseTimeInput(text, opts)).toEqual({ type: "relative", period });
     expect(parseTimeInput(label, opts)).toEqual({ type: "relative", period });
-  });
-});
-
-describe("formatFoldLabel [#10]", () => {
-  it("names the clock, abbreviation and offset", () => {
-    expect(formatFoldLabel(us("2026-11-01T05:30:00Z"), NY)).toBe("01:30 EDT (UTC-04:00)");
-    expect(formatFoldLabel(us("2026-11-01T06:30:00Z"), NY)).toBe("01:30 EST (UTC-05:00)");
   });
 });
 

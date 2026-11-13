@@ -21,12 +21,12 @@ export async function hasPeriodChip(page, value, unit) {
     return chip.isEnabled().catch(() => false);
 }
 
-/** Relative and Absolute share one panel, so a former tab click only waits for the open panel. */
+/** Relative and Absolute share one panel, so switching to either only waits for the open panel. */
 export async function waitForDateTimePanel(page, timeout = 10000) {
     await page.locator(DATE_TIME_PANEL).first().waitFor({ state: 'visible', timeout });
 }
 
-/** Opens the picker's calendar (the former Absolute tab), which holds the Start and End fields. */
+/** Opens the picker's calendar, which holds the Start and End fields. */
 export async function openDateFields(page, timeout = 10000) {
     await waitForDateTimePanel(page, timeout);
     const pickDates = page.locator(`${DATE_TIME_PANEL} [data-test="date-time-pick-dates-btn"]`).first();
