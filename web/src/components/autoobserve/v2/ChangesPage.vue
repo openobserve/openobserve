@@ -221,6 +221,7 @@ const highlight = async () => {
   const id = props.highlightId;
   if (!id || !changes.value.some((c) => c.id === id)) return;
   opened[id] = true;
+  if (!capped.value.shown.some((c) => c.id === id)) showAll.value = true;
   await nextTick();
   document
     .querySelector(`[data-test="autoobserve2-change-${id}"]`)

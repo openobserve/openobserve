@@ -114,7 +114,7 @@ const liveRow = (
 
 const mountDrawer = (
   row: CoverageRow,
-  state: "watched" | "gap",
+  state: "watched" | "gap" | "learning",
   expanded: "absence" | null = null,
 ) =>
   mount(CoverageServiceDrawer, {
@@ -399,6 +399,10 @@ describe("CoverageServiceDrawer in live mode", () => {
       expect.stringMatching(/^fresh.*9 of 14/),
       expect.stringMatching(/^kept.*less than 14/),
     ]);
+    const learning = mountDrawer(row, "learning");
+    const chips = learning.findAll('[data-test^="autoobserve-coverage-drawer-chip-"]');
+    expect(chips.map((c) => c.text()).every((text) => text.endsWith("Learning"))).toBe(true);
+    expect(learning.text()).not.toContain("Coverage gap");
   });
 
   it("has no learning line when the server sends no learning_until", () => {

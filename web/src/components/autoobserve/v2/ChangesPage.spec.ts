@@ -252,6 +252,18 @@ describe("Changes page empty and loading", () => {
     expect(wrapper.emitted("see-suggestions")).toHaveLength(1);
   });
 
+  it("renders a linked change that sits past the first 20, so the link lands on it", async () => {
+    const views = Array.from({ length: 23 }, (_, i) =>
+      view(`m-${String(i).padStart(2, "0")}`, {
+        decided_at: Date.now() * 1000 - (100 + i) * 1_000_000,
+      }),
+    );
+    api.list.mockResolvedValue(list(views));
+    const w = await mountPage(ChangesPage, { highlightId: "alert_finding:m-22" });
+    await flushPromises();
+    expect(sel(w, "autoobserve2-change-alert_finding:m-22").exists()).toBe(true);
+  });
+
   it("filters to undone changes and names the filter's own empty state", async () => {
     api.list.mockResolvedValue(list([view("f-1")]));
     const w = await mountPage(ChangesPage);

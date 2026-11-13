@@ -336,6 +336,16 @@ describe("chart and comparison", () => {
         ["pay_api, while it was out", "0", "affected"],
       ],
     ],
+    [
+      "a grouped stream detected later, from its own detection",
+      { ...open, name: "b", lead: false, firstSeenUs: (T0 + 2 * 900_000) * 1000 },
+      null,
+      null,
+      [
+        ["b, before", "650", "healthy"],
+        ["b, since it started", "450", "affected"],
+      ],
+    ],
   ])("compares %s", (_name, stream, baseline, endUs, expected) => {
     const rows = issueComparisonRows(gt, "en-US", [{ stream, series, baseline }], endUs);
     expect(rows.map((r) => [r.label, r.shown, r.kind])).toEqual(expected);

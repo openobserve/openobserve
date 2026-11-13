@@ -27,6 +27,7 @@ import {
   insightActionsOf,
   titleAfterName,
   isClean,
+  isQuiet,
   isScoped,
   latestEmission,
   latestPerWindow,
@@ -194,6 +195,8 @@ describe("a run's verdict", () => {
     expect(isClean(run())).toBe(true);
     expect(isClean(run({ skip_count: 1 }))).toBe(false);
     expect(isClean(run({ coverage_gap: true }))).toBe(false);
+    expect(isClean(run({ coverage_definitions_not_checked: 4 }))).toBe(false);
+    expect(isQuiet(run(), 4)).toBe(false);
   });
 
   it("reads a run that measured nothing as such, even though it is also a gap", () => {

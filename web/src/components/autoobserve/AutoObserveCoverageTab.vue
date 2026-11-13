@@ -320,21 +320,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="selected = { service: row.service, signal: check }"
             >
               <OTag
-                v-if="cellMark(row, check) === 'gap'"
+                v-if="cellLook(row, check) === 'gap'"
                 variant="warning-soft"
                 size="xs"
                 :label="t('autoobserve.coverageLive.gapChip')"
               />
-              <span v-else-if="cellMark(row, check) === 'learning'" class="text-text-secondary">{{
-                coverageWord(t, "learning")
+              <span v-else-if="cellLook(row, check) === 'learning'" class="text-text-secondary">{{
+                liveLookWord(t, "learning")
               }}</span>
               <template v-else>
                 <span
                   class="size-2 shrink-0 rounded-full"
                   :class="LIVE_DOT[cellLook(row, check)]"
                   aria-hidden="true"
-                /><span :class="cellMark(row, check) === 'covered' ? 'sr-only' : ''">{{
-                  liveCellWord(t, row.checks[check].engine?.stateKey ?? "none", isAdded(row, check))
+                /><span :class="cellLook(row, check) === 'covered' ? 'sr-only' : ''">{{
+                  liveLookWord(t, cellLook(row, check))
                 }}</span>
               </template>
             </OButton>
@@ -459,13 +459,11 @@ import {
   emptyCoverageNotice,
   LIVE_DOT,
   liveCellLook,
-  liveCellWord,
   liveCheckName,
   liveCheckText,
   liveLoadText,
   liveLookWord,
   liveNotice,
-  type LiveCellLook,
   type LiveCoverageState,
 } from "./live/liveCopy";
 import { useStore } from "vuex";
@@ -633,7 +631,15 @@ const pick = <T extends string>(value: unknown, options: T[], fallback: T): T =>
 const query = ref("");
 const term = computed(() => query.value.trim().toLowerCase());
 const filter = ref<CoverageFilter>(
-  pick(FILTER_ALIAS[String(route.query.filter)] ?? route.query.filter, filters.value, "all"),
+  pick(FILTER_ALIAS[String(route.query.filter)] ?? route.query.filter, FILTERS, "all"),
+);
+// Learning is only offered once a settled read holds a learning service, so a link's filter waits for it.
+watch(
+  () => !props.skeleton && props.source.status === "ready" && !filters.value.includes(filter.value),
+  (gone) => {
+    if (gone) filter.value = "all";
+  },
+  { immediate: true },
 );
 const view = ref<CoverageView>(pick(route.query.cov, VIEWS, "map"));
 const fill = ref<CoverageFill>(pick(route.query.fill, FILLS, "state"));
@@ -822,15 +828,20 @@ const closeDrawer = () => {
 
 const isAdded = (row: CoverageRow, check: LiveCheck) =>
   justAdded(String(store.state.selectedOrganization?.identifier ?? ""), row, check);
-// A learning service has no baseline yet, so its unwatched checks wait instead of reading as gaps.
-const cellMark = (row: CoverageRow, check: LiveCheck): LiveCellLook | "learning" => {
-  const look = cellLook(row, check);
-  return look === "gap" && serviceState(row) === "learning" ? "learning" : look;
-};
 const cellLook = (row: CoverageRow, check: LiveCheck) =>
-  liveCellLook(row.checks?.[check].engine?.stateKey ?? "none", isAdded(row, check));
+  liveCellLook(
+    row.checks?.[check].engine?.stateKey ?? "none",
+    isAdded(row, check),
+    serviceState(row) === "learning",
+  );
 const liveCellAria = (row: CoverageRow, check: LiveCheck) =>
-  liveCheckText(t, check, row.checks?.[check].engine?.stateKey ?? "none", isAdded(row, check));
+  liveCheckText(
+    t,
+    check,
+    row.checks?.[check].engine?.stateKey ?? "none",
+    isAdded(row, check),
+    serviceState(row) === "learning",
+  );
 
 const SERVICE_COLUMN: OTableColumnDef<CoverageRow> = {
   id: "service",

@@ -158,10 +158,22 @@ describe("IssueSignal", () => {
     expect(w.get(sel("autoobserve-issue-signal-caption")).text()).toBe("No rows in this window");
   });
 
-  it("a 400 is a red failure whose Retry asks again", async () => {
+  it.each([
+    ["a 400", (call: Call) => call[1].error(null, { content: { status: 400 } })],
+    [
+      "a partial answer, whose missing buckets were never measured,",
+      (call: Call) => {
+        call[1].data(null, {
+          type: "search_response_metadata",
+          content: { results: { hits: [], is_partial: true } },
+        });
+        call[1].complete(null, {});
+      },
+    ],
+  ])("%s is a red failure whose Retry asks again", async (_name, fail) => {
     const w = mountSignal();
     await flushPromises();
-    calls()[0][1].error(null, { content: { status: 400 } });
+    fail(calls()[0]);
     await flushPromises();
     expect(w.get(sel("ao-sparkline-error")).text()).toContain("Couldn't load the chart");
     await w.get(sel("ao-sparkline-retry")).trigger("click");

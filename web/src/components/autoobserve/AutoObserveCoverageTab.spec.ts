@@ -253,6 +253,21 @@ describe("AutoObserveCoverageTab in live mode", () => {
       expect(shown(mountTab(live(FEW)))).toEqual(["web", "api", "db"]);
     });
 
+    it("keeps the filter a link names while the first read is still loading", async () => {
+      routeQuery.cov = "table";
+      routeQuery.filter = "learning";
+      const w = mountTab(live(undefined, { status: "loading" }), true);
+      const young = {
+        ...row("young", "none"),
+        streams: [
+          { type: "logs", name: "young_logs", learning_until: (Date.now() + 86_400_000) * 1000 },
+        ],
+      };
+      await w.setProps({ source: live(coverage([young, watched("ready")])), skeleton: false });
+      const shown = w.findComponent(OTable).props("data") as { service: string }[];
+      expect(shown.map((r) => r.service)).toEqual(["young"]);
+    });
+
     it("counts the legend over the services the search matches", async () => {
       routeQuery.cov = "map";
       const wrapper = mountTab(

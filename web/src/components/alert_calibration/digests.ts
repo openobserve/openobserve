@@ -351,8 +351,10 @@ const compactCount = (locale: string) =>
   new Intl.NumberFormat(locale, { notation: "compact", maximumFractionDigits: 1 });
 
 /** No finding, no gap and nothing declined, over the alerts the reader can see. */
-export const isQuiet = (row: RunRow) =>
-  row.finding_count === 0 && !row.coverage_gap && row.skip_count === 0;
+export const isQuiet = (row: RunRow, uncheckedSkips = 0) =>
+  row.finding_count === 0 &&
+  coverageVerdict(row, uncheckedSkips) === "full" &&
+  row.skip_count === 0;
 
 /** Clean needs full coverage and nothing declined as well as zero findings: a zero alone may mean nothing was judged. */
 export const isClean = (row: RunRow) => isQuiet(row) && !isScoped(row);

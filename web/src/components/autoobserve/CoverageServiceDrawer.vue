@@ -236,6 +236,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :partial="chart.live?.partial"
               :wide="chart.live?.wide"
               :added="addedChecks.has(LIVE_CELL[chart.def.signal as LiveChartSignal])"
+              :learning="isLearning"
               @toggle="toggle(chart.def.signal)"
               @retry="chart.live?.retry()"
             >
@@ -286,7 +287,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <span
                 class="size-2 shrink-0 rounded-full"
-                :class="LIVE_DOT[liveCellLook(item.cell.engine?.stateKey ?? 'none')]"
+                :class="
+                  LIVE_DOT[liveCellLook(item.cell.engine?.stateKey ?? 'none', false, isLearning)]
+                "
               />
               <span class="text-text-heading text-sm font-medium">{{ item.label }}</span>
               <OTruncatedText class="text-text-body min-w-0 flex-1 text-sm">{{
@@ -463,6 +466,7 @@ const serviceCharts = useServiceCharts(
 const timeWindow = computed(() => serviceCharts.span.value);
 
 const state = computed<ServiceState>(() => props.serviceStates[props.row.service] ?? "watched");
+const isLearning = computed(() => state.value === "learning");
 
 const stateLabel = computed(() => {
   if (props.row.status) return props.row.status.label;
@@ -555,9 +559,9 @@ const liveChips = computed(() =>
     const added = addedChecks.value.has(check);
     return {
       check,
-      look: liveCellLook(stateKey, added),
+      look: liveCellLook(stateKey, added, isLearning.value),
       open: props.expanded === check,
-      text: liveCheckText(t, check, stateKey, added),
+      text: liveCheckText(t, check, stateKey, added, isLearning.value),
     };
   }),
 );
@@ -586,7 +590,9 @@ const openCheck = (check: LiveCheck) => {
 };
 
 const extraValue = (cell: CoverageCell): I18nText =>
-  cell.detector ? raw(cell.detector) : liveCellWord(t, cell.engine?.stateKey ?? "none");
+  cell.detector
+    ? raw(cell.detector)
+    : liveCellWord(t, cell.engine?.stateKey ?? "none", false, isLearning.value);
 
 // A logs-only service has no spans and no catalog entry, so its one way out is Logs.
 const logsOnly = computed(

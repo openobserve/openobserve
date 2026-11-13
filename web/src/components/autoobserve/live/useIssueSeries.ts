@@ -35,7 +35,7 @@ export type IssueSeriesStatus = "idle" | "loading" | "ready" | "empty" | "failed
 
 interface StreamEvent {
   type?: string;
-  content?: { results?: { hits?: BucketHit[] }; streaming_aggs?: boolean };
+  content?: { results?: { hits?: BucketHit[]; is_partial?: boolean }; streaming_aggs?: boolean };
 }
 
 interface StreamError {
@@ -61,6 +61,7 @@ const fetchHits = (
   new Promise((resolve, reject) => {
     const { traceId } = generateTraceContext();
     const hits = new Map<string, BucketHit>();
+    let partial = false;
     signal.addEventListener("abort", () =>
       streaming.cancelStreamQueryBasedOnRequestId({ trace_id: traceId, org_id: org }),
     );
@@ -85,13 +86,16 @@ const fetchHits = (
       },
       {
         data: (_payload: unknown, res: StreamEvent) => {
+          if (res?.content?.results?.is_partial) partial = true;
           if (res?.type !== "search_response_hits") return;
           if (res.content?.streaming_aggs) hits.clear();
           for (const hit of res.content?.results?.hits ?? []) hits.set(String(hit.t), hit);
         },
         error: (_payload: unknown, err?: StreamError) =>
           reject(new IssueSeriesError(err?.content?.status ?? null)),
-        complete: () => resolve([...hits.values()]),
+        // A partial answer leaves buckets unread, which zero-filling would draw as measured silence.
+        complete: () =>
+          partial ? reject(new IssueSeriesError(null)) : resolve([...hits.values()]),
       },
     );
   });

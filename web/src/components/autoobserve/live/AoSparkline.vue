@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           y="0"
           :width="r.width"
           height="100"
-          class="text-status-error-text"
+          class="text-status-error-text dark:[fill-opacity:0.24]"
           fill="currentColor"
           fill-opacity="0.08"
           data-test="ao-sparkline-highlight"
@@ -85,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <path
           v-if="shape.band"
           :d="shape.band"
-          class="text-text-secondary"
+          class="text-text-secondary dark:[fill-opacity:0.3]"
           fill="currentColor"
           fill-opacity="0.12"
           data-test="ao-sparkline-band"

@@ -590,6 +590,18 @@ const meanOf = (values: number[]) =>
 
 type ComparisonRow = ComparisonRows[number];
 
+// A grouped stream shares the lead's window but went out at its own time.
+const ownDetectedIndex = (stream: IssueStreamInfo, series: IssueSeries) =>
+  Math.min(
+    series.points.length - 1,
+    Math.max(0, Math.floor((usToMs(stream.firstSeenUs) - series.startMs) / series.stepMs)),
+  );
+
+const rowsBefore = (series: IssueSeries, own: number) =>
+  series.firstRowIndex !== null && series.firstRowIndex < own
+    ? meanOf(series.points.slice(series.firstRowIndex, own))
+    : null;
+
 export interface ComparedStream {
   stream: IssueStreamInfo;
   series: IssueSeries;
@@ -610,12 +622,13 @@ export const issueComparisonRows = (
         ? []
         : [{ label: t(key, { stream: name }), value, shown: count(locale, value), kind }];
     const index = (us: number) => Math.floor((usToMs(us) - series.startMs) / series.stepMs);
+    const own = ownDetectedIndex(stream, series);
     const back = stream.recoveredUs == null ? null : index(stream.recoveredUs);
-    const during = series.points.slice(series.detectedIndex, back ?? undefined);
+    const during = series.points.slice(own, back ?? undefined);
     // Only buckets after the whole incident ended count as healthy, never a stream's early return.
     const after = endUs === null ? [] : series.points.slice(Math.max(index(endUs) + 1, 0));
     const outMs = {
-      from: series.startMs + series.detectedIndex * series.stepMs,
+      from: series.startMs + own * series.stepMs,
       to:
         back === null
           ? series.startMs + series.points.length * series.stepMs
@@ -625,7 +638,7 @@ export const issueComparisonRows = (
     return [
       ...(usual !== null
         ? bar("autoobserve.issueLive.compare.usual", usual, "healthy")
-        : bar("autoobserve.issueLive.compare.before", series.usual, "healthy")),
+        : bar("autoobserve.issueLive.compare.before", rowsBefore(series, own), "healthy")),
       ...bar(
         back === null
           ? "autoobserve.issueLive.compare.since"
@@ -666,7 +679,10 @@ export const issueComparisonNote = (
   pairs: ComparedStream[],
 ): I18nText | null => {
   const names = pairs
-    .filter((p) => !p.baseline?.expected.length && issueNoRowsBefore(p.series))
+    .filter((p) => {
+      const own = ownDetectedIndex(p.stream, p.series);
+      return !p.baseline?.expected.length && own > 0 && rowsBefore(p.series, own) === null;
+    })
     .map((p) => p.stream.name);
   if (!names.length) return null;
   const list = new Intl.ListFormat(locale, { type: "conjunction" }).format(names);

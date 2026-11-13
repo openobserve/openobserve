@@ -480,24 +480,31 @@ const COVERAGE_WORD: Record<LiveCoverageState, I18nKey> = {
 export const coverageWord = (t: TranslateFn, state: LiveCoverageState): I18nText =>
   t(COVERAGE_WORD[state]);
 
-export type LiveCellLook = "covered" | "gap" | "added";
+export type LiveCellLook = "covered" | "gap" | "added" | "learning";
 
-/** A check this page just added an alert for reads "Added" until a pass counts it. */
-export const liveCellLook = (state: AutoObserveCellState, added = false): LiveCellLook => {
-  if (added && state !== "covered") return "added";
-  return state === "covered" ? "covered" : "gap";
+/** "Added" until a pass counts a new alert; a learning service's unwatched checks wait, not gap. */
+export const liveCellLook = (
+  state: AutoObserveCellState,
+  added = false,
+  learning = false,
+): LiveCellLook => {
+  if (state === "covered") return "covered";
+  if (added) return "added";
+  return learning ? "learning" : "gap";
 };
 
 export const LIVE_DOT: Record<LiveCellLook, string> = {
   covered: "bg-badge-success-soft-text",
   gap: "bg-badge-amber-soft-text",
   added: "bg-border-strong",
+  learning: "bg-status-neutral-text/60",
 };
 
 const LOOK_WORD: Record<LiveCellLook, I18nKey> = {
   covered: "autoobserveLive.coverage.stateWatched",
   gap: "autoobserveLive.coverage.stateGap",
   added: "autoobserveLive.cell.added",
+  learning: "autoobserve.coverageLive.stateLearning",
 };
 
 // A check is Watched or has a Coverage gap; why it has one is the detail's job, not the chip's.
@@ -505,7 +512,8 @@ export const liveCellWord = (
   t: TranslateFn,
   state: AutoObserveCellState,
   added = false,
-): I18nText => t(LOOK_WORD[liveCellLook(state, added)]);
+  learning = false,
+): I18nText => t(LOOK_WORD[liveCellLook(state, added, learning)]);
 
 export const liveLookWord = (t: TranslateFn, look: LiveCellLook): I18nText => t(LOOK_WORD[look]);
 
@@ -525,10 +533,11 @@ export const liveCheckText = (
   check: LiveCheck,
   state: AutoObserveCellState,
   added = false,
+  learning = false,
 ): I18nText =>
   t("autoobserve.coverage.chipAria", {
     signal: liveCheckName(t, check),
-    state: liveCellWord(t, state, added),
+    state: liveCellWord(t, state, added, learning),
   });
 
 // The same words as the coverage gap card's Why, so the drawer and the card never disagree.

@@ -161,7 +161,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OBanner>
 
       <OEmptyState
-        v-else-if="isQuiet(run)"
+        v-else-if="isQuiet(run, uncheckedSkips)"
         size="block"
         :illustration="isScoped(run) ? 'radar' : 'check'"
         :title="t('alertCalibration.detail.nothingTitle')"

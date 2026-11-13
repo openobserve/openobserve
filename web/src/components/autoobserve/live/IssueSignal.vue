@@ -203,12 +203,12 @@ const usualKeys = computed(() => {
     },
     d.band.length && {
       kind: "band",
-      swatch: "bg-text-secondary/20 h-2 w-3 rounded-xs",
+      swatch: "bg-text-secondary/20 dark:bg-text-secondary/45 h-2 w-3 rounded-xs",
       label: t("autoobserve.issueLive.usual.band"),
     },
     d.outside.length && {
       kind: "outside",
-      swatch: "bg-status-error-text/15 h-2 w-3 rounded-xs",
+      swatch: "bg-status-error-text/15 dark:bg-status-error-text/40 h-2 w-3 rounded-xs",
       label: t("autoobserve.issueLive.usual.outside"),
     },
   ].filter((k) => !!k);
