@@ -42,6 +42,9 @@ import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 
 const { t } = useI18nTyped();
 
+// Inline, the host popover scrolls the panel, so Apply stays pinned to its bottom edge.
+const STICKY_APPLY_CLASS = "bg-datepicker-popup-bg sticky bottom-0 py-2";
+
 const props = withDefaults(defineProps<DateTimeRangeProps>(), {
   startDate: "",
   startTime: "",
@@ -55,6 +58,7 @@ const props = withDefaults(defineProps<DateTimeRangeProps>(), {
   disableRelative: false,
   hideTime: false,
   showTimezone: false,
+  inline: false,
   disabled: false,
   // No default here: t() cannot run at module scope, so the English fallback is
   // resolved reactively below (see `placeholderText`).
@@ -345,7 +349,7 @@ const triggerClasses = computed(() => [
 
     <!-- Trigger + Popover -->
     <PopoverRoot v-model:open="popoverOpen">
-      <PopoverTrigger as-child>
+      <PopoverTrigger v-if="!inline" as-child>
         <div
           :class="triggerClasses"
           role="button"
@@ -394,11 +398,16 @@ const triggerClasses = computed(() => [
         </div>
       </PopoverTrigger>
 
-      <PopoverContent
-        :side-offset="4"
-        align="start"
-        class="rounded-default bg-datepicker-popup-bg border-datepicker-popup-border z-50 w-80 border shadow-lg outline-none max-lg:max-h-[var(--reka-popper-available-height,75vh)] max-lg:overflow-y-auto"
-        data-test="datetimerange-popup"
+      <!-- Inline, the same panel renders in place so a host popover stays the one surface. -->
+      <component
+        :is="inline ? 'div' : PopoverContent"
+        v-bind="inline ? {} : { sideOffset: 4, align: 'start' }"
+        :class="
+          inline
+            ? 'flex flex-col'
+            : 'rounded-default bg-datepicker-popup-bg border-datepicker-popup-border z-50 w-80 border shadow-lg outline-none max-lg:max-h-[var(--reka-popper-available-height,75vh)] max-lg:overflow-y-auto'
+        "
+        :data-test="inline ? 'datetimerange-inline' : 'datetimerange-popup'"
       >
         <!-- Tab bar -->
         <div
@@ -561,7 +570,10 @@ const triggerClasses = computed(() => [
           <!-- Apply -->
           <div
             v-if="!autoApply"
-            class="border-datepicker-popup-border flex justify-end border-t pt-2"
+            :class="[
+              'border-datepicker-popup-border flex justify-end border-t pt-2',
+              inline && STICKY_APPLY_CLASS,
+            ]"
           >
             <button
               type="button"
@@ -578,7 +590,10 @@ const triggerClasses = computed(() => [
         <!-- ── ABSOLUTE TAB ──────────────────────────────────── -->
         <div
           v-if="activeTab === 'absolute'"
-          class="flex max-h-[70vh] flex-col gap-3 overflow-y-auto p-3 max-lg:max-h-none max-lg:overflow-visible"
+          :class="[
+            'flex flex-col gap-3 p-3',
+            !inline && 'max-h-[70vh] overflow-y-auto max-lg:max-h-none max-lg:overflow-visible',
+          ]"
           data-test="datetimerange-absolute-panel"
         >
           <!-- Range calendar -->
@@ -761,7 +776,7 @@ const triggerClasses = computed(() => [
           </div>
 
           <!-- Apply -->
-          <div v-if="!autoApply" class="flex justify-end">
+          <div v-if="!autoApply" :class="['flex justify-end', inline && STICKY_APPLY_CLASS]">
             <button
               type="button"
               :disabled="isDisabled"
@@ -773,7 +788,7 @@ const triggerClasses = computed(() => [
             </button>
           </div>
         </div>
-      </PopoverContent>
+      </component>
     </PopoverRoot>
 
     <!-- Error / help text -->

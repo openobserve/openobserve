@@ -154,14 +154,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <AssistantLauncherAgent v-model="agent" :disabled="fieldLoading" />
                 </span>
               </template>
-              <AssistantIconButton
-                v-if="text"
-                :label="t('assistant.welcome.launcher.clear')"
-                :icon="assistantGlyph.close"
-                size="md"
-                data-test="assistant-launcher-clear"
-                @click="clear"
-              />
               <AssistantDictationWave v-if="voice.mine.value" :elapsed-ms="voice.elapsedMs.value" />
               <AssistantDictateButton
                 v-if="voice.mic.value !== 'none'"
@@ -789,7 +781,7 @@ function onKeydown(event: KeyboardEvent): void {
     event.preventDefault();
     ask(event.shiftKey);
   } else if (event.key === "Escape") {
-    // Escape never clears what was typed; only the clear button does (round 1 X-20).
+    // Escape never clears what was typed (round 1 X-20).
     (event.target as HTMLElement | null)?.blur();
   }
 }
@@ -845,11 +837,6 @@ function pickStarter(starter: Starter, index: number): void {
       ...(timeOverride.value && { timeOverride: sendRange() }),
     },
   });
-}
-
-function clear(): void {
-  text.value = "";
-  input.value?.focus();
 }
 
 function openFull(): void {

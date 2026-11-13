@@ -301,17 +301,14 @@ describe("AssistantLauncher", () => {
     expect(router.currentRoute.value.name).toBe("assistant");
   });
 
-  it("keeps the text on Escape and clears it only with the clear button (HOME-03, round 1 X-20)", async () => {
+  it("keeps the text on Escape and draws no clear button in the bar (HOME-03, round 1 X-20)", async () => {
     const { wrapper } = setup();
     await input(wrapper).setValue("keep me");
     (input(wrapper).element as HTMLInputElement).focus();
     await input(wrapper).trigger("keydown", { key: "Escape" });
     expect((input(wrapper).element as HTMLInputElement).value).toBe("keep me");
     expect(document.activeElement).not.toBe(input(wrapper).element);
-    const clear = wrapper.get('[data-test="assistant-launcher-clear"]');
-    expect(clear.attributes("aria-label")).toBe("Clear question");
-    await clear.trigger("click");
-    expect((input(wrapper).element as HTMLInputElement).value).toBe("");
+    expect(wrapper.find('[data-test="assistant-launcher-clear"]').exists()).toBe(false);
   });
 
   it("stages a starter without sending", async () => {
@@ -451,22 +448,26 @@ describe("AssistantLauncher", () => {
     expect(wrapper.find('[data-test="assistant-launcher-narrow-tools"]').exists()).toBe(false);
   });
 
-  it("rings Home's field with the ribbon only on focus, over a solid edge, and keeps the card plain", async () => {
+  it("rings Home's field with one flush ribbon on focus, over a solid edge at rest, and keeps the card plain", async () => {
     const { wrapper } = setupOn({ layout: "overview" });
     const frame = wrapper.get('[data-test="assistant-composer-frame"] > div');
     expect(frame.classes()).toEqual(
       expect.arrayContaining([
         "assistant-focus-glow",
-        "rounded-surface",
         "[&>div]:rounded-surface",
-        "[&>div]:focus-within:border-focus-ring-accent",
+        "[&>div]:focus-within:border-transparent",
+        "[&>div]:shadow-sm",
       ]),
     );
-    // Nothing paints a gradient at rest; the ribbon lives only in the utility's focus-within layers.
-    expect(frame.classes().some((c) => /gradient|rounded-3xl|border-0/.test(c))).toBe(false);
+    // One focus edge: no second coloured border, no gap padding, no gradient painted at rest.
+    expect(frame.classes().some((c) => /gradient|rounded-3xl|focus-ring-accent/.test(c))).toBe(
+      false,
+    );
+    expect(frame.classes()).not.toContain("p-0.5");
     expect(frame.get(":scope > div").classes()).toContain("border-input-border");
     const card = setup().wrapper.get('[data-test="assistant-composer-frame"] > div');
     expect(card.classes()).not.toContain("assistant-focus-glow");
+    expect(card.classes()).not.toContain("[&>div]:shadow-sm");
     expect(card.classes()).toContain("[&>div]:focus-within:ring-1");
     expect(wrapper.get('[data-test="assistant-composer-bar"]').classes()).toContain("border-t");
     expect(input(wrapper).classes()).toContain("placeholder:text-text-secondary");
@@ -503,13 +504,19 @@ describe("AssistantLauncher", () => {
     }
   });
 
-  it("fades the focus glow in once, never loops it, and holds it still under reduced motion", () => {
+  it("rests on a faint still halo, brightens it with the ring on focus, never loops, and holds still under reduced motion", () => {
     const css = readFileSync(resolve(__dirname, "../../../styles/tailwind.css"), "utf8");
     const start = css.indexOf("@utility assistant-focus-glow {");
     const rule = css.slice(start, css.indexOf("\n}\n", start));
     expect(start).toBeGreaterThan(-1);
     expect(rule).toContain("background: var(--color-gradient-brand-ribbon-focus)");
+    // Ring and halo sit one ring width out, on the box's radius plus that width, so all three are concentric.
+    expect(rule).toMatch(/inset: -0\.125rem;/);
+    expect(rule).toContain("border-radius: calc(var(--radius-surface) + 0.125rem)");
+    // The ring is hidden at rest, the halo shows at 0.15, and focus lifts them to 1 and 0.35.
     expect(rule).toMatch(/opacity: 0;\s*transition: opacity 0\.2s/);
+    expect(rule).toMatch(/&::before \{\s*filter: blur\(1rem\);\s*opacity: 0\.15;/);
+    expect(rule).toMatch(/&:focus-within::before \{\s*opacity: 0\.35;/);
     expect(rule).toMatch(/&:focus-within::after \{\s*opacity: 1;/);
     expect(rule).not.toMatch(/animation|infinite/);
     expect(rule).toMatch(/prefers-reduced-motion: reduce\)[\s\S]*transition: none/);
