@@ -248,7 +248,8 @@ test.describe("Report Folders", () => {
       testLogger.info(`Deleted/already gone test report: ${report.name} (${result.code})`);
     }
     // Spec-specific prefixes: 'test_folder_' alone also matches scheduledReportsDrawer's folders mid-run.
-    await apiCleanup.cleanupReportFolders(['test_folder_a_', 'test_folder_b_', 'test_special_chars_']);
+    await apiCleanup.cleanupReportFolders(['test_folder_a_', 'test_folder_b_', 'test_special_chars_'])
+      .catch(e => testLogger.warn(`Report folder cleanup incomplete: ${e.message}`));
     // cleanupDashboards() would also remove every other spec's dashboards under fullyParallel.
     const dashboards = await apiCleanup.fetchDashboardsInFolder('default');
     for (const dash of dashboards.filter(d => d.title && d.title.startsWith(DASH_PREFIX))) {
