@@ -63,7 +63,7 @@ describe("DateTime pickerTimezone and hideClipboard", () => {
   });
 
   /// A zone picked here changes this range only, never the timezone every other page reads.
-  it("re-reads the shown times in a newly picked zone without touching the app's", async () => {
+  it("redraws the same instants in a newly picked zone without touching the app's", async () => {
     const dispatch = store.dispatch;
     const calls: unknown[][] = [];
     store.dispatch = ((...args: unknown[]) => {
@@ -77,7 +77,8 @@ describe("DateTime pickerTimezone and hideClipboard", () => {
       await wrapper!.vm.onTimezoneChange();
       await flushPromises();
 
-      expect(lastEmit().startTime).toBe(START + 5.5 * 3_600_000_000);
+      expect(wrapper!.vm.getConsumableDateTime().startTime).toBe(START);
+      expect(wrapper!.vm.selectedTime.startTime).toBe("00:00:00");
       expect(wrapper!.emitted("on:timezone-change")!.at(-1)).toEqual(["UTC"]);
       expect(store.state.timezone).toBe("UTC");
       expect(calls.some((call) => call[0] === "setTimezone")).toBe(false);
@@ -86,13 +87,49 @@ describe("DateTime pickerTimezone and hideClipboard", () => {
     }
   });
 
-  it("drops the copy and paste row but keeps the zone select and the hint", async () => {
+  it("keeps the applied range when the zone changes and the panel closes without Apply", async () => {
+    createWrapper({ pickerTimezone: "Asia/Calcutta", autoApply: false });
+    await flushPromises();
+    wrapper!.vm.onMenuOpenChange(true);
+    wrapper!.vm.menuOpen = true;
+    await flushPromises();
+    wrapper!.vm.timezone = "UTC";
+    await wrapper!.vm.onTimezoneChange();
+    await flushPromises();
+    wrapper!.vm.menuOpen = false;
+    wrapper!.vm.onMenuOpenChange(false);
+    await flushPromises();
+
+    const range = wrapper!.vm.getConsumableDateTime();
+    expect(range.startTime).toBe(START);
+    expect(range.endTime).toBe(END);
+    expect(wrapper!.vm.selectedTime.startTime).toBe("00:00:00");
+  });
+
+  it("re-emits a linked fixed range as fixed when the link also names a zone", async () => {
+    createWrapper({
+      disableRelative: false,
+      defaultType: "absolute",
+      initialTimezone: "Asia/Calcutta",
+    });
+    await flushPromises();
+    const events = wrapper!.emitted("on:date-change") as Record<string, unknown>[][];
+    expect(events.length).toBeGreaterThan(0);
+    for (const [payload] of events) {
+      expect(payload.valueType).toBe("absolute");
+      expect(payload.startTime).toBe(START);
+    }
+  });
+
+  it("drops the text input, copy and paste but keeps the zone select and the resolved range", async () => {
     createWrapper({ pickerTimezone: "Asia/Calcutta", hideClipboard: true, defaultOpen: true });
     await flushPromises();
+    expect(inMenu("date-time-input")).toBeNull();
     expect(inMenu("date-time-copy-btn")).toBeNull();
     expect(inMenu("date-time-paste-btn")).toBeNull();
     expect(inMenu("datetime-timezone-select")).not.toBeNull();
-    expect(document.body.textContent).toContain("You can choose multiple dates");
+    expect(inMenu("date-time-resolved")).not.toBeNull();
+    expect(document.body.textContent).not.toContain("You can choose multiple dates");
   });
 
   it("keeps copy and paste and reads the app's zone by default", async () => {

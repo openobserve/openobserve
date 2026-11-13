@@ -412,6 +412,69 @@ describe("Logs Index", async () => {
     });
   });
 
+  describe("stale range strip", () => {
+    const showStaleRange = async () => {
+      wrapper.vm.searchObj.data.stream.streamLists = [{ label: "s1", value: "s1" }];
+      wrapper.vm.searchObj.data.stream.selectedStream = ["s1"];
+      wrapper.vm.searchObj.data.queryResults = { hits: [{ _timestamp: 1 }] };
+      wrapper.vm.searchObj.meta.searchApplied = true;
+      wrapper.vm.searchObj.data.errorMsg = "";
+      wrapper.vm.searchObj.meta.liveMode = false;
+      wrapper.vm.searchObj.loading = false;
+      wrapper.vm.searchObj.meta.logsVisualizeToggle = "logs";
+      wrapper.vm.searchObj.data.datetime.type = "relative";
+      wrapper.vm.searchObj.data.datetime.relativeTimePeriod = "1h";
+      wrapper.vm.searchObj.meta.executed = {
+        signature: { time: { type: "relative", period: "15m" } },
+      };
+      await flushPromises();
+    };
+
+    afterEach(() => {
+      wrapper.vm.searchObj.meta.executed = null;
+    });
+
+    it("names the range the shown results came from once the picker moves off it", async () => {
+      await showStaleRange();
+      expect(wrapper.vm.staleRangeText).toContain("15");
+      const strip = wrapper.find('[data-test="logs-search-bar-stale-range-strip"]');
+      expect(strip.exists()).toBe(true);
+      expect(strip.text()).toContain(wrapper.vm.staleRangeText);
+    });
+
+    it("keeps the strip above the no-events state (V5)", async () => {
+      await showStaleRange();
+      wrapper.vm.searchObj.data.queryResults = { hits: [] };
+      await flushPromises();
+      const empty = wrapper.find('[data-test="logs-search-no-events-found-text"]');
+      expect(empty.exists()).toBe(true);
+      const strip = empty.find('[data-test="logs-search-bar-stale-range-strip"]');
+      expect(strip.exists()).toBe(true);
+      expect(strip.text()).toContain(wrapper.vm.staleRangeText);
+    });
+
+    it("runs the query from the strip", async () => {
+      await showStaleRange();
+      const handleRunQueryFn = vi.fn();
+      wrapper.vm.searchBarRef = { handleRunQueryFn } as any;
+      await wrapper.find('[data-test="logs-search-bar-stale-range-strip-run"]').trigger("click");
+      expect(handleRunQueryFn).toHaveBeenCalled();
+    });
+
+    it("hides while the range still matches, or a search is running", async () => {
+      await showStaleRange();
+      wrapper.vm.searchObj.data.datetime.relativeTimePeriod = "15m";
+      expect(wrapper.vm.staleRangeText).toBeNull();
+      wrapper.vm.searchObj.data.datetime.relativeTimePeriod = "1h";
+      wrapper.vm.searchObj.loading = true;
+      expect(wrapper.vm.staleRangeText).toBeNull();
+      wrapper.vm.searchObj.loading = false;
+      wrapper.vm.searchObj.meta.logsVisualizeToggle = "patterns";
+      expect(wrapper.vm.staleRangeText).toBeNull();
+      wrapper.vm.searchObj.meta.logsVisualizeToggle = "logs";
+    });
+  });
+
   describe("free text (item 1)", () => {
     const stream = (name: string, fts: boolean) => ({
       name,
@@ -941,6 +1004,58 @@ describe("Logs Index", async () => {
     const date = { startTime: "2020-01-01", endTime: "2020-01-02" };
     wrapper.vm.setHistogramDate(date);
     expect(setCustomDate).toHaveBeenCalledWith("absolute", date);
+  });
+
+  it("drops the armed window query when the picker refuses the search-around window", async () => {
+    wrapper.vm.searchObj.meta.sqlMode = false;
+    const setCustomDate = vi.fn(() => false);
+    wrapper.vm.searchBarRef = { dateTimeRef: { setCustomDate } } as any;
+    wrapper.vm.onSearchAroundWindow({ startUs: 1_000_000, endUs: 2_000_000 });
+    expect(setCustomDate).toHaveBeenCalled();
+    expect(wrapper.vm.searchObj.data.searchAround.windowQuery).toBeNull();
+  });
+
+  it("binds the window query to the window the picker's new range starts", async () => {
+    wrapper.vm.searchObj.meta.sqlMode = false;
+    wrapper.vm.searchObj.meta.editorDirty = false;
+    const setCustomDate = vi.fn(() => true);
+    wrapper.vm.searchBarRef = { dateTimeRef: { setCustomDate } } as any;
+    wrapper.vm.onSearchAroundWindow({ startUs: 1_000_000, endUs: 2_000_000 });
+    expect(wrapper.vm.searchObj.data.searchAround.windowQuery).toMatchObject({
+      query: "",
+      startUs: 1_000_000,
+      endUs: 2_000_000,
+      view: "logs",
+    });
+    wrapper.vm.searchObj.data.searchAround.windowQuery = null;
+  });
+
+  it("applies the window without arming it while the editor holds an unrun edit", async () => {
+    wrapper.vm.searchObj.meta.sqlMode = false;
+    wrapper.vm.searchObj.meta.editorDirty = true;
+    const setCustomDate = vi.fn(() => true);
+    wrapper.vm.searchBarRef = { dateTimeRef: { setCustomDate } } as any;
+    wrapper.vm.onSearchAroundWindow({ startUs: 1_000_000, endUs: 2_000_000 });
+    expect(setCustomDate).toHaveBeenCalled();
+    expect(wrapper.vm.searchObj.data.searchAround.windowQuery).toBeNull();
+    wrapper.vm.searchObj.meta.editorDirty = false;
+  });
+
+  it("drops the window query when the view leaves the one it was armed in", async () => {
+    wrapper.vm.searchObj.meta.logsVisualizeToggle = "logs";
+    wrapper.vm.searchObj.data.searchAround.windowQuery = {
+      query: "",
+      typedQuery: "",
+      view: "logs",
+      startUs: 1,
+      endUs: 2,
+      pinned: true,
+    };
+    wrapper.vm.searchObj.meta.logsVisualizeToggle = "patterns";
+    await flushPromises();
+    expect(wrapper.vm.searchObj.data.searchAround.windowQuery).toBeNull();
+    wrapper.vm.searchObj.meta.logsVisualizeToggle = "logs";
+    await flushPromises();
   });
 
   it("Should handle chart API error and populate errors list", async () => {

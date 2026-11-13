@@ -475,7 +475,6 @@ test.describe("Unflattened testcases", () => {
 
     testLogger.info('Selecting relative time range');
     await pageManager.unflattenedPage.relativeTab.waitFor();
-    await pageManager.unflattenedPage.relativeTab.click();
     await page.waitForTimeout(1000);
 
     testLogger.info('Verifying timestamp field is visible (final verification)');

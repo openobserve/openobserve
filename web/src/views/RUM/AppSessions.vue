@@ -78,6 +78,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 }"
                 :default-relative-time="sessionState.data.datetime.relativeTimePeriod"
                 data-test="logs-search-bar-date-time-dropdown"
+                :retention-days="rumStreamLimits.retentionDays"
+                :query-range-restriction-in-hour="rumStreamLimits.queryRangeRestrictionInHour"
                 @on:date-change="updateDateChange"
               />
               <!-- Run query button -->
@@ -513,6 +515,7 @@ import { durationFormatter, b64DecodeUnicode, b64EncodeUnicode } from "@/utils/z
 import SearchFieldList from "@/components/common/sidebar/SearchFieldList.vue";
 import { useRouter, type LocationQuery } from "vue-router";
 import { useStore } from "vuex";
+import { useStreamTimeLimits } from "@/composables/useStreamTimeLimits";
 import useQuery from "@/composables/useQuery";
 import searchService from "@/services/search";
 import useSession from "@/composables/useSessionReplay";
@@ -600,6 +603,7 @@ const { getTimeInterval, buildQueryPayload, parseQuery } = useQuery();
 
 const { sessionState } = useSession();
 const store = useStore();
+const rumStreamLimits = useStreamTimeLimits(() => [{ name: "_rumdata", type: "logs" }]);
 const isLoading = ref<boolean[]>([]);
 const { t } = useI18nTyped();
 const dateTime = ref({
@@ -1447,7 +1451,9 @@ const updateDateChange = (date: any) => {
     valueType: date.relativeTimePeriod ? "relative" : "absolute",
   };
   sessionState.data.datetime = dateTime.value;
-  if (date.valueType === "relative" && isMounted.value) getSessions();
+  // The picker commits typed and calendar ranges only on Apply, so any user change runs.
+  const userApplied = date.valueType === "relative" || date.userChangedValue === true;
+  if (userApplied && isMounted.value) getSessions();
 };
 
 const splitterModel = ref(250);

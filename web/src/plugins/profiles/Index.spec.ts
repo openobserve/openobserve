@@ -55,7 +55,8 @@ vi.mock("vue-router", () => ({
 
 vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
-vi.mock("@/utils/date", () => ({
+vi.mock("@/utils/date", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/utils/date")>()),
   getConsumableRelativeTime: mocks.getConsumableRelativeTime,
 }));
 

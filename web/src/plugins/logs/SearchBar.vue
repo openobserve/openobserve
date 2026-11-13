@@ -563,7 +563,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div
         ref="toolbarRightRef"
-        class="flex flex-shrink-0 items-center gap-2 max-md:w-full max-md:justify-end"
+        class="flex flex-shrink-0 items-center gap-2 max-md:w-full max-md:flex-wrap max-md:justify-end max-md:gap-x-1 max-md:gap-y-1"
       >
         <OPageHeaderStatus />
         <template v-if="searchObj.meta.showTransformEditor && !shouldMoveShareToMenu">
@@ -601,8 +601,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="p-2"
             data-test="logs-search-bar-menu-share-link-btn"
           >
+            <!-- A caret menu would nest inside this menu, so the narrow layout copies the fixed link only. -->
             <ShareButton
               :url="shareURL"
+              :fixed-label="shareFixedLabel"
               variant="outline"
               size="sm-action"
               :show-label="true"
@@ -848,6 +850,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="!shouldMoveShareToMenu"
           data-test="logs-search-bar-share-link-btn"
           :url="shareURL"
+          :live-url="shareRollingURL"
+          :fixed-label="shareFixedLabel"
+          :fixed-copy-label="shareFixedCopyLabel"
+          :live-label="shareRollingLabel"
+          :range-context="shareRangeContext"
           variant="outline"
           size="icon-md"
           :disabled="!!shareReason"
@@ -874,11 +881,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTooltip :content="t('search.functionEditorLabel')" />
         </OButton>
 
-        <div class="order-1 max-md:me-auto">
+        <div class="order-1 min-w-0 max-md:me-auto max-md:shrink-0">
           <DateTime
             ref="dateTimeRef"
             auto-apply
             menu-align="end"
+            shortcuts
             :default-type="searchObj.data.datetime.type"
             :default-absolute-time="{
               startTime: searchObj.data.datetime.startTime,
@@ -891,13 +899,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :queryRangeRestrictionInHour="searchObj.data.datetime.queryRangeRestrictionInHour"
             @on:date-change="updateDateTime"
             @on:timezone-change="updateTimezone"
+            :retention-days="retentionDays"
+            :narrowed-by-query="narrowedByQuery"
             :disable="disable"
             class="h-8.5!"
           />
         </div>
 
         <div class="search-time order-2">
-          <div class="flex gap-2">
+          <div class="flex gap-2 max-md:gap-1">
             <OTooltip
               v-if="
                 config.isEnterprise == 'true' &&
@@ -966,7 +976,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </ODropdown>
             </OButtonGroup>
             <RecentSearchesButton
-              class="me-1 size-[2.125rem]!"
+              class="size-[2.125rem]! md:me-1"
               data-test="logs-search-bar-recent-searches-btn"
               @view-all="openRecentSearches"
             />
@@ -1133,7 +1143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :variant="showRunQueryPending ? 'pending' : 'primary'"
                 :title="t('search.runQuery')"
                 size="sm-toolbar"
-                class="rounded-s-default! relative min-w-[5.875rem] rounded-e-none! [transition:box-shadow_0.3s_ease,opacity_0.2s_ease]"
+                class="rounded-s-default! relative rounded-e-none! [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] md:min-w-[5.875rem]"
                 :class="[
                   showRunQueryPending
                     ? ''
@@ -1166,7 +1176,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   size="xs"
                   class="me-1"
                 />
-                {{ t("search.runQuery") }}
+                <OIcon
+                  v-if="!(searchObj.meta.liveMode && store.state.zoConfig.auto_query_enabled)"
+                  name="play-arrow"
+                  size="sm"
+                  class="md:hidden"
+                />
+                <span class="max-md:sr-only">{{ t("search.runQuery") }}</span>
               </OButton>
               <OSeparator
                 v-if="!showRunQueryPending || isRunQueryCancelShown"
@@ -1238,13 +1254,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </ODropdown>
               <!-- Compact Auto Refresh Button -->
               <AutoRefreshInterval
-                class="ms-2"
+                class="ms-1 md:ms-2"
                 v-model="searchObj.meta.refreshInterval"
                 :trigger="true"
                 :is-compact="true"
                 :min-refresh-interval="store.state?.zoConfig?.min_auto_refresh_interval ?? 0"
+                :range-end-us="refreshRangeEndUs"
+                :range-start-us="refreshRangeStartUs"
                 @update:model-value="onRefreshIntervalUpdate"
                 @trigger="$emit('onAutoIntervalTrigger')"
+                @live="goLiveRange"
               />
             </div>
           </div>
@@ -1813,6 +1832,10 @@ import { useTheme } from "@/composables/useTheme";
 import useBreakpoint from "@/composables/useBreakpoint";
 import DateTime from "@/components/DateTime.vue";
 import ShareButton from "@/components/common/ShareButton.vue";
+import { fixedShareLabel, withRollingPeriod } from "@/utils/shareTimeRange";
+import { queryNarrowedRange } from "@/utils/queryTimeNarrowing";
+import { fixedRangeEnd } from "@/utils/autoRefreshPause";
+import { formatPeriodLabel } from "@/utils/timeRangeRail";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OPageHeaderStatus from "@/lib/core/PageHeader/OPageHeaderStatus.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
@@ -2173,6 +2196,10 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    retentionDays: {
+      type: Number,
+      default: undefined,
+    },
   },
   setup(props, { emit }) {
     const router = useRouter();
@@ -2222,6 +2249,7 @@ export default defineComponent({
       updatedLocalLogFilterField,
       patchUrlViewState,
       generateURLQuery,
+      shownPeriod,
       checkTimestampAlias,
     } = logsUtils();
     const { getSavedViews, setSelectedStreams, onStreamChange, cancelQuery } = useSearchBar(t);
@@ -3243,6 +3271,12 @@ export default defineComponent({
     const updateDateTime = async (value: object) => {
       if (suppressUpdateDateTime) return;
       const isZoom = takeZoom(value);
+      // Refresh pauses while results are stale, so going live from an ended range must run once to resume it.
+      const resumesRefresh =
+        value.userChangedValue === true &&
+        !!value.relativeTimePeriod &&
+        searchObj.data.datetime?.type === "absolute" &&
+        Number(searchObj.meta.refreshInterval) > 0;
       if (value.userChangedValue === true) noteUserScopeChange();
       ignoreAutoTrigger = searchObj.shouldIgnoreWatcher;
       if (
@@ -3260,13 +3294,14 @@ export default defineComponent({
           searchObj.data.datetime.queryRangeRestrictionInHour * 60 * 60 * 1000000;
 
         if (parseInt(newStartTime) > parseInt(value.startTime)) {
-          // User-visible warning so the silent rewrite isn't invisible.
-          toast({
-            variant: "warning",
-            message: t("logs.searchBar.rangeExceedsLimit", {
-              hours: searchObj.data.datetime.queryRangeRestrictionInHour,
-            }),
-          });
+          // The picker names the limit on a user's pick, so only a URL or view clamp needs the toast.
+          if (value.userChangedValue !== true)
+            toast({
+              variant: "warning",
+              message: t("logs.searchBar.rangeExceedsLimit", {
+                hours: searchObj.data.datetime.queryRangeRestrictionInHour,
+              }),
+            });
 
           value.startTime = newStartTime;
 
@@ -3347,15 +3382,14 @@ export default defineComponent({
         ignoreAutoTrigger === false &&
         (isLogsResultsMode() || searchObj.meta.logsVisualizeToggle === "patterns")
       ) {
-        requestTimeRun(value.valueType, isZoom);
+        // "run" is explicit and would execute unsaved editor edits.
+        if (resumesRefresh && !searchObj.meta.editorDirty) autoRun.request("run");
+        else requestTimeRun(value.valueType, isZoom || value.rerun === true);
       }
     };
 
-    const updateTimezone = () => {
-      if (store.state.zoConfig.query_on_stream_selection == false) {
-        emit("onChangeTimezone");
-      }
-    };
+    // A zone change keeps the instants, so nothing re-runs and the page must redraw its rows.
+    const updateTimezone = () => emit("onChangeTimezone");
 
     const updateQuery = () => {
       if (queryEditorRef.value?.setValue) queryEditorRef.value.setValue(searchObj.data.query);
@@ -4469,6 +4503,53 @@ export default defineComponent({
 
       return url;
     });
+
+    // The shared link holds the shown results' range, which can differ from the picker until the next run.
+    const sharePeriod = computed<string | null>(() => shownPeriod());
+    const shareRollingURL = computed(
+      () => withRollingPeriod(shareURL.value, sharePeriod.value) ?? "",
+    );
+    // The fixed link holds the shown results' bounds, which the share URL already resolved.
+    const shareBoundsUs = computed(() => {
+      const params = new URLSearchParams(shareURL.value.slice(shareURL.value.indexOf("?") + 1));
+      return { start: Number(params.get("from")), end: Number(params.get("to")) };
+    });
+    const shareFixedLabel = computed(() =>
+      fixedShareLabel(shareBoundsUs.value.start, shareBoundsUs.value.end, store.state.timezone),
+    );
+    const shareFixedCopyLabel = computed(() =>
+      fixedShareLabel(shareBoundsUs.value.start, shareBoundsUs.value.end, "UTC"),
+    );
+    const shareRangeContext = computed(() =>
+      [t("menu.search"), searchObj.data.stream.selectedStream.join(", ")]
+        .filter(Boolean)
+        .join(" · "),
+    );
+    const shareRollingLabel = computed(() =>
+      sharePeriod.value
+        ? String(formatPeriodLabel(sharePeriod.value, store.state.timezone, t))
+        : "",
+    );
+    // Logs keep a stale relativeTimePeriod on absolute ranges, so only type and end decide.
+    const refreshRangeEndUs = computed(() => {
+      const { type, endTime } = searchObj.data.datetime;
+      return fixedRangeEnd({ type, endTime: Number(endTime) });
+    });
+    const narrowedByQuery = computed(() => {
+      if (!searchObj.meta.sqlMode) return null;
+      const { startTime, endTime } = searchObj.data.datetime;
+      return queryNarrowedRange(
+        searchObj.data.query,
+        store.state.zoConfig?.timestamp_column || "_timestamp",
+        { startUs: Number(startTime), endUs: Number(endTime) },
+      );
+    });
+    const refreshRangeStartUs = computed(() =>
+      refreshRangeEndUs.value === null ? null : Number(searchObj.data.datetime.startTime) || null,
+    );
+    const goLiveRange = () => {
+      (dateTimeRef.value as { goLive?: () => void } | null)?.goLive?.();
+    };
     const showSearchHistoryfn = () => {
       emit("showSearchHistory");
     };
@@ -5412,6 +5493,15 @@ export default defineComponent({
       functionUpdateConfirm,
       executeFunctionUpdate,
       shareURL,
+      shareRollingURL,
+      shareFixedLabel,
+      shareFixedCopyLabel,
+      shareRangeContext,
+      refreshRangeStartUs,
+      narrowedByQuery,
+      shareRollingLabel,
+      refreshRangeEndUs,
+      goLiveRange,
       showSearchHistoryfn,
       getImageURL,
       resetFilters,

@@ -704,6 +704,13 @@ describe("logsUtils", () => {
       expect(query.to).toBe(2000000);
     });
 
+    it("names the same rolling period as the URL, without building the URL", () => {
+      expect(utils.shownPeriod()).toBe(utils.generateURLQuery().period);
+      mockSearchObj.data.datetime.type = "absolute";
+      expect(utils.shownPeriod()).toBeNull();
+      expect(utils.generateURLQuery().period).toBeUndefined();
+    });
+
     it("should include from/to for share link even with relative time", () => {
       mockSearchObj.data.datetime.startTime = 1000000;
       mockSearchObj.data.datetime.endTime = 2000000;

@@ -62,6 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :buildRunBlocked="buildRunBlocked"
               @handleRunQueryFn="handleRunQueryFn"
               @on-auto-interval-trigger="onAutoIntervalTrigger"
+              :retention-days="logsRetentionDays"
               @showSearchHistory="showSearchHistoryfn"
               @extractPatterns="extractPatternsForCurrentQuery"
               @buildModeToggle="onBuildModeToggle"
@@ -308,6 +309,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="flex h-full flex-col"
                       data-test="logs-search-no-events-found-text"
                     >
+                      <StaleRangeStrip
+                        v-if="staleRangeText"
+                        :text="staleRangeText"
+                        data-test="logs-search-bar-stale-range-strip"
+                        shortcut-id="logsRunQuery"
+                        @run="() => searchBarRef?.handleRunQueryFn?.()"
+                      />
                       <LogsPermalinkBanner
                         @retry="onPermalinkRetry"
                         @show-lines="onPermalinkShowLines"
@@ -402,6 +410,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @search-job="onGuardSearchJob"
                         @select-stream="onSelectStream"
                       />
+                      <StaleRangeStrip
+                        v-if="staleRangeText"
+                        :text="staleRangeText"
+                        data-test="logs-search-bar-stale-range-strip"
+                        shortcut-id="logsRunQuery"
+                        @run="() => searchBarRef?.handleRunQueryFn?.()"
+                      />
                       <div v-if="showSearchCancelledNotice" class="flex items-center px-2.5 pt-2">
                         <OBadge
                           variant="default-soft"
@@ -427,6 +442,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :stream-doc-time-range="streamDocTimeRange"
                           :query-window-us="queryWindowUs"
                           @update:datetime="setHistogramDate"
+                          @search:aroundwindow="onSearchAroundWindow"
                           @update:scroll="getMoreData"
                           @update:recordsPerPage="getMoreDataRecordsPerPage"
                           @expandlog="toggleExpandLog"
@@ -669,6 +685,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <LogsPermalinkDrawer
       @search-around="runSearchAround"
+      @search:aroundwindow="onSearchAroundWindow"
       @add-search-term="onPermalinkAddSearchTerm"
       @send-to-ai-chat="sendToAiChat"
     />
@@ -701,6 +718,8 @@ import analytics from "@/services/product_analytics";
 import config from "@/aws-exports";
 import { featureState, streamTypeFeature } from "@/utils/featureGate";
 import { inheritedRetentionDays } from "@/utils/dataRetention";
+import { combineStreamTimeLimits, type StreamLimitEntry } from "@/composables/useStreamTimeLimits";
+import { fixedRangeEnd, fixedRangeRefreshDone } from "@/utils/autoRefreshPause";
 import { useLicenseLocks } from "@/composables/useFeatureLock";
 import { verifyOrganizationStatus, deepCopy, addSpacesToOperators } from "@/utils/zincutils";
 import MainLayoutCloudMixin from "@/enterprise/mixins/mainLayout.mixin";
@@ -790,8 +809,12 @@ import {
   sharedPageNotice,
 } from "@/composables/useLogs/useLogsUrl";
 import { useLogsUrlSync } from "@/composables/useLogs/useLogsUrlSync";
-import { useSearchAround } from "@/composables/useLogs/searchAround";
+import { useSearchAround, searchAroundPickerRange } from "@/composables/useLogs/searchAround";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
+import StaleRangeStrip from "@/components/StaleRangeStrip.vue";
+import { liveTimeSelection, staleQueriedRange } from "@/utils/logsStaleRange";
+import { formatRangeLabel } from "@/utils/timeRangeLabel";
+import { formatPeriodLabel } from "@/utils/timeRangeRail";
 import {
   saveLogsSelectedStreams,
   saveLogsStreamType,
@@ -861,13 +884,22 @@ export default defineComponent({
     LogsErrorState,
     LogsAutoRunGuard,
     OBadge,
+    StaleRangeStrip,
   },
   mixins: [MainLayoutCloudMixin],
   emits: ["sendToAiChat"],
   methods: {
-    setHistogramDate(date: any) {
+    setHistogramDate(date: any): boolean {
       this.searchBarRef?.markZoom?.(date);
-      this.searchBarRef.dateTimeRef.setCustomDate("absolute", date);
+      return this.searchBarRef.dateTimeRef.setCustomDate("absolute", date) !== false;
+    },
+    // The setCustomDate behind setHistogramDate re-runs the search, so the unfiltered query is armed first.
+    onSearchAroundWindow(range: { startUs: number; endUs: number }) {
+      this.armWindowQuery(range);
+      const applied = this.setHistogramDate(
+        searchAroundPickerRange(range, this.store.state.timezone),
+      );
+      if (!applied) this.searchObj.data.searchAround.windowQuery = null;
     },
     searchData() {
       this.autoRun.engine.requestRun("run");
@@ -1323,8 +1355,10 @@ export default defineComponent({
       autoRun.engine.requestRun("run");
     };
 
+    // A window run sent its own unfiltered query, so the editor's filter is not what ran.
     const showRanFilter = (generationId: number, ranQuery: string) => {
       if (searchObj.meta.sqlMode || searchObj.meta.editorDirty) return;
+      if (searchObj.data.searchAround.windowQuery) return;
       if (!autoRun.engine.isCurrent(generationId)) return;
       if (String(searchObj.data.query ?? "").trim() !== ranQuery) return;
       const ctx = buildFilterContext(searchObj, store.state.zoConfig);
@@ -2660,6 +2694,9 @@ export default defineComponent({
     watch(
       () => [searchObj?.meta?.logsVisualizeToggle],
       async () => {
+        const around = searchObj.data.searchAround;
+        if (around.windowQuery && around.windowQuery.view !== searchObj.meta.logsVisualizeToggle)
+          around.windowQuery = null;
         try {
           // Reset buildModeQueryEditorDisabled when not in build mode
           if (searchObj.meta.logsVisualizeToggle !== "build") {
@@ -3989,6 +4026,24 @@ export default defineComponent({
       );
     });
     const showGuardBanner = computed(() => guardBlocksGrid.value && !showGuardEmptyState.value);
+    // Logs runs by hand, so a picked range sits over the old results until Run; say which range they are.
+    const staleRangeText = computed(() => {
+      if (isAutoRunOn.value || searchObj.loading) return null;
+      if (searchObj.meta.logsVisualizeToggle !== "logs") return null;
+      const queried = staleQueriedRange(
+        searchObj.meta.executed?.signature?.time,
+        liveTimeSelection(searchObj.data.datetime ?? {}),
+      );
+      if (!queried) return null;
+      const range =
+        queried.type === "relative"
+          ? String(formatPeriodLabel(queried.period, store.state.timezone, t))
+          : formatRangeLabel(
+              { startUs: queried.startUs, endUs: queried.endUs },
+              { timezone: store.state.timezone, surface: "summary" },
+            );
+      return t("search.resultsAreForRange", { range });
+    });
     // A re-run rewrites the error before it fails again, so the kept panel holds the error it last showed.
     const shownError = ref({ code: 0, msg: "", detail: "", query: "" });
     watch(
@@ -4016,6 +4071,28 @@ export default defineComponent({
       () => [isResultsStale.value, !!searchObj.meta.autoRunBlocked],
       () => autoRun.engine.checkRefreshResume(),
     );
+
+    // Logs keeps the last rolling period on an absolute range, so only the type marks it fixed.
+    const logsRefreshDone = () => {
+      const { type, endTime } = searchObj.data.datetime ?? {};
+      if (type !== "absolute") return false;
+      const lastRunMs = autoRun.engine.lastRunStartedMs();
+      return fixedRangeRefreshDone(fixedRangeEnd({ type, endTime }), lastRunMs, Date.now());
+    };
+    const pageHidden = () => document.visibilityState === "hidden";
+    const stopRefreshPauses = [
+      autoRun.engine.registerRefreshPause(pageHidden),
+      autoRun.engine.registerRefreshPause(logsRefreshDone),
+    ];
+    // Ticks missed while hidden collapse into the engine's single missed tick.
+    const onVisibilityChange = () => {
+      if (!pageHidden()) autoRun.engine.checkRefreshResume();
+    };
+    onMounted(() => document.addEventListener("visibilitychange", onVisibilityChange));
+    onBeforeUnmount(() => {
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      stopRefreshPauses.forEach((stop) => stop());
+    });
 
     watch(
       () => autoRun.readSignature(),
@@ -4048,6 +4125,28 @@ export default defineComponent({
       sharedPageNotice.value = null;
     };
 
+    const listedStream = (stream: string): any =>
+      (searchObj.data.streamResults?.list ?? []).find((item: any) => item?.name === stream);
+
+    /** Days a stream entry keeps data, falling back to the org default; null when kept forever. */
+    const retentionDaysOf = (entry: any): number | null => {
+      const days =
+        Number(entry?.settings?.data_retention ?? 0) ||
+        inheritedRetentionDays(store.state, searchObj.data.stream.streamType);
+      return days > 0 ? days : null;
+    };
+
+    const logsRetentionDays = computed((): number | undefined => {
+      const type = searchObj.data.stream.streamType;
+      const entries: StreamLimitEntry[] = searchObj.data.stream.selectedStream.map(
+        (stream: string) => {
+          const listed = listedStream(stream);
+          return listed ? { type, settings: listed.settings } : null;
+        },
+      );
+      return combineStreamTimeLimits(entries, store.state).retentionDays;
+    });
+
     const permalinkResolveContext = (): ResolveContext => {
       const superCluster =
         !!store.state.zoConfig?.super_cluster_enabled &&
@@ -4057,15 +4156,7 @@ export default defineComponent({
         clusters: superCluster ? [...(searchObj.meta.clusters ?? [])] : [],
         multiStream: searchObj.data.stream.selectedStream.length > 1,
         allFieldsName: store.state.zoConfig?.all_fields_name,
-        retentionDays: (stream: string) => {
-          const entry = (searchObj.data.streamResults?.list ?? []).find(
-            (item: any) => item?.name === stream,
-          );
-          const days =
-            Number(entry?.settings?.data_retention ?? 0) ||
-            inheritedRetentionDays(store.state, searchObj.data.stream.streamType);
-          return days > 0 ? days : null;
-        },
+        retentionDays: (stream: string) => retentionDaysOf(listedStream(stream)),
       };
     };
 
@@ -4077,7 +4168,7 @@ export default defineComponent({
       onJumpToStreamData(ts, ts + 1);
     };
 
-    const { searchAroundData } = useSearchAround();
+    const { searchAroundData, armWindowQuery } = useSearchAround();
 
     const runSearchAround = (params: {
       key: unknown;
@@ -4214,6 +4305,7 @@ export default defineComponent({
       isResultsStale,
       showSearchCancelledState,
       showSearchCancelledNotice,
+      staleRangeText,
       showGuardEmptyState,
       streamSwitchPending,
       shownError,
@@ -4271,10 +4363,12 @@ export default defineComponent({
       onPermalinkShowInContext,
       onPermalinkAddSearchTerm,
       runSearchAround,
+      armWindowQuery,
       onSharedPageGo,
       refreshHistogramChart,
       onChangeInterval,
       onAutoIntervalTrigger,
+      logsRetentionDays,
       showSearchHistoryfn,
       openSearchHistory,
       isAiEnabled,

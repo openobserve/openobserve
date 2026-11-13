@@ -131,18 +131,15 @@ describe("CustomDateTimePicker.vue", () => {
       expect(vm.getDisplayValue()).toBe("5 Minutes ago");
     });
 
-    it("getTrimmedDisplayValue returns correct format", () => {
-      wrapper = createWrapper({ modelValue: "5m" });
-      const vm = wrapper.vm as any;
+    // CompareWithPast's offset is how far back the comparison starts, not a window ending now.
+    it.each([
+      ["1d", "1 Day ago"],
+      ["5m", "5 Minutes ago"],
+    ])("labels the compact %s offset as %s", (modelValue, expected) => {
+      wrapper = createWrapper({ modelValue, changeStyle: true });
 
-      expect(vm.getTrimmedDisplayValue()).toBe("Past 5 Minutes");
-    });
-
-    it("getTrimmedDisplayValue uses the singular unit for a count of one", () => {
-      wrapper = createWrapper({ modelValue: "1h" });
-      const vm = wrapper.vm as any;
-
-      expect(vm.getTrimmedDisplayValue()).toBe("Past 1 Hour");
+      expect(wrapper.find('[data-test="date-time-btn"]').text()).toContain(expected);
+      expect(wrapper.find('[data-test="date-time-btn"]').text()).not.toContain("Last");
     });
 
     it("getDisplayValue works with hours", () => {
@@ -174,13 +171,6 @@ describe("CustomDateTimePicker.vue", () => {
       const vm = wrapper.vm as any;
 
       expect(vm.getDisplayValue()).toBe(expected);
-    });
-
-    it("getTrimmedDisplayValue works with days", () => {
-      wrapper = createWrapper({ modelValue: "3d" });
-      const vm = wrapper.vm as any;
-
-      expect(vm.getTrimmedDisplayValue()).toBe("Past 3 Days");
     });
   });
 

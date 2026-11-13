@@ -25,13 +25,13 @@ const PageManager = require('../../pages/page-manager.js');
 // the past so no calendar max-date restriction can clamp it.
 const ANCHOR_START_MICROS = 1784800800000000;
 const ANCHOR_END_MICROS = 1784804400000000;
-// 10:10:00Z — 10 min from the start, 50 min from the end, so the proximity rule
-// in applySingleDateTime() must replace the START.
+// 10:10:00Z and 10:50:00Z: single instants inside the anchor window.
 const NEAR_START_MICROS = 1784801400000000;
-// 10:50:00Z — the mirror case, which must replace the END.
 const NEAR_END_MICROS = 1784803800000000;
 
 const MICROS_PER_SECOND = 1_000_000;
+// A single pasted instant opens a window this wide on each side, as typing it does.
+const SINGLE_WINDOW_MICROS = 5 * 60 * MICROS_PER_SECOND;
 
 test.describe("DateTime Picker Copy Paste testcases", () => {
   let pm;
@@ -222,43 +222,42 @@ test.describe("DateTime Picker Copy Paste testcases", () => {
     });
 
     // TC-09
-    test("should apply a single pasted value to the start when it is closer to the start", {
+    test("should open a five minute window either side of a single pasted value", {
       tag: ['@datetime-picker', '@all', '@P1']
     }, async () => {
-      testLogger.info('Pasting a single value nearer the start of the current range');
+      testLogger.info('Pasting a single value reads it as typed text does');
 
       // Establish a known 10:00-11:00 window first.
       await pm.dateTimePickerPage.pasteAndReadBackRange(
         `${ANCHOR_START_MICROS} - ${ANCHOR_END_MICROS}`
       );
 
-      // 10:10 is 10 min from the start and 50 min from the end, so the proximity
-      // rule must move the START and leave the END alone.
+      // The single value replaces the whole range, not the nearer end of the old one.
       const range = await pm.dateTimePickerPage.pasteAndReadBackRange(`${NEAR_START_MICROS}`);
 
-      expect(range.start_date).toBe(NEAR_START_MICROS);
-      expect(range.end_date).toBe(ANCHOR_END_MICROS);
+      expect(range.start_date).toBe(NEAR_START_MICROS - SINGLE_WINDOW_MICROS);
+      expect(range.end_date).toBe(NEAR_START_MICROS + SINGLE_WINDOW_MICROS);
 
-      testLogger.info('Single value replaced the start boundary');
+      testLogger.info('Single value opened a +-5 minute window');
     });
 
     // TC-10
-    test("should apply a single pasted value to the end when it is closer to the end", {
+    test("should centre the window on a single pasted value near the old end too", {
       tag: ['@datetime-picker', '@all', '@P1']
     }, async () => {
-      testLogger.info('Pasting a single value nearer the end of the current range');
+      testLogger.info('Pasting a single value near the end of the current range');
 
       await pm.dateTimePickerPage.pasteAndReadBackRange(
         `${ANCHOR_START_MICROS} - ${ANCHOR_END_MICROS}`
       );
 
-      // 10:50 is 50 min from the start and 10 min from the end — mirror of TC-09.
+      // The window centres on the pasted value, wherever the previous range ended.
       const range = await pm.dateTimePickerPage.pasteAndReadBackRange(`${NEAR_END_MICROS}`);
 
-      expect(range.start_date).toBe(ANCHOR_START_MICROS);
-      expect(range.end_date).toBe(NEAR_END_MICROS);
+      expect(range.start_date).toBe(NEAR_END_MICROS - SINGLE_WINDOW_MICROS);
+      expect(range.end_date).toBe(NEAR_END_MICROS + SINGLE_WINDOW_MICROS);
 
-      testLogger.info('Single value replaced the end boundary');
+      testLogger.info('Single value opened a +-5 minute window');
     });
 
     // TC-11

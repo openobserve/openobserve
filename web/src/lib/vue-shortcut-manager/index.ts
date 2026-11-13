@@ -1,5 +1,5 @@
 export { ShortcutManager, getManager, resetManager } from "./manager";
-export { useShortcut, useShortcuts, useShortcutList } from "./composables";
+export { registerShortcuts, useShortcut, useShortcuts, useShortcutList } from "./composables";
 export { default as ShortcutCheatsheet } from "./ShortcutCheatsheet.vue";
 export {
   SHORTCUT_REGISTRY,

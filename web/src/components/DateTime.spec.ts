@@ -31,7 +31,8 @@ vi.mock("@/utils/date", () => ({
   }),
 }));
 
-vi.mock("date-fns-tz", () => ({
+vi.mock("date-fns-tz", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("date-fns-tz")>()),
   toZonedTime: vi.fn((date) => new Date(date)),
 }));
 
@@ -95,23 +96,6 @@ describe("DateTime Component", () => {
       expect(wrapper.vm.selectedType).toBe("relative");
       expect(wrapper.vm.relativePeriod).toBe("m");
       expect(wrapper.vm.relativeValue).toBe(30);
-    });
-
-    it("should test onCustomPeriodSelect function", () => {
-      wrapper = createWrapper({
-        queryRangeRestrictionInHour: 24,
-        autoApply: false,
-      });
-
-      // Set up initial values
-      wrapper.vm.selectedType = "relative";
-      wrapper.vm.relativePeriod = "h";
-      wrapper.vm.relativeValue = 48; // Exceeds restriction
-
-      wrapper.vm.onCustomPeriodSelect();
-
-      // Should be limited by restriction
-      expect(wrapper.vm.relativeValue).toBeLessThanOrEqual(24);
     });
 
     it("should test setRelativeTime function", () => {
@@ -186,17 +170,20 @@ describe("DateTime Component", () => {
       expect(lastPayload.userChangedValue).toBe(false);
     });
 
-    it("should test getPeriodLabel computed property", () => {
-      wrapper = createWrapper();
+    it("stamps a clamp from a query limit that arrives after mount as programmatic", async () => {
+      wrapper = createWrapper({ autoApply: true, defaultRelativeTime: "7d" });
+      await wrapper.vm.$nextTick();
+      await wrapper.vm.$nextTick();
+      store.state.savedViewFlag = false;
+      const before = wrapper.emitted("on:date-change")?.length ?? 0;
 
-      wrapper.vm.relativePeriod = "m";
-      expect(wrapper.vm.getPeriodLabel).toBe("Minutes");
+      await wrapper.setProps({ queryRangeRestrictionInHour: 24 });
 
-      wrapper.vm.relativePeriod = "h";
-      expect(wrapper.vm.getPeriodLabel).toBe("Hours");
-
-      wrapper.vm.relativePeriod = "d";
-      expect(wrapper.vm.getPeriodLabel).toBe("Days");
+      const events = wrapper.emitted("on:date-change")!;
+      expect(events.length).toBeGreaterThan(before);
+      const lastPayload = events[events.length - 1][0];
+      expect(lastPayload.relativeTimePeriod).toBe("1d");
+      expect(lastPayload.userChangedValue).toBe(false);
     });
 
     it("should test getConsumableDateTime function for relative type", () => {
@@ -273,7 +260,7 @@ describe("DateTime Component", () => {
       wrapper.vm.relativeValue = 15;
       wrapper.vm.relativePeriod = "m";
 
-      expect(wrapper.vm.getDisplayValue).toBe("Past 15 Minutes");
+      expect(wrapper.vm.getDisplayValue).toBe("Last 15 minutes");
     });
 
     it("should test getDisplayValue computed property for absolute type", () => {
@@ -350,9 +337,14 @@ describe("DateTime Component", () => {
       wrapper.vm.selectedType = "relative";
       wrapper.vm.computeRelativePeriod();
 
-      expect(wrapper.vm.relativePeriodsMaxValue.s).toBe(60);
-      expect(wrapper.vm.relativePeriodsMaxValue.m).toBe(60);
-      expect(wrapper.vm.relativePeriodsMaxValue.h).toBe(48);
+      expect(wrapper.vm.relativePeriodsMaxValue).toEqual({
+        s: 172_800,
+        m: 2_880,
+        h: 48,
+        d: 2,
+        w: -1,
+        M: -1,
+      });
     });
 
     it("should test onTimezoneChange function", async () => {
@@ -429,92 +421,7 @@ describe("DateTime Component", () => {
       wrapper.vm.computeRelativePeriod();
 
       // Should compute appropriate restrictions
-      expect(wrapper.vm.relativePeriodsMaxValue).toBeDefined();
-      expect(wrapper.vm.relativePeriodsSelect).toBeDefined();
-    });
-
-    it("should test onCustomPeriodSelect with no restriction", async () => {
-      wrapper = createWrapper({
-        queryRangeRestrictionInHour: 0,
-        autoApply: true,
-      });
-      store.state.savedViewFlag = false;
-
-      wrapper.vm.selectedType = "relative";
-      wrapper.vm.relativePeriod = "h";
-      wrapper.vm.relativeValue = 48;
-
-      wrapper.vm.onCustomPeriodSelect();
-      await wrapper.vm.$nextTick();
-
-      // Should not be limited when no restriction
-      expect(wrapper.vm.relativeValue).toBe(48);
-      expect(wrapper.emitted("on:date-change")).toBeTruthy();
-    });
-
-    it("should cap a huge custom value at the per-unit maximum", async () => {
-      wrapper = createWrapper({ queryRangeRestrictionInHour: 0, autoApply: true });
-      store.state.savedViewFlag = false;
-      wrapper.vm.selectedType = "relative";
-      wrapper.vm.relativePeriod = "m";
-      wrapper.vm.relativeValue = 40000000000000000000;
-
-      wrapper.vm.onCustomPeriodSelect();
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.vm.relativeValue).toBe(5_256_000);
-    });
-
-    it("should re-cap the custom value when the unit changes", async () => {
-      wrapper = createWrapper({ queryRangeRestrictionInHour: 0, autoApply: true });
-      store.state.savedViewFlag = false;
-      wrapper.vm.selectedType = "relative";
-      wrapper.vm.relativeValue = 5000;
-      wrapper.vm.relativePeriod = "M";
-
-      wrapper.vm.onCustomPeriodSelect();
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.vm.relativeValue).toBe(120);
-    });
-
-    it.each([0, -5, 2.7])(
-      "should clamp custom value %s to a whole number of at least 1",
-      async (typed) => {
-        wrapper = createWrapper({ queryRangeRestrictionInHour: 0, autoApply: true });
-        store.state.savedViewFlag = false;
-        wrapper.vm.selectedType = "relative";
-        wrapper.vm.relativePeriod = "m";
-        wrapper.vm.relativeValue = typed;
-
-        wrapper.vm.onCustomPeriodSelect();
-        await wrapper.vm.$nextTick();
-
-        expect(wrapper.vm.relativeValue).toBe(Math.max(1, Math.trunc(typed)));
-      },
-    );
-
-    it("should not apply an emptied custom value and restore the last applied one on blur", async () => {
-      wrapper = createWrapper({ queryRangeRestrictionInHour: 0, autoApply: true });
-      store.state.savedViewFlag = false;
-      wrapper.vm.selectedType = "relative";
-      wrapper.vm.relativePeriod = "m";
-      wrapper.vm.relativeValue = 30;
-      wrapper.vm.onCustomValueFocus();
-      wrapper.vm.relativeValue = 45;
-      wrapper.vm.onCustomPeriodSelect();
-      const emittedBefore = wrapper.emitted("on:date-change")?.length ?? 0;
-
-      wrapper.vm.relativeValue = "";
-      wrapper.vm.onCustomPeriodSelect();
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.emitted("on:date-change")?.length ?? 0).toBe(emittedBefore);
-      expect(wrapper.vm.getDisplayValue).toContain("45");
-      expect(wrapper.vm.getDisplayValue).not.toContain("NaN");
-
-      wrapper.vm.onCustomValueBlur();
-      expect(wrapper.vm.relativeValue).toBe(45);
+      expect(wrapper.vm.relativePeriodsMaxValue).toMatchObject({ d: 7, w: 1, M: -1 });
     });
 
     it("should test setRelativeDate with autoApply", async () => {
@@ -538,13 +445,17 @@ describe("DateTime Component", () => {
       wrapper.vm.selectedDate = { from: "2026/09/07", to: "2026/09/07" };
       wrapper.vm.selectedTime = { startTime: "22:00:00", endTime: "23:00:00" };
 
+      const before = wrapper.vm.getConsumableDateTime();
       wrapper.vm.shiftTimeRange("next");
 
-      // The window advances by its own duration (1h); the end must roll into the
-      // next day rather than wrapping back to "00:00:00" on the same date.
-      expect(wrapper.vm.selectedDate).toEqual({ from: "2026/09/07", to: "2026/09/08" });
-      expect(wrapper.vm.selectedTime).toEqual({ startTime: "23:00:00", endTime: "00:00:00" });
+      // The window advances by its own duration (1h); a midnight end shows as the day's last second.
+      expect(wrapper.vm.selectedDate).toEqual({ from: "2026/09/07", to: "2026/09/07" });
+      expect(wrapper.vm.selectedTime).toEqual({ startTime: "23:00:00", endTime: "23:59:59" });
       expect(wrapper.vm.selectedType).toBe("absolute");
+      expect(wrapper.vm.getConsumableDateTime()).toMatchObject({
+        startTime: before.endTime,
+        endTime: before.endTime + 3_600_000_000,
+      });
     });
 
     it("should shift the range backward across midnight with shiftTimeRange('prev')", () => {
@@ -555,10 +466,15 @@ describe("DateTime Component", () => {
       wrapper.vm.selectedDate = { from: "2026/09/08", to: "2026/09/08" };
       wrapper.vm.selectedTime = { startTime: "00:00:00", endTime: "01:00:00" };
 
+      const before = wrapper.vm.getConsumableDateTime();
       wrapper.vm.shiftTimeRange("prev");
 
-      expect(wrapper.vm.selectedDate).toEqual({ from: "2026/09/07", to: "2026/09/08" });
-      expect(wrapper.vm.selectedTime).toEqual({ startTime: "23:00:00", endTime: "00:00:00" });
+      expect(wrapper.vm.selectedDate).toEqual({ from: "2026/09/07", to: "2026/09/07" });
+      expect(wrapper.vm.selectedTime).toEqual({ startTime: "23:00:00", endTime: "23:59:59" });
+      expect(wrapper.vm.getConsumableDateTime()).toMatchObject({
+        startTime: before.startTime - 3_600_000_000,
+        endTime: before.startTime,
+      });
       expect(wrapper.vm.selectedType).toBe("absolute");
     });
 
@@ -737,13 +653,11 @@ describe("DateTime Component", () => {
     it("offers Seconds by default, as every existing picker has it", () => {
       wrapper = createWrapper();
       expect(units(wrapper.vm.relativePeriods)).toEqual(["s", "m", "h", "d", "w", "M"]);
-      expect(units(wrapper.vm.relativePeriodsSelect)).toEqual(["s", "m", "h", "d", "w", "M"]);
     });
 
     it("drops Seconds from the rows and the custom unit when the parent asks", () => {
       wrapper = createWrapper({ hideSeconds: true });
       expect(units(wrapper.vm.relativePeriods)).toEqual(["m", "h", "d", "w", "M"]);
-      expect(units(wrapper.vm.relativePeriodsSelect)).toEqual(["m", "h", "d", "w", "M"]);
     });
   });
 });

@@ -49,7 +49,7 @@ const DASHBOARD = {
   // Dashboard main buttons
   SETTING_BTN: '[data-test="dashboard-setting-btn"]',
   MORE_OPTIONS_BTN: '[data-test="dashboard-more-options-btn"]',
-  SHARE_OPTIONS_BTN: '[data-test="dashboard-share-options-btn"]',
+  SHARE_OPTIONS_BTN: '[data-test="dashboard-share-btn-kinds"]',
   REFRESH_BTN: '[data-test="dashboard-refresh-btn"]',
   SEARCH: '[data-test="dashboard-search"]',
   ADD_PANEL_BTN: '[data-test="dashboard-if-no-panel-add-panel-btn"]',
@@ -108,7 +108,6 @@ const DASHBOARD = {
 
   // Date/Time
   DATE_TIME_BTN: '[data-test="date-time-btn"]',
-  DATE_TIME_RELATIVE_6H: '[data-test="date-time-relative-6-h-btn"]',
 };
 
 /**

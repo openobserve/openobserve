@@ -339,6 +339,7 @@ describe("DetailTable Component", () => {
 
     it("should emit the hit, including its stream name, as the search around body", async () => {
       const hit = { _timestamp: 1700000000000000, _stream_name: "stream2" };
+      wrapper.vm.setSearchAroundChoice("r10");
       wrapper.vm.rowData = hit;
       wrapper.vm.tab = "table";
       await nextTick();
@@ -348,6 +349,95 @@ describe("DetailTable Component", () => {
       expect(wrapper.emitted()["search:timeboxed"][0]).toEqual([
         { key: 1700000000000000, size: 10, body: hit },
       ]);
+    });
+  });
+
+  describe("search around window select", () => {
+    const ts = 1700000000000000;
+    const minuteUs = 60_000_000;
+    const click = async () => {
+      wrapper.vm.rowData = { _timestamp: ts };
+      wrapper.vm.tab = "table";
+      await nextTick();
+      await wrapper.find('[data-test="logs-detail-table-search-around-btn"]').trigger("click");
+    };
+    const remount = async () => {
+      wrapper.unmount();
+      wrapper = mount(DetailTable, {
+        attachTo: "#app",
+        props: defaultProps,
+        global: globalMountOptions,
+      });
+      await flushPromises();
+    };
+
+    it("offers five time windows then four record counts, defaulting to ± 5 min", () => {
+      expect(wrapper.vm.searchAroundChoice).toBe("t5");
+      expect(wrapper.vm.searchAroundTimeOptions.map((o: any) => [o.label, o.value])).toEqual([
+        ["± 5 s", "s5"],
+        ["± 30 s", "s30"],
+        ["± 1 min", "t1"],
+        ["± 5 min", "t5"],
+        ["± 15 min", "t15"],
+      ]);
+      expect(wrapper.vm.searchAroundRecordOptions.map((o: any) => [o.label, o.value])).toEqual([
+        ["10 records", "r10"],
+        ["20 records", "r20"],
+        ["50 records", "r50"],
+        ["100 records", "r100"],
+        ["200 records", "r200"],
+        ["500 records", "r500"],
+        ["1000 records", "r1000"],
+      ]);
+    });
+
+    it("emits the row's time ± 5 min by default instead of a record search", async () => {
+      await click();
+      expect(wrapper.emitted()["search:aroundwindow"][0]).toEqual([
+        { startUs: ts - 5 * minuteUs, endUs: ts + 5 * minuteUs },
+      ]);
+      expect(wrapper.emitted()["search:timeboxed"]).toBeUndefined();
+    });
+
+    it("reads a string timestamp as a number", async () => {
+      wrapper.vm.setSearchAroundChoice("t1");
+      wrapper.vm.rowData = { _timestamp: String(ts) };
+      wrapper.vm.tab = "table";
+      await nextTick();
+      await wrapper.find('[data-test="logs-detail-table-search-around-btn"]').trigger("click");
+      expect(wrapper.emitted()["search:aroundwindow"][0]).toEqual([
+        { startUs: ts - minuteUs, endUs: ts + minuteUs },
+      ]);
+    });
+
+    it("emits a window under a minute for ± 30 s", async () => {
+      wrapper.vm.setSearchAroundChoice("s30");
+      await click();
+      expect(wrapper.emitted()["search:aroundwindow"][0]).toEqual([
+        { startUs: ts - 30_000_000, endUs: ts + 30_000_000 },
+      ]);
+    });
+
+    it("runs the existing record search for a records choice", async () => {
+      wrapper.vm.setSearchAroundChoice("r50");
+      await click();
+      expect(wrapper.emitted()["search:timeboxed"][0]).toEqual([
+        { key: ts, size: 50, body: { _timestamp: ts } },
+      ]);
+      expect(wrapper.emitted()["search:aroundwindow"]).toBeUndefined();
+    });
+
+    it("remembers the last choice per user", async () => {
+      wrapper.vm.setSearchAroundChoice("t15");
+      expect(window.localStorage.getItem("o2.searchAroundChoice.example@gmail.com")).toBe("t15");
+      await remount();
+      expect(wrapper.vm.searchAroundChoice).toBe("t15");
+    });
+
+    it("ignores a value that is not offered", () => {
+      wrapper.vm.setSearchAroundChoice("t7");
+      expect(wrapper.vm.searchAroundChoice).toBe("t5");
+      expect(window.localStorage.getItem("o2.searchAroundChoice.example@gmail.com")).toBeNull();
     });
   });
 

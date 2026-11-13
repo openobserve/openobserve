@@ -25,6 +25,7 @@ import {
   setPickerTimezoneSource,
   shiftCalendarToken,
 } from "./calendarPeriods";
+import type { WeekDay } from "@/utils/weekStart";
 
 // Thursday 2026-10-08 08:30 in Asia/Calcutta, 03:00 in UTC, still Wednesday 23:00 in New York.
 const NOW = Date.parse("2026-10-08T03:00:00Z");
@@ -32,8 +33,9 @@ const IST = "Asia/Calcutta";
 const NY = "America/New_York";
 const THIN = " ";
 
-const range = (token: string, timezone: string, now: number = NOW) => {
-  const r = resolveCalendarPeriod(token, timezone, now);
+// Week cases below are written for a Monday week start; the Sunday rule has its own cases.
+const range = (token: string, timezone: string, now: number = NOW, weekStart: WeekDay = 1) => {
+  const r = resolveCalendarPeriod(token, timezone, now, weekStart);
   if (!r) return null;
   return {
     start: new Date(r.startTime / 1000).toISOString(),
@@ -41,8 +43,8 @@ const range = (token: string, timezone: string, now: number = NOW) => {
   };
 };
 
-const label = (token: string, timezone: string = IST, now: number = NOW) =>
-  formatCalendarLabel(token, timezone, gt, "en-US", now);
+const label = (token: string, timezone: string = IST, now: number = NOW, weekStart: WeekDay = 1) =>
+  formatCalendarLabel(token, timezone, gt, "en-US", now, weekStart);
 
 describe("calendarPeriods", () => {
   describe("parseCalendarToken", () => {
@@ -439,21 +441,30 @@ describe("calendarPeriods", () => {
       ["calendar:day:-1", "Yesterday"],
       ["calendar:day:-2", "Oct 6"],
       ["calendar:week:0", "This week"],
-      ["calendar:week:-1", "Last week"],
+      ["calendar:week:-1", "Previous week"],
       ["calendar:week:-2", `Sep 21${THIN}–${THIN}27`],
       ["calendar:month:0", "This month"],
-      ["calendar:month:-1", "Last month"],
+      ["calendar:month:-1", "Previous month"],
       ["calendar:month:-2", "Aug 2026"],
       ["calendar:month:-13", "Sep 2025"],
       ["calendar:quarter:0", "This quarter"],
-      ["calendar:quarter:-1", "Last quarter"],
+      ["calendar:quarter:-1", "Previous quarter"],
       ["calendar:quarter:-2", "Q2 2026"],
       ["calendar:quarter:-13", "Q3 2023"],
       ["calendar:year:0", "This year"],
-      ["calendar:year:-1", "Last year"],
+      ["calendar:year:-1", "Previous year"],
       ["calendar:year:-2", "2024"],
     ])("%s → %s", (token, expected) => {
       expect(label(token)).toBe(expected);
+    });
+
+    it("starts weeks on the locale's first day", () => {
+      expect(label("calendar:week:-2", IST, NOW, 0)).toBe(`Sep 20${THIN}–${THIN}26`);
+      expect(range("calendar:week:0", "UTC", NOW, 0)).toEqual({
+        start: "2026-10-04T00:00:00.000Z",
+        end: "2026-10-08T03:00:00.000Z",
+      });
+      expect(range("calendar:week:0", "UTC", NOW, 6)?.start).toBe("2026-10-03T00:00:00.000Z");
     });
 
     it("spells a cross-month week with both months", () => {

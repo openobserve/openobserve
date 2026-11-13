@@ -70,7 +70,7 @@ describe("useRecentEntryText", () => {
       );
     expect(relative("calendar:day:0")).toBe("Today");
     expect(relative("calendar:week:0")).toBe("This week");
-    expect(relative("calendar:month:-1")).toBe("Last month");
+    expect(relative("calendar:month:-1")).toBe("Previous month");
     expect(relative("15m")).toBe("Last 15m");
     expect(api.windowText(entry({ context: { time_range: { period: "calendar:day:-1" } } }))).toBe(
       "Yesterday",

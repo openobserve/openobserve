@@ -840,6 +840,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @add:searchterm="addSearchTerm"
           @remove:searchterm="removeSearchTerm"
           @search:timeboxed="onTimeBoxed"
+          @search:aroundwindow="onSearchAroundWindow"
           @add:table="addFieldToTable"
           @close="onDetailUserClose"
           @view-trace="redirectToTraces(detailRow)"
@@ -1075,6 +1076,7 @@ export default defineComponent({
     "update:datetime",
     "remove:searchTerm",
     "search:timeboxed",
+    "search:aroundwindow",
     "expandlog",
     "update:recordsPerPage",
     "update:columnSizes",
@@ -1263,6 +1265,12 @@ export default defineComponent({
       this.searchObj.data.searchAround.indexTimestamp = obj.key;
       // this.$emit("search:timeboxed", obj);
       this.searchAroundData(obj);
+    },
+    onSearchAroundWindow(range: { startUs: number; endUs: number }) {
+      clearPermalink();
+      this.searchObj.meta.showDetailTab = false;
+      resetRowSelection(this.searchObj);
+      this.$emit("search:aroundwindow", range);
     },
     toggleErrorDetails() {
       this.disableMoreErrorDetails = !this.disableMoreErrorDetails;

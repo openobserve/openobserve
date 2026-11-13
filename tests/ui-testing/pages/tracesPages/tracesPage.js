@@ -3,7 +3,8 @@ import { expect } from '@playwright/test';
 import { confirmDraftSignOut } from '../generalPages/draftSignOut.js';
 
 
-import { dateTimeButtonLocator, relative30SecondsButtonLocator, absoluteTabLocator, Past30SecondsValue } from '../commonActions.js';
+import { dateTimeButtonLocator, Past30SecondsValue } from '../commonActions.js';
+import { openDateFields, pickRelativePeriod, waitForDateTimePanel } from '../generalPages/relativePeriod.js';
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
 const MonacoEditorHelper = require('../../playwright-tests/utils/MonacoEditorHelper.js');
 const { isCloudEnvironment } = require('../cloudPages/cloud-env.js');
@@ -219,9 +220,7 @@ export class TracesPage {
     this.viewLines = '.view-lines';
 
     // Time Range Selectors
-    this.dateTimeRelative15mButton = '[data-test="date-time-relative-15-m-btn"]';
-    this.dateTimeRelative1mButton = '[data-test="date-time-relative-1-m-btn"]';
-    this.dateTimeRelativeCustomButton = '[data-test="date-time-relative-custom-btn"]';
+    this.dateTimeRelative15mButton = '[data-test="date-time-chip-15m"]';
 
     // Trace Tree/Span Selectors
     this.traceTreeSpanServiceName = '[data-test="trace-tree-span-service-name"]';
@@ -232,15 +231,12 @@ export class TracesPage {
 
     // Legacy/Common
     this.dateTimeButton = dateTimeButtonLocator;
-    this.relative30SecondsButton = page.locator(relative30SecondsButtonLocator);
-    this.absoluteTab = absoluteTabLocator;
     // Profile menu / sign-out — navbar selectors verified against Header.vue
     this.profileButton = page.locator('[data-test="header-my-account-profile-icon"]');
     this.signOutButton = page.locator('[data-test="menu-link-logout-item"]');
 
     // Trace details — datetime absolute tab Start/End time fields (OInput convention)
-    this.datetimeStartTime = '[data-test="datetime-start-time-field"]';
-    this.datetimeEndTime = '[data-test="datetime-end-time-field"]';
+    this.datetimeStartTime = '[data-test="datetime-start-time"] input';
 
     // Field list header expansion (Field rows include data-test=`log-search-expand-{name}-field-btn`)
     this.fieldExpandPrefix = '[data-test^="log-search-expand-"]';
@@ -649,35 +645,21 @@ export class TracesPage {
   async setTimeToPast30Seconds() {
     // Set the time filter to the last 30 seconds
     await this.page.locator(this.dateTimeButton).click();
-    await this.relative30SecondsButton.click();
+    await pickRelativePeriod(this.page, '30', 's');
   }
 
   async setTimeRange(range) {
-    // Set time range based on provided value (e.g., '15m', '1h', '6d', '1M').
-    // Source: web/src/components/DateTime.vue — items per period:
-    //   s/m: [1,5,10,15,30,45], h: [1,2,3,6,8,12], d/w/M: [1,2,3,4,5,6]
+    // Set time range based on provided value (e.g., '15m', '1h', '24h', '6d', '1M').
     await this.page.locator(this.dateTimeButton).click();
-    // Wait for relative tab content to mount
-    await this.page.locator('[data-test^="date-time-relative-"]').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+    await waitForDateTimePanel(this.page, 5000).catch(() => {});
 
-    const rangeMap = {
-      '15m': '[data-test="date-time-relative-15-m-btn"]',
-      '30m': '[data-test="date-time-relative-30-m-btn"]',
-      '1h': '[data-test="date-time-relative-1-h-btn"]',
-      '6h': '[data-test="date-time-relative-6-h-btn"]',
-      '12h': '[data-test="date-time-relative-12-h-btn"]',
-      '24h': '[data-test="date-time-relative-1-d-btn"]',
-      '2d': '[data-test="date-time-relative-2-d-btn"]',
-      '6d': '[data-test="date-time-relative-6-d-btn"]',
-      '1M': '[data-test="date-time-relative-1-M-btn"]',
-    };
-
-    const selector = rangeMap[range] || '[data-test="date-time-relative-15-m-btn"]';
-    await this.page.locator(selector).click();
+    const match = String(range).match(/^(\d+)([smhdwM])$/);
+    const [value, unit] = match ? [match[1], match[2]] : ['15', 'm'];
+    await pickRelativePeriod(this.page, value, unit);
     await this.closeDateTimePickerIfOpen();
   }
 
-  /** The auto-apply picker stays open after a pick, and its panel covers part of the query editor. */
+  /** A pick that did not land leaves the panel open, covering part of the query editor. */
   async closeDateTimePickerIfOpen() {
     const panel = this.page.locator('#date-time-menu');
     if (!(await panel.isVisible().catch(() => false))) return;
@@ -693,7 +675,7 @@ export class TracesPage {
   }
 
   async verifyTimeSetTo30Seconds() {
-    // Verify that the time filter displays "Past 30 Seconds"
+    // Verify that the time filter displays "Last 30 seconds"
     await expect(this.page.locator(this.dateTimeButton)).toContainText(Past30SecondsValue);
   }
 
@@ -705,16 +687,7 @@ export class TracesPage {
   async setDateTime() {
     await expect(this.page.locator(this.dateTimeButton)).toBeVisible();
     await this.page.locator(this.dateTimeButton).click();
-    await this.page.locator(this.absoluteTab).click();
-    // Wait for absolute tab content (Start time field) to be visible
-    await this.page.locator(this.datetimeStartTime).first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
-  }
-
-  async fillTimeRange(startTime, endTime) {
-    // Source: web/src/components/DateTime.vue — OTime renders an OInput,
-    // OInput inner native input uses data-test="${parent}-field"
-    await this.page.locator(this.datetimeStartTime).fill(startTime);
-    await this.page.locator(this.datetimeEndTime).fill(endTime);
+    await openDateFields(this.page);
   }
 
   async verifyDateTime(startTime, endTime) {
@@ -1971,12 +1944,7 @@ export class TracesPage {
    */
   async clickTimeRange1m() {
     await this.page.locator(this.dateTimeButton).click();
-    try {
-      await this.page.locator(this.dateTimeRelative1mButton).click({ timeout: 5000 });
-    } catch {
-      // Fallback to custom range if 1m not available
-      await this.page.locator(this.dateTimeRelativeCustomButton).click();
-    }
+    await pickRelativePeriod(this.page, '1', 'm');
   }
 
   /**

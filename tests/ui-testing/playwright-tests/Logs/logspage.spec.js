@@ -263,12 +263,12 @@ test.describe("Logs Page testcases", () => {
     await pm.logsPage.clickDateTimeButton();
     await pm.logsPage.waitForRelative6WeeksButtonVisible();
     await pm.logsPage.clickRelative6WeeksButton();
-    await pm.logsPage.expectTextVisible("Past 6 Weeks");
+    await pm.logsPage.expectTextVisible("Last 6 weeks");
     await applyQueryButton(pm);
     await pm.logsPage.clickDateTimeButton();
     await pm.logsPage.waitForPast6DaysButtonVisible();
     await pm.logsPage.clickPast6DaysButton();
-    await pm.logsPage.expectTextVisible("Past 6 Days");
+    await pm.logsPage.expectTextVisible("Last 6 days");
     await applyQueryButton(pm);
     
     testLogger.info('Date-time UI switching test completed');

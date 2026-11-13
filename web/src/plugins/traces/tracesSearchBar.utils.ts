@@ -19,6 +19,7 @@
  * mounting the full SFC (which pulls in monaco / vuex).
  */
 
+import type { TimeSelection } from "@/composables/useLogs/useAutoRun";
 import { parseCalendarToken } from "@/utils/dashboard/calendarPeriods";
 
 /** Subset of `searchObj.data.datetime` that the comparison cares about. */
@@ -126,6 +127,18 @@ export function tracesSearchRunSignature(searchObj: {
     sqlMode: searchObj.meta.sqlMode,
     datetime: searchObj.data.datetime,
   });
+}
+
+/** The time range a run signature from `tracesRunSignature` was queried with. */
+export function tracesRunTimeSelection(signature: string | null | undefined): TimeSelection | null {
+  if (!signature) return null;
+  try {
+    const [, , , relative, first, second] = JSON.parse(signature);
+    if (relative) return { type: "relative", period: String(first) };
+    return { type: "absolute", startUs: Number(first), endUs: Number(second) };
+  } catch {
+    return null;
+  }
 }
 
 /** True when auto-run is off and the search state differs from the last Run, so the edit waits for Run. */

@@ -35,6 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="rounded-default"
       @add:searchterm="onAddSearchTerm"
       @search:timeboxed="onSearchAround"
+      @search:aroundwindow="onSearchAroundWindow"
       @close="clearPermalink"
       @closeTable="clearPermalink"
       @view-trace="onViewTrace"
@@ -62,6 +63,7 @@ const DetailTable = defineAsyncComponent(() => import("@/plugins/logs/DetailTabl
 
 const emit = defineEmits<{
   "search-around": [params: { key: unknown; size: number; body: Record<string, unknown> }];
+  "search:aroundwindow": [range: { startUs: number; endUs: number }];
   "add-search-term": [field: string | number, value: string | number | boolean, action: string];
   "send-to-ai-chat": [value: unknown, append?: boolean];
 }>();
@@ -87,6 +89,11 @@ const onAddSearchTerm = (
 const onSearchAround = (params: { key: unknown; size: number; body: Record<string, unknown> }) => {
   clearPermalink();
   emit("search-around", params);
+};
+
+const onSearchAroundWindow = (range: { startUs: number; endUs: number }) => {
+  clearPermalink();
+  emit("search:aroundwindow", range);
 };
 
 const onViewTrace = () => {

@@ -53,6 +53,12 @@ export function isInsideDialog(target?: EventTarget | null): boolean {
   return !!el.closest('[role="dialog"], [role="alertdialog"], [data-reka-popper-content-wrapper]');
 }
 
+/** True while a modal layer is open: marked `aria-modal`, or hiding the rest of the page as reka's modals do. */
+export function isModalOpen(): boolean {
+  if (typeof document === "undefined") return false;
+  return !!document.querySelector('[aria-modal="true"], [data-aria-hidden="true"]');
+}
+
 /**
  * Focuses a search field identified by its `data-test`, resilient to where the
  * attribute actually lands in the DOM:

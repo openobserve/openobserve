@@ -18,7 +18,8 @@ import { defineComponent } from "vue";
 import { mount, flushPromises } from "@vue/test-utils";
 import i18n from "@/locales";
 import { b64EncodeUnicode } from "@/utils/zincutils";
-import { useSearchAround } from "./searchAround";
+import { Parser } from "@openobserve/node-sql-parser/build/datafusionsql";
+import { searchAroundPickerRange, unfilteredWindowQuery, useSearchAround } from "./searchAround";
 import { useLogsAutoRun } from "./logsAutoRun";
 
 const searchAroundMock = vi.hoisted(() => vi.fn());
@@ -65,7 +66,13 @@ const buildSearchObj = (selectedStream: string[], sqlMode = false) => ({
   organizationIdentifier: "default",
   loading: false,
   loadingProgressPercentage: 0,
-  meta: { sqlMode, quickMode: false, showHistogram: false },
+  meta: {
+    sqlMode,
+    quickMode: false,
+    showHistogram: false,
+    editorDirty: false,
+    logsVisualizeToggle: "logs",
+  },
   data: {
     query: "",
     errorCode: 0,
@@ -113,6 +120,60 @@ describe("useSearchAround", () => {
   afterEach(() => {
     wrapper?.unmount();
     vi.clearAllMocks();
+  });
+
+  const range = { startUs: 1_000_000, endUs: 9_000_000 };
+  const armedWindow = () => searchObj.value.data.searchAround.windowQuery;
+
+  it("binds an unfiltered query to the window and leaves the user's query and editor alone", () => {
+    searchObj.value = buildSearchObj(["stream1"]);
+    searchObj.value.data.query = "level = 'error'";
+    searchObj.value.data.editorValue = "level = 'error'";
+    wrapper = mount(TestComponent, { global: { plugins: [i18n] } });
+    wrapper.vm.armWindowQuery(range);
+    expect(armedWindow()).toEqual({
+      query: "",
+      typedQuery: "level = 'error'",
+      view: "logs",
+      ...range,
+      pinned: false,
+    });
+    expect(searchObj.value.data.query).toBe("level = 'error'");
+    expect(searchObj.value.data.editorValue).toBe("level = 'error'");
+    wrapper.unmount();
+
+    searchObj.value = buildSearchObj(["stream1"], true);
+    const sql = `SELECT * FROM "stream1" WHERE level = 'error'`;
+    searchObj.value.data.query = sql;
+    wrapper = mount(TestComponent, { global: { plugins: [i18n] } });
+    wrapper.vm.armWindowQuery(range);
+    expect(armedWindow()?.query).toBe('SELECT * FROM "stream1"');
+    expect(searchObj.value.data.query).toBe(sql);
+  });
+
+  it("does not arm while the editor holds an unrun edit, so the next Run sends what it shows", () => {
+    searchObj.value = buildSearchObj(["stream1"]);
+    searchObj.value.meta.editorDirty = true;
+    searchObj.value.data.searchAround.windowQuery = { query: "" } as any;
+    wrapper = mount(TestComponent, { global: { plugins: [i18n] } });
+    wrapper.vm.armWindowQuery(range);
+    expect(armedWindow()).toBeNull();
+  });
+
+  it("does not arm outside the logs and drilldown views, whose runs never read it", () => {
+    for (const view of ["patterns", "visualize"]) {
+      searchObj.value = buildSearchObj(["stream1"]);
+      searchObj.value.meta.logsVisualizeToggle = view;
+      wrapper = mount(TestComponent, { global: { plugins: [i18n] } });
+      wrapper.vm.armWindowQuery(range);
+      expect(armedWindow() ?? null).toBeNull();
+      wrapper.unmount();
+    }
+    searchObj.value = buildSearchObj(["stream1"]);
+    searchObj.value.meta.logsVisualizeToggle = "drilldown";
+    wrapper = mount(TestComponent, { global: { plugins: [i18n] } });
+    wrapper.vm.armWindowQuery(range);
+    expect(armedWindow()?.view).toBe("drilldown");
   });
 
   it("searches around the hit's own stream when several streams are selected", async () => {
@@ -249,5 +310,71 @@ describe("useSearchAround", () => {
     expect(request.is_multistream).toBe(false);
     expect(decodeSql(request.query_context[0])).toContain('FROM "stream1"');
     expect(searchObj.value.data.queryResults.hits).toEqual([{ _timestamp: 1 }, { _timestamp: 2 }]);
+  });
+});
+
+describe("unfilteredWindowQuery", () => {
+  const parser = new Parser();
+  const parse = (sql: string) => parser.astify(sql);
+  const unparse = (ast: any) => parser.sqlify(ast);
+
+  it("drops every WHERE, including CTE, subquery and UNION branches", () => {
+    expect(
+      unfilteredWindowQuery(
+        `WITH a AS (SELECT * FROM "s" WHERE x = 1) SELECT * FROM (SELECT * FROM a WHERE y = 2) WHERE z = 3`,
+        parse,
+        unparse,
+      ),
+    ).toBe('WITH "a" AS (SELECT * FROM "s") SELECT * FROM (SELECT * FROM "a")');
+    expect(
+      unfilteredWindowQuery(
+        `SELECT * FROM "s" WHERE x = 1 UNION ALL SELECT * FROM "t" WHERE z = 3`,
+        parse,
+        unparse,
+      ),
+    ).toBe('SELECT * FROM "s" UNION ALL SELECT * FROM "t"');
+  });
+
+  it("drops the outer ORDER BY and LIMIT so the window shows in time order", () => {
+    expect(
+      unfilteredWindowQuery(`SELECT * FROM "s" WHERE x = 1 ORDER BY x LIMIT 5`, parse, unparse),
+    ).toBe('SELECT * FROM "s"');
+    expect(
+      unfilteredWindowQuery(
+        `SELECT * FROM "s" UNION ALL SELECT * FROM "t" ORDER BY x LIMIT 5`,
+        parse,
+        unparse,
+      ),
+    ).toBe('SELECT * FROM "s" UNION ALL SELECT * FROM "t"');
+  });
+
+  it("quotes identifiers without touching backticks inside string literals", () => {
+    expect(
+      unfilteredWindowQuery(`SELECT 'a \`b\`' AS c FROM "s" WHERE x = 1`, parse, unparse),
+    ).toBe(`SELECT 'a \`b\`' AS "c" FROM "s"`);
+  });
+
+  it("returns null for SQL it cannot read", () => {
+    expect(unfilteredWindowQuery("SELECT FROM WHERE", parse, unparse)).toBeNull();
+  });
+});
+
+describe("searchAroundPickerRange", () => {
+  const startUs = Date.UTC(2026, 10, 11, 7, 6, 57) * 1000;
+  const endUs = startUs + 10 * 60_000_000;
+
+  it("reads the UTC wall clock when the app zone is UTC", () => {
+    const range = searchAroundPickerRange({ startUs, endUs }, "UTC");
+    const start = new Date(range.start);
+    expect([start.getHours(), start.getMinutes(), start.getSeconds()]).toEqual([7, 6, 57]);
+    expect(range.end - range.start).toBe(10 * 60_000);
+  });
+
+  it("gives values whose browser-local fields read the app-zone wall clock", () => {
+    const range = searchAroundPickerRange({ startUs, endUs }, "Asia/Kolkata");
+    const start = new Date(range.start);
+    const end = new Date(range.end);
+    expect([start.getHours(), start.getMinutes(), start.getSeconds()]).toEqual([12, 36, 57]);
+    expect([end.getHours(), end.getMinutes()]).toEqual([12, 46]);
   });
 });

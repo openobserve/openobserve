@@ -14,7 +14,13 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect } from "vitest";
-import { parseDateRangeString, parseSingleDateTime } from "./dateTimeRangeParse";
+import {
+  parseDateRangeString,
+  parseRelativeText,
+  parseRollingPeriod,
+  parseSingleDateTime,
+  parseTimeInput,
+} from "./dateTimeRangeParse";
 
 describe("parseDateRangeString", () => {
   describe("copy-emitted JSON object ({start_date, end_date} in epoch µs)", () => {
@@ -109,8 +115,8 @@ describe("parseDateRangeString", () => {
         type: "absolute",
         startDate: "2026/07/21",
         startTime: "00:00:00",
-        endDate: "2026/07/22",
-        endTime: "23:59:59",
+        endDate: "2026/07/23",
+        endTime: "00:00:00",
       });
     });
 
@@ -189,13 +195,13 @@ describe("parseDateRangeString", () => {
       });
     });
 
-    it("defaults times to full-day bounds when only dates are given", () => {
+    it("ends a dates-only range at the next midnight, as the search end is exclusive", () => {
       expect(parseDateRangeString("2026/07/21 - 2026/07/22")).toEqual({
         type: "absolute",
         startDate: "2026/07/21",
         startTime: "00:00:00",
-        endDate: "2026/07/22",
-        endTime: "23:59:59",
+        endDate: "2026/07/23",
+        endTime: "00:00:00",
       });
     });
 
@@ -271,9 +277,9 @@ describe("parseDateRangeString", () => {
     });
 
     it("rejects out-of-range digit lengths and single values", () => {
-      // 9 digits (too short) and 17 digits (too long) are not accepted.
+      // 9 digits (too short) and 20 digits (longer than nanoseconds) are not accepted.
       expect(parseDateRangeString("123456789 - 123456789")).toBeNull();
-      expect(parseDateRangeString("12345678901234567 - 12345678901234567")).toBeNull();
+      expect(parseDateRangeString("12345678901234567890 - 12345678901234567890")).toBeNull();
       expect(parseDateRangeString("1721557986000000")).toBeNull();
     });
   });
@@ -374,7 +380,7 @@ describe("parseSingleDateTime", () => {
 
     it("rejects out-of-range digit lengths", () => {
       expect(parseSingleDateTime("123456789")).toBeNull();
-      expect(parseSingleDateTime("12345678901234567")).toBeNull();
+      expect(parseSingleDateTime("12345678901234567890")).toBeNull();
     });
   });
 
@@ -577,4 +583,285 @@ describe("parseSingleDateTime", () => {
       });
     },
   );
+});
+
+describe("parseDateRangeString separators and partial ends", () => {
+  it.each([
+    "2026/11/06 14:02:11 to 2026/11/06 15:10:43",
+    "2026/11/06 14:02:11 TO 2026/11/06 15:10:43",
+    "2026/11/06 14:02:11 – 2026/11/06 15:10:43",
+    "2026/11/06 14:02:11 — 2026/11/06 15:10:43",
+    "2026/11/06 14:02:11 - 2026/11/06 15:10:43",
+  ])("reads %s as one zoneless range", (text) => {
+    expect(parseDateRangeString(text)).toEqual({
+      type: "absolute",
+      startDate: "2026/11/06",
+      startTime: "14:02:11",
+      endDate: "2026/11/06",
+      endTime: "15:10:43",
+    });
+  });
+
+  it("reads an ISO interval split by a slash as instants", () => {
+    expect(parseDateRangeString("2026-11-08T03:30:00Z / 2026-11-08T05:30:00Z")).toEqual({
+      type: "timestamp",
+      startMicros: Date.parse("2026-11-08T03:30:00Z") * 1000,
+      endMicros: Date.parse("2026-11-08T05:30:00Z") * 1000,
+    });
+  });
+
+  it("gives a time-only end the start's date", () => {
+    expect(parseDateRangeString("2026-11-06 14:02:11 to 15:10:43")).toEqual({
+      type: "absolute",
+      startDate: "2026/11/06",
+      startTime: "14:02:11",
+      endDate: "2026/11/06",
+      endTime: "15:10:43",
+    });
+  });
+
+  it("rolls a time-only end that is earlier than the start into the next day", () => {
+    expect(parseDateRangeString("2026/12/31 23:00:00 to 01:30")).toEqual({
+      type: "absolute",
+      startDate: "2026/12/31",
+      startTime: "23:00:00",
+      endDate: "2027/01/01",
+      endTime: "01:30:00",
+    });
+  });
+
+  it.each([
+    ["2024-01-01 10:00:00 - 05:00"],
+    ["2024/01/01 10:00 - 05:00"],
+    ["Jan 1, 2024 10:00:00 - 05:00"],
+  ])("refuses %s, as a bare dash before HH:MM also reads as a negative offset", (text) => {
+    expect(parseDateRangeString(text)).toBeNull();
+    expect(parseTimeInput(text)).toBeNull();
+  });
+
+  it("still reads a dashed time-only end that has seconds, which no offset has", () => {
+    expect(parseDateRangeString("2024-01-01 10:00:00 - 12:30:00")).toEqual({
+      type: "absolute",
+      startDate: "2024/01/01",
+      startTime: "10:00:00",
+      endDate: "2024/01/01",
+      endTime: "12:30:00",
+    });
+  });
+
+  it("gives a time-only end the start's offset", () => {
+    expect(parseDateRangeString("2026-11-06T14:02:00+05:30 to 15:10")).toEqual({
+      type: "timestamp",
+      startMicros: Date.parse("2026-11-06T14:02:00+05:30") * 1000,
+      endMicros: Date.parse("2026-11-06T15:10:00+05:30") * 1000,
+    });
+  });
+
+  it("rejects a time-only end after an epoch start, which has no date of its own", () => {
+    expect(parseDateRangeString("1762437731 to 15:10")).toBeNull();
+  });
+
+  it("rejects a time-only start", () => {
+    expect(parseDateRangeString("14:02 - 15:10")).toBeNull();
+  });
+
+  it.each([
+    ["seconds", "1762437731 to 1762441843", 1762437731000000, 1762441843000000],
+    ["milliseconds", "1762437731000 – 1762441843000", 1762437731000000, 1762441843000000],
+    ["microseconds", "1762437731000000-1762441843000000", 1762437731000000, 1762441843000000],
+    [
+      "nanoseconds",
+      "1762437731000000123 - 1762441843000000999",
+      1762437731000000,
+      1762441843000000,
+    ],
+  ])("reads an epoch pair in %s", (_unit, text, startMicros, endMicros) => {
+    expect(parseDateRangeString(String(text))).toEqual({
+      type: "timestamp",
+      startMicros,
+      endMicros,
+    });
+  });
+});
+
+describe("parseRelativeText", () => {
+  it.each([
+    ["15m", "15m"],
+    ["15 m", "15m"],
+    ["15 min", "15m"],
+    ["15 minutes", "15m"],
+    ["last 2 hours", "2h"],
+    ["Past 2 Hours", "2h"],
+    ["last hour", "1h"],
+    ["7d", "7d"],
+    ["2 weeks", "2w"],
+    ["3M", "3M"],
+    ["3 months", "3M"],
+    ["30s", "30s"],
+  ])("reads %s as %s", (text, period) => {
+    expect(parseRelativeText(text)).toBe(period);
+  });
+
+  it.each(["", "m", "hours", "0m", "15 parsecs", "last tuesday-ish", "1762437731"])(
+    "rejects %s",
+    (text) => {
+      expect(parseRelativeText(text)).toBeNull();
+    },
+  );
+});
+
+describe("parseTimeInput", () => {
+  it("returns a rolling period for relative text", () => {
+    expect(parseTimeInput("last 2 hours")).toEqual({ type: "relative", period: "2h" });
+  });
+
+  it("widens a single instant to ±5 minutes, keeping the instant and its epoch unit", () => {
+    const micros = Date.parse("2026-11-06T14:00:00Z") * 1000;
+    expect(parseTimeInput("2026-11-06T14:00:00Z")).toEqual({
+      type: "timestamp",
+      startMicros: micros - 300_000_000,
+      endMicros: micros + 300_000_000,
+      centreMicros: micros,
+      sourceZone: "UTC",
+      utcStamp: true,
+    });
+    expect(parseTimeInput("1762437600")).toEqual({
+      type: "timestamp",
+      startMicros: 1762437600_000000 - 300_000_000,
+      endMicros: 1762437600_000000 + 300_000_000,
+      centreMicros: 1762437600_000000,
+      epochUnit: "s",
+    });
+  });
+
+  it("widens a single zoneless date-time to ±5 minutes, across midnight", () => {
+    expect(parseTimeInput("2026/11/06 23:58:00")).toEqual({
+      type: "absolute",
+      startDate: "2026/11/06",
+      startTime: "23:53:00",
+      endDate: "2026/11/07",
+      endTime: "00:03:00",
+      centre: { date: "2026/11/06", time: "23:58:00" },
+      hasYear: true,
+    });
+  });
+
+  it("reads a lone date as that whole day, ending at the next midnight", () => {
+    expect(parseTimeInput("2026/11/06")).toEqual({
+      type: "absolute",
+      startDate: "2026/11/06",
+      startTime: "00:00:00",
+      endDate: "2026/11/07",
+      endTime: "00:00:00",
+      hasYear: true,
+    });
+  });
+
+  it("keeps a zoneless range zoneless, so the caller reads it in the picker timezone", () => {
+    expect(parseTimeInput("2026-11-06 14:02:11 to 15:10:43")?.type).toBe("absolute");
+  });
+
+  it("keeps an offset range as instants", () => {
+    expect(parseTimeInput("2026-11-08T03:30:00Z / 2026-11-08T05:30:00Z")?.type).toBe("timestamp");
+  });
+
+  it.each(["", "   ", "last tuesday-ish", "garbage", "2026/13/01"])("rejects %s", (text) => {
+    expect(parseTimeInput(text)).toBeNull();
+  });
+});
+
+describe("round-2 regressions", () => {
+  it("keeps a lone instant with a negative offset as one instant, not a dash-split range", () => {
+    const micros = Date.parse("2024-01-02T10:00:00-05:00") * 1000;
+    expect(parseDateRangeString("Jan 2, 2024 10:00:00 -05:00")).toBeNull();
+    expect(parseTimeInput("Jan 2, 2024 10:00:00 -05:00")).toEqual({
+      type: "timestamp",
+      startMicros: micros - 300_000_000,
+      endMicros: micros + 300_000_000,
+      centreMicros: micros,
+      sourceZone: "UTC-05:00",
+    });
+    expect(parseTimeInput("2024-01-02T10:00:00-05:00")).toEqual({
+      type: "timestamp",
+      startMicros: micros - 300_000_000,
+      endMicros: micros + 300_000_000,
+      centreMicros: micros,
+      sourceZone: "UTC-05:00",
+    });
+  });
+
+  it("still splits a bare-dash epoch or slash-date pair", () => {
+    expect(parseDateRangeString("1762437731-1762441843")?.type).toBe("timestamp");
+    expect(parseDateRangeString("2026/01/01-2026/01/02")?.type).toBe("absolute");
+  });
+
+  it("reads a time-only end in its own offset before deciding whether it rolls over", () => {
+    expect(parseDateRangeString("2024-01-01T23:00:00+05:30 to 18:00Z")).toEqual({
+      type: "timestamp",
+      startMicros: Date.parse("2024-01-01T23:00:00+05:30") * 1000,
+      endMicros: Date.parse("2024-01-01T18:00:00Z") * 1000,
+    });
+    expect(parseDateRangeString("2024-01-01T23:00:00+05:30 to 01:30")).toEqual({
+      type: "timestamp",
+      startMicros: Date.parse("2024-01-01T23:00:00+05:30") * 1000,
+      endMicros: Date.parse("2024-01-02T01:30:00+05:30") * 1000,
+    });
+  });
+
+  it.each([
+    ["2024-01-01T01:00:00+05:30 to 20:00Z", "2023-12-31T19:30:00Z", "2023-12-31T20:00:00Z"],
+    ["2024-01-01T23:00:00-05:00 to 03:00Z", "2024-01-02T04:00:00Z", "2024-01-03T03:00:00Z"],
+    ["2024-01-01T23:00:00-05:00 to 05:00Z", "2024-01-02T04:00:00Z", "2024-01-02T05:00:00Z"],
+  ])("dates a time-only end in its own offset: %s", (text, start, end) => {
+    expect(parseDateRangeString(text)).toEqual({
+      type: "timestamp",
+      startMicros: Date.parse(start) * 1000,
+      endMicros: Date.parse(end) * 1000,
+    });
+  });
+
+  it.each(["17300000000000000", "173000000000000000"])(
+    "rejects a %s-digit epoch that fits no unit",
+    (digits) => {
+      expect(parseSingleDateTime(digits)).toBeNull();
+      expect(parseTimeInput(digits)).toBeNull();
+    },
+  );
+
+  it("splits a picker period into count and unit, and rejects a zero count", () => {
+    expect(parseRollingPeriod("15m")).toEqual({ value: 15, unit: "m" });
+    expect(parseRollingPeriod("3M")).toEqual({ value: 3, unit: "M" });
+    expect(parseRollingPeriod("0h")).toBeNull();
+    expect(parseRollingPeriod("calendar:day:0")).toBeNull();
+  });
+});
+
+describe("calendar words", () => {
+  it.each([
+    ["today", "calendar:day:0"],
+    ["Yesterday", "calendar:day:-1"],
+    ["this week", "calendar:week:0"],
+    ["last week", "calendar:week:-1"],
+    ["this month", "calendar:month:0"],
+    ["Last Month", "calendar:month:-1"],
+    ["this  quarter", "calendar:quarter:0"],
+    ["last quarter", "calendar:quarter:-1"],
+    ["last day", "calendar:day:-1"],
+  ])("reads %s as the rail's %s token", (text, token) => {
+    expect(parseTimeInput(text)).toEqual({ type: "relative", period: token });
+  });
+
+  // "last <unit>" names the previous calendar period where one exists; "past <unit>" and any count are rolling.
+  it.each([
+    ["last 1 month", "1M"],
+    ["last 2 months", "2M"],
+    ["past month", "1M"],
+    ["past week", "1w"],
+    ["past day", "1d"],
+    ["past hour", "1h"],
+    ["last hour", "1h"],
+    ["last minute", "1m"],
+  ])("keeps %s rolling", (text, period) => {
+    expect(parseTimeInput(text)).toEqual({ type: "relative", period });
+  });
 });

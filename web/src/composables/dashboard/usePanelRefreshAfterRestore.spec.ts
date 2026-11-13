@@ -140,16 +140,27 @@ describe("usePanelRefreshAfterRestore", () => {
     expect(refresh.release(true)).toBe(false);
   });
 
-  it("accepts any cached window for a relative range and outside dashboards", () => {
-    const { refresh } = setup();
+  it("accepts any cached window outside dashboards", () => {
     const outside = usePanelRefreshAfterRestore({
       state: restoredState(),
       panelSchema: ref({ id: "P1" }),
     });
 
-    expect(refresh.acceptsCachedWindow({ start_time: 1, end_time: 2 }, WINDOW)).toBe(true);
     expect(outside.acceptsCachedWindow({ start_time: 1, end_time: 2 }, WINDOW)).toBe(true);
   });
+
+  it.each([true, false])(
+    "accepts a relative range's cache only for the same length (auto-run %s)",
+    (autoRun) => {
+      const { refresh } = setup({ autoRun });
+      const sameLengthEarlier = { start_time: 400_000, end_time: 1_300_000 };
+
+      expect(refresh.acceptsCachedWindow(sameLengthEarlier, WINDOW)).toBe(true);
+      expect(
+        refresh.acceptsCachedWindow({ start_time: 1_000_000, end_time: 1_015_000 }, WINDOW),
+      ).toBe(false);
+    },
+  );
 
   it("accepts only the exact window for an absolute range, whatever the auto-run setting", () => {
     const { refresh } = setup({ autoRun: false, relative: false });

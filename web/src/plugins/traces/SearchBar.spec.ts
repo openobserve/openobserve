@@ -689,6 +689,23 @@ describe("SearchBar", () => {
       expect(wrapper.find('[data-test="service-graph-refresh-btn"]').exists()).toBe(false);
     });
 
+    it.each([
+      ["traces", "logs-search-bar-date-time-dropdown", 1],
+      ["service-graph", "service-graph-date-time-picker", 2],
+      ["services-catalog", "services-catalog-date-time-picker", 2],
+    ] as const)(
+      "lets the %s picker's wrapper shrink inside the toolbar row instead of overflowing it",
+      async (mode, dataTest, depth) => {
+        searchObjInstance.meta.searchMode = mode;
+        wrapper = mountSearchBar();
+        await flushPromises();
+
+        let shrinkable = wrapper.findComponent(`[data-test="${dataTest}"]`).element as Element;
+        for (let i = 0; i < depth; i++) shrinkable = shrinkable.parentElement!;
+        expect(shrinkable.classList).toContain("min-w-0");
+      },
+    );
+
     it.each(["service-graph", "services-catalog"])(
       "keeps a shared calendar range on the %s picker by offering calendar presets",
       async (mode) => {

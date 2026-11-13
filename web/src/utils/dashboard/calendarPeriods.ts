@@ -16,6 +16,7 @@
 import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 
 import { raw, type I18nKey, type I18nText, type TranslateFn } from "@/types/i18n";
+import { weekStartsOn, type WeekDay } from "@/utils/weekStart";
 
 const CALENDAR_TOKEN_PATTERN = /^calendar:(day|week|month|quarter|year):(0|-[1-9]\d{0,5})$/;
 const RANGE_FORMAT = "yyyy/MM/dd HH:mm:ss";
@@ -28,11 +29,12 @@ const THIS_KEYS: Record<Exclude<CalendarUnit, "day">, I18nKey> = {
   year: "common.thisYear",
 };
 
-const LAST_KEYS: Record<Exclude<CalendarUnit, "day">, I18nKey> = {
-  week: "common.lastWeek",
-  month: "common.lastMonth",
-  quarter: "common.lastQuarter",
-  year: "common.lastYear",
+// A finished period reads "Previous …", so it is never taken for the rolling "Last …" range.
+const PREVIOUS_KEYS: Record<Exclude<CalendarUnit, "day">, I18nKey> = {
+  week: "dateTime.previousWeek",
+  month: "dateTime.previousMonth",
+  quarter: "dateTime.previousQuarter",
+  year: "dateTime.previousYear",
 };
 
 export type CalendarUnit = "day" | "week" | "month" | "quarter" | "year";
@@ -78,35 +80,18 @@ export const resolveCalendarPeriod = (
   token: unknown,
   timezone?: string | null,
   nowMs: number = Date.now(),
+  weekStart: WeekDay = weekStartsOn(),
 ): CalendarRange | null => {
   const period = parseCalendarToken(token);
   if (!period) return null;
   const zone = safeTimezone(timezone);
-  const bounds = civilBounds(period, zone, nowMs);
+  const bounds = civilBounds(period, zone, nowMs, weekStart);
   if (!bounds) return null;
   const startMs = zonedMidnight(bounds.start, zone);
   // The search end bound is exclusive, so a finished period ends at the next one's start and periods tile with no gap.
   const endMs = period.offset === 0 ? nowMs : zonedMidnight(bounds.next, zone);
   if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) return null;
   return { startTime: startMs * 1000, endTime: endMs * 1000 };
-};
-
-/** First and last civil day of a calendar period, plus today, as UTC-held dates in the given zone; a current period spans its whole length, not just the part elapsed. */
-export const resolveCalendarCivilSpan = (
-  token: unknown,
-  timezone?: string | null,
-  nowMs: number = Date.now(),
-): { unit: CalendarUnit; first: Date; last: Date; today: Date } | null => {
-  const period = parseCalendarToken(token);
-  if (!period) return null;
-  const bounds = civilBounds(period, safeTimezone(timezone), nowMs);
-  if (!bounds) return null;
-  return {
-    unit: period.unit,
-    first: bounds.start,
-    last: new Date(bounds.next.getTime() - 86_400_000),
-    today: bounds.today,
-  };
 };
 
 /** Trigger-button label for a calendar token, e.g. "This month", "Oct 6", "Q2 2026". */
@@ -116,10 +101,11 @@ export const formatCalendarLabel = (
   t: TranslateFn,
   locale: string = "en-US",
   nowMs: number = Date.now(),
+  weekStart: WeekDay = weekStartsOn(),
 ): I18nText | null => {
   const period = parseCalendarToken(token);
   if (!period) return null;
-  const bounds = civilBounds(period, safeTimezone(timezone), nowMs);
+  const bounds = civilBounds(period, safeTimezone(timezone), nowMs, weekStart);
   if (!bounds) return null;
   const { unit, offset } = period;
   if (unit === "day") {
@@ -127,7 +113,7 @@ export const formatCalendarLabel = (
     if (offset === -1) return t("common.yesterday");
   } else {
     if (offset === 0) return t(THIS_KEYS[unit]);
-    if (offset === -1) return t(LAST_KEYS[unit]);
+    if (offset === -1) return t(PREVIOUS_KEYS[unit]);
   }
   return formatOlderLabel(unit, bounds, t, locale);
 };
@@ -205,14 +191,14 @@ const civilDate = (year: number, monthIndex: number, day: number): Date => {
   return date;
 };
 
-const periodStart = (unit: CalendarUnit, offset: number, today: Date): Date => {
+const periodStart = (unit: CalendarUnit, offset: number, today: Date, weekStart: WeekDay): Date => {
   const y = today.getUTCFullYear();
   const m = today.getUTCMonth();
   const d = today.getUTCDate();
   if (unit === "day") return civilDate(y, m, d + offset);
   if (unit === "week") {
-    const isoWeekday = ((today.getUTCDay() + 6) % 7) + 1;
-    return civilDate(y, m, d - (isoWeekday - 1) + 7 * offset);
+    const daysIntoWeek = (today.getUTCDay() - weekStart + 7) % 7;
+    return civilDate(y, m, d - daysIntoWeek + 7 * offset);
   }
   if (unit === "month") return civilDate(y, m + offset, 1);
   if (unit === "quarter") return civilDate(y, Math.floor(m / 3) * 3 + 3 * offset, 1);
@@ -220,11 +206,16 @@ const periodStart = (unit: CalendarUnit, offset: number, today: Date): Date => {
 };
 
 // Calendar maths runs on UTC-held civil dates so the browser's own zone never shifts a boundary.
-const civilBounds = (period: CalendarPeriod, zone: string, nowMs: number): CivilBounds | null => {
+const civilBounds = (
+  period: CalendarPeriod,
+  zone: string,
+  nowMs: number,
+  weekStart: WeekDay,
+): CivilBounds | null => {
   const [y, m, d] = formatInTimeZone(nowMs, zone, "yyyy-MM-dd").split("-").map(Number);
   const today = civilDate(y, m - 1, d);
-  const start = periodStart(period.unit, period.offset, today);
-  const next = periodStart(period.unit, period.offset + 1, today);
+  const start = periodStart(period.unit, period.offset, today, weekStart);
+  const next = periodStart(period.unit, period.offset + 1, today, weekStart);
   const startYear = start.getUTCFullYear();
   if (!Number.isFinite(startYear) || startYear < 1 || next.getUTCFullYear() > 9999) return null;
   return { start, next, today };

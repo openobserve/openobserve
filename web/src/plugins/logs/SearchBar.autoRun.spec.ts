@@ -557,6 +557,62 @@ describe("SearchBar — auto-run wiring (item 2)", () => {
       expect(logs.mock.calls[0][0]).toMatchObject({ reason: "time" });
     });
 
+    it("going live from an ended range with refresh on runs even with Auto Run off (V4)", async () => {
+      const { logs, searchObj } = await setup({ liveMode: false });
+      vi.useFakeTimers();
+      searchObj.data.datetime = { type: "absolute", startTime: 1, endTime: 2 };
+      searchObj.meta.refreshInterval = 5;
+      markExecuted();
+      await wrapper!.vm.updateDateTime({
+        valueType: "relative",
+        relativeTimePeriod: "8h",
+        startTime: 1,
+        endTime: 2,
+        userChangedValue: true,
+      });
+      await vi.advanceTimersByTimeAsync(10);
+      expect(logs).toHaveBeenCalledTimes(1);
+      expect(logs.mock.calls[0][0]).toMatchObject({ reason: "run" });
+    });
+
+    it("a live range from an ended one stays manual while refresh is off (V4)", async () => {
+      const { logs, searchObj } = await setup({ liveMode: false });
+      vi.useFakeTimers();
+      searchObj.data.datetime = { type: "absolute", startTime: 1, endTime: 2 };
+      searchObj.meta.refreshInterval = 0;
+      markExecuted();
+      await wrapper!.vm.updateDateTime({
+        valueType: "relative",
+        relativeTimePeriod: "8h",
+        startTime: 1,
+        endTime: 2,
+        userChangedValue: true,
+      });
+      await vi.advanceTimersByTimeAsync(10);
+      expect(logs).not.toHaveBeenCalled();
+    });
+
+    it("clamps an over-limit pick without a second toast; the picker names the limit (V7)", async () => {
+      const { searchObj } = await setup({ liveMode: false });
+      searchObj.data.datetime = { type: "relative", queryRangeRestrictionInHour: 24 };
+      const end = Date.parse("2026-10-06T10:00:00") * 1000;
+      const overLimit = (userChangedValue: boolean) => ({
+        valueType: "absolute",
+        startTime: end - 48 * 3600 * 1_000_000,
+        endTime: end,
+        selectedDate: { from: "2026/10/04", to: "2026/10/06" },
+        selectedTime: { startTime: "10:00", endTime: "10:00" },
+        userChangedValue,
+      });
+      await wrapper!.vm.updateDateTime(overLimit(true));
+      expect(Number(searchObj.data.datetime.startTime)).toBe(end - 24 * 3600 * 1_000_000);
+      expect(toastMock).not.toHaveBeenCalled();
+
+      searchObj.data.datetime.queryRangeRestrictionInHour = 24;
+      await wrapper!.vm.updateDateTime(overLimit(false));
+      expect(toastMock).toHaveBeenCalledTimes(1);
+    });
+
     it("tracks a user time change as logs_time_range_changed without the raw value", async () => {
       await setup({ liveMode: false });
       const track = vi.spyOn(analytics, "track");
@@ -579,6 +635,20 @@ describe("SearchBar — auto-run wiring (item 2)", () => {
       const { logs } = await setup({ liveMode: false });
       wrapper!.vm.markZoom(ZOOM);
       await wrapper!.vm.updateDateTime(zoomPayload(ZOOM));
+      expect(logs).toHaveBeenCalledTimes(1);
+      expect(logs.mock.calls[0][0]).toMatchObject({ reason: "zoom", kind: "explicit" });
+    });
+
+    it("runs an undo of a change that ran, like a zoom, even with Auto Run off (D-UNDO)", async () => {
+      const { logs } = await setup({ liveMode: false });
+      await wrapper!.vm.updateDateTime({
+        valueType: "relative",
+        relativeTimePeriod: "24h",
+        startTime: 1,
+        endTime: 2,
+        userChangedValue: true,
+        rerun: true,
+      });
       expect(logs).toHaveBeenCalledTimes(1);
       expect(logs.mock.calls[0][0]).toMatchObject({ reason: "zoom", kind: "explicit" });
     });

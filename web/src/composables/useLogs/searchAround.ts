@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { toZonedTime } from "date-fns-tz";
 import { searchState } from "@/composables/useLogs/searchState";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { b64EncodeUnicode, generateTraceContext } from "@/utils/zincutils";
@@ -24,6 +25,7 @@ import useStreamFields from "@/composables/useLogs/useStreamFields";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { STREAM_NAME_FIELD } from "@/utils/logs/streamNameColumn";
 import { useLogsAutoRun } from "@/composables/useLogs/logsAutoRun";
+import { WINDOW_QUERY_VIEWS } from "@/utils/searchAroundWindow";
 import {
   bindSeverityRequest,
   type SeverityRequestSnapshot,
@@ -35,6 +37,58 @@ import {
   SearchAroundError,
   TraceContext,
 } from "@/ts/interfaces";
+
+/** Chart-style values for `DateTime.setCustomDate`: their browser-local fields read the app-zone wall clock. */
+export const searchAroundPickerRange = (
+  range: { startUs: number; endUs: number },
+  timezone: string,
+): { start: number; end: number } => ({
+  start: toZonedTime(range.startUs / 1000, timezone).getTime(),
+  end: toZonedTime(range.endUs / 1000, timezone).getTime(),
+});
+
+/** Swaps the parser's backtick identifiers for double quotes, leaving string literals as typed. */
+const quoteIdentifiers = (sql: string): string =>
+  sql.replace(/('(?:[^']|'')*')|`/g, (match, literal) => literal ?? '"');
+
+// A select node and every UNION branch after it; parser ASTs are untyped.
+const selectChain = (node: any): any[] => {
+  const chain: any[] = [];
+  for (let current = node; current && typeof current === "object"; current = current._next) {
+    chain.push(current);
+  }
+  return chain;
+};
+
+const dropWhere = (node: any): void => {
+  for (const select of selectChain(node)) {
+    select.where = null;
+    (select.with ?? []).forEach((cte: any) => dropWhere(cte?.stmt?.ast ?? cte?.stmt));
+    (select.from ?? []).forEach((source: any) => dropWhere(source?.expr?.ast));
+  }
+};
+
+/** The user's SQL with every WHERE and the outer ORDER BY/LIMIT removed, or null when it cannot be read. */
+export const unfilteredWindowQuery = (
+  sql: string,
+  parse: (sql: string) => unknown,
+  unparse: (ast: unknown) => string,
+): string | null => {
+  try {
+    const parsed: any = parse(sql);
+    const ast = Array.isArray(parsed) ? parsed[0] : parsed;
+    if (!ast?.from?.length) return null;
+    dropWhere(ast);
+    for (const select of selectChain(ast)) {
+      select.orderby = null;
+      select.limit = null;
+    }
+    const query = unparse(ast);
+    return query ? quoteIdentifiers(query) : null;
+  } catch {
+    return null;
+  }
+};
 
 export const useSearchAround = () => {
   // Safe only because useSearchAround() runs inside component setup (SearchResult.vue).
@@ -106,7 +160,7 @@ export const useSearchAround = () => {
       } else if (searchObj.meta.sqlMode === true) {
         const parsedSQL = fnParsedSQL(query);
         parsedSQL.where = null;
-        sqlContext.push(b64EncodeUnicode(fnUnparsedSQL(parsedSQL).replace(/`/g, '"')) ?? "");
+        sqlContext.push(b64EncodeUnicode(quoteIdentifiers(fnUnparsedSQL(parsedSQL))) ?? "");
       } else {
         const parseQuery = [query];
         let queryFunctions = "";
@@ -284,7 +338,31 @@ export const useSearchAround = () => {
     }
   };
 
+  // Like the records path, only the request drops the filter; unparsable SQL runs as typed.
+  // A dirty editor's next Run must send what it shows, and other views never read the query.
+  const armWindowQuery = (range: { startUs: number; endUs: number }): void => {
+    const view = String(searchObj.meta.logsVisualizeToggle ?? "");
+    const query =
+      searchObj.meta.editorDirty || !WINDOW_QUERY_VIEWS.includes(view)
+        ? null
+        : searchObj.meta.sqlMode === true
+          ? unfilteredWindowQuery(searchObj.data.query, fnParsedSQL, fnUnparsedSQL)
+          : "";
+    searchObj.data.searchAround.windowQuery =
+      query === null
+        ? null
+        : {
+            query,
+            typedQuery: String(searchObj.data.query ?? ""),
+            view,
+            startUs: range.startUs,
+            endUs: range.endUs,
+            pinned: false,
+          };
+  };
+
   return {
     searchAroundData,
+    armWindowQuery,
   };
 };

@@ -248,6 +248,18 @@ describe("SearchResult Component", () => {
       expect(wrapper.vm.searchObj.meta.showDetailTab).toBe(false);
       expect(wrapper.vm.searchObj.data.searchAround.indexTimestamp).toBe("2023-01-01T00:00:00Z");
     });
+
+    it("hands a search-around time window to the page, not as a plain date update", async () => {
+      const startUs = 1_700_000_000_000_000;
+      const endUs = startUs + 600_000_000;
+      wrapper.vm.searchObj.meta.showDetailTab = true;
+
+      await wrapper.vm.onSearchAroundWindow({ startUs, endUs });
+
+      expect(wrapper.vm.searchObj.meta.showDetailTab).toBe(false);
+      expect(wrapper.emitted()["search:aroundwindow"]).toEqual([[{ startUs, endUs }]]);
+      expect(wrapper.emitted()["update:datetime"]).toBeUndefined();
+    });
   });
 
   describe("Search and Filter Operations", () => {

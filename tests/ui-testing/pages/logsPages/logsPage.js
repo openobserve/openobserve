@@ -5,10 +5,11 @@ import { LoginPage } from '../generalPages/loginPage.js';
 import { IngestionPage } from '../generalPages/ingestionPage.js';
 import { ManagementPage } from '../generalPages/managementPage.js';
 import { openNavFlyoutChild, clickNavUntilRoute, selectLogsViewMode } from '../commonActions.js';
-import { openOSelectDropdown } from '../alertsPages/oselectHelpers.js';
+import { openOSelectDropdown, selectOSelectOption } from '../alertsPages/oselectHelpers.js';
 import * as fs from 'fs';
 import * as path from 'path';
 import { ingestBase } from '../../playwright-tests/utils/ingest-url.js';
+import { openDateFields, pickRelativePeriod, pickRelativePeriodCode, waitForDateTimePanel } from '../generalPages/relativePeriod.js';
 
 // Import testLogger for proper logging
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
@@ -95,21 +96,14 @@ export class LogsPage {
         this.logTableColumnSource = '[data-test="o2-table-row-0"] [data-test="o2-table-cell-source"]';
         this.logsSearchBarQueryEditor = '[data-test="logs-search-bar-query-editor"]';
         this.searchBarRefreshButton = '[data-test="logs-search-bar-refresh-btn"]';
-        this.relative15MinButton = '[data-test="date-time-relative-15-m-btn"]';
-        this.relative6WeeksButton = '[data-test="date-time-relative-6-w-btn"]';
-        this.relative30SecondsButton = '[data-test="date-time-relative-30-s-btn"]';
-        this.relative1HourButton = '[data-test="date-time-relative-1-h-btn"]';
-        this.absoluteTab = '[data-test="date-time-absolute-tab"]';
+        this.relative15MinButton = '[data-test="date-time-chip-15m"]';
+        this.relative1HourButton = '[data-test="date-time-chip-1h"]';
         this.scheduleText = '[data-test="date-time-btn"]';
         this.timeZoneDropdown = '[data-test="timezone-select"]';
         this.timeZoneOption = (zone) => `[data-test="timezone-option-${zone}"]`;
         this.dateSelector = (day) => `[data-test="date-selector-${day}"]`;
         this.monthSelector = (month) => `[data-test="month-selector-${month}"]`;
         this.yearSelector = (year) => `[data-test="year-selector-${year}"]`;
-        this.startTimeField = '[data-test="datetime-start-time"]';
-        this.endTimeField = '[data-test="datetime-end-time"]';
-        this.startTimeInput = '[data-test="datetime-start-time"] input[type="time"]';
-        this.endTimeInput = '[data-test="datetime-end-time"] input[type="time"]';
         this.showQueryToggle = '[data-test="logs-search-bar-show-query-toggle-btn"]';
         this.fieldListCollapseButton = '[data-test="logs-search-field-list-collapse-btn"]';
         this.savedViewsButton = '[data-test="logs-search-bar-utilities-menu-btn"]';
@@ -184,6 +178,7 @@ export class LogsPage {
         // [data-test="log-search-expand-<field>-field-btn"]. Deterministic data-test for waits.
         this.expandCodeFieldBtn = '[data-test="log-search-expand-code-field-btn"]';
         this.logsDetailTableSearchAroundBtn = '[data-test="logs-detail-table-search-around-btn"]';
+        this.logsDetailTableSearchAroundWindow = '[data-test="logs-detail-table-search-around-window"]';
         this.logTableColumn3Source = '[data-test="o2-table-row-3"] [data-test="o2-table-cell-source"]';
         this.histogramToggleDiv = '[data-test="logs-search-bar-show-histogram-toggle-btn"] div';
 
@@ -197,7 +192,6 @@ export class LogsPage {
         this.liveMode5SecBtn = '[data-test="logs-search-bar-refresh-time-5"]';
         this.vrlToggleButton = '[data-test="logs-search-bar-show-query-toggle-btn"]';
         this.vrlEditor = '[data-test="logs-vrl-function-editor"]';
-        this.relative6DaysBtn = '[data-test="date-time-relative-6-d-btn"]';
         this.menuLink = link => `[data-test="menu-link-${link}"]`;
         this.searchAroundBtn = '[data-test="logs-search-bar-search-around-btn"]';
         this.pagination = '[data-test="logs-search-pagination"]';
@@ -1743,11 +1737,11 @@ export class LogsPage {
     // Time and date methods
     async setTimeToPast30Seconds() {
         await this.page.locator(this.dateTimeButton).click();
-        await this.page.locator(this.relative30SecondsButton).click();
+        await pickRelativePeriod(this.page, '30', 's');
     }
 
     async verifyTimeSetTo30Seconds() {
-        await expect(this.page.locator(this.scheduleText)).toContainText('Past 30 Seconds');
+        await expect(this.page.locator(this.scheduleText)).toContainText('Last 30 seconds');
     }
 
     async setDateTime() {
@@ -1756,12 +1750,12 @@ export class LogsPage {
 
     async setDateTimeToToday() {
         await this.page.locator(this.dateTimeButton).click();
-        await this.page.locator(this.absoluteTab).click();
+        await openDateFields(this.page);
     }
 
     async setDateTimeTo15Minutes() {
         await this.page.locator(this.dateTimeButton).click();
-        await this.page.locator('[data-test="date-time-relative-15-m-btn"]').click();
+        await this.page.locator('[data-test="date-time-chip-15m"]').click();
     }
 
     async setDateTimeToPast1Hour() {
@@ -1771,19 +1765,10 @@ export class LogsPage {
 
     async setAbsoluteDate(year, month, day, currentMonth, currentYear) {
         await this.page.locator(this.dateTimeButton).click();
-        await this.page.locator(this.absoluteTab).click();
+        await openDateFields(this.page);
         await this.page.locator(this.monthSelector(currentMonth)).click();
         await this.page.locator(this.yearSelector(currentYear)).click();
         await this.page.locator(this.dateSelector(day)).click();
-    }
-
-    async setStartAndEndTime(startTime, endTime) {
-        await this.page.locator(this.startTimeField).fill(startTime);
-        await this.page.locator(this.endTimeField).fill(endTime);
-    }
-
-    async setTimeRange(startTime, endTime) {
-        await this.setStartAndEndTime(startTime, endTime);
     }
 
     async verifySchedule(expectedTime) {
@@ -1797,11 +1782,6 @@ export class LogsPage {
 
     async changeTimeZone() {
         await this.setTimeZone('UTC');
-    }
-
-    async verifyDateTime(startTime, endTime) {
-        await expect(this.page.locator(this.startTimeInput)).toHaveValue(startTime);
-        await expect(this.page.locator(this.endTimeInput)).toHaveValue(endTime);
     }
 
     async getScheduleText() {
@@ -2892,12 +2872,12 @@ export class LogsPage {
     async clickRelative15MinButton() {
         const btn = this.page.locator(this.relative15MinButton);
         await btn.waitFor({ state: 'visible', timeout: 10000 });
-        // Mirror clickRelative6WeeksButton: settle the toolbar then verify the label so an in-flight-search reflow can't drop the click off-target.
+        // Settle the toolbar then verify the label so an in-flight-search reflow can't drop the click off-target.
         await this._waitForQueryButtonIdle();
         await btn.click();
         const applied = await this.page
             .locator(this.dateTimeButton)
-            .filter({ hasText: 'Past 15 Minutes' })
+            .filter({ hasText: 'Last 15 minutes' })
             .first()
             .waitFor({ state: 'visible', timeout: 3000 })
             .then(() => true)
@@ -2929,31 +2909,17 @@ export class LogsPage {
     }
 
     async clickRelative6WeeksButton() {
-        const btn = this.page.locator(this.relative6WeeksButton);
-        await btn.waitFor({ state: 'visible', timeout: 10000 });
-        // The date picker is a popover anchored to the toolbar; an in-flight auto-search
-        // reflows the toolbar and repositions the popover, so the preset can shift under
-        // the pointer and the click misses (range stays "Past 15 Minutes"). Let the
-        // toolbar settle first, then click (no force), and verify the trigger label
-        // actually updated — retry once if the Reka toggle dropped the click mid-animation.
+        // Six weeks has no chip, so it is typed into the bar; settle the toolbar first so a reflow can't move the panel mid-entry.
+        await waitForDateTimePanel(this.page);
         await this._waitForQueryButtonIdle();
-        await btn.click();
-        const applied = await this.page
-            .locator(this.dateTimeButton)
-            .filter({ hasText: 'Past 6 Weeks' })
-            .first()
-            .waitFor({ state: 'visible', timeout: 3000 })
-            .then(() => true)
-            .catch(() => false);
-        if (!applied) {
-            await btn.click().catch(() => {});
-        }
+        await pickRelativePeriod(this.page, '6', 'w');
+        await expect(this.page.locator(this.dateTimeButton).first()).toContainText('Last 6 weeks', { timeout: 5000 });
     }
 
     // Deterministic wait helpers for date-picker popover buttons — replace
     // legacy waitForTimeout buffers used to absorb popover-open animation.
     async waitForRelative6WeeksButtonVisible(timeout = 10000) {
-        await this.page.locator(this.relative6WeeksButton).waitFor({ state: 'visible', timeout });
+        await waitForDateTimePanel(this.page, timeout);
     }
 
     async waitForRelative15MinButtonVisible(timeout = 10000) {
@@ -2961,7 +2927,7 @@ export class LogsPage {
     }
 
     async waitForPast6DaysButtonVisible(timeout = 10000) {
-        await this.page.locator(this.relative6DaysBtn).waitFor({ state: 'visible', timeout });
+        await waitForDateTimePanel(this.page, timeout);
     }
 
     // Wait for the log-detail drawer (opened by clickLogTableColumnSource) to be visible
@@ -4374,10 +4340,10 @@ export class LogsPage {
 
     async expectTextVisible(text) {
         // Text-based locators (`text=...`) violate the data-test-only policy. For the
-        // known callers ("Past 6 Weeks", "Past 6 Days", ".a=2"), expand to data-test-scoped
-        // assertions where possible. "Past N <Period>" is rendered inside the date-time
+        // known callers ("Last 6 weeks", "Last 6 days", ".a=2"), expand to data-test-scoped
+        // assertions where possible. "Last N <period>" is rendered inside the date-time
         // button (data-test="date-time-btn"). ".a=2" appears in the page container.
-        if (/^Past\s/.test(text)) {
+        if (/^Last\s/.test(text)) {
             await expect(this.page.locator(this.dateTimeButton)).toContainText(text, { timeout: 15000 });
             return;
         }
@@ -4859,7 +4825,7 @@ export class LogsPage {
     }
 
     async clickPast6DaysButton() {
-        return await this.page.locator(this.relative6DaysBtn).click();
+        return await pickRelativePeriod(this.page, '6', 'd');
     }
 
     async clickMenuLink(link) {
@@ -5317,7 +5283,17 @@ export class LogsPage {
         return await this.page.locator(this.expandCodeFieldBtn).click();
     }
 
-    async clickLogsDetailTableSearchAroundBtn() {
+    /**
+     * Pick a Search around window in the log detail drawer: `t1|t5|t15` (± minutes) or
+     * `r10|r20|r50|r100` (records, the `_around` request). The default is `t5`.
+     */
+    async selectSearchAroundWindow(value) {
+        await selectOSelectOption(this.page, this.logsDetailTableSearchAroundWindow, value);
+    }
+
+    /** Runs a record search around (10 records), the behaviour these steps were written for. */
+    async clickLogsDetailTableSearchAroundBtn(window = 'r10') {
+        await this.selectSearchAroundWindow(window);
         return await this.page.locator(this.logsDetailTableSearchAroundBtn).click();
     }
 
@@ -6670,7 +6646,7 @@ export class LogsPage {
     }
 
     async selectRelative6Hours() {
-        return await this.page.locator('[data-test="date-time-relative-6-h-btn"]').click();
+        return await pickRelativePeriod(this.page, '6', 'h');
     }
 
     async selectRelative1Hour() {
@@ -6678,7 +6654,7 @@ export class LogsPage {
     }
 
     async clickAbsoluteTimeTab() {
-        return await this.page.locator('[data-test="date-time-absolute-tab"]').click();
+        return await openDateFields(this.page);
     }
 
     async fillStartDate(date) {
@@ -7121,36 +7097,6 @@ export class LogsPage {
         await this.page.keyboard.press('Backspace');
         await this.page.waitForTimeout(200);
         await this.page.keyboard.type(text, { delay: 30 });
-    }
-
-    async clickTimeCell() {
-        // Post-UX-revamp: time input is a native <input type="time"> inside datetime-start-time
-        const timeInput = this.page.locator('[data-test="datetime-start-time"] input[type="time"]').first();
-        await timeInput.waitFor({ state: 'visible', timeout: 5000 });
-        return await timeInput.click();
-    }
-
-    async fillTimeCellWithInvalidValue(value) {
-        // Use fill() with the value and rely on the component's validation to surface
-        // the error state, rather than bypassing browser validation via evaluate().
-        const timeInput = this.page.locator('[data-test="datetime-start-time"] input[type="time"]').first();
-        await timeInput.waitFor({ state: 'visible', timeout: 5000 });
-        const currentValue = await timeInput.inputValue().catch(() => '');
-        await timeInput.fill('');
-        await timeInput.fill(value);
-        // Verify the input reflects the attempted value (or its best-effort parse)
-        const newValue = await timeInput.inputValue().catch(() => '');
-        if (newValue !== value) {
-            // Browser rejected or parsed the value — that's the expected error path
-            return { rejected: true, originalValue: currentValue, newValue };
-        }
-        return { rejected: false, originalValue: currentValue, newValue };
-    }
-
-    async expectErrorIconVisible() {
-        // O2 OInput error state uses data-test="o-input-error" scoped to the datetime container
-        const errorIcon = this.page.locator('[data-test="datetime-start-time"] [data-test="o-input-error"]').first();
-        return await expect(errorIcon).toBeVisible({ timeout: 5000 });
     }
 
     async expectResultErrorDetailsButtonVisible() {
@@ -8321,9 +8267,8 @@ export class LogsPage {
      */
     async setRelativeTimeRange(suffix) {
         await this.page.locator(this.dateTimeButton).click();
-        const relativeBtn = this.page.locator(`[data-test="date-time-relative-${suffix}-btn"]`);
-        await relativeBtn.waitFor({ state: 'visible', timeout: 5000 });
-        await relativeBtn.click();
+        await waitForDateTimePanel(this.page, 5000);
+        await pickRelativePeriodCode(this.page, suffix);
         await this.closeDateTimePickerIfOpen();
         testLogger.info(`Relative time range set: ${suffix}`);
     }
@@ -8709,7 +8654,7 @@ export class LogsPage {
      * Check if Last 1 hour button is visible and click it, fallback to 15 min
      */
     async clickRelative1HourOrFallback() {
-        const oneHourButton = this.page.locator('[data-test="date-time-relative-1-h-btn"]');
+        const oneHourButton = this.page.locator('[data-test="date-time-chip-1h"]');
         let picked;
         if (await oneHourButton.isVisible({ timeout: 2000 }).catch(() => false)) {
             await oneHourButton.click();
@@ -8722,7 +8667,7 @@ export class LogsPage {
         return picked;
     }
 
-    /** The auto-apply picker stays open after a pick, and force-clicks behind it land on the panel. */
+    /** A pick that did not land leaves the panel open, and force-clicks behind it land on the panel. */
     async closeDateTimePickerIfOpen() {
         const panel = this.page.locator('#date-time-menu');
         if (!(await panel.isVisible().catch(() => false))) return;
@@ -8737,13 +8682,12 @@ export class LogsPage {
      * Tries: Last 1 hour → Last 12 hours → Last 15 minutes (fallback)
      */
     async clickWideRelativeTimeRangeOrFallback() {
-        const oneHourButton = this.page.locator('[data-test="date-time-relative-1-h-btn"]');
-        const twelveHourButton = this.page.locator('[data-test="date-time-relative-12-h-btn"]');
+        const oneHourButton = this.page.locator('[data-test="date-time-chip-1h"]');
         if (await oneHourButton.isVisible({ timeout: 2000 }).catch(() => false)) {
             await oneHourButton.click();
             return 'Last 1 hour';
-        } else if (await twelveHourButton.isVisible({ timeout: 2000 }).catch(() => false)) {
-            await twelveHourButton.click();
+        } else if (await this.page.locator('#date-time-menu').first().isVisible({ timeout: 2000 }).catch(() => false)) {
+            await pickRelativePeriod(this.page, '12', 'h');
             return 'Last 12 hours';
         } else {
             await this.clickRelative15MinButton();
@@ -9594,7 +9538,7 @@ export class LogsPage {
     async clickRelativeTimeButton(timeSelector) {
         await this.page.locator(this.dateTimeButton).click();
         await this.page.waitForTimeout(500);
-        await this.page.locator(`[data-test="date-time-relative-${timeSelector}-btn"]`).click();
+        await pickRelativePeriodCode(this.page, timeSelector);
         await this.page.waitForTimeout(500);
         testLogger.info(`Selected relative time: ${timeSelector}`);
     }
@@ -12007,6 +11951,7 @@ export class LogsPage {
             '[data-test="end-time-input"]',
             '[data-test="start-time-field"] input',
             '[data-test="end-time-field"] input',
+            '[data-test="datetime-start-time"] input',
             'input[type="time"]',
             '[aria-label*="time" i] input',
             '[aria-label*="Time" i]',
@@ -13189,6 +13134,7 @@ export class LogsPage {
         await cell.click();
         const aroundBtn = this.page.locator(this.logsDetailTableSearchAroundBtn);
         await aroundBtn.waitFor({ state: 'visible', timeout: 15000 });
+        await this.selectSearchAroundWindow('r10');
         await aroundBtn.click();
     }
 
@@ -13747,6 +13693,7 @@ export class LogsPage {
      * satisfied by the old ones.
      */
     async clickSearchAroundAwaitingResponse(timeout = 30000) {
+        await this.selectSearchAroundWindow('r10');
         const [response] = await Promise.all([
             this.page.waitForResponse((r) => /_around/.test(r.url()), { timeout }),
             this.searchAroundButton().click(),
@@ -13756,6 +13703,7 @@ export class LogsPage {
 
     /** Clicks Search around and resolves with the _around request (not its answer). */
     async clickSearchAroundAwaitingRequest(timeout = 30000) {
+        await this.selectSearchAroundWindow('r10');
         const [request] = await Promise.all([
             this.page.waitForRequest((r) => /_around/.test(r.url()), { timeout }),
             this.searchAroundButton().click(),

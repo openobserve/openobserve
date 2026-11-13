@@ -74,7 +74,7 @@ test.describe("Traces toolbar tabs (in-page)", () => {
 
     // All per-mode DateTime instances bind to the same searchObj.data.datetime,
     // so the chosen period carries into the catalog toolbar implicitly.
-    await pm.tracesPage.expectServicesCatalogTimeRange('Past 30 Minutes');
+    await pm.tracesPage.expectServicesCatalogTimeRange('Last 30 minutes');
 
     // Reload — mandatory: a warm in-app visit does NOT re-run
     // restoreUrlQueryParams (pre-#13659-faithful); only a cold load proves the

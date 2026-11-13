@@ -497,6 +497,7 @@
   --color-datepicker-popup-border: var(--color-border-default);
   --color-datepicker-day-hover-bg: var(--color-surface-accent-hover);
   --color-datepicker-day-selected-bg: var(--color-primary-500);
+  --color-datepicker-day-selected-text: var(--color-grey-900);
   --color-datepicker-day-today-border: var(--color-primary-400);
   --color-datepicker-day-outside-text: var(--color-text-disabled);
   --color-datepicker-nav-hover-bg: var(--color-surface-accent-hover);

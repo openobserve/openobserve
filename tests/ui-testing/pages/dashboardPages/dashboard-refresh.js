@@ -1,4 +1,5 @@
 import { applyPickedDateTime } from "./dashboard-time.js";
+import { openDateFields, pickRelativePeriod } from "../generalPages/relativePeriod.js";
 
 //Dahboard time refresh
 // Methods: Set relative time selection, Set absolute time selection, Auto refresh interval, Refresh dashboard manual
@@ -12,12 +13,9 @@ export default class DashboardTimeRefresh {
       'button[data-test="dashboard-folder-tab-default"]'
     );
     this.timeTab = page.locator('[data-test="date-time-btn"]');
-    this.relativeTime = page.locator('[data-test="date-time-relative-tab"]');
-    this.absolutetimeTime = page.locator(
-      '[data-test="date-time-absolute-tab"]'
-    );
     this.dateTimeMenu = page.locator("#date-time-menu").first();
-    this.selectTime = page.locator('[data-test="date-time-relative-10-m-btn"]');
+    this.relativeTime = this.dateTimeMenu;
+    this.absolutetimeTime = this.dateTimeMenu;
     this.refreshBtnManual = page.locator(
       '[data-test="logs-search-bar-refresh-interval-btn"]'
     );
@@ -46,11 +44,7 @@ export default class DashboardTimeRefresh {
       await this.relativeTime.waitFor({ state: "visible", timeout: 10000 });
     }
 
-    await this.relativeTime.click();
-    const relBtn = this.page.locator(`[data-test="date-time-relative-${date}-${time}-btn"]`);
-    await relBtn.waitFor({ state: "attached" });
-    // Use JS click — the dropdown can extend outside the viewport in the new layout
-    await relBtn.evaluate((el) => el.click());
+    await pickRelativePeriod(this.page, date, time);
     await applyPickedDateTime(this.page);
   }
 
@@ -60,21 +54,10 @@ export default class DashboardTimeRefresh {
     await this.timeTab.waitFor({ state: "visible" });
     await this.timeTab.click();
 
-    // Wait for the picker dropdown to render its tabs (relative + absolute).
-    // The dropdown animates in, so give the absolute tab enough time to
-    // become visible. If the very first click is swallowed mid-animation,
-    // a follow-up click on timeTab is unsafe (it would close the dropdown),
-    // so we rely on the visibility wait alone.
-    await this.absolutetimeTime.waitFor({ state: "visible", timeout: 15000 });
+    // The panel animates in; a follow-up click on timeTab would close it, so rely on the visibility wait alone.
+    await openDateFields(this.page, 15000);
 
-    // Switch to the absolute tab via dispatchEvent so overlay/transition
-    // races never block the action. The handler is bound on the OButton
-    // element itself, so a synthetic click is enough to flip selectedType.
-    await this.absolutetimeTime.evaluate((el) => el.click());
-
-    // Wait for the absolute-tab calendar (daterangecalendar-root) to mount
-    // AND for cell triggers to be rendered. Without this, the subsequent
-    // prevBtn click can land while Reka UI is still rendering.
+    // The prev click below can land while Reka UI is still rendering the calendar's cells.
     await this.page
       .locator('[data-test="daterangecalendar-root"]')
       .first()

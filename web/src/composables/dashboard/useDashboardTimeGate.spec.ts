@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
-import { effectScope, nextTick, ref, type EffectScope, type Ref } from "vue";
+import { effectScope, nextTick, ref, watch, type EffectScope, type Ref } from "vue";
 import { ABSOLUTE_APPLY_DEBOUNCE_MS, useDashboardTimeGate } from "./useDashboardTimeGate";
 
 const relative = (period: string) => ({
@@ -541,5 +541,77 @@ describe("useDashboardTimeGate", () => {
 
     expect(gate.applied.value).toEqual(START);
     expect(onAutoApply).not.toHaveBeenCalled();
+  });
+
+  describe("apply from the picker", () => {
+    it("runs an applied range at once with Auto Run off", () => {
+      autoRun.value = false;
+      const gate = createGate();
+
+      gate.onApply(relative("7d"));
+
+      expect(gate.applied.value).toEqual(relative("7d"));
+      expect(gate.needsRefresh.value).toBe(false);
+    });
+
+    it("runs two Start/End edits in the open panel once, on close, with Auto Run off", async () => {
+      autoRun.value = false;
+      const applied = ref<any>(null);
+      const gate = createGate(applied);
+      const changes: unknown[] = [];
+      watch(applied, (value) => changes.push(value));
+      gate.onShow();
+
+      gate.onApply(absolute(10, 20));
+      gate.onApply(absolute(10, 30));
+      vi.advanceTimersByTime(ABSOLUTE_APPLY_DEBOUNCE_MS);
+      expect(applied.value).toEqual(START);
+
+      gate.onHide();
+      expect(applied.value).toEqual(absolute(10, 30));
+      await nextTick();
+      expect(changes).toEqual([absolute(10, 30)]);
+    });
+
+    it("applies an absolute range at once while the panel is closed", () => {
+      autoRun.value = false;
+      const gate = createGate();
+
+      gate.onApply(absolute(10, 20));
+
+      expect(gate.applied.value).toEqual(absolute(10, 20));
+    });
+
+    it("runs a chip picked in the open panel at once, dropping an earlier field edit", () => {
+      autoRun.value = false;
+      const gate = createGate();
+      gate.onShow();
+
+      gate.onApply(absolute(10, 20));
+      gate.onApply(relative("7d"));
+      expect(gate.applied.value).toEqual(relative("7d"));
+
+      gate.onHide();
+      expect(gate.applied.value).toEqual(relative("7d"));
+    });
+
+    it("treats the picker's own corrections as picks, not applies", () => {
+      autoRun.value = false;
+      const gate = createGate();
+
+      gate.onApply(relative("1h"), { userChanged: false });
+
+      expect(gate.applied.value).toEqual(START);
+      expect(gate.needsRefresh.value).toBe(true);
+    });
+
+    it("keeps the applied range when the picker reports a broken one", () => {
+      autoRun.value = false;
+      const gate = createGate();
+
+      gate.onApply(absolute(20, 10));
+
+      expect(gate.applied.value).toEqual(START);
+    });
   });
 });

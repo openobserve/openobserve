@@ -77,6 +77,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               }"
               :default-relative-time="errorTrackingState.data.datetime.relativeTimePeriod"
               data-test="logs-search-bar-date-time-dropdown"
+              :retention-days="rumStreamLimits.retentionDays"
+              :query-range-restriction-in-hour="rumStreamLimits.queryRangeRestrictionInHour"
               @on:date-change="updateDateChange"
             />
             <!-- Run query button (also bound to the refresh shortcut) -->
@@ -327,6 +329,7 @@ import useErrorIssuesData from "@/composables/rum/useErrorIssuesData";
 import { issueKey, formatRelativeTime, escapeSqlString } from "@/utils/rum/errorIssueUtils";
 import { addCommasToNumber } from "@/utils/formatters";
 import { useStore } from "vuex";
+import { useStreamTimeLimits } from "@/composables/useStreamTimeLimits";
 import DateTime from "@/components/DateTime.vue";
 import SyntaxGuide from "@/plugins/traces/SyntaxGuide.vue";
 import { cloneDeep } from "lodash-es";
@@ -457,6 +460,7 @@ watch(lastQueryError, async (err) => {
   });
 });
 const store = useStore();
+const rumStreamLimits = useStreamTimeLimits(() => [{ name: "_rumdata", type: "logs" }]);
 watch(
   () => [store.state.selectedOrganization?.identifier, errorTrackingState.data.stream.errorStream],
   syncSuggestStreamContext,
@@ -770,7 +774,9 @@ const updateDateChange = (date: any) => {
     valueType: date.relativeTimePeriod ? "relative" : "absolute",
   };
   errorTrackingState.data.datetime = dateTime.value;
-  if (!isLoading.value.length && date.valueType === "relative") runQuery();
+  // The picker commits typed and calendar ranges only on Apply, so any user change runs.
+  const userApplied = date.valueType === "relative" || date.userChangedValue === true;
+  if (!isLoading.value.length && userApplied) runQuery();
 };
 
 const runQuery = () => {

@@ -15,7 +15,86 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
+  <div v-if="hasMenu" class="inline-flex items-stretch">
+    <OButton
+      ref="buttonRef"
+      :data-test="dataTest"
+      :aria-label="t('search.shareLink')"
+      :class="buttonClass"
+      class="rounded-e-none!"
+      :variant="variant"
+      :size="size"
+      :loading="isLoading"
+      :disabled="disabled || !url || isWebUrlNotConfigured"
+      :focusable-unavailable="isWebUrlNotConfigured || (disabled && !!tooltip)"
+      @click="handleShareClick(kinds[0])"
+      icon-left="share"
+    >
+      <template #unavailable-reason>{{
+        isWebUrlNotConfigured ? t("search.webUrlNotConfigured") : tooltip
+      }}</template>
+      <span v-if="showLabel" class="ms-1">{{ t("search.shareLink") }}</span>
+      <OTooltip
+        v-if="!isWebUrlNotConfigured"
+        :content="tooltip || kindTitle(kinds[0])"
+        :shortcut="shortcut || undefined"
+        :shortcut-id="shortcutId || undefined"
+      />
+    </OButton>
+    <ODropdown align="end">
+      <template #trigger>
+        <OButton
+          :data-test="`${dataTest}-kinds`"
+          :variant="variant"
+          size="icon-xs-sq"
+          class="h-auto! rounded-s-none! border-s-0!"
+          icon-left="arrow-drop-down"
+          :aria-label="t('dateTime.shareOptions')"
+          :disabled="disabled || !url || isWebUrlNotConfigured"
+        />
+      </template>
+      <ODropdownItem
+        v-for="kind in menuKinds"
+        :key="kind"
+        :data-test="`share-button-copy-${kind}`"
+        @select="handleShareClick(kind)"
+      >
+        <div class="flex min-w-0 flex-col">
+          <span>{{ kindTitle(kind) }}</span>
+          <span class="text-text-secondary text-xs tabular-nums">{{ kindHint(kind) }}</span>
+        </div>
+        <template #icon-right>
+          <OIcon
+            v-if="kind === kinds[0]"
+            data-test="share-button-default-check"
+            name="check"
+            size="sm"
+            class="text-text-secondary ms-auto shrink-0"
+          />
+        </template>
+      </ODropdownItem>
+      <template v-if="rangeContext">
+        <ODropdownSeparator />
+        <ODropdownItem
+          data-test="share-button-copy-with-range"
+          @select="handleShareClick(kinds[0], true)"
+        >
+          <div class="flex min-w-0 flex-col">
+            <span>{{ t("dateTime.shareCopyWithRange") }}</span>
+            <span class="text-text-secondary max-w-88 text-xs whitespace-normal tabular-nums">{{
+              t("dateTime.shareCopyWithRangeHint", { line: kindRangeLine(kinds[0]) })
+            }}</span>
+          </div>
+        </ODropdownItem>
+      </template>
+      <template v-if="$slots['menu-extra']">
+        <ODropdownSeparator />
+        <slot name="menu-extra" />
+      </template>
+    </ODropdown>
+  </div>
   <OButton
+    v-else
     ref="buttonRef"
     :data-test="dataTest"
     :aria-label="t('search.shareLink')"
@@ -25,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :loading="isLoading"
     :disabled="disabled || !url || isWebUrlNotConfigured"
     :focusable-unavailable="isWebUrlNotConfigured || (disabled && !!tooltip)"
-    @click="handleShareClick"
+    @click="handleShareClick(kinds[0])"
     icon-left="share"
   >
     <template #unavailable-reason>{{
@@ -59,10 +138,19 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import shortURLService from "@/services/short_url";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
+import {
+  linkWithRangeText,
+  rangeLineText,
+  shareTimeKinds,
+  type ShareTimeKind,
+} from "@/utils/shareTimeRange";
 
 export default defineComponent({
   name: "ShareButton",
-  components: { OButton, OIcon, OTooltip },
+  components: { OButton, OIcon, OTooltip, ODropdown, ODropdownItem, ODropdownSeparator },
   props: {
     // The long URL to be copied and shortened
     url: {
@@ -115,13 +203,83 @@ export default defineComponent({
       type: String,
       default: "share-link-btn",
     },
+    /** The same link holding the range as a live period; empty when the range is fixed. */
+    liveUrl: {
+      type: String,
+      default: "",
+    },
+    /** Which kind a plain click copies, and the menu lists first and checks. */
+    defaultKind: {
+      type: String as PropType<ShareTimeKind>,
+      default: "fixed",
+    },
+    /** The resolved window a fixed link holds, with its zone; named in the menu and the toast. */
+    fixedLabel: {
+      type: String,
+      default: "",
+    },
+    /** The live period's name, named in the menu and the toast. */
+    liveLabel: {
+      type: String,
+      default: "",
+    },
+    /** The fixed window as the copied line names it, e.g. in UTC; empty uses `fixedLabel`. */
+    fixedCopyLabel: {
+      type: String,
+      default: "",
+    },
+    /** `{page} · {stream or dashboard}`; when set the menu offers to copy the link with a line naming the range. */
+    rangeContext: {
+      type: String,
+      default: "",
+    },
   },
   emits: ["copy:success", "copy:error", "shorten:success", "shorten:error"],
-  setup(props, { emit }) {
+  setup(props, { emit, slots }) {
     const { t } = useI18nTyped();
     const store = useStore();
 
     const isLoading = ref(false);
+    const kinds = computed(() => shareTimeKinds(props.defaultKind, !!props.liveUrl));
+    const hasMenu = computed(
+      () => kinds.value.length > 1 || !!props.rangeContext || !!slots["menu-extra"],
+    );
+    // Fixed always reads second, so the menu order stays put whichever kind the page defaults to.
+    const menuKinds = computed<ShareTimeKind[]>(() =>
+      kinds.value.includes("live") ? ["live", "fixed"] : ["fixed"],
+    );
+    const kindTitle = (kind: ShareTimeKind) =>
+      kind === "fixed" ? t("dateTime.shareCopyFixed") : t("dateTime.shareCopyLive");
+    const kindHint = (kind: ShareTimeKind) =>
+      kind === "fixed"
+        ? props.fixedLabel
+        : props.liveLabel
+          ? t("dateTime.shareLiveHint", { name: props.liveLabel })
+          : "";
+    const fixedRange = () => props.fixedCopyLabel || props.fixedLabel;
+    // A live link opens on a later window, so the line also pins the dates the sender saw.
+    const kindRange = (kind: ShareTimeKind) =>
+      kind === "fixed" ? fixedRange() : [props.liveLabel, fixedRange()].filter(Boolean).join(" · ");
+    // The toast names the kind only when the caller said which window the link holds.
+    const copiedMessage = (kind: ShareTimeKind) => {
+      if (kind === "live" && props.liveLabel) {
+        return t("dateTime.linkCopiedLive", { name: props.liveLabel });
+      }
+      if (kind === "fixed" && props.fixedLabel) {
+        return t("dateTime.linkCopiedFixed", { range: props.fixedLabel });
+      }
+      return t("search.linkCopiedSuccessfully");
+    };
+    const kindRangeParts = (kind: ShareTimeKind) => ({
+      context: props.rangeContext,
+      range: kindRange(kind),
+      kind: kind === "fixed" ? t("dateTime.shareKindFixed") : t("dateTime.shareKindLive"),
+    });
+    const kindRangeLine = (kind: ShareTimeKind) => rangeLineText(kindRangeParts(kind));
+    const clipboardText = (shortUrl: string, kind: ShareTimeKind, withRange: boolean) =>
+      withRange ? linkWithRangeText({ url: shortUrl, ...kindRangeParts(kind) }) : shortUrl;
+    let copyingKind: ShareTimeKind = "fixed";
+    let copyingWithRange = false;
     const buttonRef = ref<{ $el: HTMLElement } | null>(null);
     let pollIntervalId: number | null = null;
     let isPolling = false; // Flag to prevent multiple polling instances
@@ -175,8 +333,8 @@ export default defineComponent({
           isPolling = false;
 
           // Short URL is ready! Copy it to clipboard
-          copyToClipboard(shortURL, t, {
-            successMessage: t("search.linkCopiedSuccessfully"),
+          copyToClipboard(clipboardText(shortURL, copyingKind, copyingWithRange), t, {
+            successMessage: copiedMessage(copyingKind),
             errorMessage: t("search.errorCopyingLink"),
             timeout: 5000,
             anchor: buttonRef.value?.$el,
@@ -221,8 +379,11 @@ export default defineComponent({
      * Safari: Uses polling mechanism to maintain user gesture context
      * Chrome/Firefox: Copies directly in API response
      */
-    const handleShareClick = () => {
-      if (!props.url) {
+    const handleShareClick = (kind: ShareTimeKind = kinds.value[0], withRange = false) => {
+      const longUrl = kind === "live" && props.liveUrl ? props.liveUrl : props.url;
+      copyingKind = kind;
+      copyingWithRange = withRange && !!props.rangeContext;
+      if (!longUrl) {
         toast({
           variant: "warning",
           message: t("toastMessages.common.noUrlToShare"),
@@ -243,7 +404,7 @@ export default defineComponent({
 
       // Fetch short URL via API
       shortURLService
-        .create(store.state.selectedOrganization.identifier, props.url)
+        .create(store.state.selectedOrganization.identifier, longUrl)
         .then((res: any) => {
           if (res.status === 200) {
             const shortUrl = res.data.short_url;
@@ -253,8 +414,8 @@ export default defineComponent({
               store.commit("setPendingShortURL", shortUrl);
             } else {
               // Chrome/Firefox: Copy directly here
-              copyToClipboard(shortUrl, t, {
-                successMessage: t("search.linkCopiedSuccessfully"),
+              copyToClipboard(clipboardText(shortUrl, kind, copyingWithRange), t, {
+                successMessage: copiedMessage(kind),
                 errorMessage: t("search.errorCopyingLink"),
                 timeout: 5000,
                 anchor: buttonRef.value?.$el,
@@ -273,7 +434,7 @@ export default defineComponent({
             }
 
             emit("shorten:success", {
-              longUrl: props.url,
+              longUrl,
               shortUrl: shortUrl,
             });
           } else {
@@ -327,6 +488,12 @@ export default defineComponent({
       buttonRef,
       isWebUrlNotConfigured,
       handleShareClick,
+      kinds,
+      hasMenu,
+      menuKinds,
+      kindTitle,
+      kindHint,
+      kindRangeLine,
     };
   },
 });

@@ -210,7 +210,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OButton
                   variant="outline"
                   size="xs"
-                  class="h-full text-xs!"
+                  class="text-xs!"
                   disabled
                   icon-left="lock"
                   data-test="trace-details-sidebar-header-toolbar-view-logs-btn"
@@ -224,7 +224,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 ref="viewLogsBtnRef"
                 variant="outline"
                 size="xs"
-                class="h-full text-xs!"
+                class="text-xs!"
                 :disabled="isViewLogsDisabled"
                 :loading="viewLogsBusy"
                 :spinner="false"
@@ -245,12 +245,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
               <OTooltip :content="viewLogsTooltipContent" />
             </span>
+            <span v-if="!logsLocked" class="ms-1 inline-flex items-center gap-1">
+              <OSelect
+                :model-value="spanSearchAroundChoice"
+                :options="spanSearchAroundOptions"
+                size="xs"
+                width="xs"
+                :aria-label="t('dateTime.searchAroundWindow')"
+                data-test="trace-details-sidebar-search-around-window"
+                @update:model-value="setSpanSearchAroundChoice"
+              />
+              <span class="inline-block">
+                <OButton
+                  variant="outline"
+                  size="xs"
+                  class="text-xs!"
+                  data-test="trace-details-sidebar-search-around-btn"
+                  :disabled="isSearchAroundDisabled"
+                  @click.stop="searchAroundSpan"
+                >
+                  {{ t("dateTime.searchAroundWindow") }}
+                </OButton>
+                <OTooltip :content="searchAroundTooltip" />
+              </span>
+            </span>
             <OTooltip v-if="profilingLocked && spanProfileRequest" :content="profilingLockedReason">
               <span class="ms-1 inline-flex">
                 <OButton
                   variant="outline"
                   size="xs"
-                  class="h-full text-xs!"
+                  class="text-xs!"
                   disabled
                   data-test="trace-details-sidebar-header-toolbar-view-profile-btn"
                 >
@@ -265,7 +289,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-else-if="spanProfileMatch"
               variant="outline"
               size="xs"
-              class="ms-1 h-full text-xs!"
+              class="ms-1 text-xs!"
               data-test="trace-details-sidebar-header-toolbar-view-profile-btn"
               @click.stop="viewSpanProfile"
             >
@@ -1118,6 +1142,17 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import TraceIssuesPanel from "./TraceIssuesPanel.vue";
 import type { TraceIssue } from "./traceIssues";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import {
+  currentSearchAroundUser,
+  parseSearchAroundChoice,
+  readSearchAroundChoice,
+  searchAroundWindow,
+  searchAroundTimeOptions,
+  writeSearchAroundChoice,
+  DEFAULT_SEARCH_AROUND,
+  type SearchAroundChoice,
+} from "@/utils/searchAroundWindow";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
@@ -1348,6 +1383,7 @@ export default defineComponent({
     OToggleGroup,
     OToggleGroupItem,
     OButton,
+    OSelect,
     OIcon,
     OTooltip,
     OTruncatedText,
@@ -1737,6 +1773,14 @@ export default defineComponent({
       );
     });
 
+    // Unlike View Logs it has no correlation fallback, so it needs a picked stream even where the selector is hidden.
+    const isSearchAroundDisabled = computed(
+      () => logsLocked.value || props.selectedLogStreams.length === 0,
+    );
+    const searchAroundTooltip = computed(() =>
+      props.selectedLogStreams.length === 0 ? t("search.selectLogsStreamFirst") : undefined,
+    );
+
     // Get tooltip content based on disabled state
     const viewLogsTooltipContent = computed(() => {
       if (logsLocked.value) return logsLockedReason.value;
@@ -2124,6 +2168,29 @@ export default defineComponent({
         announced.withdraw?.();
         viewLogsRuns.value--;
       }
+    };
+
+    const searchAroundUser = () => currentSearchAroundUser(store.state);
+    const rememberedTimeChoice = (): SearchAroundChoice => {
+      const stored = readSearchAroundChoice(searchAroundUser());
+      return parseSearchAroundChoice(stored)?.kind === "time" ? stored : DEFAULT_SEARCH_AROUND;
+    };
+    const spanSearchAroundChoice = ref<SearchAroundChoice>(rememberedTimeChoice());
+    const spanSearchAroundOptions = computed(() => searchAroundTimeOptions(t));
+    const setSpanSearchAroundChoice = (value: unknown) => {
+      if (parseSearchAroundChoice(value)?.kind !== "time") return;
+      spanSearchAroundChoice.value = value as SearchAroundChoice;
+      writeSearchAroundChoice(searchAroundUser(), spanSearchAroundChoice.value);
+    };
+
+    // Unfiltered on purpose: the point is what else happened in the log streams near this span.
+    const searchAroundSpan = () => {
+      if (isSearchAroundDisabled.value) return;
+      const choice = parseSearchAroundChoice(spanSearchAroundChoice.value);
+      const spanStartUs = Math.floor(Number(props.span?.start_time) / 1000);
+      if (choice?.kind !== "time" || !Number.isFinite(spanStartUs)) return;
+      const { startUs, endUs } = searchAroundWindow(spanStartUs, choice.seconds);
+      navigateToLogs({ ...buildQueryDetails(props.span), from: startUs, to: endUs, query: "" });
     };
 
     const evaluateSpan = () => {
@@ -3038,6 +3105,10 @@ export default defineComponent({
       viewSpanProfile,
       getTTFT,
       viewSpanLogs,
+      spanSearchAroundChoice,
+      spanSearchAroundOptions,
+      setSpanSearchAroundChoice,
+      searchAroundSpan,
       evaluateSpan,
       addSpanToDataset,
       canOpenPlayground,
@@ -3091,6 +3162,8 @@ export default defineComponent({
       toggleFullscreen,
       isDarkMode,
       isViewLogsDisabled,
+      isSearchAroundDisabled,
+      searchAroundTooltip,
       viewLogsTooltipContent,
       logsLocked,
       logsLockedReason,

@@ -66,6 +66,7 @@ import {
   type FilterResolveContext,
 } from "@/composables/useLogs/freeTextSearch";
 import { closeDrawerForQuery } from "@/composables/useLogs/logsRowNav";
+import { windowQueryForRun, type WindowQueryRun } from "@/utils/searchAroundWindow";
 
 export { appendConjunct, materializeFreeText, planStreamsFilter, type FilterResolveContext };
 
@@ -363,6 +364,19 @@ export const useSearchQuery = (t: TranslateFn) => {
     unparse: (ast: any) => fnUnparsedSQL(ast),
   });
 
+  const runWindow = (): WindowQueryRun => {
+    const { type, startTime, endTime } = searchObj.data.datetime;
+    const start = Number(startTime);
+    const end = Number(endTime);
+    const absolute = type === "absolute" && Number.isFinite(start) && Number.isFinite(end);
+    return {
+      query: String(searchObj.data.query ?? ""),
+      view: String(searchObj.meta.logsVisualizeToggle ?? ""),
+      startUs: absolute ? start : null,
+      endUs: absolute ? end : null,
+    };
+  };
+
   const getQueryReq = (isPagination: boolean): SearchRequestPayload | null => {
     searchObj.data.highlightQuery = "";
     searchObj.data.freeTextBlocked = null;
@@ -392,7 +406,11 @@ export const useSearchQuery = (t: TranslateFn) => {
     if (Number.isNaN(searchObj.data.datetime.startTime))
       searchObj.data.datetime.startTime = "Invalid Date";
 
-    const queryReq: SearchRequestPayload | null = buildSearch();
+    const around = searchObj.data.searchAround;
+    if (around && !isPagination)
+      around.windowQuery = windowQueryForRun(around.windowQuery, runWindow());
+    const windowQuery = around?.windowQuery?.query;
+    const queryReq: SearchRequestPayload | null = buildSearch(false, false, windowQuery);
     if (queryReq) {
       recordSeverityRequest(
         captureSeverityRequest(searchObj, !!queryReq.query?.quick_mode, () => fnParsedSQL()),
@@ -400,7 +418,9 @@ export const useSearchQuery = (t: TranslateFn) => {
     }
 
     // Keep the query's case: str_match and re_match highlight case-sensitively.
-    if (searchObj.meta.sqlMode) {
+    if (windowQuery !== undefined) {
+      searchObj.data.freeTextDecorations = null;
+    } else if (searchObj.meta.sqlMode) {
       searchObj.data.highlightQuery = searchObj.data.query.split(/where/i)?.[1] || "";
       searchObj.data.freeTextDecorations = null;
     } else {
@@ -687,7 +707,7 @@ export const useSearchQuery = (t: TranslateFn) => {
       }
 
       if (searchObj.meta.sqlMode == true) {
-        return handleSqlMode(query, req, readOnly);
+        return handleSqlMode(query, req, readOnly, filterOverride !== undefined);
       } else {
         return handleNonSqlMode(query, req, ignoreQuickMode, readOnly);
       }
@@ -732,12 +752,13 @@ export const useSearchQuery = (t: TranslateFn) => {
     query: string,
     req: any,
     readOnly: boolean = false,
+    overridden: boolean = false,
   ): SearchRequestPayload | null => {
     // Only mutate query in normal mode
-    if (!readOnly) {
+    if (!readOnly && !overridden) {
       searchObj.data.query = query;
     }
-    const parsedSQL: any = fnParsedSQL();
+    const parsedSQL: any = fnParsedSQL(query);
 
     if (parsedSQL != undefined) {
       if (!checkTimestampAlias(searchObj.data.query)) {

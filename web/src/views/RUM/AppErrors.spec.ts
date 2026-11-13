@@ -784,6 +784,43 @@ describe("AppErrors", () => {
       expect(mockFetchAll).toHaveBeenCalledTimes(1);
     });
 
+    it.each(["absolute", "relative-custom"])(
+      "runs a user-applied %s range, typed or picked (V16)",
+      async (valueType) => {
+        ({ wrapper, router } = await mountAppErrors());
+        await flushPromises();
+        mockFetchAll.mockClear();
+
+        await wrapper.findComponent(DATETIME_STUB).vm.$emit("on:date-change", {
+          startTime: FROZEN_NOW_MS * 1000 - 7200 * 1_000_000,
+          endTime: FROZEN_NOW_MS * 1000,
+          relativeTimePeriod: valueType === "absolute" ? null : "2h",
+          valueType,
+          userChangedValue: true,
+        });
+        await flushPromises();
+
+        expect(mockFetchAll).toHaveBeenCalledTimes(1);
+      },
+    );
+
+    it("does not run an absolute range the picker set by itself (V16)", async () => {
+      ({ wrapper, router } = await mountAppErrors());
+      await flushPromises();
+      mockFetchAll.mockClear();
+
+      await wrapper.findComponent(DATETIME_STUB).vm.$emit("on:date-change", {
+        startTime: FROZEN_NOW_MS * 1000 - 7200 * 1_000_000,
+        endTime: FROZEN_NOW_MS * 1000,
+        relativeTimePeriod: null,
+        valueType: "absolute",
+        userChangedValue: false,
+      });
+      await flushPromises();
+
+      expect(mockFetchAll).not.toHaveBeenCalled();
+    });
+
     it("does NOT call fetchAll when DateTime emits the same date again", async () => {
       ({ wrapper, router } = await mountAppErrors());
       await flushPromises();

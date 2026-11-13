@@ -61,11 +61,11 @@ describe("LogsAutoRunGuard (J5, F5–F9)", () => {
     expect(wrapper.find('[data-test="logs-auto-run-guard"]').exists()).toBe(true);
     expect(wrapper.text()).toContain("This search would scan about 1.76 TB");
     expect(wrapper.find('[data-test="logs-auto-run-guard-estimate"]').text()).toBe(
-      "k8s_logs · Past 7 Days. Auto Run paused so you can narrow it first.",
+      "k8s_logs · Last 7 days. Auto Run paused so you can narrow it first.",
     );
     expect(wrapper.find('[data-test="logs-auto-run-guard-hint"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="logs-auto-run-guard-narrow-btn"]').text()).toBe(
-      "Narrow to Past 3 Hours (~32.00 GB)",
+      "Narrow to Last 3 hours (~32.00 GB)",
     );
 
     await wrapper.find('[data-test="logs-auto-run-guard-run-btn"]').trigger("click");
@@ -82,7 +82,7 @@ describe("LogsAutoRunGuard (J5, F5–F9)", () => {
       blocked: blocked({ window: { type: "relative", period: "calendar:month:-1" } }),
     });
     const scope = wrapper.find('[data-test="logs-auto-run-guard-estimate"]').text();
-    expect(scope).toContain("k8s_logs · Last month");
+    expect(scope).toContain("k8s_logs · Previous month");
     expect(scope).not.toContain("NaN");
   });
 
@@ -112,7 +112,7 @@ describe("LogsAutoRunGuard (J5, F5–F9)", () => {
     expect(wrapper.text()).toContain("Size unknown for this window");
     expect(wrapper.text()).toContain("fresh has no size statistics yet");
     expect(wrapper.find('[data-test="logs-auto-run-guard-narrow-btn"]').text()).toBe(
-      "Narrow to Past 1 Hour",
+      "Narrow to Last 1 hour",
     );
   });
 
@@ -150,7 +150,7 @@ describe("LogsAutoRunGuard (J5, F5–F9)", () => {
     const banner = mountGuard({ variant: "banner", autoRunOn: true });
     expect(banner.find('[data-test="logs-auto-run-guard-banner"]').exists()).toBe(true);
     expect(banner.find('[data-test="logs-auto-run-guard-estimate"]').text()).toBe(
-      "This change would scan about 1.76 TB (k8s_logs · Past 7 Days), so Auto Run paused. The results below are from the previous query.",
+      "This change would scan about 1.76 TB (k8s_logs · Last 7 days), so Auto Run paused. The results below are from the previous query.",
     );
 
     const refresh = mountGuard({
@@ -175,7 +175,7 @@ describe("LogsAutoRunGuard (J5, F5–F9)", () => {
       }),
     });
     expect(wrapper.find('[data-test="logs-auto-run-guard-estimate"]').text()).toContain(
-      "a, b, c +2 · Past 7 Days",
+      "a, b, c +2 · Last 7 days",
     );
   });
 });

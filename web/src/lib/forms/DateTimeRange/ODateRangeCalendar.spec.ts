@@ -1,6 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
 
-import { describe, it, expect, afterEach, vi } from "vitest";
+import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
 import { parseDate } from "@internationalized/date";
 import ODateRangeCalendar from "./ODateRangeCalendar.vue";
@@ -184,5 +184,216 @@ describe("ODateRangeCalendar", () => {
     }).not.toThrow();
 
     expect(wrapper.find('[data-test="daterangecalendar-root"]').exists()).toBe(true);
+  });
+
+  it.each([
+    ["clears the selection", false, null],
+    ["starts a new range on it when asked", true, "2026/10/26"],
+  ])("on a click on the selected single day, %s", async (_, preventDeselect, pending) => {
+    wrapper = mount(ODateRangeCalendar, {
+      props: { startDate: "2026/10/26", endDate: "2026/10/26", preventDeselect },
+      attachTo: document.body,
+    });
+
+    await wrapper.get('[data-test="daterangecalendar-cell-2026-10-26"]').trigger("click");
+
+    expect(wrapper.emitted("update:pendingDate")?.at(-1)).toEqual([pending]);
+    expect(wrapper.emitted("update:startDate")).toBeUndefined();
+  });
+
+  it("adds the band styling only when asked", () => {
+    wrapper = mount(ODateRangeCalendar, { attachTo: document.body });
+    expect(wrapper.find('[data-test="daterangecalendar-root"]').classes()).not.toContain(
+      "o-range-cal--band",
+    );
+    wrapper.unmount();
+    wrapper = mount(ODateRangeCalendar, { props: { bandRange: true }, attachTo: document.body });
+    expect(wrapper.find('[data-test="daterangecalendar-root"]').classes()).toContain(
+      "o-range-cal--band",
+    );
+  });
+
+  it("stretches the grid to its container only when asked", () => {
+    wrapper = mount(ODateRangeCalendar, { attachTo: document.body });
+    const fixedCell = wrapper.find('[data-test^="daterangecalendar-cell-"]');
+    expect(fixedCell.classes()).toContain("w-8");
+    wrapper.unmount();
+    wrapper = mount(ODateRangeCalendar, { props: { fill: true }, attachTo: document.body });
+    expect(wrapper.find('[data-test="daterangecalendar-root"]').classes()).toContain("w-full");
+    const cell = wrapper.find('[data-test^="daterangecalendar-cell-"]');
+    expect(cell.classes()).toEqual(expect.arrayContaining(["w-full", "h-8"]));
+    expect(cell.element.closest("tr")?.className).toContain("grid-cols-7");
+  });
+  describe("band and today marking", () => {
+    const cell = (iso: string) => wrapper.find(`[data-test="daterangecalendar-cell-${iso}"]`);
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("paints the band behind the days of a range, half cells at its ends, and dots today", () => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(new Date("2026-11-11T12:00:00Z"));
+      wrapper = mount(ODateRangeCalendar, {
+        props: { bandRange: true, fill: true, startDate: "2026/11/04", endDate: "2026/11/06" },
+        attachTo: document.body,
+      });
+
+      const td = (iso: string) => cell(iso).element.closest("td")!.className;
+      expect(td("2026-11-04")).toContain("before:bg-datepicker-day-range-bg");
+      expect(td("2026-11-04")).toContain("before:start-1/2");
+      expect(td("2026-11-05")).toContain("before:bg-datepicker-day-range-bg");
+      expect(td("2026-11-06")).toContain("before:end-1/2");
+      expect(td("2026-11-07")).not.toContain("before:bg-datepicker-day-range-bg");
+      expect(cell("2026-11-11").classes()).toContain("o-range-cal__today");
+      expect(cell("2026-11-11").classes().join(" ")).not.toContain("border-datepicker-day-today");
+    });
+
+    it("leaves a range another control produced unpainted and keeps today a dot", () => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(new Date("2026-11-11T12:00:00Z"));
+      wrapper = mount(ODateRangeCalendar, {
+        props: {
+          bandRange: true,
+          fill: true,
+          hideSelection: true,
+          startDate: "2026/11/04",
+          endDate: "2026/11/06",
+        },
+        attachTo: document.body,
+      });
+
+      expect(wrapper.findAll("[data-selected]")).toHaveLength(0);
+      expect(cell("2026-11-05").element.closest("td")!.className).not.toContain("before:");
+      expect(cell("2026-11-11").classes()).toContain("o-range-cal__today");
+      expect(cell("2026-11-11").classes().join(" ")).not.toContain("data-today:not-data-selected");
+    });
+  });
+
+  describe("v2 picking", () => {
+    const cell = (iso: string) =>
+      wrapper.find<HTMLElement>(`[data-test="daterangecalendar-cell-${iso}"]`);
+
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(new Date("2026-11-11T12:00:00Z"));
+    });
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("keeps a first pick made over a hidden selection as a lone start when the parent unhides it", async () => {
+      wrapper = mount(ODateRangeCalendar, {
+        props: {
+          bandRange: true,
+          hideSelection: true,
+          startDate: "2026/11/11",
+          endDate: "2026/11/11",
+        },
+        attachTo: document.body,
+      });
+      await cell("2026-11-04").trigger("click");
+      expect(wrapper.emitted("update:pendingDate")?.at(-1)).toEqual(["2026/11/04"]);
+      await wrapper.setProps({ hideSelection: false });
+
+      expect(wrapper.emitted("update:startDate")).toBeUndefined();
+      expect(cell("2026-11-04").attributes("data-selection-start")).toBeDefined();
+      expect(cell("2026-11-11").attributes("data-selected")).toBeUndefined();
+    });
+
+    it("previews the would-be end under the pointer and drops a half pick on request", async () => {
+      wrapper = mount(ODateRangeCalendar, {
+        props: { bandRange: true, hideSelection: true },
+        attachTo: document.body,
+      });
+      await cell("2026-11-04").trigger("click");
+      await cell("2026-11-09").trigger("mouseenter");
+
+      expect(wrapper.emitted("update:previewDate")?.at(-1)).toEqual(["2026/11/09"]);
+      expect(cell("2026-11-06").attributes("data-preview")).toBeDefined();
+      expect(cell("2026-11-09").attributes("data-preview-end")).toBeDefined();
+
+      const exposed = wrapper.vm as unknown as { clearPending: () => boolean };
+      expect(exposed.clearPending()).toBe(true);
+      expect(wrapper.emitted("update:pendingDate")?.at(-1)).toEqual([null]);
+      expect(exposed.clearPending()).toBe(false);
+    });
+
+    it("starts the week on the given day and names the grid and month buttons", () => {
+      wrapper = mount(ODateRangeCalendar, {
+        props: {
+          weekStartsOn: 1,
+          locale: "en-GB",
+          calendarLabel: "Date range",
+          prevLabel: "Previous month",
+          nextLabel: "Next month",
+        },
+        attachTo: document.body,
+      });
+      const firstCell = wrapper.find("[data-reka-calendar-cell-trigger]");
+      expect(new Date(`${firstCell.attributes("data-value")}T00:00:00Z`).getUTCDay()).toBe(1);
+      expect(wrapper.find('[data-test="daterangecalendar-prev"]').attributes("aria-label")).toBe(
+        "Previous month",
+      );
+      expect(wrapper.find('[data-test="daterangecalendar-next"]').attributes("aria-label")).toBe(
+        "Next month",
+      );
+    });
+
+    it("moves a month with PageDown and to the week's end with End", async () => {
+      wrapper = mount(ODateRangeCalendar, {
+        props: { weekStartsOn: 1, autoFocus: true },
+        attachTo: document.body,
+      });
+      await new Promise((resolve) => setTimeout(resolve));
+      expect(document.activeElement?.getAttribute("data-value")).toBe("2026-11-11");
+
+      await cell("2026-11-11").trigger("keydown", { key: "End" });
+      await new Promise((resolve) => setTimeout(resolve));
+      expect(document.activeElement?.getAttribute("data-value")).toBe("2026-11-15");
+
+      await cell("2026-11-15").trigger("keydown", { key: "PageDown" });
+      await new Promise((resolve) => setTimeout(resolve));
+      expect(wrapper.find('[data-test="daterangecalendar-heading"]').text()).toContain("December");
+      expect(document.activeElement?.getAttribute("data-value")).toBe("2026-12-15");
+    });
+
+    it("strikes days before the retention floor and says why in a tooltip and the name (V23)", async () => {
+      wrapper = mount(ODateRangeCalendar, {
+        props: { unavailableBefore: "2026/11/05", unavailableReason: "Outside 7-day retention" },
+        attachTo: document.body,
+      });
+      expect(cell("2026-11-04").attributes("data-unavailable")).toBeDefined();
+      expect(cell("2026-11-04").attributes("aria-label")).toBe(
+        "Wednesday, November 4, 2026, Outside 7-day retention",
+      );
+      expect(cell("2026-11-05").attributes("data-unavailable")).toBeUndefined();
+      expect(cell("2026-11-05").attributes("aria-label")).not.toContain("retention");
+
+      await cell("2026-11-04").trigger("mouseenter");
+      await new Promise((resolve) => setTimeout(resolve));
+      expect(document.body.textContent).toContain("Outside 7-day retention");
+      await cell("2026-11-04").trigger("mouseleave");
+      await cell("2026-11-05").trigger("focus");
+      await new Promise((resolve) => setTimeout(resolve));
+      expect(document.querySelector("[role='tooltip']")).toBeNull();
+    });
+
+    it("labels the grid and draws day numbers in the locale's digits (P6, P8)", () => {
+      wrapper = mount(ODateRangeCalendar, {
+        props: { locale: "ar-EG", calendarLabel: "Date range" },
+        attachTo: document.body,
+      });
+      expect(document.querySelector("[role='application']")?.getAttribute("aria-label")).toBe(
+        "Date range",
+      );
+      const expected = new Intl.DateTimeFormat("ar-EG", { day: "numeric", timeZone: "UTC" }).format(
+        new Date(Date.UTC(2026, 10, 4)),
+      );
+      expect(cell("2026-11-04").text()).toBe(expected);
+      expect(wrapper.find('[data-test="daterangecalendar-prev"] svg').classes()).toContain(
+        "rtl:-scale-x-100",
+      );
+    });
   });
 });

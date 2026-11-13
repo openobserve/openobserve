@@ -284,3 +284,32 @@ describe("row navigation entries (item 4a)", () => {
     );
   });
 });
+
+describe("time range shortcuts", () => {
+  it("binds T, [, ], -, Z and the copy combo, in their own cheatsheet page", () => {
+    const group = SHORTCUT_REGISTRY.find((item) => item.pageKey === "shortcuts.pages.timeRange");
+    expect(group?.scope).toBeUndefined();
+    expect(group?.shortcuts.map((entry) => [entry.id, entry.key ?? entry.keyForMac])).toEqual([
+      ["timeRangeOpen", "t"],
+      ["timeRangePrevious", "["],
+      ["timeRangeNext", "]"],
+      ["timeRangeZoomOut", "-"],
+      ["timeRangeUndo", "z"],
+      ["timeRangeCopy", "meta+shift+c"],
+    ]);
+    expect(getShortcutDef("timeRangeCopy")?.keyForWindows).toBe("alt+shift+c");
+    expect(getShortcutDef("timeRangePrevious")?.code).toBe("BracketLeft");
+    expect(getShortcutDef("timeRangeNext")?.code).toBe("BracketRight");
+    const plainKeys = ["timeRangeOpen", "timeRangePrevious", "timeRangeNext", "timeRangeZoomOut"];
+    expect(plainKeys.map((id) => getShortcutDef(id)?.skipUnderModal)).toEqual([
+      true,
+      true,
+      true,
+      true,
+    ]);
+    expect(SHORTCUT_MODULES[1]).toEqual({
+      titleKey: "shortcuts.modules.timeRange",
+      pages: ["shortcuts.pages.timeRange"],
+    });
+  });
+});
