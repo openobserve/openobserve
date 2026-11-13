@@ -21,7 +21,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import OText from "@/lib/core/Typography/OText.vue";
-import OPopover from "@/lib/overlay/Popover/OPopover.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { HomePack } from "@/composables/starterPacks/useHomePacks";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { getImageURL } from "@/utils/zincutils";
@@ -122,50 +122,50 @@ const tiles = computed(() => {
             <OText variant="mono" class="min-w-0 truncate" :title="stream">{{ raw(stream) }}</OText>
           </li>
           <li v-if="moreStreams.length">
-            <OPopover align="start" :aria-label="t('starterPacks.home.moreStreamsLabel')">
-              <template #trigger>
-                <OButton
-                  variant="outline"
-                  size="chip"
-                  icon-right="arrow-drop-down"
-                  :data-test="id('home-pack-streams-more')"
-                >
-                  {{
-                    t(
-                      "starterPacks.home.moreStreams",
-                      { count: moreStreams.length },
-                      moreStreams.length,
-                    )
-                  }}
-                </OButton>
-              </template>
-              <ul
-                class="flex max-h-60 flex-col gap-1 overflow-y-auto p-2"
-                :data-test="id('home-pack-streams-more-list')"
-              >
-                <li v-for="stream in moreStreams" :key="stream">
-                  <OText variant="mono">{{ raw(stream) }}</OText>
-                </li>
-              </ul>
-            </OPopover>
+            <OBadge
+              variant="default-outline"
+              size="sm"
+              tabindex="0"
+              :aria-label="t('starterPacks.home.moreStreamsLabel')"
+              :data-test="id('home-pack-streams-more')"
+            >
+              <OTooltip side="bottom" align="start" hoverable>
+                <template #content>
+                  <ul
+                    class="flex max-h-60 flex-col gap-1 overflow-y-auto"
+                    :data-test="id('home-pack-streams-more-list')"
+                  >
+                    <li v-for="stream in moreStreams" :key="stream" class="font-mono">
+                      {{ raw(stream) }}
+                    </li>
+                  </ul>
+                </template>
+              </OTooltip>
+              {{
+                t(
+                  "starterPacks.home.moreStreams",
+                  { count: moreStreams.length },
+                  moreStreams.length,
+                )
+              }}
+            </OBadge>
           </li>
         </ul>
       </div>
-      <OIcon name="arrow-forward" size="sm" class="text-text-secondary shrink-0 max-lg:hidden" />
     </div>
 
     <div
-      class="flex items-stretch gap-3 p-4 max-md:flex-col"
+      class="grid grid-cols-3 gap-3 p-4 max-md:grid-cols-1"
       :data-test="id('home-pack-card-counts')"
     >
-      <OText v-if="forbidden" variant="meta" class="self-center">{{
+      <OText v-if="forbidden" variant="meta" class="col-span-full self-center">{{
         t("starterPacks.guide.forbiddenSub", { title: item.title })
       }}</OText>
       <template v-else>
         <div
           v-for="tile in tiles"
           :key="tile.kind"
-          class="border-border-default rounded-default flex w-52 min-w-0 flex-col gap-1 border p-3 max-md:w-auto"
+          class="border-border-default rounded-default flex h-full min-w-0 flex-col gap-1 border p-3"
           :data-test="id(`home-pack-card-row-${tile.kind}`)"
         >
           <div class="flex items-center gap-2">
