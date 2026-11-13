@@ -37,6 +37,8 @@ export interface FirstSourceOption {
   labelKey: I18nKey;
   /** Guide route name; absent for sample data, which loads in the welcome dialog, and for "Not sure yet". */
   route?: string;
+  /** The AI integrations category this pick opens. */
+  aiCategory?: string;
   /** Image path under assets/images, for getImageURL. */
   logo?: string;
   /** Inverted in dark mode because the logo is dark ink on transparent. */
@@ -118,6 +120,7 @@ export const FIRST_SOURCE_OPTIONS: readonly FirstSourceOption[] = Object.freeze(
     id: "llm",
     labelKey: "login.getStarted.sources.llm",
     route: "ai-integrations",
+    aiCategory: "model-providers",
     logo: "images/common/ai_icon.svg",
     logoInvertDark: true,
     signals: ["traces"],
@@ -125,10 +128,10 @@ export const FIRST_SOURCE_OPTIONS: readonly FirstSourceOption[] = Object.freeze(
   {
     id: "agent",
     labelKey: "login.getStarted.sources.agent",
-    route: "recommendedMcp",
+    route: "ai-integrations",
+    aiCategory: "frameworks",
     icon: "auto-awesome",
-    signals: [],
-    feature: "mcp",
+    signals: ["traces"],
   },
   {
     id: "sample",
@@ -166,7 +169,6 @@ const DOCS_SEGMENT_SOURCES: Record<string, FirstSourceId> = {
   rum: "rum",
   llm: "llm",
   genai: "llm",
-  mcp: "agent",
 };
 
 /** The option with this id, or undefined for an unknown id. */

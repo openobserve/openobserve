@@ -4217,7 +4217,7 @@
         "cloud": "AWS, Azure or GCP",
         "rum": "Browser (RUM)",
         "llm": "LLM or AI app",
-        "agent": "Let an AI agent set it up",
+        "agent": "AI agent app",
         "unsure": "Not sure yet"
       },
       "chips": {
@@ -6772,8 +6772,7 @@
     },
     "firstSource": {
       "yourPick": "Your pick",
-      "recommended": "Recommended",
-      "categories": "Categories"
+      "recommended": "Recommended"
     },
     "webServerGuide": {
       "installTitle": "Install Fluent Bit on the {server} host",
