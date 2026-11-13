@@ -36,6 +36,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :persist-columns="true"
     table-id="settings-query-management-summary"
   >
+    <template #toolbar>
+      <div class="flex min-w-0 flex-1 items-center">
+        <slot name="filters" />
+      </div>
+    </template>
     <template #toolbar-trailing>
       <ORefreshButton
         layout="inline"

@@ -41,8 +41,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:selected-ids="handleSelectedIdsUpdate"
     >
       <template #toolbar>
-        <div class="flex min-w-0 flex-1 items-center gap-3">
-          <div class="flex-1"></div>
+        <div class="flex min-w-0 flex-1 items-center gap-3 max-md:flex-wrap">
+          <slot name="filters" />
           <OToggleGroup
             v-if="searchTypes && searchTypes.length"
             :model-value="searchType"

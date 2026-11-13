@@ -144,4 +144,20 @@ describe("RunningQueries drill-through from User Summary", () => {
     expect(wrapper.vm.rowsQuery.every((r: any) => r.user_id === "alice@example.com")).toBe(true);
     expect(wrapper.vm.rowsQuery).toHaveLength(2);
   });
+
+  it("puts the filters in the visible list's toolbar row, once", async () => {
+    for (const [value, list] of [
+      ["summary", "running-queries-summary-list"],
+      ["all", "running-queries-all-queries-list"],
+    ]) {
+      if (value === "all") {
+        await tab("all")!.trigger("click");
+        await flushPromises();
+      }
+      expect(wrapper.findAll('[data-test="running-queries-filter-container"]')).toHaveLength(1);
+      const toolbar = wrapper.find(`[data-test="${list}"] [data-test="o2-table-toolbar"]`);
+      expect(toolbar.find('[data-test="running-queries-search-input"]').exists(), value).toBe(true);
+      expect(toolbar.find('[data-test="o2-table-column-toggle-btn"]').exists(), value).toBe(true);
+    }
+  });
 });
