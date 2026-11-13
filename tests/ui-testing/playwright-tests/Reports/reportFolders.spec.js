@@ -1,6 +1,7 @@
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
+const APICleanup = require('../../pages/apiCleanup.js');
 const { createDashboardViaApi } = require('../../pages/dashboardPages/dashCreation.js');
 const { createDashboardReportViaApi } = require('../../pages/reportsPages/reportCreation.js');
 
@@ -24,6 +25,30 @@ const DASHBOARD_A = `${DASH_PREFIX}${timestamp}`;
 test.describe("Report Folders", () => {
   test.describe.configure({ mode: 'serial' });
   let pm;
+  let reportACreated = false;
+
+  // CI reruns only the failed tests, so any test that needs REPORT_A creates it when an earlier one did not.
+  async function ensureReportA() {
+    if (reportACreated) return;
+    const dashResult = await createDashboardViaApi(pm.apiCleanup, DASHBOARD_A);
+    if (!dashResult.success) {
+      throw new Error(`Failed to create dashboard: ${dashResult.error}`);
+    }
+    testLogger.info(`Dashboard "${dashResult.dashboard.dashboard_id}" created via API`);
+    // cached: false keeps a destination, so the report lands in the "Scheduled" tab the list shows.
+    const result = await createDashboardReportViaApi(pm.apiCleanup, {
+      reportName: REPORT_A,
+      dashboardId: dashResult.dashboard.dashboard_id,
+      tabId: dashResult.dashboard.tabs?.[0]?.tab_id || 'default',
+      cached: false,
+    });
+    if (!result.success) {
+      throw new Error(`Failed to create test report: ${result.error}`);
+    }
+    reportACreated = true;
+    testLogger.info(`Test report "${REPORT_A}" created via API`);
+    await pm.reportFoldersPage.navigateToReports();
+  }
 
   test.beforeEach(async ({ page }, testInfo) => {
     testLogger.testStart(testInfo.title, testInfo.file);
@@ -57,36 +82,8 @@ test.describe("Report Folders", () => {
   test("P1: Create a report from scratch via API and verify it is visible", {
     tag: ['@reportFolders', '@functional', '@P1']
   }, async ({ page }) => {
-    testLogger.info('Creating dashboard via API for report');
-
-    // Create a dashboard via API helper (from dashCreation.js)
-    const dashResult = await createDashboardViaApi(pm.apiCleanup, DASHBOARD_A);
-    if (!dashResult.success) {
-      throw new Error(`Failed to create dashboard: ${dashResult.error}`);
-    }
-    const dashboardId = dashResult.dashboard.dashboard_id;
-    testLogger.info(`Dashboard "${dashboardId}" created via API`);
-
-    // Navigate to reports
-    await pm.reportFoldersPage.navigateToReports();
-
-    testLogger.info('Creating test report via API');
-    // Bind explicitly to the dashboard we just created, and keep a destination
-    // (cached: false) so the report lands in the "Scheduled" tab the list shows.
-    const result = await createDashboardReportViaApi(pm.apiCleanup, {
-      reportName: REPORT_A,
-      dashboardId,
-      tabId: dashResult.dashboard.tabs?.[0]?.tab_id || 'default',
-      cached: false,
-    });
-    if (!result.success) {
-      throw new Error(`Failed to create test report: ${result.error}`);
-    }
-
-    testLogger.info(`Test report "${REPORT_A}" created via API`);
-
-    // Refresh the page so the reports table picks up the newly created report
-    await pm.reportFoldersPage.navigateToReports();
+    testLogger.info('Creating dashboard and report via API');
+    await ensureReportA();
     await pm.reportFoldersPage.expectReportVisibleInTable(REPORT_A);
 
     testLogger.info('Test report visible in default folder');
@@ -96,6 +93,7 @@ test.describe("Report Folders", () => {
     tag: ['@reportFolders', '@functional', '@P1']
   }, async ({ page }) => {
     testLogger.info('Testing move report between folders');
+    await ensureReportA();
 
     await pm.reportFoldersPage.createFolder(FOLDER_B);
     await pm.reportFoldersPage.expectFolderTabVisible(FOLDER_B);
@@ -172,6 +170,7 @@ test.describe("Report Folders", () => {
     tag: ['@reportFolders', '@edge', '@P2']
   }, async ({ page }) => {
     testLogger.info('Testing move button disabled for same folder');
+    await ensureReportA();
 
     await pm.reportFoldersPage.clickFolderTab('default');
 
@@ -239,42 +238,22 @@ test.describe("Report Folders", () => {
     testLogger.info('Special characters are allowed in folder names (known behavior)');
   });
 
-  // ===== CLEANUP via API =====
-
-  test("Cleanup: Remove all test resources via API", {
-    tag: ['@reportFolders', '@cleanup']
-  }, async ({ page }) => {
-    testLogger.info('Cleaning up all test resources via API');
-
-    // Delete all test reports matching prefix (catches leftovers from failed runs too)
-    const reports = await pm.apiCleanup.fetchReports();
-    expect(Array.isArray(reports)).toBeTruthy();
-    const testReports = reports.filter(r => r.name && r.name.startsWith(RPT_PREFIX));
-    for (const report of testReports) {
-      const result = await pm.apiCleanup.deleteReport(report.name);
-      // Accept 200 (deleted) or 404 (already gone from a prior partial cleanup)
-      if (result.code !== 200 && result.code !== 404) {
-        throw new Error(`Unexpected status deleting report ${report.name}: ${result.code}`);
-      }
+  // afterAll runs even when a serial test fails, so a failed run still removes its folders, report and dashboard.
+  test.afterAll(async () => {
+    const apiCleanup = new APICleanup();
+    // Reports go first: a folder that still holds one cannot be deleted, and dropping its dashboard orphans it.
+    const reports = await apiCleanup.fetchReports();
+    for (const report of (reports || []).filter(r => r.name && r.name.startsWith(RPT_PREFIX))) {
+      const result = await apiCleanup.deleteReport(report.name);
       testLogger.info(`Deleted/already gone test report: ${report.name} (${result.code})`);
     }
-
-    // Delete all test folders
-    const foldersBefore = await pm.apiCleanup.fetchReportFolders();
-    expect(Array.isArray(foldersBefore)).toBeTruthy();
-    await pm.apiCleanup.cleanupReportFolders(['test_folder_', 'test_special_']);
-
-    // Delete only the dashboards this spec created. cleanupDashboards() removes
-    // every dashboard in `default` owned by the automation user — which under
-    // fullyParallel is every other spec's too, breaking them mid-run. Runs after
-    // the report deletes above: dropping a dashboard first orphans its report.
-    const dashboards = await pm.apiCleanup.fetchDashboardsInFolder('default');
-    const ourDashboards = dashboards.filter(d => d.title && d.title.startsWith(DASH_PREFIX));
-    for (const dash of ourDashboards) {
-      await pm.apiCleanup.deleteDashboard(dash.dashboard_id, dash.folder_id || 'default');
+    // Spec-specific prefixes: 'test_folder_' alone also matches scheduledReportsDrawer's folders mid-run.
+    await apiCleanup.cleanupReportFolders(['test_folder_a_', 'test_folder_b_', 'test_special_chars_']);
+    // cleanupDashboards() would also remove every other spec's dashboards under fullyParallel.
+    const dashboards = await apiCleanup.fetchDashboardsInFolder('default');
+    for (const dash of dashboards.filter(d => d.title && d.title.startsWith(DASH_PREFIX))) {
+      await apiCleanup.deleteDashboard(dash.dashboard_id, dash.folder_id || 'default');
       testLogger.info(`Deleted test dashboard: ${dash.title}`);
     }
-
-    testLogger.info('Cleanup completed');
   });
 });
