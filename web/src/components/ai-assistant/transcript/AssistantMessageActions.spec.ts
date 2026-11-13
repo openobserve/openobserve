@@ -185,26 +185,12 @@ describe("AssistantMessageActions", () => {
   });
 
   describe("the full answer row", () => {
-    const spoken: { onboundary?: (e: { charIndex: number }) => void }[] = [];
     beforeEach(() => {
-      spoken.length = 0;
-      vi.stubGlobal("speechSynthesis", {
-        speak: (u: (typeof spoken)[number]) => spoken.push(u),
-        cancel: vi.fn(),
-        pause: vi.fn(),
-        resume: vi.fn(),
-      });
-      vi.stubGlobal(
-        "SpeechSynthesisUtterance",
-        class {
-          constructor(public text: string) {}
-        },
-      );
       branch.mockReset().mockResolvedValue(null);
     });
     afterEach(() => vi.unstubAllGlobals());
 
-    it("orders Copy, Read aloud, Share link, Regenerate, the stepper, Branch", () => {
+    it("orders Copy, Share link, Regenerate, the stepper, Branch", () => {
       const wrapper = mount(AssistantMessageActions, {
         props: { sid: fake.current.sid, isLast: true, message: answer, prompt, turnId: "t1" },
         slots: { versions: '<span data-test="stepper" />' },
@@ -216,41 +202,11 @@ describe("AssistantMessageActions", () => {
       ].map((el) => el.getAttribute("data-test"));
       expect(ids).toEqual([
         "assistant-msg-copy-answer",
-        "assistant-msg-read-aloud",
         "assistant-msg-share-link",
         "assistant-msg-regenerate",
         "stepper",
         "assistant-msg-branch",
       ]);
-    });
-
-    it("reads aloud: Pause shows on, a progress bar runs under the row", async () => {
-      const wrapper = mountActions({ message: answer, turnId: "t1" });
-      const button = wrapper.get('[data-test="assistant-msg-read-aloud"]');
-      expect(button.attributes("aria-label")).toBe("Read aloud");
-      await button.trigger("click");
-      await flushPromises();
-      expect(button.attributes("aria-label")).toBe("Pause");
-      expect(button.attributes("data-on")).toBe("true");
-      spoken[0].onboundary?.({ charIndex: 10 });
-      await flushPromises();
-      expect(wrapper.find('[data-test="assistant-msg-read-progress"]').exists()).toBe(true);
-      expect(track).toHaveBeenCalledWith("ai_read_aloud", { action: "start" });
-      await button.trigger("click");
-      await flushPromises();
-      expect(track).toHaveBeenCalledWith("ai_read_aloud", { action: "stop" });
-    });
-
-    it("B-conversation-24: the progress bar takes no row space, so starting playback moves nothing", async () => {
-      const wrapper = mountActions({ message: answer, turnId: "t1" });
-      await wrapper.get('[data-test="assistant-msg-read-aloud"]').trigger("click");
-      await flushPromises();
-      const slot = wrapper.get('[data-test="assistant-msg-read-progress-slot"]');
-      const group = wrapper.get('[data-test="assistant-msg-actions"]');
-      expect(slot.element.parentElement).toBe(group.element);
-      expect(slot.find('[data-test="assistant-msg-read-progress"]').exists()).toBe(true);
-      expect(slot.classes()).toEqual(expect.arrayContaining(["absolute", "inset-x-0", "top-full"]));
-      expect(group.classes()).toContain("relative");
     });
 
     it("copies the answer's link and says Link copied in place for 2 s", async () => {

@@ -20,6 +20,7 @@ import { parseChatDetail } from "@/services/assistant";
 import { raw } from "@/types/i18n";
 
 import {
+  boundedChartSeries,
   boundedQuery,
   answerQueriesAllEmpty,
   boundedFindings,
@@ -497,5 +498,36 @@ describe("a reloaded answer's query cards keep the window the agent ran", () => 
     const fence = fenceQuery(SQL, "sql", stepsOf(answer, "default"), "default", null);
     expect(fence?.query).toMatchObject({ from: 1_794_136_221_614, to: 1_794_222_621_614 });
     expect(fence?.rangeSource).toBe("step");
+  });
+});
+
+describe("boundedChartSeries: non-measure columns", () => {
+  const us = 1_794_136_221_614_000;
+  const line = (name: string, ys: number[]) => ({
+    name,
+    points: ys.map((y, i) => [us + i * 60_000_000, y]),
+  });
+
+  it("drops time-like and epoch-valued lines and keeps duration", () => {
+    const chart = boundedChartSeries({
+      x_unit: "us",
+      series: [
+        line("start_time", [us, us + 5]),
+        line("end_time", [us + 9, us + 11]),
+        line("trace_id", [1, 2]),
+        line("duration", [120, 480]),
+      ],
+    });
+    expect(chart?.series.map((s) => s.name)).toEqual(["duration"]);
+    expect(Math.max(...chart!.series.flatMap((s) => s.points.map((p) => p[1])))).toBeLessThan(1e9);
+  });
+
+  it("drops epoch values under a neutral name, and the whole chart when nothing is left", () => {
+    expect(
+      boundedChartSeries({
+        x_unit: "us",
+        series: [line("a", [1.7e9, 1.7e9 + 1]), line("b", [1.7e12, 1.7e12 + 1])],
+      }),
+    ).toBeNull();
   });
 });

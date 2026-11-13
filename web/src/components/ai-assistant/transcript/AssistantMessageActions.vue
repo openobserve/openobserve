@@ -42,14 +42,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
     <template v-if="variant === 'answer'">
       <AssistantIconButton
-        v-if="reader.supported"
-        :label="reading ? t('assistant.message.pauseReading') : t('assistant.message.readAloud')"
-        :icon="reading ? assistantGlyph.pause : assistantGlyph.readAloud"
-        :on="reading"
-        data-test="assistant-msg-read-aloud"
-        @click="toggleReading"
-      />
-      <AssistantIconButton
         v-if="turnId"
         :label="t('assistant.message.shareAnswer')"
         :icon="assistantGlyph.shareLink"
@@ -92,18 +84,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="branch"
       />
     </template>
-    <div
-      v-if="reader.state.value !== 'idle'"
-      class="pointer-events-none absolute inset-x-0 top-full"
-      data-test="assistant-msg-read-progress-slot"
-    >
-      <OProgressBar
-        :value="reader.progress.value / 100"
-        size="xs"
-        :aria-label="t('assistant.message.readingAloud')"
-        data-test="assistant-msg-read-progress"
-      />
-    </div>
   </div>
 </template>
 
@@ -152,7 +132,6 @@ import {
   useTurnLock,
 } from "@/composables/assistant/pure";
 import { queryClient } from "@/composables/query/queryClient";
-import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import { chatSharesQuery } from "@/services/ai_chat_share.queries";
 import { trackAssistant } from "@/services/assistantAnalytics";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -161,7 +140,6 @@ import { copyToClipboard } from "@/utils/clipboard";
 import { activeShareUrl, answerLink } from "./answerLink";
 import { markdownToPlainText } from "./markdown";
 import { useBranchChat } from "./useBranchChat";
-import { useReadAloud } from "./useReadAloud";
 
 const props = withDefaults(defineProps<AssistantMessageActionsProps>(), {
   variant: "answer",
@@ -182,7 +160,6 @@ const turnLock = useTurnLock(() => props.sid);
 const view = useAssistantSession(() => props.sid);
 const org = () => view.session.value?.org ?? "";
 const branching = useBranchChat(org);
-const reader = useReadAloud(() => answerText());
 
 // Without B-12 a version replaces the latest answer only, so older turns never offer Re-run.
 const rerunShown = computed(
@@ -199,7 +176,6 @@ const copyName = computed(() =>
     ? t("assistant.message.copyPrompt")
     : t("assistant.message.copyAnswer"),
 );
-const reading = computed(() => reader.state.value === "playing");
 
 const copied = ref(false);
 const linkCopied = ref(false);
@@ -212,7 +188,7 @@ function answerText(): string | Promise<string> {
   const texts = blocks
     .filter((block) => block.type === "text" && block.text?.trim())
     .map((block) => block.text!);
-  // A findings-only answer has no prose, so its card's words are what Copy and Read aloud carry.
+  // A findings-only answer has no prose, so its card's words are what Copy carries.
   if (!texts.length) texts.push(...blocks.flatMap((block) => findingsText(block.findings)));
   const plains = (texts.length ? texts : [String(props.message.content ?? "")]).map(
     markdownToPlainText,
@@ -262,15 +238,6 @@ function branch(): void {
     turnId: props.turnId,
     ...(version !== undefined && { version }),
   });
-}
-
-// Pause counts as a stop: the reader chose to end it; reaching the end of the text is not tracked.
-async function toggleReading(): Promise<void> {
-  const before = reader.state.value;
-  await reader.toggle();
-  if (before === "playing") trackAssistant("ai_read_aloud", { action: "stop" });
-  else if (before === "idle" && reader.state.value === "playing")
-    trackAssistant("ai_read_aloud", { action: "start" });
 }
 
 function editPrompt(): void {

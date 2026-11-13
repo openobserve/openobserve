@@ -215,14 +215,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <OButton
         variant="outline"
-        size="sm"
-        :icon-left="assistantGlyph.jumpToLatest"
+        size="icon"
         :aria-label="jumpName"
-        class="bg-surface-base! pointer-events-auto shadow-md max-md:min-h-11 pointer-coarse:min-h-11"
+        class="bg-surface-panel! text-text-heading! border-border-default! pointer-events-auto size-10! rounded-full! shadow-lg max-md:min-h-11 pointer-coarse:min-h-11"
         data-test="assistant-transcript-jump-latest"
         @click="jumpToLatest"
       >
-        {{ jumpLabel }}
+        <OIcon :name="assistantGlyph.jumpToLatest" size="sm" />
+        <OTooltip :content="jumpLabel" />
       </OButton>
     </div>
   </div>
@@ -379,13 +379,16 @@ import {
 } from "@/composables/assistant/pure";
 import { explorerOf } from "@/utils/assistant/explorerRoutes";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OText from "@/lib/core/Typography/OText.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { trackAssistant } from "@/services/assistantAnalytics";
 import { raw, useI18nTyped } from "@/types/i18n";
 
 import AssistantHandoffMarker from "./AssistantHandoffMarker.vue";
 import AssistantHandoffSuggestion from "./AssistantHandoffSuggestion.vue";
+import { splitFollowUps } from "./followUpsText";
 import AssistantMessage from "./AssistantMessage.vue";
 import { answerAnchor, answerTurnOf } from "./answerLink";
 import AssistantVersionPicker from "./AssistantVersionPicker.vue";
@@ -615,7 +618,9 @@ function followUpsOf(turn: TranscriptTurn): string[] {
   if (!turn.isLast || turn.live || props.readonly || !props.sid || !live) return [];
   if (turn.outcomes.length) return [];
   const blocks = turn.answer?.contentBlocks ?? [];
-  const items = blocks.find((block) => block.type === "follow_ups")?.followUps ?? [];
+  const typed = blocks.find((block) => block.type === "follow_ups")?.followUps;
+  const lastText = blocks.findLast((block) => block.type === "text")?.text;
+  const items = typed?.length ? typed : splitFollowUps(lastText ?? "").items;
   return items.slice(0, blocks.some((block) => block.type === "findings") ? 2 : 3);
 }
 

@@ -166,7 +166,6 @@ const SAMPLES: { [N in AiEventName]: AiEventProps[N] } = {
     truncated: false,
   },
   ai_fork: { result: "ok" },
-  ai_read_aloud: { action: "start" },
   ai_answer_link: { result: "copied" },
   ai_branch: { result: "failed", status: 409 },
   ai_local_import: { result: "done", count: 4 },
@@ -270,7 +269,6 @@ const CATALOGUE: Record<AiEventName, string[]> = {
   ai_share: ["action", "visibility", "mode", "scope"],
   ai_shared_view: ["visibility", "mode", "state", "redacted", "truncated"],
   ai_fork: ["result"],
-  ai_read_aloud: ["action"],
   ai_answer_link: ["result"],
   ai_branch: ["result", "status"],
   ai_local_import: ["result", "count"],
@@ -328,7 +326,7 @@ afterEach(() => {
 describe("event catalogue", () => {
   it("pins every event name of 99 §3.3", () => {
     expect([...AI_EVENT_NAMES].sort()).toEqual(Object.keys(CATALOGUE).sort());
-    expect(AI_EVENT_NAMES).toHaveLength(67);
+    expect(AI_EVENT_NAMES).toHaveLength(66);
   });
 
   it.each(AI_EVENT_NAMES)("%s carries exactly its catalogue properties", (name) => {

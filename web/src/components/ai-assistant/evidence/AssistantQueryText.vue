@@ -29,15 +29,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OTruncatedText v-if="meta" class="min-w-0 font-normal" :data-test="`${dataTest}-meta`">{{
         meta
       }}</OTruncatedText>
-      <AssistantIconButton
-        class="ms-auto"
-        :label="t('assistant.query.copy')"
-        :icon="assistantGlyph.copy"
-        :done="copied ? t('common.copied') : undefined"
-        confirms
-        :data-test="`${dataTest}-copy`"
-        @click="copy"
-      />
+      <div class="ms-auto flex shrink-0 items-center gap-1">
+        <AssistantIconButton
+          :label="t('assistant.query.copy')"
+          :icon="assistantGlyph.copy"
+          :done="copied ? t('common.copied') : undefined"
+          confirms
+          :data-test="`${dataTest}-copy`"
+          @click="copy"
+        />
+        <slot name="head-actions" />
+      </div>
     </div>
     <OCodeBlock
       :code="text"
@@ -145,7 +147,7 @@ const props = withDefaults(
   { chrome: false, meta: undefined },
 );
 
-defineSlots<{ foot?: () => unknown }>();
+defineSlots<{ foot?: () => unknown; "head-actions"?: () => unknown }>();
 
 const { t } = useI18nTyped();
 
