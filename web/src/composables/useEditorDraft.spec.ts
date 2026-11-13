@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { orgSwitchPending } from "@/utils/orgScopedRoutes";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import { defineComponent, h, nextTick, reactive } from "vue";
@@ -388,6 +389,19 @@ describe("useEditorDraft", () => {
       await nextTick();
       expect(readEditorDraft(editScope)).not.toBeNull();
       expect(await leave()).toBe(true);
+    });
+
+    it("leaves without a prompt while an org switch is leaving the page", async () => {
+      await startHost();
+      userInput();
+      await edit({ name: "typed" });
+      orgSwitchPending.value = true;
+      try {
+        expect(await leave()).toBe(true);
+      } finally {
+        orgSwitchPending.value = false;
+      }
+      expect(readEditorDraft(editScope)).not.toBeNull();
     });
   });
 

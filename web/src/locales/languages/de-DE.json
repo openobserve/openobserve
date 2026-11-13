@@ -10,7 +10,8 @@
     "toastMessageGeneric": "Ihre Lizenz enthält diese Funktion nicht. Bitten Sie Ihren Administrator, die Lizenz zu aktualisieren.",
     "bannerMessage": "Diese Funktion ist gesperrt. Sie setzt die Funktion {feature} in Ihrer Lizenz voraus.",
     "bannerMessageGeneric": "Diese Seite benötigt eine Funktion, die nicht in Ihrer Lizenz enthalten ist.",
-    "headerLocked": "Gesperrt: {feature} erforderlich"
+    "headerLocked": "Gesperrt: {feature} erforderlich",
+    "availableInEnterprise": "In OpenObserve Enterprise verfügbar: {feature}"
   },
   "emptyState": {
     "illustrations": {
@@ -10368,6 +10369,23 @@
     "services": "Dienstleistungen",
     "recentEvents": "Letzte Ereignisse",
     "investigate": "Untersuchen →",
+    "askAi": {
+      "label": "KI fragen",
+      "hint": "KI dazu fragen",
+      "labelFor": "KI nach {item} fragen",
+      "chip": {
+        "firing": "Ausgelöste Alarme",
+        "failing": "Fehlgeschlagene Regeln",
+        "incidents": "Offene Vorfälle",
+        "pipelines": "Pipeline-Fehler",
+        "delivery": "Zustellungsfehler",
+        "quiet": "Ruhige Streams",
+        "critical": "Kritische Alarme",
+        "warning": "Warnalarme",
+        "alert": "Alarm · {name}",
+        "incident": "Vorfall · {name}"
+      }
+    },
     "viewAll": "Alles ansehen",
     "showingOf": "Es werden {shown} von {total} angezeigt",
     "colErrorRate": "Fehlerrate",
@@ -11991,6 +12009,12 @@
     "summaryPaused": "Pausiert",
     "summaryFailed": "Fehlgeschlagen",
     "summaryFiring": "Ausgelöst",
+    "summaryEvalError": "Auswertungsfehler",
+    "summaryDeliveryFailed": "Zustellung fehlgeschlagen",
+    "levelFilter": "Ausgelöst auf Stufe {level}",
+    "levelFilterRemove": "Filter entfernen: {label}",
+    "levelCritical": "Kritisch",
+    "levelWarning": "Warnung",
     "summaryRecent": "Ausgelöst < 15m",
     "summaryTotal": "Gesamt",
     "webhook": "Web-Hook",

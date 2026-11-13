@@ -10,7 +10,8 @@
     "toastMessageGeneric": "Ваша лицензия не включает эту функцию. Попросите администратора обновить лицензию.",
     "bannerMessage": "Эта функция заблокирована. Для неё требуется функция {feature} в вашей лицензии.",
     "bannerMessageGeneric": "Для этой страницы нужна функция, которой нет в вашей лицензии.",
-    "headerLocked": "Заблокировано: требуется {feature}"
+    "headerLocked": "Заблокировано: требуется {feature}",
+    "availableInEnterprise": "Доступно в OpenObserve Enterprise: {feature}"
   },
   "emptyState": {
     "illustrations": {
@@ -10368,6 +10369,23 @@
     "services": "Сервисы",
     "recentEvents": "Недавние события",
     "investigate": "Расследовать →",
+    "askAi": {
+      "label": "Спросить ИИ",
+      "hint": "Спросить ИИ об этом",
+      "labelFor": "Спросить ИИ про {item}",
+      "chip": {
+        "firing": "Сработавшие оповещения",
+        "failing": "Правила со сбоями",
+        "incidents": "Открытые инциденты",
+        "pipelines": "Ошибки конвейеров",
+        "delivery": "Сбои доставки",
+        "quiet": "Тихие потоки",
+        "critical": "Критические оповещения",
+        "warning": "Предупреждающие оповещения",
+        "alert": "Оповещение · {name}",
+        "incident": "Инцидент · {name}"
+      }
+    },
     "viewAll": "Показать все",
     "showingOf": "Показано {shown} из {total}",
     "colErrorRate": "Частота ошибок",
@@ -11991,6 +12009,12 @@
     "summaryPaused": "Приостановлен",
     "summaryFailed": "Сбой",
     "summaryFiring": "Сработало",
+    "summaryEvalError": "Ошибки оценки",
+    "summaryDeliveryFailed": "Сбой доставки",
+    "levelFilter": "Сработало на уровне {level}",
+    "levelFilterRemove": "Убрать фильтр: {label}",
+    "levelCritical": "Критический",
+    "levelWarning": "Предупреждение",
     "summaryRecent": "Сработало < 15m",
     "summaryTotal": "Всего",
     "webhook": "Вебхук",

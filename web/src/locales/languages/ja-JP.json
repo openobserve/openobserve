@@ -10,7 +10,8 @@
     "toastMessageGeneric": "ライセンスにこの機能は含まれていません。管理者にライセンスの更新を依頼してください。",
     "bannerMessage": "この機能はロックされています。ライセンスに {feature} 機能が必要です。",
     "bannerMessageGeneric": "このページにはライセンスに含まれていない機能が必要です。",
-    "headerLocked": "ロック中: {feature} が必要"
+    "headerLocked": "ロック中: {feature} が必要",
+    "availableInEnterprise": "{feature} は OpenObserve Enterprise で利用できます"
   },
   "emptyState": {
     "illustrations": {
@@ -10368,6 +10369,23 @@
     "services": "サービス",
     "recentEvents": "最近のイベント",
     "investigate": "調査する →",
+    "askAi": {
+      "label": "AI に質問",
+      "hint": "AI にこれについて質問",
+      "labelFor": "AI に{item}について質問",
+      "chip": {
+        "firing": "発火中のアラート",
+        "failing": "失敗しているルール",
+        "incidents": "未解決のインシデント",
+        "pipelines": "パイプラインエラー",
+        "delivery": "配信失敗",
+        "quiet": "静かなストリーム",
+        "critical": "重大なアラート",
+        "warning": "警告アラート",
+        "alert": "アラート · {name}",
+        "incident": "インシデント · {name}"
+      }
+    },
     "viewAll": "すべて表示",
     "showingOf": "{total} の {shown} を表示中",
     "colErrorRate": "エラー率",
@@ -11991,6 +12009,12 @@
     "summaryPaused": "一時停止中",
     "summaryFailed": "失敗",
     "summaryFiring": "発火中",
+    "summaryEvalError": "評価エラー",
+    "summaryDeliveryFailed": "配信失敗",
+    "levelFilter": "{level} レベルで発火中",
+    "levelFilterRemove": "フィルターを解除: {label}",
+    "levelCritical": "重大",
+    "levelWarning": "警告",
     "summaryRecent": "トリガー < 15m",
     "summaryTotal": "合計",
     "webhook": "Webhook",

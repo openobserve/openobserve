@@ -10,7 +10,8 @@
     "toastMessageGeneric": "Your license does not include this feature. Ask your administrator to update the license.",
     "bannerMessage": "This feature is locked. It needs the {feature} feature in your license.",
     "bannerMessageGeneric": "This page needs a feature that is not in your license.",
-    "headerLocked": "Locked: needs {feature}"
+    "headerLocked": "Locked: needs {feature}",
+    "availableInEnterprise": "{feature} is available in OpenObserve Enterprise"
   },
   "emptyState": {
     "illustrations": {
@@ -10471,6 +10472,23 @@
     "services": "Services",
     "recentEvents": "Recent events",
     "investigate": "Investigate →",
+    "askAi": {
+      "label": "Ask AI",
+      "hint": "Ask AI about this",
+      "labelFor": "Ask AI about {item}",
+      "chip": {
+        "firing": "Firing alerts",
+        "failing": "Failing rules",
+        "incidents": "Open incidents",
+        "pipelines": "Pipeline errors",
+        "delivery": "Delivery failures",
+        "quiet": "Quiet streams",
+        "critical": "Critical alerts",
+        "warning": "Warning alerts",
+        "alert": "Alert · {name}",
+        "incident": "Incident · {name}"
+      }
+    },
     "viewAll": "View all",
     "showingOf": "Showing {shown} of {total}",
     "colErrorRate": "Error rate",
@@ -12417,6 +12435,12 @@
     "summaryPaused": "Paused",
     "summaryFailed": "Failed",
     "summaryFiring": "Firing",
+    "summaryEvalError": "Eval errors",
+    "summaryDeliveryFailed": "Delivery failed",
+    "levelFilter": "Firing at {level} level",
+    "levelFilterRemove": "Remove filter: {label}",
+    "levelCritical": "Critical",
+    "levelWarning": "Warning",
     "summaryRecent": "Triggered < 15m",
     "summaryTotal": "Total",
     "webhook": "Web Hook",

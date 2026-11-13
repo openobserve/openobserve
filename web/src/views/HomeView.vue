@@ -128,7 +128,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="home-ai-panel flex min-h-0 flex-1 flex-row overflow-hidden max-md:flex-col"
         >
           <HomeChatHistory class="max-md:hidden" @load-chat="onLoadChat" @new-chat="onNewChat" />
-          <O2AIChat ref="homeChat" :is-open="true" :header-height="0" :centered-start="true" />
+          <O2AIChat
+            ref="homeChat"
+            :is-open="true"
+            :header-height="0"
+            :centered-start="true"
+            :ai-chat-payload="aiChatPayload"
+          />
           <ODrawer
             v-if="isMobile"
             v-model:open="mobileChatsOpen"
@@ -201,7 +207,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="-mx-2.5 -mb-2.5 min-h-0 flex-1 overflow-hidden"
             data-test="home-overview-panel"
           >
-            <OverviewTab />
+            <OverviewTab @send-to-ai-chat="onSendToAiChat" />
           </div>
           <div v-else class="-mx-2.5 min-h-0 flex-1 overflow-hidden">
             <UsageTab />
@@ -216,7 +222,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="-mx-2.5 -mb-2.5 min-h-0 flex-1 overflow-hidden"
             data-test="home-overview-panel"
           >
-            <OverviewTab />
+            <OverviewTab @send-to-ai-chat="onSendToAiChat" />
           </div>
 
           <!-- Usage tab -->
@@ -243,7 +249,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, inject, ref, watch, onMounted, onUnmounted } from "vue";
+import {
+  computed,
+  defineComponent,
+  inject,
+  nextTick,
+  ref,
+  watch,
+  onMounted,
+  onUnmounted,
+} from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -253,6 +268,7 @@ import UsageTab from "@/views/UsageTab.vue";
 import O2AIChat from "@/components/O2AIChat.vue";
 import LicenseDeniedState from "@/components/common/LicenseDeniedState.vue";
 import { menuState } from "@/utils/featureGate";
+import type { AiChatHandoff } from "@/plugins/traces/utils/traceAiPayload";
 import HomeChatHistory from "@/views/HomeChatHistory.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
@@ -560,6 +576,30 @@ export default defineComponent({
       homeChat.value?.addNewChat();
     }
 
+    const aiChatPayload = ref<{
+      text: string;
+      autoSend: boolean;
+      id: number;
+      chipName: string;
+      newChat: boolean;
+      context: Record<string, unknown>;
+    } | null>(null);
+
+    // The chat mounts with the AI tab, so the payload waits a tick for its watcher to see the change.
+    function onSendToAiChat(handoff: AiChatHandoff) {
+      if (aiLocked.value) return;
+      const payload = {
+        text: handoff.query,
+        autoSend: false,
+        id: Date.now(),
+        chipName: handoff.chipName,
+        newChat: handoff.newChat,
+        context: handoff.context,
+      };
+      activeHomeTab.value = "ai";
+      nextTick(() => (aiChatPayload.value = payload));
+    }
+
     function onSwitchTab(e: Event) {
       const tab = (e as CustomEvent).detail;
       if (DEFAULT_TABS.value.find((t) => t.id === tab)) {
@@ -602,6 +642,8 @@ export default defineComponent({
       onTabReorder,
       isEnterpriseOrCloud,
       homeChat,
+      aiChatPayload,
+      onSendToAiChat,
       onLoadChat,
       onNewChat,
       parsePinnedTabId,

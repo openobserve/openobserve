@@ -3393,29 +3393,37 @@ export class TracesPage {
     await expect(this.page.locator(this.traceDetailsSpanIdLabel).first()).toContainText(spanId, { timeout: 30000 });
   }
 
-  // An example counts only once the typewriter moves off it, so a half-typed string is never mistaken for one.
-  async sampleQueryPlaceholder({ minExamples = 2, maxMs = 12000, intervalMs = 100 } = {}) {
-    const typewriter = this.page.locator(`${this.searchBar} ${this.queryPlaceholderTypewriter}`);
-    await expect(typewriter).toHaveText(/\S/, { timeout: 30000 });
-    return typewriter.evaluate((el, { minExamples, maxMs, intervalMs }) => new Promise((resolve) => {
-      const seen = new Set();
-      const peaks = new Set();
-      let prev = '';
-      const summarize = () => {
-        const samples = [...seen].filter((s) => s.trim());
-        const examples = [...peaks].filter((p) => p.trim() && !samples.some((o) => o !== p && o.startsWith(p)));
-        return { samples, examples };
-      };
-      const finish = () => { clearInterval(timer); clearTimeout(cap); resolve(summarize()); };
-      const timer = setInterval(() => {
-        const cur = el.textContent || '';
-        seen.add(cur);
-        if (!cur.startsWith(prev)) peaks.add(prev);
-        prev = cur;
-        if (summarize().examples.length >= minExamples) finish();
-      }, intervalMs);
-      const cap = setTimeout(finish, maxMs);
-    }), { minExamples, maxMs, intervalMs });
+  // The typewriter types each example once and rests on the last, so recording must start before navigation.
+  async recordQueryPlaceholder() {
+    await this.page.addInitScript((selector) => {
+      const texts = [];
+      window.__o2PlaceholderTexts = texts;
+      window.__o2PlaceholderChangedAt = Date.now();
+      new MutationObserver(() => {
+        const text = document.querySelector(selector)?.textContent ?? '';
+        if (text === texts[texts.length - 1]) return;
+        texts.push(text);
+        window.__o2PlaceholderChangedAt = Date.now();
+      }).observe(document, { subtree: true, childList: true, characterData: true });
+    }, `${this.searchBar} ${this.queryPlaceholderTypewriter}`);
+  }
+
+  // A text counts once the typewriter moves off it or rests on it, so a list change mid-typing can count a partial.
+  async sampleQueryPlaceholder({ restMs = 3000, timeout = 60000 } = {}) {
+    const read = () => this.page.evaluate(() => ({
+      texts: [...(window.__o2PlaceholderTexts ?? [])],
+      idleMs: Date.now() - (window.__o2PlaceholderChangedAt ?? Date.now()),
+    }));
+    // restMs exceeds the typewriter's 2s hold, so a still text is the final rest, not a pause between examples.
+    await expect.poll(async () => {
+      const { texts, idleMs } = await read();
+      return Boolean(texts[texts.length - 1]?.trim()) && idleMs >= restMs;
+    }, { timeout, message: 'the query placeholder must finish typing and rest' }).toBe(true);
+    const { texts } = await read();
+    const samples = [...new Set(texts)].filter((s) => s.trim());
+    const peaks = texts.filter((t, i) => t.trim() && !(texts[i + 1] ?? '').startsWith(t));
+    const examples = [...new Set(peaks)].filter((p) => !samples.some((o) => o !== p && o.startsWith(p)));
+    return { samples, examples };
   }
 
   // ============================================

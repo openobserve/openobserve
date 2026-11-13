@@ -10,7 +10,8 @@
     "toastMessageGeneric": "您的授權未包含此功能。請您的管理員更新授權。",
     "bannerMessage": "此功能已鎖定。您的授權需要包含 {feature} 功能。",
     "bannerMessageGeneric": "此頁面所需的功能不在您的授權中。",
-    "headerLocked": "已鎖定：需要 {feature}"
+    "headerLocked": "已鎖定：需要 {feature}",
+    "availableInEnterprise": "{feature} 適用於 OpenObserve 企業版"
   },
   "emptyState": {
     "illustrations": {
@@ -10363,6 +10364,23 @@
     "services": "服務",
     "recentEvents": "最近事件",
     "investigate": "調查 →",
+    "askAi": {
+      "label": "詢問 AI",
+      "hint": "就此詢問 AI",
+      "labelFor": "就{item}詢問 AI",
+      "chip": {
+        "firing": "觸發中的警示",
+        "failing": "失敗的規則",
+        "incidents": "未解決的事件",
+        "pipelines": "管線錯誤",
+        "delivery": "傳送失敗",
+        "quiet": "靜默的串流",
+        "critical": "嚴重警示",
+        "warning": "警告警示",
+        "alert": "警示 · {name}",
+        "incident": "事件 · {name}"
+      }
+    },
     "viewAll": "檢視全部",
     "showingOf": "顯示 {shown} / {total}",
     "colErrorRate": "錯誤率",
@@ -11986,6 +12004,12 @@
     "summaryPaused": "已暫停",
     "summaryFailed": "失敗",
     "summaryFiring": "觸發中",
+    "summaryEvalError": "評估錯誤",
+    "summaryDeliveryFailed": "傳送失敗",
+    "levelFilter": "{level} 等級觸發中",
+    "levelFilterRemove": "移除篩選：{label}",
+    "levelCritical": "嚴重",
+    "levelWarning": "警告",
     "summaryRecent": "已觸發 < 15 分鐘",
     "summaryTotal": "總計",
     "webhook": "Webhook",
