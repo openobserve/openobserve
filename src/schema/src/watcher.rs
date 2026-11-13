@@ -49,13 +49,22 @@ pub trait OrganizationProvisioner: Send + Sync + 'static {
 }
 
 static ORGANIZATION_PROVISIONER: OnceLock<Arc<dyn OrganizationProvisioner>> = OnceLock::new();
+static STREAM_DELETE_HOOK: OnceLock<StreamDeleteHook> = OnceLock::new();
 
 pub type SchemaWatcher = Pin<Box<dyn Future<Output = Result<(), anyhow::Error>> + Send + 'static>>;
+
+/// Gets a fully deleted stream's org, type and name inside the watcher loop, so it must not block.
+pub type StreamDeleteHook = fn(&str, StreamType, &str);
 
 pub fn set_organization_provisioner(
     provisioner: Arc<dyn OrganizationProvisioner>,
 ) -> Result<(), Arc<dyn OrganizationProvisioner>> {
     ORGANIZATION_PROVISIONER.set(provisioner)
+}
+
+/// Registers the full-stream-delete hook; a second registration is ignored.
+pub fn set_stream_delete_hook(hook: StreamDeleteHook) {
+    _ = STREAM_DELETE_HOOK.set(hook);
 }
 
 pub fn create_watcher() -> Result<SchemaWatcher, anyhow::Error> {
@@ -209,10 +218,7 @@ async fn watch(
                 let org_id = columns[0];
                 let stream_type = StreamType::from(columns[1]);
                 let stream_name = columns[2];
-                let start_dt = match columns.get(3) {
-                    Some(start_dt) => start_dt.parse::<i64>().unwrap_or_default(),
-                    None => ev.start_dt.unwrap_or_default(),
-                };
+                let start_dt = deleted_start_dt(&columns, ev.start_dt);
                 log::warn!(
                     "[Schema:watch] Deleting schema cache for {org_id}/{stream_type}/{stream_name} with start_dt {start_dt}",
                 );
@@ -228,6 +234,7 @@ async fn watch(
                 drop(w);
                 STREAM_RECORD_ID_GENERATOR.remove(item_key);
                 infra::schema::remove_stream_settings(item_key).await;
+                notify_stream_deleted(org_id, stream_type, stream_name);
                 cache::stats::remove_stream_stats(org_id, stream_name, stream_type);
                 if let Err(e) =
                     ::db::compact::files::del_offset(org_id, stream_type, stream_name).await
@@ -352,4 +359,56 @@ async fn flush_cache_for_stream(
     }
 
     Ok(())
+}
+
+/// The schema version a delete event removes; 0 means the whole stream.
+fn deleted_start_dt(columns: &[&str], ev_start_dt: Option<i64>) -> i64 {
+    match columns.get(3) {
+        Some(start_dt) => start_dt.parse::<i64>().unwrap_or_default(),
+        None => ev_start_dt.unwrap_or_default(),
+    }
+}
+
+fn notify_stream_deleted(org_id: &str, stream_type: StreamType, stream_name: &str) {
+    if let Some(hook) = STREAM_DELETE_HOOK.get() {
+        hook(org_id, stream_type, stream_name);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Mutex;
+
+    use super::*;
+
+    static DELETED: Mutex<Vec<String>> = Mutex::new(Vec::new());
+
+    fn record(org_id: &str, stream_type: StreamType, stream_name: &str) {
+        DELETED
+            .lock()
+            .unwrap()
+            .push(format!("{org_id}/{stream_type}/{stream_name}"));
+    }
+
+    fn ignore(_: &str, _: StreamType, _: &str) {}
+
+    #[test]
+    fn only_a_delete_without_a_version_removes_the_whole_stream() {
+        let key = |item: &'static str| item.split('/').collect::<Vec<&str>>();
+        assert_eq!(deleted_start_dt(&key("o1/logs/triggers"), None), 0);
+        assert_eq!(deleted_start_dt(&key("o1/logs/triggers/1700"), None), 1700);
+        assert_eq!(deleted_start_dt(&key("o1/logs/triggers"), Some(1700)), 1700);
+    }
+
+    #[test]
+    fn the_delete_hook_is_optional_and_set_once() {
+        notify_stream_deleted("o1", StreamType::Logs, "triggers");
+        set_stream_delete_hook(record);
+        set_stream_delete_hook(ignore);
+        notify_stream_deleted("o1", StreamType::Logs, "triggers");
+        assert_eq!(
+            *DELETED.lock().unwrap(),
+            vec!["o1/logs/triggers".to_string()]
+        );
+    }
 }

@@ -47,17 +47,14 @@ use crate::common::{
     meta::http::HttpResponse as MetaHttpResponse, utils::http::get_or_create_trace_id,
 };
 
-/// Non-`Option` `TriggerData` fields, which every row carries.
-const HISTORY_COLUMNS: &str =
-    "_timestamp, org, key, status, is_realtime, is_silenced, start_time, end_time, retries";
-
-/// `Option` fields a re-created triggers stream lacks until a row carried them.
-const OPTIONAL_HISTORY_COLUMNS: [&str; 5] = [
+/// Pipeline-only columns read after the shared history columns, each once the stream has it.
+const PIPELINE_HISTORY_COLUMNS: [&str; 6] = [
     "delay_in_secs",
     "evaluation_took_in_secs",
     "source_node",
     "query_took",
     "error",
+    "is_partial",
 ];
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -480,10 +477,8 @@ pub async fn get_pipeline_history(
             ));
         }
     };
-    let columns =
-        trigger_stream::present_columns(HISTORY_COLUMNS, &OPTIONAL_HISTORY_COLUMNS, &schema);
-    let sort_column =
-        trigger_stream::sortable_column(sort_column, &OPTIONAL_HISTORY_COLUMNS, &schema);
+    let columns = history_columns(&schema);
+    let sort_column = trigger_stream::sortable_column(sort_column, &schema);
 
     // Step 2: Get the actual paginated results
     // Build data query with LIMIT/OFFSET for pagination
@@ -592,6 +587,15 @@ pub async fn get_pipeline_history(
     };
 
     MetaHttpResponse::json(response)
+}
+
+fn history_columns(schema: &arrow_schema::Schema) -> String {
+    trigger_stream::present_columns(
+        trigger_stream::HISTORY_COLUMNS
+            .into_iter()
+            .chain(PIPELINE_HISTORY_COLUMNS),
+        schema,
+    )
 }
 
 /// Helper function to get all pipeline IDs for an organization
@@ -855,5 +859,20 @@ mod tests {
         assert_eq!(response.from, 50);
         assert_eq!(response.size, 10);
         assert_eq!(response.hits.len(), 1);
+    }
+
+    #[test]
+    fn the_history_query_reads_is_partial_once_the_stream_has_it() {
+        use arrow_schema::{DataType, Field, Schema};
+
+        let mut fields: Vec<Field> = trigger_stream::HISTORY_COLUMNS
+            .into_iter()
+            .map(|name| Field::new(name, DataType::Utf8, true))
+            .collect();
+        let bare = history_columns(&Schema::new(fields.clone()));
+        assert_eq!(bare, trigger_stream::HISTORY_COLUMNS.join(", "));
+        fields.push(Field::new("is_partial", DataType::Boolean, true));
+        let with = history_columns(&Schema::new(fields));
+        assert!(with.ends_with(", is_partial"), "{with}");
     }
 }

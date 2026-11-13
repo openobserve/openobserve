@@ -190,6 +190,7 @@ fn cache_instance_identity(identity: &InstanceIdentity, env_ext_auth_salt: &str)
 pub async fn init() -> Result<(), anyhow::Error> {
     schema::set_organization_provisioner(Arc::new(CoreOrganizationProvisioner))
         .map_err(|_| anyhow::anyhow!("organization provisioner is already initialized"))?;
+    schema::set_stream_delete_hook(crate::self_reporting::triggers_schema::forget_deleted_stream);
     usage_reporting::set_batch_publisher(Arc::new(CoreBatchPublisher))
         .map_err(|_| anyhow::anyhow!("usage batch publisher is already initialized"))?;
     #[cfg(feature = "enterprise")]

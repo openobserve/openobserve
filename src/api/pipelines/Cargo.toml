@@ -37,6 +37,7 @@ vectorscan = [
 [dependencies]
 ahash.workspace = true
 anyhow.workspace = true
+arrow-schema.workspace = true
 axum.workspace = true
 chrono.workspace = true
 common.workspace = true

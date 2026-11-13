@@ -63,8 +63,18 @@ use crate::{
 /// Bounded because a move runs one OpenFGA check per id before authorizing anything.
 const MAX_MOVE_WORKFLOWS: usize = 100;
 
-/// `Option` fields a re-created triggers stream lacks until a row carried them.
-const OPTIONAL_HISTORY_COLUMNS: [&str; 3] = ["evaluation_took_in_secs", "source_node", "error"];
+/// The triggers stream columns the workflow history reads.
+const HISTORY_COLUMNS: [&str; 9] = [
+    "_timestamp",
+    "org",
+    "key",
+    "start_time",
+    "end_time",
+    "status",
+    "evaluation_took_in_secs",
+    "source_node",
+    "error",
+];
 
 #[derive(Deserialize)]
 pub struct WorkflowTestInput {
@@ -116,9 +126,9 @@ struct WorkflowHistoryRow {
     org: String,
     start_time: i64,
     end_time: i64,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "null_as_default")]
     evaluation_took_in_secs: f64,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "null_as_default")]
     source_node: String,
     key: String,
     #[serde(default)]
@@ -1511,11 +1521,7 @@ fn history_sql(
     end_time: i64,
     schema: &arrow_schema::Schema,
 ) -> String {
-    let columns = trigger_stream::present_columns(
-        "_timestamp, org, key, start_time, end_time, status",
-        &OPTIONAL_HISTORY_COLUMNS,
-        schema,
-    );
+    let columns = trigger_stream::present_columns(HISTORY_COLUMNS, schema);
     format!(
         "SELECT {columns} FROM \"{TRIGGERS_STREAM}\" \
          WHERE module = 'workflow' AND org = '{org_id}' \
@@ -1523,6 +1529,15 @@ fn history_sql(
          AND _timestamp >= {start_time} AND _timestamp <= {end_time}",
         escape_like(workflow_id).replace("'", "''")
     )
+}
+
+/// A search hit carries a column the stream has but this row left empty as JSON `null`.
+fn null_as_default<'de, D, T>(deserializer: D) -> Result<T, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: Default + Deserialize<'de>,
+{
+    Ok(Option::<T>::deserialize(deserializer)?.unwrap_or_default())
 }
 
 /// Rows written before the stored-status fix say `succeeded` even when the run errored.
@@ -1891,7 +1906,7 @@ mod tests {
             sql.split(" FROM ").next().unwrap().to_string()
         };
         let bare = select(&Schema::empty());
-        for missing in OPTIONAL_HISTORY_COLUMNS {
+        for missing in ["evaluation_took_in_secs", "source_node", "error"] {
             assert!(!bare.contains(missing), "{missing} in {bare}");
         }
         let with_error = select(&Schema::new(vec![Field::new(
@@ -1912,5 +1927,18 @@ mod tests {
         .unwrap();
         assert_eq!(row.source_node, "");
         assert!(row.evaluation_took_in_secs.abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn a_history_row_with_null_optional_columns_still_parses() {
+        let row: WorkflowHistoryRow = serde_json::from_value(serde_json::json!({
+            "_timestamp": 1, "org": "org1", "key": "wf1/run1",
+            "start_time": 1, "end_time": 2, "status": "succeeded",
+            "evaluation_took_in_secs": null, "source_node": null, "error": null
+        }))
+        .unwrap();
+        assert_eq!(row.source_node, "");
+        assert!(row.evaluation_took_in_secs.abs() < f64::EPSILON);
+        assert_eq!(row.error, None);
     }
 }

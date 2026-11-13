@@ -150,12 +150,12 @@ async fn fetch_series(org_id: &str, alert_id: &str, lookback_secs: u64) -> Optio
         return None;
     }
 
-    // A stream re-created after a delete lacks the column until a row carried it.
-    crate::self_reporting::triggers_schema::get(org_id)
-        .await
-        .ok()?
-        .field_with_name("actual_value")
-        .ok()?;
+    if !may_hold_values(
+        org_id,
+        crate::self_reporting::triggers_schema::get(org_id).await,
+    ) {
+        return None;
+    }
 
     let end_time = config::utils::time::now_micros();
     let start_time = end_time - (lookback_secs as i64) * 1_000_000;
@@ -224,6 +224,19 @@ pub struct ChartRequest<'a> {
     pub current_value: Option<f64>,
     pub crit_threshold: Option<f64>,
     pub warn_threshold: Option<f64>,
+}
+
+/// A stream re-created after a delete lacks `actual_value` until a row carried it.
+fn may_hold_values(org_id: &str, schema: infra::errors::Result<arrow_schema::Schema>) -> bool {
+    match schema {
+        Ok(schema) => schema.field_with_name("actual_value").is_ok(),
+        Err(e) => {
+            log::warn!(
+                "[ALERT_CHART] triggers schema read failed for {org_id}, querying anyway: {e}"
+            );
+            true
+        }
+    }
 }
 
 /// Build the signed chart payload for one firing. Returns `None` whenever a
@@ -295,5 +308,21 @@ pub fn try_render_png(p: &ChartPayload) -> Option<Vec<u8>> {
             log::warn!("[ALERT_CHART] send-time render failed: {e}");
             None
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use arrow_schema::{DataType, Field, Schema};
+
+    use super::*;
+
+    #[test]
+    fn only_a_stream_without_actual_value_skips_the_chart() {
+        let with = Schema::new(vec![Field::new("actual_value", DataType::Float64, true)]);
+        assert!(may_hold_values("org1", Ok(with)));
+        assert!(!may_hold_values("org1", Ok(Schema::empty())));
+        let failed = Err(infra::errors::Error::Message("db down".to_string()));
+        assert!(may_hold_values("org1", failed));
     }
 }

@@ -32,7 +32,9 @@ use config::{
 };
 use openobserve_api_common::extractors::Headers;
 use openobserve_core::{
-    alerts::alert::get_by_id, auth::UserEmail, self_reporting::triggers_schema as trigger_stream,
+    alerts::alert::get_by_id,
+    auth::UserEmail,
+    self_reporting::triggers_schema::{self as trigger_stream, HISTORY_COLUMNS},
 };
 use search_service as SearchService;
 use search_service::query_range::get_settings_max_query_range;
@@ -53,8 +55,8 @@ const LIKE_PREDICATE_MAX_IDS: usize = 20;
 /// Latest accepted end time (9999-12-31); search adds offsets to it and overflows near `i64::MAX`.
 const MAX_END_TIME_MICROS: i64 = 253_402_300_799_999_999;
 
-/// Columns a stream gains only once a row carried them, so [history_columns] adds each one present.
-const OPTIONAL_HISTORY_COLUMNS: [&str; 19] = [
+/// Alert-only columns read after [HISTORY_COLUMNS], each once the stream has it.
+const ALERT_HISTORY_COLUMNS: [&str; 19] = [
     "level",
     "actual_value",
     "threshold_value",
@@ -79,13 +81,8 @@ const OPTIONAL_HISTORY_COLUMNS: [&str; 19] = [
 /// A webhook can answer with a body of any size, and the list returns up to 1000 rows.
 const SUCCESS_RESPONSE_MAX_CHARS: usize = 500;
 
-/// Non-`Option` `TriggerData` fields, which every row carries since ingest drops nulls.
-const HISTORY_COLUMNS: &str =
-    "_timestamp, org, key, status, is_realtime, is_silenced, start_time, end_time, retries";
-
-/// The anomaly reads' columns a stream may lack, added only when present.
-const OPTIONAL_ANOMALY_COLUMNS: [&str; 3] =
-    ["evaluation_took_in_secs", "error", "success_response"];
+/// The anomaly reads' run detail columns, each read only once the stream has it.
+const ANOMALY_COLUMNS: [&str; 3] = ["evaluation_took_in_secs", "error", "success_response"];
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AlertHistoryQuery {
@@ -441,11 +438,10 @@ pub async fn get_alert_history(
             Err(response) => return response,
         };
         let columns = trigger_stream::present_columns(
-            "_timestamp, status",
-            &OPTIONAL_ANOMALY_COLUMNS,
+            ["_timestamp", "status"].into_iter().chain(ANOMALY_COLUMNS),
             &schema,
         );
-        let sort_column = sortable_column(sort_column, &schema);
+        let sort_column = trigger_stream::sortable_column(sort_column, &schema);
         let data_sql = format!(
             "SELECT {columns} FROM \"{TRIGGERS_STREAM}\" WHERE {where_clause} \
              ORDER BY {sort_column} {sort_order} LIMIT {size} OFFSET {from}"
@@ -867,7 +863,7 @@ pub async fn get_alert_history(
     // Step 2: Get the actual paginated results
     // Build data query with LIMIT/OFFSET for pagination
     let columns = history_columns(&triggers_schema);
-    let sort_column = sortable_column(sort_column, &triggers_schema);
+    let sort_column = trigger_stream::sortable_column(sort_column, &triggers_schema);
     let data_sql = format!(
         "SELECT {columns} FROM \"{TRIGGERS_STREAM}\" \
          WHERE {where_clause} \
@@ -1106,13 +1102,11 @@ fn triggers_schema(read: infra::errors::Result<Schema>) -> Result<Schema, Respon
     })
 }
 
-/// [HISTORY_COLUMNS] plus each optional column the stream has, which may lack any of them.
 fn history_columns(schema: &Schema) -> String {
-    trigger_stream::present_columns(HISTORY_COLUMNS, &OPTIONAL_HISTORY_COLUMNS, schema)
-}
-
-fn sortable_column(sort_column: &'static str, schema: &Schema) -> &'static str {
-    trigger_stream::sortable_column(sort_column, &OPTIONAL_HISTORY_COLUMNS, schema)
+    trigger_stream::present_columns(
+        HISTORY_COLUMNS.into_iter().chain(ALERT_HISTORY_COLUMNS),
+        schema,
+    )
 }
 
 fn capped_success_response(text: &str) -> String {
@@ -1254,8 +1248,9 @@ pub async fn get_all_anomaly_history(
         Err(response) => return response,
     };
     let columns = trigger_stream::present_columns(
-        "_timestamp, key, status",
-        &OPTIONAL_ANOMALY_COLUMNS,
+        ["_timestamp", "key", "status"]
+            .into_iter()
+            .chain(ANOMALY_COLUMNS),
         &schema,
     );
     let data_sql = format!(
@@ -2174,10 +2169,10 @@ mod tests {
         use arrow_schema::{DataType, Field};
 
         let field = |name: &str| Field::new(name, DataType::Utf8, true);
-        let upgraded: Vec<Field> = HISTORY_COLUMNS.split(", ").map(field).collect();
+        let upgraded: Vec<Field> = HISTORY_COLUMNS.into_iter().map(field).collect();
         let columns = history_columns(&Schema::new(upgraded.clone()));
         assert!(!columns.contains("downtime_id"), "{columns}");
-        assert_eq!(columns, HISTORY_COLUMNS);
+        assert_eq!(columns, HISTORY_COLUMNS.join(", "));
 
         let mut current = upgraded;
         current.push(field("downtime_id"));
@@ -2189,7 +2184,7 @@ mod tests {
         use arrow_schema::{DataType, Field};
 
         let field = |name: &str| Field::new(name, DataType::Utf8, true);
-        let mut fields: Vec<Field> = HISTORY_COLUMNS.split(", ").map(field).collect();
+        let mut fields: Vec<Field> = HISTORY_COLUMNS.into_iter().map(field).collect();
         fields.push(field("acked_by"));
         let columns = history_columns(&Schema::new(fields.clone()));
         assert!(columns.ends_with(", acked_by"), "{columns}");
@@ -2211,7 +2206,7 @@ mod tests {
         use arrow_schema::{DataType, Field};
 
         let mut fields: Vec<Field> = HISTORY_COLUMNS
-            .split(", ")
+            .into_iter()
             .map(|name| Field::new(name, DataType::Utf8, true))
             .collect();
         assert!(!history_columns(&Schema::new(fields.clone())).contains("repeat_suppressed"));
@@ -2237,7 +2232,7 @@ mod tests {
         use arrow_schema::{DataType, Field};
 
         let field = |name: &str| Field::new(name, DataType::Utf8, true);
-        let mut fields: Vec<Field> = HISTORY_COLUMNS.split(", ").map(field).collect();
+        let mut fields: Vec<Field> = HISTORY_COLUMNS.into_iter().map(field).collect();
         assert!(!history_columns(&Schema::new(fields.clone())).contains("success_response"));
         fields.push(field("success_response"));
         assert!(
@@ -2251,7 +2246,7 @@ mod tests {
         use arrow_schema::{DataType, Field};
 
         let field = |name: &str| Field::new(name, DataType::Utf8, true);
-        let mut fields: Vec<Field> = HISTORY_COLUMNS.split(", ").map(field).collect();
+        let mut fields: Vec<Field> = HISTORY_COLUMNS.into_iter().map(field).collect();
         assert!(!history_columns(&Schema::new(fields.clone())).contains("severity"));
         fields.push(field("severity"));
         assert!(history_columns(&Schema::new(fields)).ends_with(", severity"));
@@ -2264,7 +2259,7 @@ mod tests {
         use arrow_schema::{DataType, Field};
 
         let field = |name: &str| Field::new(name, DataType::Utf8, true);
-        let mut fields: Vec<Field> = HISTORY_COLUMNS.split(", ").map(field).collect();
+        let mut fields: Vec<Field> = HISTORY_COLUMNS.into_iter().map(field).collect();
         for name in [
             "module",
             "next_run_at",
@@ -2298,13 +2293,13 @@ mod tests {
 
         let field = |name: &str| Field::new(name, DataType::Utf8, true);
         let fields: Vec<Field> = HISTORY_COLUMNS
-            .split(", ")
-            .chain(OPTIONAL_HISTORY_COLUMNS)
+            .into_iter()
+            .chain(ALERT_HISTORY_COLUMNS)
             .map(field)
             .collect();
         let columns = history_columns(&Schema::new(fields));
         let selected: Vec<&str> = columns.split(", ").collect();
-        for name in HISTORY_COLUMNS.split(", ").chain(OPTIONAL_HISTORY_COLUMNS) {
+        for name in HISTORY_COLUMNS.into_iter().chain(ALERT_HISTORY_COLUMNS) {
             assert!(selected.contains(&name), "{name} not in {columns}");
         }
         assert!(selected.contains(&"value_is_lower_bound"), "{columns}");
@@ -2318,8 +2313,9 @@ mod tests {
         let bare = Schema::new(vec![field("_timestamp"), field("key"), field("status")]);
         assert_eq!(
             trigger_stream::present_columns(
-                "_timestamp, key, status",
-                &OPTIONAL_ANOMALY_COLUMNS,
+                ["_timestamp", "key", "status"]
+                    .into_iter()
+                    .chain(ANOMALY_COLUMNS),
                 &bare
             ),
             "_timestamp, key, status"
@@ -2327,12 +2323,15 @@ mod tests {
         let full = Schema::new(
             ["_timestamp", "status"]
                 .into_iter()
-                .chain(OPTIONAL_ANOMALY_COLUMNS)
+                .chain(ANOMALY_COLUMNS)
                 .map(field)
                 .collect::<Vec<_>>(),
         );
         assert_eq!(
-            trigger_stream::present_columns("_timestamp, status", &OPTIONAL_ANOMALY_COLUMNS, &full),
+            trigger_stream::present_columns(
+                ["_timestamp", "status"].into_iter().chain(ANOMALY_COLUMNS),
+                &full
+            ),
             "_timestamp, status, evaluation_took_in_secs, error, success_response"
         );
     }
@@ -2342,15 +2341,16 @@ mod tests {
         use arrow_schema::{DataType, Field};
 
         let field = |name: &str| Field::new(name, DataType::Utf8, true);
-        let bare = Schema::new(HISTORY_COLUMNS.split(", ").map(field).collect::<Vec<_>>());
-        assert_eq!(sortable_column("query_took", &bare), "_timestamp");
-        assert_eq!(sortable_column("source_node", &bare), "_timestamp");
-        assert_eq!(sortable_column("retries", &bare), "retries");
+        let bare = Schema::new(HISTORY_COLUMNS.into_iter().map(field).collect::<Vec<_>>());
+        let sortable = trigger_stream::sortable_column;
+        assert_eq!(sortable("query_took", &bare), "_timestamp");
+        assert_eq!(sortable("source_node", &bare), "_timestamp");
+        assert_eq!(sortable("retries", &bare), "retries");
         assert_eq!(
-            sortable_column("(end_time - start_time)", &bare),
+            sortable("(end_time - start_time)", &bare),
             "(end_time - start_time)"
         );
         let with = Schema::new(vec![field("query_took")]);
-        assert_eq!(sortable_column("query_took", &with), "query_took");
+        assert_eq!(sortable("query_took", &with), "query_took");
     }
 }
