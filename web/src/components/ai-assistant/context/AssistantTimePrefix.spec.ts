@@ -18,7 +18,9 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import type { TimeWindow } from "@/composables/assistant";
 
-import AssistantTimePrefix from "./AssistantTimePrefix.vue";
+import OPopover from "@/lib/overlay/Popover/OPopover.vue";
+
+import AssistantTimePrefix, { FIT_VIEWPORT_CLASS } from "./AssistantTimePrefix.vue";
 
 const DEFAULT: TimeWindow = { from: 0, to: 900_000, period: "15m", source: "default" };
 const PAGE: TimeWindow = { from: 0, to: 3_600_000, period: "1h", source: "page" };
@@ -74,7 +76,11 @@ describe("AssistantTimePrefix", () => {
   it("carries a ✕ only on a picked range, and a press on the open chip closes its picker", async () => {
     const remove = '[data-test="assistant-context-chip-time-remove"]';
     const picker = () => document.body.querySelector('[data-test="assistant-context-time-picker"]');
-    expect(mount(AssistantTimePrefix, { props: { window: PAGE } }).find(remove).exists()).toBe(false);
+    expect(
+      mount(AssistantTimePrefix, { props: { window: PAGE } })
+        .find(remove)
+        .exists(),
+    ).toBe(false);
     const { wrapper } = await open({ window: { ...PAGE, source: "custom" } });
     expect(picker()).not.toBeNull();
     const chip = wrapper.get('[data-test="assistant-context-chip-time"]');
@@ -123,6 +129,30 @@ describe("AssistantTimePrefix", () => {
     expect(document.body.querySelector('[role="dialog"]')?.getAttribute("aria-label")).toBe(
       "Change time range",
     );
+  });
+
+  it("opens the range picker inside the one popup, which fits the room it has and keeps Apply in view", async () => {
+    const { wrapper } = await open({ window: DEFAULT });
+    const popover = wrapper.findComponent(OPopover);
+    expect(popover.props("collisionPadding")).toBe(8);
+    expect(popover.props("contentClass")).toContain(FIT_VIEWPORT_CLASS);
+    const dialog = document.body.querySelector<HTMLElement>('[role="dialog"]')!;
+    expect(dialog.className).toContain("max-h-[var(--reka-popper-available-height,75vh)]");
+    dialog.querySelector<HTMLElement>('[data-test="assistant-context-time-range"] button')!.click();
+    await flushPromises();
+    const panel = dialog.querySelector('[data-test="datetimerange-inline"]');
+    expect(panel).not.toBeNull();
+    expect(document.body.querySelector('[data-test="datetimerange-trigger"]')).toBeNull();
+    expect(document.body.querySelector('[data-test="datetimerange-popup"]')).toBeNull();
+    dialog.querySelector<HTMLElement>('[data-test="datetimerange-tab-absolute"]')?.click();
+    await flushPromises();
+    const apply = dialog.querySelector('[data-test="datetimerange-apply"]')?.parentElement;
+    expect(apply?.className).toContain("sticky");
+  });
+
+  it("opens a picked date range with the picker already showing it", async () => {
+    await open({ window: { from: 1_000, to: 2_000, source: "custom" } });
+    expect(document.body.querySelector('[data-test="datetimerange-inline"]')).not.toBeNull();
   });
 
   it("shows a chip-sized skeleton, not a stale range, while the page range loads", () => {

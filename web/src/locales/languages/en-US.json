@@ -13399,7 +13399,6 @@
       "launcher": {
         "agentHint": "The agent that answers",
         "ask": "Ask",
-        "clear": "Clear question",
         "inputName": "Ask {product}",
         "noThreadsYet": "No threads yet · your first answer shows up here",
         "openFull": "Open full view",

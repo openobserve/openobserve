@@ -30,7 +30,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     side="top"
     :align="align"
     :aria-label="t('assistant.context.time.swap')"
-    :content-class="`${composerPopoverClass(layout.tight)} flex flex-col gap-0.5 p-1`"
+    :collision-padding="8"
+    :content-class="`${composerPopoverClass(layout.tight)} ${FIT_VIEWPORT_CLASS} flex flex-col gap-0.5 p-1`"
     @update:open="setOpen"
     @pointer-down-outside="keepOnChip"
   >
@@ -88,17 +89,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="pickPeriod(period)"
         />
       </div>
-      <ODateTimeRange
-        v-bind="pickerValue"
+      <!-- The range picker opens in this same surface, never as a second popup over it. -->
+      <OCollapsible
         :label="t('assistant.context.time.dateRange')"
-        :timezone="timezone"
-        show-timezone
-        :auto-apply="false"
-        tabindex="0"
-        class="mt-1.5"
+        :default-open="window.source === 'custom' && !window.period"
+        class="border-border-default mt-1 border-t pt-1"
         data-test="assistant-context-time-range"
-        @change="onPick"
-      />
+      >
+        <ODateTimeRange
+          v-bind="pickerValue"
+          inline
+          :timezone="timezone"
+          show-timezone
+          :auto-apply="false"
+          @change="onPick"
+        />
+      </OCollapsible>
       <OText
         v-if="reversed"
         variant="meta"
@@ -136,6 +142,10 @@ export interface AssistantTimePrefixEmits {
 
 const PERIODS = ["15m", "1h", "24h", "7d"] as const;
 
+/** The picker never outgrows the room on its side; past that it scrolls inside, with Apply pinned. */
+export const FIT_VIEWPORT_CLASS =
+  "max-h-[var(--reka-popper-available-height,75vh)] overflow-y-auto";
+
 const DEFAULT_PERIOD = "15m";
 
 const UNIT_OF: Record<string, RelativeUnit> = {
@@ -168,6 +178,7 @@ import {
 } from "@/components/ai-assistant/composer/composerUi";
 import { periodMs, timeRangeShortText } from "@/composables/assistant";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";

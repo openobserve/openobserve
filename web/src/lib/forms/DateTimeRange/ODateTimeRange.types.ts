@@ -37,6 +37,8 @@ export interface DateTimeRangeProps {
   hideTime?: boolean;
   /** Show the timezone selector (hidden by default) */
   showTimezone?: boolean;
+  /** Render the picker panel in place, with no trigger or popup of its own (for a host popover). */
+  inline?: boolean;
 
   // ── Restrictions ──────────────────────────────────────────────
   /** Minimum selectable date `YYYY-MM-DD` */

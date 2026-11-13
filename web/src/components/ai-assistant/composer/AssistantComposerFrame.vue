@@ -53,7 +53,7 @@ export interface AssistantComposerFrameProps {
   opening?: boolean;
   /** Attributes for the textarea itself; `class` adds to the frame's own. */
   inputAttrs?: Record<string, string | number | boolean | undefined>;
-  /** Home's Ask box: a plain edge at rest; on focus a brand ribbon rings the box and a soft glow fades in. */
+  /** Home's Ask box: a solid edge, soft lift and faint halo at rest; on focus a brand ribbon rings the box and the halo brightens. */
   glow?: boolean;
   /** Both composers start two lines tall. */
   tall?: boolean;
@@ -72,11 +72,11 @@ const FRAME_CLASS = [
   "[&>div]:ring-offset-0 [&>div]:motion-reduce:transition-none [&>div]:focus-within:border-input-border-focus [&>div]:focus-within:ring-1 [&>div]:focus-within:ring-focus-ring-accent",
 ].join(" ");
 
-// The box keeps OTextarea's own 3:1 border and takes the focus-ring colour on focus, so the ribbon is never the only focus cue.
+// At rest the box keeps OTextarea's 3:1 border; on focus it clears, so the ribbon (every stop 3:1) is the one focus edge.
 const GLOW_FRAME_CLASS = [
-  "rounded-surface assistant-focus-glow p-0.5",
+  "assistant-focus-glow",
   "[&>div]:rounded-surface [&>div]:gap-0.5 [&>div]:px-2 [&>div]:pt-1.5 [&>div]:pb-2 [&>div]:motion-reduce:transition-none",
-  "[&>div]:focus-within:border-focus-ring-accent",
+  "[&>div]:shadow-sm [&>div]:focus-within:border-transparent",
 ].join(" ");
 
 const INERT_CLASS = "[&>div]:bg-surface-subtle";
