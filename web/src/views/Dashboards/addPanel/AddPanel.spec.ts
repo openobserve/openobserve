@@ -735,6 +735,23 @@ describe("AddPanel.vue", () => {
         return failure;
       };
 
+      const cancelledNavigation = async () => {
+        const probe = createRouter({
+          history: createMemoryHistory(),
+          routes: [{ path: "/:any(.*)", component: { render: () => null } }],
+        });
+        await probe.push("/a");
+        let newer: Promise<unknown> = Promise.resolve();
+        probe.beforeEach((to) => {
+          if (to.path === "/b") newer = probe.push("/c");
+          return true;
+        });
+        const failure = await probe.push("/b");
+        await newer;
+        expect(isNavigationFailure(failure, NavigationFailureType.cancelled)).toBe(true);
+        return failure;
+      };
+
       const editPanel = async () => {
         window.dispatchEvent(new Event("keydown"));
         wrapper.vm.dashboardPanelData.data.title = "edited by the user";
@@ -935,20 +952,67 @@ describe("AddPanel.vue", () => {
         expect(editorRouter().replace).toHaveBeenCalledTimes(1);
       });
 
-      it("keeps the URL sync held when a second navigation is rejected while the dialog is open", async () => {
-        const { done } = await openLeaveDialog();
+      it("lets a second navigation take over the open leave dialog", async () => {
+        const { next, done } = await openLeaveDialog();
         const secondNext = vi.fn();
         const secondTo = toView();
         await leaveGuard(secondTo, fromEditor, secondNext);
-        expect(secondNext).toHaveBeenCalledWith(false);
+        expect(next).toHaveBeenCalledWith();
+        expect(secondNext).not.toHaveBeenCalled();
+        expect(wrapper.vm.leaveDialogOpen).toBe(true);
         editorRouter().replace.mockClear();
 
-        onNavigationEnd()(secondTo, fromEditor, await abortedNavigation());
         wrapper.vm.variablesDataUpdated(variables);
+        expect(editorRouter().replace).not.toHaveBeenCalled();
+
+        wrapper.vm.onLeaveChoice("discard");
+        await done;
+        expect(next).toHaveBeenCalledTimes(1);
+        expect(secondNext).toHaveBeenCalledWith();
+      });
+
+      it("refuses the newer navigation and resumes the URL sync when Stay answers a taken-over dialog", async () => {
+        const { next, done, to } = await openLeaveDialog();
+        const secondNext = vi.fn();
+        const secondTo = toView();
+        await leaveGuard(secondTo, fromEditor, secondNext);
+        wrapper.vm.variablesDataUpdated(variables);
+        editorRouter().replace.mockClear();
+
+        onNavigationEnd()(to, fromEditor, await cancelledNavigation());
         expect(editorRouter().replace).not.toHaveBeenCalled();
 
         wrapper.vm.onLeaveChoice("stay");
         await done;
+        expect(next).toHaveBeenCalledWith();
+        expect(secondNext).toHaveBeenCalledWith(false);
+        expect(editorRouter().replace).toHaveBeenCalledTimes(1);
+      });
+
+      it("resumes the URL sync when a guard redirects the confirmed leave back to the editor", async () => {
+        const { done, to } = await openLeaveDialog();
+        wrapper.vm.onLeaveChoice("discard");
+        await done;
+        wrapper.vm.variablesDataUpdated(variables);
+        editorRouter().replace.mockClear();
+
+        const redirected = { path: "/dashboards/add_panel", redirectedFrom: to };
+        onNavigationEnd()(redirected, fromEditor, await abortedNavigation());
+
+        expect(editorRouter().replace).toHaveBeenCalledTimes(1);
+      });
+
+      it("stops waiting for a history restore when the refused leave turns out cancelled", async () => {
+        const { done, to } = await openLeaveDialog();
+        wrapper.vm.variablesDataUpdated(variables);
+        editorRouter().replace.mockClear();
+        editorRouter().options.history.location = "/dashboards/view";
+
+        wrapper.vm.onLeaveChoice("stay");
+        await done;
+        expect(editorRouter().replace).not.toHaveBeenCalled();
+
+        onNavigationEnd()(to, fromEditor, await cancelledNavigation());
         expect(editorRouter().replace).toHaveBeenCalledTimes(1);
       });
 

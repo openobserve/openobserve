@@ -352,11 +352,15 @@ import {
   updateDashboard,
 } from "../../../utils/commons";
 import {
+  isNavigationFailure,
+  NavigationFailureType,
   onBeforeRouteLeave,
   stringifyQuery,
   useRoute,
   useRouter,
   type LocationQueryRaw,
+  type NavigationFailure,
+  type NavigationGuardNext,
   type RouteLocationNormalized,
 } from "vue-router";
 import { useStore } from "vuex";
@@ -1657,24 +1661,46 @@ export default defineComponent({
       return `${resolved.path}?${stringifyQuery(resolved.query)}${resolved.hash}`;
     };
 
-    const replayRouteQuery = () => {
-      window.removeEventListener("popstate", replayRouteQuery);
+    // The leave whose refused Back the hold waits on; a cancelled one is never rolled back.
+    let restoreTarget: RouteLocationNormalized | null = null;
+    const replayRouteQuery = (awaitRestore = true) => {
+      window.removeEventListener("popstate", onHistoryRestored);
       if (editorDisposed || leaveTarget) return;
       historyRestorePending =
+        awaitRestore &&
         normalizedLocation(router.options.history.location) !==
-        normalizedLocation(router.currentRoute.value.fullPath);
+          normalizedLocation(router.currentRoute.value.fullPath);
       if (historyRestorePending) {
-        window.addEventListener("popstate", replayRouteQuery, { once: true });
+        window.addEventListener("popstate", onHistoryRestored, { once: true });
         return;
       }
+      restoreTarget = null;
       if (deferredRouteQuery) syncRouteQuery(deferredRouteQuery);
     };
+    const onHistoryRestored = () => replayRouteQuery();
+
+    // A redirect carries the original leave in redirectedFrom and never ends it through afterEach.
+    const isLeave = (target: RouteLocationNormalized, leave: RouteLocationNormalized | null) =>
+      !!leave && (target === leave || target.redirectedFrom === leave);
 
     // A guard settling late must not end the leave a newer navigation has started.
-    const endLeave = (target: RouteLocationNormalized) => {
-      if (leaveTarget !== target) return;
+    const endLeave = (target: RouteLocationNormalized, failure?: NavigationFailure) => {
+      const cancelled = isNavigationFailure(failure, NavigationFailureType.cancelled);
+      if (cancelled && historyRestorePending && isLeave(target, restoreTarget)) {
+        replayRouteQuery(false);
+        return;
+      }
+      if (!isLeave(target, leaveTarget)) return;
+      restoreTarget = leaveTarget;
       leaveTarget = null;
-      replayRouteQuery();
+      replayRouteQuery(!cancelled);
+    };
+
+    let pendingLeave: { to: RouteLocationNormalized; next: NavigationGuardNext } | null = null;
+    const takePendingLeave = (to: RouteLocationNormalized, next: NavigationGuardNext) => {
+      const latest = pendingLeave ?? { to, next };
+      pendingLeave = null;
+      return latest;
     };
 
     // Kept after next(): the navigation stays pending while the next view loads.
@@ -1705,30 +1731,37 @@ export default defineComponent({
         return;
       }
 
-      // A second navigation while the dialog is up must not stack another dialog.
-      if (leaveResolver) {
-        next(false);
+      // vue-router has already cancelled the older navigation, so the open dialog answers the newer one.
+      if (pendingLeave) {
+        // next(false) here would roll a superseded Back's URL back under the newer navigation.
+        pendingLeave.next();
+        pendingLeave = { to, next };
+        leaveTarget = to;
         return;
       }
 
+      pendingLeave = { to, next };
       leaveTarget = to;
       let leave: boolean;
       try {
         leave = await resolveLeave(await askLeave());
       } catch (error) {
-        endLeave(to);
+        const latest = takePendingLeave(to, next);
+        if (latest.to === to) endLeave(to);
+        else latest.next(false);
         throw error;
       }
+      const latest = takePendingLeave(to, next);
       if (leave) {
-        next();
+        latest.next();
         return;
       }
-      next(false);
-      endLeave(to);
+      latest.next(false);
+      endLeave(latest.to);
     });
-    // Only the navigation this guard let through counts: a rejected second one fails while the dialog is still up.
-    const stopLeaveFailureReset = router.afterEach((to, _from, failure) => {
-      if (failure) endLeave(to);
+    // Only the navigation this guard let through counts; a success off the editor unmounts it instead.
+    const stopLeaveFailureReset = router.afterEach((to, from, failure) => {
+      if (failure || to.path === from.path) endLeave(to, failure || undefined);
     });
     // A navigation that throws, such as a view chunk failing to load, never reaches afterEach.
     const stopLeaveErrorReset = router.onError((_error, to) => {
@@ -1737,7 +1770,7 @@ export default defineComponent({
     onBeforeUnmount(() => {
       stopLeaveFailureReset();
       stopLeaveErrorReset();
-      window.removeEventListener("popstate", replayRouteQuery);
+      window.removeEventListener("popstate", onHistoryRestored);
     });
     const panelTitle = computed(() => {
       return { title: dashboardPanelData.data.title };
