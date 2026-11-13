@@ -1295,12 +1295,10 @@ pub struct QueryData {
     /// AND/OR filter tree; saved instead of `filter` only when OR or nesting is used.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub filter_group: Option<GroupType>,
-    /// Query language of the variable: "sql" (default) or "promql".
+    /// Query language of the variable: "promql", or absent for SQL.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub query_type: Option<String>,
-    /// True when options come from the hand-written `query` instead of stream/field/filter.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub custom_query: Option<bool>,
+    /// Hand-written query; when non-empty, options come from it instead of stream/field/filter.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub query: Option<String>,
     /// SQL result column used as the option value.
@@ -2614,8 +2612,6 @@ mod tests {
             "stream": "default",
             "field": "service",
             "max_record_size": null,
-            "custom_query": true,
-            "query_type": "sql",
             "query": "SELECT DISTINCT service AS v, service_name AS l FROM default",
             "value_field": "v",
             "label_field": "l"
@@ -2625,7 +2621,6 @@ mod tests {
             "stream": "",
             "field": "",
             "max_record_size": null,
-            "custom_query": true,
             "query_type": "promql",
             "query": promql
         });
@@ -2644,14 +2639,13 @@ mod tests {
         ]));
         let list = &d.variables.as_ref().unwrap().list;
         let sql = list[0].query_data.as_ref().unwrap();
-        assert_eq!(sql.custom_query, Some(true));
-        assert_eq!(sql.query_type.as_deref(), Some("sql"));
+        assert_eq!(sql.query_type, None);
         assert_eq!(sql.value_field.as_deref(), Some("v"));
         assert_eq!(sql.label_field.as_deref(), Some("l"));
         let prom = list[1].query_data.as_ref().unwrap();
         assert_eq!(prom.query.as_deref(), Some(promql));
         let auto = list[2].query_data.as_ref().unwrap();
-        assert_eq!(auto.custom_query, None);
+        assert_eq!(auto.query, None);
         assert_eq!(auto.query_type.as_deref(), Some("promql"));
 
         let json = serde_json::to_value(&d).unwrap();

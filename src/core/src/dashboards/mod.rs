@@ -373,8 +373,10 @@ pub fn get_query_variables(
         8 => {
             let dash = dashboard.v8.as_ref().unwrap();
             // A custom query variable never reads the distinct values of its stream/field.
-            _get_variables!(map, dash, |qd: &v8::QueryData| qd.custom_query
-                == Some(true));
+            _get_variables!(map, dash, |qd: &v8::QueryData| qd
+                .query
+                .as_deref()
+                .is_some_and(|q| !q.trim().is_empty()));
         }
         _ => {
             unreachable!("we only have 8 dashboard versions")
@@ -1657,8 +1659,10 @@ mod tests {
                  "query_data": {"stream_type": "logs", "stream": "default", "field": "host"}},
                 {"type": "query_values", "name": "b", "label": "b",
                  "query_data": {"stream_type": "logs", "stream": "default", "field": "pod",
-                                "custom_query": true, "query_type": "sql",
                                 "query": "SELECT 1 AS v", "value_field": "v"}},
+                {"type": "query_values", "name": "e", "label": "e",
+                 "query_data": {"stream_type": "logs", "stream": "other", "field": "pod",
+                                "query": "  "}},
                 {"type": "query_values", "name": "c", "label": "c",
                  "query_data": {"stream_type": "logs", "stream": "", "field": ""}},
                 {"type": "query_values", "name": "d", "label": "d",
@@ -1669,7 +1673,11 @@ mod tests {
         .unwrap();
         let dashboard: Dashboard = dash.into();
         let map = get_query_variables(Some(&dashboard));
-        assert_eq!(map.len(), 2);
+        assert_eq!(map.len(), 3);
+        assert_eq!(
+            map.get(&("other".to_string(), StreamType::Logs)),
+            Some(&vec!["pod".to_string()])
+        );
         assert_eq!(
             map.get(&("default".to_string(), StreamType::Logs)),
             Some(&vec!["host".to_string()])
