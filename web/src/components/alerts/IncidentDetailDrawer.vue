@@ -158,7 +158,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @reorder="onTabReorder"
         >
           <OTab
-            v-for="tab in tabOrder"
+            v-for="tab in shownTabs"
             :key="tab"
             :name="tab"
             :label="tab === 'alertTriggers' ? undefined : tabLabels[tab]"
@@ -1242,8 +1242,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <!-- Logs Tab Content -->
+              <template v-if="activeTab === 'logs' && findingLogsRoute">
+                <div
+                  v-if="findingItemQuery.isLoading.value"
+                  class="flex flex-1 items-center justify-center p-4"
+                  data-test="incident-finding-logs-loading"
+                >
+                  <OSpinner />
+                </div>
+                <IssueLogsLink
+                  v-else
+                  :route="findingLogsRoute"
+                  :streams="findingLogStreams"
+                  :ended="findingEndUs !== null"
+                />
+              </template>
               <LicenseDeniedState
-                v-if="correlationLocked && isCorrelationTab(activeTab)"
+                v-else-if="correlationLocked && isCorrelationTab(activeTab)"
                 :features="['correlation']"
                 data-test="incident-correlation-license-denied"
               />
@@ -1594,6 +1609,18 @@ import IncidentRCAAnalysis from "./IncidentRCAAnalysis.vue";
 import IncidentTimeline from "./IncidentTimeline.vue";
 import IncidentAlertTriggersTable from "./IncidentAlertTriggersTable.vue";
 import IncidentFindingDetails from "./IncidentFindingDetails.vue";
+import IssueLogsLink from "@/components/autoobserve/live/IssueLogsLink.vue";
+import {
+  logsForFinding,
+  PAGED_LEAD_US,
+} from "@/components/autoobserve/insight/targets/logsTargets";
+import { findingLogs } from "@/components/autoobserve/live/incidentsCopy";
+import {
+  issueEndUs,
+  issueLogsEndMs,
+  issueLogStreams,
+} from "@/components/autoobserve/live/issueModel";
+import { autoobserveIncidentsPageQuery } from "@/services/autoobserve.queries";
 import {
   AUTOOBSERVE_TRIGGER_KIND,
   dimensionDisplay,
@@ -1680,6 +1707,9 @@ function loadIncidentTabOrder(): IncidentTab[] {
   return [...DEFAULT_INCIDENT_TAB_ORDER];
 }
 
+// The newest page of AutoObserve incidents; an older incident falls back to its lead stream.
+const FINDING_LOOKUP_LIMIT = 100;
+
 export default defineComponent({
   name: "IncidentDetailDrawer",
   components: {
@@ -1692,6 +1722,7 @@ export default defineComponent({
     IncidentUnfoldGraph,
     IncidentAlertTriggersTable,
     IncidentFindingDetails,
+    IssueLogsLink,
     IncidentRCAAnalysis,
     IncidentTimeline,
     CustomChartRenderer,
@@ -2014,6 +2045,59 @@ export default defineComponent({
     const findingFactsShown = computed(() =>
       findingFacts(t, incidentDetails.value?.group_values, triggers.value),
     );
+
+    // The AutoObserve list names the incident's member streams, so this Logs tab says what its drawer says.
+    const findingItemQuery = useQuery(() => ({
+      ...autoobserveIncidentsPageQuery(incidentOrgId.value, FINDING_LOOKUP_LIMIT, 0),
+      enabled: isFinding.value && !!incidentOrgId.value,
+    }));
+    const findingItem = computed(
+      () =>
+        findingItemQuery.data.value?.items.find(
+          (i) => i.incident.id === incidentDetails.value?.id,
+        ) ?? null,
+    );
+    const findingEndUs = computed(
+      () =>
+        (findingItem.value ? issueEndUs(findingItem.value) : null) ??
+        (incidentDetails.value?.status === "resolved"
+          ? (incidentDetails.value.resolved_at ?? null)
+          : null),
+    );
+
+    // A finding has no alert to correlate from, so its Logs tab opens the stream at the incident window.
+    const findingLogsRoute = computed(() => {
+      const facts = isFinding.value ? findingFactsShown.value : null;
+      if (!facts) return null;
+      const endMs = issueLogsEndMs(findingEndUs.value, Date.now());
+      if (findingItem.value) return findingLogs(findingItem.value, endMs);
+      return logsForFinding(
+        {
+          stream_type: facts.streamType,
+          stream_name: facts.streamName,
+          signal_at: facts.startedAt ?? incidentDetails.value?.first_alert_at ?? 0,
+          lead_us: PAGED_LEAD_US,
+        },
+        endMs * 1000,
+      );
+    });
+    const findingLogStreams = computed(() => {
+      if (findingItem.value) return issueLogStreams(findingItem.value);
+      return findingFactsShown.value ? [findingFactsShown.value.streamName] : [];
+    });
+
+    // Metrics and Traces stay empty for a finding, so only incidents with alerts show them.
+    const shownTabs = computed<IncidentTab[]>(() =>
+      isFinding.value
+        ? tabOrder.value.filter(
+            (tab) =>
+              tab !== "metrics" && tab !== "traces" && (tab !== "logs" || !!findingLogsRoute.value),
+          )
+        : tabOrder.value,
+    );
+    watch(shownTabs, (tabs) => {
+      if (!tabs.includes(activeTab.value as IncidentTab)) activeTab.value = tabs[0];
+    });
     const dimensionRows = computed(() => {
       const groupValues = incidentDetails.value?.group_values ?? {};
       return orderedDimensionKeys(groupValues, triggers.value).map((key) => {
@@ -2493,6 +2577,7 @@ export default defineComponent({
     watch(activeTab, (newTab) => {
       if (
         (newTab === "logs" || newTab === "metrics" || newTab === "traces") &&
+        !findingLogsRoute.value &&
         !correlationData.value &&
         !correlationLoading.value &&
         !correlationError.value
@@ -3438,6 +3523,11 @@ export default defineComponent({
       handleSeverityChange,
       handleTriggerRowClick,
       isFinding,
+      findingLogsRoute,
+      findingItemQuery,
+      findingLogStreams,
+      findingEndUs,
+      shownTabs,
       findingFactsShown,
       dimensionRows,
       tableTriggers,

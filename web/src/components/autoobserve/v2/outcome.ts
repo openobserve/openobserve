@@ -15,7 +15,9 @@
 
 import type { I18nKey } from "@/types/i18n";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
-import type { ProblemOutcome } from "./fixtures";
+
+export type ProblemOutcome =
+  "active" | "fixing" | "fixed" | "contained" | "resolved" | "held" | "predicted";
 
 // One look per outcome, shared by the problem list and the problem drawer.
 export const OUTCOME: Record<

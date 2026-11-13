@@ -47,6 +47,9 @@ vi.mock("@/services/alerts", () => ({
   },
 }));
 vi.mock("@/services/common", () => ({ default: { list_Folders: api.folders } }));
+vi.mock("@/services/autoobserveFolders", () => ({
+  default: { writable: async () => ({ data: { folders: {} } }) },
+}));
 vi.mock("@/services/alert_destination", () => ({ default: { list: api.destinations } }));
 vi.mock("@/utils/clipboard", () => ({ copyToClipboard: api.copy }));
 vi.mock("@/services/stream", () => ({ default: { schema: api.schema } }));
@@ -356,7 +359,7 @@ describe("BulkReviewDrawer — results", () => {
     await openWith();
     await click("bulk-review-create");
     expect(review.state.open).toBe(true);
-    expect(text("bulk-review-failures")).toContain("1 of 11 alerts wasn't created.");
+    expect(text("bulk-review-failures")).toContain("1 alert out of 11 wasn't created.");
     expect(text("bulk-review-failure-j")).toBe(
       "svc-j: You can't create alerts. Your role is missing the Create permission on Alerts. The alert was going to folder payments.",
     );

@@ -22,7 +22,7 @@ import {
   type MetricSeries,
   type MetricUnit,
 } from "../coverageSeries";
-import { SIGNAL_LABEL } from "../fixtures";
+import { SIGNAL_LABEL } from "../aoTypes";
 
 export type LiveChartSignal = "requests" | "errors" | "latency";
 
@@ -149,7 +149,7 @@ export const valueOf = (signal: LiveChartSignal, source: ChartSource, range: Cha
 };
 
 // Search answers a histogram bucket as a zone-less UTC string, or as epoch microseconds.
-const bucketMs = (t: unknown): number | null => {
+export const bucketMs = (t: unknown): number | null => {
   if (typeof t === "number") return t > 1e14 ? Math.floor(t / 1000) : t;
   if (typeof t !== "string") return null;
   const ms = Date.parse(/(Z|[+-]\d\d:?\d\d)$/i.test(t) ? t : `${t}Z`);

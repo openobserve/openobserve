@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :get-user-id="getUserId"
     :get-avatar-color="getAvatarColor"
     :get-timestamp="(event: any) => event.timestamp"
-    :format-relative-time="formatRelativeTime"
+    :format-relative-time="formatTime ?? formatRelativeTime"
     :get-event-icon="getEventIcon"
     :get-event-badge-color="getEventBadgeColor"
     :get-event-badge-text="getEventBadgeText"
@@ -68,6 +68,11 @@ interface Props {
   incidentId: string;
   visible: boolean;
   refreshTrigger?: number;
+  // Per-page option: how a page names an actor, such as the server's own account.
+  actorLabel?: (userId: string) => string;
+  // Per-page options: absolute times so same-day events keep their order, and names in body ink.
+  formatTime?: (timestampUs: number) => string;
+  plainNames?: boolean;
 }
 
 const props = defineProps<Props>();
@@ -134,7 +139,8 @@ const isCommentEvent = (event: any): boolean => {
 const SYSTEM_USER_ID = "System";
 
 const getUserId = (event: any): string => {
-  return event.data?.user_id || SYSTEM_USER_ID;
+  const id = event.data?.user_id;
+  return id ? (props.actorLabel?.(id) ?? id) : SYSTEM_USER_ID;
 };
 
 // Get current user ID
@@ -328,7 +334,7 @@ const getInlineEventText = (event: any): string => {
       .replace(/"/g, "&quot;")
       .replace(/'/g, "&#39;");
   const bold = (text: string) =>
-    `<span style="font-weight: 600; color: ${eventColor};">${esc(text)}</span>`;
+    `<span style="font-weight: 600; color: ${props.plainNames ? "var(--color-text-heading)" : eventColor};">${esc(text)}</span>`;
   const severityBadge = (severity: string) =>
     // eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom
     `<span style="display: inline-flex; align-items: center; padding: 0.125rem 0.5rem; border-radius: 0.25rem; font-size: var(--text-2xs); font-weight: 600; background-color: color-mix(in srgb, ${getSeverityColor(severity)} ${isDark.value ? "31%" : "25%"}, transparent); color: ${isDark.value ? "var(--color-grey-0)" : getSeverityColor(severity)}; border: 1px solid color-mix(in srgb, ${getSeverityColor(severity)} ${isDark.value ? "38%" : "25%"}, transparent);">${esc(severity)}</span>`;

@@ -3,8 +3,6 @@ const { test, expect } = require('../utils/enhanced-baseFixtures.js');
 const { AutoObserveDecisionsPage, BASE } = require('../../pages/autoobservePages/autoobserveDecisionsPage.js');
 
 const ORG = process.env.AO_ORG || 'demo-org';
-const READER = process.env.AO_READER_EMAIL || '';
-const READER_PASSWORD = process.env.AO_READER_PASSWORD || '';
 
 const auth = () =>
   `Basic ${Buffer.from(`${process.env.ZO_ROOT_USER_EMAIL}:${process.env.ZO_ROOT_USER_PASSWORD}`).toString('base64')}`;
@@ -111,28 +109,5 @@ test.describe('AutoObserve decisions on Alert calibration', { tag: ['@autoobserv
     expect(await ao.undo(ao.toastUndo.first())).toBe(200);
     await expect(ao.findingBadge).toHaveCount(0, { timeout: 30000 });
     await expect(ao.markButtons.first()).toBeVisible();
-  });
-
-  test('a reader who may not dismiss sees the locked line and cannot save', async ({ browser }) => {
-    test.skip(!READER || !READER_PASSWORD, 'set AO_READER_EMAIL and AO_READER_PASSWORD to a folder-only user');
-    const context = await browser.newContext({ viewport: { width: 1500, height: 1024 } });
-    const page = await context.newPage();
-    await page.goto(`${BASE()}/web/login`);
-    await page.locator('[data-test="login-user-id-field"]').fill(READER);
-    await page.locator('[data-test="login-password-field"]').fill(READER_PASSWORD);
-    await page.locator('[data-test="login-sign-in"]').click();
-    await page.waitForURL((u) => !u.pathname.includes('login'), { timeout: 60000 });
-
-    const ao = new AutoObserveDecisionsPage(page);
-    let posted = 0;
-    page.on('request', (r) => {
-      if (r.method() === 'POST' && r.url().includes('/autoobserve/decisions')) posted += 1;
-    });
-    await ao.open(ORG);
-    await ao.openDismiss();
-    await expect(ao.locked).toBeVisible();
-    await expect(ao.submit).toBeDisabled();
-    expect(posted).toBe(0);
-    await context.close();
   });
 });

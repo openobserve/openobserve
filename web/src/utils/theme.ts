@@ -322,6 +322,8 @@ const syncO2LibraryTokens = (themeColor: string, mode: "light" | "dark"): void =
   for (const [token, hex] of Object.entries(assistantRoleColors(palette, mode))) {
     root.style.setProperty(token, hex);
   }
+  // Timeline pills carry small text, so they take the strict AA pick, not the button floor.
+  root.style.setProperty("--color-timeline-dot-primary-fg", pickReadableForeground(palette["600"]));
 };
 
 /**
@@ -354,6 +356,7 @@ export const applyThemeColors = (
     );
     root.style.removeProperty("--color-button-primary-foreground");
     ASSISTANT_ROLE_TOKENS.forEach((token) => root.style.removeProperty(token));
+    root.style.removeProperty("--color-timeline-dot-primary-fg");
   } else {
     syncO2LibraryTokens(themeColor, mode);
   }

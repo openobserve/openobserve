@@ -20,6 +20,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use async_trait::async_trait;
 use config::meta::alerts::{incidents::AlertKind, rca_runs::RunSummaryFields};
 use infra::table::{
+    alert_incidents::CaseFilter,
     entity::{alert_incident_alerts, alert_incidents},
     oncall_ownership::Landing,
     service_streams::ServiceRecord,
@@ -76,6 +77,30 @@ impl InvestigationPort for IncidentInvestigation {
         // The pull's budget drops this future; spawned, a resolve already begun still finishes.
         let resolve = async move { resolve_finding_firing(&org, &subject, at, back).await };
         Ok(tokio::spawn(resolve).await??)
+    }
+
+    /// Two reads for all of a pass's recoveries, so paging off costs no query per stream.
+    async fn open_incidents(&self, recoveries: &[Recovery]) -> anyhow::Result<Vec<bool>> {
+        let Some(org) = recoveries.first().map(|r| r.org.clone()) else {
+            return Ok(Vec::new());
+        };
+        if !incidents_enabled() {
+            return Ok(vec![false; recoveries.len()]);
+        }
+        let subjects: Vec<String> = recoveries.iter().map(recovery_subject).collect();
+        // A finding never opens a security case, so only ops incidents can hold one.
+        let wanted: HashMap<String, CaseFilter> = subjects
+            .iter()
+            .map(|s| (s.clone(), CaseFilter::NoCases))
+            .collect();
+        let open =
+            infra::table::alert_incidents::find_open_incidents_containing_alerts(&org, &wanted)
+                .await?;
+        Ok(recoveries
+            .iter()
+            .zip(&subjects)
+            .map(|(r, s)| r.org == org && open.contains_key(s))
+            .collect())
     }
 }
 

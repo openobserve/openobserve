@@ -24,7 +24,6 @@ import autoobserve, {
   type AutoObserveIncidentList,
 } from "@/services/autoobserve";
 import fixture from "./__fixtures__/autoobserveIncidents.json";
-import { analysisLink, incidentLink } from "./incidentsCopy";
 import LiveIssues from "./LiveIssues.vue";
 
 const routeQuery = reactive<Record<string, string | undefined>>({});
@@ -109,7 +108,11 @@ const mountTable = (range: "7d" | "30d" | "90d" = "30d") => {
   const wrapper = mount(LiveIssues, {
     props: { range, initialFilter: "all" },
     attachTo: document.body,
-    global: { plugins: [i18n, store] },
+    global: {
+      plugins: [i18n, store],
+      // The drawer and the per-row chart have their own specs; here only what the table hands them counts.
+      stubs: { AutoObserveIssueDrawer: true, IssueSignal: true },
+    },
   });
   wrappers.push(wrapper);
   return wrapper;
@@ -172,16 +175,57 @@ describe("LiveIssues", () => {
     expect(w.find('[role="alert"]').exists()).toBe(false);
   });
 
-  it("one row reads in the singular, with the shared finding sentence and no ids", async () => {
-    api.mockResolvedValue(page([at(0, 1)]));
+  it("one row reads in the singular, with a short incident id and no finding id", async () => {
+    api.mockResolvedValue(page([at(0, 1, "V5wPnqa6c0qfMLxGTdrwcF68Xq8")]));
     const w = mountTable();
     await loaded();
     expect(bodyRows(w)).toHaveLength(1);
     expect(w.find(sel("count")).text()).toBe("1 issue");
     expect(sentences(w)).toEqual(["checkout (logs) stopped sending data"]);
     expect(w.find(sel("stream")).text()).toBe("checkout");
-    expect(w.text()).not.toContain("inc-0-1");
+    expect(w.find(sel("id")).text()).toBe("V5wPnqa6");
+    expect(w.find(sel("id")).attributes("title")).toBe("V5wPnqa6c0qfMLxGTdrwcF68Xq8");
     expect(w.text()).not.toContain("f-inc");
+  });
+
+  it("the meta line holds the span, duration, grouping, who was paged and the analysis", async () => {
+    const base = at(4, 1, "inc-meta");
+    api.mockResolvedValue(
+      page([{ ...base, page: { outcome: "paged", team_id: "t", team_name: "SRE" } } as never]),
+    );
+    const w = mountTable();
+    await loaded();
+    const meta = w.get(sel("meta")).text();
+    expect(meta).toContain("→ now");
+    expect(meta).toContain("1 hour");
+    expect(meta).toContain("Paged SRE");
+    // No dot dangles before the badge when it wraps.
+    expect(meta).not.toMatch(/Paged SRE\s*·/);
+    expect(w.find(sel("analysis")).exists()).toBe(true);
+    expect(w.get(sel("cause")).text()).toContain("search (logs) has received much less data");
+  });
+
+  it("each row hands its lead stream to the shared signal chart, live only while open", async () => {
+    api.mockResolvedValue(page([at(4, 1, "inc-open"), at(2, 2, "inc-done")]));
+    const w = mountTable();
+    await loaded();
+    const charts = w.findAllComponents({ name: "IssueSignal" });
+    expect(charts).toHaveLength(2);
+    expect(charts[0].props("stream")).toMatchObject({ type: "logs", name: "search", lead: true });
+    expect(charts[0].props("active")).toBe(true);
+    expect(charts[1].props("active")).toBe(false);
+  });
+
+  it("search matches the incident id and the cause, not only the sentence", async () => {
+    api.mockResolvedValue(page([at(0, 1, "inc-findme"), at(4, 2, "inc-other")]));
+    const w = mountTable();
+    await loaded();
+    await w.find(`${sel("search")} input`).setValue("inc-findme");
+    await flushPromises();
+    expect(sentences(w)).toEqual(["checkout (logs) stopped sending data"]);
+    await w.find(`${sel("search")} input`).setValue("much less data");
+    await flushPromises();
+    expect(sentences(w)).toEqual(["search (logs) volume dropped sharply"]);
   });
 
   it("twelve rows across three days make three day groups, newest first", async () => {
@@ -199,27 +243,43 @@ describe("LiveIssues", () => {
     expect(days[1].text()).toContain("Yesterday");
   });
 
-  it("a row click opens the incident page, never a drawer", async () => {
+  it("a row click opens the AutoObserve drawer on Overview and records it in the URL", async () => {
     api.mockResolvedValue(page([at(0, 1, "inc-abc")]));
     const w = mountTable();
     await loaded();
+    const drawer = w.findComponent({ name: "AutoObserveIssueDrawer" });
+    expect(drawer.props("open")).toBe(false);
     await bodyRows(w)[0].trigger("click");
-    expect(push).toHaveBeenCalledWith(incidentLink("demo-org", "inc-abc"));
-    expect(push.mock.calls[0][0]).toEqual({
-      name: "incidentDetail",
-      params: { id: "inc-abc" },
-      query: { org_identifier: "demo-org" },
-    });
-    expect(document.querySelector('[data-test="autoobserve-issue-drawer"]')).toBeNull();
+    await flushPromises();
+    expect(push).not.toHaveBeenCalled();
+    expect(routeQuery.incident).toBe("inc-abc");
+    expect(drawer.props("open")).toBe(true);
+    expect(drawer.props("liveItem")?.incident.id).toBe("inc-abc");
+    expect(drawer.props("liveTab")).toBe("overview");
+    drawer.vm.$emit("update:open", false);
+    await flushPromises();
+    expect(routeQuery.incident).toBeUndefined();
+    expect(drawer.props("open")).toBe(false);
   });
 
-  it("the analysis badge of a run opens the analysis tab, not the row", async () => {
+  it("a linked incident reopens its drawer on reload", async () => {
+    routeQuery.incident = "inc-linked";
+    api.mockResolvedValue(page([at(0, 1, "inc-linked")]));
+    const w = mountTable();
+    await loaded();
+    const drawer = w.findComponent({ name: "AutoObserveIssueDrawer" });
+    expect(drawer.props("open")).toBe(true);
+  });
+
+  it("the analysis badge of a run opens the drawer on its analysis tab", async () => {
     api.mockResolvedValue(page([at(1, 1, "inc-run")]));
     const w = mountTable();
     await loaded();
     await w.find(sel("analysis-link")).trigger("click");
-    expect(push).toHaveBeenCalledTimes(1);
-    expect(push).toHaveBeenCalledWith(analysisLink("demo-org", "inc-run"));
+    await flushPromises();
+    expect(push).not.toHaveBeenCalled();
+    expect(routeQuery.incident).toBe("inc-run");
+    expect(w.findComponent({ name: "AutoObserveIssueDrawer" }).props("liveTab")).toBe("analysis");
   });
 
   it("a 403 is the red denial with no Retry", async () => {
@@ -442,7 +502,14 @@ describe("LiveIssues", () => {
       const w = mountTable();
       await loaded();
       expect(sentences(w)).toEqual(["3 streams stopped sending data"]);
-      expect(w.find(sel("stream")).text()).toBe("batch_x1 +2");
+      const chips = w.get(sel("stream"));
+      expect(chips.findAll(sel("stream-text")).map((c) => c.text())).toEqual([
+        "batch_x1",
+        "batch_x2",
+      ]);
+      expect(chips.get(sel("stream-more")).text()).toBe("+1");
+      expect(chips.attributes("title")).toBe("batch_x1, batch_x2, batch_x3");
+      expect(w.get(sel("meta")).text()).toContain("3 streams → 1 incident");
       await w.find(`${sel("search")} input`).setValue("batch_x3");
       await flushPromises();
       expect(sentences(w)).toEqual(["3 streams stopped sending data"]);
@@ -471,42 +538,6 @@ describe("LiveIssues", () => {
       expect(cells[0].attributes("data-tone")).toBe("neutral");
     });
 
-    it("cuts a long team name and a long unbroken sentence with an ellipsis, not mid-glyph (T1-N7)", async () => {
-      api.mockResolvedValue(
-        page([paged(0, "paged", "A Very Long Team Name For The Platform On Call Rotation")]),
-      );
-      const w = mountTable();
-      await loaded();
-      const chip = w.get(sel("page"));
-      expect(chip.classes()).toContain("max-w-full");
-      expect(chip.find('[data-test="autoobserve-live-issues-page-text"]').classes()).toContain(
-        "truncate",
-      );
-      expect(w.get(sel("sentence")).classes()).toContain("wrap-anywhere");
-    });
-
-    it("cuts a long stream name with an ellipsis inside the cell (T1-N7)", async () => {
-      const base = at(4, 1, "inc-long-stream");
-      const long = "k8s_cluster_e_namespace_g_payments_backend_ingest_and_enrichment_pipeline_logs";
-      api.mockResolvedValue(page([{ ...base, finding: { ...base.finding, stream_name: long } }]));
-      const w = mountTable();
-      await loaded();
-      const chip = w.get(sel("stream"));
-      expect(chip.classes()).toContain("max-w-full");
-      const text = chip.get('[data-test="autoobserve-live-issues-stream-text"]');
-      expect(text.classes()).toContain("truncate");
-      expect(text.text()).toBe(long);
-    });
-
-    it("keeps the two-line sentence clamp clear of the cell padding, so no third line peeks (F-N2)", async () => {
-      api.mockResolvedValue(page([at(4, 1)]));
-      const w = mountTable();
-      await loaded();
-      const sentence = w.get(sel("sentence"));
-      expect(sentence.classes().some((c) => /^p[ytb]?-/.test(c))).toBe(false);
-      expect(sentence.element.parentElement?.classList.contains("py-1.5")).toBe(true);
-    });
-
     it("the status filter says Open, the word the status chip uses", async () => {
       api.mockResolvedValue(page([at(4, 1)]));
       const w = mountTable();
@@ -514,14 +545,13 @@ describe("LiveIssues", () => {
       expect(w.find(sel("filter-open")).text()).toBe("Open");
     });
 
-    it("a denial hides the search, filters and counts but keeps their space, so the table doesn't jump (T5-N4)", async () => {
+    it("a denial keeps the search, filters and counts mounted but inert and hidden from assistive tech", async () => {
       api.mockRejectedValue(httpError(403));
       const w = mountTable();
       await loaded();
       expect(w.find(sel("denied")).exists()).toBe(true);
       for (const part of ["controls", "summary"]) {
         const box = w.get(sel(part));
-        expect(box.classes(), part).toContain("invisible");
         expect(box.attributes("inert"), part).toBeDefined();
         expect(box.attributes("aria-hidden"), part).toBe("true");
       }
@@ -531,15 +561,15 @@ describe("LiveIssues", () => {
       api.mockResolvedValue(page([at(4, 1)]));
       const w = mountTable();
       await loaded();
-      expect(w.get(sel("controls")).classes()).not.toContain("invisible");
       expect(w.get(sel("controls")).attributes("inert")).toBeUndefined();
+      expect(w.get(sel("controls")).attributes("aria-hidden")).toBeUndefined();
     });
 
     it("while loading, the priority counts are blank, not zero", async () => {
       api.mockReturnValue(new Promise(() => {}) as never);
       const w = mountTable();
       await flushPromises();
-      expect(w.find(sel("priority")).findAll(".tabular-nums")).toHaveLength(0);
+      expect(w.find(sel("priority-p1")).text()).toBe("P1");
     });
 
     it("a failed load names the page's own noun", async () => {

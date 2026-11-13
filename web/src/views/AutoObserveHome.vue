@@ -28,53 +28,53 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OBanner>
     </div>
     <div class="min-h-0 flex-1">
-      <AutoObserve v-if="view === 'nerd'" />
+      <AutoObserveMock v-if="!live" />
+      <AutoObserve v-else-if="view === 'nerd'" />
       <AutoObserve2 v-else />
     </div>
   </div>
   <div v-else class="h-full" data-test="autoobserve-home">
-    <AutoObserve v-if="view === 'nerd'" />
+    <AutoObserveMock v-if="!live" />
+    <AutoObserve v-else-if="view === 'nerd'" />
     <AutoObserve2 v-else />
     <BulkReviewDrawer />
   </div>
 </template>
 
 <script setup lang="ts">
-import AutoObserve from "@/views/AutoObserve.vue";
-import AutoObserve2 from "@/views/AutoObserve2.vue";
-import { computed, provide, watch } from "vue";
+import { defineAsyncComponent, provide } from "vue";
+import { onBeforeRouteUpdate } from "vue-router";
 import BulkReviewDrawer from "@/components/autoobserve/insight/bulk/BulkReviewDrawer.vue";
 import { ASK_AI_KEY, type InsightAskPayload } from "@/components/autoobserve/insight/insightCta";
-import { useStore } from "vuex";
+import { keepLiveMode, useLiveMode } from "@/components/autoobserve/v2/autoobserveRoute";
+import { useAutoObserveView } from "@/components/autoobserve/v2/useAutoObserveView";
 import { isAssistantV2 } from "@/composables/assistant/flags";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
-import { useI18nTyped } from "@/types/i18n";
-import { useAutoObserveView } from "@/components/autoobserve/v2/useAutoObserveView";
-import { resetDecisions, switchDecisionsOrg } from "@/components/autoobserve/v2/useDecisions";
-import { useAssistantStore } from "@/composables/assistant";
 import OText from "@/lib/core/Typography/OText.vue";
-import { useScenario } from "@/components/autoobserve/data/useScenario";
-import { useFixtureMode } from "@/components/autoobserve/live/liveModel";
+import { useI18nTyped } from "@/types/i18n";
+
+// Loaded on demand, so a visitor downloads the live pages or the sample pages, never both.
+const AutoObserve = defineAsyncComponent(() => import("@/views/AutoObserve.vue"));
+const AutoObserve2 = defineAsyncComponent(() => import("@/views/AutoObserve2.vue"));
+// The sample pages read their data and their copy synchronously, so both are installed before they mount.
+const AutoObserveMock = defineAsyncComponent(async () => {
+  const [facts, locale] = await Promise.all([
+    import("@/components/autoobserve/mock/data/facts"),
+    import("@/components/autoobserve/mock/locale"),
+  ]);
+  locale.installMockLocale();
+  await facts.factsReady;
+  return import("@/components/autoobserve/mock/views/AutoObserveMockHome.vue");
+});
 
 // The route root carries MainLayout's chat binding, so every card below asks through this one emit.
 const emit = defineEmits<{ sendToAiChat: [payload: InsightAskPayload] }>();
 provide(ASK_AI_KEY, (payload: InsightAskPayload) => emit("sendToAiChat", payload));
 
 const { view } = useAutoObserveView();
-const { scenario } = useScenario();
-const fixture = useFixtureMode();
-// Answers belong to one scenario's story, so switching scenario in either view starts fresh.
-watch(scenario, () => fixture.value && resetDecisions());
+const live = useLiveMode();
+onBeforeRouteUpdate(keepLiveMode);
 
 const { t } = useI18nTyped();
-const vuex = useStore();
 const assistantV2 = isAssistantV2();
-if (assistantV2) {
-  const assistant = useAssistantStore();
-  watch(
-    computed(() => assistant.state.userOrgKey ?? vuex.state.selectedOrganization?.identifier ?? ""),
-    (key) => switchDecisionsOrg(key),
-    { immediate: true },
-  );
-}
 </script>

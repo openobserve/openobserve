@@ -407,15 +407,7 @@ const useEnterpriseRoutes = () => {
     routes.push({
       path: "autoobserve",
       name: "autoobserve",
-      // The sample scenarios render synchronously, so their facts finish loading before the view does.
-      component: async () => {
-        const [view, facts] = await Promise.all([
-          import("@/views/AutoObserveHome.vue"),
-          import("@/components/autoobserve/data/facts"),
-        ]);
-        await facts.factsReady;
-        return view;
-      },
+      component: () => import("@/views/AutoObserveHome.vue"),
       // Home, coverage, issues and What I've changed share this route but read different things.
       meta: { titleKey: "menu.autoobserve", allowOnEmptyData: true, accessScopeQuery: ["page"] },
       beforeEnter(to: any, from: any, next: any) {

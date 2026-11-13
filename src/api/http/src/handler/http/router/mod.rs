@@ -1405,6 +1405,8 @@ fn autoobserve_routes(router: Router) -> Router {
         .route("/v2/{org_id}/autoobserve/entity_types", get(autoobserve::entity_types))
         .route("/v2/{org_id}/autoobserve/coverage", get(autoobserve::coverage))
         .route("/v2/{org_id}/autoobserve/coverage/history", get(autoobserve::coverage_history))
+        .route("/v2/{org_id}/autoobserve/folders/writable", get(autoobserve::writable_folders))
+        .route("/v2/{org_id}/autoobserve/streams/volume", get(autoobserve::stream_volume))
         .route("/v2/{org_id}/autoobserve/suggestions", get(autoobserve::suggestions))
         .route("/v2/{org_id}/autoobserve/decisions", get(autoobserve::decisions::list_decisions).post(autoobserve::decisions::decide))
         .route("/v2/{org_id}/autoobserve/decisions/preview", get(autoobserve::decisions::preview_decision))
