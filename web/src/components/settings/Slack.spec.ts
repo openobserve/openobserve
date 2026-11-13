@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ref } from "vue";
+import { defineComponent, h, ref } from "vue";
 import { flushPromises, mount } from "@vue/test-utils";
 import i18n from "@/locales";
 import config from "@/aws-exports";
@@ -22,7 +22,10 @@ import slack from "@/services/slack";
 import { queryClient } from "@/composables/query/queryClient";
 import { slackInstallationsQuery } from "@/services/slack.queries";
 import Slack from "./Slack.vue";
+import { useConfirmDialog } from "@/composables/useConfirmDialog";
+import { useSlackSavePart } from "./slackSaveBar";
 import {
+  OTableStub,
   axiosError,
   installationView,
   instanceView,
@@ -40,6 +43,10 @@ vi.mock("@/services/slack", () => ({
     getPrerequisites: vi.fn(),
     listOncallUnlinked: vi.fn(),
     getInsightsSettings: vi.fn(),
+    getHelpContact: vi.fn(),
+    putHelpContact: vi.fn(),
+    getLinking: vi.fn(),
+    updateLinking: vi.fn(),
   },
 }));
 
@@ -514,20 +521,20 @@ describe("Slack settings: General and AutoObserve sections (S7)", () => {
     );
   const sections = (w: ReturnType<typeof mountSlack>) => ({
     bar: w.find('[data-test="slack-section-bar"]'),
-    general: w.find('[data-test="slack-section-general-heading"]'),
+    autoobserve: w.find('[data-test="slack-section-autoobserve-heading"]'),
     insights: w.find('[data-test-stub="SlackInsightsSection"]'),
   });
 
-  it("shows the section bar, the General heading and AutoObserve after General", async () => {
+  it("shows the section bar and AutoObserve as its own card after the workspace", async () => {
     oneWorkspace();
     settingsOn();
     const w = mountSlack({ slack_enabled: true });
     await flushPromises();
-    const { bar, general, insights } = sections(w);
+    const { bar, autoobserve, insights } = sections(w);
     expect(bar.exists()).toBe(true);
     expect(bar.text()).toContain("On this page");
     expect(bar.findAll("button").map((b) => b.text())).toEqual(["General", "AutoObserve"]);
-    expect(general.text()).toContain("General");
+    expect(autoobserve.text()).toContain("AutoObserve");
     expect(insights.exists()).toBe(true);
     const html = w.html();
     expect(html.indexOf("SlackWorkspaceCard")).toBeLessThan(html.indexOf("SlackInsightsSection"));
@@ -538,9 +545,9 @@ describe("Slack settings: General and AutoObserve sections (S7)", () => {
     oneWorkspace();
     const w = mountSlack({ slack_enabled: true });
     await flushPromises();
-    const { bar, general, insights } = sections(w);
+    const { bar, autoobserve, insights } = sections(w);
     expect(bar.exists()).toBe(false);
-    expect(general.exists()).toBe(false);
+    expect(autoobserve.exists()).toBe(false);
     expect(insights.exists()).toBe(false);
     expect(w.find('[data-test-stub="SlackWorkspaceCard"]').exists()).toBe(true);
   });
@@ -589,6 +596,204 @@ describe("Slack settings: General and AutoObserve sections (S7)", () => {
     await flushPromises();
     expect(w.find('[data-test-stub="SlackWorkspaceCard"]').exists()).toBe(true);
     expect(sections(w).bar.exists()).toBe(true);
+  });
+
+  it("puts the sections' unsaved settings in one pinned bar that saves, discards and guards leaving", async () => {
+    const part = {
+      changes: () => 2,
+      errors: () => 1,
+      save: vi.fn(async () => true),
+      discard: vi.fn(),
+    };
+    const linking = defineComponent({
+      name: "SlackLinkingSection",
+      props: ["installation"],
+      setup() {
+        useSlackSavePart(part);
+        return () => h("div");
+      },
+    });
+    oneWorkspace();
+    const w = mount(Slack, {
+      global: {
+        plugins: [i18n, makeSlackStore({ slack_enabled: true })],
+        stubs: { ...STUBS, SlackLinkingSection: linking },
+      },
+    });
+    await flushPromises();
+    expect(w.find('[data-test="slack-save-bar-status"]').text()).toContain("2");
+    expect(w.find('[data-test="slack-save-bar-fix"]').exists()).toBe(true);
+    const unload = new Event("beforeunload", { cancelable: true });
+    window.dispatchEvent(unload);
+    expect(unload.defaultPrevented).toBe(true);
+
+    await w.find('[data-test="slack-save-bar-save"]').trigger("click");
+    await flushPromises();
+    expect(part.save).toHaveBeenCalledTimes(1);
+    await w.find('[data-test="slack-save-bar-discard"]').trigger("click");
+    expect(part.discard).toHaveBeenCalledTimes(1);
+    w.unmount();
+  });
+
+  it.each([
+    {
+      name: "Add another workspace",
+      go: (w: ReturnType<typeof mountSlack>) =>
+        w.find('[data-test="slack-add-workspace"]').trigger("click"),
+    },
+    {
+      name: "another workspace's tab",
+      go: (w: ReturnType<typeof mountSlack>) =>
+        w.findComponent({ name: "OTabs" }).vm.$emit("update:modelValue", "inst-2"),
+    },
+    {
+      name: "Go to Reinstall in another workspace",
+      go: (w: ReturnType<typeof mountSlack>) =>
+        w.findComponent({ name: "SlackInsightsSection" }).vm.$emit("reinstall", "inst-2"),
+    },
+  ])("asks before $name replaces a workspace's unsaved settings", async ({ go }) => {
+    const dirty = ref(true);
+    const linking = defineComponent({
+      name: "SlackLinkingSection",
+      props: ["installation"],
+      setup() {
+        useSlackSavePart({
+          changes: () => Number(dirty.value),
+          errors: () => 0,
+          save: async () => true,
+          discard: () => (dirty.value = false),
+        });
+        return () => h("div");
+      },
+    });
+    vi.mocked(slack.listInstallations).mockReturnValue(
+      ok({ installations: [installationView(), installationView({ id: "inst-2" })] }) as any,
+    );
+    settingsOn();
+    Element.prototype.scrollIntoView = vi.fn();
+    const w = mount(Slack, {
+      global: {
+        plugins: [i18n, makeSlackStore({ slack_enabled: true })],
+        stubs: { ...STUBS, SlackLinkingSection: linking },
+      },
+    });
+    await flushPromises();
+    const dialog = useConfirmDialog();
+    const shown = () => {
+      const card = w.findComponent({ name: "SlackWorkspaceCard" });
+      return card.exists() ? card.props("installation").id : null;
+    };
+
+    await go(w);
+    await flushPromises();
+    expect(dialog.currentDialog.value).not.toBeNull();
+    dialog.handleCancel();
+    await flushPromises();
+    expect([shown(), dirty.value]).toEqual(["inst-1", true]);
+
+    await go(w);
+    await flushPromises();
+    dialog.handleConfirm();
+    await flushPromises();
+    expect([shown() === "inst-1", dirty.value]).toEqual([false, false]);
+    w.unmount();
+  });
+
+  it.each([
+    {
+      form: "help contact",
+      real: "SlackWorkspaceCard" as const,
+      edit: (w: ReturnType<typeof mountSlack>, value: string) =>
+        w.find('[data-test="slack-help-contact"] input').setValue(value),
+      values: ["#first", "#o2-help"],
+      sent: () => slack.putHelpContact,
+    },
+    {
+      form: "linking",
+      real: "SlackLinkingSection" as const,
+      edit: (w: ReturnType<typeof mountSlack>) =>
+        w.find('[data-test="slack-linking-switch"] button').trigger("click"),
+      values: ["off", "on"],
+      sent: () => slack.updateLinking,
+    },
+  ])(
+    "asks before leaving a $form draft put back to its old value after the save, while the refresh is still out",
+    async ({ real, edit, values, sent }) => {
+      oneWorkspace();
+      settingsOn();
+      vi.mocked(slack.getHelpContact).mockReturnValue(ok({ help_contact: "#o2-help" }) as any);
+      vi.mocked(slack.getLinking).mockReturnValue(ok(linkingView({ source: "manual" })) as any);
+      vi.mocked(slack.putHelpContact).mockReturnValue(ok({}) as any);
+      vi.mocked(slack.updateLinking).mockReturnValue(ok({}) as any);
+      const { [real]: _real, ...stubs } = STUBS;
+      const w = mount(Slack, {
+        attachTo: document.body,
+        global: {
+          plugins: [i18n, makeSlackStore({ slack_enabled: true })],
+          stubs: { ...stubs, OTable: OTableStub, SlackCredentialsDialog: true },
+        },
+      });
+      await flushPromises();
+      const dialog = useConfirmDialog();
+
+      await edit(w, values[0]);
+      const never = new Promise(() => {});
+      vi.mocked(slack.getHelpContact).mockReturnValue(never as any);
+      vi.mocked(slack.getLinking).mockReturnValue(never as any);
+      await w.find('[data-test="slack-save-bar-save"]').trigger("click");
+      await vi.waitFor(() => expect(sent()).toHaveBeenCalledTimes(1));
+      await flushPromises();
+      await edit(w, values[1]);
+      await flushPromises();
+
+      expect(w.find('[data-test="slack-save-bar"]').attributes("data-state")).toBe("changed");
+      await w.find('[data-test="slack-add-workspace"]').trigger("click");
+      await flushPromises();
+      expect(dialog.currentDialog.value).not.toBeNull();
+      dialog.handleCancel();
+      await flushPromises();
+      w.unmount();
+    },
+  );
+
+  it("a save still open in a workspace that was left does not hold Save in the next workspace", async () => {
+    vi.mocked(slack.listInstallations).mockReturnValue(
+      ok({ installations: [installationView(), installationView({ id: "inst-2" })] }) as any,
+    );
+    settingsOn();
+    vi.mocked(slack.getHelpContact).mockReturnValue(ok({ help_contact: "#o2-help" }) as any);
+    vi.mocked(slack.putHelpContact).mockReturnValueOnce(new Promise(() => {}) as any);
+    vi.mocked(slack.putHelpContact).mockReturnValue(ok({}) as any);
+    const { SlackWorkspaceCard: _real, ...stubs } = STUBS;
+    const w = mount(Slack, {
+      attachTo: document.body,
+      global: {
+        plugins: [i18n, makeSlackStore({ slack_enabled: true })],
+        stubs: { ...stubs, OTable: OTableStub, SlackCredentialsDialog: true },
+      },
+    });
+    await flushPromises();
+    const dialog = useConfirmDialog();
+    const edit = (value: string) =>
+      w.find('[data-test="slack-help-contact"] input').setValue(value);
+    const save = () => w.find('[data-test="slack-save-bar-save"]').trigger("click");
+
+    await edit("#first");
+    await save();
+    await vi.waitFor(() => expect(slack.putHelpContact).toHaveBeenCalledTimes(1));
+    w.findComponent({ name: "OTabs" }).vm.$emit("update:modelValue", "inst-2");
+    await flushPromises();
+    dialog.handleConfirm();
+    await flushPromises();
+    await edit("#second");
+    await save();
+    await flushPromises();
+
+    expect(vi.mocked(slack.putHelpContact).mock.calls.map((call) => call.slice(0, 3))).toEqual([
+      ["acme", "inst-1", { help_contact: "#first" }],
+      ["acme", "inst-2", { help_contact: "#second" }],
+    ]);
+    w.unmount();
   });
 
   describe("Go to Reinstall (F3)", () => {

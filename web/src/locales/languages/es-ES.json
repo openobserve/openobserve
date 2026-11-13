@@ -30684,7 +30684,7 @@
   },
   "slackApp": {
     "prereq": {
-      "title": "Paso 0 · Requisitos previos del servidor",
+      "title": "Paso 1 · Requisitos previos del servidor",
       "subtitle": "Comprobado en este servidor antes de cualquier trabajo en Slack",
       "columnSetting": "Ajuste",
       "columnResult": "Resultado",
@@ -30755,7 +30755,7 @@
       "back": "Atrás",
       "finish": "Finalizar",
       "connection": {
-        "title": "Paso 1 · Conexión",
+        "title": "Paso 2 · Conexión",
         "description": "La comprobación llega a Slack desde este servidor mediante la misma ruta de código que usa producción.",
         "allPassed": "Se puede acceder a Slack desde este servidor",
         "someFailed": "No se puede acceder a Slack desde este servidor. Permite *.slack.com en tu proxy o firewall y, después, vuelve a comprobar.",
@@ -30764,7 +30764,7 @@
         "socketHost": "Host de WebSocket {host}"
       },
       "create": {
-        "title": "Paso 2 · Crear la app",
+        "title": "Paso 3 · Crear la app",
         "modeLabel": "Modo de conexión",
         "socket": "Modo Socket",
         "socketDescription": "Recomendado. OpenObserve abre la conexión, así que Slack no necesita una URL pública",
@@ -30793,7 +30793,7 @@
         "signingSecretRequired": "El modo HTTP necesita el secreto de firma"
       },
       "install": {
-        "title": "Paso 3 · Instalar",
+        "title": "Paso 4 · Instalar",
         "created": "Aplicación creada · {appId}",
         "allowHint": "Abre la pantalla de instalación de Slack: haz clic en Permitir allí. El token del bot vuelve desde Slack por sí solo; no hay nada que copiar.",
         "allow": "Permitir en Slack",
@@ -30816,7 +30816,7 @@
         "appNotCreatedByO2": "OpenObserve no creó esta aplicación, así que permanece en Slack. Elimínala allí si ya no la necesitas."
       },
       "test": {
-        "title": "Paso 4 · Prueba y vinculación",
+        "title": "Paso 5 · Prueba y vinculación",
         "run": "Ejecutar comprobaciones",
         "signIn": "Probar Iniciar sesión con Slack",
         "signInPassed": "Iniciar sesión con Slack funciona",

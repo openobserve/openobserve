@@ -36,16 +36,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :persist-columns="true"
       table-id="settings-query-management"
       :show-global-filter="false"
+      :row-actions="rowActions"
+      row-actions-more-data-test="running-queries-row-more-actions"
       @update:selected-ids="handleSelectedIdsUpdate"
     >
       <template #toolbar>
         <div class="flex min-w-0 flex-1 items-center gap-3">
-          <span
-            class="text-xs font-bold whitespace-nowrap"
-            data-test="running-queries-last-refresh"
-          >
-            {{ t("queries.lastDataRefreshTime") }} {{ lastRefreshed }}
-          </span>
           <div class="flex-1"></div>
           <OToggleGroup
             v-if="searchTypes && searchTypes.length"
@@ -65,16 +61,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </template>
       <template #toolbar-trailing>
-        <OButton
+        <ORefreshButton
+          layout="inline"
           variant="outline"
-          size="icon-toolbar"
-          class="shrink-0"
-          icon-left="refresh"
+          :last-run-at="lastRefreshedAt"
           data-test="running-queries-refresh-btn"
           @click="$emit('refresh')"
-        >
-          <OTooltip side="bottom" :content="t('common.refresh')" />
-        </OButton>
+        />
       </template>
       <template #empty>
         <OEmptyState
@@ -84,56 +77,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :hide-action="!filtered"
           @action="(id) => id === 'clear-filters' && $emit('clear:filters')"
         />
-      </template>
-      <template #cell-actions="{ row }">
-        <OButton
-          icon-left="format-list-bulleted"
-          variant="ghost"
-          size="icon-xs-sq"
-          class="max-md:hidden"
-          :title="t('queries.queryList')"
-          data-test="queryList-btn"
-          @click="listSchema(row)"
-        />
-        <OButton
-          icon-left="close"
-          variant="ghost-destructive"
-          size="icon-xs-sq"
-          class="max-md:hidden"
-          :title="t('queries.cancelQuery')"
-          data-test="cancelQuery-btn"
-          @click="confirmDeleteAction(row)"
-        />
-        <ODropdown side="bottom" align="end">
-          <template #trigger>
-            <OButton
-              :aria-label="t('common.moreActions')"
-              icon-left="more-vert"
-              variant="ghost"
-              size="icon-xs-sq"
-              class="md:hidden"
-              data-test="running-queries-row-more-actions"
-              @click.stop
-            />
-          </template>
-          <ODropdownItem
-            icon-left="format-list-bulleted"
-            class="md:hidden"
-            data-test="queryList-btn-menu"
-            @select="listSchema(row)"
-          >
-            <span>{{ t("queries.queryList") }}</span>
-          </ODropdownItem>
-          <ODropdownItem
-            icon-left="close"
-            variant="destructive"
-            class="md:hidden"
-            data-test="cancelQuery-btn-menu"
-            @select="confirmDeleteAction(row)"
-          >
-            <span>{{ t("queries.cancelQuery") }}</span>
-          </ODropdownItem>
-        </ODropdown>
       </template>
       <template #cell-user_id="{ row }">
         <OUserCell :value="row.user_id" />
@@ -173,9 +116,7 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { useStore } from "vuex";
 import QueryList from "@/components/queries/QueryList.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
-import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
@@ -183,7 +124,7 @@ import { getDuration, durationFormatter } from "@/utils/zincutils";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import type { OTableColumnDef, OTableRowAction } from "@/lib/core/Table/OTable.types";
 import { COL } from "@/lib/core/Table/OTable.types";
 import type { ForbiddenState } from "@/utils/featureGate";
 
@@ -193,9 +134,7 @@ export default defineComponent({
     QueryList,
     OEmptyState,
     OButton,
-    ODropdown,
-    ODropdownItem,
-    OTooltip,
+    ORefreshButton,
     OToggleGroup,
     OToggleGroupItem,
     ODrawer,
@@ -220,9 +159,9 @@ export default defineComponent({
       type: [Boolean, Array] as PropType<ForbiddenState>,
       default: false,
     },
-    lastRefreshed: {
-      type: String,
-      default: "",
+    lastRefreshedAt: {
+      type: Number as PropType<number | null>,
+      default: null,
     },
     searchType: {
       type: String,
@@ -279,7 +218,8 @@ export default defineComponent({
         resizable: true,
         hideable: true,
         size: COL.owner,
-        meta: { align: "left" },
+        minSize: 148,
+        meta: { align: "left", flex: true },
       },
       {
         id: "search_type",
@@ -289,7 +229,8 @@ export default defineComponent({
         resizable: true,
         hideable: true,
         size: 130,
-        meta: { align: "left" },
+        minSize: 118,
+        meta: { align: "left", flex: true },
       },
       {
         id: "query_source",
@@ -299,7 +240,8 @@ export default defineComponent({
         resizable: true,
         hideable: true,
         size: 140,
-        meta: { align: "left" },
+        minSize: 124,
+        meta: { align: "left", flex: true },
       },
       {
         id: "duration",
@@ -309,7 +251,8 @@ export default defineComponent({
         resizable: true,
         hideable: true,
         size: 150,
-        meta: { align: "left" },
+        minSize: 138,
+        meta: { align: "left", flex: true },
       },
       {
         id: "queryRange",
@@ -319,7 +262,8 @@ export default defineComponent({
         resizable: true,
         hideable: true,
         size: 130,
-        meta: { align: "left" },
+        minSize: 118,
+        meta: { align: "left", flex: true },
       },
       {
         id: "work_group",
@@ -329,7 +273,8 @@ export default defineComponent({
         resizable: true,
         hideable: true,
         size: 130,
-        meta: { align: "left" },
+        minSize: 110,
+        meta: { align: "left", flex: true },
       },
       {
         id: "status",
@@ -339,17 +284,19 @@ export default defineComponent({
         resizable: true,
         hideable: true,
         size: COL.status,
-        meta: { align: "left" },
+        minSize: 84,
+        meta: { align: "left", flex: true },
       },
       {
         id: "stream_type",
-        header: t("alerts.streamType"),
+        header: t("queries.streamType"),
         accessorKey: "stream_type",
         sortable: true,
         resizable: true,
         hideable: true,
         size: 130,
-        meta: { align: "left" },
+        minSize: 118,
+        meta: { align: "left", flex: true },
       },
       {
         id: "actions",
@@ -357,7 +304,24 @@ export default defineComponent({
         isAction: true,
         pinned: "right",
         size: 100,
-        meta: { align: "center", actionCount: 2 },
+      },
+    ];
+
+    const rowActions: OTableRowAction[] = [
+      {
+        id: "query-list",
+        label: t("queries.queryList"),
+        icon: "format-list-bulleted",
+        onSelect: (row) => listSchema(row),
+        dataTest: () => "queryList-btn",
+      },
+      {
+        id: "cancel",
+        label: t("queries.cancelQuery"),
+        icon: "close",
+        tone: "destructive",
+        onSelect: (row) => confirmDeleteAction(row),
+        dataTest: () => "cancelQuery-btn",
       },
     ];
 
@@ -389,6 +353,7 @@ export default defineComponent({
       t,
       store,
       columns,
+      rowActions,
       confirmDeleteAction,
       listSchema,
       showListSchemaDialog,

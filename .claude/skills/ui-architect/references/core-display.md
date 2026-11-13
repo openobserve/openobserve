@@ -17,7 +17,6 @@ Reference for the O2 display and content primitives under `@/lib/core/*`. Each e
 - [OIcon](#oicon)
 - [OSeparator](#oseparator)
 - [OSettingRow](#osettingrow)
-- [OSettingRowPair](#osettingrowpair)
 - [OShortcut](#oshortcut)
 - [OText](#otext)
 - [OTruncatedText](#otruncatedtext) — cut text ("…") + full-text tooltip only when cut
@@ -425,6 +424,47 @@ Note: delete/bin icon names render in the destructive (red) colour by default; o
 
 ---
 
+### OFormSection
+**Import:** `@/lib/core/FormSection/OFormSection.vue`
+**Use when:** One titled section of a multi-section form — a bordered card with a heading and the section's fields or `OSettingRow`s inside.
+**Don't use for:** A page's own content inset (use `OContent`), or a section wrapped around a single control — except where the heading is that control's label, and the danger zone.
+**Key props:**
+- `title` (`I18nText`, required — the section heading)
+- `variant` (`"accent" | "plain"`, default `"accent"` — `"plain"` drops the accent bar, gives the header a tinted band above its divider and renders the heading as an `h2`; Settings and IAM pages use it)
+- `description` (`I18nText` — one line under the heading, either variant)
+- `tone` (`"default" | "danger"`, default `"default"` — `"danger"` applies to `variant="plain"` only: error-coloured heading with a warning icon and an error-coloured card border, for a destructive section)
+- `info` (`I18nText` — tooltip on an info icon after the heading)
+- `required` (boolean — appends the required marker to the heading)
+- `dataTest` (string)
+
+**Slots:** `default` — the section body; `actions` — controls at the end of the header (an in-section adder); `description` — replaces the `description` text when the line needs markup, such as a tooltip
+**Emits:** none
+**Example:**
+```vue
+<OFormSection
+  variant="plain"
+  :title="t('settings.retentionTitle')"
+  :description="t('settings.retentionDescription')"
+  data-test="settings-retention-section"
+>
+  <OSettingRow :label="t('settings.retentionDays')" data-test="settings-retention-days">
+    <OFormInput name="retention_days" type="number" width="xs" />
+  </OSettingRow>
+</OFormSection>
+
+<OFormSection
+  variant="plain"
+  tone="danger"
+  :title="t('settings.dangerZone')"
+  data-test="settings-danger-zone-section"
+>
+  …
+</OFormSection>
+```
+**Family:** `OSettingRow` for the rows inside. One `h1` (the page title) above the plain sections' `h2`s.
+
+---
+
 ### OSeparator
 
 **Import:** `@/lib/core/Separator/OSeparator.vue`
@@ -449,15 +489,20 @@ Note: delete/bin icon names render in the destructive (red) colour by default; o
 
 ### OSettingRow
 **Import:** `@/lib/core/SettingRow/OSettingRow.vue`
-**Use when:** One labelled setting inside a settings card — name and one-line description on the left, the control on the right, hairline rule between rows (the last row drops its own).
+**Use when:** One labelled setting inside a settings card — name and one-line description on the left, the control on the right, hairline rule between rows (the last row drops its own). Pass `name` (or `error`) and the field's error takes the description's place, so nothing moves. Pass `loading` while the value is pending. `control-at="end"` pins a fixed control column to the row's end; Settings forms use it.
 **Don't use for:** Form fields with a label above the control — use `OFormInput` directly.
 **Key props:**
 - `label` (`I18nText`, required — the setting's name)
 - `description` (`I18nText` — one line saying what the setting does or what a special value means)
 - `disabled` (boolean, default `false` — renders the row muted only; the control owns its own disabled state)
 - `dataTest` (string)
+- `errorDataTest` (string, default `<dataTest>-error` — selector of the printed error text; pass it to keep a selector the field's own error had)
+- `loading` (boolean, default `false` — one static skeleton replaces the control; label and description stay)
+- `name` (string — field path in the enclosing `OForm`; the row prints that field's error and the `OForm*` control with the same `name` keeps its red border but prints nothing)
+- `error` (`I18nText` — same place, for pages without `OForm`; wins over `name`)
+- `controlAt` (`"label" | "end"`, default `"label"` — `"end"`: the label grows and a fixed control column sits at the row's end; it stacks when the row is narrower than 42rem)
 
-**Slots:** `default` — the control on the right
+**Slots:** `default` — the control on the right. A single control gets `aria-describedby` for the shown error automatically; when the control sits inside other markup, bind the slot prop yourself: `#default="{ describedBy }"`. `description` — rich help (a bold name inside a sentence) in place of the `description` text.
 **Emits:** none
 **Example:**
 ```vue
@@ -469,36 +514,7 @@ Note: delete/bin icon names render in the destructive (red) colour by default; o
   <OFormInput name="min_length" type="number" width="xs" />
 </OSettingRow>
 ```
-**Family:** Pair with `OFormSection`, which supplies the card.
-
----
-
-### OSettingRowPair
-**Import:** `@/lib/core/SettingRow/OSettingRowPair.vue`
-**Use when:** Two related settings — a min/max, a period and its warning — on one row; the pair owns the hairline and padding so the two cells read as one row.
-**Don't use for:** More than two controls, or unrelated settings that only happen to be adjacent.
-**Key props:**
-- `dataTest` (string)
-
-**Slots:** `default` — exactly two `OSettingRow`; `footer` — a full-width message under both cells (a cross-field validation error)
-**Emits:** none
-**Example:**
-```vue
-<OSettingRowPair data-test="settings-password-policy-pair-length">
-  <OSettingRow :label="t('passwordPolicy.minLength')" data-test="settings-password-policy-min-length">
-    <OFormInput name="min_length" type="number" width="xs" />
-  </OSettingRow>
-  <OSettingRow :label="t('passwordPolicy.maxLength')" data-test="settings-password-policy-max-length">
-    <OFormInput name="max_length" type="number" width="xs">
-      <template #error />
-    </OFormInput>
-  </OSettingRow>
-  <template v-if="maxLengthError" #footer>
-    <p class="text-input-error-text text-xs" role="alert">{{ maxLengthError }}</p>
-  </template>
-</OSettingRowPair>
-```
-**Family:** `OSettingRow`, `OFormSection`.
+**Family:** Pair with `OFormSection`, which supplies the card. On Settings and IAM pages use `variant="plain"`: one heading level, no accent bar, no section over a single control.
 
 ---
 

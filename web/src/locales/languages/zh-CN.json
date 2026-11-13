@@ -30684,7 +30684,7 @@
   },
   "slackApp": {
     "prereq": {
-      "title": "第 0 步 · 服务器前提条件",
+      "title": "第 1 步 · 服务器前提条件",
       "subtitle": "进行任何 Slack 操作前，都会在此服务器上检查",
       "columnSetting": "设置",
       "columnResult": "结果",
@@ -30755,7 +30755,7 @@
       "back": "上一步",
       "finish": "完成",
       "connection": {
-        "title": "第 1 步 · 连接",
+        "title": "第 2 步 · 连接",
         "description": "此检查会从此服务器通过生产环境使用的同一代码路径访问 Slack。",
         "allPassed": "此服务器可访问 Slack",
         "someFailed": "此服务器无法访问 Slack。请允许 *.slack.com 通过您的代理或防火墙，然后重新检查。",
@@ -30764,7 +30764,7 @@
         "socketHost": "WebSocket 主机 {host}"
       },
       "create": {
-        "title": "第 2 步 · 创建应用",
+        "title": "第 3 步 · 创建应用",
         "modeLabel": "连接模式",
         "socket": "Socket 模式",
         "socketDescription": "推荐。OpenObserve 会建立连接，因此 Slack 无需公共 URL",
@@ -30793,7 +30793,7 @@
         "signingSecretRequired": "HTTP 模式需要签名密钥"
       },
       "install": {
-        "title": "第 3 步 · 安装",
+        "title": "第 4 步 · 安装",
         "created": "应用已创建 · {appId}",
         "allowHint": "打开 Slack 的安装页面：在那里点击“允许”。机器人令牌会由 Slack 自动返回；无需复制。",
         "allow": "在 Slack 中允许",
@@ -30816,7 +30816,7 @@
         "appNotCreatedByO2": "此应用并非由 OpenObserve 创建，因此会保留在 Slack 中。如果不再需要，请在 Slack 中删除。"
       },
       "test": {
-        "title": "第 4 步 · 测试与关联",
+        "title": "第 5 步 · 测试与关联",
         "run": "运行检查",
         "signIn": "测试“使用 Slack 登录”",
         "signInPassed": "“使用 Slack 登录”可用",

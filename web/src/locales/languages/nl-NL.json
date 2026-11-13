@@ -30684,7 +30684,7 @@
   },
   "slackApp": {
     "prereq": {
-      "title": "Stap 0 · Serververeisten",
+      "title": "Stap 1 · Serververeisten",
       "subtitle": "Gecontroleerd op deze server voordat je met Slack aan de slag gaat",
       "columnSetting": "Instelling",
       "columnResult": "Resultaat",
@@ -30755,7 +30755,7 @@
       "back": "Terug",
       "finish": "Voltooien",
       "connection": {
-        "title": "Stap 1 · Verbinding",
+        "title": "Stap 2 · Verbinding",
         "description": "De controle bereikt Slack vanaf deze server via hetzelfde codepad dat productie gebruikt.",
         "allPassed": "Slack is bereikbaar vanaf deze server",
         "someFailed": "Slack is niet bereikbaar vanaf deze server. Sta *.slack.com toe via je proxy of firewall en klik op Opnieuw controleren.",
@@ -30764,7 +30764,7 @@
         "socketHost": "WebSocket-host {host}"
       },
       "create": {
-        "title": "Stap 2 · De app aanmaken",
+        "title": "Stap 3 · De app aanmaken",
         "modeLabel": "Verbindingsmodus",
         "socket": "Socket-modus",
         "socketDescription": "Aanbevolen. OpenObserve opent de verbinding, dus Slack heeft geen openbare URL nodig",
@@ -30793,7 +30793,7 @@
         "signingSecretRequired": "HTTP-modus vereist het signing secret"
       },
       "install": {
-        "title": "Stap 3 · Installeren",
+        "title": "Stap 4 · Installeren",
         "created": "App aangemaakt · {appId}",
         "allowHint": "Opent het installatiescherm van Slack: klik daar op Toestaan. Het bot-token komt vanzelf terug van Slack; je hoeft niets te kopiëren.",
         "allow": "Toestaan in Slack",
@@ -30816,7 +30816,7 @@
         "appNotCreatedByO2": "OpenObserve heeft deze app niet aangemaakt, dus hij blijft in Slack. Verwijder hem daar als je hem niet meer nodig hebt."
       },
       "test": {
-        "title": "Stap 4 · Testen en koppelen",
+        "title": "Stap 5 · Testen en koppelen",
         "run": "Controles uitvoeren",
         "signIn": "Test Aanmelden met Slack",
         "signInPassed": "Aanmelden met Slack werkt",

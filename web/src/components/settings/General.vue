@@ -17,186 +17,167 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
   <div>
-    <!-- Section header (title + description) is provided full-width by the
-         Settings shell; this component renders only the form content. -->
-    <!-- platform settings section. The page gutter is owned by the Settings
-         shell's ConstrainedPage; this block adds none of its own. -->
-    <div v-if="!trialExpired">
-      <GroupHeader :title="t('settings.platformSettings')" :showIcon="false" />
-      <div class="flex w-full flex-col">
-        <OForm
-          :schema="generalSettingsSchema"
-          :default-values="generalSettingsDefaults"
-          @submit="saveGeneralSettings"
-          v-slot="{ isSubmitting }"
-        >
-          <!-- scape interval section -->
-          <div
-            class="settings-grid-item border-card-glass-border grid grid-cols-3 items-center gap-4 border-b py-4 max-lg:grid-cols-1 max-lg:gap-2"
+    <OForm id="general-settings-form" :form="form">
+      <div class="flex flex-col gap-4">
+        <template v-if="!trialExpired">
+          <OFormSection
+            variant="plain"
+            :title="t('settings.general.themeTitle')"
+            :description="t('settings.general.themeDescription', { org: deleteOrgName })"
+            data-test="general-settings-theme-section"
           >
-            <span class="individual-setting-title text-sm leading-5 font-medium">
-              {{ t("settings.scrapintervalLabel") }}
-            </span>
-            <OFormInput
+            <OSettingRow
+              control-at="end"
+              :label="t('settings.general.accentColorLabel')"
+              :loading="!settingsLoaded"
+              data-test="general-settings-theme-row"
+            >
+              <div class="flex w-full flex-wrap items-center gap-1.5">
+                <button
+                  type="button"
+                  class="group/chip bg-surface-subtle border-border-default hover:bg-surface-subtle-hover hover:border-accent focus-visible:outline-focus-ring-accent inline-flex cursor-pointer items-center gap-1 rounded-full border py-1.5 ps-1.5 pe-2 transition-all duration-200 outline-none hover:-translate-y-px hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-solid"
+                  :aria-label="t('settings.general.lightColorLabel', { color: customLightColor })"
+                  data-test="theme-light-chip"
+                  @click="handleThemeChipClick('light')"
+                >
+                  <span
+                    class="color-circle relative flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-full shadow-sm"
+                    :style="{ backgroundColor: customLightColor }"
+                  >
+                    <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling it with text makes elevation bloom -->
+                    <OIcon
+                      name="palette"
+                      size="xs"
+                      class="opacity-0 filter-[drop-shadow(0_1px_1px_color-mix(in_srgb,var(--color-black)_30%,transparent))] transition-opacity duration-200 group-hover/chip:opacity-90 max-md:opacity-90"
+                    />
+                    <!-- eslint-enable local/no-hardcoded-px -->
+                  </span>
+                  <span class="chip-label text-text-body text-xs font-semibold">{{
+                    t("settings.light")
+                  }}</span>
+                  <span class="chip-value text-text-body font-mono text-xs font-medium">{{
+                    customLightColor
+                  }}</span>
+                </button>
+
+                <button
+                  type="button"
+                  class="group/chip bg-surface-subtle border-border-default hover:bg-surface-subtle-hover hover:border-accent focus-visible:outline-focus-ring-accent inline-flex cursor-pointer items-center gap-1 rounded-full border py-1.5 ps-1.5 pe-2 transition-all duration-200 outline-none hover:-translate-y-px hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-solid"
+                  :aria-label="t('settings.general.darkColorLabel', { color: customDarkColor })"
+                  data-test="theme-dark-chip"
+                  @click="handleThemeChipClick('dark')"
+                >
+                  <span
+                    class="color-circle relative flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-full shadow-sm"
+                    :style="{ backgroundColor: customDarkColor }"
+                  >
+                    <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling it with text makes elevation bloom -->
+                    <OIcon
+                      name="palette"
+                      size="xs"
+                      class="opacity-0 filter-[drop-shadow(0_1px_1px_color-mix(in_srgb,var(--color-black)_30%,transparent))] transition-opacity duration-200 group-hover/chip:opacity-90 max-md:opacity-90"
+                    />
+                    <!-- eslint-enable local/no-hardcoded-px -->
+                  </span>
+                  <span class="chip-label text-text-body text-xs font-semibold">{{
+                    t("settings.dark")
+                  }}</span>
+                  <span class="chip-value text-text-body font-mono text-xs font-medium">{{
+                    customDarkColor
+                  }}</span>
+                </button>
+
+                <button
+                  type="button"
+                  class="group/resetChip border-border-default hover:border-error-400 hover:bg-error-500/10 focus-visible:outline-focus-ring-accent inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border border-dashed bg-transparent opacity-60 transition-all duration-200 outline-none hover:-translate-y-px hover:rotate-180 hover:border-solid hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-solid"
+                  :aria-label="t('settings.resetToDefaultColors')"
+                  data-test="reset-theme-colors-btn"
+                  @click="resetThemeColors"
+                >
+                  <OIcon
+                    name="refresh"
+                    size="sm"
+                    class="group-hover/resetChip:text-error-500 dark:group-hover/resetChip:text-error-400"
+                  />
+                  <OTooltip :content="t('settings.resetToDefaultColors')" side="top" />
+                </button>
+              </div>
+            </OSettingRow>
+          </OFormSection>
+
+          <OFormSection
+            variant="plain"
+            :title="t('settings.general.queryDefaultsTitle')"
+            :description="t('settings.general.queryDefaultsDescription')"
+            data-test="general-settings-query-defaults-section"
+          >
+            <OSettingRow
+              control-at="end"
               name="scrape_interval"
-              :aria-label="t('settings.scrapintervalLabel')"
-              type="number"
-              min="0"
-              class="w-52!"
-              data-test="general-settings-scrape-interval"
-            />
-            <span class="individual-setting-description text-compact text-text-secondary">
-              {{ t("settings.scrapeIntervalDescription") }}
-            </span>
-          </div>
+              error-data-test="general-settings-scrape-interval-error"
+              :label="t('settings.general.scrapeIntervalLabel')"
+              :description="t('settings.general.scrapeIntervalHelp')"
+              :loading="!settingsLoaded"
+              data-test="general-settings-scrape-interval-row"
+            >
+              <OFormInput
+                name="scrape_interval"
+                :aria-label="t('settings.general.scrapeIntervalLabel')"
+                type="number"
+                min="0"
+                :suffix="t('settings.general.unitSeconds')"
+                data-test="general-settings-scrape-interval"
+              />
+            </OSettingRow>
 
-          <!-- Max Series Per Query section -->
-          <div
-            class="settings-grid-item border-card-glass-border grid grid-cols-3 items-center gap-4 border-b py-4 max-lg:grid-cols-1 max-lg:gap-2"
-          >
-            <span class="individual-setting-title text-sm leading-5 font-medium">
-              {{ t("settings.maxSeriesPerQueryLabel") }}
-            </span>
-            <OFormInput
+            <OSettingRow
+              control-at="end"
               name="max_series_per_query"
-              type="number"
-              :min="1000"
-              :max="1000000"
-              class="w-52!"
-              :placeholder="raw('40000')"
-              :aria-label="t('settings.maxSeriesPerQueryLabel')"
-              data-test="general-settings-max-series-per-query"
+              :label="t('settings.general.maxSeriesLabel')"
+              :description="t('settings.general.maxSeriesHelp', { n: defaultMaxSeries })"
+              :loading="!settingsLoaded"
+              data-test="general-settings-max-series-per-query-row"
             >
-              <template v-slot:icon-right>
-                <OIcon name="info" size="sm" class="cursor-pointer">
-                  <OTooltip side="top" :content="t('settings.maxSeriesPerQueryTooltip')" />
-                </OIcon>
-              </template>
-            </OFormInput>
-            <span class="individual-setting-description text-compact text-text-secondary">
-              {{ t("settings.maxSeriesPerQueryDescription") }}
-            </span>
-          </div>
+              <OFormInput
+                name="max_series_per_query"
+                type="number"
+                :min="1000"
+                :max="1000000"
+                :placeholder="raw(defaultMaxSeries)"
+                :suffix="t('settings.general.unitSeries')"
+                :aria-label="t('settings.general.maxSeriesLabel')"
+                data-test="general-settings-max-series-per-query"
+              />
+            </OSettingRow>
+          </OFormSection>
+        </template>
 
-          <!-- Manage Theme section -->
-          <div
-            class="settings-grid-item border-card-glass-border grid grid-cols-3 items-center gap-4 border-b py-4 max-lg:grid-cols-1 max-lg:gap-2"
-          >
-            <span class="individual-setting-title text-sm leading-5 font-medium">
-              {{ t("settings.manageTheme") }}
-            </span>
-            <div class="flex items-center gap-2 max-lg:flex-wrap">
-              <!-- Light Mode Theme -->
-              <div
-                class="group/chip bg-surface-subtle border-border-default hover:bg-surface-subtle-hover hover:border-accent inline-flex cursor-pointer items-center gap-2 rounded-full border py-1.5 ps-1.5 pe-3 transition-all duration-200 hover:-translate-y-px hover:shadow-md"
-                @click="handleThemeChipClick('light')"
-                data-test="theme-light-chip"
-              >
-                <div
-                  class="color-circle relative flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-full shadow-sm"
-                  :style="{ backgroundColor: customLightColor }"
-                >
-                  <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling it with text makes elevation bloom -->
-                  <OIcon
-                    name="palette"
-                    size="xs"
-                    class="opacity-0 filter-[drop-shadow(0_1px_1px_color-mix(in_srgb,var(--color-black)_30%,transparent))] transition-opacity duration-200 group-hover/chip:opacity-90 max-md:opacity-90"
-                  />
-                  <!-- eslint-enable local/no-hardcoded-px -->
-                </div>
-                <span class="chip-label text-text-body text-xs font-semibold">{{
-                  t("settings.light")
-                }}</span>
-                <span class="chip-value text-text-body font-mono text-xs font-medium">{{
-                  customLightColor
-                }}</span>
-              </div>
-
-              <!-- Dark Mode Theme -->
-              <div
-                class="group/chip bg-surface-subtle border-border-default hover:bg-surface-subtle-hover hover:border-accent inline-flex cursor-pointer items-center gap-2 rounded-full border py-1.5 ps-1.5 pe-3 transition-all duration-200 hover:-translate-y-px hover:shadow-md"
-                @click="handleThemeChipClick('dark')"
-                data-test="theme-dark-chip"
-              >
-                <div
-                  class="color-circle relative flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-full shadow-sm"
-                  :style="{ backgroundColor: customDarkColor }"
-                >
-                  <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling it with text makes elevation bloom -->
-                  <OIcon
-                    name="palette"
-                    size="xs"
-                    class="opacity-0 filter-[drop-shadow(0_1px_1px_color-mix(in_srgb,var(--color-black)_30%,transparent))] transition-opacity duration-200 group-hover/chip:opacity-90 max-md:opacity-90"
-                  />
-                  <!-- eslint-enable local/no-hardcoded-px -->
-                </div>
-                <span class="chip-label text-text-body text-xs font-semibold">{{
-                  t("settings.dark")
-                }}</span>
-                <span class="chip-value text-text-body font-mono text-xs font-medium">{{
-                  customDarkColor
-                }}</span>
-              </div>
-
-              <!-- Reset Button -->
-              <div
-                class="group/resetChip border-border-default hover:border-error-400 hover:bg-error-500/10 inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border border-dashed bg-transparent opacity-60 transition-all duration-200 hover:-translate-y-px hover:rotate-180 hover:border-solid hover:opacity-100"
-                @click="resetThemeColors"
-                data-test="reset-theme-colors-btn"
-              >
-                <OIcon
-                  name="refresh"
-                  size="sm"
-                  class="group-hover/resetChip:text-error-500 dark:group-hover/resetChip:text-error-400"
-                />
-                <OTooltip :content="t('settings.resetToDefaultColors')" side="top" />
-              </div>
-            </div>
-            <span
-              class="individual-setting-description text-compact text-text-secondary self-start"
-            >
-              {{ t("settings.themeManagementDescription") }}
-            </span>
-          </div>
-
-          <span>&nbsp;</span>
-
-          <div class="flex justify-start">
-            <OButton
-              data-test="dashboard-add-submit"
-              :loading="isSubmitting"
-              variant="primary"
-              size="sm-action"
-              type="submit"
-            >
-              {{ t("dashboard.save") }}
-            </OButton>
-          </div>
-        </OForm>
-      </div>
-    </div>
-    <div
-      id="enterpriseFeature"
-      v-if="
-        !trialExpired &&
-        customBrandingAccess.visible &&
-        store.state.zoConfig.meta_org == store.state.selectedOrganization.identifier
-      "
-    >
-      <div class="py-2">
-        <GroupHeader :title="t('settings.enterpriseFeatures')" :showIcon="false" />
-      </div>
-      <div>
-        <div
-          class="settings-grid-item no-border-bottom border-card-glass-border grid grid-cols-3 items-center gap-4 border-b py-4 max-lg:grid-cols-1 max-lg:gap-2"
+        <OFormSection
+          v-if="
+            !trialExpired &&
+            customBrandingAccess.visible &&
+            store.state.zoConfig.meta_org == store.state.selectedOrganization.identifier
+          "
+          id="enterpriseFeature"
+          variant="plain"
+          :title="t('settings.general.brandingTitle')"
+          :description="t('settings.general.brandingDescription')"
+          data-test="general-settings-branding-section"
         >
-          <span class="individual-setting-title text-sm leading-5 font-medium">
-            {{ t("settings.customLogoText") }}
-          </span>
-          <template v-if="!customBrandingAccess.allowed">
-            <div class="flex items-center gap-2" @click.capture="onLockedBrandingClick">
+          <OSettingRow
+            control-at="end"
+            name="custom_logo_text"
+            error-data-test="settings_ent_logo_custom_text_error"
+            :label="t('settings.customLogoText')"
+            :description="t('settings.general.logoTextHelp')"
+          >
+            <div
+              v-if="!customBrandingAccess.allowed"
+              class="flex w-full items-center gap-2"
+              @click.capture="onLockedBrandingClick"
+            >
               <OInput
-                class="w-62.5"
+                class="min-w-0 flex-1"
                 model-value=""
                 :placeholder="t('settings.noTextAvailable')"
                 :aria-label="t('settings.customLogoText')"
@@ -207,313 +188,215 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
               </OInput>
             </div>
-          </template>
-          <template v-else>
+            <OFormInput
+              v-else
+              name="custom_logo_text"
+              :aria-label="t('settings.customLogoText')"
+              data-test="settings_ent_logo_custom_text"
+            />
+          </OSettingRow>
+
+          <OSettingRow
+            control-at="end"
+            :label="t('settings.general.logoLightLabel')"
+            :description="t('settings.general.logoLightHelp')"
+          >
             <div
-              v-if="editingText || store.state.zoConfig.custom_logo_text == ''"
-              class="flex items-center gap-2"
+              v-if="!customBrandingAccess.allowed"
+              class="flex w-full items-center gap-2"
+              @click.capture="onLockedBrandingClick"
             >
-              <OInput
-                class="w-62.5"
-                :aria-label="t('settings.customLogoText')"
-                data-test="settings_ent_logo_custom_text"
-                v-model="customText"
-              />
-              <div class="flex gap-x-2">
-                <OButton
-                  :aria-label="t('common.cancel')"
-                  type="button"
-                  variant="outline-destructive"
-                  size="icon-xs-sq"
-                  @click="cancelLogoText"
-                  icon-left="close"
-                />
-                <OButton
-                  :aria-label="t('common.save')"
-                  data-test="settings_ent_logo_custom_text_save_btn"
-                  :loading="loadingState"
-                  variant="outline"
-                  size="icon-xs-sq"
-                  type="button"
-                  @click="updateCustomText"
-                  icon-left="check"
-                />
-              </div>
-            </div>
-            <div v-else class="flex items-center">
-              <OTruncatedText class="w-47.5 text-center"
-                >{{ store.state.zoConfig.custom_logo_text || t("settings.noTextAvailable") }}
-              </OTruncatedText>
-              <OButton
-                :aria-label="t('common.edit')"
-                data-test="settings_ent_logo_custom_text_edit_btn"
-                :loading="loadingState"
-                variant="outline"
-                size="icon-xs-sq"
-                class="ms-2"
-                type="button"
-                @click="editingText = !editingText"
-                icon-left="edit"
-              />
-            </div>
-          </template>
-          <span class="individual-setting-description text-compact text-text-secondary">
-            {{ t("settings.customLogoTextDescription") }}
-          </span>
-        </div>
-        <!-- Light Mode Logo -->
-        <div
-          class="settings-grid-item border-card-glass-border grid grid-cols-3 items-center gap-4 border-b py-4 max-lg:grid-cols-1 max-lg:gap-2"
-        >
-          <div class="individual-setting-title mb-5 w-full pt-2 text-sm leading-5 font-medium">
-            {{ t("settings.customLogoTitle") }} ({{ t("settings.lightMode") }})
-          </div>
-          <template v-if="!customBrandingAccess.allowed">
-            <div class="flex items-start gap-2" @click.capture="onLockedBrandingClick">
               <OFile
                 data-test="setting_ent_custom_logo_img_file_upload_locked"
-                :label="t('settings.dragDropUpload')"
                 accept=".png, .jpg, .jpeg, .gif, .bmp, .jpeg2, image/*"
-                :help-text="t('settings.fileFormatConstraint')"
-                class="o2-file-input mx-0"
+                class="o2-file-input mx-0 min-w-0 flex-1"
               >
                 <template v-slot:prepend>
                   <OIcon name="lock" size="sm" class="lock-chip" />
                 </template>
               </OFile>
             </div>
-          </template>
-          <template v-else>
             <div
-              v-if="
+              v-else-if="
                 store.state.zoConfig.hasOwnProperty('custom_logo_img') &&
                 store.state.zoConfig.custom_logo_img != null
               "
-              class="w-full"
+              class="flex w-full items-center gap-3"
             >
               <img
                 data-test="setting_ent_custom_logo_img"
                 :src="`data:image; base64, ` + store.state.zoConfig.custom_logo_img"
                 :alt="t('settings.logoLabel')"
-                class="mx-3 max-h-7.75 max-w-37.5"
+                class="max-h-7.75 max-w-37.5"
               />
               <OButton
                 :aria-label="t('common.delete')"
                 data-test="setting_ent_custom_logo_img_delete_btn"
                 variant="ghost-destructive"
                 size="icon-xs-sq"
-                class="mx-3"
+                type="button"
                 @click="confirmDeleteLogo('light')"
                 icon-left="delete"
               />
             </div>
-            <div v-else class="flex items-start gap-2">
+            <div v-else class="flex w-full items-center gap-2">
               <OFile
                 data-test="setting_ent_custom_logo_img_file_upload"
                 v-model="filesLight"
-                :label="t('settings.dragDropUpload')"
-                counter
-                :counter-label="counterLabelFn"
+                :aria-label="t('settings.general.logoLightLabel')"
                 accept=".png, .jpg, .jpeg, .gif, .bmp, .jpeg2, image/*"
                 @rejected="onRejected"
-                :help-text="t('settings.fileFormatConstraint')"
-                class="o2-file-input mx-0"
+                class="o2-file-input mx-0 min-w-0 flex-1"
               >
                 <template v-slot:prepend>
                   <OIcon name="attach-file" size="sm" />
                 </template>
               </OFile>
-              <div class="flex gap-x-2 pt-5.75">
-                <OButton
-                  :aria-label="t('common.cancel')"
-                  type="button"
-                  variant="outline-destructive"
-                  size="icon-xs-sq"
-                  @click="filesLight = null"
-                  icon-left="close"
-                />
-                <OButton
-                  :aria-label="t('common.save')"
-                  data-test="settings_ent_logo_custom_light_save_btn"
-                  :loading="loadingState"
-                  variant="outline"
-                  size="icon-xs-sq"
-                  type="button"
-                  @click="uploadImage(filesLight, 'light')"
-                  icon-left="check"
-                />
-              </div>
+              <OButton
+                v-if="filesLight"
+                data-test="settings_ent_logo_custom_light_save_btn"
+                :loading="loadingState"
+                variant="outline"
+                size="sm-action"
+                type="button"
+                @click="uploadImage(filesLight, 'light')"
+                >{{ t("settings.general.uploadLogo") }}</OButton
+              >
             </div>
-          </template>
-          <span
-            class="individual-setting-description text-compact text-text-secondary -translate-y-1.25"
-          >
-            {{ t("settings.customLogoLightDescription") }}
-          </span>
-        </div>
+          </OSettingRow>
 
-        <!-- Dark Mode Logo -->
-        <div
-          class="settings-grid-item border-card-glass-border grid grid-cols-3 items-center gap-4 border-b py-4 max-lg:grid-cols-1 max-lg:gap-2"
-        >
-          <div class="individual-setting-title mb-5 w-full pt-2 text-sm leading-5 font-medium">
-            {{ t("settings.customLogoTitle") }} ({{ t("settings.darkMode") }})
-          </div>
-          <template v-if="!customBrandingAccess.allowed">
-            <div class="flex items-start gap-2" @click.capture="onLockedBrandingClick">
+          <OSettingRow
+            control-at="end"
+            :label="t('settings.general.logoDarkLabel')"
+            :description="t('settings.general.logoDarkHelp')"
+          >
+            <div
+              v-if="!customBrandingAccess.allowed"
+              class="flex w-full items-center gap-2"
+              @click.capture="onLockedBrandingClick"
+            >
               <OFile
                 data-test="setting_ent_custom_logo_dark_img_file_upload_locked"
-                :label="t('settings.dragDropUpload')"
                 accept=".png, .jpg, .jpeg, .gif, .bmp, .jpeg2, image/*"
-                :help-text="t('settings.fileFormatConstraint')"
-                class="o2-file-input mx-0"
+                class="o2-file-input mx-0 min-w-0 flex-1"
               >
                 <template v-slot:prepend>
                   <OIcon name="lock" size="sm" class="lock-chip" />
                 </template>
               </OFile>
             </div>
-          </template>
-          <template v-else>
             <div
-              v-if="
+              v-else-if="
                 store.state.zoConfig.hasOwnProperty('custom_logo_dark_img') &&
                 store.state.zoConfig.custom_logo_dark_img != null
               "
-              class="w-full"
+              class="flex w-full items-center gap-3"
             >
               <img
                 data-test="setting_ent_custom_logo_dark_img"
                 :src="`data:image; base64, ` + store.state.zoConfig.custom_logo_dark_img"
                 :alt="t('settings.logoLabel')"
-                class="mx-3 max-h-7.75 max-w-37.5"
+                class="max-h-7.75 max-w-37.5"
               />
               <OButton
                 :aria-label="t('common.delete')"
                 data-test="setting_ent_custom_logo_dark_img_delete_btn"
                 variant="ghost-destructive"
                 size="icon-xs-sq"
-                class="mx-3"
+                type="button"
                 @click="confirmDeleteLogo('dark')"
                 icon-left="delete"
               />
             </div>
-            <div v-else class="flex items-start gap-2">
+            <div v-else class="flex w-full items-center gap-2">
               <OFile
                 data-test="setting_ent_custom_logo_dark_img_file_upload"
                 v-model="filesDark"
-                :label="t('settings.dragDropUpload')"
-                counter
-                :counter-label="counterLabelFn"
+                :aria-label="t('settings.general.logoDarkLabel')"
                 accept=".png, .jpg, .jpeg, .gif, .bmp, .jpeg2, image/*"
                 @rejected="onRejected"
-                :help-text="t('settings.fileFormatConstraint')"
-                class="o2-file-input mx-0"
+                class="o2-file-input mx-0 min-w-0 flex-1"
               >
                 <template v-slot:prepend>
                   <OIcon name="attach-file" size="sm" />
                 </template>
               </OFile>
-              <div class="flex gap-x-2 pt-5.75">
-                <OButton
-                  :aria-label="t('common.cancel')"
-                  type="button"
-                  variant="outline-destructive"
-                  size="icon-xs-sq"
-                  @click="filesDark = null"
-                  icon-left="close"
-                />
-                <OButton
-                  :aria-label="t('common.save')"
-                  data-test="settings_ent_logo_custom_dark_save_btn"
-                  :loading="loadingState"
-                  variant="outline"
-                  size="icon-xs-sq"
-                  type="button"
-                  @click="uploadImage(filesDark, 'dark')"
-                  icon-left="check"
-                />
-              </div>
+              <OButton
+                v-if="filesDark"
+                data-test="settings_ent_logo_custom_dark_save_btn"
+                :loading="loadingState"
+                variant="outline"
+                size="sm-action"
+                type="button"
+                @click="uploadImage(filesDark, 'dark')"
+                >{{ t("settings.general.uploadLogo") }}</OButton
+              >
             </div>
-          </template>
-          <span
-            class="individual-setting-description text-compact text-text-secondary -translate-y-1.25"
-          >
-            {{ t("settings.customLogoDarkDescription") }}
-          </span>
-        </div>
-      </div>
-    </div>
+          </OSettingRow>
+        </OFormSection>
 
-    <!-- Danger Zone: delete this organization (owner/admin only).
-         Backend gate is the per-org RBAC check on DELETE /api/{org_id}/organizations;
-         this UI gate just hides the action for non-admins of the current org. -->
-    <div
-      id="dangerZone"
-      v-if="canDeleteOrg"
-      data-test="general-settings-danger-zone"
-      class="rounded-default border-banner-error-soft-border mt-8 overflow-hidden border"
-    >
-      <!-- Red-accented header signals this section is destructive. -->
-      <div
-        class="border-banner-error-soft-border bg-banner-error-soft-bg flex items-center gap-2 border-b px-5 py-3"
-      >
-        <OIcon name="warning" size="sm" class="text-banner-error-soft-text" />
-        <span class="text-banner-error-soft-text text-base font-bold">
-          {{ t("settings.dangerZone") }}
-        </span>
-      </div>
-
-      <!-- Action row: what the action does, and the control that does it. The org
-           name is interpolated so the sentence names the thing being destroyed. -->
-      <div class="bg-surface-base flex items-start justify-between gap-6 px-5 py-4">
-        <div class="flex flex-col gap-1">
-          <span class="text-text-heading text-sm font-semibold">
-            {{ t("settings.deleteOrganizationTitle") }}
-          </span>
-          <i18n-t
-            keypath="settings.deleteOrganizationDescription"
-            tag="p"
-            class="text-text-secondary max-w-3xl text-sm"
-          >
-            <template #name>
-              <span class="text-text-body font-semibold">{{ deleteOrgName }}</span>
+        <!-- Visibility only: the backend's per-org RBAC check on DELETE is the real gate. -->
+        <OFormSection
+          v-if="canDeleteOrg"
+          id="dangerZone"
+          variant="plain"
+          tone="danger"
+          :title="t('settings.dangerZone')"
+          data-test="general-settings-danger-zone"
+        >
+          <OSettingRow control-at="end" :label="t('settings.deleteOrganizationTitle')">
+            <template #description>
+              <i18n-t keypath="settings.deleteOrganizationDescription" tag="span">
+                <template #name>
+                  <span class="text-text-body font-semibold">{{ deleteOrgName }}</span>
+                </template>
+              </i18n-t>
             </template>
-          </i18n-t>
-        </div>
-        <OButton
-          data-test="general-settings-delete-org-btn"
-          variant="outline-destructive"
-          size="sm-action"
-          icon-left="delete"
-          class="shrink-0"
-          :loading="deleting"
-          @click="openDeleteOrgDialog"
-        >
-          {{ t("settings.deleteOrganization") }}
-        </OButton>
+            <OButton
+              data-test="general-settings-delete-org-btn"
+              variant="outline-destructive"
+              size="sm-action"
+              icon-left="delete"
+              type="button"
+              :loading="deleting"
+              @click="openDeleteOrgDialog"
+            >
+              {{ t("settings.deleteOrganization") }}
+            </OButton>
+          </OSettingRow>
+
+          <div
+            data-test="general-settings-delete-org-facts"
+            class="divide-border-default grid grid-cols-4 divide-x max-md:grid-cols-1 max-md:divide-x-0"
+          >
+            <div
+              v-for="fact in deleteOrgFacts"
+              :key="fact.key"
+              :data-test="`general-settings-delete-org-fact-${fact.key}`"
+              class="flex flex-col gap-1 px-4 py-3"
+            >
+              <div class="flex items-center gap-2">
+                <OIcon :name="fact.icon" size="sm" class="text-text-muted shrink-0" />
+                <span class="text-text-heading text-sm font-semibold">{{ fact.title }}</span>
+              </div>
+              <span class="text-text-secondary text-xs">{{ fact.detail }}</span>
+            </div>
+          </div>
+        </OFormSection>
       </div>
 
-      <!-- Consequence strip: the four things worth knowing before deciding —
-           reversibility, blast radius, who is affected, and who may do it. -->
-      <div
-        data-test="general-settings-delete-org-facts"
-        class="divide-border-default border-border-default bg-surface-base grid grid-cols-4 divide-x border-t"
-      >
-        <div
-          v-for="fact in deleteOrgFacts"
-          :key="fact.key"
-          :data-test="`general-settings-delete-org-fact-${fact.key}`"
-          class="flex flex-col gap-1 px-5 py-4"
-        >
-          <div class="flex items-center gap-2">
-            <OIcon :name="fact.icon" size="sm" class="text-text-muted shrink-0" />
-            <span class="text-text-heading text-sm font-semibold">{{ fact.title }}</span>
-          </div>
-          <span class="text-text-secondary text-xs">{{ fact.detail }}</span>
-        </div>
-      </div>
-    </div>
+      <Teleport v-if="!trialExpired" defer :to="SAVE_BAR_SLOT">
+        <OSaveBar
+          class="px-page-edge"
+          form-id="general-settings-form"
+          :change-count="changeCount"
+          :loaded="settingsLoaded"
+          data-test="general-settings-save-bar"
+          save-data-test="dashboard-add-submit"
+          @discard="discardThemeColors"
+        />
+      </Teleport>
+    </OForm>
   </div>
   <OSpinner
     v-if="loadingState"
@@ -653,23 +536,32 @@ import settingsService from "@/services/settings";
 import analytics from "@/services/product_analytics";
 import config from "@/aws-exports";
 import DOMPurify from "dompurify";
-import GroupHeader from "../common/GroupHeader.vue";
 import { applyThemeColors, switchThemeMode } from "@/utils/theme";
 import { isTrialExpired, useLocalOrganization } from "@/utils/zincutils";
 import { formatSizeFromMB } from "@/utils/formatters";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OFile from "@/lib/forms/File/OFile.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import { useOForm } from "@/lib/forms/Form/useOForm";
+import OSaveBar from "@/lib/forms/SaveBar/OSaveBar.vue";
+import {
+  discardFormChanges,
+  rebaseSavedValues,
+  useFormCounts,
+} from "@/lib/forms/SaveBar/formCounts";
+import { useLeaveGuard } from "@/lib/forms/SaveBar/useLeaveGuard";
+import OFormSection from "@/lib/core/FormSection/OFormSection.vue";
+import OSettingRow from "@/lib/core/SettingRow/OSettingRow.vue";
 import OColor from "@/lib/forms/Color/OColor.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { makeGeneralSettingsSchema, type GeneralSettingsForm } from "./General.schema";
+import { SAVE_BAR_SLOT } from "./saveBarSlot";
 import { useLockedAffordance } from "@/composables/useLockedAffordance";
 import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
 
@@ -689,17 +581,18 @@ export default defineComponent({
     },
   },
   components: {
-    GroupHeader,
     OButton,
     ODialog,
     OSpinner,
     OIcon,
     OTooltip,
-    OTruncatedText,
     OInput,
     OFile,
     OForm,
     OFormInput,
+    OFormSection,
+    OSettingRow,
+    OSaveBar,
     OColor,
   },
   setup() {
@@ -721,12 +614,24 @@ export default defineComponent({
 
     // Built once from the component's `t` so the messages are localized.
     const generalSettingsSchema = makeGeneralSettingsSchema(t);
-    // Dynamic defaults (edit-prefill from the store) → a typed computed.
-    const generalSettingsDefaults = computed((): GeneralSettingsForm => ({
-      scrape_interval: store.state?.organizationData?.organizationSettings?.scrape_interval ?? 15,
-      max_series_per_query:
-        store.state?.organizationData?.organizationSettings?.max_series_per_query ?? null,
-    }));
+    const orgSettings = computed(() => store.state?.organizationData?.organizationSettings);
+    const settingsLoaded = computed(() => !!orgSettings.value);
+    // Held as text because a number input emits text: a retyped saved value must compare equal.
+    const fieldText = (value: unknown) =>
+      value === null || value === undefined ? "" : String(value);
+    const savedFormValues = (): GeneralSettingsForm => ({
+      scrape_interval: fieldText(orgSettings.value?.scrape_interval),
+      max_series_per_query: fieldText(orgSettings.value?.max_series_per_query),
+      custom_logo_text: fieldText(store.state.zoConfig?.custom_logo_text),
+    });
+    const form = useOForm<GeneralSettingsForm>({
+      defaultValues: savedFormValues(),
+      schema: generalSettingsSchema,
+      validateOn: "leave",
+      onSubmit: (value) => saveGeneralSettings(value),
+    });
+    const { changes: formChanges } = useFormCounts(form);
+    const defaultMaxSeries = new Intl.NumberFormat().format(40000);
 
     const loadingState = ref(false);
 
@@ -739,14 +644,10 @@ export default defineComponent({
     const updateOrgSettings = useMutation(() =>
       updateOrgSettingsMutation(store.state?.selectedOrganization?.identifier),
     );
-    const customText = ref("");
-    const editingText = ref(false);
     const files = ref(null);
     const filesLight = ref(null);
     const filesDark = ref(null);
     const logoThemeToDelete = ref<string>("light");
-
-    customText.value = store.state.zoConfig.custom_logo_text;
 
     // Theme management state
     // Get default colors from Vuex store (centralized - can be updated in one place)
@@ -765,6 +666,19 @@ export default defineComponent({
       store.state.tempThemeColors?.dark ||
         store.state?.organizationData?.organizationSettings?.dark_mode_theme_color ||
         DEFAULT_DARK_COLOR,
+    );
+
+    const savedLightColor = computed(
+      () => orgSettings.value?.light_mode_theme_color || DEFAULT_LIGHT_COLOR,
+    );
+    const savedDarkColor = computed(
+      () => orgSettings.value?.dark_mode_theme_color || DEFAULT_DARK_COLOR,
+    );
+    const changeCount = computed(
+      () =>
+        formChanges.value +
+        Number(customLightColor.value !== savedLightColor.value) +
+        Number(customDarkColor.value !== savedDarkColor.value),
     );
 
     // Color picker dialog state
@@ -965,6 +879,8 @@ export default defineComponent({
         // org list (via the update_org flag MainLayout watches): its stale-org
         // guard then auto-selects a surviving org, or lands on the empty state if
         // this was the user's only org.
+        // The organization is gone, so its unsaved edits have nowhere to be saved and must not hold the redirect.
+        discardUnsaved();
         useLocalOrganization("");
         store.dispatch("setSelectedOrganization", {});
         router.push({
@@ -1003,19 +919,19 @@ export default defineComponent({
       { deep: true, immediate: true }, // Deep watch to catch nested property changes
     );
 
+    // A clean form follows the store (late load, another admin's save); a dirty one keeps the user's edits.
     watch(
-      () => editingText.value,
-      (value) => {
-        if (!value) {
-          customText.value = store.state.zoConfig.custom_logo_text;
-        }
+      () => [
+        orgSettings.value?.scrape_interval,
+        orgSettings.value?.max_series_per_query,
+        store.state.zoConfig?.custom_logo_text,
+      ],
+      () => {
+        if (formChanges.value === 0) form.reset(savedFormValues());
       },
     );
 
-    // @submit handler — fires only once the schema passes (scrape_interval
-    // required + ≥0; max_series_per_query optional range). The <input
-    // type="number"> emits a string, so coerce at use. Awaited by OForm so the
-    // inline Save button's spinner spans the POST (no useLoading wrapper).
+    // Runs only once the schema passes; the number inputs emit text, so coerce at use.
     const saveGeneralSettings = async (value: GeneralSettingsForm) => {
       const maxSeriesRaw = value.max_series_per_query;
       const maxSeriesNum =
@@ -1031,39 +947,112 @@ export default defineComponent({
         dark_mode_theme_color: customDarkColor.value,
       };
 
-      try {
-        //set organizations settings in store
-        //scrape interval will be in number
+      const base = form.options.defaultValues as GeneralSettingsForm;
+      const textChanged = (value.custom_logo_text ?? "") !== (base.custom_logo_text ?? "");
+      const text = sanitizeInput(value.custom_logo_text ?? "");
+      // A text-only edit must not rewrite, or fail on, organization settings nobody touched.
+      const sendOrg = !textChanged || changeCount.value > 1;
+
+      const savedOrg = store.state?.selectedOrganization?.identifier;
+      const [orgSaved, textSaved] = await Promise.all([
+        sendOrg && saveOrgPart(owned),
+        textChanged && saveLogoText(text),
+      ]);
+      // The store holds only the selected organization: a save that outlives a switch has nowhere to land.
+      if (store.state?.selectedOrganization?.identifier !== savedOrg) return;
+      // Stored only after the write succeeds, so a failed save leaves the bar in its changed state.
+      if (orgSaved) {
         store.dispatch("setOrganizationSettings", {
           ...store.state?.organizationData?.organizationSettings,
           ...owned,
         });
+      }
+      // A switch away and back replaced this page; the form and preview colors now belong to its successor.
+      if (unmounted || (!orgSaved && !textSaved)) return;
 
-        //update settings in backend
+      // A failed or unsent part keeps its old baseline, so its edits stay counted as unsaved.
+      const orgFields = (
+        from: Pick<GeneralSettingsForm, "scrape_interval" | "max_series_per_query">,
+      ) => ({
+        scrape_interval: from.scrape_interval,
+        max_series_per_query: from.max_series_per_query,
+      });
+      rebaseSavedValues(
+        form,
+        {
+          ...orgFields(
+            orgSaved
+              ? {
+                  scrape_interval: fieldText(owned.scrape_interval),
+                  max_series_per_query: fieldText(owned.max_series_per_query),
+                }
+              : base,
+          ),
+          custom_logo_text: textSaved ? text : base.custom_logo_text,
+        },
+        {
+          ...orgFields(orgSaved ? value : base),
+          custom_logo_text: textSaved ? value.custom_logo_text : base.custom_logo_text,
+        },
+      );
+
+      // A color picked while the request was pending is still an unsaved preview, so it stays.
+      if (
+        orgSaved &&
+        customLightColor.value === owned.light_mode_theme_color &&
+        customDarkColor.value === owned.dark_mode_theme_color
+      ) {
+        const currentMode = isDark.value ? "dark" : "light";
+        const color = currentMode === "light" ? customLightColor.value : customDarkColor.value;
+        applyThemeColors(color, currentMode, false);
+        store.commit("clearTempThemeColors");
+      }
+
+      toast({
+        variant: "success",
+        message: orgSaved
+          ? t("settings.organizationSettingsUpdated")
+          : t("settings.logoTextUpdatedSuccessfully"),
+      });
+    };
+
+    const saveOrgPart = async (owned: Record<string, unknown>): Promise<boolean> => {
+      try {
         await updateOrgSettings.mutateAsync(owned);
         analytics.track("org_general_settings_saved", {
           custom_theme:
             owned.light_mode_theme_color !== DEFAULT_LIGHT_COLOR ||
             owned.dark_mode_theme_color !== DEFAULT_DARK_COLOR,
         });
-
-        // Apply the current mode's theme
-        const currentMode = isDark.value ? "dark" : "light";
-        const color = currentMode === "light" ? customLightColor.value : customDarkColor.value;
-        applyThemeColors(color, currentMode, false);
-
-        // Clear temporary theme colors from store since we're saving permanently
-        store.commit("clearTempThemeColors");
-
-        toast({
-          variant: "success",
-          message: t("settings.organizationSettingsUpdated"),
-        });
+        return true;
       } catch (err: any) {
         toast({
           variant: "error",
           message: err?.message || t("settings.somethingWentWrong"),
         });
+        return false;
+      }
+    };
+
+    // Branding text is instance-wide with its own endpoint: a second request that fails on its own.
+    const saveLogoText = async (text: string): Promise<boolean> => {
+      try {
+        const res: any = await updateCustomLogoText.mutateAsync(text);
+        if (res?.status != 200) throw new Error(res?.message);
+        store.dispatch("setConfig", {
+          ...JSON.parse(JSON.stringify(store.state.zoConfig)),
+          custom_logo_text: text,
+        });
+        return true;
+      } catch (err: any) {
+        toast({
+          variant: "error",
+          message: t("settings.general.logoTextSaveFailed", {
+            reason:
+              err?.response?.data?.message || err?.message || t("settings.somethingWentWrong"),
+          }),
+        });
+        return false;
       }
     };
 
@@ -1340,92 +1329,55 @@ export default defineComponent({
       });
     };
 
-    const cancelLogoText = () => {
-      editingText.value = false;
-      customText.value = store.state.zoConfig.custom_logo_text;
-    };
-
-    const updateCustomText = () => {
-      loadingState.value = true;
-      customText.value = sanitizeInput(customText.value);
-      if (customText.value.length > 100) {
-        toast({
-          variant: "error",
-          message: t("settings.textMaxCharacters"),
-        });
-        loadingState.value = false;
-        return;
-      }
-
-      // Returned so a caller can await the write.
-      return updateCustomLogoText
-        .mutateAsync(customText.value)
-        .then(async (res: any) => {
-          if (res.status == 200) {
-            toast({
-              variant: "success",
-              message: t("settings.logoTextUpdatedSuccessfully"),
-            });
-
-            let stateConfig = JSON.parse(JSON.stringify(store.state.zoConfig));
-            stateConfig.custom_logo_text = customText.value;
-            store.dispatch("setConfig", stateConfig);
-            editingText.value = false;
-          } else {
-            toast({
-              variant: "error",
-              message: res?.message || t("settings.errorUpdatingImage"),
-            });
-          }
-        })
-        .catch((err) => {
-          toast({
-            variant: "error",
-            message: err?.message || t("settings.somethingWentWrong"),
-          });
-        })
-        .finally(() => {
-          loadingState.value = false;
-        });
-    };
-
-    /**
-     * When navigating away from General Settings without saving, clear temp preview
-     * colors and restore the correct colors for the current mode.
-     *
-     * Without this, tempThemeColors persists in the Vuex store and can cause
-     * App.vue's initializeThemeColors() to apply stale/wrong CSS variables
-     * when the user switches theme modes on other pages.
-     */
-    onBeforeUnmount(() => {
+    // Unsaved preview colors live in the store; left there they repaint other pages with the wrong palette.
+    const restoreSavedTheme = () => {
       if (!store || !store.state) return;
       const hasTempColors = store.state.tempThemeColors?.light || store.state.tempThemeColors?.dark;
-      if (hasTempColors) {
-        // Clear the unsaved preview colors from the store
-        store.commit("clearTempThemeColors");
+      if (!hasTempColors) return;
+      store.commit("clearTempThemeColors");
 
-        // Re-apply the correct (saved) colors for the current mode so the rest
-        // of the app doesn't remain stuck with the preview's CSS variables.
-        const currentMode = isDark.value ? "dark" : "light";
-        const defaultLight = store.state.defaultThemeColors?.light || "#3F7994";
-        const defaultDark = store.state.defaultThemeColors?.dark || "#5B9FBE";
+      const currentMode = isDark.value ? "dark" : "light";
+      const defaultLight = store.state.defaultThemeColors?.light || "#3F7994";
+      const defaultDark = store.state.defaultThemeColors?.dark || "#5B9FBE";
 
-        const savedLight =
-          localStorage.getItem("customLightColor") ||
-          store.state?.organizationData?.organizationSettings?.light_mode_theme_color ||
-          defaultLight;
-        const savedDark =
-          localStorage.getItem("customDarkColor") ||
-          store.state?.organizationData?.organizationSettings?.dark_mode_theme_color ||
-          defaultDark;
+      const savedLight =
+        localStorage.getItem("customLightColor") ||
+        store.state?.organizationData?.organizationSettings?.light_mode_theme_color ||
+        defaultLight;
+      const savedDark =
+        localStorage.getItem("customDarkColor") ||
+        store.state?.organizationData?.organizationSettings?.dark_mode_theme_color ||
+        defaultDark;
 
-        const color = currentMode === "light" ? savedLight : savedDark;
-        const isDefault =
-          (currentMode === "light" && color === defaultLight) ||
-          (currentMode === "dark" && color === defaultDark);
+      const color = currentMode === "light" ? savedLight : savedDark;
+      const isDefault =
+        (currentMode === "light" && color === defaultLight) ||
+        (currentMode === "dark" && color === defaultDark);
 
-        applyThemeColors(color, currentMode, isDefault);
-      }
+      applyThemeColors(color, currentMode, isDefault);
+    };
+
+    const discardThemeColors = () => {
+      customLightColor.value = savedLightColor.value;
+      customDarkColor.value = savedDarkColor.value;
+      restoreSavedTheme();
+    };
+
+    const discardUnsaved = () => {
+      discardFormChanges(form);
+      discardThemeColors();
+    };
+
+    let unmounted = false;
+    onBeforeUnmount(() => {
+      unmounted = true;
+      restoreSavedTheme();
+    });
+
+    // Settings pages are kept alive, so a confirmed leave must reset or the page comes back dirty.
+    useLeaveGuard(() => settingsLoaded.value && changeCount.value > 0, {
+      count: () => changeCount.value,
+      onDiscard: discardUnsaved,
     });
 
     return {
@@ -1434,22 +1386,17 @@ export default defineComponent({
       store,
       config,
       router,
-      // Form wiring (Options-API: schema + defaults MUST be returned so :schema
-      // resolves and validation runs).
-      generalSettingsSchema,
-      generalSettingsDefaults,
+      form,
+      settingsLoaded,
+      changeCount,
+      SAVE_BAR_SLOT,
+      defaultMaxSeries,
+      discardThemeColors,
       saveGeneralSettings,
       files,
       filesLight,
       filesDark,
       logoThemeToDelete,
-      counterLabelFn(CounterLabelParams: { filesNumber: any; totalSize: any }) {
-        return t("settings.general.fileCounterLabel", {
-          constraint: t("settings.fileFormatConstraint"),
-          filesNumber: CounterLabelParams.filesNumber,
-          totalSize: CounterLabelParams.totalSize,
-        });
-      },
       filesImages: ref(null),
       filesMaxSize: ref(null),
       filesMaxTotalSize: ref(null),
@@ -1465,10 +1412,6 @@ export default defineComponent({
       uploadImage,
       deleteLogo,
       loadingState,
-      customText,
-      editingText,
-      cancelLogoText,
-      updateCustomText,
       confirmDeleteImage: ref(false),
       sanitizeInput,
       // Theme management

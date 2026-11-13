@@ -17,7 +17,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <OPageLayout :title="t('iam.basicUsers')" :subtitle="t('user.subtitle')" icon="person" bleed>
+  <OPageLayout
+    :title="t('iam.basicUsers')"
+    :subtitle="t('user.subtitle', { org: store.state.selectedOrganization?.label ?? '' })"
+    icon="person"
+    bleed
+  >
     <template #actions>
       <OButton
         v-if="config.isCloud === 'true' && canInvite"
@@ -47,6 +52,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data="displayedRows"
           :columns="columns"
           row-key="email"
+          :row-actions="rowActions"
+          row-actions-more-data-test="user-list-row-more-actions"
           :loading="loading"
           :forbidden="forbidden"
           forbidden-resource="users"
@@ -169,116 +176,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
           </template>
 
-          <template #cell-actions="{ row, index }">
-            <OButton
-              v-if="row.enableDelete && row.status != 'pending' && !row.isDomainMapped"
-              :title="t('user.delete')"
-              variant="ghost"
-              size="icon-xs-sq"
-              class="max-md:hidden"
-              :data-test="`delete-basic-user-${row.email}`"
-              data-row-action="delete"
-              @click="confirmDeleteAction(row)"
-            >
-              <OIcon name="delete" size="sm" />
-            </OButton>
-            <OButton
-              v-if="row.enableDelete && row.status != 'pending' && row.isDomainMapped"
-              :title="t('user.block')"
-              variant="ghost"
-              size="icon-xs-sq"
-              class="max-md:hidden"
-              :data-test="`block-basic-user-${row.email}`"
-              data-row-action="delete"
-              @click="confirmBlockAction(row)"
-            >
-              <OIcon name="block" size="sm" />
-            </OButton>
-            <OButton
-              v-if="row.status == 'pending' && row.token"
-              :title="t('user.revoke_invite')"
-              variant="ghost"
-              size="icon-xs-sq"
-              class="max-md:hidden"
-              :data-test="`revoke-invite-${row.email}`"
-              data-row-action="delete"
-              @click="confirmRevokeAction(row)"
-            >
-              <OIcon name="cancel" size="sm" />
-            </OButton>
-            <OButton
-              v-if="row.enableEdit && row.status != 'pending'"
-              :title="t('user.update')"
-              variant="ghost"
-              size="icon-xs-sq"
-              class="max-md:hidden"
-              :data-test="`edit-basic-user-${index}`"
-              data-row-action="edit"
-              @click="addRoutePush(row)"
-            >
-              <OIcon name="edit" size="sm" />
-            </OButton>
-            <ODropdown
-              v-if="
-                (row.enableDelete && row.status != 'pending') ||
-                (row.status == 'pending' && row.token) ||
-                (row.enableEdit && row.status != 'pending')
-              "
-              side="bottom"
-              align="end"
-            >
-              <template #trigger>
-                <OButton
-                  :aria-label="t('common.moreActions')"
-                  icon-left="more-vert"
-                  variant="ghost"
-                  size="icon-xs-sq"
-                  class="md:hidden"
-                  data-test="user-list-row-more-actions"
-                  @click.stop
-                />
-              </template>
-              <ODropdownItem
-                v-if="row.enableDelete && row.status != 'pending' && !row.isDomainMapped"
-                icon-left="delete"
-                variant="destructive"
-                class="md:hidden"
-                :data-test="`delete-basic-user-${row.email}-menu`"
-                @select="confirmDeleteAction(row)"
-              >
-                <span>{{ t("user.delete") }}</span>
-              </ODropdownItem>
-              <ODropdownItem
-                v-if="row.enableDelete && row.status != 'pending' && row.isDomainMapped"
-                icon-left="block"
-                variant="destructive"
-                class="md:hidden"
-                :data-test="`block-basic-user-${row.email}-menu`"
-                @select="confirmBlockAction(row)"
-              >
-                <span>{{ t("user.block") }}</span>
-              </ODropdownItem>
-              <ODropdownItem
-                v-if="row.status == 'pending' && row.token"
-                icon-left="cancel"
-                variant="destructive"
-                class="md:hidden"
-                :data-test="`revoke-invite-${row.email}-menu`"
-                @select="confirmRevokeAction(row)"
-              >
-                <span>{{ t("user.revoke_invite") }}</span>
-              </ODropdownItem>
-              <ODropdownItem
-                v-if="row.enableEdit && row.status != 'pending'"
-                icon-left="edit"
-                class="md:hidden"
-                :data-test="`edit-basic-user-${index}-menu`"
-                @select="addRoutePush(row)"
-              >
-                <span>{{ t("user.update") }}</span>
-              </ODropdownItem>
-            </ODropdown>
-          </template>
           <template #selection-actions>
             <OButton
               data-test="users-list-delete-users-btn"
@@ -409,8 +306,6 @@ import { defineComponent, ref, toRef, onActivated, onBeforeMount, watch, compute
 import { useListViewState } from "@/composables/useListViewState";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
-import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
-import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
@@ -418,7 +313,7 @@ import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
-import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import type { OTableColumnDef, OTableRowAction } from "@/lib/core/Table/OTable.types";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
@@ -431,7 +326,6 @@ import analytics from "@/services/product_analytics";
 import InviteMembersDialog from "@/components/iam/users/InviteMembersDialog.vue";
 import { splitInviteEmails } from "@/components/iam/users/MemberInvitation.schema";
 import { getImageURL, verifyOrganizationStatus, maskText, validateEmail } from "@/utils/zincutils";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
@@ -454,11 +348,8 @@ export default defineComponent({
     InviteMembersDialog,
     OButton,
     ORefreshButton,
-    ODropdown,
-    ODropdownItem,
     OTag,
     OStatStrip,
-    OIcon,
     ODialog,
     OEmptyState,
     EmptyStateActionCard,
@@ -566,7 +457,11 @@ export default defineComponent({
           hideable: true,
           size: COL.email,
           minSize: 200,
-          meta: { align: "left", flex: true },
+          meta: {
+            align: "left",
+            flex: true,
+            link: (row: any) => (canEditRow(row) ? () => addRoutePush(row) : undefined),
+          },
         },
         {
           id: "first_name",
@@ -621,14 +516,51 @@ export default defineComponent({
         header: t("user.actions"),
         isAction: true,
         pinned: "right",
-        size: 120,
-        minSize: 80,
-        maxSize: 140,
-        meta: { align: "center", actionCount: 2 },
       });
 
       return cols;
     });
+
+    const canEditRow = (row: any): boolean => !!row.enableEdit && row.status != "pending";
+    const canRemoveRow = (row: any): boolean => !!row.enableDelete && row.status != "pending";
+    const rowActions: OTableRowAction[] = [
+      {
+        id: "edit",
+        label: t("user.update"),
+        icon: "edit",
+        onSelect: (row) => addRoutePush(row),
+        visible: canEditRow,
+        dataTest: (_row, index) => `edit-basic-user-${index}`,
+      },
+      {
+        id: "block",
+        label: t("user.block"),
+        icon: "block",
+        tone: "destructive",
+        shortcut: "delete",
+        onSelect: (row) => confirmBlockAction(row),
+        visible: (row) => canRemoveRow(row) && !!row.isDomainMapped,
+        dataTest: (row) => `block-basic-user-${row.email}`,
+      },
+      {
+        id: "revoke",
+        label: t("user.revoke_invite"),
+        icon: "cancel",
+        tone: "destructive",
+        shortcut: "delete",
+        onSelect: (row) => confirmRevokeAction(row),
+        visible: (row) => row.status == "pending" && !!row.token,
+        dataTest: (row) => `revoke-invite-${row.email}`,
+      },
+      {
+        id: "delete",
+        label: t("user.delete"),
+        icon: "delete",
+        onSelect: (row) => confirmDeleteAction(row),
+        visible: (row) => canRemoveRow(row) && !row.isDomainMapped,
+        dataTest: (row) => `delete-basic-user-${row.email}`,
+      },
+    ];
 
     // Built-in role names get the muted (yellow) outline badge; anything else
     // is treated as a custom role and gets the destructive (red) outline badge.
@@ -717,7 +649,7 @@ export default defineComponent({
     const overflowUserCount = computed(() => {
       const keys = new Set(overflowRoles.value.map((r) => r.key));
       if (!keys.size) return 0;
-      return (rows.value || []).filter((row: any) =>
+      return searchedRows.value.filter((row: any) =>
         userRoles(row).some((r) => keys.has(r.toLowerCase())),
       ).length;
     });
@@ -739,9 +671,25 @@ export default defineComponent({
       return "manage-accounts";
     };
 
-    // ── Role facet + summary strip ──────────────────────────────────────────
-    // Counts run over the full row set (not the facet-filtered one) so the tiles
-    // keep their totals while a facet is active.
+    // Tile counts follow the search box but not the facet, so a tile keeps its number while selected.
+    const searchedRows = computed(() => {
+      const all = rows.value || [];
+      const query = String(filterQuery.value ?? "").toLowerCase();
+      if (!query) return all;
+      const keys = columns.value.map((col) => col.accessorKey).filter(Boolean) as string[];
+      return all.filter((row: any) =>
+        keys.some((key) => {
+          const value = row[key];
+          return (
+            (typeof value === "string" || typeof value === "number") &&
+            String(value).toLowerCase().includes(query)
+          );
+        }),
+      );
+    });
+    const countRole = (roleKey: string): number =>
+      searchedRows.value.filter((row: any) => hasRole(row, roleKey)).length;
+
     const OVERFLOW_KEY = "__other_roles__";
     const INVITED_KEY = "__invited__";
     const roleFilter = ref<string | null>(null);
@@ -766,21 +714,22 @@ export default defineComponent({
       roleFilter.value = roleFilter.value === key ? null : key;
     };
 
+    const hasInvited = computed(() => (rows.value || []).some((row: any) => isInvited(row)));
     const invitedCount = computed(
-      () => (rows.value || []).filter((row: any) => isInvited(row)).length,
+      () => searchedRows.value.filter((row: any) => isInvited(row)).length,
     );
 
     const summaryStats = computed<StatItem[]>(() => {
-      const total = (rows.value || []).length;
-      const hasData = total > 0;
+      const total = searchedRows.value.length;
+      const hasData = (rows.value || []).length > 0;
       const v = (n: number): string | number => (hasData ? n : "—");
-      const share = hasData ? total : undefined;
+      const share = total > 0 ? total : undefined;
 
       const tiles: StatItem[] = visibleRoles.value.map((role) => ({
         key: role.key,
         // The label is the role name itself — data, not a translatable string.
         label: raw(role.label),
-        value: v(role.count),
+        value: v(countRole(role.key)),
         icon: roleIcon(role.key),
         tone: roleTone(role.key),
         max: share,
@@ -800,7 +749,7 @@ export default defineComponent({
       }
 
       // Invited is a lifecycle state, not a privilege, so it sits after the roles.
-      if (invitedCount.value > 0) {
+      if (hasInvited.value) {
         tiles.push({
           key: INVITED_KEY,
           label: t("iam.summaryInvited"),
@@ -1795,6 +1744,7 @@ export default defineComponent({
       bulkBlockCount,
       rows,
       displayedRows,
+      rowActions,
       roleFilter,
       onStatSelect,
       summaryStats,

@@ -41,6 +41,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data="serviceAccountsState.service_accounts_users"
           :columns="columns"
           row-key="email"
+          :row-actions="rowActions"
+          :row-actions-slot="isSystemRow"
+          row-actions-more-data-test="service-accounts-row-more-actions"
           :loading="loading"
           :forbidden="forbidden"
           forbidden-resource="service_accounts"
@@ -107,15 +110,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- UI-created accounts store `<name>.<org>@sa.internal`; show
                      the friendly name first, full identifier (the Basic-auth
                      username) beneath it. -->
-              <div :data-test="`service-accounts-email-${row.email}`" class="flex flex-col">
-                <span class="font-medium">{{ saDisplayName(row.email) }}</span>
+              <div :data-test="`service-accounts-email-${row.email}`" class="flex min-w-0 flex-col">
+                <ONameLinkCell
+                  :to="() => addRoutePush(row)"
+                  data-test="service-accounts-list-name-link"
+                  >{{ saDisplayName(row.email) }}</ONameLinkCell
+                >
                 <span class="text-text-secondary text-xs">{{ row.email }}</span>
               </div>
             </template>
             <template v-else>
               <span :data-test="`service-accounts-email-${row.email}`"
-                ><OUserCell :value="row.email"
-              /></span>
+                ><ONameLinkCell
+                  :to="() => addRoutePush(row)"
+                  data-test="service-accounts-list-name-link"
+                  >{{ row.email }}</ONameLinkCell
+                ></span
+              >
             </template>
           </template>
 
@@ -165,85 +176,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
           </template>
 
-          <template #cell-actions="{ row }">
-            <template v-if="row.is_system">
-              <span
-                data-test="service-accounts-system-managed-badge"
-                class="inline-flex items-center gap-1"
-              >
-                <OTag type="serviceAccountKind" value="managed" />
-                <OTooltip :content="t('serviceAccounts.row.managedByTooltip')" />
-              </span>
-            </template>
-            <template v-else>
-              <OButton
-                data-test="service-accounts-refresh"
-                :title="t('serviceAccounts.rotate')"
-                variant="ghost"
-                size="icon-xs-sq"
-                icon-left="refresh"
-                class="max-md:hidden"
-                @click="confirmRefreshAction(row)"
-              />
-              <OButton
-                data-test="service-accounts-edit"
-                data-row-action="edit"
-                :title="t('serviceAccounts.update')"
-                variant="ghost"
-                size="icon-xs-sq"
-                icon-left="edit"
-                class="max-md:hidden"
-                @click="addRoutePush(row)"
-              />
-              <OButton
-                data-test="service-accounts-delete"
-                data-row-action="delete"
-                :title="t('serviceAccounts.deleteServiceAccount')"
-                variant="ghost"
-                size="icon-xs-sq"
-                icon-left="delete"
-                class="max-md:hidden"
-                @click="confirmDeleteAction(row)"
-              />
-              <ODropdown side="bottom" align="end">
-                <template #trigger>
-                  <OButton
-                    icon-left="more-vert"
-                    :title="t('dashboard.moreActions')"
-                    variant="ghost"
-                    size="icon-xs-sq"
-                    class="md:hidden"
-                    data-test="service-accounts-row-more-actions"
-                    @click.stop
-                  />
-                </template>
-                <ODropdownItem
-                  icon-left="refresh"
-                  class="md:hidden"
-                  data-test="service-accounts-refresh-menu"
-                  @select="confirmRefreshAction(row)"
-                >
-                  <span>{{ t("serviceAccounts.rotate") }}</span>
-                </ODropdownItem>
-                <ODropdownItem
-                  icon-left="edit"
-                  class="md:hidden"
-                  data-test="service-accounts-edit-menu"
-                  @select="addRoutePush(row)"
-                >
-                  <span>{{ t("serviceAccounts.update") }}</span>
-                </ODropdownItem>
-                <ODropdownItem
-                  icon-left="delete"
-                  variant="destructive"
-                  class="md:hidden"
-                  data-test="service-accounts-delete-menu"
-                  @select="confirmDeleteAction(row)"
-                >
-                  <span>{{ t("serviceAccounts.deleteServiceAccount") }}</span>
-                </ODropdownItem>
-              </ODropdown>
-            </template>
+          <template #row-actions>
+            <span
+              data-test="service-accounts-system-managed-badge"
+              class="inline-flex items-center gap-1"
+            >
+              <OTag type="serviceAccountKind" value="managed" />
+              <OTooltip :content="t('serviceAccounts.row.managedByTooltip')" />
+            </span>
           </template>
 
           <template #selection-actions>
@@ -535,8 +475,6 @@ import { allUserRolesQuery } from "@/services/users.queries";
 import { queryClient } from "@/composables/query/queryClient";
 import { defineComponent, ref, onBeforeMount, computed, watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
-import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
@@ -547,7 +485,6 @@ import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
 import OCodeCell from "@/lib/core/Table/cells/OCodeCell.vue";
-import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -560,7 +497,8 @@ import {
   serviceAccountDisplayName,
 } from "./AddServiceAccount.schema";
 import OTable from "@/lib/core/Table/OTable.vue";
-import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import type { OTableColumnDef, OTableRowAction } from "@/lib/core/Table/OTable.types";
+import ONameLinkCell from "@/lib/core/Table/cells/ONameLinkCell.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
@@ -590,8 +528,6 @@ export default defineComponent({
     AddServiceAccount,
     ConfirmDialog,
     OButton,
-    ODropdown,
-    ODropdownItem,
     ODialog,
     OIcon,
     OPageLayout,
@@ -603,7 +539,7 @@ export default defineComponent({
     OBanner,
     OCodeBlock,
     OCodeCell,
-    OUserCell,
+    ONameLinkCell,
     OTimeCell,
     OSearchInput,
     OTabs,
@@ -873,8 +809,32 @@ export default defineComponent({
         header: t("user.actions"),
         isAction: true,
         pinned: "right",
-        size: 130,
-        meta: { align: "center", actionCount: 3 },
+        // Wider than three icon buttons: a system row shows a text tag here.
+        size: 136,
+      },
+    ];
+    const isSystemRow = (row: any): boolean => !!row.is_system;
+    const rowActions: OTableRowAction[] = [
+      {
+        id: "edit",
+        label: t("serviceAccounts.update"),
+        icon: "edit",
+        onSelect: (row) => addRoutePush(row),
+        dataTest: () => "service-accounts-edit",
+      },
+      {
+        id: "rotate",
+        label: t("serviceAccounts.rotate"),
+        icon: "refresh",
+        onSelect: (row) => confirmRefreshAction(row),
+        dataTest: () => "service-accounts-refresh",
+      },
+      {
+        id: "delete",
+        label: t("serviceAccounts.deleteServiceAccount"),
+        icon: "delete",
+        onSelect: (row) => confirmDeleteAction(row),
+        dataTest: () => "service-accounts-delete",
       },
     ];
     const userEmail: any = ref("");
@@ -1277,6 +1237,8 @@ export default defineComponent({
       store,
       serviceAccountsState,
       columns,
+      rowActions,
+      isSystemRow,
       loading,
       fetching,
       lastUpdatedAt,

@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { mount } from "@vue/test-utils";
+import { flushPromises, mount } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import General from "./General.vue";
 import i18n from "@/locales";
@@ -90,6 +90,8 @@ import DOMPurify from "dompurify";
 import analytics from "@/services/product_analytics";
 import config from "@/aws-exports";
 import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
+import { useConfirmDialog } from "@/composables/useConfirmDialog";
+import { confirmLeave } from "@/lib/forms/SaveBar/useLeaveGuard";
 
 const mockOrganizations = organizations as any;
 const mockSettingsService = settingsService as any;
@@ -159,6 +161,7 @@ const createWrapper = (props = {}, options = {}) => {
         store: mockStore,
       },
       stubs: {
+        teleport: true,
         // OForm / OFormInput / OInput are intentionally NOT stubbed so the real
         // schema validation runs (per the migration playbook: at least one path
         // must mount the real <OForm>).
@@ -256,10 +259,6 @@ const createWrapper = (props = {}, options = {}) => {
           template: '<div data-test-stub="o-tooltip"><slot></slot></div>',
           props: ["content", "side", "align", "maxWidth"],
         },
-        GroupHeader: {
-          template: '<div data-test-stub="group-header"><slot></slot></div>',
-          props: ["title", "showIcon"],
-        },
       },
     },
     attachTo: document.body,
@@ -307,7 +306,33 @@ describe("General", () => {
     it("should seed the form defaults from organization settings", () => {
       const wrapper = createWrapper();
       const form = wrapper.findComponent({ name: "OForm" });
-      expect(form.vm.form.state.values.scrape_interval).toBe(30);
+      expect(form.vm.form.state.values.scrape_interval).toBe("30");
+    });
+  });
+
+  describe("Save bar", () => {
+    const bar = (wrapper: any) => wrapper.find('[data-test="general-settings-save-bar"]');
+
+    it("counts theme colors with the form fields, and Discard restores both", async () => {
+      const wrapper = createWrapper();
+      const form = wrapper.findComponent({ name: "OForm" }).vm.form;
+      expect(bar(wrapper).attributes("data-state")).toBe("clean");
+
+      await wrapper.find('[data-test="theme-light-chip"]').trigger("click");
+      Object.assign(wrapper.vm, { tempColor: "#112233" });
+      (wrapper.vm as any).updateCustomColor();
+      form.setFieldValue("scrape_interval", "45");
+      await nextTick();
+
+      expect((wrapper.vm as any).changeCount).toBe(2);
+      expect(bar(wrapper).attributes("data-state")).toBe("changed");
+
+      await wrapper.find('[data-test="general-settings-save-bar-discard"]').trigger("click");
+      await nextTick();
+
+      expect((wrapper.vm as any).customLightColor).toBe("#3F7994");
+      expect(form.state.values.scrape_interval).toBe("30");
+      expect(bar(wrapper).attributes("data-state")).toBe("clean");
     });
   });
 
@@ -315,7 +340,7 @@ describe("General", () => {
     it("gives the max series input an accessible name", () => {
       const wrapper = createWrapper();
       const input = wrapper.find('[data-test="general-settings-max-series-per-query"]');
-      expect(input.find("input").attributes("aria-label")).toBe("Max Series Per Query");
+      expect(input.find("input").attributes("aria-label")).toBe("Max series per query");
     });
 
     it("should keep the scrape interval and max series inputs (data-tests preserved)", () => {
@@ -354,6 +379,78 @@ describe("General", () => {
       });
     });
 
+    it("a save that completes late keeps later edits and never writes into another organization", async () => {
+      let finish = () => {};
+      const holdSave = () =>
+        mockOrganizations.post_organization_settings.mockImplementationOnce(
+          () => new Promise((resolve) => (finish = () => resolve({ status: 200 }))),
+        );
+      const wrapper = createWrapper();
+      const form = wrapper.findComponent({ name: "OForm" }).vm.form;
+      const stored = () =>
+        mockStore.dispatch.mock.calls.filter(([action]) => action === "setOrganizationSettings");
+
+      holdSave();
+      form.setFieldValue("scrape_interval", "40");
+      const first = form.handleSubmit();
+      await vi.waitFor(() =>
+        expect(mockOrganizations.post_organization_settings).toHaveBeenCalled(),
+      );
+      form.setFieldValue("scrape_interval", "45");
+      await wrapper.find('[data-test="theme-light-chip"]').trigger("click");
+      Object.assign(wrapper.vm, { tempColor: "#112233" });
+      (wrapper.vm as any).updateCustomColor();
+      finish();
+      await first;
+      await nextTick();
+
+      expect(stored()[0][1]).toMatchObject({ scrape_interval: 40 });
+      expect(form.state.values.scrape_interval).toBe("45");
+      expect((wrapper.vm as any).customLightColor).toBe("#112233");
+      expect(mockStore.commit).not.toHaveBeenCalledWith("clearTempThemeColors");
+
+      holdSave();
+      const second = form.handleSubmit();
+      await vi.waitFor(() =>
+        expect(mockOrganizations.post_organization_settings).toHaveBeenCalledTimes(2),
+      );
+      mockStore.state.selectedOrganization = { identifier: "other-org" };
+      finish();
+      await second;
+
+      expect(stored()).toHaveLength(1);
+      expect(mockStore.commit).not.toHaveBeenCalledWith("clearTempThemeColors");
+    });
+
+    it("a Discard confirmed on leaving while the save is open stays discarded when the save lands", async () => {
+      let finish = () => {};
+      mockOrganizations.post_organization_settings.mockImplementationOnce(
+        () => new Promise((resolve) => (finish = () => resolve({ status: 200 }))),
+      );
+      const wrapper = createWrapper();
+      const form = wrapper.findComponent({ name: "OForm" }).vm.form;
+      const dialog = useConfirmDialog();
+
+      form.setFieldValue("scrape_interval", "45");
+      const saving = form.handleSubmit();
+      await vi.waitFor(() =>
+        expect(mockOrganizations.post_organization_settings).toHaveBeenCalled(),
+      );
+      let left = false;
+      void confirmLeave().then((leave) => (left = leave));
+      // Pages left mounted by earlier cases are asked too, one dialog each.
+      await vi.waitFor(() => {
+        dialog.handleConfirm();
+        expect(left).toBe(true);
+      });
+      finish();
+      await saving;
+      await nextTick();
+
+      expect(form.state.values.scrape_interval).toBe("45");
+      expect(wrapper.vm.changeCount).toBe(0);
+    });
+
     it("should handle save error gracefully", async () => {
       mockOrganizations.post_organization_settings.mockRejectedValue({
         message: "Server error",
@@ -361,6 +458,7 @@ describe("General", () => {
 
       const wrapper = createWrapper();
       const form = wrapper.findComponent({ name: "OForm" });
+      form.vm.form.setFieldValue("scrape_interval", "45");
       await form.vm.form.handleSubmit();
       await nextTick();
 
@@ -368,6 +466,14 @@ describe("General", () => {
         variant: "error",
         message: "Server error",
       });
+      // A failed save must leave the page changed: nothing stored, nothing reset.
+      expect(mockStore.dispatch).not.toHaveBeenCalledWith(
+        "setOrganizationSettings",
+        expect.anything(),
+      );
+      expect(wrapper.find('[data-test="general-settings-save-bar"]').attributes("data-state")).toBe(
+        "changed",
+      );
     });
 
     it("tracks org_general_settings_saved once the save succeeds", async () => {
@@ -458,9 +564,6 @@ describe("General", () => {
       ).toBe(true);
       // The functional controls must not render alongside the locked ones.
       expect(wrapper.find('[data-test="settings_ent_logo_custom_text"]').exists()).toBe(false);
-      expect(wrapper.find('[data-test="settings_ent_logo_custom_text_edit_btn"]').exists()).toBe(
-        false,
-      );
     });
 
     it("opens the upgrade dialog when a locked branding row is clicked", async () => {
@@ -499,138 +602,86 @@ describe("General", () => {
     });
   });
 
-  describe("Custom logo text functionality", () => {
-    it("should display current custom logo text", () => {
-      const wrapper = createWrapper();
+  describe("Custom logo text", () => {
+    const textField = (wrapper: any) =>
+      wrapper.get('[data-test="settings_ent_logo_custom_text-field"]');
+    const formOf = (wrapper: any) => wrapper.findComponent({ name: "OForm" }).vm.form;
 
-      // Check if text is available in component or fallback to checking store state
-      if (wrapper.text().includes("Test Logo Text")) {
-        expect(wrapper.text()).toContain("Test Logo Text");
-      } else {
-        // Fallback: verify component has access to the custom text from store
-        expect(mockStore.state.zoConfig.custom_logo_text).toBe("Test Logo Text");
-      }
+    beforeEach(() => {
+      mockStore.state.zoConfig.meta_org = "test-org";
     });
 
-    it("should enter edit mode when edit button is clicked", async () => {
+    it("saves from the bar with its own request and leaves untouched organization settings alone", async () => {
       const wrapper = createWrapper();
-      const editButton = wrapper.find('[data-test="settings_ent_logo_custom_text_edit_btn"]');
+      expect((textField(wrapper).element as HTMLInputElement).value).toBe("Test Logo Text");
+      expect(wrapper.find('[data-test="settings_ent_logo_custom_text_save_btn"]').exists()).toBe(
+        false,
+      );
 
-      if (editButton.exists()) {
-        await editButton.trigger("click");
-        expect(wrapper.vm.editingText).toBe(true);
-      } else {
-        // Fallback: set editingText directly since the button toggles it
-        wrapper.vm.editingText = true;
-        expect(wrapper.vm.editingText).toBe(true);
-      }
-    });
-
-    it("should show input field in edit mode", async () => {
-      const wrapper = createWrapper();
-      Object.assign(wrapper.vm, { editingText: true });
+      await textField(wrapper).setValue("New Logo Text");
+      expect(wrapper.vm.changeCount).toBe(1);
+      await formOf(wrapper).handleSubmit();
       await nextTick();
 
-      const textInput = wrapper.find('[data-test="settings_ent_logo_custom_text"]');
-      if (textInput.exists()) {
-        expect(textInput.exists()).toBe(true);
-      } else {
-        // Fallback: verify component state indicates edit mode
-        expect(wrapper.vm.editingText).toBe(true);
-      }
-    });
-
-    it("should save custom text successfully", async () => {
-      const wrapper = createWrapper();
-      Object.assign(wrapper.vm, {
-        editingText: true,
-        customText: "New Logo Text",
-      });
-
-      const saveButton = wrapper.find('[data-test="settings_ent_logo_custom_text_save_btn"]');
-      if (saveButton.exists()) {
-        await saveButton.trigger("click");
-      } else {
-        // Fallback: call the method directly
-        await wrapper.vm.updateCustomText();
-      }
-      await nextTick();
-
-      expect(mockDOMPurify.sanitize).toHaveBeenCalledWith("New Logo Text");
       expect(mockSettingsService.updateCustomText).toHaveBeenCalledWith(
         "test-org",
         "custom_logo_text",
         "New Logo Text",
       );
+      expect(mockOrganizations.post_organization_settings).not.toHaveBeenCalled();
+      expect(mockStore.dispatch).toHaveBeenCalledWith(
+        "setConfig",
+        expect.objectContaining({ custom_logo_text: "New Logo Text" }),
+      );
+      expect(wrapper.vm.changeCount).toBe(0);
     });
 
-    it("should handle text length validation", async () => {
-      const longText = "a".repeat(101); // 101 characters
+    it.each([
+      { failing: "text", reason: "Update failed", stillChanged: "custom_logo_text" },
+      { failing: "settings", reason: "Server error", stillChanged: "scrape_interval" },
+    ])(
+      "reports a failed $failing request on its own and keeps only that part unsaved",
+      async ({ failing, reason, stillChanged }) => {
+        const failed =
+          failing === "text"
+            ? mockSettingsService.updateCustomText
+            : mockOrganizations.post_organization_settings;
+        failed.mockRejectedValue({ message: reason });
+        const wrapper = createWrapper();
+        const form = formOf(wrapper);
+
+        await textField(wrapper).setValue("New Text");
+        form.setFieldValue("scrape_interval", "45");
+        await nextTick();
+        expect(wrapper.vm.changeCount).toBe(2);
+        await form.handleSubmit();
+        await nextTick();
+
+        expect(mockToast).toHaveBeenCalledWith({
+          variant: "error",
+          message: expect.stringContaining(reason),
+        });
+        expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ variant: "success" }));
+        expect(form.state.values).toMatchObject({
+          custom_logo_text: "New Text",
+          scrape_interval: "45",
+        });
+        expect(wrapper.vm.changeCount).toBe(1);
+        expect(form.options.defaultValues[stillChanged]).not.toBe(form.state.values[stillChanged]);
+      },
+    );
+
+    it("rejects more than 100 characters when the field is left, and does not save it", async () => {
       const wrapper = createWrapper();
-      Object.assign(wrapper.vm, {
-        editingText: true,
-        customText: longText,
-      });
 
-      const saveButton = wrapper.find('[data-test="settings_ent_logo_custom_text_save_btn"]');
-      if (saveButton.exists()) {
-        await saveButton.trigger("click");
-      } else {
-        // Fallback: call the method directly
-        await wrapper.vm.updateCustomText();
-      }
-      await nextTick();
+      await textField(wrapper).setValue("a".repeat(101));
+      await textField(wrapper).trigger("blur");
+      await flushPromises();
+      expect(wrapper.find('[data-test="settings_ent_logo_custom_text_error"]').exists()).toBe(true);
 
-      expect(mockToast).toHaveBeenCalledWith({
-        variant: "error",
-        message: "Text should be less than 100 characters.",
-      });
+      await formOf(wrapper).handleSubmit();
+      await flushPromises();
       expect(mockSettingsService.updateCustomText).not.toHaveBeenCalled();
-    });
-
-    it("should cancel text editing", async () => {
-      const wrapper = createWrapper();
-      Object.assign(wrapper.vm, {
-        editingText: true,
-        customText: "Modified Text",
-      });
-
-      // Toggle editingText to false (as per the component logic)
-      wrapper.vm.editingText = false;
-      // Wait for watcher to trigger and multiple render cycles
-      await wrapper.vm.$nextTick();
-      await wrapper.vm.$nextTick();
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.vm.editingText).toBe(false);
-      // The watcher should reset customText, but if it doesn't in test environment,
-      // we still verify the core functionality works
-      if (wrapper.vm.customText === "Test Logo Text") {
-        expect(wrapper.vm.customText).toBe("Test Logo Text");
-      } else {
-        // Fallback: verify editing mode is properly cancelled
-        expect(wrapper.vm.editingText).toBe(false);
-      }
-    });
-
-    it("should handle custom text update error", async () => {
-      const wrapper = createWrapper();
-      mockSettingsService.updateCustomText.mockRejectedValue({
-        message: "Update failed",
-      });
-      Object.assign(wrapper.vm, {
-        editingText: true,
-        customText: "New Text",
-      });
-
-      await wrapper.vm.updateCustomText();
-      // Wait for async operations to complete
-      await wrapper.vm.$nextTick();
-
-      expect(mockToast).toHaveBeenCalledWith({
-        variant: "error",
-        message: "Update failed",
-      });
     });
   });
 
@@ -646,17 +697,27 @@ describe("General", () => {
       }
     });
 
-    it("should show file upload when no logo exists", async () => {
+    it("shows the file picker when no logo exists, and Upload only once a file is chosen", async () => {
+      mockStore.state.zoConfig.meta_org = "test-org";
       mockStore.state.zoConfig.custom_logo_img = null;
       const wrapper = createWrapper();
+      const upload = () => wrapper.find('[data-test="settings_ent_logo_custom_light_save_btn"]');
 
-      const fileUpload = wrapper.find('[data-test="setting_ent_custom_logo_img_file_upload"]');
-      if (fileUpload.exists()) {
-        expect(fileUpload.exists()).toBe(true);
-      } else {
-        // Fallback: verify store state shows no logo image
-        expect(mockStore.state.zoConfig.custom_logo_img).toBeNull();
-      }
+      expect(wrapper.find('[data-test="setting_ent_custom_logo_img_file_upload"]').exists()).toBe(
+        true,
+      );
+      expect(upload().exists()).toBe(false);
+
+      const file = new File(["test"], "test.png", { type: "image/png" });
+      Object.assign(wrapper.vm, { filesLight: file });
+      await nextTick();
+      await upload().trigger("click");
+
+      expect(mockSettingsService.createLogo).toHaveBeenCalledWith(
+        "test-org",
+        expect.any(FormData),
+        "light",
+      );
     });
 
     it("should upload image successfully with default theme", async () => {
@@ -819,8 +880,10 @@ describe("General", () => {
   describe("Color picker ODialog", () => {
     it("opens the color picker ODialog when a theme chip is clicked", async () => {
       const wrapper = createWrapper();
-      await wrapper.vm.handleThemeChipClick("light");
-      await nextTick();
+      const chip = wrapper.find('[data-test="theme-light-chip"]');
+      // A real button, so the chip is reachable and operable from the keyboard.
+      expect(chip.element.tagName).toBe("BUTTON");
+      await chip.trigger("click");
 
       expect(wrapper.vm.showColorPicker).toBe(true);
       expect(wrapper.vm.currentPickerMode).toBe("light");
@@ -1036,13 +1099,17 @@ describe("General", () => {
   });
 
   describe("Edge cases", () => {
-    it("should handle missing organization settings gracefully", () => {
+    it("shows loading rows, not fallback values, until organization settings are present", () => {
       mockStore.state.organizationData.organizationSettings = null;
       const wrapper = createWrapper();
 
-      // The form falls back to the default scrape_interval (15) from the schema defaults.
-      const form = wrapper.findComponent({ name: "OForm" });
-      expect(form.vm.form.state.values.scrape_interval).toBe(15);
+      expect(wrapper.find('[data-test="general-settings-scrape-interval"]').exists()).toBe(false);
+      expect(
+        wrapper.find('[data-test="general-settings-scrape-interval-row"]').attributes("aria-busy"),
+      ).toBe("true");
+      expect(wrapper.find('[data-test="general-settings-save-bar"]').attributes("data-state")).toBe(
+        "loading",
+      );
     });
 
     it("should handle upload when not enterprise", async () => {
@@ -1062,20 +1129,6 @@ describe("General", () => {
 
       // Restore original value
       wrapper.vm.config.isEnterprise = originalIsEnterprise;
-    });
-
-    it("should show 'No Text Available' when custom text is empty", async () => {
-      // Create wrapper first, then modify store
-      const wrapper = createWrapper();
-      mockStore.state.zoConfig.custom_logo_text = "";
-      Object.assign(wrapper.vm, { editingText: false });
-
-      if (wrapper.text().includes("No Text Available")) {
-        expect(wrapper.text()).toContain("No Text Available");
-      } else {
-        // Fallback: verify store state shows empty text
-        expect(mockStore.state.zoConfig.custom_logo_text).toBe("");
-      }
     });
   });
 });

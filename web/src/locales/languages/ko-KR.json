@@ -30684,7 +30684,7 @@
   },
   "slackApp": {
     "prereq": {
-      "title": "0단계 · 서버 사전 요구 사항",
+      "title": "1단계 · 서버 사전 요구 사항",
       "subtitle": "Slack 작업 전에 이 서버에서 확인됩니다",
       "columnSetting": "설정",
       "columnResult": "결과",
@@ -30755,7 +30755,7 @@
       "back": "뒤로",
       "finish": "완료",
       "connection": {
-        "title": "1단계 · 연결",
+        "title": "2단계 · 연결",
         "description": "이 검사는 이 서버에서 프로덕션과 동일한 코드 경로를 통해 Slack에 연결합니다.",
         "allPassed": "이 서버에서 Slack에 연결할 수 있습니다",
         "someFailed": "이 서버에서 Slack에 연결할 수 없습니다. 프록시 또는 방화벽에서 *.slack.com을 허용한 후 다시 확인하세요.",
@@ -30764,7 +30764,7 @@
         "socketHost": "WebSocket 호스트 {host}"
       },
       "create": {
-        "title": "2단계 · 앱 생성",
+        "title": "3단계 · 앱 생성",
         "modeLabel": "연결 모드",
         "socket": "Socket 모드",
         "socketDescription": "권장. OpenObserve가 연결을 열므로 Slack에 공개 URL이 필요하지 않습니다.",
@@ -30793,7 +30793,7 @@
         "signingSecretRequired": "HTTP 모드에는 서명 시크릿이 필요합니다"
       },
       "install": {
-        "title": "3단계 · 설치",
+        "title": "4단계 · 설치",
         "created": "앱 생성됨 · {appId}",
         "allowHint": "Slack의 설치 화면이 열립니다. 거기서 '허용'을 클릭하세요. 봇 토큰은 Slack에서 자동으로 돌아오므로 복사할 필요가 없습니다.",
         "allow": "Slack에서 허용",
@@ -30816,7 +30816,7 @@
         "appNotCreatedByO2": "OpenObserve가 이 앱을 만들지 않았으므로 Slack에 그대로 남습니다. 더 이상 필요하지 않으면 Slack에서 삭제하세요."
       },
       "test": {
-        "title": "4단계 · 테스트 및 연결",
+        "title": "5단계 · 테스트 및 연결",
         "run": "검사 실행",
         "signIn": "Slack으로 로그인 테스트",
         "signInPassed": "Slack으로 로그인이 작동합니다",

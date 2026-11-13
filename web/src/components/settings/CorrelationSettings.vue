@@ -94,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <ServiceEnvVersionSettings v-else />
       </div>
 
-      <div v-show="activeTab === 'discovery'" class="px-page-edge h-full overflow-y-auto py-4">
+      <div v-show="activeTab === 'discovery'" class="h-full overflow-y-auto px-4 py-4">
         <LicenseDeniedState
           v-if="correlationLocked"
           :features="['correlation']"
@@ -102,6 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <ServiceIdentitySetup
           v-else
+          ref="identitySetup"
           :org-identifier="store.state.selectedOrganization.identifier"
           :semantic-groups="semanticGroups"
           @navigate-to-aliases="onNavigateToAliases"
@@ -109,7 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
 
-      <div v-show="activeTab === 'field-aliases'" class="px-page-edge h-full overflow-y-auto py-4">
+      <div v-show="activeTab === 'field-aliases'" class="h-full overflow-y-auto px-4 py-4">
         <LicenseDeniedState
           v-if="alertsLocked"
           :features="['alerts']"
@@ -117,25 +118,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <SemanticFieldGroupsConfig
           v-else
+          class="mt-2 max-w-5xl"
           :key="`field-aliases-${fieldAliasesEditorKey}`"
           :semantic-field-groups="draftSemanticGroups"
           :scroll-to-group-id="aliasScrollToGroup"
           @update:semanticFieldGroups="onDraftSemanticGroupsChange"
-        >
-          <template #header-actions>
-            <OButton
-              data-test="correlation-semanticfieldgroup-save-btn"
-              :variant="isFieldAliasesDirty ? 'primary' : 'outline'"
-              size="sm"
-              :loading="savingFieldAliases"
-              @click="saveSemanticGroups"
-            >
-              {{ t("common.save") }}
-            </OButton>
-          </template>
-        </SemanticFieldGroupsConfig>
+        />
       </div>
     </div>
+
+    <!-- One bar for the page: Detection Rules and Field Mappings keep their edits across tab switches. -->
+    <OSaveBar
+      v-if="showSaveBar"
+      class="shrink-0 px-4"
+      :change-count="changeCount"
+      :saving="saving"
+      data-test="correlation-settings-save-bar"
+      :save-data-test="
+        activeTab === 'discovery'
+          ? 'service-identity-save-btn'
+          : 'correlation-semanticfieldgroup-save-btn'
+      "
+      discard-data-test="correlation-settings-discard-btn"
+      @save="savePage"
+      @discard="discardPage"
+    />
   </OPageLayout>
 </template>
 
@@ -145,20 +152,19 @@ import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import { defineComponent, ref, computed, onMounted, watch } from "vue";
 import { useStore } from "vuex";
 import { useI18nTyped } from "@/types/i18n";
-import { useRouter, useRoute, onBeforeRouteLeave } from "vue-router";
+import { useRouter, useRoute } from "vue-router";
 import DiscoveredServices from "@/components/settings/DiscoveredServices.vue";
 import ServiceIdentitySetup from "@/components/settings/ServiceIdentitySetup.vue";
 import ServiceEnvVersionSettings from "@/components/settings/ServiceEnvVersionSettings.vue";
 import config from "@/aws-exports";
 import SemanticFieldGroupsConfig from "@/components/alerts/SemanticFieldGroupsConfig.vue";
-import OButton from "@/lib/core/Button/OButton.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
+import OSaveBar from "@/lib/forms/SaveBar/OSaveBar.vue";
+import { useLeaveGuard } from "@/lib/forms/SaveBar/useLeaveGuard";
 import serviceStreamsService from "@/services/service_streams";
 import { serviceStreamKeys } from "@/services/service_streams.querykeys";
 import { queryClient } from "@/composables/query/queryClient";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { useConfirmDialog } from "@/composables/useConfirmDialog";
-import { confirmForcedSignOutDiscard, draftSignOutForced } from "@/utils/drafts/draftSession";
 import { useLicenseLock } from "@/composables/useFeatureLock";
 import LicenseDeniedState from "@/components/common/LicenseDeniedState.vue";
 
@@ -174,12 +180,11 @@ export default defineComponent({
     LicenseDeniedState,
     OTabs,
     OTab,
-    OButton,
     OPageLayout,
+    OSaveBar,
   },
   setup() {
     const store = useStore();
-    const { confirm } = useConfirmDialog();
     const { t } = useI18nTyped();
     const router = useRouter();
     const route = useRoute();
@@ -222,7 +227,7 @@ export default defineComponent({
     // just because the user focused/blurred a Name input. Empty draft entries
     // (no display + no fields) are ignored so just clicking "Add Custom Group"
     // without filling anything in doesn't enable Save.
-    const normalizeGroupsForCompare = (groups: any[]): string => {
+    const normalizeGroups = (groups: any[]) => {
       const normalized = (groups ?? [])
         .filter((g) => (g.display ?? "").trim() !== "" || (g.fields ?? []).length > 0)
         .map((g) => ({
@@ -232,14 +237,47 @@ export default defineComponent({
           fields: [...(g.fields ?? [])].sort(),
         }));
       normalized.sort((a, b) => a.display.localeCompare(b.display));
-      return JSON.stringify(normalized);
+      return normalized;
     };
+    const normalizeGroupsForCompare = (groups: any[]): string =>
+      JSON.stringify(normalizeGroups(groups));
 
     const isFieldAliasesDirty = computed(
       () =>
         normalizeGroupsForCompare(draftSemanticGroups.value) !==
         normalizeGroupsForCompare(semanticGroups.value),
     );
+    // One change per group that was added, removed or edited since the last load or save.
+    const fieldAliasChangeCount = computed(() => {
+      if (!isFieldAliasesDirty.value) return 0;
+      const byName = (groups: any[]) =>
+        new Map(normalizeGroups(groups).map((g) => [g.display, JSON.stringify(g)]));
+      const saved = byName(semanticGroups.value);
+      const draft = byName(draftSemanticGroups.value);
+      const names = new Set([...saved.keys(), ...draft.keys()]);
+      return Math.max(1, [...names].filter((name) => saved.get(name) !== draft.get(name)).length);
+    });
+
+    // Detection Rules owns its draft; the page reads its state and runs its save through the bar.
+    const identitySetup = ref<{
+      isDirty: boolean;
+      saving: boolean;
+      saveConfig: () => Promise<boolean>;
+      discardChanges: () => void;
+    } | null>(null);
+    const isIdentityDirty = computed(() => !!identitySetup.value?.isDirty);
+
+    const changeCount = computed(
+      () => (isIdentityDirty.value ? 1 : 0) + fieldAliasChangeCount.value,
+    );
+    const saving = computed(() => savingFieldAliases.value || !!identitySetup.value?.saving);
+    const showSaveBar = computed(
+      () =>
+        changeCount.value > 0 ||
+        (activeTab.value === "discovery" && !correlationLocked.value) ||
+        (activeTab.value === "field-aliases" && !alertsLocked.value),
+    );
+
     // Bumped to force-reset SemanticFieldGroupsConfig's internal state on discard
     const fieldAliasesEditorKey = ref(0);
 
@@ -305,25 +343,21 @@ export default defineComponent({
       },
     ]);
 
-    const confirmDiscardUnsaved = async (): Promise<boolean> => {
-      if (!isFieldAliasesDirty.value) return true;
-      return confirm({
-        title: t("common.unsavedChanges"),
-        message: t("settings.correlation.fieldAliasesUnsavedConfirm"),
-        confirmLabel: t("common.discardChanges"),
-        cancelLabel: t("common.cancel"),
-      });
+    // A tab switch changes the route path but keeps both drafts, so the leave guard must not ask.
+    let switchingTab = false;
+    const pushTab = async (to: Parameters<typeof router.push>[0]) => {
+      switchingTab = true;
+      try {
+        await router.push(to);
+      } finally {
+        switchingTab = false;
+      }
     };
 
-    const onTabChange = async (value: string | number) => {
+    const onTabChange = (value: string | number) => {
       const tab = String(value);
-      if (activeTab.value === "field-aliases" && tab !== "field-aliases") {
-        const proceed = await confirmDiscardUnsaved();
-        if (!proceed) return;
-        if (isFieldAliasesDirty.value) discardSemanticGroups();
-      }
       activeTab.value = tab;
-      router.push({
+      return pushTab({
         name: "correlationSettings",
         params: { tab: tabToSlug[tab] ?? tab },
         query: tab === "services" ? route.query : withoutView(),
@@ -342,7 +376,7 @@ export default defineComponent({
     const onNavigateToAliases = (groupId: string) => {
       aliasScrollToGroup.value = groupId;
       activeTab.value = "field-aliases";
-      router.push({
+      return pushTab({
         name: "correlationSettings",
         params: { tab: "field-aliases" },
         query: { ...route.query, group: groupId },
@@ -359,12 +393,16 @@ export default defineComponent({
       savingFieldAliases.value = true;
       try {
         const orgId = store.state.selectedOrganization.identifier;
-        const groups = draftSemanticGroups.value;
+        // A copy taken before the request: groups edited while it is pending stay unsaved.
+        const groups = cloneGroups(draftSemanticGroups.value);
+        const sent = normalizeGroupsForCompare(groups);
         await serviceStreamsService.updateSemanticGroups(orgId, groups);
         // The groups are cached, and dimension analytics is computed from them.
         void queryClient.invalidateQueries({ queryKey: serviceStreamKeys.all(orgId) });
         semanticGroups.value = groups;
-        draftSemanticGroups.value = cloneGroups(groups);
+        if (normalizeGroupsForCompare(draftSemanticGroups.value) === sent) {
+          draftSemanticGroups.value = cloneGroups(groups);
+        }
         toast({ variant: "success", message: t("settings.correlation.fieldAliasesSaved") });
       } catch (_) {
         toast({ variant: "error", message: t("settings.correlation.fieldAliasesSaveError") });
@@ -379,10 +417,23 @@ export default defineComponent({
       fieldAliasesEditorKey.value += 1;
     };
 
-    onBeforeRouteLeave(async () => {
-      if (!isFieldAliasesDirty.value) return true;
-      if (draftSignOutForced.value) return confirmForcedSignOutDiscard(confirm, t);
-      return await confirmDiscardUnsaved();
+    // Each dirty tab sends its own request and reports its own failure; a failed tab stays counted.
+    // Both start together so each sends what Save was clicked on, not edits made while the other waits.
+    const savePage = async () => {
+      await Promise.all([
+        isIdentityDirty.value && identitySetup.value?.saveConfig(),
+        isFieldAliasesDirty.value && saveSemanticGroups(),
+      ]);
+    };
+
+    const discardPage = () => {
+      if (isIdentityDirty.value) identitySetup.value?.discardChanges();
+      if (isFieldAliasesDirty.value) discardSemanticGroups();
+    };
+
+    useLeaveGuard(() => !switchingTab && changeCount.value > 0, {
+      count: () => changeCount.value,
+      onDiscard: discardPage,
     });
 
     return {
@@ -398,6 +449,12 @@ export default defineComponent({
       onDraftSemanticGroupsChange,
       saveSemanticGroups,
       discardSemanticGroups,
+      identitySetup,
+      changeCount,
+      saving,
+      showSaveBar,
+      savePage,
+      discardPage,
       semanticGroups,
       draftSemanticGroups,
       isFieldAliasesDirty,

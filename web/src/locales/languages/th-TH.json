@@ -30681,7 +30681,7 @@
   },
   "slackApp": {
     "prereq": {
-      "title": "Step 0 · Server prerequisites",
+      "title": "Step 1 · Server prerequisites",
       "subtitle": "Checked on this server before any Slack work",
       "columnSetting": "Setting",
       "columnResult": "Result",
@@ -30752,7 +30752,7 @@
       "back": "ย้อนกลับ",
       "finish": "Finish",
       "connection": {
-        "title": "Step 1 · Connection",
+        "title": "Step 2 · Connection",
         "description": "The check reaches Slack from this server through the same code path production uses.",
         "allPassed": "Slack is reachable from this server",
         "someFailed": "Slack is not reachable from this server. Allow *.slack.com through your proxy or firewall, then Re-check.",
@@ -30761,7 +30761,7 @@
         "socketHost": "WebSocket host {host}"
       },
       "create": {
-        "title": "Step 2 · Create the app",
+        "title": "Step 3 · Create the app",
         "modeLabel": "Connection mode",
         "socket": "Socket Mode",
         "socketDescription": "Recommended. OpenObserve opens the connection, so Slack needs no public URL",
@@ -30790,7 +30790,7 @@
         "signingSecretRequired": "HTTP mode needs the signing secret"
       },
       "install": {
-        "title": "Step 3 · Install",
+        "title": "Step 4 · Install",
         "created": "App created · {appId}",
         "allowHint": "Opens Slack's install screen: click Allow there. The bot token comes back from Slack by itself; nothing to copy.",
         "allow": "Allow in Slack",
@@ -30813,7 +30813,7 @@
         "appNotCreatedByO2": "OpenObserve did not create this app, so it stays in Slack. Delete it there if you no longer need it."
       },
       "test": {
-        "title": "Step 4 · Test and linking",
+        "title": "Step 5 · Test and linking",
         "run": "Run checks",
         "signIn": "Test Sign in with Slack",
         "signInPassed": "Sign in with Slack works",

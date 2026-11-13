@@ -30684,7 +30684,7 @@
   },
   "slackApp": {
     "prereq": {
-      "title": "Schritt 0 · Server-Voraussetzungen",
+      "title": "Schritt 1 · Server-Voraussetzungen",
       "subtitle": "Wird auf diesem Server geprüft, bevor Slack eingerichtet wird",
       "columnSetting": "Einstellung",
       "columnResult": "Ergebnis",
@@ -30755,7 +30755,7 @@
       "back": "Zurück",
       "finish": "Fertigstellen",
       "connection": {
-        "title": "Schritt 1 · Verbindung",
+        "title": "Schritt 2 · Verbindung",
         "description": "Die Prüfung erreicht Slack von diesem Server aus über denselben Codepfad, den die Produktion verwendet.",
         "allPassed": "Slack ist von diesem Server aus erreichbar",
         "someFailed": "Slack ist von diesem Server aus nicht erreichbar. Lassen Sie *.slack.com durch Ihren Proxy oder Ihre Firewall zu und prüfen Sie dann erneut.",
@@ -30764,7 +30764,7 @@
         "socketHost": "WebSocket-Host {host}"
       },
       "create": {
-        "title": "Schritt 2 · App erstellen",
+        "title": "Schritt 3 · App erstellen",
         "modeLabel": "Verbindungsmodus",
         "socket": "Socket-Modus",
         "socketDescription": "Empfohlen. OpenObserve baut die Verbindung auf, daher benötigt Slack keine öffentliche URL",
@@ -30793,7 +30793,7 @@
         "signingSecretRequired": "Für den HTTP-Modus ist das Signing-Secret erforderlich"
       },
       "install": {
-        "title": "Schritt 3 · Installieren",
+        "title": "Schritt 4 · Installieren",
         "created": "App erstellt · {appId}",
         "allowHint": "Öffnet den Installationsbildschirm von Slack: Klicken Sie dort auf Zulassen. Das Bot-Token kommt automatisch von Slack zurück; nichts zum Kopieren.",
         "allow": "In Slack zulassen",
@@ -30816,7 +30816,7 @@
         "appNotCreatedByO2": "Da OpenObserve diese App nicht erstellt hat, bleibt sie in Slack. Löschen Sie sie dort, wenn Sie sie nicht mehr benötigen."
       },
       "test": {
-        "title": "Schritt 4 · Test und Verknüpfung",
+        "title": "Schritt 5 · Test und Verknüpfung",
         "run": "Prüfungen ausführen",
         "signIn": "„Sign in with Slack“ testen",
         "signInPassed": "„Sign in with Slack“ funktioniert",

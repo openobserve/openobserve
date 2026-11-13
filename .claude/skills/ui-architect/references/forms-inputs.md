@@ -455,7 +455,7 @@ Because the wrapper is `Omit<..., "modelValue" | ...>`, you never pass `v-model`
 **Import:** `@/lib/forms/Switch/OSwitch.vue`
 **Use when:** An on/off toggle — instant enable/disable of a setting. Supports custom `checkedValue`/`uncheckedValue` and label placement.
 **Don't use for:** A checkbox in a list/form validation context (use `OCheckbox`); choosing among 3+ options (use `ORadioGroup`/`OOptionGroup`).
-**Key props:** `modelValue` (`boolean | string | number`), `label`, `labelPosition` (`"left"` | `"right"` default), `size` (`"sm"` | `"md"` default | `"lg"` | `"xl"`), `checkedValue` (custom on-value — string/number only), `uncheckedValue` (custom off-value), `disabled` (default `false`), `required`, `id`, `name`
+**Key props:** `modelValue` (`boolean | string | number`), `label`, `labelPosition` (`"left"` | `"right"` default), `size` (`"sm"` | `"md"` default | `"lg"` | `"xl"`), `checkedValue` (custom on-value — string/number only), `uncheckedValue` (custom off-value), `disabled` (default `false`), `required`, `id`, `name`, `offTone` (`"brand"` default | `"neutral"`: Off drawn in grey, for settings rows where a brand-coloured Off reads as On), `stateText` (default `false`: prints On / Off beside the track)
 **Slots:** `label` (custom label content — overrides prop), `tooltip` (info icon inline in label)
 **Emits:** `update:modelValue`, `change`
 **Example:**
@@ -465,13 +465,14 @@ Because the wrapper is `Omit<..., "modelValue" | ...>`, you never pass `v-model`
 ```
 
 **Family:** Sibling `OFormSwitch`. Headless.
+In an `OSettingRow`, pass `off-tone="neutral" state-text` and no `label`; the row's label names the switch.
 
 ### OFormSwitch
 
 **Import:** `@/lib/forms/Switch/OFormSwitch.vue`
 **Use when:** An on/off toggle bound to one `<OForm>` field.
 **Don't use for:** Standalone toggles (use `OSwitch`).
-**Key props:** `name` (**required**), plus everything `OSwitch` accepts **except** `modelValue`: `label`, `labelPosition`, `size`, `checkedValue`, `uncheckedValue`, `disabled`, `required`, `id`, `name`.
+**Key props:** `name` (**required**), plus everything `OSwitch` accepts **except** `modelValue`: `label`, `labelPosition`, `size`, `checkedValue`, `uncheckedValue`, `disabled`, `required`, `id`, `name`, `offTone`, `stateText`.
 **Slots:** `label`, `tooltip` (per `OSwitch`).
 **Emits:** none consumer-facing (binds into the form field).
 **Example:**

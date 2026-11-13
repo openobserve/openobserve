@@ -25,6 +25,7 @@ import {
   makeSlackStore,
   managedView,
   ok,
+  withSlackSaveBar,
 } from "@/test/unit/helpers/slack";
 import type { InstallationView, LinkingView } from "@/types/slack";
 import { SLACK_READ_ONLY } from "./slackReadOnly";
@@ -51,8 +52,8 @@ const mountSection = async (
   readOnly = false,
 ) => {
   vi.mocked(slack.getLinking).mockReturnValue(ok(linking) as any);
-  const w = mount(SlackLinkingSection, {
-    props: { installation },
+  const w = mount(withSlackSaveBar(SlackLinkingSection), {
+    props: { installation } as any,
     attachTo: document.body,
     global: {
       provide: { [SLACK_READ_ONLY as symbol]: computed(() => readOnly) },
@@ -63,6 +64,9 @@ const mountSection = async (
   await flushPromises();
   return w;
 };
+
+const pageSave = (w: Awaited<ReturnType<typeof mountSection>>) => (w.vm as any).bar.save();
+const DOMAINS_INPUT = '[data-test="slack-linking-domains"] [data-test="tag-input-field"]';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -83,11 +87,26 @@ describe("SlackLinkingSection (row 11)", () => {
     expect(w.text()).toContain("Mapped domains are read-only here");
   });
 
-  it("mapped: turning linking off sends only enabled", async () => {
+  it("mapped: turning linking off is one unsaved change, and the page's Save sends only enabled", async () => {
     const w = await mountSection(linkingView({ source: "mapping" }));
     await w.find('[data-test="slack-linking-switch"] button').trigger("click");
     await flushPromises();
+    expect(slack.updateLinking).not.toHaveBeenCalled();
+    expect((w.vm as any).bar.changeCount.value).toBe(1);
+    await pageSave(w);
     expect(slack.updateLinking).toHaveBeenCalledWith("acme", "inst-1", { enabled: false });
+  });
+
+  it("Discard on the page's bar puts the switch and the domains back", async () => {
+    const w = await mountSection(linkingView({ source: "manual", domains: ["acme.example"] }));
+    await w.find('[data-test="slack-linking-switch"] button').trigger("click");
+    await w.find(DOMAINS_INPUT).setValue("acme.dev");
+    await w.find(DOMAINS_INPUT).trigger("keydown", { key: "Enter" });
+    expect((w.vm as any).bar.changeCount.value).toBe(2);
+    (w.vm as any).bar.discard();
+    await flushPromises();
+    expect((w.vm as any).bar.changeCount.value).toBe(0);
+    expect(slack.updateLinking).not.toHaveBeenCalled();
   });
 
   it("a_reader_without_manage_slack_cannot_edit_domains_or_switch_linking", async () => {
@@ -96,7 +115,8 @@ describe("SlackLinkingSection (row 11)", () => {
       installationView(),
       true,
     );
-    expect(w.find('[data-test="slack-linking-edit"]').attributes("disabled")).toBeDefined();
+    expect(w.find(DOMAINS_INPUT).exists()).toBe(false);
+    expect(w.find('[data-test="slack-linking-domains-readonly"]').text()).toBe("acme.example");
     expect(
       w
         .find('[data-test="slack-linking-switch"]')
@@ -108,30 +128,51 @@ describe("SlackLinkingSection (row 11)", () => {
   it("AC-12.1 manual: edits domains and refuses a public email domain", async () => {
     const w = await mountSection(linkingView({ source: "manual", domains: ["acme.example"] }));
     expect(w.find('[data-test="slack-linking-summary"]').exists()).toBe(false);
-    await w.find('[data-test="slack-linking-edit"]').trigger("click");
-    const input = w.find('[data-test="slack-linking-domains"] [data-test="tag-input-field"]');
+    const input = w.find(DOMAINS_INPUT);
     await input.setValue("gmail.com");
     await input.trigger("keydown", { key: "Enter" });
-    await w.find('[data-test="slack-linking-form"]').trigger("submit");
+    Element.prototype.scrollIntoView = vi.fn();
+    await pageSave(w);
     await vi.waitFor(() =>
       expect(w.text()).toContain("gmail.com is a public email domain; use your company's domain"),
     );
     expect(slack.updateLinking).not.toHaveBeenCalled();
+    // The page's bar counts the refused field and a rejected Save lands on it.
+    expect((w.vm as any).bar.errorCount.value).toBe(1);
+    expect(document.activeElement).toBe(w.find(DOMAINS_INPUT).element);
   });
 
-  it("manual: saves the edited domains", async () => {
+  it("manual: saves the edited domains, and edits made while saving stay unsaved, even back to the old values", async () => {
     const w = await mountSection(linkingView({ source: "manual", domains: ["acme.example"] }));
-    await w.find('[data-test="slack-linking-edit"]').trigger("click");
-    const input = w.find('[data-test="slack-linking-domains"] [data-test="tag-input-field"]');
+    let answer: (value: unknown) => void = () => {};
+    vi.mocked(slack.updateLinking).mockReturnValue(new Promise((r) => (answer = r)) as any);
+    const input = w.find(DOMAINS_INPUT);
+    const toggle = () => w.find('[data-test="slack-linking-switch"] button').trigger("click");
+    await toggle();
     await input.setValue("acme.dev");
     await input.trigger("keydown", { key: "Enter" });
-    await w.find('[data-test="slack-linking-form"]').trigger("submit");
+    const saving = pageSave(w);
     await vi.waitFor(() =>
       expect(slack.updateLinking).toHaveBeenCalledWith("acme", "inst-1", {
-        enabled: true,
+        enabled: false,
         domains: ["acme.example", "acme.dev"],
       }),
     );
+
+    // Both put back to what they were before Save, while the request is open.
+    await toggle();
+    await w.find('[data-test="tag-chip-1"] button').trigger("click");
+    const saved = linkingView({
+      source: "manual",
+      enabled: false,
+      domains: ["acme.example", "acme.dev"],
+    });
+    vi.mocked(slack.getLinking).mockReturnValue(ok(saved) as any);
+    answer({ data: saved });
+    await saving;
+    await flushPromises();
+    expect(w.find('[data-test="slack-linking-domains"]').text()).not.toContain("acme.dev");
+    expect((w.vm as any).bar.changeCount.value).toBe(2);
   });
 
   it("shows the link counts and runs Link all for the matches", async () => {
@@ -187,7 +228,7 @@ describe("SlackLinkingSection (row 11)", () => {
     const warning = w.find('[data-test="slack-linking-no-domains"]');
     expect(warning.exists() ? warning.text().replace(/\s+/g, " ") : null).toBe(c.warning);
     expect(w.find('[data-test="slack-linking-summary"]').exists()).toBe(false);
-    expect(w.find('[data-test="slack-linking-edit"]').exists()).toBe(true);
+    expect(w.find(DOMAINS_INPUT).exists()).toBe(true);
   });
 
   it("hides Link all when no member is waiting", async () => {
@@ -232,7 +273,7 @@ describe("SlackLinkingSection (row 11)", () => {
     expect(
       w.find('[data-test="slack-linking-switch"] button').attributes("disabled"),
     ).toBeDefined();
-    expect(w.find('[data-test="slack-linking-edit"]').exists()).toBe(false);
+    expect(w.find(DOMAINS_INPUT).exists()).toBe(false);
     expect(w.find('[data-test="slack-linking-matches"]').exists()).toBe(false);
     expect(w.find('[data-test="slack-linking-summary"]').exists()).toBe(false);
     await w.find('[data-test="slack-linking-switch"] button').trigger("click");
@@ -252,7 +293,6 @@ describe("SlackLinkingSection (row 11)", () => {
       linkingView({ source: "mapping", domains: ["acme.example"], manual_domains: ["acme.dev"] }),
     );
     expect(w.find('[data-test="slack-linking-summary"]').text()).toContain("acme.example");
-    await w.find('[data-test="slack-linking-edit"]').trigger("click");
     const form = w.find('[data-test="slack-linking-form"]');
     expect(form.text()).toContain("For organizations without a domain mapping");
     const chips = form.findAll('[data-test="slack-linking-domains"] [data-test^="tag-chip-"]');
@@ -260,7 +300,7 @@ describe("SlackLinkingSection (row 11)", () => {
     const input = form.find('[data-test="slack-linking-domains"] [data-test="tag-input-field"]');
     await input.setValue("acme.io");
     await input.trigger("keydown", { key: "Enter" });
-    await form.trigger("submit");
+    await pageSave(w);
     await vi.waitFor(() =>
       expect(slack.updateLinking).toHaveBeenCalledWith("acme", "inst-1", {
         enabled: true,

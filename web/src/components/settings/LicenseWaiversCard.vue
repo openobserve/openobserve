@@ -15,18 +15,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OCard
+  <OFormSection
     v-if="rows.length"
-    class="border-card-glass-border mt-4 border border-solid"
+    variant="plain"
+    class="mt-4"
+    :title="t('about.waivers_title')"
+    :description="t('about.waivers_from_key')"
     data-test="license-waivers-card"
   >
-    <OCardSection role="body">
-      <div class="text-xl font-semibold" data-test="license-waivers-title">
-        {{ t("about.waivers_title") }}
-      </div>
-      <div class="text-text-secondary mt-1 mb-3 text-sm" data-test="license-waivers-description">
-        {{ t("about.waivers_from_key") }}
-      </div>
+    <div class="rounded-b-surface -mx-4 -my-3 overflow-hidden">
       <OTable
         :data="rows"
         :columns="columns"
@@ -81,20 +78,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OTable>
       <div
         v-if="!canUpdate"
-        class="text-text-secondary mt-3 text-sm"
+        class="text-text-secondary border-border-default border-t px-4 py-3 text-sm"
         data-test="license-waivers-ask-admin"
       >
         {{ t("about.waivers_ask_admin") }}
       </div>
-    </OCardSection>
-  </OCard>
+    </div>
+  </OFormSection>
 </template>
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { useI18nTyped } from "@/types/i18n";
-import OCard from "@/lib/core/Card/OCard.vue";
-import OCardSection from "@/lib/core/Card/OCardSection.vue";
+import OFormSection from "@/lib/core/FormSection/OFormSection.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";

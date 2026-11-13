@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { z } from "zod";
-import { RETENTION_STREAM_TYPES } from "@/utils/dataRetention";
+import { RETENTION_STREAM_TYPES, type RetentionKey } from "@/utils/dataRetention";
 
 export const MIN_RETENTION_DAYS = 3;
 
@@ -41,3 +41,35 @@ export const makeDataRetentionDefaultsSchema = (t: (_key: string) => string) => 
 };
 
 export type DataRetentionDefaultsForm = z.infer<ReturnType<typeof makeDataRetentionDefaultsSchema>>;
+
+export type DataRetentionPayload = Partial<Record<RetentionKey, number>>;
+
+export const toRetentionFormValues = (
+  stored?: DataRetentionPayload,
+): DataRetentionDefaultsForm => ({
+  default: stored?.default && stored.default > 0 ? stored.default : "",
+  types: RETENTION_STREAM_TYPES.filter((type) => (stored?.[type] ?? 0) > 0).map((type) => ({
+    type,
+    days: stored?.[type],
+  })),
+});
+
+// An empty default is sent as 0 and a removed type is left out: both mean "use the global value".
+export const toRetentionPayload = (value: DataRetentionDefaultsForm): DataRetentionPayload => {
+  const payload: DataRetentionPayload = { default: Number(value.default || 0) };
+  for (const row of value.types) payload[row.type] = Number(row.days);
+  return payload;
+};
+
+type RetentionRows = DataRetentionDefaultsForm["types"] | undefined;
+
+/** Stream types added, removed or given other days than saved: one change each. */
+export const retentionRowChanges = (current: RetentionRows, saved: RetentionRows): number => {
+  const days = (rows: RetentionRows) =>
+    new Map((rows ?? []).map((row) => [row.type, String(row.days ?? "")]));
+  const now = days(current);
+  const before = days(saved);
+  const edited = [...now].filter(([type, value]) => before.get(type) !== value).length;
+  const removed = [...before.keys()].filter((type) => !now.has(type)).length;
+  return edited + removed;
+};

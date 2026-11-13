@@ -4,16 +4,14 @@
 import { inject } from "vue";
 import OSelect from "./OSelect.vue";
 import { FORM_CONTEXT_KEY } from "../Form/OForm.types";
-import { firstFieldError } from "../Form/fieldError";
+import { useVisibleFieldError } from "../Form/fieldError";
 import { raw, type I18nText } from "@/types/i18n";
 import type { FormSelectProps } from "./OFormSelect.types";
 
 defineOptions({ inheritAttrs: false });
 
-const errorText = (errors: readonly unknown[] | undefined): I18nText | undefined => {
-  const message = firstFieldError(errors);
-  return message ? raw(message) : undefined;
-};
+const errorText = (message: string | undefined): I18nText | undefined =>
+  message ? raw(message) : undefined;
 
 // OSelect defaults `searchable` to true. Because OFormSelect re-declares it as a
 // boolean prop, an OMITTED `searchable` would be cast to `false` (Vue's
@@ -25,6 +23,7 @@ const props = withDefaults(defineProps<FormSelectProps>(), {
 });
 
 const form = inject(FORM_CONTEXT_KEY, null);
+const shown = useVisibleFieldError(form);
 
 if (import.meta.env.DEV && !form) {
   console.warn("[OFormSelect] must be rendered inside <OForm>. No form context found.");
@@ -47,10 +46,8 @@ if (import.meta.env.DEV && !form) {
       <OSelect
         v-bind="{ ...$attrs, ...props }"
         :model-value="field.state.value"
-        :error="field.state.meta.errors.length > 0"
-        :error-message="
-          field.state.meta.errors.length > 0 ? errorText(field.state.meta.errors) : undefined
-        "
+        :error="shown(field).invalid"
+        :error-message="errorText(shown(field).message)"
         @update:model-value="field.handleChange"
         @blur="field.handleBlur"
       >

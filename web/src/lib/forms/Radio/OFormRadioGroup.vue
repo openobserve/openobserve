@@ -4,7 +4,7 @@
 import { inject } from "vue";
 import ORadioGroup from "./ORadioGroup.vue";
 import { FORM_CONTEXT_KEY } from "../Form/OForm.types";
-import { firstFieldError } from "../Form/fieldError";
+import { useVisibleFieldError } from "../Form/fieldError";
 import type { FormRadioGroupProps } from "./OFormRadioGroup.types";
 import type { RadioValue } from "./ORadio.types";
 
@@ -13,6 +13,7 @@ defineOptions({ inheritAttrs: false });
 const props = defineProps<FormRadioGroupProps>();
 
 const form = inject(FORM_CONTEXT_KEY, null);
+const shown = useVisibleFieldError(form);
 
 if (import.meta.env.DEV && !form) {
   console.warn("[OFormRadioGroup] must be rendered inside <OForm>. No form context found.");
@@ -40,8 +41,8 @@ if (import.meta.env.DEV && !form) {
         >
           <slot />
         </ORadioGroup>
-        <div v-if="field.state.meta.errors.length > 0" class="text-input-error-text text-xs">
-          {{ firstFieldError(field.state.meta.errors) }}
+        <div v-if="shown(field).message !== undefined" class="text-input-error-text text-xs">
+          {{ shown(field).message }}
         </div>
       </div>
     </template>

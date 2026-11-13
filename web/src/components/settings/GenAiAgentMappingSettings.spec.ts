@@ -71,8 +71,9 @@ function config(agentNameFields: string[]): GenAiAgentMappingConfig {
   };
 }
 
-async function mountPage() {
+async function mountPage(attachTo?: HTMLElement) {
   const wrapper = mount(GenAiAgentMappingSettings, {
+    attachTo,
     global: {
       plugins: [i18n, store, router],
       provide: { store },
@@ -121,10 +122,12 @@ describe("GenAiAgentMappingSettings", () => {
     const wrapper = await mountPage();
     expect(saveButton(wrapper).attributes("disabled")).toBeDefined();
 
-    await wrapper.find('[data-test="gen-ai-agent-name-fields-input"] input').setValue("other");
+    await wrapper.find('[data-test="gen-ai-agent-name-fields-input"] textarea').setValue("other");
     expect(saveButton(wrapper).attributes("disabled")).toBeUndefined();
 
-    await wrapper.find('[data-test="gen-ai-agent-name-fields-input"] input').setValue("my.agent");
+    await wrapper
+      .find('[data-test="gen-ai-agent-name-fields-input"] textarea')
+      .setValue("my.agent");
     expect(saveButton(wrapper).attributes("disabled")).toBeDefined();
   });
 
@@ -134,7 +137,7 @@ describe("GenAiAgentMappingSettings", () => {
     const wrapper = await mountPage();
     expect(
       (
-        wrapper.find('[data-test="gen-ai-agent-name-fields-input"] input')
+        wrapper.find('[data-test="gen-ai-agent-name-fields-input"] textarea')
           .element as HTMLInputElement
       ).value,
     ).toBe("default.agent");
@@ -350,22 +353,46 @@ describe("GenAiAgentMappingSettings", () => {
     await wrapper.find('[data-test="gen-ai-harness-add-agent"]').trigger("click");
     await wrapper.find('[data-test="gen-ai-harness-agent-1"] input').setValue(" omp ");
     await wrapper.find('[data-test="gen-ai-harness-patterns-1"] textarea').setValue("tag x");
-    expect(saveButton(wrapper).attributes("disabled")).toBeDefined();
+    await saveButton(wrapper).trigger("click");
+    await flushPromises();
+    expect(mockSave).not.toHaveBeenCalled();
     expect(wrapper.find('[data-test="gen-ai-harness-agent-1"]').text()).toContain(
       "This agent has another row",
     );
 
     await wrapper.find('[data-test="gen-ai-harness-agent-1"] input').setValue("task");
-    expect(saveButton(wrapper).attributes("disabled")).toBeUndefined();
     expect(wrapper.text()).not.toContain("This agent has another row");
   });
+
+  // A fallback list is checked when its field is left; Save refuses while one is invalid.
+  it.each(["gen-ai-agent-name-fields-input", "gen-ai-attribution-user"])(
+    "focuses invalid fallback %s and refuses to save it",
+    async (dataTest) => {
+      mockGet.mockResolvedValue(config(["my.agent"]));
+      const wrapper = await mountPage(document.body);
+      const input = wrapper.find(`[data-test="${dataTest}"] textarea`);
+      (input.element as HTMLElement).scrollIntoView = vi.fn();
+      await input.setValue("bad value!!, ok.field");
+      expect(wrapper.text()).not.toContain("Use field names separated by commas");
+
+      await input.trigger("blur");
+      expect(wrapper.text()).toContain("Use field names separated by commas");
+      await saveButton(wrapper).trigger("click");
+      await flushPromises();
+      expect(mockSave).not.toHaveBeenCalled();
+      await wrapper.find('[data-test="gen-ai-agent-mapping-save-bar-fix"]').trigger("click");
+      await flushPromises();
+      expect(document.activeElement).toBe(input.element);
+      wrapper.unmount();
+    },
+  );
 
   it("shows the server's message when save rejects a pattern", async () => {
     mockGet.mockResolvedValue(config(["my.agent"]));
     const error = "invalid regex in 'regex (': unclosed group";
     mockSave.mockRejectedValue({ response: { data: { message: error } } });
     const wrapper = await mountPage();
-    await wrapper.find('[data-test="gen-ai-agent-name-fields-input"] input').setValue("other");
+    await wrapper.find('[data-test="gen-ai-agent-name-fields-input"] textarea').setValue("other");
     await saveButton(wrapper).trigger("click");
     await flushPromises();
     expect(mockToast).toHaveBeenCalledWith(

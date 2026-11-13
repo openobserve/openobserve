@@ -246,7 +246,7 @@ it("does not attribute an earlier success to the latest failed-attempt actor", (
     last_attempt_by: "different@example.test",
     last_error: "timeout",
   });
-  const rows = w.findAll('[data-test="o2-description-item"]');
+  const rows = w.findAll("[data-o-setting-row]");
   expect(rows.find((row) => row.text().includes("Last refreshed"))?.text()).not.toContain(
     "different@example.test",
   );

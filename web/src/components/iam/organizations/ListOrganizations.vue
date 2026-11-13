@@ -38,6 +38,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data="organizations"
           :columns="columns"
           row-key="identifier"
+          :row-actions="rowActions"
+          row-actions-more-data-test="organization-row-more-actions"
           :loading="loading"
           :forbidden="forbidden"
           v-model:global-filter="filterQuery"
@@ -84,6 +86,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </template>
 
+          <template #cell-name="{ row }">
+            <div class="flex min-w-0 items-center gap-2">
+              <OTruncatedText>{{ row.name }}</OTruncatedText>
+              <OTag
+                v-if="isCurrentOrganization(row)"
+                variant="default-soft"
+                size="sm"
+                :label="t('iam.listOrganizations.current')"
+                data-test="organization-current-tag"
+              />
+            </div>
+          </template>
+
           <template #cell-identifier="{ row }">
             <OCodeCell :value="row.identifier" />
           </template>
@@ -96,65 +111,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #cell-plan="{ row }">
             <OTag v-if="row.plan && row.plan !== '-'" type="subscriptionPlan" :value="row.plan" />
             <span v-else class="text-text-body">—</span>
-          </template>
-
-          <template #cell-actions="{ row }">
-            <!-- Edit is pinned first so it stays column-aligned across every row,
-                 regardless of which trailing actions a row shows. -->
-            <div class="flex items-center justify-start gap-1">
-              <OButton
-                data-test="organization-name-edit"
-                variant="ghost"
-                size="icon-sm"
-                class="max-md:hidden"
-                :title="t('iam.listOrganizations.edit')"
-                @click="renameOrganization(row)"
-              >
-                <OIcon name="edit" size="sm" />
-              </OButton>
-              <OButton
-                v-if="canDeleteOrg(row)"
-                data-test="organization-delete"
-                variant="ghost"
-                size="icon-sm"
-                class="max-md:hidden"
-                :title="t('iam.listOrganizations.deleteOrganization')"
-                @click="deleteOrganization(row)"
-              >
-                <OIcon name="delete" size="sm" />
-              </OButton>
-              <ODropdown side="bottom" align="end">
-                <template #trigger>
-                  <OButton
-                    icon-left="more-vert"
-                    :title="t('dashboard.moreActions')"
-                    variant="ghost"
-                    size="icon-xs-sq"
-                    class="md:hidden"
-                    data-test="organization-row-more-actions"
-                    @click.stop
-                  />
-                </template>
-                <ODropdownItem
-                  icon-left="edit"
-                  class="md:hidden"
-                  data-test="organization-name-edit-menu"
-                  @select="renameOrganization(row)"
-                >
-                  <span>{{ t("iam.listOrganizations.edit") }}</span>
-                </ODropdownItem>
-                <ODropdownItem
-                  v-if="canDeleteOrg(row)"
-                  icon-left="delete"
-                  variant="destructive"
-                  class="md:hidden"
-                  data-test="organization-delete-menu"
-                  @select="deleteOrganization(row)"
-                >
-                  <span>{{ t("iam.listOrganizations.deleteOrganization") }}</span>
-                </ODropdownItem>
-              </ODropdown>
-            </div>
           </template>
         </OTable>
       </div>
@@ -182,18 +138,18 @@ import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import AddUpdateOrganization from "@/components/iam/organizations/AddUpdateOrganization.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
-import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OCodeCell from "@/lib/core/Table/cells/OCodeCell.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
-import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import type { OTableColumnDef, OTableRowAction } from "@/lib/core/Table/OTable.types";
 import analytics from "@/services/product_analytics";
 import { convertToTitleCase } from "@/utils/zincutils";
+import { switchOrganization as selectOrganization } from "@/utils/organizationSwitch";
+import useStreams from "@/composables/useStreams";
 import config from "@/aws-exports";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { COL } from "@/lib/core/Table/OTable.types";
@@ -207,11 +163,9 @@ export default defineComponent({
     AddUpdateOrganization,
     OEmptyState,
     OButton,
-    ODropdown,
-    ODropdownItem,
     OTag,
+    OTruncatedText,
     OPageLayout,
-    OIcon,
     OTable,
     OSearchInput,
     ORefreshButton,
@@ -220,6 +174,7 @@ export default defineComponent({
     const store = useStore();
     const router = useRouter();
     const { t } = useI18nTyped();
+    const { resetStreams } = useStreams(t);
     const organizations = ref([]);
     const organization = ref({});
     const showAddOrganizationDialog = ref(false);
@@ -285,12 +240,37 @@ export default defineComponent({
       header: t("user.actions"),
       isAction: true,
       pinned: "right",
-      size: 112,
-      minSize: 96,
-      maxSize: 140,
-      // Center-aligned to match every other listing table's actions column.
-      meta: { align: "center", actionCount: 3 },
     });
+    const isCurrentOrganization = (row: any): boolean =>
+      row.identifier === store.state.selectedOrganization?.identifier;
+
+    // The table ranks id "edit" first, so edit is "rename" with the edit shortcut to sit after Switch.
+    const rowActions: OTableRowAction[] = [
+      {
+        id: "switch",
+        label: t("iam.listOrganizations.switch"),
+        icon: "swap-horiz",
+        onSelect: (row) => switchOrganization(row),
+        visible: (row) => !isCurrentOrganization(row),
+        dataTest: () => "organization-switch",
+      },
+      {
+        id: "rename",
+        shortcut: "edit",
+        label: t("iam.listOrganizations.edit"),
+        icon: "edit",
+        onSelect: (row) => renameOrganization(row),
+        dataTest: () => "organization-name-edit",
+      },
+      {
+        id: "delete",
+        label: t("iam.listOrganizations.deleteOrganization"),
+        icon: "delete",
+        onSelect: (row) => deleteOrganization(row),
+        visible: (row) => canDeleteOrg(row),
+        dataTest: () => "organization-delete",
+      },
+    ];
 
     watch(
       () => router.currentRoute.value.query?.action,
@@ -474,6 +454,30 @@ export default defineComponent({
 
     // Returns true if the current user can delete the given org row.
     // Only shown on cloud builds; user must be root or an admin of that org.
+    // Same option shape as the header's organization switcher, which the layout then syncs to.
+    const switchOrganization = (row: any) => {
+      const org = (store.state.organizations ?? []).find(
+        (o: any) => o.identifier === row.identifier,
+      );
+      if (!org) return;
+      const option = {
+        label: org.name,
+        id: org.id,
+        identifier: org.identifier,
+        user_email: store.state.userInfo.email,
+        ingest_threshold: org.ingest_threshold,
+        search_threshold: org.search_threshold,
+        subscription_type: org.CustomerBillingObj?.subscription_type ?? "",
+        status: org.status,
+        note: org.CustomerBillingObj?.note ?? "",
+        created_at: org.created_at,
+      };
+      void selectOrganization({ store, router, resetStreams }, option, {
+        name: "organizations",
+        query: { org_identifier: org.identifier },
+      });
+    };
+
     const canDeleteOrg = (row: any): boolean => {
       if (config.isCloud !== "true") return false;
       const role = row._userRole?.toLowerCase();
@@ -541,6 +545,8 @@ export default defineComponent({
       organizations,
       organization,
       columns,
+      rowActions,
+      isCurrentOrganization,
       showAddOrganizationDialog,
       showJoinOrganizationDialog,
       showOrgAPIKeyDialog,

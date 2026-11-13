@@ -81,7 +81,7 @@ const OPageLayoutStub = {
       :data-icon="icon"
       :data-subtitle="subtitle"
     >
-      <div data-test="page-actions"><slot name="actions" /></div>
+      <div data-test="page-actions"><slot name="actions-overflow" /><slot name="actions" /></div>
       <slot />
     </div>
   `,
@@ -175,9 +175,11 @@ const OEmptyStateStub = {
       data-test="empty-state"
       :data-preset="preset"
       :data-filtered="String(filtered)"
+      :data-actions="(actions || []).map((a) => a.id).join(',')"
+      @click="$emit('action', 'create')"
     />
   `,
-  props: ["size", "preset", "filtered"],
+  props: ["size", "preset", "filtered", "actions"],
   emits: ["action"],
 };
 
@@ -441,7 +443,7 @@ describe("SyntheticsLocationsList", () => {
       expect(emptyState.attributes("data-filtered")).toBe("true");
     });
 
-    it("shows no-data empty state when there are no locations at all", async () => {
+    it("offers to create the first location when there are no locations at all", async () => {
       // Re-mount with no locations
       wrapper.unmount();
       mockGetLocations.mockResolvedValue(mockLocationsResponse([]));
@@ -450,8 +452,9 @@ describe("SyntheticsLocationsList", () => {
 
       const emptyState = wrapper.find('[data-test="empty-state"]');
       expect(emptyState.exists()).toBe(true);
-      expect(emptyState.attributes("data-preset")).toBe("no-data");
-      expect(emptyState.attributes("data-filtered")).toBe("false");
+      expect(emptyState.attributes("data-actions")).toBe("create");
+      await emptyState.trigger("click");
+      expect(wrapper.vm.formDialog.show).toBe(true);
     });
   });
 

@@ -56,11 +56,25 @@ describe("RoleTable member count columns", () => {
     wrapper.unmount();
   });
 
-  it("hides the service accounts column when counts are unavailable", async () => {
-    const wrapper = mountTable([{ role_name: "ops", user_count: 3, service_account_count: null }]);
+  it("keeps both count columns and marks an unknown count as loading, then as unavailable", async () => {
+    const wrapper = mount(RoleTable, {
+      props: {
+        data: [{ role_name: "ops", user_count: 3, service_account_count: null }],
+        loading: false,
+        countsLoading: true,
+      },
+      global: { plugins: [i18n, store, router] },
+      attachTo: document.body,
+    });
     await flushPromises();
-    expect(wrapper.find('[data-test="iam-roles-ops-service-accounts-link"]').exists()).toBe(false);
+    const pending = '[data-test="iam-roles-ops-service-accounts-loading"]';
+    expect(wrapper.find(pending).exists()).toBe(true);
     expect(wrapper.find('[data-test="iam-roles-ops-users-link"]').exists()).toBe(true);
+
+    await wrapper.setProps({ countsLoading: false });
+    expect(wrapper.find(pending).exists()).toBe(false);
+    expect(wrapper.find('[data-test="iam-roles-ops-service-accounts-link"]').exists()).toBe(false);
+    expect(wrapper.text()).toContain(i18n.global.t("iam.serviceAccounts"));
     wrapper.unmount();
   });
 });

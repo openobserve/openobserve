@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
   <OPageLayout
-    :title="t('nodes.header')"
+    :title="t('settings.nodes')"
     icon="hub"
     :subtitle="t('settings.nodesPage.subtitle')"
     bleed
@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="border-r4 border-border-default flex h-full flex-col border-e max-md:overflow-y-auto max-md:border-e-0 max-md:border-b"
         >
           <div class="sticky top-0 shrink-0 px-2">
-            <div class="flex items-center justify-between p-2 text-lg">
+            <div class="flex items-center justify-between p-2 text-sm font-medium">
               <span class="flex items-center gap-1">
                 {{ t("nodes.filter_header") }}
                 <OIcon name="filter-list" size="sm" />
@@ -583,7 +583,7 @@ import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import ORange from "@/lib/forms/Range/ORange.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
-import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import type { ProgressBarVariant } from "@/lib/data/ProgressBar/OProgressBar.types";
@@ -696,7 +696,7 @@ export default defineComponent({
           sortable: true,
           resizable: true,
           hideable: true,
-          minSize: 160,
+          minSize: 240,
           meta: { align: "left", flex: true },
         },
         {
@@ -705,7 +705,8 @@ export default defineComponent({
           accessorKey: "region",
           resizable: true,
           hideable: true,
-          size: 50,
+          size: 72,
+          minSize: 66,
           meta: { align: "left" },
         },
         {
@@ -715,8 +716,8 @@ export default defineComponent({
           sortable: true,
           resizable: true,
           hideable: true,
-          size: COL.status,
-          minSize: 96,
+          size: 92,
+          minSize: 80,
           meta: { align: "left" },
         },
         {
@@ -727,7 +728,8 @@ export default defineComponent({
           sortable: true,
           resizable: true,
           hideable: true,
-          size: COL.role,
+          size: 100,
+          minSize: 98,
           meta: { align: "left" },
         },
         {
@@ -737,7 +739,8 @@ export default defineComponent({
           sortable: true,
           resizable: true,
           hideable: true,
-          size: 100,
+          size: 84,
+          minSize: 82,
           meta: { align: "left" },
         },
         {
@@ -747,7 +750,8 @@ export default defineComponent({
           sortable: true,
           resizable: true,
           hideable: true,
-          size: 200,
+          size: 92,
+          minSize: 80,
           meta: { align: "right" },
         },
         {
@@ -757,7 +761,8 @@ export default defineComponent({
           sortable: true,
           resizable: true,
           hideable: true,
-          size: 200,
+          size: 96,
+          minSize: 96,
           meta: { align: "right" },
         },
         {
@@ -766,7 +771,8 @@ export default defineComponent({
           accessorKey: "tcp_conns",
           resizable: true,
           hideable: true,
-          size: 150,
+          size: 132,
+          minSize: 130,
           meta: { align: "right" },
         },
       ];

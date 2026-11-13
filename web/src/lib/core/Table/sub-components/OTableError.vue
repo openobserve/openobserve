@@ -20,7 +20,7 @@ defineSlots<{
 </script>
 
 <template>
-  <div data-test="o2-table-error" class="px-2 py-4">
+  <div data-test="o2-table-error" class="sticky start-0 px-2 py-4">
     <slot :message="message ?? ''">
       <OBanner variant="error" :content="raw(message ?? '')" inline-actions>
         <template v-if="message" #actions>

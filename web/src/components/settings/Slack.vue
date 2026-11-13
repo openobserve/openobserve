@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from "vue";
+import { computed, nextTick, onMounted, ref, watch } from "vue";
 import { useQuery } from "@tanstack/vue-query";
 import { useStore } from "vuex";
 import config from "@/aws-exports";
@@ -23,6 +23,8 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSaveBar from "@/lib/forms/SaveBar/OSaveBar.vue";
+import { confirmLeave, useLeaveGuard } from "@/lib/forms/SaveBar/useLeaveGuard";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import useIsMetaOrg from "@/composables/useIsMetaOrg";
@@ -45,7 +47,10 @@ import SlackSwitchAllCard from "./SlackSwitchAllCard.vue";
 import SlackUninstallDialog from "./SlackUninstallDialog.vue";
 import SlackWorkspaceCard from "./SlackWorkspaceCard.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { PAGE_ACTIONS_SLOT } from "./pageActionsSlot";
+import { SAVE_BAR_SLOT } from "./saveBarSlot";
 import { provideSlackReadOnly } from "./slackReadOnly";
+import { provideSlackSaveBar } from "./slackSaveBar";
 
 type DialogMode = "disconnect" | "uninstall";
 
@@ -79,7 +84,7 @@ const current = computed<InstallationView | null>(
 );
 const selectedTab = computed<string>({
   get: () => current.value?.id ?? "",
-  set: (id) => (selectedId.value = id),
+  set: (id) => void leaveWorkspace(() => (selectedId.value = id)),
 });
 const pendingId = computed(() => ordered.value.find((i) => i.status === "pending")?.id ?? null);
 const showOrgAccess = computed(() => isMetaOrg.value && current.value?.scope === "instance");
@@ -160,7 +165,34 @@ const showConfirmation = (value: Confirmation): void => {
 
 const page = ref<HTMLElement | null>(null);
 
+const saveBar = provideSlackSaveBar(page);
+useLeaveGuard(() => saveBar.changeCount.value > 0, {
+  count: () => saveBar.changeCount.value,
+  onDiscard: saveBar.discard,
+});
+const showWorkspace = computed(
+  () =>
+    slackState.value.enabled &&
+    !installations.isPending.value &&
+    !pageSettling.value &&
+    !forbidden.value &&
+    !installations.isError.value &&
+    !confirmation.value &&
+    !showWizard.value &&
+    !!current.value &&
+    !adding.value,
+);
+// Outside the Settings shell there is no header or bar row, so the controls stay in the page.
+const inShell = ref(false);
+onMounted(() => (inShell.value = !!document.querySelector(PAGE_ACTIONS_SLOT)));
+
+// These swap the workspace's forms without a navigation, so the router's guard never sees them.
+async function leaveWorkspace(go: () => void): Promise<void> {
+  if (await confirmLeave()) go();
+}
+
 const goToReinstall = async (installationId: string): Promise<void> => {
+  if (installationId !== current.value?.id && !(await confirmLeave())) return;
   selectedId.value = installationId;
   await nextTick();
   const button = page.value?.querySelector<HTMLElement>(REINSTALL_BUTTONS);
@@ -178,6 +210,51 @@ const openDialog = (mode: DialogMode): void => {
 
 <template>
   <div ref="page" class="flex flex-col gap-6 pb-6" data-test="slack-settings">
+    <Teleport defer :to="PAGE_ACTIONS_SLOT" :disabled="!inShell">
+      <div
+        v-if="showWorkspace || adding"
+        :key="org"
+        class="flex items-center justify-end gap-2"
+        data-test="slack-page-actions"
+      >
+        <OButton
+          v-if="adding"
+          variant="outline"
+          size="sm-action"
+          data-test="slack-add-workspace-cancel"
+          @click="adding = false"
+        >
+          {{ t("common.cancel") }}
+        </OButton>
+        <OButton
+          v-else
+          variant="outline"
+          size="sm-action"
+          :disabled="readOnly"
+          data-test="slack-add-workspace"
+          @click="leaveWorkspace(() => (adding = true))"
+        >
+          {{ t("slackApp.workspaces.addAnother") }}
+          <OTooltip v-if="readOnly" side="bottom" :content="t('slackApp.connect.permissionHint')" />
+        </OButton>
+      </div>
+    </Teleport>
+    <Teleport
+      v-if="showWorkspace && saveBar.hasParts.value"
+      defer
+      :to="SAVE_BAR_SLOT"
+      :disabled="!inShell"
+    >
+      <OSaveBar
+        class="px-page-edge"
+        :change-count="saveBar.changeCount.value"
+        :error-count="saveBar.errorCount.value"
+        :saving="saveBar.saving.value"
+        data-test="slack-save-bar"
+        @save="saveBar.save"
+        @discard="saveBar.discard"
+      />
+    </Teleport>
     <!-- Keyed by org: every step, ticket and popup below belongs to the org it started in. -->
     <div v-if="slackState.enabled" :key="org" class="flex flex-col gap-6">
       <div v-if="installations.isPending.value || pageSettling" class="flex justify-center py-16">
@@ -210,21 +287,9 @@ const openDialog = (mode: DialogMode): void => {
       />
       <template v-else-if="current && !adding">
         <SlackSectionBar v-if="showInsights" :sections="sectionLinks" />
-        <SlackPageSection
-          section-id="general"
-          :title="showInsights ? t('slackApp.sections.general') : undefined"
-          :description="showInsights ? t('slackApp.sections.generalDescription') : undefined"
-        >
-          <div
-            class="flex items-end justify-between gap-3"
-            :class="ordered.length > 1 ? 'border-border-default border-b' : ''"
-          >
-            <OTabs
-              v-if="ordered.length > 1"
-              v-model="selectedTab"
-              class="min-w-0"
-              data-test="slack-workspace-tabs"
-            >
+        <SlackPageSection section-id="general">
+          <div v-if="ordered.length > 1" class="border-border-default border-b">
+            <OTabs v-model="selectedTab" class="min-w-0" data-test="slack-workspace-tabs">
               <OTab
                 v-for="inst in ordered"
                 :key="inst.id"
@@ -242,22 +307,6 @@ const openDialog = (mode: DialogMode): void => {
                 </span>
               </OTab>
             </OTabs>
-            <OButton
-              variant="outline"
-              size="sm-action"
-              icon-left="add"
-              class="ms-auto"
-              :disabled="readOnly"
-              data-test="slack-add-workspace"
-              @click="adding = true"
-            >
-              {{ t("slackApp.workspaces.addAnother") }}
-              <OTooltip
-                v-if="readOnly"
-                side="bottom"
-                :content="t('slackApp.connect.permissionHint')"
-              />
-            </OButton>
           </div>
           <SlackSwitchAllCard :key="`switch-${current.id}`" :installation="current" />
           <SlackWorkspaceCard
@@ -279,7 +328,6 @@ const openDialog = (mode: DialogMode): void => {
         <SlackPageSection
           v-if="showInsights"
           section-id="autoobserve"
-          class="border-border-default border-t pt-6"
           :title="t('slackApp.sections.autoobserve')"
           :description="t('slackApp.sections.autoobserveDescription')"
         >
@@ -287,17 +335,6 @@ const openDialog = (mode: DialogMode): void => {
         </SlackPageSection>
       </template>
       <template v-else>
-        <div v-if="adding" class="flex justify-end">
-          <OButton
-            variant="outline"
-            size="sm-action"
-            icon-left="close"
-            data-test="slack-add-workspace-cancel"
-            @click="adding = false"
-          >
-            {{ t("common.cancel") }}
-          </OButton>
-        </div>
         <SlackConnectEmpty
           :is-cloud="isCloud"
           :available="installations.data.value?.available ?? []"

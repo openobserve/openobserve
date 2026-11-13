@@ -30684,7 +30684,7 @@
   },
   "slackApp": {
     "prereq": {
-      "title": "Adım 0 · Sunucu ön koşulları",
+      "title": "Adım 1 · Sunucu ön koşulları",
       "subtitle": "Herhangi bir Slack işleminden önce bu sunucuda kontrol edilir",
       "columnSetting": "Ayar",
       "columnResult": "Sonuç",
@@ -30755,7 +30755,7 @@
       "back": "Geri",
       "finish": "Bitir",
       "connection": {
-        "title": "Adım 1 · Bağlantı",
+        "title": "Adım 2 · Bağlantı",
         "description": "Kontrol, Slack'e bu sunucudan üretim ortamının kullandığı aynı kod yolundan erişir.",
         "allPassed": "Slack'e bu sunucudan erişilebiliyor",
         "someFailed": "Slack'e bu sunucudan erişilemiyor. Proxy veya güvenlik duvarınızdan *.slack.com'a izin verin, ardından yeniden kontrol edin.",
@@ -30764,7 +30764,7 @@
         "socketHost": "WebSocket ana bilgisayarı {host}"
       },
       "create": {
-        "title": "Adım 2 · Uygulamayı oluştur",
+        "title": "Adım 3 · Uygulamayı oluştur",
         "modeLabel": "Bağlantı modu",
         "socket": "Socket Modu",
         "socketDescription": "Önerilir. Bağlantıyı OpenObserve açar, böylece Slack'in genel bir URL'ye ihtiyacı olmaz",
@@ -30793,7 +30793,7 @@
         "signingSecretRequired": "HTTP modu için imzalama gizli anahtarı gerekir"
       },
       "install": {
-        "title": "Adım 3 · Kurulum",
+        "title": "Adım 4 · Kurulum",
         "created": "Uygulama oluşturuldu · {appId}",
         "allowHint": "Slack'in kurulum ekranını açar: orada İzin Ver'e tıklayın. Bot token'ı Slack'ten kendiliğinden gelir; kopyalanacak bir şey yok.",
         "allow": "Slack'te İzin Ver",
@@ -30816,7 +30816,7 @@
         "appNotCreatedByO2": "Bu uygulamayı OpenObserve oluşturmadı; bu nedenle Slack'te kalır. Artık ihtiyacınız yoksa orada silin."
       },
       "test": {
-        "title": "Adım 4 · Test ve bağlama",
+        "title": "Adım 5 · Test ve bağlama",
         "run": "Kontrolleri çalıştır",
         "signIn": "Slack ile Oturum Açmayı test et",
         "signInPassed": "Slack ile Oturum Açma çalışıyor",

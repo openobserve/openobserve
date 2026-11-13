@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OPageLayout
     v-if="isMetaOrg"
-    :title="t('queries.runningQueries')"
+    :title="t('settings.queryManagement')"
     icon="query-stats"
     :subtitle="t('settings.queryManagementDesc')"
     bleed
@@ -87,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :rows="rowsQuery"
               :forbidden="forbidden"
               :filtered="!!filterQuery"
-              :last-refreshed="lastRefreshed"
+              :last-refreshed-at="lastRefreshedAt"
               :search-type="selectedSearchType"
               :search-types="searchTypes"
               :search-type-labels="searchTypeLabels"
@@ -109,7 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :rows="summaryRows"
               :forbidden="forbidden"
               :filtered="!!filterQuery"
-              :last-refreshed="lastRefreshed"
+              :last-refreshed-at="lastRefreshedAt"
               v-model:selectedRows="selectedRow['summary']"
               @filter:queries="filterUserQueries"
               @delete:queries="handleMultiQueryCancel"
@@ -184,7 +184,7 @@ export default defineComponent({
     const { t } = useI18nTyped();
     const store = useStore();
     const schemaData = ref({});
-    const lastRefreshed = ref("");
+    const lastRefreshedAt = ref<number | null>(null);
     const { isMetaOrg } = useIsMetaOrg();
     const resultTotal = ref<number>(0);
     const selectedRow = ref<{
@@ -196,7 +196,7 @@ export default defineComponent({
     });
 
     const searchFieldOptions = ref([
-      { label: t("search.allFieldsLabel"), value: "all" },
+      { label: t("queries.allFields"), value: "all" },
       { label: t("queries.duration"), value: "exec_duration" },
       { label: t("queries.queryRange"), value: "query_range" },
     ]);
@@ -219,7 +219,7 @@ export default defineComponent({
 
     const refreshData = () => {
       getRunningQueries();
-      lastRefreshed.value = getCurrentTime();
+      lastRefreshedAt.value = Date.now();
     };
 
     /**
@@ -292,20 +292,6 @@ export default defineComponent({
     };
 
     // Convert result object to array
-    // Function to get current time in a desired format
-    const getCurrentTime = () => {
-      const now = new Date();
-      const year = now.getFullYear().toString().padStart(4, "0");
-      const month = (now.getMonth() + 1).toString().padStart(2, "0");
-      const day = now.getDate().toString().padStart(2, "0");
-      const hours = now.getHours().toString().padStart(2, "0");
-      const minutes = now.getMinutes().toString().padStart(2, "0");
-      const seconds = now.getSeconds().toString().padStart(2, "0");
-      const timezone = store.state.timezone;
-
-      return `${year}-${month}-${day} ${hours}:${minutes}:${seconds} ${timezone}`;
-    };
-
     const loadingState = ref(false);
     const forbidden = ref<ForbiddenState>(false);
     const queries = ref([]);
@@ -453,7 +439,7 @@ export default defineComponent({
 
     onBeforeMount(() => {
       getRunningQueries();
-      lastRefreshed.value = getCurrentTime();
+      lastRefreshedAt.value = Date.now();
     });
 
     // Watcher to filter queries based on user_id
@@ -793,7 +779,7 @@ export default defineComponent({
       loadingState,
       forbidden,
       refreshData,
-      lastRefreshed,
+      lastRefreshedAt,
       isMetaOrg,
       resultTotal,
       selectedPerPage,
@@ -817,7 +803,6 @@ export default defineComponent({
       summaryRows,
       // Additional functions for testing
       getRunningQueriesSummary,
-      getCurrentTime,
       localTimeToMicroseconds,
       getDuration,
       queryRange,

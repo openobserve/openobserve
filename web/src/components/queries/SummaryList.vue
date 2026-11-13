@@ -36,22 +36,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :persist-columns="true"
     table-id="settings-query-management-summary"
   >
-    <template #toolbar>
-      <div class="flex-1 text-xs font-bold" data-test="summary-list-last-refresh">
-        {{ t("queries.lastDataRefreshTime") }} {{ lastRefreshed }}
-      </div>
-    </template>
     <template #toolbar-trailing>
-      <OButton
+      <ORefreshButton
+        layout="inline"
         variant="outline"
-        size="icon-toolbar"
-        class="shrink-0"
-        icon-left="refresh"
+        :last-run-at="lastRefreshedAt"
         data-test="summary-list-refresh-btn"
         @click="$emit('refresh')"
-      >
-        <OTooltip side="bottom" :content="t('common.refresh')" />
-      </OButton>
+      />
     </template>
     <template #empty>
       <OEmptyState
@@ -109,14 +101,14 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import { durationFormatter } from "@/utils/zincutils";
 import { COL } from "@/lib/core/Table/OTable.types";
 import type { ForbiddenState } from "@/utils/featureGate";
 
 export default defineComponent({
   name: "RunningQueriesList",
-  components: { OEmptyState, OTable, OUserCell, OButton, OTooltip },
+  components: { OEmptyState, OTable, OUserCell, OButton, ORefreshButton },
   props: {
     rows: {
       type: Array,
@@ -134,9 +126,9 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
-    lastRefreshed: {
-      type: String,
-      default: "",
+    lastRefreshedAt: {
+      type: Number as PropType<number | null>,
+      default: null,
     },
   },
   emits: [

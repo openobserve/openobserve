@@ -23,6 +23,7 @@ import type { PasswordPolicy as PasswordPolicyType } from "@/services/passwordPo
 import PasswordPolicy from "./PasswordPolicy.vue";
 import {
   buildPolicyPayload,
+  countPolicyChanges,
   INITIAL_POLICY,
   lockoutLadder,
   policyDefaults,
@@ -47,6 +48,7 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
 }));
 
 import passwordPolicyService from "@/services/passwordPolicy";
+import { confirmLeave } from "@/lib/forms/SaveBar/useLeaveGuard";
 
 // Every non-complexity feature configured: the values a complexity-only edit must carry back untouched.
 const CONFIGURED_POLICY: PasswordPolicyType = {
@@ -86,7 +88,7 @@ const mountPage = () => {
   const wrapper = mount(PasswordPolicy, {
     global: {
       plugins: [i18n, store],
-      stubs: { OSpinner: true },
+      stubs: { teleport: true },
     },
   });
   wrappers.push(wrapper);
@@ -102,8 +104,8 @@ const editField = async (wrapper: any, row: string, value: string) => {
 const editMinLength = (wrapper: any, value: string) => editField(wrapper, "min-length", value);
 const lockoutControl = (wrapper: any, row: string, selector: string) =>
   wrapper.find(`[data-test="settings-password-policy-lockout-${row}"] ${selector}`);
-const pair = (wrapper: any, name: string) =>
-  wrapper.find(`[data-test="settings-password-policy-pair-${name}"]`);
+const rowError = (wrapper: any, row: string) =>
+  wrapper.find(`[data-test="settings-password-policy-${row}"] [role="alert"]`);
 
 // A DOM `trigger("submit")` returns before the awaited onSubmit settles, so the assertions would race it.
 const submit = async (wrapper: any) => {
@@ -183,6 +185,36 @@ describe("PasswordPolicy", () => {
 
     expect(confirmMock).toHaveBeenCalled();
     expect(passwordPolicyService.updatePolicy).not.toHaveBeenCalled();
+  });
+
+  it("a Discard confirmed on leaving while the save is open stays discarded when the save lands; a later edit stays unsaved", async () => {
+    let finish = () => {};
+    (passwordPolicyService.updatePolicy as any).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = () =>
+            resolve({
+              data: { policy: { ...CONFIGURED_POLICY, min_length: 12 }, users_flagged: 0 },
+            });
+        }),
+    );
+    const wrapper = mountPage();
+    await flushPromises();
+
+    await editMinLength(wrapper, "12");
+    const saving = wrapper.vm.form.handleSubmit();
+    await vi.waitFor(() => expect(passwordPolicyService.updatePolicy).toHaveBeenCalled());
+    expect(await confirmLeave()).toBe(true);
+    await editField(wrapper, "max-length", "70");
+    finish();
+    await saving;
+    await flushPromises();
+
+    const input = wrapper.find('[data-test="settings-password-policy-min-length"] input');
+    const later = wrapper.find('[data-test="settings-password-policy-max-length"] input');
+    expect((input.element as HTMLInputElement).value).toBe("12");
+    expect((later.element as HTMLInputElement).value).toBe("70");
+    expect(wrapper.findComponent({ name: "OSaveBar" }).props("changeCount")).toBe(1);
   });
 
   it("posts a body that still carries rotation, reuse and lockout from the GET", async () => {
@@ -293,62 +325,29 @@ describe("PasswordPolicy", () => {
     );
   });
 
-  it("lays the settings out in the planned pairs", async () => {
-    const wrapper = mountPage();
-    await flushPromises();
-
-    const plan: [string, string[]][] = [
-      ["length", ["min-length", "max-length"]],
-      ["case", ["require-uppercase", "require-lowercase"]],
-      ["digit-special", ["require-digit", "require-special"]],
-      ["rotation", ["rotation-days", "rotation-warning-days"]],
-      ["history", ["history-count", "history-max-retained"]],
-      ["lockout-duration", ["lockout-start-secs", "lockout-max-secs"]],
-      ["lockout-escalation", ["lockout-bucket-size", "lockout-backoff"]],
-      ["session-enforcement", ["cookie-max-age", "apply-to-root"]],
-    ];
-    for (const [name, rows] of plan) {
-      expect(pair(wrapper, name).exists()).toBe(true);
-      for (const row of rows) {
-        expect(
-          pair(wrapper, name).find(`[data-test="settings-password-policy-${row}"]`).exists(),
-        ).toBe(true);
-      }
-    }
-
-    await wrapper
-      .find('[data-test="settings-password-policy-require-special"] button[role="switch"]')
-      .trigger("click");
-    await flushPromises();
-
-    // VTU has no ancestor query, so the singles are checked through the DOM.
-    for (const row of ["lockout-threshold", "special-char-set"]) {
-      const el = wrapper.find(`[data-test="settings-password-policy-${row}"]`).element;
-      expect(el.closest('[data-test^="settings-password-policy-pair-"]')).toBeNull();
-    }
-  });
-
-  it("renders a cross-field message under the pair, not inside the narrow field", async () => {
+  it("marks both length fields and prints one message, on the maximum row, once the field is left", async () => {
     const wrapper = mountPage();
     await flushPromises();
 
     await editField(wrapper, "max-length", "4");
-    await submit(wrapper);
+    expect(rowError(wrapper, "max-length").exists()).toBe(false);
 
-    expect(passwordPolicyService.updatePolicy).not.toHaveBeenCalled();
-    const error = wrapper.find('[data-test="settings-password-policy-max-length-error"]');
-    expect(error.exists()).toBe(true);
-    expect(error.text()).toBe("Maximum length must be between the minimum length and 128.");
-    expect(
-      pair(wrapper, "length")
-        .find('[data-test="settings-password-policy-max-length-error"]')
-        .exists(),
-    ).toBe(true);
-    const field = wrapper.find('[data-test="settings-password-policy-max-length"]');
-    expect(field.find('[data-test="settings-password-policy-max-length-error"]').exists()).toBe(
-      false,
+    await wrapper.find('[data-test="settings-password-policy-max-length"] input').trigger("blur");
+    await flushPromises();
+
+    expect(rowError(wrapper, "max-length").text()).toBe(
+      "Must be 10 or more, to match the minimum length.",
     );
-    expect(field.find(".text-input-error-text").exists()).toBe(false);
+    expect(rowError(wrapper, "min-length").exists()).toBe(false);
+    for (const row of ["min-length", "max-length"]) {
+      const input = wrapper.find(`[data-test="settings-password-policy-${row}"] input`);
+      expect(input.attributes("aria-invalid")).toBe("true");
+    }
+    const bar = wrapper.find('[data-test="settings-password-policy-save-bar"]');
+    expect(bar.attributes("data-state")).toBe("invalid");
+    expect(bar.find('[data-test="settings-password-policy-save-bar-fix"]').text()).toBe(
+      "Fix 1 field",
+    );
   });
 
   it.each([
@@ -365,39 +364,19 @@ describe("PasswordPolicy", () => {
     await editField(wrapper, "max-length", value);
     await submit(wrapper);
 
-    expect(wrapper.find('[data-test="settings-password-policy-max-length-error"]').exists()).toBe(
-      hasError,
-    );
-  });
-
-  it("clears the footer once the values are valid again", async () => {
-    const wrapper = mountPage();
-    await flushPromises();
-
-    await editField(wrapper, "max-length", "4");
-    await submit(wrapper);
-    expect(wrapper.find('[data-test="settings-password-policy-max-length-error"]').exists()).toBe(
-      true,
-    );
-
-    await editField(wrapper, "max-length", "64");
-
-    expect(wrapper.find('[data-test="settings-password-policy-max-length-error"]').exists()).toBe(
-      false,
-    );
+    expect(rowError(wrapper, "max-length").exists()).toBe(hasError);
   });
 
   it("uses one card for session and enforcement", async () => {
     const wrapper = mountPage();
     await flushPromises();
 
-    expect(wrapper.text()).toContain("Session & enforcement");
-    expect(wrapper.findAll(".text-compact.font-semibold").map((n) => n.text())).toEqual([
+    expect(wrapper.findAll("h2").map((n) => n.text())).toEqual([
       "Complexity",
       "Rotation",
       "Reuse prevention",
       "Account lockout",
-      "Session & enforcement",
+      "Session and enforcement",
     ]);
   });
 
@@ -446,6 +425,21 @@ describe("INITIAL_POLICY", () => {
       cookie_max_age_secs: 0,
       apply_to_root: false,
     });
+  });
+});
+
+describe("countPolicyChanges", () => {
+  const form = () => policyDefaults(CONFIGURED_POLICY);
+
+  it.each([
+    ["nothing edited", {}, 0],
+    ["a number retyped as the same digits", { min_length: "10" }, 0],
+    ["one number and one nested lockout value", { min_length: "12", lockout: { threshold: 6 } }, 2],
+    ["a special set typed while its switch is off", { special_char_set: "!?" }, 0],
+    ["the switch turned on with a set", { require_special: true, special_char_set: "!?" }, 2],
+  ])("%s", (_name, edit: any, expected) => {
+    const values = { ...form(), ...edit, lockout: { ...form().lockout, ...edit.lockout } };
+    expect(countPolicyChanges(CONFIGURED_POLICY, values)).toBe(expected);
   });
 });
 

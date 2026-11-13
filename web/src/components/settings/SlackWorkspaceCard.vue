@@ -19,11 +19,11 @@ import { computed, ref } from "vue";
 import { useMutation, useQuery } from "@tanstack/vue-query";
 import { useStore } from "vuex";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
-import OAvatar from "@/lib/core/Avatar/OAvatar.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OCard from "@/lib/core/Card/OCard.vue";
+import OFormSection from "@/lib/core/FormSection/OFormSection.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSettingRow from "@/lib/core/SettingRow/OSettingRow.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
@@ -31,6 +31,8 @@ import OText from "@/lib/core/Typography/OText.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OForm from "@/lib/forms/Form/OForm.vue";
+import { useFormCounts } from "@/lib/forms/SaveBar/formCounts";
+import { useOForm } from "@/lib/forms/Form/useOForm";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OPopover from "@/lib/overlay/Popover/OPopover.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -56,6 +58,7 @@ import { formatDuration } from "@/utils/downtimes/schedule";
 import { isSlackUrl } from "@/utils/slackLink";
 import SlackCheckList, { type SlackCheckItem } from "./SlackCheckList.vue";
 import SlackCredentialsDialog from "./SlackCredentialsDialog.vue";
+import { useSavedBaseline, useSlackSavePart } from "./slackSaveBar";
 import {
   HELP_CONTACT_MAX_LENGTH,
   makeHelpContactSchema,
@@ -245,266 +248,94 @@ const orgRows = computed<ConnectedOrgRow[]>(() => [
   },
 ]);
 
-const helpContactSchema = makeHelpContactSchema();
+const metaLine = computed(() =>
+  managed.value
+    ? t("slackApp.card.managedBy")
+    : t("slackApp.card.connectedBy", {
+        user: nameOf(props.installation.this_org.connected_by),
+        date: connectedDate.value,
+      }),
+);
+// The name alone cannot tell two namesakes apart, so the email stays one hover away.
+const connectedByHint = computed(() => {
+  const email = props.installation.this_org.connected_by;
+  return !managed.value && nameOf(email) !== email ? tooltipOf(email) : undefined;
+});
+const otherOrgsLine = computed(() =>
+  t(
+    "slackApp.card.otherOrgs",
+    { count: props.installation.other_connected_orgs },
+    props.installation.other_connected_orgs,
+  ),
+);
+
 const helpContactDefaults = computed<HelpContactForm>(() => ({
   help_contact: helpContact.data.value?.help_contact ?? "",
 }));
 const saveHelpContact = async (value: HelpContactForm): Promise<void> => {
-  await helpContactMutation.mutateAsync(value.help_contact);
+  await helpContactBaseline.save(() => helpContactMutation.mutateAsync(value.help_contact));
   toast({ variant: "success", message: t("slackApp.card.helpContactSaved") });
 };
+const helpContactForm = useOForm<HelpContactForm>({
+  defaultValues: helpContactDefaults.value,
+  schema: makeHelpContactSchema(),
+  validateOn: "leave",
+  onSubmit: saveHelpContact,
+});
+const helpContactValues = helpContactForm.useStore((s) => s.values);
+const helpContactBaseline = useSavedBaseline(
+  helpContactForm,
+  helpContactValues,
+  () => helpContactDefaults.value,
+  (value) => ({ help_contact: value.help_contact.trim() }),
+);
+const { errors: helpContactErrors } = useFormCounts(helpContactForm);
+const helpContactChanged = computed(
+  () => !helpContact.isPending.value && helpContactBaseline.changed.value.length > 0,
+);
+
+useSlackSavePart({
+  changes: () => Number(helpContactChanged.value),
+  errors: () => helpContactErrors.value,
+  save: async () => {
+    try {
+      await helpContactForm.handleSubmit();
+    } catch {
+      return false;
+    }
+    return helpContactForm.state.isValid && !helpContactChanged.value;
+  },
+  discard: helpContactBaseline.discard,
+});
 </script>
 
 <template>
   <div class="flex flex-col gap-6" data-test="slack-workspace">
-    <OCard variant="outlined" class="gap-4 p-5">
-      <div class="flex flex-wrap items-start justify-between gap-3">
-        <div class="flex min-w-0 items-center gap-3">
-          <OAvatar :value="installation.team_name" size="lg" />
-          <div class="flex min-w-0 flex-col gap-0.5">
-            <h2
-              class="text-text-heading m-0 text-lg font-semibold"
-              data-test="slack-workspace-name"
-            >
-              {{ raw(installation.team_name) }}
-            </h2>
-            <span class="text-text-secondary text-sm" data-test="slack-workspace-meta">
-              <template v-if="managed">{{ t("slackApp.card.managedBy") }}</template>
-              <template v-else>
-                {{
-                  t("slackApp.card.connectedBy", {
-                    user: nameOf(installation.this_org.connected_by),
-                    date: connectedDate,
-                  })
-                }}
-                <OTooltip
-                  v-if="
-                    nameOf(installation.this_org.connected_by) !==
-                    installation.this_org.connected_by
-                  "
-                  :content="tooltipOf(installation.this_org.connected_by)"
-                />
-              </template>
-            </span>
-          </div>
-        </div>
-        <div class="flex items-center gap-2">
-          <OTag
-            v-if="isInstance"
-            variant="primary-soft"
-            shape="pill"
-            size="sm"
-            :label="t('slackApp.card.instanceTag')"
-            data-test="slack-workspace-instance-tag"
-          />
-          <OTag
-            type="slackInstallStatus"
-            :value="installation.status"
-            data-test="slack-workspace-status"
-          />
-        </div>
-      </div>
-
-      <OBanner v-if="managed" variant="info" icon="info" data-test="slack-managed-banner">
-        <span class="font-semibold">{{ t("slackApp.card.managedTitle") }}</span>
-        {{ t("slackApp.card.managedDetail", { team: installation.team_name }) }}
-        <template v-if="installation.instance_help_contact">
-          {{ t("slackApp.card.managedQuestions", { contact: installation.instance_help_contact }) }}
-        </template>
-      </OBanner>
-
-      <OBanner
-        v-if="!installation.credentials_readable"
-        variant="error-soft"
-        icon="error-outline"
-        data-test="slack-credentials-unreadable"
-      >
-        {{
-          selfHosted
-            ? t("slackApp.card.credentialsUnreadable")
-            : t("slackApp.card.credentialsUnreadableCloud")
-        }}
-        <template v-if="!managed" #actions>
-          <OButton
-            v-if="selfHosted"
-            variant="outline"
-            size="sm-action"
-            icon-left="key"
-            :disabled="readOnly"
-            data-test="slack-credentials-update"
-            @click="credentialsOpen = true"
-          >
-            {{ t("slackApp.card.updateCredentials") }}
-            <OTooltip
-              v-if="readOnly"
-              side="bottom"
-              :content="t('slackApp.connect.permissionHint')"
-            />
-          </OButton>
-          <OButton
-            v-else
-            variant="outline"
-            size="sm-action"
-            icon-left="refresh"
-            :loading="reinstall.connecting.value"
-            :disabled="readOnly"
-            data-test="slack-credentials-reinstall"
-            @click="reinstall.open()"
-          >
-            {{ t("slackApp.card.reinstall") }}
-            <OTooltip
-              v-if="readOnly"
-              side="bottom"
-              :content="t('slackApp.connect.permissionHint')"
-            />
-          </OButton>
-        </template>
-      </OBanner>
-
-      <OBanner
-        v-if="reinstalledTeam"
-        variant="success"
-        dense
-        icon="check-circle"
-        data-test="slack-reinstall-result"
-      >
-        {{ t("slackApp.card.reinstalled", { team: reinstalledTeam }) }}
-      </OBanner>
-
-      <div class="border-border-default grid grid-cols-1 gap-2 border-t pt-4 md:grid-cols-2">
-        <span class="flex items-center gap-2 text-sm" data-test="slack-workspace-events">
-          <OIcon
-            :name="installation.health.last_event_at ? 'check-circle' : 'schedule'"
-            size="sm"
-            :class="
-              installation.health.last_event_at ? 'text-status-positive' : 'text-text-secondary'
-            "
-          />
-          <template v-if="installation.health.last_event_at">
-            {{ t("slackApp.card.eventsReceived") }}
-            <OTimeCell :value="installation.health.last_event_at" />
-          </template>
-          <template v-else>{{ t("slackApp.card.noEvents") }}</template>
+    <OFormSection
+      variant="plain"
+      :title="raw(installation.team_name)"
+      data-test="slack-workspace-card"
+    >
+      <template #description>
+        <span>
+          {{ metaLine }}
+          <OTooltip v-if="connectedByHint" :content="connectedByHint" />
         </span>
-        <span
-          v-if="showSockets"
-          class="flex items-center gap-2 text-sm"
-          data-test="slack-workspace-sockets"
-        >
-          <OIcon
-            :name="socketsUp ? 'check-circle' : 'warning-amber'"
-            size="sm"
-            :class="socketsUp ? 'text-status-positive' : 'text-status-warning-text'"
-          />
-          {{ socketsUp ? t("slackApp.card.connectionUp") : t("slackApp.card.connectionDown") }}
-          <OPopover
-            v-model:open="connectionInfoOpen"
-            side="bottom"
-            align="start"
-            :aria-label="t('slackApp.card.aboutConnection')"
-          >
-            <template #trigger>
-              <OButton
-                variant="ghost"
-                size="xs"
-                icon-left="info-outline"
-                data-test="slack-workspace-connection-info"
-              >
-                <span class="sr-only">{{ t("slackApp.card.aboutConnection") }}</span>
-              </OButton>
-            </template>
-            <p class="w-96 max-w-[calc(100vw-1.5rem)] p-3 leading-5">
-              <OText variant="meta" data-test="slack-workspace-connection-detail">
-                {{ modeLabel }} {{ raw("·") }}
-                {{
-                  t("slackApp.card.sockets", {
-                    up: installation.health.sockets_up,
-                    want: installation.health.sockets_want,
-                    time: socketsAsOf,
-                  })
-                }}
-              </OText>
-            </p>
-          </OPopover>
-        </span>
-        <span
-          v-if="outbound"
-          class="flex items-center gap-2 text-sm"
-          :data-state="outbound.slow ? 'warning' : 'ok'"
-          data-test="slack-workspace-outbound"
-        >
-          <OIcon
-            :name="outbound.slow ? 'warning-amber' : 'check-circle'"
-            size="sm"
-            :class="outbound.slow ? 'text-status-warning-text' : 'text-status-positive'"
-          />
-          {{ outbound.text }}
-        </span>
-        <span
-          v-if="refused"
-          class="text-status-warning-text flex items-center gap-2 text-sm md:col-span-2"
-          data-test="slack-workspace-refused"
-        >
-          <OIcon name="warning-amber" size="sm" />
-          {{ refused.text }}
-          <OTimeCell :value="refused.at" unit="us" />
-        </span>
-        <span
-          v-if="appTokenWarning"
-          class="text-status-warning-text flex items-center gap-2 text-sm md:col-span-2"
-          data-test="slack-workspace-app-token"
-        >
-          <OIcon name="warning-amber" size="sm" />
-          {{ appTokenWarning }}
-        </span>
-        <span
-          v-if="ownsInstallation"
-          class="flex flex-wrap items-center justify-between gap-2 text-sm md:col-span-2"
-        >
-          <span class="text-text-secondary flex items-center gap-2">
-            <OIcon name="info" size="sm" />
-            {{ t("slackApp.card.collaborator") }}
-          </span>
-          <OButton
-            as="a"
-            :href="collaboratorsUrl"
-            target="_blank"
-            rel="noopener noreferrer"
-            variant="ghost-primary"
-            size="xs"
-            icon-right="open-in-new"
-            data-test="slack-collaborators"
-          >
-            {{ t("slackApp.card.openCollaborators") }}
-          </OButton>
-        </span>
-        <span
-          v-if="ownsInstallation && installation.has_config_refresh_token"
-          class="flex flex-wrap items-center gap-2 text-sm md:col-span-2"
-          data-test="slack-refresh-token"
-        >
-          <OIcon name="key" size="sm" class="text-text-secondary" />
-          <span class="text-text-secondary">{{ t("slackApp.card.refreshTokenKept") }}</span>
-          <OButton
-            variant="outline-destructive"
-            size="sm"
-            icon-left="delete"
-            :loading="credentialsMutation.isPending.value"
-            :disabled="readOnly"
-            data-test="slack-forget-token"
-            @click="forgetOpen = true"
-          >
-            {{ t("slackApp.card.forget") }}
-            <OTooltip
-              v-if="readOnly"
-              side="bottom"
-              :content="t('slackApp.connect.permissionHint')"
-            />
-          </OButton>
-        </span>
-      </div>
-
-      <div class="flex flex-wrap justify-end gap-2">
+      </template>
+      <template #actions>
+        <OTag
+          v-if="isInstance"
+          variant="primary-soft"
+          shape="pill"
+          size="sm"
+          :label="t('slackApp.card.instanceTag')"
+          data-test="slack-workspace-instance-tag"
+        />
+        <OTag
+          type="slackInstallStatus"
+          :value="installation.status"
+          data-test="slack-workspace-status"
+        />
         <OButton
           variant="outline"
           size="sm-action"
@@ -542,11 +373,238 @@ const saveHelpContact = async (value: HelpContactForm): Promise<void> => {
           {{ t("slackApp.card.updateCredentials") }}
           <OTooltip v-if="readOnly" side="bottom" :content="t('slackApp.connect.permissionHint')" />
         </OButton>
+      </template>
+
+      <div
+        v-if="
+          managed ||
+          !installation.credentials_readable ||
+          reinstalledTeam ||
+          refused ||
+          appTokenWarning
+        "
+        class="border-border-default flex flex-col gap-3 border-b px-4 py-3"
+      >
+        <OBanner v-if="managed" variant="info" icon="info" data-test="slack-managed-banner">
+          <span class="font-semibold">{{ t("slackApp.card.managedTitle") }}</span>
+          {{ t("slackApp.card.managedDetail", { team: installation.team_name }) }}
+          <template v-if="installation.instance_help_contact">
+            {{
+              t("slackApp.card.managedQuestions", { contact: installation.instance_help_contact })
+            }}
+          </template>
+        </OBanner>
+
+        <OBanner
+          v-if="!installation.credentials_readable"
+          variant="error-soft"
+          icon="error-outline"
+          data-test="slack-credentials-unreadable"
+        >
+          {{
+            selfHosted
+              ? t("slackApp.card.credentialsUnreadable")
+              : t("slackApp.card.credentialsUnreadableCloud")
+          }}
+          <template v-if="!managed" #actions>
+            <OButton
+              v-if="selfHosted"
+              variant="outline"
+              size="sm-action"
+              icon-left="key"
+              :disabled="readOnly"
+              data-test="slack-credentials-update"
+              @click="credentialsOpen = true"
+            >
+              {{ t("slackApp.card.updateCredentials") }}
+              <OTooltip
+                v-if="readOnly"
+                side="bottom"
+                :content="t('slackApp.connect.permissionHint')"
+              />
+            </OButton>
+            <OButton
+              v-else
+              variant="outline"
+              size="sm-action"
+              icon-left="refresh"
+              :loading="reinstall.connecting.value"
+              :disabled="readOnly"
+              data-test="slack-credentials-reinstall"
+              @click="reinstall.open()"
+            >
+              {{ t("slackApp.card.reinstall") }}
+              <OTooltip
+                v-if="readOnly"
+                side="bottom"
+                :content="t('slackApp.connect.permissionHint')"
+              />
+            </OButton>
+          </template>
+        </OBanner>
+
+        <OBanner
+          v-if="reinstalledTeam"
+          variant="success"
+          dense
+          icon="check-circle"
+          data-test="slack-reinstall-result"
+        >
+          {{ t("slackApp.card.reinstalled", { team: reinstalledTeam }) }}
+        </OBanner>
+
+        <OBanner
+          v-if="refused"
+          variant="warning"
+          dense
+          icon="warning"
+          data-test="slack-workspace-refused"
+        >
+          {{ refused.text }}
+          <OTimeCell :value="refused.at" unit="us" />
+        </OBanner>
+        <OBanner
+          v-if="appTokenWarning"
+          variant="warning"
+          dense
+          icon="warning"
+          data-test="slack-workspace-app-token"
+        >
+          {{ appTokenWarning }}
+        </OBanner>
       </div>
+
+      <OSettingRow control-at="end" :label="t('slackApp.card.eventsLabel')">
+        <span class="flex items-center gap-2 text-sm" data-test="slack-workspace-events">
+          <OIcon
+            :name="installation.health.last_event_at ? 'check-circle' : 'schedule'"
+            size="sm"
+            :class="
+              installation.health.last_event_at ? 'text-status-positive' : 'text-text-secondary'
+            "
+          />
+          <template v-if="installation.health.last_event_at">
+            {{ t("slackApp.card.eventsReceived") }}
+            <OTimeCell :value="installation.health.last_event_at" />
+          </template>
+          <template v-else>{{ t("slackApp.card.noEvents") }}</template>
+        </span>
+      </OSettingRow>
+      <OSettingRow v-if="showSockets" control-at="end" :label="t('slackApp.card.connectionLabel')">
+        <span class="flex items-center gap-2 text-sm" data-test="slack-workspace-sockets">
+          <OIcon
+            :name="socketsUp ? 'check-circle' : 'warning-amber'"
+            size="sm"
+            :class="socketsUp ? 'text-status-positive' : 'text-status-warning-text'"
+          />
+          {{ socketsUp ? t("slackApp.card.connectionUp") : t("slackApp.card.connectionDown") }}
+          <OPopover
+            v-model:open="connectionInfoOpen"
+            side="bottom"
+            align="start"
+            :aria-label="t('slackApp.card.aboutConnection')"
+          >
+            <template #trigger>
+              <OButton
+                variant="ghost"
+                size="xs"
+                icon-left="info-outline"
+                data-test="slack-workspace-connection-info"
+              >
+                <span class="sr-only">{{ t("slackApp.card.aboutConnection") }}</span>
+              </OButton>
+            </template>
+            <p class="w-96 max-w-[calc(100vw-1.5rem)] p-3 leading-5">
+              <OText variant="meta" data-test="slack-workspace-connection-detail">
+                {{ modeLabel }} {{ raw("·") }}
+                {{
+                  t("slackApp.card.sockets", {
+                    up: installation.health.sockets_up,
+                    want: installation.health.sockets_want,
+                    time: socketsAsOf,
+                  })
+                }}
+              </OText>
+            </p>
+          </OPopover>
+        </span>
+      </OSettingRow>
+      <OSettingRow v-if="outbound" control-at="end" :label="t('slackApp.card.outboundLabel')">
+        <span
+          class="flex items-center gap-2 text-sm"
+          :data-state="outbound.slow ? 'warning' : 'ok'"
+          data-test="slack-workspace-outbound"
+        >
+          <OIcon
+            :name="outbound.slow ? 'warning-amber' : 'check-circle'"
+            size="sm"
+            class="shrink-0"
+            :class="outbound.slow ? 'text-status-warning-text' : 'text-status-positive'"
+          />
+          {{ outbound.text }}
+        </span>
+      </OSettingRow>
+      <OSettingRow
+        v-if="ownsInstallation"
+        control-at="end"
+        :label="t('slackApp.card.collaboratorsLabel')"
+        :description="t('slackApp.card.collaborator')"
+      >
+        <OButton
+          as="a"
+          :href="collaboratorsUrl"
+          target="_blank"
+          rel="noopener noreferrer"
+          variant="outline"
+          size="sm-action"
+          icon-right="open-in-new"
+          data-test="slack-collaborators"
+        >
+          {{ t("slackApp.card.openCollaborators") }}
+        </OButton>
+      </OSettingRow>
+      <OSettingRow
+        v-if="ownsInstallation && installation.has_config_refresh_token"
+        control-at="end"
+        :label="t('slackApp.card.refreshTokenKept')"
+        data-test="slack-refresh-token"
+      >
+        <OButton
+          variant="outline-destructive"
+          size="sm-action"
+          icon-left="delete"
+          :loading="credentialsMutation.isPending.value"
+          :disabled="readOnly"
+          data-test="slack-forget-token"
+          @click="forgetOpen = true"
+        >
+          {{ t("slackApp.card.forget") }}
+          <OTooltip v-if="readOnly" side="bottom" :content="t('slackApp.connect.permissionHint')" />
+        </OButton>
+      </OSettingRow>
+      <OForm :form="helpContactForm" novalidate data-test="slack-help-contact-form">
+        <OSettingRow
+          control-at="end"
+          name="help_contact"
+          :loading="helpContact.isPending.value"
+          :label="t('slackApp.card.helpContact')"
+          :description="t('slackApp.card.helpContactHelp')"
+        >
+          <OFormInput
+            name="help_contact"
+            class="w-full"
+            :aria-label="t('slackApp.card.helpContact')"
+            :placeholder="t('slackApp.card.helpContactPlaceholder')"
+            :maxlength="HELP_CONTACT_MAX_LENGTH"
+            :disabled="readOnly"
+            data-test="slack-help-contact"
+          />
+        </OSettingRow>
+      </OForm>
 
       <div
         v-if="testItems.length"
-        class="border-border-default flex flex-col gap-3 border-t pt-4"
+        class="border-border-default flex flex-col gap-3 border-t px-4 py-3"
         data-test="slack-test-results"
       >
         <span class="text-text-heading text-sm font-medium">
@@ -572,129 +630,82 @@ const saveHelpContact = async (value: HelpContactForm): Promise<void> => {
           </span>
         </div>
       </div>
-    </OCard>
+    </OFormSection>
 
     <slot name="oncall" />
 
-    <section v-if="!isInstance" class="flex flex-col gap-3" data-test="slack-connected-orgs">
-      <div class="flex flex-col gap-0.5">
-        <h2 class="text-text-heading m-0 text-lg font-semibold">
-          {{ t("slackApp.card.connectedOrgs") }}
-        </h2>
+    <OFormSection
+      v-if="!isInstance"
+      variant="plain"
+      :title="t('slackApp.card.connectedOrgs')"
+      :description="otherOrgsLine"
+      data-test="slack-connected-orgs"
+    >
+      <div class="rounded-b-surface -mx-4 -my-3 overflow-hidden">
+        <OTable
+          :data="orgRows"
+          :columns="orgColumns"
+          row-key="org"
+          pagination="none"
+          :show-global-filter="false"
+          :cell-overflow-tooltip="false"
+          :frame="false"
+          dense
+        />
       </div>
-      <OTable
-        :data="orgRows"
-        :columns="orgColumns"
-        row-key="org"
-        pagination="none"
-        :show-global-filter="false"
-        :cell-overflow-tooltip="false"
-        dense
-      />
-      <span class="text-text-secondary text-sm">
-        {{
-          t(
-            "slackApp.card.otherOrgs",
-            { count: installation.other_connected_orgs },
-            installation.other_connected_orgs,
-          )
-        }}
-      </span>
-    </section>
+    </OFormSection>
 
     <slot />
 
-    <section class="flex flex-col gap-2">
-      <OForm
-        v-if="!helpContact.isPending.value"
-        :key="helpContactDefaults.help_contact"
-        :schema="helpContactSchema"
-        :default-values="helpContactDefaults"
-        class="flex flex-wrap items-end gap-3"
-        data-test="slack-help-contact-form"
-        @submit="saveHelpContact"
+    <OFormSection
+      v-if="showDisconnect || ownsInstallation"
+      variant="plain"
+      tone="danger"
+      :title="t('slackApp.card.disconnectSection')"
+    >
+      <p
+        v-if="readOnly"
+        class="text-text-secondary border-border-default flex items-start gap-2 border-b px-4 py-3 text-sm"
+        data-test="slack-danger-locked"
       >
-        <OFormInput
-          name="help_contact"
-          class="min-w-0 flex-1 md:max-w-120"
-          :label="t('slackApp.card.helpContact')"
-          :placeholder="t('slackApp.card.helpContactPlaceholder')"
-          :maxlength="HELP_CONTACT_MAX_LENGTH"
-          :disabled="readOnly"
-          data-test="slack-help-contact"
-        />
+        <OIcon name="lock" size="sm" class="mt-0.5 shrink-0" />
+        <span>{{ t("slackApp.insights.locked") }} {{ t("slackApp.insights.lockedDetail") }}</span>
+      </p>
+      <OSettingRow
+        v-if="showDisconnect"
+        control-at="end"
+        :label="t('slackApp.card.disconnectThisOrg')"
+        :description="t('slackApp.card.disconnectDescription', { org: orgName })"
+      >
         <OButton
-          variant="outline"
+          variant="outline-destructive"
           size="sm-action"
-          type="submit"
+          icon-left="link-off"
           :disabled="readOnly"
-          data-test="slack-help-contact-save"
+          data-test="slack-disconnect-org"
+          @click="emit('disconnect')"
         >
-          {{ t("common.save") }}
-          <OTooltip v-if="readOnly" side="bottom" :content="t('slackApp.connect.permissionHint')" />
+          {{ t("slackApp.card.disconnectThisOrg") }}
         </OButton>
-      </OForm>
-    </section>
-
-    <section v-if="showDisconnect || ownsInstallation" class="flex flex-col gap-3">
-      <h2 class="text-text-heading m-0 text-lg font-semibold">
-        {{ t("slackApp.card.disconnectSection") }}
-      </h2>
-      <OCard variant="outlined" class="p-5">
-        <p
-          v-if="readOnly"
-          class="text-text-secondary mb-4 flex items-start gap-2 text-sm"
-          data-test="slack-danger-locked"
+      </OSettingRow>
+      <OSettingRow
+        v-if="ownsInstallation"
+        control-at="end"
+        :label="t('slackApp.card.uninstall')"
+        :description="t('slackApp.card.uninstallDescription')"
+      >
+        <OButton
+          variant="destructive"
+          size="sm-action"
+          icon-left="delete"
+          :disabled="readOnly"
+          data-test="slack-uninstall"
+          @click="emit('uninstall')"
         >
-          <OIcon name="lock" size="sm" class="mt-0.5 shrink-0" />
-          <span>{{ t("slackApp.insights.locked") }} {{ t("slackApp.insights.lockedDetail") }}</span>
-        </p>
-        <div v-if="showDisconnect" class="flex flex-wrap items-center justify-between gap-3">
-          <div class="flex min-w-0 flex-col gap-0.5">
-            <span class="text-text-heading text-sm font-medium">
-              {{ t("slackApp.card.disconnectThisOrg") }}
-            </span>
-            <span class="text-text-secondary text-sm">
-              {{ t("slackApp.card.disconnectDescription", { org: orgName }) }}
-            </span>
-          </div>
-          <OButton
-            variant="outline-destructive"
-            size="sm-action"
-            icon-left="link-off"
-            :disabled="readOnly"
-            data-test="slack-disconnect-org"
-            @click="emit('disconnect')"
-          >
-            {{ t("slackApp.card.disconnectThisOrg") }}
-          </OButton>
-        </div>
-        <div
-          v-if="ownsInstallation"
-          class="flex flex-wrap items-center justify-between gap-3"
-          :class="showDisconnect && 'border-border-default mt-4 border-t pt-4'"
-        >
-          <div class="flex min-w-0 flex-col gap-0.5">
-            <span class="text-text-heading text-sm font-medium">
-              {{ t("slackApp.card.uninstall") }}
-            </span>
-            <span class="text-text-secondary text-sm">
-              {{ t("slackApp.card.uninstallDescription") }}
-            </span>
-          </div>
-          <OButton
-            variant="destructive"
-            size="sm-action"
-            icon-left="delete"
-            :disabled="readOnly"
-            data-test="slack-uninstall"
-            @click="emit('uninstall')"
-          >
-            {{ t("slackApp.card.uninstall") }}
-          </OButton>
-        </div>
-      </OCard>
-    </section>
+          {{ t("slackApp.card.uninstall") }}
+        </OButton>
+      </OSettingRow>
+    </OFormSection>
 
     <SlackCredentialsDialog v-model:open="credentialsOpen" :installation="installation" />
     <ConfirmDialog

@@ -230,7 +230,7 @@ describe("About", () => {
       },
     });
 
-    expect(wrapper.text()).toContain("License Information");
+    expect(wrapper.text()).toContain("License information");
   });
 
   it("should use dark logo src when theme is dark", () => {
@@ -324,7 +324,7 @@ describe("About", () => {
 
     // The grid contains Open Source Libraries and License sections
     expect(wrapper.text()).toContain("Open Source Libraries");
-    expect(wrapper.text()).toContain("License Information");
+    expect(wrapper.text()).toContain("License information");
   });
 
   it("should have external links with target blank", () => {

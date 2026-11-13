@@ -323,8 +323,7 @@ import {
 } from "vue";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
-import { useRoute, useRouter, RouterView, isNavigationFailure } from "vue-router";
-import { orgSwitchListRoute, orgSwitchPending } from "@/utils/orgScopedRoutes";
+import { useRoute, useRouter, RouterView } from "vue-router";
 import { solutionModeForPath } from "@/utils/security/solutionMode";
 import { useSecurityAccess } from "@/composables/security/useSecurityAccess";
 import config from "../aws-exports";
@@ -358,6 +357,8 @@ import { signOutDraftsToConfirm, signOutThroughLeaveGuards } from "@/utils/draft
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import { confirmLeave } from "@/lib/forms/SaveBar/useLeaveGuard";
+import { switchOrganization } from "@/utils/organizationSwitch";
 import useBreakpoint from "@/composables/useBreakpoint";
 import SlackIcon from "@/components/icons/SlackIcon.vue";
 import ManagementIcon from "@/components/icons/ManagementIcon.vue";
@@ -1327,44 +1328,23 @@ export default defineComponent({
 
     const updateOrganization = async () => {
       const targetOrg = { ...selectedOrg.value };
-      const orgIdentifier = targetOrg.identifier;
-      const listRoute = orgSwitchListRoute(
-        router.currentRoute.value.name,
-        router.currentRoute.value.query,
-      );
-      if (listRoute) {
-        if (orgIdentifier === store.state.selectedOrganization?.identifier) return;
-        // leave before anything resets: the page's id is org-scoped and would fail to load in the new org
-        orgSwitchPending.value = true;
-        const failure = await router
-          .replace({ name: listRoute, query: { org_identifier: orgIdentifier } })
-          .finally(() => {
-            orgSwitchPending.value = false;
-          });
-        if (isNavigationFailure(failure)) {
-          // the leave was blocked (e.g. the unsaved-changes prompt was declined), so the user stays in the current org
-          selectedOrg.value = { ...store.state.selectedOrganization };
-          return;
-        }
-      }
-      resetStreams();
-      store.dispatch("logs/resetLogs");
-      store.dispatch("setIsDataIngested", false);
-      if (!listRoute) {
-        const queryParams =
-          router.currentRoute.value.path.indexOf(".logs") > -1
-            ? router.currentRoute.value.query
-            : {};
-        router.push({
-          path: router.currentRoute.value.path,
-          query: {
-            ...queryParams,
-            org_identifier: orgIdentifier,
-          },
-        });
-      }
-      useLocalOrganization(targetOrg);
-      store.dispatch("setSelectedOrganization", targetOrg);
+      const keepCurrent = () => {
+        const current = store.state.selectedOrganization;
+        selectedOrg.value =
+          orgOptions.value.find((org) => org.identifier === current?.identifier) ?? current;
+      };
+      // Asked before anything is committed: the switch unmounts the page, and its edits cannot be brought back.
+      if (!(await confirmLeave())) return keepCurrent();
+      const queryParams =
+        router.currentRoute.value.path.indexOf(".logs") > -1 ? router.currentRoute.value.query : {};
+      const switched = await switchOrganization({ store, router, resetStreams }, targetOrg, {
+        path: router.currentRoute.value.path,
+        query: {
+          ...queryParams,
+          org_identifier: targetOrg.identifier,
+        },
+      });
+      if (!switched) return keepCurrent();
       // setSelectedOrganization();
       // if (
       //   config.isCloud &&

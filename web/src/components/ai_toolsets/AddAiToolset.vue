@@ -310,18 +310,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Footer -->
         <div
-          class="border-border-default sticky bottom-0 flex items-center gap-2 border-t px-4 py-3"
+          class="border-border-default sticky bottom-0 flex items-center justify-end gap-2 border-t px-4 py-3"
           :class="'bg-surface-base'"
         >
-          <OButton
-            data-test="ai-toolset-save-btn"
-            variant="primary"
-            size="sm-action"
-            type="submit"
-            :loading="isSubmitting"
-          >
-            {{ isEditing ? t("common.update") : t("common.save") }}
-          </OButton>
           <OButton
             data-test="ai-toolset-cancel-btn"
             variant="outline"
@@ -330,6 +321,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="closeEditor"
           >
             {{ t("common.cancel") }}
+          </OButton>
+          <OButton
+            data-test="ai-toolset-save-btn"
+            variant="primary"
+            size="sm-action"
+            type="submit"
+            :loading="isSubmitting"
+          >
+            {{ isEditing ? t("common.update") : t("common.save") }}
           </OButton>
         </div>
       </div>

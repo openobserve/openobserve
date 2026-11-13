@@ -4,7 +4,7 @@
 import { inject, ref } from "vue";
 import OTime from "./OTime.vue";
 import { FORM_CONTEXT_KEY } from "../Form/OForm.types";
-import { firstFieldError } from "../Form/fieldError";
+import { useVisibleFieldError } from "../Form/fieldError";
 import { raw, useI18nTyped } from "@/types/i18n";
 import type { FormTimeProps } from "./OFormTime.types";
 
@@ -13,6 +13,7 @@ defineOptions({ inheritAttrs: false });
 const props = defineProps<FormTimeProps>();
 
 const form = inject(FORM_CONTEXT_KEY, null);
+const shown = useVisibleFieldError(form);
 const { t } = useI18nTyped();
 
 if (import.meta.env.DEV && !form) {
@@ -56,12 +57,8 @@ function onInvalid(field: any, invalid: boolean) {
         :id="props.id"
         :name="props.name"
         :model-value="field.state.value"
-        :error="field.state.meta.errors.length > 0"
-        :error-message="
-          field.state.meta.errors.length > 0
-            ? raw(firstFieldError(field.state.meta.errors))
-            : undefined
-        "
+        :error="shown(field).invalid"
+        :error-message="shown(field).message !== undefined ? raw(shown(field).message) : undefined"
         @update:model-value="field.handleChange"
         @blur="field.handleBlur"
         @invalid="onInvalid(field, $event)"

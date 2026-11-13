@@ -17,6 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OPageLayout
     :title="t('telephony.title')"
+    :subtitle="t('telephony.subtitle')"
     icon="call"
     title-data-test="telephony-settings-title"
     scroll
@@ -34,18 +35,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OSpinner size="md" data-test="telephony-settings-loading" />
       </div>
 
-      <OText v-else-if="state === 'forbidden'" data-test="telephony-settings-forbidden">
-        {{ t("telephony.readOnly") }}
-      </OText>
+      <OEmptyState
+        v-else-if="state === 'forbidden'"
+        size="hero"
+        preset="no-access"
+        :description="t('telephony.readOnly')"
+        data-test="telephony-settings-forbidden"
+      />
 
-      <OBanner v-else-if="state === 'failed'" variant="error" data-test="telephony-settings-failed">
-        {{ loadFailedText }}
-      </OBanner>
+      <OEmptyState
+        v-else-if="state === 'failed'"
+        size="block"
+        preset="load-error"
+        :description="loadFailedText"
+        data-test="telephony-settings-failed"
+        @action="read.refetch()"
+      />
 
       <div v-else-if="state === 'empty'" data-test="telephony-settings-hero">
         <OEmptyState
           size="hero"
           preset="no-phone-provider"
+          :description="t('emptyState.noPhoneProvider.description')"
           :hide-action="readOnly"
           @action="(id) => id === 'connect' && openDialog('connect')"
         />
@@ -149,7 +160,6 @@ import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
-import OText from "@/lib/core/Typography/OText.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";

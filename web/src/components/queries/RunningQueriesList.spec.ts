@@ -99,29 +99,31 @@ describe("RunningQueriesList.vue", () => {
             template:
               '<div data-test="o-drawer-stub" :data-open="open" :data-size="size"><slot /><slot name="header" /><slot name="footer" /></div>',
           },
-          OTable: {
-            name: "OTable",
-            props: [
-              "data",
-              "columns",
-              "rowKey",
-              "selectedIds",
-              "selection",
-              "pagination",
-              "pageSize",
-              "pageSizeOptions",
-              "sorting",
-              "filterMode",
-              "defaultColumns",
-              "showGlobalFilter",
-            ],
-            emits: ["update:selected-ids", "row-click"],
-            template:
-              '<div data-test="o-table-stub"><slot name="cell-actions" :row="{}" /><slot name="cell-duration" :row="{}" /><slot name="cell-queryRange" :row="{}" /><slot name="empty" /><slot name="selection-actions" /></div>',
-          },
+          OTable: tableStub,
         },
       },
     });
+  };
+
+  const tableStub = {
+    name: "OTable",
+    props: [
+      "data",
+      "columns",
+      "rowKey",
+      "selectedIds",
+      "selection",
+      "pagination",
+      "pageSize",
+      "pageSizeOptions",
+      "sorting",
+      "filterMode",
+      "defaultColumns",
+      "showGlobalFilter",
+    ],
+    emits: ["update:selected-ids", "row-click"],
+    template:
+      '<div data-test="o-table-stub"><slot name="cell-actions" :row="{}" /><slot name="cell-duration" :row="{}" /><slot name="cell-queryRange" :row="{}" /><slot name="empty" /><slot name="selection-actions" /></div>',
   };
 
   beforeEach(() => {

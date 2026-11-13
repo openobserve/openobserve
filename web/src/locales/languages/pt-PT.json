@@ -30684,7 +30684,7 @@
   },
   "slackApp": {
     "prereq": {
-      "title": "Passo 0 · Pré-requisitos do servidor",
+      "title": "Passo 1 · Pré-requisitos do servidor",
       "subtitle": "Verificados neste servidor antes de qualquer trabalho no Slack",
       "columnSetting": "Definição",
       "columnResult": "Resultado",
@@ -30755,7 +30755,7 @@
       "back": "Retroceder",
       "finish": "Concluir",
       "connection": {
-        "title": "Passo 1 · Ligação",
+        "title": "Passo 2 · Ligação",
         "description": "A verificação chega ao Slack a partir deste servidor através do mesmo caminho de código que a produção utiliza.",
         "allPassed": "O Slack está acessível a partir deste servidor",
         "someFailed": "O Slack não está acessível a partir deste servidor. Permita *.slack.com através do seu proxy ou firewall e, em seguida, clique em Verificar novamente.",
@@ -30764,7 +30764,7 @@
         "socketHost": "Host WebSocket {host}"
       },
       "create": {
-        "title": "Passo 2 · Criar a aplicação",
+        "title": "Passo 3 · Criar a aplicação",
         "modeLabel": "Modo de ligação",
         "socket": "Modo Socket",
         "socketDescription": "Recomendado. O OpenObserve abre a ligação, pelo que o Slack não precisa de um URL público",
@@ -30793,7 +30793,7 @@
         "signingSecretRequired": "O modo HTTP requer o segredo de assinatura"
       },
       "install": {
-        "title": "Passo 3 · Instalação",
+        "title": "Passo 4 · Instalação",
         "created": "Aplicação criada · {appId}",
         "allowHint": "Abre o ecrã de instalação do Slack: clique em Permitir nesse ecrã. O token do bot é devolvido automaticamente pelo Slack; não há nada para copiar.",
         "allow": "Permitir no Slack",
@@ -30816,7 +30816,7 @@
         "appNotCreatedByO2": "O OpenObserve não criou esta aplicação, por isso ela permanece no Slack. Elimine-a no Slack se já não precisar dela."
       },
       "test": {
-        "title": "Passo 4 · Teste e associação",
+        "title": "Passo 5 · Teste e associação",
         "run": "Executar verificações",
         "signIn": "Testar início de sessão com o Slack",
         "signInPassed": "O início de sessão com o Slack funciona",
