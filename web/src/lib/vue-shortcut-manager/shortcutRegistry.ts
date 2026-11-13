@@ -76,11 +76,7 @@ export interface ShortcutCapabilities {
 export interface ShortcutModule {
   /** i18n key under shortcuts.modules.* */
   titleKey: I18nKey;
-  /**
-   * Literal title, used INSTEAD of `titleKey` when the name must not be translated.
-   * Acronyms only: "RUM" and "IAM" came back from the translator as "RON"/"RHUM"
-   * (the drink) and "SOY YO" ("I am me").
-   */
+  /** Literal title used instead of `titleKey` for an acronym the translator mangles ("RUM" came back as "RON"/"RHUM"). */
   title?: string;
   /** pageKeys (ShortcutGroup.pageKey) grouped under this module, in display order */
   pages: I18nKey[];
@@ -162,7 +158,6 @@ export const SHORTCUT_MODULES: ShortcutModule[] = [
   },
   {
     titleKey: "shortcuts.modules.iam",
-    title: "IAM",
     pages: [
       "shortcuts.pages.iamUsers",
       "shortcuts.pages.iamRoles",

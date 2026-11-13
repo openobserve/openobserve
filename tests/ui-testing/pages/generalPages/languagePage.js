@@ -28,7 +28,7 @@ class LanguagePage {
     { name: 'Reports', path: '/reports', menuKey: 'reports' },
     { name: 'Alerts', path: '/alerts', menuKey: 'alerts' },
     { name: 'Data Sources', path: '/ingestion/custom/logs', menuKey: 'ingestion' },
-    { name: 'IAM', path: '/iam/users', menuKey: 'iam' },
+    { name: 'Users & access', path: '/iam/users', menuKey: 'iam' },
   ];
 
   // Sub-tabs/sub-pages for each module (from frontend routes)
@@ -67,7 +67,7 @@ class LanguagePage {
       { name: 'Traces Ingestion', path: '/ingestion/custom/traces' },
       { name: 'Recommended', path: '/ingestion/recommended' },
     ],
-    IAM: [
+    'Users & access': [
       { name: 'Users', path: '/iam/users' },
       { name: 'Service Accounts', path: '/iam/serviceAccounts' },
       { name: 'Organizations', path: '/iam/organizations' },
@@ -94,7 +94,7 @@ class LanguagePage {
     'Search', 'Refresh', 'Back', 'Next', 'Previous', 'Confirm', 'Submit',
     'Home', 'Logs', 'Metrics', 'Traces', 'Dashboards', 'Streams', 'Alerts',
     'Data sources', 'Ingestion', 'Settings', 'Management', 'Help', 'About',
-    'Sign Out', 'Language', 'Reports', 'IAM', 'Functions', 'Pipelines',
+    'Sign Out', 'Language', 'Reports', 'Users & access', 'Functions', 'Pipelines',
     'Query', 'Fields', 'Results', 'Filter', 'Filters', 'Name', 'Type', 'Value',
     'Description', 'Status', 'Actions', 'Duration', 'Date', 'Time',
     'Start time', 'End time', 'Timestamp', 'Source', 'Details',
