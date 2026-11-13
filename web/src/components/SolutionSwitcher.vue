@@ -12,6 +12,7 @@ import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OLockBadge from "@/lib/core/Badge/OLockBadge.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 
 defineProps<{
@@ -69,10 +70,11 @@ function switchTo(solution: (typeof SOLUTIONS)[0]) {
         size="sm"
         :icon-left="current.icon"
         icon-right="expand-more"
-        class="font-semibold tracking-tight"
+        class="font-semibold tracking-tight md:max-xl:max-w-full md:max-xl:min-w-0"
         data-test="solution-switcher"
       >
-        {{ t(current.labelKey) }}
+        <span class="md:max-xl:truncate">{{ t(current.labelKey) }}</span>
+        <OTooltip :content="t(current.labelKey)" />
       </OButton>
     </template>
 
