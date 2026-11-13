@@ -206,7 +206,9 @@ export function useAlertEditHeader(input: AlertEditHeaderInput): AlertEditHeader
                 variant: "warning",
                 message: raw(data.message ?? "") || t("alerts.messages.triggerAlertFailed"),
               }
-            : { variant: "success", message: t("alerts.alertTriggeredSuccess") },
+            : data?.warning
+              ? { variant: "warning", message: raw(data.warning) }
+              : { variant: "success", message: t("alerts.alertTriggeredSuccess") },
       );
     } catch (error: unknown) {
       toast({

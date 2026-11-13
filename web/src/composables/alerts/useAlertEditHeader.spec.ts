@@ -181,6 +181,13 @@ describe("useAlertEditHeader", () => {
     expect(toastSpy).toHaveBeenCalledWith({ variant: "warning", message: "not eligible" });
   });
 
+  it("says when the alert fired but a delivery failed", async () => {
+    trigger.mockResolvedValue({ data: { warning: "webhook returned 502" } });
+    const api = host();
+    await api().fireNow();
+    expect(toastSpy).toHaveBeenCalledWith({ variant: "warning", message: "webhook returned 502" });
+  });
+
   it("toggles enabled through the state mutation", async () => {
     listRows = [{ alert_id: "a1", enabled: true }];
     const api = host();

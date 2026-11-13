@@ -32,6 +32,8 @@ const SPY_BAND = 0.3;
 const MIN_STOP = 0.1;
 // A reveal hands focus to the element at once; a dropdown opened during a smooth glide closes on its next scroll event.
 const REVEAL_BEHAVIOR: ScrollBehavior = "instant";
+const MAX_SNAP_RETRIES = 3;
+const SETTLE_FALLBACK_MS = 800;
 
 const BUTTON_LIKE =
   'button, summary, [role="button"], [role="switch"], [role="checkbox"], [role="radio"], [role="tab"]';
@@ -91,7 +93,7 @@ const stopOffsets = (sectionsOnly: boolean): number[] => {
   return [...blocks, ...sectionEnds()].sort((a, b) => a - b);
 };
 
-const targetFor = (direction: 1 | -1, sectionsOnly: boolean): number | null => {
+const targetFor = (direction: 1 | -1, sectionsOnly: boolean, skip = 0): number | null => {
   const scroller = root.value;
   if (!scroller) return null;
   const top = scroller.scrollTop;
@@ -99,19 +101,38 @@ const targetFor = (direction: 1 | -1, sectionsOnly: boolean): number | null => {
   const viewport = scroller.clientHeight;
   const stops = stopOffsets(sectionsOnly);
   if (direction === 1) {
-    const next = stops.find((s) => s > top + EDGE) ?? max;
+    const next = stops.filter((s) => s > top + EDGE)[skip] ?? max;
     // Never skip content: a block taller than the view pages by at most one view.
     return Math.min(next, sectionsOnly ? next : top + viewport, max);
   }
-  const prev = [...stops].reverse().find((s) => s < top - EDGE) ?? 0;
+  const prev = [...stops].reverse().filter((s) => s < top - EDGE)[skip] ?? 0;
   return Math.max(prev, sectionsOnly ? prev : top - viewport, 0);
 };
 
-const go = (direction: 1 | -1, sectionsOnly: boolean): void => {
+const afterScroll = (scroller: HTMLElement, run: () => void): void => {
+  let done = false;
+  const finish = (): void => {
+    if (done) return;
+    done = true;
+    scroller.removeEventListener("scrollend", finish);
+    run();
+  };
+  scroller.addEventListener("scrollend", finish, { once: true });
+  setTimeout(finish, SETTLE_FALLBACK_MS);
+};
+
+const go = (direction: 1 | -1, sectionsOnly: boolean, skip = 0): void => {
   markStops();
-  const target = targetFor(direction, sectionsOnly);
-  if (target === null || !root.value) return;
-  root.value.scrollTo({ top: target, behavior: "smooth" });
+  const scroller = root.value;
+  const target = targetFor(direction, sectionsOnly, skip);
+  if (target === null || !scroller) return;
+  const from = scroller.scrollTop;
+  scroller.scrollTo({ top: target, behavior: "smooth" });
+  if (skip >= MAX_SNAP_RETRIES || Math.abs(target - from) <= EDGE) return;
+  // Snapping can pull a stop that is not a snap point back to where the page was; then try the next one.
+  afterScroll(scroller, () => {
+    if (Math.abs(scroller.scrollTop - from) <= EDGE) go(direction, sectionsOnly, skip + 1);
+  });
 };
 
 const pageStop = (direction: 1 | -1): void => go(direction, false);
