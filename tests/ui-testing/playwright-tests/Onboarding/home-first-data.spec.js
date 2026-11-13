@@ -418,12 +418,13 @@ const SCREENS = [
             }));
             await page.route(OVERVIEW_SECTIONS[2], (route) => route.fulfill({ json: { incidents: [], total: 0 } }));
         },
-        async run({ page, orgId }) {
+        async run({ page, orgId, buildType }) {
             await openHome(page, orgId, 'overview');
             await expect(tid(page, 'overview-anomalies-load-error')).toBeVisible({ timeout: 30000 });
             await expect(tid(page, 'overview-anomalies-load-error-retry-btn')).toBeVisible();
             await expect(tid(page, 'overview-recent-events-section')).toBeVisible();
-            await expect(tid(page, 'overview-services-section')).toBeVisible();
+            // the services section rides on incidents, which OSS shows locked
+            await expect(tid(page, 'overview-services-section')).toHaveCount(buildType === 'opensource' ? 0 : 1);
             await expect(tid(page, 'overview-load-error-empty-state')).toHaveCount(0);
         },
     },
@@ -501,7 +502,9 @@ test.describe('Home before and at first data', () => {
                 const ctx = { page, request, orgId: getOrgIdentifier() };
                 // read outside the page, so a flag-off screen's pinned config does not hide the stack's real flag
                 const cfg = await page.context().request.get(`${base()}/api/${ctx.orgId}/config`);
-                const flagOn = cfg.ok() && (await cfg.json()).restricted_routes_on_empty_data === true;
+                const cfgBody = cfg.ok() ? await cfg.json() : {};
+                ctx.buildType = cfgBody.build_type;
+                const flagOn = cfgBody.restricted_routes_on_empty_data === true;
                 test.skip(!flagOn, 'needs ZO_RESTRICTED_ROUTES_ON_EMPTY_DATA on (flag-off screens pin it off per page)');
                 if (screen.emptyOrg) ctx.orgId = await emptyOrgId(page, process.env.HOME_EMPTY_ORG || 'onboarding_test');
                 const ep = new EmptyPagesPage(page);
