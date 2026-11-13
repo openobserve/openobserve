@@ -472,6 +472,7 @@ const sizeClasses: Record<NonNullable<ButtonProps["size"]>, string> = {
   "icon-md": "h-8.5 w-8.5 shrink-0 p-0 rounded-default gap-x-0",
   "icon-lg": "h-12 w-12 shrink-0 p-0 rounded-default gap-x-0",
   "icon-circle": "size-8 shrink-0 p-0 rounded-full gap-x-0",
+  "icon-circle-lg": "size-10 shrink-0 p-0 rounded-full gap-x-0",
   "icon-circle-sm": "size-7 shrink-0 p-0 rounded-full gap-x-0",
   // Square twin of sm-toolbar for icon-only toolbar controls.
   "icon-toolbar": "size-8.5 shrink-0 p-0 rounded-default gap-x-0",

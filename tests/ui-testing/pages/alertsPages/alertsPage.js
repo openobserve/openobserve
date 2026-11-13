@@ -20,6 +20,15 @@ import { CommonActions } from '../commonActions';
 import { AlertCreationWizard } from './alertCreationWizard.js';
 import { openOSelectDropdown } from './oselectHelpers.js';
 import { discardEditorDraftIfAsked } from './editorDraftHelpers.js';
+import {
+    destinationsShowAsList,
+    expandAlertSettingGroups,
+    goToAlertSection,
+    openAlertSectionForTab,
+    pickAlertDestination,
+    revealAlertSetting,
+    settleIntoView,
+} from './alertSectionHelpers.js';
 import { AlertManagement } from './alertManagement.js';
 import { AlertBulkOperations } from './alertBulkOperations.js';
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
@@ -75,9 +84,7 @@ export class AlertsPage {
 
             // Step 1: Alert Setup selectors (v3 UI)
             // OSelect: trigger wrapper + `${parent}-popover` + `${parent}-option` with `data-test-value="<value>"` (§4)
-            streamTypeDropdown: '[data-test="add-alert-stream-type-select-dropdown"]',
-            streamTypePopover: '[data-test="add-alert-stream-type-select-dropdown-popover"]',
-            streamTypeOption: '[data-test="add-alert-stream-type-select-dropdown-option"]',
+            streamTypeCards: '[data-test="add-alert-stream-type-cards"]',
             streamNameDropdown: '[data-test="add-alert-stream-name-select-dropdown"]',
             queryEditorDialog: '[data-test="query-editor-dialog"]',
             queryResultLabel: 'Query Result',
@@ -123,7 +130,6 @@ export class AlertsPage {
             // Alerts 4.0 — priority & tags (Feature 2)
             prioritySelect: '[data-test="alert-priority-select"]',
             tagsInput: '[data-test="alert-tags-input"]',
-            advancedTabBtn: '[data-test="add-alert-tab-advanced"]',
             // ODropdown content carries data-test="o-dropdown-content"
             visibleDropdownMenu: '[data-test="o-dropdown-content"]:visible',
 
@@ -168,7 +174,7 @@ export class AlertsPage {
             alertDetailsHistoryEmpty: '[data-test="alerts-alertevaluationhistory-empty"]',
 
             // Evaluation Status Indicator (v3 UI - rendered in AlertWizardRightColumn with data-test)
-            alertStatusIndicator: '[data-test="alert-status-indicator"]',
+            alertStatusIndicator: '[data-test="add-alert-rail-verdict"]',
 
             // Messages
             alertSuccessMessage: 'Alert saved successfully.',
@@ -325,9 +331,9 @@ export class AlertsPage {
             alertSectionTabAlertTemplates: '[data-test="alert-section-tab-alertTemplates"]',
             alertSectionTabAlertLibrary: '[data-test="alert-section-tab-alertLibrary"]',
 
-            // v3 AddAlert wizard tabs (OToggleGroupItem with data-test="add-alert-tab-{key}")
-            addAlertTabCondition: '[data-test="add-alert-tab-condition"]',
-            addAlertTabAdvanced: '[data-test="add-alert-tab-advanced"]',
+            // Sectioned AddAlert editor: section list items and section containers
+            alertSectionNavItem: (id) => `[data-test="o-section-nav-item-${id}"]`,
+            alertSection: (id) => `[data-test="add-alert-section-${id}"]`,
 
             // OToast (alerts module - success / error variants)
             oToastSuccess: '[data-test-variant="success"]',
@@ -438,9 +444,9 @@ export class AlertsPage {
         return this.page.locator(this.locators.addConditionButton);
     }
 
-    /** Advanced tab button (.first() — matches clickAdvancedTab). */
-    getAdvancedTabLocator() {
-        return this.page.locator(this.locators.advancedTabBtn).first();
+    /** Section-list item for an editor section (watch, condition, notify, schedule, details). */
+    getAlertSectionNavItemLocator(sectionId) {
+        return this.page.locator(this.locators.alertSectionNavItem(sectionId)).first();
     }
 
     /** Alert import button (bare locator). */
@@ -466,6 +472,11 @@ export class AlertsPage {
     /** Alert submit button (bare locator). */
     getAlertSubmitButtonLocator() {
         return this.page.locator(this.locators.alertSubmitButton);
+    }
+
+    /** Scrolls a form control into view and lets the editor column settle before it is clicked. */
+    async settleIntoView(locator) {
+        await settleIntoView(this.page, locator);
     }
 
     /** Alert destinations select (bare locator). */
@@ -536,7 +547,7 @@ export class AlertsPage {
 
     /** "Group by" label row (parent element via ..). */
     getGroupByRow() {
-        return this.page.locator('text=Group by').locator('..');
+        return this.page.locator(this.locators.alertGroupByRow).first();
     }
 
     /** First group-by select trigger. */
@@ -582,6 +593,11 @@ export class AlertsPage {
     }
 
     /** "Learn more" help trigger next to the Additional Variables field. */
+    /** Shows the Variables block through its "+ add" link, which also adds one empty key/value row. */
+    async revealAlertVariables() {
+        await revealAlertSetting(this.page, 'variables');
+    }
+
     getHelpDrawerVariablesInfoBtn() {
         return this.page.locator(this.locators.helpDrawerVariablesInfoBtn);
     }
@@ -998,7 +1014,7 @@ export class AlertsPage {
     }
 
     /**
-     * Expect the evaluation status indicator ("Would Trigger" / "Would Not Trigger") to be visible
+     * Expect the rail's preview verdict ("Right now this would alert you: ..." / "Quiet right now: ...") to be visible
      */
     async expectEvaluationStatusIndicatorVisible() {
         await expect(this.page.locator(this.locators.alertStatusIndicator)).toBeVisible({ timeout: 15000 });
@@ -1214,15 +1230,9 @@ export class AlertsPage {
         return (await this.page.locator(this.locators.alertNameInputField).inputValue()).trim();
     }
 
-    /**
-     * Click the Advanced tab in the alert creation form
-     */
+    /** Shows every setting the old Advanced tab held (tucked groups, template override) and scrolls to "Who should hear about it?". */
     async clickAdvancedTab() {
-        const tab = this.page.locator(this.locators.advancedTabBtn).first();
-        await tab.waitFor({ state: 'visible', timeout: 3000 });
-        await tab.click();
-        await this.page.waitForTimeout(500);
-        testLogger.info('Switched to Advanced tab');
+        await openAlertSectionForTab(this.page, 'Advanced');
     }
 
     /**
@@ -1281,12 +1291,12 @@ export class AlertsPage {
      * `_switchToTab`, which can fire before a just-closed popover settles and miss the tab.
      */
     async openConditionTab() {
-        await this.page.locator(this.locators.addAlertTabCondition).click();
-        await this.page.waitForTimeout(300);
+        await goToAlertSection(this.page, 'watch');
     }
 
     /** Assert the Advanced-panel priority select and tag input are both present. */
     async expectPriorityAndTagControlsVisible() {
+        await expandAlertSettingGroups(this.page, ['details']);
         await expect(this.page.locator(this.locators.prioritySelect)).toBeVisible({ timeout: 10000 });
         await expect(this.page.locator(this.locators.tagsInput)).toBeVisible({ timeout: 10000 });
     }
@@ -1303,6 +1313,7 @@ export class AlertsPage {
 
     /** Select a priority by its label (e.g. "P3"). */
     async selectPriority(label) {
+        await expandAlertSettingGroups(this.page, ['details']);
         await openOSelectDropdown(this.page, this.page.locator(this.locators.prioritySelect));
         await this.page
             .locator('[data-test$="-popover"] [data-test$="-option"]')
@@ -1314,6 +1325,7 @@ export class AlertsPage {
 
     /** Type a tag into the tag input and commit it with Enter. */
     async addTag(value) {
+        await expandAlertSettingGroups(this.page, ['details']);
         const input = this.page.locator(`${this.locators.tagsInput} input`).first();
         await input.fill(value);
         await input.press('Enter');
@@ -1325,7 +1337,9 @@ export class AlertsPage {
      * and value inputs share a data-test across rows, so `.last()` targets the newest.
      */
     async addAlertVariable(key, value) {
-        await this.page.locator(this.locators.contextAttributesAddButton).click();
+        if (!(await revealAlertSetting(this.page, 'variables'))) {
+            await this.page.locator(this.locators.contextAttributesAddButton).click();
+        }
         await this.page.locator(`${this.locators.contextAttributeKeyInput} input`).last().fill(key);
         await this.page.locator(`${this.locators.contextAttributeValueInput} input`).last().fill(value);
         testLogger.info('Added alert variable', { key });
@@ -1333,6 +1347,11 @@ export class AlertsPage {
 
     /** Open the destinations select and pick the first available option. */
     async selectFirstDestination() {
+        if (await destinationsShowAsList(this.page)) {
+            await this.page.locator('[data-test="alert-destinations-list-option"]').first().click();
+            testLogger.info('Selected first available destination');
+            return;
+        }
         const dropdown = this.page.locator(this.locators.alertDestinationsSelect);
         await dropdown.waitFor({ state: 'visible', timeout: 10000 });
         await openOSelectDropdown(this.page, dropdown);
@@ -1349,16 +1368,7 @@ export class AlertsPage {
      * and deleted before save, which surfaces as a 404 "destination not found".
      */
     async selectDestinationByName(name) {
-        const dropdown = this.page.locator(this.locators.alertDestinationsSelect);
-        await dropdown.waitFor({ state: 'visible', timeout: 10000 });
-        await openOSelectDropdown(this.page, dropdown);
-        const option = this.page
-            .locator('[data-test$="-popover"] [data-test$="-option"]')
-            .filter({ hasText: name })
-            .first();
-        await expect(option).toBeVisible({ timeout: 5000 });
-        await option.click();
-        await this.page.keyboard.press('Escape');
+        await pickAlertDestination(this.page, name);
         testLogger.info('Selected destination by name', { name });
     }
 
@@ -3251,9 +3261,7 @@ export class AlertsPage {
      * OSelect popover pattern: open trigger, wait for popover, click option keyed by data-test-value (§4)
      */
     async selectStreamType(streamType) {
-        await this.page.locator(this.locators.streamTypeDropdown).click();
-        await expect(this.page.locator(this.locators.streamTypePopover)).toBeVisible({ timeout: 10000 });
-        await this.page.locator(`${this.locators.streamTypeOption}[data-test-value="${streamType}"]`).click();
+        await this.page.locator(`[data-test="add-alert-stream-type-card-${streamType}"]`).click();
         testLogger.info('Selected stream type', { streamType });
     }
 
@@ -3667,6 +3675,7 @@ export class AlertsPage {
      * and selecting the first available option from the new group-by OSelect.
      */
     async addFirstGroupByField() {
+        await expandAlertSettingGroups(this.page, ['condition']);
         const groupByRow = this.page.locator(this.locators.alertGroupByRow);
         await groupByRow.waitFor({ state: 'visible', timeout: 5000 });
         const addBtn = this.page.locator(this.locators.alertGroupByAddButton);
@@ -4555,8 +4564,11 @@ export class AlertsPage {
     async enableAggregation() {
         const toggle = this.getAggregationToggle();
         await toggle.waitFor({ state: 'visible', timeout: 30000 });
+        await settleIntoView(this.page, toggle);
         await toggle.click();
         await this._selectAggregationOption('count');
+        // Group by is a tucked setting of "When is it a problem?"; it renders once aggregating and expanded.
+        await expandAlertSettingGroups(this.page, ['condition']);
         testLogger.info('Aggregation enabled via count function');
     }
 
@@ -4567,6 +4579,7 @@ export class AlertsPage {
     async disableAggregation() {
         const toggle = this.getAggregationToggle();
         await toggle.waitFor({ state: 'visible', timeout: 5000 });
+        await settleIntoView(this.page, toggle);
         await toggle.click();
         await this._selectAggregationOption('total_events');
         testLogger.info('Aggregation disabled via total_events function');
@@ -4582,6 +4595,7 @@ export class AlertsPage {
     async selectAggregationFunction(functionValue) {
         const toggle = this.getAggregationToggle();
         await toggle.waitFor({ state: 'visible', timeout: 5000 });
+        await settleIntoView(this.page, toggle);
         await toggle.click();
         await this._selectAggregationOption(functionValue);
         testLogger.info('Selected aggregation function', { functionValue });

@@ -332,6 +332,20 @@ describe("QueryConfig.vue", () => {
     }
   });
 
+  describe("Operator wording", () => {
+    it("echoes a count warning row's operator in the same words as its select", () => {
+      expect(wrapper.vm.operatorLabel(">=")).toBe("at least");
+      expect(wrapper.vm.operatorLabel("<")).toBe("fewer than");
+      expect(wrapper.vm.operatorLabel("~=")).toBe("~=");
+    });
+
+    it("stores the same operator symbols whether a row shows words or symbols", () => {
+      expect(wrapper.vm.plainOperators.map((o: { value: string }) => o.value).sort()).toEqual(
+        [...wrapper.vm.numericOperators].sort(),
+      );
+    });
+  });
+
   describe("Timezone Options", () => {
     it("lists 'Browser Time' and 'UTC' shortcuts at the top of the options", () => {
       const options = wrapper.vm.filteredTimezones;
@@ -451,14 +465,14 @@ describe("QueryConfig.vue", () => {
       expect(tabOptions.map((t: any) => t.value)).toEqual(["custom", "sql", "promql"]);
     });
 
-    it("should show only custom and SQL tabs for logs stream type", async () => {
+    it("should show the builder then SQL for logs stream type", async () => {
       await setQCProps({ streamType: "logs" });
       const tabOptions = wrapper.vm.tabOptions;
       expect(tabOptions.length).toBe(2);
       expect(tabOptions.map((t: any) => t.value)).toEqual(["custom", "sql"]);
     });
 
-    it("should show only custom and SQL tabs for traces stream type", async () => {
+    it("should show the builder then SQL for traces stream type", async () => {
       await setQCProps({ streamType: "traces" });
       const tabOptions = wrapper.vm.tabOptions;
       expect(tabOptions.length).toBe(2);

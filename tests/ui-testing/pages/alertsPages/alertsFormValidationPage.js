@@ -2,6 +2,7 @@
 
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
 const { openNavFlyoutChild } = require('../commonActions.js');
+import { goToAlertSection } from './alertSectionHelpers.js';
 const { FilterBuilderDriver } = require('../generalPages/filterBuilderPage.js');
 
 export class AlertsFormValidationPage {
@@ -101,7 +102,6 @@ export class AlertsFormValidationPage {
     // Redesigned form uses OToggleGroup tabs (no Next button). The default
     // active tab is "condition", which already renders FilterCondition,
     // QueryConfig and AlertSettings content once a stream is selected.
-    this.alertTabCondition = '[data-test="add-alert-tab-condition"]';
 
     // ── AlertSettings (step 3 of alert wizard) ───────────────────────────────
     this.alertSettingsSilenceDuration = '[data-test="alert-settings-silence-duration-input-field"]';
@@ -118,10 +118,9 @@ export class AlertsFormValidationPage {
     this.alertTriggerThresholdError   = '[data-test="alert-trigger-threshold-input-error"]';
 
     // ── Alert wizard step 1 stream selectors ─────────────────────────────────
-    this.wizardStreamTypeDropdown     = '[data-test="add-alert-stream-type-select-dropdown"]';
+    this.wizardStreamTypeDropdown     = '[data-test="add-alert-stream-type-cards"]';
     this.wizardStreamNameDropdown     = '[data-test="add-alert-stream-name-select-dropdown"]';
     // OSelect popovers — options carry `data-test-value` for value-specific picks
-    this.wizardStreamTypePopover      = '[data-test="add-alert-stream-type-select-dropdown-popover"]';
     this.wizardStreamNamePopover      = '[data-test="add-alert-stream-name-select-dropdown-popover"]';
 
     // ── Condition builder (shared FilterBuilder, prefix "alert-conditions") ──
@@ -398,10 +397,8 @@ export class AlertsFormValidationPage {
    * the condition tab is the active tab so the downstream assertions resolve.
    */
   async clickWizardNext() {
-    testLogger.info('Ensuring condition tab is active (no wizard Next button)');
-    const conditionTab = this.page.locator(this.alertTabCondition);
-    await conditionTab.waitFor({ state: 'visible', timeout: 10000 });
-    await conditionTab.click();
+    testLogger.info('Scrolling to the first editor section (no wizard Next button)');
+    await goToAlertSection(this.page, 'watch');
   }
 
   /**
@@ -415,7 +412,7 @@ export class AlertsFormValidationPage {
   // OSelect option factories — pick by `data-test-value` (§4) rather than text.
   getWizardStreamTypeOption(value) {
     return this.page.locator(
-      `[data-test="add-alert-stream-type-select-dropdown-option"][data-test-value="${value}"]`,
+      `[data-test="add-alert-stream-type-card-${value}"]`,
     );
   }
 
@@ -429,8 +426,6 @@ export class AlertsFormValidationPage {
     testLogger.info('Selecting alert wizard stream type: ' + typeLabel);
     // streamTypes are the lowercase values logs/metrics/traces (AddAlert.vue)
     const value = typeLabel.trim().toLowerCase();
-    await this.page.locator(this.wizardStreamTypeDropdown).click();
-    await this.page.locator(this.wizardStreamTypePopover).waitFor({ state: 'visible', timeout: 10000 });
     await this.getWizardStreamTypeOption(value).click();
   }
 

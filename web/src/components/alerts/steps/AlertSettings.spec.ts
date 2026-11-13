@@ -291,6 +291,13 @@ describe("AlertSettings — descendant (binds into ancestor OForm) mode", () => 
     expect(host.find('[data-test="alert-settings-period-input"]').exists()).toBe(true);
   });
 
+  it("marks look-back and cooldown as required, as before", () => {
+    const host = mountDescendant("false");
+    const text = host.text();
+    expect(text).toContain("Look back over *");
+    expect(text).toContain("Quiet after alerting *");
+  });
+
   it("preserves every data-test (scheduled branch)", () => {
     const host = mountDescendant("false");
     for (const dt of [

@@ -32,8 +32,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   in the parent (AlertSettings) so the two alert-type layouts keep their chrome.
 -->
 <template>
-  <div class="flex items-center max-md:flex-wrap max-md:gap-y-2">
+  <div
+    :class="['flex items-center max-md:flex-wrap max-md:gap-y-2', wrap ? 'flex-wrap gap-y-2' : '']"
+  >
+    <div v-if="showsList" class="w-full" data-test="alert-destinations-list">
+      <OCheckboxGroup
+        v-if="listOptions.length"
+        :model-value="model"
+        :aria-label="t('alerts.destination')"
+        @update:model-value="onUpdate"
+      >
+        <div class="grid grid-cols-[repeat(auto-fill,minmax(12rem,1fr))] gap-2">
+          <OCheckbox
+            v-for="option in listOptions"
+            :key="option.value"
+            :value="option.value"
+            :label="option.label"
+            class="border-border-default rounded-default border px-3 py-2"
+            data-test="alert-destinations-list-option"
+          />
+        </div>
+      </OCheckboxGroup>
+      <p v-else class="text-text-secondary m-0 text-sm" data-test="alert-destinations-list-empty">
+        {{ t("alerts.sections.noDestinationsYet") }}
+      </p>
+    </div>
     <OSelect
+      v-else
       :model-value="model"
       :aria-label="t('alerts.destination')"
       :options="options"
@@ -43,6 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :collapsible-groups="workflowsEnabled"
       pin-selected-in-groups
       class="max-w-[18.75rem] min-w-[11.25rem] max-md:max-w-none max-md:min-w-0 max-md:flex-1 max-md:basis-[calc(100%-2rem)]"
+      :class="wrap && 'flex-1'"
       data-test="alert-destinations-select"
       @update:model-value="onUpdate"
     >
@@ -117,6 +143,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, ref, watch } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OCheckboxGroup from "@/lib/forms/Checkbox/OCheckboxGroup.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -145,6 +173,10 @@ const props = defineProps<{
   lockedWorkflowNames?: Record<string, string>;
   error?: boolean;
   placeholder?: I18nText;
+  /** Let the buttons drop to a second line when the row is narrower than the controls. */
+  wrap?: boolean;
+  /** Show the targets as checkboxes while there are few enough to scan. */
+  list?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -158,6 +190,7 @@ const emit = defineEmits<{
 const { t } = useI18nTyped();
 
 const DEST = "dest:";
+const LIST_MAX = 8;
 const WF = "wf:";
 
 // Every list below is API-backed, so a failed or partially-loaded fetch can hand
@@ -271,6 +304,17 @@ const options = computed(() => {
     ...missingWfs,
   ];
 });
+
+const listOptions = computed(() =>
+  options.value.filter((option): option is Option => !("header" in option)),
+);
+// Workflow groups and missing/locked badges only render in the dropdown, so the list is for plain destinations.
+const showsList = computed(
+  () =>
+    props.list &&
+    listOptions.value.length <= LIST_MAX &&
+    listOptions.value.every((option) => !("badge" in option) && option.value.startsWith(DEST)),
+);
 
 // Split the tagged selection back into the two backend fields. Keep the control's
 // own order in `model` so the chips don't jump when props round-trip back.

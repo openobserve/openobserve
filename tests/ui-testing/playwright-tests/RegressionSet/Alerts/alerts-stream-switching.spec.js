@@ -447,16 +447,7 @@ test.describe("Alerts Stream Switching Regression", () => {
     testLogger.info(`Saving alert: ${alertName}`);
 
     // Select destination using POM locator
-    const destDropdown = pm.alertsPage.getAlertDestinationsSelectLocator();
-    await destDropdown.waitFor({ state: 'visible', timeout: 10000 });
-    await destDropdown.click();
-    await page.waitForTimeout(1000);
-
-    const destMenu = pm.alertsPage.getAlertDestinationsSelectPopover();
-    await expect(destMenu).toBeVisible({ timeout: 5000 });
-    const firstDest = pm.alertsPage.getFirstAlertDestinationOption();
-    await expect(firstDest).toBeVisible({ timeout: 5000 });
-    await firstDest.click();
+    await pm.alertsPage.selectFirstDestination();
     testLogger.info(`Selected destination`);
     await page.waitForTimeout(500);
     await pm.alertsPage.getBodyLocator().click({ position: { x: 10, y: 10 } });

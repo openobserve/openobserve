@@ -240,7 +240,7 @@ export function buildPanelAutoName(
 // with underscores, comparison symbols are spelled out, and everything is run
 // through `slugify` as a backstop — a generated name that the form would then
 // reject as invalid is worse than no name at all.
-const ALERT_NAME_UNSUPPORTED_CHARS = /[:#?\s'"%&]+/g;
+const ALERT_NAME_UNSUPPORTED_CHARS = /[:#?\s'"%&/]+/g;
 
 /** Comparison symbols spelled out — `>=` is legal in a name but unreadable in one. */
 const OPERATOR_WORDS: Record<string, string> = {

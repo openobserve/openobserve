@@ -520,3 +520,46 @@ describe("AlertTargetsSelect", () => {
     });
   });
 });
+
+describe("AlertTargetsSelect — checkbox list", () => {
+  const list = (wrapper: any) => wrapper.find('[data-test="alert-destinations-list"]');
+
+  it("shows a short plain destination list as checkboxes", () => {
+    const wrapper = createWrapper({ list: true, destinationOptions: ["slack", "email"] });
+    expect(list(wrapper).exists()).toBe(true);
+  });
+
+  it("names the checkbox group for screen readers", () => {
+    const wrapper = createWrapper({ list: true, destinationOptions: ["slack"] });
+    expect(list(wrapper).find('[role="group"]').attributes("aria-label")).toBe("Destination");
+  });
+
+  it("keeps the dropdown when a selected destination is missing, so its Missing badge stays visible", () => {
+    const wrapper = createWrapper({
+      list: true,
+      destinations: ["deleted-dest"],
+      destinationOptions: ["slack"],
+    });
+    expect(list(wrapper).exists()).toBe(false);
+    expect(select(wrapper).exists()).toBe(true);
+  });
+
+  it("keeps the checkboxes when workflows are locked and none is selected", () => {
+    const wrapper = createWrapper({
+      list: true,
+      workflowsLocked: true,
+      destinationOptions: ["slack", "email"],
+    });
+    expect(list(wrapper).exists()).toBe(true);
+  });
+
+  it("keeps the dropdown when workflows add group headers", () => {
+    const wrapper = createWrapper({
+      list: true,
+      workflowsEnabled: true,
+      destinationOptions: ["slack"],
+      workflowOptions: [{ label: "Escalate", value: "wf-1" }],
+    });
+    expect(list(wrapper).exists()).toBe(false);
+  });
+});

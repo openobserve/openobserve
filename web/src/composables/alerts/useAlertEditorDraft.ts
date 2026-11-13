@@ -91,12 +91,16 @@ export const useAlertEditorDraft = ({
     return id === null || id === undefined || id === "" ? null : String(id);
   };
 
-  const content = () => ({
-    values: form.formData.value as Record<string, unknown>,
-    folderId: String(form.activeFolderId.value ?? "default"),
-    aggregationEnabled: form.isAggregationEnabled.value,
-    anomaly: anomalyDraftConfig(form.anomalyConfig.value),
-  });
+  const content = () => {
+    // Pause and resume save at once from the header, so the enabled state is never draft content.
+    const { enabled: _enabled, ...values } = form.formData.value as Record<string, unknown>;
+    return {
+      values,
+      folderId: String(form.activeFolderId.value ?? "default"),
+      aggregationEnabled: form.isAggregationEnabled.value,
+      anomaly: anomalyDraftConfig(form.anomalyConfig.value),
+    };
+  };
 
   const reloadStreams = async () => {
     const values = form.form.state.values;
@@ -113,7 +117,8 @@ export const useAlertEditorDraft = ({
   };
 
   const apply = async (data: AlertDraftData) => {
-    form.resetForm(data.values);
+    const { enabled } = form.formData.value as Record<string, unknown>;
+    form.resetForm({ ...data.values, enabled });
     form.activeFolderId.value = data.folderId;
     form.isAggregationEnabled.value = data.aggregationEnabled;
     form.anomalyConfig.value = {

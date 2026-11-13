@@ -620,14 +620,7 @@ test.describe("Dashboard Create Alert testcases", () => {
       await thresholdInput.fill("1");
 
       // Select destination
-      const destinationDropdown = pm.alertsPage.getDestinationsSelect();
-      await destinationDropdown.waitFor({ state: "visible", timeout: 5000 });
-      await destinationDropdown.click();
-
-      const destOption = pm.alertsPage.getDestinationOption(destinationName);
-      await expect(destOption).toBeVisible({ timeout: 5000 });
-      await destOption.click();
-      await page.keyboard.press("Escape");
+      await pm.alertsPage.selectDestinationByName(destinationName);
 
       // Step 5 (Advanced) → Skip, Continue
       await continueBtn.click();
