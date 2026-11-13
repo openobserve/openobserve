@@ -731,7 +731,10 @@ export default [
     // validating against the whole folder would flag every untranslated key.
     settings: {
       "vue-i18n": {
-        localeDir: "./src/locales/languages/en-US.json",
+        localeDir: [
+          "./src/locales/languages/en-US.json",
+          "./src/components/autoobserve/mock/locale/en-US.json",
+        ],
         messageSyntaxVersion: "^11.0.0",
       },
     },

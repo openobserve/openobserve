@@ -22,7 +22,7 @@ import autoobserve, {
   type AutoObserveIncidentItem,
   type AutoObserveIncidentList,
 } from "@/services/autoobserve";
-import type { IssuesRange } from "../v2/fixtures";
+import type { IssuesRange } from "../v2/autoobserveRoute";
 import fixture from "./__fixtures__/autoobserveIncidents.json";
 import { useLiveIssues } from "./useLiveIssues";
 

@@ -797,6 +797,38 @@ export class AlertsPage {
         return this.management.openCloneDialog(alertName);
     }
 
+    rowLastOutcome(alertName) {
+        return this.management.rowLastOutcome(alertName);
+    }
+
+    async openAlertListAndSearch(search, org) {
+        return this.management.openAlertListAndSearch(search, org);
+    }
+
+    async expectRowsFiring(org, search, names) {
+        return this.management.expectRowsFiring(org, search, names);
+    }
+
+    async holdAlertDetailLoad(alertId) {
+        return this.management.holdAlertDetailLoad(alertId);
+    }
+
+    waitForAlertDetailLoad(alertId) {
+        return this.management.waitForAlertDetailLoad(alertId);
+    }
+
+    alertDetailUrl(alertId) {
+        return this.management.alertDetailUrl(alertId);
+    }
+
+    async saveCloneDialog() {
+        return this.management.saveCloneDialog();
+    }
+
+    async settlePendingUiTasks() {
+        return this.management.settlePendingUiTasks();
+    }
+
     cloneSaveButton() {
         return this.management.cloneSaveButton();
     }
@@ -4899,7 +4931,7 @@ export class AlertsPage {
     }
 
     async expectLastOutcome(name, text) {
-        await expect(this.page.locator(`[data-test="alert-list-${name}-last-outcome"]`)).toHaveText(text, { timeout: 20000 });
+        await expect(this.rowLastOutcome(name)).toHaveText(text, { timeout: 20000 });
     }
 
     /** Throws when no element renders exactly the full name, since measuring the whole cell could report "not clipped" by accident. */

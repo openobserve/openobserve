@@ -66,33 +66,46 @@ export function formatSeconds(t: TranslateFn, secs: number): I18nText {
 }
 
 /** Under a minute keeps one decimal, so 29.6 s is not rounded up to the 30 s limit it missed. */
-export function formatMillis(t: TranslateFn, ms: number): I18nText {
+export function formatMillis(t: TranslateFn, ms: number, locale?: string): I18nText {
   if (ms < 1000) {
     const rounded = Math.round(ms);
     return t(
       "alertCalibration.duration.milliseconds",
-      { count: rounded.toLocaleString() },
+      { count: rounded.toLocaleString(locale) },
       rounded,
     );
   }
   if (ms < 60_000) {
     const secs = Math.round(ms / 100) / 10;
-    const shown = secs.toLocaleString(undefined, { maximumFractionDigits: 1 });
+    const shown = secs.toLocaleString(locale, { maximumFractionDigits: 1 });
     return t("alertCalibration.duration.seconds", { count: shown }, secs);
   }
   return formatSeconds(t, ms / 1000);
 }
 
+const PERCENT = (locale?: string) =>
+  new Intl.NumberFormat(locale, {
+    style: "percent",
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+  });
+
 /** Microseconds, in the card's existing hour format. */
 const formatTime = (micros: number) => formatDate(micros / 1000, "MMM d, HH:mm");
 
-export function formatEvidence(t: TranslateFn, value: unknown, format: EvidenceFormat): I18nText {
+/** `locale` is the app's, so a count reads "12,345" in English whatever the browser's language. */
+export function formatEvidence(
+  t: TranslateFn,
+  value: unknown,
+  format: EvidenceFormat,
+  locale?: string,
+): I18nText {
   if (value === undefined || value === null || value === "") return raw("—");
-  if (format === "ratio") return raw(`${(Number(value) * 100).toFixed(1)}%`);
+  if (format === "ratio") return raw(PERCENT(locale).format(Number(value)));
   if (format === "seconds") return formatSeconds(t, Number(value));
-  if (format === "count") return raw(Number(value).toLocaleString());
+  if (format === "count") return raw(Number(value).toLocaleString(locale));
   if (format === "time") return raw(formatTime(Number(value)));
-  if (format === "durationMs") return formatMillis(t, Number(value));
+  if (format === "durationMs") return formatMillis(t, Number(value), locale);
   if (format === "errorClass") return isErrorClass(value) ? t(ERROR_CLASS_LABEL[value]) : raw("—");
   if (format === "boolean") {
     return value === true || value === "true"
@@ -111,9 +124,10 @@ export function formatEvidenceField(
   t: TranslateFn,
   record: DigestRecord,
   field: EvidenceField,
+  locale?: string,
 ): I18nText {
   const column = (name: string) => record[`${NOT_WORKING}${name}`];
-  const millis = (name: string) => formatEvidence(t, column(name), "durationMs");
+  const millis = (name: string) => formatEvidence(t, column(name), "durationMs", locale);
   if (field.format === "evaluationTimes") {
     return t("alertCalibration.evidence.successTimesValue", {
       p50: millis("ok_p50_ms"),
@@ -127,14 +141,14 @@ export function formatEvidenceField(
     return t(
       "alertCalibration.evidence.nearLimitValue",
       {
-        count: Number(record[field.column]).toLocaleString(),
-        total: total.toLocaleString(),
-        near: formatMillis(t, limitSecs * NEAR_LIMIT_SHARE * 1000),
+        count: Number(record[field.column]).toLocaleString(locale),
+        total: total.toLocaleString(locale),
+        near: formatMillis(t, limitSecs * NEAR_LIMIT_SHARE * 1000, locale),
       },
       total,
     );
   }
-  return formatEvidence(t, record[field.column], field.format);
+  return formatEvidence(t, record[field.column], field.format, locale);
 }
 
 export interface ResourceOption {
@@ -396,9 +410,16 @@ export const COVERAGE_BADGE: Record<
 
 /** A run's coverage badge; full coverage of no alert at all is not a healthy state, so it is neutral. */
 export const coverageBadge = (
-  run: Pick<RunRow, "coverage_gap" | "coverage_stream_substrate_empty" | "alerts_in_scope">,
+  run: Pick<
+    RunRow,
+    | "coverage_gap"
+    | "coverage_stream_substrate_empty"
+    | "alerts_in_scope"
+    | "coverage_definitions_not_checked"
+  >,
+  uncheckedSkips = 0,
 ) => {
-  const verdict = coverageVerdict(run as RunRow);
+  const verdict = coverageVerdict(run as RunRow, uncheckedSkips);
   const badge = COVERAGE_BADGE[verdict];
   return verdict === "full" && run.alerts_in_scope === 0
     ? { ...badge, variant: "default-soft" as const, tone: "neutral" as const }

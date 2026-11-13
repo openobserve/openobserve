@@ -188,11 +188,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from "vue";
+import { computed, inject, nextTick, provide, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useQuery } from "@tanstack/vue-query";
 import { raw, useI18nTyped } from "@/types/i18n";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import { DIALOG_DEPTH_KEY } from "@/lib/overlay/Dialog/dialogStacking";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -232,6 +233,8 @@ const emit = defineEmits<{
   "update:kind": [value: null];
 }>();
 
+// Its dialogs open over the drawer, so they stack one layer above it and their backdrop dims it too.
+provide(DIALOG_DEPTH_KEY, inject<number>("o2DrawerDepth", 0) + 1);
 const { t, locale } = useI18nTyped();
 const store = useStore();
 const zone = useLiveZone();

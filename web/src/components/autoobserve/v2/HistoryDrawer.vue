@@ -22,135 +22,62 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="autoobserve2-history-drawer"
     @update:open="(v) => emit('update:open', v)"
   >
-    <slot v-if="$slots.empty && !entries.length" name="empty" />
-    <div v-else class="flex flex-col gap-4 pb-8">
+    <div class="flex flex-col gap-4">
       <OToggleGroup
         :model-value="filter"
         mobile-dropdown
+        :aria-label="t('autoobserve.activityLive.historyFilter')"
         data-test="autoobserve2-history-filter"
-        @update:model-value="(v) => v && (filter = v as Filter)"
+        @update:model-value="(v) => v && emit('update:filter', v as HistoryFilter)"
       >
         <OToggleGroupItem
-          v-for="f in FILTERS"
-          :key="f.value"
-          :value="f.value"
+          v-for="f in HISTORY_FILTERS"
+          :key="f"
+          :value="f"
           size="xs"
-          :data-test="`autoobserve2-history-filter-${f.value}`"
+          :data-test="`autoobserve2-history-filter-${f}`"
         >
-          {{ t(f.label) }}
+          {{ t(HISTORY_FILTER_LABEL[f]) }}
         </OToggleGroupItem>
       </OToggleGroup>
-
-      <p v-if="!shown.length" class="text-text-secondary text-sm">
-        {{ t("autoobserve2.historyDrawer.empty") }}
-      </p>
-      <ul v-else class="flex flex-col">
-        <li
-          v-for="entry in shown"
-          :key="entry.id"
-          class="border-border-subtle flex gap-3 border-b py-3 last:border-b-0"
-          :data-test="`autoobserve2-history-${entry.id}`"
-        >
-          <span class="flex h-5 w-3 shrink-0 items-center justify-center">
-            <OIcon
-              v-if="entry.kind === 'decisions'"
-              name="person"
-              size="xs"
-              class="text-text-secondary"
-            />
-            <span v-else class="size-2 rounded-full" :class="TONE_DOT[entry.tone]" />
-          </span>
-          <span class="flex min-w-0 flex-col gap-1">
-            <span class="text-text-secondary text-xs tabular-nums">
-              {{
-                entry.time
-                  ? t("autoobserve2.when", { day: t(entry.day), time: raw(entry.time) })
-                  : t(entry.day)
-              }}
-            </span>
-            <p class="text-text-body text-sm leading-relaxed text-pretty">
-              {{ say(t, entry.text) }}
-              <OTag
-                v-if="entry.worked !== undefined"
-                :variant="entry.worked ? 'success-soft' : 'warning-soft'"
-                size="xs"
-                class="ms-1 align-middle"
-                :label="
-                  entry.worked
-                    ? t('autoobserve2.drawer.worked')
-                    : t('autoobserve2.drawer.didntHelp')
-                "
-              />
-            </p>
-            <OButton
-              v-if="entry.ledgerId && changeIds.has(entry.ledgerId)"
-              variant="ghost-primary"
-              size="xs"
-              icon-right="arrow-forward"
-              class="-ms-2 self-start"
-              :data-test="`autoobserve2-history-${entry.id}-change`"
-              @click="emit('open-change', entry.ledgerId)"
-            >
-              {{ t("autoobserve2.historyDrawer.seeChange") }}
-            </OButton>
-          </span>
-        </li>
-      </ul>
+      <LiveHistory
+        :filter="filter"
+        @see-issues="emit('see-issues')"
+        @open-issue="(id) => emit('open-issue', id)"
+        @see-change="(id) => emit('see-change', id)"
+      />
     </div>
   </ODrawer>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
-import { raw, useI18nTyped, type I18nKey } from "@/types/i18n";
+import { useI18nTyped, type I18nKey } from "@/types/i18n";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
-import OTag from "@/lib/core/Badge/OTag.vue";
-import OButton from "@/lib/core/Button/OButton.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
-import { say, type HistoryEntry, type HistoryKind, type HistoryTone } from "./fixtures";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
+import LiveHistory from "../live/LiveHistory.vue";
+import type { LiveHistoryKind } from "../live/historyFeed";
 
-type Filter = HistoryKind | "all";
+export type HistoryFilter = "all" | LiveHistoryKind;
 
-const props = defineProps<{
-  open: boolean;
-  entries: HistoryEntry[];
-  changeIds: Set<string>;
-}>();
+const HISTORY_FILTERS: HistoryFilter[] = ["all", "incident", "change", "decision"];
 
-const emit = defineEmits<{ "update:open": [value: boolean]; "open-change": [ledgerId: string] }>();
-
-const { t } = useI18nTyped();
-
-const FILTERS: { value: Filter; label: I18nKey }[] = [
-  { value: "all", label: "autoobserve2.historyDrawer.filters.all" },
-  { value: "problems", label: "autoobserve2.historyDrawer.filters.problems" },
-  { value: "changes", label: "autoobserve2.historyDrawer.filters.changes" },
-  { value: "fixes", label: "autoobserve2.historyDrawer.filters.fixes" },
-  { value: "decisions", label: "autoobserve2.historyDrawer.filters.decisions" },
-];
-
-const TONE_DOT: Record<HistoryTone, string> = {
-  active: "bg-status-error-text",
-  fixed: "bg-accent",
-  resolved: "bg-status-positive",
-  held: "bg-border-strong",
-  predicted: "bg-status-warning-text",
-  neutral: "bg-border-strong",
-  fix: "bg-accent",
+const HISTORY_FILTER_LABEL: Record<HistoryFilter, I18nKey> = {
+  all: "autoobserve2.activityPage.filters.all",
+  incident: "autoobserve.activityLive.history.incident",
+  change: "autoobserve.activityLive.history.change",
+  decision: "autoobserve.activityLive.history.decision",
 };
 
-const filter = ref<Filter>("all");
+withDefaults(defineProps<{ open: boolean; filter?: HistoryFilter }>(), { filter: "all" });
 
-watch(
-  () => props.open,
-  (isOpen) => {
-    if (isOpen) filter.value = "all";
-  },
-);
+const emit = defineEmits<{
+  "update:open": [open: boolean];
+  "update:filter": [filter: HistoryFilter];
+  "see-issues": [];
+  "open-issue": [id: string];
+  "see-change": [decisionId: string];
+}>();
 
-const shown = computed(() =>
-  filter.value === "all" ? props.entries : props.entries.filter((e) => e.kind === filter.value),
-);
+const { t } = useI18nTyped();
 </script>

@@ -142,6 +142,9 @@ export default mergeConfig(
           "src/aws-exports.ts",
           // Constants/config files with only static data
           "src/constants/cards.ts",
+          // Sample-data snapshot of the AutoObserve screens: untested by decision, and
+          // 46 never-covered files in every shard report tip the merge over its heap.
+          "src/components/autoobserve/mock/**",
         ],
       },
     },

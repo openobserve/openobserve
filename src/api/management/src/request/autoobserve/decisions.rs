@@ -231,10 +231,10 @@ pub async fn preview_decision(
     tag = "AutoObserve",
     operation_id = "AutoObserveDecide",
     summary = "Dismiss, accept or apply",
-    description = "Dismisses or accepts a suggestion, or dismisses an alert calibration finding or applies its stored change to the alert as the caller, for the whole org. An apply writes only while the alert still holds each old value; `applied_via: editor` records a change the alert editor already saved. The body is one decision or `items` (1 to 50), each answered with its own status. The same `request_id` answers the stored outcome as `unchanged` and writes nothing; a stale `expected_revision` is a 409. Planned work takes `until`, at most 7 days ahead; other reasons take `duration_days` (30, 90 or 180) or, for a finding, `until_reopened`. A refusal is a 403 naming the folder and up to 3 people who can act.",
+    description = "Dismisses or accepts a suggestion, or dismisses an alert calibration finding or applies its stored change to the alert as the caller, for the whole org. A patch write requires the offer_fingerprint from preview and writes only while that offer and the alert's old values still match; `applied_via: editor` records a change the alert editor already saved. The body is one decision or `items` (1 to 50), each answered with its own status. The same `request_id` answers the stored outcome as `unchanged` and writes nothing; a stale `expected_revision` is a 409. Planned work takes `until`, at most 7 days ahead; other reasons take `duration_days` (30, 90 or 180) or, for a finding, `until_reopened`. A refusal is a 403 naming the folder and up to 3 people who can act.",
     security(("Authorization" = [])),
     params(("org_id" = String, Path, description = "Organization name")),
-    request_body(content = inline(Object), description = "family, id, action, reason, note, until, duration_days or until_reopened, expected_revision, request_id, applied_via; or items of those", content_type = "application/json"),
+    request_body(content = inline(Object), description = "family, id, action, reason, note, until, duration_days or until_reopened, expected_revision, offer_fingerprint, request_id, applied_via; or items of those", content_type = "application/json"),
     responses(
         (status = 200, description = "`change` is created, updated or unchanged; a batch answers `results`", content_type = "application/json", body = Object),
         (status = 400, description = "An unreadable body, or an invalid reason, note or term", content_type = "application/json", body = Object),
@@ -340,7 +340,7 @@ pub async fn undo_decision(
     tag = "AutoObserve",
     operation_id = "AutoObserveListDecisions",
     summary = "List decisions in force and applied changes",
-    description = "The dismissals and accepts in force on items the caller can read, and every change applied to an alert the caller can read, newest first: who, why, until when, and the revision an undo needs. An applied change has action `apply`, state `applied` or `undone`, `via` (`apply` or `editor`) and `change` with the alert's id and title and each field from old to new; undone changes stay listed. `total` counts only readable decisions. A note is returned only to its author and to callers who may decide; others see `has_note`.",
+    description = "The dismissals and accepts in force on items the caller can read, and every change applied to an alert the caller can read, newest first: who, why, until when, and the revision an undo needs. An applied change has action `apply`, state `applied` or `undone`, `via` (`apply` or `editor`) and `change` with the alert's id and title, each field from old to new, and `evidence`: the finding's confidence and evidence as they read when the change was applied, absent for a change applied before they were kept; undone changes stay listed. `total` counts only readable decisions. A note is returned only to its author and to callers who may decide; others see `has_note`.",
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
@@ -756,6 +756,7 @@ mod tests {
             expected_revision: None,
             request_id: Some("3f2c9a1e-dialog".into()),
             applied_via: None,
+            offer_fingerprint: None,
         };
         let report = DecisionRequest {
             family: Family::AlertFinding,
@@ -791,6 +792,7 @@ mod tests {
             current: None,
             locked: None,
             change: None,
+            offer_fingerprint: None,
             summary: None,
         };
         let mut reported = view(
@@ -1271,6 +1273,7 @@ mod tests {
                 alert_id: alert_id.to_string(),
                 patch: vec![FieldPatch::PendingPeriodSecs { from: 0, to: 120 }],
                 acknowledged: None,
+                evidence: None,
             }
         }
 
@@ -1296,7 +1299,7 @@ mod tests {
 
         async fn apply(ctx: &Ctx<'_>) -> Result<DecisionResult, DecisionError> {
             let ask: DecisionRequest = serde_json::from_value(
-                json!({"family": "alert_finding", "id": FINDING, "action": "apply"}),
+                json!({"family": "alert_finding", "id": FINDING, "action": "apply", "offer_fingerprint": preview(ctx).await.offer_fingerprint}),
             )
             .unwrap();
             decisions::decide_one(ctx, &ask, now_micros()).await

@@ -65,6 +65,17 @@ export interface ChangePreview {
   acknowledged_firings_dropped?: { count: number; of: number; first_at?: number };
 }
 
+/** What a finding said when its change was applied; a change from before this was kept has none. */
+export interface AppliedEvidence {
+  confidence?: string;
+  rule_id?: string;
+  pattern?: string;
+  schema_version?: number;
+  title?: string;
+  /** The finding's own `evidence_*` columns by name. */
+  columns?: Record<`evidence_${string}`, number | string | boolean>;
+}
+
 export interface DecisionView {
   /** `{family}:{id}`; the undo path, never shown. */
   decision_id: string;
@@ -85,7 +96,11 @@ export interface DecisionView {
   /** Only the list sends it. */
   subject?: SubjectInfo;
   /** An apply's alert and fields, on servers that list applies. */
-  change?: { alert: { id: string; title: string }; fields: FieldChange[] };
+  change?: {
+    alert: { id: string; title: string };
+    fields: FieldChange[];
+    evidence?: AppliedEvidence;
+  };
   via?: "apply" | "editor";
   /** When and by whom an apply was undone, on servers that keep `decided_at` as the change time. */
   undone_at?: number | null;
@@ -109,6 +124,7 @@ export interface Preview {
   /** The revision the caller saw, sent back as `expected_revision`; 0 before any decision. */
   revision: number;
   current: DecisionView | null;
+  offer_fingerprint?: string;
   locked?: Refusal;
   /** Sent for an apply only. */
   change?: ChangePreview;
@@ -128,6 +144,7 @@ export interface DecisionRequest {
   until_reopened?: boolean;
   /** Records an apply the editor's Save already wrote. */
   applied_via?: "editor";
+  offer_fingerprint?: string;
   expected_revision?: number;
   /** One per dialog, so a double click or a retry writes once. */
   request_id?: string;
@@ -200,6 +217,11 @@ export const isRouteDisabled = (error: unknown): boolean => statusOf(error) === 
 export const isItemGone = (error: unknown): boolean =>
   statusOf(error) === 404 &&
   (error as { response?: { data?: { error?: unknown } } }).response?.data?.error === "not_found";
+
+export const isOfferChanged = (error: unknown): boolean =>
+  statusOf(error) === 409 &&
+  (error as { response?: { data?: { error?: unknown } } }).response?.data?.error ===
+    "offer_changed";
 
 /** A refusal carries `decision_refused`; any other 403 is the access layer's own. */
 export function refusalOf(error: unknown): Refusal | null {

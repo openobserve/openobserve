@@ -52,6 +52,16 @@ async function waitForSearch(request, sql, { expected, message, pick = (result) 
   return last;
 }
 
+/** Gate a one-shot page load on freshly ingested rows: wait until `stream` (optionally one trace) returns `expected` rows. */
+async function waitForStreamRows(request, stream, expected, { traceId, message, ...searchOpts } = {}) {
+  const where = traceId ? ` WHERE trace_id = '${traceId}'` : '';
+  return await waitForSearch(request, `SELECT * FROM "${stream}"${where}`, {
+    expected,
+    message: message || `Precondition: ${expected} ingested rows must be searchable in ${stream}`,
+    ...searchOpts,
+  });
+}
+
 /** Field names in a stream's schema, or [] when the schema cannot be read. */
 async function streamFieldNames(request, stream, { type = 'traces', org = orgId() } = {}) {
   const response = await request.get(`${ingestionBaseUrl()}/api/${org}/streams/${stream}/schema?type=${type}`, { headers: getAuthHeaders() });
@@ -64,6 +74,18 @@ async function deleteStream(request, stream, { type = 'traces', org = orgId() } 
   await request
     .delete(`${ingestionBaseUrl()}/api/${org}/streams/${stream}?type=${type}`, { headers: getAuthHeaders() })
     .catch(() => {});
+}
+
+/** Types without user-defined schema need the empty field list. */
+async function createEmptyStream(request, stream, type, { org = orgId() } = {}) {
+  const response = await request.post(`${ingestionBaseUrl()}/api/${org}/streams/${stream}?type=${type}`, {
+    headers: getAuthHeaders(),
+    data: {
+      fields: [],
+      settings: { partition_keys: [], index_fields: [], full_text_search_keys: [], bloom_filter_fields: [], defined_schema_fields: [] },
+    },
+  });
+  expect(response.status(), `Precondition: the ${type} stream must be created`).toBe(200);
 }
 
 /** Create a saved view, assert it returned 200, and resolve to its view_id. */
@@ -92,8 +114,10 @@ module.exports = {
   ingestRumData,
   searchStream,
   waitForSearch,
+  waitForStreamRows,
   streamFieldNames,
   deleteStream,
+  createEmptyStream,
   createSavedView,
   deleteSavedView,
 };
