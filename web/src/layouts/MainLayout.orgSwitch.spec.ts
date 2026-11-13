@@ -16,7 +16,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import { defineComponent, h } from "vue";
-import { createMemoryHistory, createRouter, type Router } from "vue-router";
+import { createMemoryHistory, createRouter, useRoute, type Router } from "vue-router";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
 import { queryClient } from "@/composables/query/queryClient";
@@ -69,13 +69,33 @@ const mountLayout = async (start: string, router: Router) => {
   });
 };
 
-const makeRouter = () =>
+// What each page saw when it mounted: which page, the selected org, and the dashboard id.
+const mounts: Array<{ page: string; org: string; dashboard?: unknown }> = [];
+const recordingPage = (page: string) =>
+  defineComponent({
+    setup() {
+      const route = useRoute();
+      mounts.push({
+        page,
+        org: store.state.selectedOrganization?.identifier,
+        dashboard: route.query.dashboard,
+      });
+      return () => h("div");
+    },
+  });
+const ViewDashboardBody = recordingPage("view");
+// Like ViewDashboard.vue, the page body is keyed on the org, so an org change remounts it.
+const ViewDashboardPage = defineComponent({
+  setup: () => () => h(ViewDashboardBody, { key: store.state.selectedOrganization?.identifier }),
+});
+
+const makeRouter = (dashboardsPage: any = recordingPage("list")) =>
   createRouter({
     history: createMemoryHistory(),
     routes: [
       { path: "/", component: StubDiv },
-      { path: "/dashboards", component: StubDiv },
-      { path: "/dashboards/view", component: StubDiv },
+      { path: "/dashboards", component: dashboardsPage },
+      { path: "/dashboards/view", component: ViewDashboardPage },
       { path: "/dashboards/add_panel", component: StubDiv },
       { path: "/alerts", component: StubDiv },
     ],
@@ -112,12 +132,9 @@ describe("MainLayout — org switch", () => {
     return vm;
   };
 
-  it("leaves a dashboard page for the new org's dashboard list before the org changes", async () => {
+  it("leaves a dashboard page for the new org's dashboard list, and each page mounts in one org", async () => {
     const router = makeRouter();
-    const orgAtNavigation: string[] = [];
-    router.afterEach(() => {
-      orgAtNavigation.push(store.state.selectedOrganization.identifier);
-    });
+    mounts.length = 0;
     await switchOrg(
       router,
       `/dashboards/view?org_identifier=${oldOrg.identifier}&dashboard=d1&folder=default&tab=default`,
@@ -126,13 +143,25 @@ describe("MainLayout — org switch", () => {
     expect(router.currentRoute.value.path).toBe("/dashboards");
     expect(router.currentRoute.value.query).toEqual({ org_identifier: "_meta" });
     expect(store.state.selectedOrganization.identifier).toBe("_meta");
-    // The last navigation (the org switch) finished while the old org was still selected,
-    // so the dashboard page never remounts with the new org and the old dashboard id.
-    expect(orgAtNavigation.at(-1)).toBe(oldOrg.identifier);
+    // The dashboard page never remounts in the new org with the old id, and the
+    // list never mounts with the old org (its folder fetch would use that org).
+    expect(mounts.filter((m) => m.page === "view" && m.org === "_meta")).toEqual([]);
+    expect(mounts.filter((m) => m.page === "list")).toEqual([
+      { page: "list", org: "_meta", dashboard: undefined },
+    ]);
     // Replace, not push: Back must not reopen the old org's dashboard in the new org.
     router.back();
     await flushPromises();
     expect(router.currentRoute.value.path).not.toBe("/dashboards/view");
+  });
+
+  it("keeps the old org when the dashboard list page fails to load", async () => {
+    const router = makeRouter(() => Promise.reject(new Error("chunk load failed")));
+    const vm = await switchOrg(router, "/dashboards/view?dashboard=d1&folder=default");
+
+    expect(router.currentRoute.value.path).toBe("/dashboards/view");
+    expect(store.state.selectedOrganization.identifier).toBe(oldOrg.identifier);
+    expect(vm.selectedOrg.identifier).toBe(oldOrg.identifier);
   });
 
   it("treats a trailing slash on the dashboard path the same way", async () => {

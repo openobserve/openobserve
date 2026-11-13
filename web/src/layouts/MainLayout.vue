@@ -1336,25 +1336,47 @@ export default defineComponent({
         router.currentRoute.value.query,
         nextOrg.identifier,
       );
+      const commitOrg = () => {
+        resetStreams();
+        store.dispatch("logs/resetLogs");
+        store.dispatch("setIsDataIngested", false);
+        useLocalOrganization(nextOrg);
+        store.dispatch("setSelectedOrganization", { ...nextOrg });
+      };
       if (isDashboardItemPath(currentPath)) {
-        // Leave the dashboard page before the org changes. Otherwise the page
-        // remounts in the new org with the old dashboard id. Replace, so Back
-        // does not open the old org's dashboard in the new org. A leave guard
-        // (unsaved edits) can cancel the move, and then the org stays.
-        const failure = await router.replace(target);
+        // The org changes only when the move off the dashboard page lands.
+        // Before that, the page would remount in the new org with the old
+        // dashboard id. In afterEach, the new route and the new org render in
+        // one pass, so the list page never mounts with the old org. Replace,
+        // so Back does not open the old org's dashboard in the new org. A leave
+        // guard (unsaved edits) or a failed page load cancels the move, and
+        // then the old org stays.
+        let landed = false;
+        const targetPath = router.resolve(target).fullPath;
+        const stopHook = router.afterEach((to: any, _from: unknown, failure: unknown) => {
+          // A cancelled older switch also reports here, for its own target.
+          if (to.fullPath !== targetPath) return;
+          stopHook();
+          if (failure || switchId !== orgSwitchSeq) return;
+          landed = true;
+          commitOrg();
+        });
+        try {
+          await router.replace(target);
+        } catch {
+          // A failed lazy page load rejects the navigation. The old org stays.
+        } finally {
+          stopHook();
+        }
         if (switchId !== orgSwitchSeq) return;
-        if (failure) {
+        if (!landed) {
           selectedOrg.value = store.state.selectedOrganization;
           return;
         }
       } else {
         router.push(target);
+        commitOrg();
       }
-      resetStreams();
-      store.dispatch("logs/resetLogs");
-      store.dispatch("setIsDataIngested", false);
-      useLocalOrganization(nextOrg);
-      store.dispatch("setSelectedOrganization", { ...nextOrg });
       // setSelectedOrganization();
       // if (
       //   config.isCloud &&
