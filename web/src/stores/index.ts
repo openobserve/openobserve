@@ -28,6 +28,7 @@ import { editorDraftSessionEnded, resumeEditorDraftSession } from "@/utils/draft
 import { setSeverityInferenceEnabled } from "@/utils/logs/statusParser";
 import { setPickerTimezoneSource } from "@/utils/dashboard/calendarPeriods";
 import config from "@/aws-exports";
+import { setDeployTimeZone } from "@/utils/deployTimeZone";
 
 const pos = window.location.pathname.indexOf("/web/");
 
@@ -96,6 +97,9 @@ const organizationObj = {
   }>,
 };
 
+const initialTimezone = useLocalTimezone() || Intl.DateTimeFormat().resolvedOptions().timeZone;
+setDeployTimeZone(initialTimezone);
+
 const store = createStore({
   state: {
     API_ENDPOINT: API_ENDPOINT,
@@ -114,9 +118,7 @@ const store = createStore({
     themeOverride: null,
     organizationData: JSON.parse(JSON.stringify(organizationObj)),
     zoConfig: <{ [key: string]: any }>{},
-    timezone: useLocalTimezone()
-      ? useLocalTimezone()
-      : Intl.DateTimeFormat().resolvedOptions().timeZone,
+    timezone: initialTimezone,
     savedViewDialog: false,
     refreshIntervalID: 0,
     savedViewFlag: false,
@@ -323,6 +325,7 @@ const store = createStore({
     },
     setTimezone(state, payload) {
       state.timezone = payload;
+      setDeployTimeZone(payload);
     },
     setSavedViewDialog(state, payload) {
       state.savedViewDialog = payload;

@@ -29,14 +29,15 @@ import ServicesCatalogNoDataState from "./ServicesCatalogNoDataState.vue";
 const OEmptyStateStub = {
   name: "OEmptyState",
   template: '<div data-test="o-empty-state" />',
-  props: ["preset", "size", "hideAction"],
+  props: ["preset", "size", "hideAction", "description"],
 };
 
 // ---------------------------------------------------------------------------
 // Mount factory
 // ---------------------------------------------------------------------------
-function mountComponent() {
+function mountComponent(props: { noTraceStream?: boolean } = {}) {
   return mount(ServicesCatalogNoDataState, {
+    props,
     global: {
       plugins: [i18n],
       stubs: {
@@ -88,6 +89,19 @@ describe("ServicesCatalogNoDataState", () => {
 
     it("does not emit widen-range (feature removed)", () => {
       expect(wrapper.emitted("widen-range")).toBeUndefined();
+    });
+  });
+
+  describe("an org with no trace stream", () => {
+    it("keeps the no-services state but drops the wider range and other stream advice", () => {
+      wrapper.unmount();
+      wrapper = mountComponent({ noTraceStream: true });
+      const stub = wrapper.findComponent({ name: "OEmptyState" });
+      expect(stub.props("preset")).toBe("no-services-catalog");
+      expect(stub.props("hideAction")).toBe(true);
+      expect(String(stub.props("description"))).toBe(
+        "No services were detected in the selected time range.",
+      );
     });
   });
 });

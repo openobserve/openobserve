@@ -19,7 +19,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="bg-card-glass-bg flex h-full min-w-0 flex-col px-2.5 py-1.5"
     data-test="rum-errors-over-time-chart"
   >
-    <h4>{{ t("rum.errorsOverTime") }}</h4>
+    <div class="flex flex-wrap items-center gap-2">
+      <h4>{{ t("rum.errorsOverTime") }}</h4>
+      <span
+        v-if="actionable.length"
+        class="ms-auto flex flex-wrap items-center gap-1"
+        data-test="svcver-marker-actions"
+      >
+        <template v-for="marker in actionable" :key="marker.deployKey || marker.version">
+          <OButton
+            v-if="marker.unavailable"
+            variant="ghost"
+            size="chip"
+            data-test="svcver-marker-unavailable-retry"
+            @click="emit('retry')"
+            >{{ t("serviceVersions.rum.markers.unavailable") }}</OButton
+          >
+          <OButton
+            v-else
+            variant="ghost"
+            size="chip"
+            data-test="svcver-marker-compare-previous"
+            :data-deploy-key="marker.deployKey"
+            @click="emit('compare', marker)"
+            ><span class="font-mono">{{ marker.version }}</span>
+            {{ t("serviceVersions.rum.markers.compareWithPrevious") }}</OButton
+          >
+        </template>
+      </span>
+    </div>
 
     <div
       v-if="loading"
@@ -47,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <template v-else>
       <div class="min-h-0 flex-1">
-        <ChartRenderer :data="{ options: chartOptions }" />
+        <ChartRenderer :data="{ options: chartOptions }" @click="onChartClick" />
       </div>
       <small
         v-if="spikeCaption"
@@ -65,8 +93,9 @@ import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { format } from "date-fns";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import type { StackedBucket } from "@/utils/rum/errorIssueQueries";
-import type { DeployInfo } from "@/utils/rum/errorIssueUtils";
+import type { RumChartMarker } from "@/enterprise/components/ServiceVersions/deployMarkers";
 
 const ChartRenderer = defineAsyncComponent(
   () => import("@/components/dashboards/panels/ChartRenderer.vue"),
@@ -74,7 +103,7 @@ const ChartRenderer = defineAsyncComponent(
 
 const props = defineProps<{
   buckets: StackedBucket[];
-  deploy: DeployInfo | null;
+  markers: RumChartMarker[];
   /** Post-deploy spike ratio (>= 1.5) or null — drives the caption. */
   spikeFactor: number | null;
   /** Type filter from the page — dims the other series via the legend. */
@@ -82,8 +111,34 @@ const props = defineProps<{
   loading?: boolean;
 }>();
 
+const emit = defineEmits<{ compare: [marker: RumChartMarker]; retry: [] }>();
 const { t } = useI18nTyped();
 const store = useStore();
+const latest = computed(() =>
+  props.markers.reduce<RumChartMarker | null>(
+    (newest, marker) => (!newest || marker.at > newest.at ? marker : newest),
+    null,
+  ),
+);
+const placed = computed(() =>
+  props.markers
+    .map((marker) => ({
+      marker,
+      index: props.buckets.findIndex((bucket) => bucket.ts >= marker.at),
+    }))
+    .filter(({ index }) => index >= 0),
+);
+// A first-seen marker without a deploy key has nothing to compare against.
+const actionable = computed(() =>
+  placed.value
+    .map(({ marker }) => marker)
+    .filter((marker) => marker.unavailable || marker.deployKey),
+);
+function onChartClick(event: { componentType?: string; data?: { deployKey?: string } }) {
+  if (event.componentType !== "markLine" || !event.data?.deployKey) return;
+  const marker = props.markers.find((row) => row.deployKey === event.data?.deployKey);
+  if (marker) emit("compare", marker);
+}
 
 const hasData = computed(() =>
   props.buckets.some((bucket) => bucket.handled + bucket.unhandled > 0),
@@ -105,11 +160,6 @@ const resolveToken = (token: string, fallback: string): string => {
   return value || fallback;
 };
 
-const deployIndex = computed(() => {
-  if (!props.deploy) return -1;
-  return props.buckets.findIndex((bucket) => bucket.ts >= props.deploy!.firstSeen);
-});
-
 const chartOptions = computed(() => {
   // Read the theme so token colors are re-resolved when it flips —
   // getComputedStyle alone is not reactive.
@@ -128,16 +178,19 @@ const chartOptions = computed(() => {
     emphasis: { focus: "series" },
     data: props.buckets.map((bucket) => bucket.unhandled),
   };
-  if (deployIndex.value >= 0 && props.deploy) {
+  if (placed.value.length) {
     unhandledSeries.markLine = {
       symbol: "none",
       animation: false,
+      silent: false,
       lineStyle: { type: "dashed" },
-      label: {
-        formatter: t("rum.deployMarker", { version: props.deploy.version }),
-        position: "insideEndTop",
-      },
-      data: [{ xAxis: deployIndex.value }],
+      label: { position: "insideEndTop" },
+      data: placed.value.map(({ marker, index }) => ({
+        ...marker,
+        name: marker.version,
+        xAxis: index,
+        label: { position: "insideEndTop", ...marker.label },
+      })),
     };
   }
 
@@ -182,10 +235,10 @@ const chartOptions = computed(() => {
 });
 
 const spikeCaption = computed(() => {
-  if (!props.deploy || props.spikeFactor === null) return "";
+  if (!latest.value || props.spikeFactor === null) return "";
   return t("rum.spikeAfterDeploy", {
     factor: props.spikeFactor.toFixed(1),
-    version: props.deploy.version,
+    version: latest.value.version,
   });
 });
 </script>

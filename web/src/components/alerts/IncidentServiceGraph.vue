@@ -107,6 +107,8 @@ import { useTheme } from "@/composables/useTheme";
 import { forceSimulation, forceManyBody, forceLink, forceCollide, forceX, forceY } from "d3-force";
 import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
 import { AlertNode } from "@/services/incidents";
+import { escapeHtml } from "@/utils/html";
+import { showsDetectedAs } from "@/types/serviceRef";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
@@ -313,6 +315,7 @@ export default defineComponent({
         BUCKET_UNITS_US.find((u) => Math.ceil(span / u) <= BUCKET_TARGET_MAX) ??
         Math.ceil(span / BUCKET_TARGET_MAX);
 
+      const displayByKey = new Map<string, string>();
       const buckets = new Map<
         string,
         {
@@ -353,6 +356,7 @@ export default defineComponent({
         if (node.last_fired_at > b.last_fired_at) b.last_fired_at = node.last_fired_at;
         const svc = node.service_name || "";
         b.serviceCounts.set(svc, (b.serviceCounts.get(svc) || 0) + 1);
+        if (node.display_name && !displayByKey.has(svc)) displayByKey.set(svc, node.display_name);
       });
 
       // Materialize bucket nodes, sorted chronologically. Each node keeps its
@@ -374,6 +378,7 @@ export default defineComponent({
             alert_id: b.alert_id,
             alert_name: b.alert_name,
             service_name: bestSvc,
+            display_name: displayByKey.get(bestSvc),
             alert_count: b.alert_count,
             first_fired_at: b.first_fired_at,
             last_fired_at: b.last_fired_at,
@@ -542,9 +547,17 @@ export default defineComponent({
               html += `<strong style="font-size: var(--text-sm);">${originalNode.alert_name}</strong><br/>`;
               // The <strong> markup is passed through the interpolation slot so the
               // message keeps the whole sentence (and its word order) translatable.
-              const serviceName = `<strong>${originalNode.service_name}</strong>`;
+              const serviceKey = String(originalNode.service_name ?? "");
+              const display = originalNode.display_name || serviceKey;
+              const serviceName = `<strong>${escapeHtml(display)}</strong>`;
               const alertCount = `<strong>${originalNode.alert_count}</strong>`;
-              html += `${t("alerts.serviceGraphTooltipService", { name: serviceName })}<br/><br/>`;
+              const serviceLine = showsDetectedAs(serviceKey, originalNode.display_name)
+                ? t("alerts.serviceGraphTooltipServiceDetected", {
+                    name: serviceName,
+                    detected: escapeHtml(serviceKey),
+                  })
+                : t("alerts.serviceGraphTooltipService", { name: serviceName });
+              html += `<span data-test="incident-graph-tooltip-service">${serviceLine}</span><br/><br/>`;
               html += `${t("alerts.serviceGraphTooltipAlertCount", { count: alertCount })}<br/>`;
               html += `${t("alerts.serviceGraphTooltipFirstFired", { time: firstTime })}<br/>`;
               if (lastTime) {

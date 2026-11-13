@@ -56,6 +56,7 @@ import {
   sortedTargets,
   targetSummary,
   type FolderNameFn,
+  type ValueLabelFn,
 } from "@/utils/downtimes/targetSummary";
 
 interface Chip {
@@ -71,6 +72,7 @@ const props = withDefaults(
     /** The alert groups a group mute covers; each leads the row as its own chip. */
     alertGroups?: AlertGroupRef[] | null;
     folderName?: FolderNameFn;
+    valueLabel?: ValueLabelFn;
     /** At most this many chips, the rest behind "+N"; unset shows every chip. */
     maxChips?: number;
     dataTest?: string;
@@ -79,6 +81,7 @@ const props = withDefaults(
     condition: null,
     alertGroups: null,
     folderName: undefined,
+    valueLabel: undefined,
     maxChips: undefined,
     dataTest: "downtime-targets",
   },
@@ -89,7 +92,9 @@ const { t } = useI18nTyped();
 const hasIdentityTarget = computed(() => props.targets.some((tg) => tg.module !== "synthetics"));
 
 const chips = computed<Chip[]>(() => {
-  const condition = hasIdentityTarget.value ? conditionSummary(props.condition, t) : null;
+  const condition = hasIdentityTarget.value
+    ? conditionSummary(props.condition, t, props.valueLabel)
+    : null;
   const targets = sortedTargets(props.targets).map((target) => {
     const chip = targetSummary(target, t, props.folderName);
     return {

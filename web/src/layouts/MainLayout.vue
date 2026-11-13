@@ -272,6 +272,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <CommunitySlackInvite v-if="!focusMode" />
     <PredefinedThemes />
     <ShortcutCheatsheet v-model:open="showShortcuts" />
+    <VersionCompareDrawerHost />
     <PaidOverageConsentDialog v-if="config.isCloud == 'true'" />
     <DashboardSaveConflictDialog
       v-if="dashboardSaveConflict.mounted"
@@ -430,6 +431,9 @@ export default defineComponent({
     EditorDraftSignOutDialog,
     FeatureLockBoundary,
     SecurityPageGate,
+    VersionCompareDrawerHost: defineAsyncComponent(
+      () => import("@/enterprise/components/ServiceVersions/VersionCompareDrawerHost.vue"),
+    ),
     DashboardSaveConflictDialog: defineAsyncComponent(
       () => import("@/components/dashboards/DashboardSaveConflictDialog.vue"),
     ),

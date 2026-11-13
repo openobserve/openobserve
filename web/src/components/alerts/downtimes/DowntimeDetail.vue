@@ -143,6 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 type="downtimeTarget"
                 value="condition"
                 :label="conditionText"
+                :title="conditionKeys"
                 data-test="downtime-detail-condition"
               />
             </ODescriptionItem>
@@ -443,6 +444,7 @@ import ExtendDowntimeMenu from "./ExtendDowntimeMenu.vue";
 import { useExtendDowntime } from "@/composables/downtimes/useExtendDowntime";
 import { useListBoundaryRefetch } from "@/composables/downtimes/useListBoundaryRefetch";
 import { useNowMicros } from "@/composables/downtimes/useNowMicros";
+import { useDowntimeValueLabels } from "@/composables/downtimes/useDowntimeValueLabels";
 import { isExtendable } from "@/utils/downtimes/extend";
 import { isEditable } from "@/utils/downtimes/listOrder";
 import { suppressedPage } from "@/utils/downtimes/suppressed";
@@ -552,9 +554,19 @@ const isCalledOff = (d: { status: string }) =>
 const { extendBy } = useExtendDowntime();
 const extendOpen = ref(false);
 
-const conditionText = computed(() =>
-  downtime.value ? conditionSummary(downtime.value.condition, t) : null,
+const valueLabel = useDowntimeValueLabels(
+  orgId,
+  computed(() => downtime.value?.folder_id || undefined),
+  () => downtime.value?.condition,
 );
+const conditionText = computed(() =>
+  downtime.value ? conditionSummary(downtime.value.condition, t, valueLabel.value) : null,
+);
+// The stored keys stay one hover away when the chip shows display names.
+const conditionKeys = computed(() => {
+  const keys = downtime.value ? conditionSummary(downtime.value.condition, t) : null;
+  return keys && keys !== conditionText.value ? keys : undefined;
+});
 const missingModules = computed(() =>
   MODULE_ORDER.filter((m) => !(downtime.value?.targets ?? []).some((tg) => tg.module === m)),
 );

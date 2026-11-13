@@ -322,6 +322,22 @@ describe("telemetryCorrelation", () => {
       expect(buildSqlCondition("svc", "a'b")).toBe("\"svc\" = 'a''b'");
     });
 
+    it("matches every spelling of a service key when the value is one of them", () => {
+      const spellings = ["checkout", "checkout.service"];
+      expect(buildSqlCondition("service_name", "checkout", spellings)).toBe(
+        "lower(trim(\"service_name\")) IN ('checkout', 'checkout.service')",
+      );
+      expect(buildSqlCondition("service_name", "Checkout.Service ", spellings)).toBe(
+        "lower(trim(\"service_name\")) IN ('checkout', 'checkout.service')",
+      );
+    });
+
+    it("keeps an exact match for a value outside the spellings, as after an edit", () => {
+      expect(buildSqlCondition("service_name", "cart", ["checkout"])).toBe(
+        "\"service_name\" = 'cart'",
+      );
+    });
+
     it("always quotes identifiers, including ones with special characters", () => {
       expect(buildSqlCondition("k8s-pod.name", "web-1")).toBe("\"k8s-pod.name\" = 'web-1'");
     });

@@ -117,6 +117,67 @@ pub struct ListIncidentsResponse {
     pub total: u64,
 }
 
+#[utoipa::path(post, path = "/v2/{org_id}/alerts/incidents", context_path = "/api", tag = "Incidents", operation_id = "CreateServiceIncident", summary = "Open or attach to a service version incident", params(("org_id" = String, Path)), request_body = config::meta::alerts::incidents::ManualIncidentRequest, responses((status = 201, description = "Incident created", content_type = "application/json", body = Object), (status = 200, description = "Attached to incident", content_type = "application/json", body = Object), (status = 403, description = "Forbidden")), security(("Authorization" = [])), extensions(("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "create"})), ("x-o2-mcp" = json!({"enabled": false}))))]
+pub async fn create_incident(
+    Path(org): Path<String>,
+    Headers(user): Headers<UserEmail>,
+    Json(request): Json<config::meta::alerts::incidents::ManualIncidentRequest>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        if !openobserve_core::auth::check_permissions(
+            &org,
+            &org,
+            &user.user_id,
+            "incidents",
+            "POST",
+            None,
+            true,
+            false,
+            false,
+        )
+        .await
+        {
+            return MetaHttpResponse::forbidden("Unauthorized Access");
+        }
+        if request.title.trim().is_empty()
+            || request.service.trim().is_empty()
+            || request.where_key.trim().is_empty()
+            || !matches!(request.severity.as_str(), "P1" | "P2" | "P3" | "P4")
+        {
+            return MetaHttpResponse::bad_request(
+                "title, service, where_key and a P1-P4 severity are required",
+            );
+        }
+        match openobserve_core::alerts::incidents::open_manual_incident(
+            &org,
+            &user.user_id,
+            &request,
+        )
+        .await
+        {
+            Ok((id, created)) => {
+                use axum::response::IntoResponse;
+                (
+                    if created {
+                        axum::http::StatusCode::CREATED
+                    } else {
+                        axum::http::StatusCode::OK
+                    },
+                    Json(serde_json::json!({"incident_id":id,"created":created})),
+                )
+                    .into_response()
+            }
+            Err(error) => MetaHttpResponse::internal_error(error),
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org, user, request);
+        MetaHttpResponse::forbidden("Service incidents require the enterprise build")
+    }
+}
+
 #[cfg(feature = "enterprise")]
 /// ListIncidents
 #[utoipa::path(
@@ -2556,6 +2617,7 @@ mod tests {
             rca_off_reason: None,
             alert_groups: None,
             historical: false,
+            group_values_display: None,
         };
 
         let response = ListIncidentsResponse {
@@ -2860,6 +2922,7 @@ mod tests {
             rca_off_reason: Some("l0_off".to_string()),
             alert_groups: None,
             historical: false,
+            group_values_display: None,
         };
         let json = serde_json::to_value(&incident).unwrap();
         assert!(json.as_object().unwrap().contains_key("rca"));

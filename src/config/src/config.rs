@@ -153,7 +153,8 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 153: add gap_since, gap_runs, gap_notified_at and gap_resumed_at to synthetics.
 // 154: add synthetics.status_recovered_at and status_streak_sig, and
 //      status_page_notices.false_alarm_recovered_at.
-pub const DB_SCHEMA_VERSION: u64 = 154;
+// 155: create the service version, identity, alias, deploy and verdict tables.
+pub const DB_SCHEMA_VERSION: u64 = 155;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -1132,6 +1133,7 @@ pub struct Config {
     pub public_dashboards: PublicDashboards,
     pub alert_composite: AlertComposite,
     pub db_monitoring: DatabaseMonitoring,
+    pub service_versions: ServiceVersions,
     pub self_profiles: SelfProfiles,
     pub public_ai_chat: PublicAiChat,
 }
@@ -1243,6 +1245,17 @@ pub struct DatabaseMonitoring {
         help = "Rollup window and job cadence in seconds. This is also the freshness floor: rolled-up data is up to one interval stale, and the read path covers the remainder with a live delta query over un-rolled-up spans. Lowering it shrinks that delta (cheaper reads, fresher pages) at the cost of a more frequent rollup job and more `_o2_db_stats` rows."
     )]
     pub rollup_interval_secs: u64,
+}
+
+/// Service versions as a whole; a per-org switch is not offered.
+#[derive(Debug, Serialize, EnvConfig, Default)]
+pub struct ServiceVersions {
+    #[env_config(
+        name = "ZO_SERVICE_VERSIONS_ENABLED",
+        default = true,
+        help = "Enable Service Versions: span stamping at ingest, the version registry flush and the service signals processor. false pauses all three and keeps every stored row and cursor; true resumes from the saved cursors."
+    )]
+    pub enabled: bool,
 }
 
 /// Public (unauthenticated) dashboards; clamped in `check_public_dashboards_config`.

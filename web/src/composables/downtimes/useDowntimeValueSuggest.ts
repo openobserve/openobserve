@@ -13,10 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { onScopeDispose, ref, watch, type Ref } from "vue";
+import { onScopeDispose, ref, shallowRef, watch, type Ref } from "vue";
 import type { QueryClient } from "@tanstack/vue-query";
 import type { DimensionCondition } from "@/services/downtimes";
 import { downtimeValuesQuery } from "@/services/downtimes.queries";
+import { LABELLED_DIMENSION } from "@/composables/downtimes/useDowntimeValueLabels";
 import { andEqPairs } from "@/utils/downtimes/conditionBridge";
 
 export const NOT_SEEN_DEBOUNCE_MS = 250;
@@ -45,24 +46,43 @@ export function useDowntimeValueSuggest(
   // Pairs whose exact value the values API did not return for their key.
   const notSeen = ref(new Set<string>());
 
+  // Display names of service values seen in any answer, so a chip keeps its name after the list closes.
+  const labels = shallowRef(new Map<string, string>());
+  // Another org may name the same key differently.
+  watch(orgId, () => (labels.value = new Map()));
+
   const fetchValues = async (key: string, search: string) => {
+    const org = orgId.value;
     // The row being edited is not one of its own narrowing pairs.
     const pairs = andEqPairs(condition.value).filter((p) => p.key !== key && p.value !== "");
-    return queryClient.fetchQuery(
-      downtimeValuesQuery(orgId.value, key, needle(search), pairs, folder.value),
+    const data = await queryClient.fetchQuery(
+      downtimeValuesQuery(org, key, needle(search), pairs, folder.value),
     );
+    // An answer for an org the user has since left must not write into the new org's state.
+    const current = org === orgId.value;
+    if (current && key === LABELLED_DIMENSION) rememberLabels(data.values);
+    return { data, current };
   };
+
+  function rememberLabels(values: Array<{ value: string; label?: string | null }>) {
+    const named = values.filter((v) => v.label && labels.value.get(v.value) !== v.label);
+    if (!named.length) return;
+    const next = new Map(labels.value);
+    for (const v of named) next.set(v.value, v.label!);
+    labels.value = next;
+  }
 
   const loadValues = async (key: string, search: string): Promise<string[]> => {
     if (!orgId.value || !key) return [];
-    const data = await fetchValues(key, search);
-    partial.value = Boolean(data.partial);
+    const { data, current } = await fetchValues(key, search);
+    if (current) partial.value = Boolean(data.partial);
     return data.values.map((v) => v.value);
   };
 
   let check = 0;
   async function checkSeen() {
     const run = ++check;
+    const org = orgId.value;
     const missing = new Set<string>();
     const typed = pairsOf(condition.value).filter(
       (p) => p.key && p.value.trim() && !p.value.trim().endsWith("*"),
@@ -71,7 +91,7 @@ export function useDowntimeValueSuggest(
       await Promise.all(
         typed.map(async (p) => {
           try {
-            const data = await fetchValues(p.key, p.value);
+            const { data } = await fetchValues(p.key, p.value);
             const exact = p.value.trim().toLowerCase();
             if (!data.values.some((v) => v.value === exact)) missing.add(pairKey(p.key, p.value));
           } catch {
@@ -80,7 +100,7 @@ export function useDowntimeValueSuggest(
         }),
       );
     }
-    if (run === check) notSeen.value = missing;
+    if (run === check && org === orgId.value) notSeen.value = missing;
   }
 
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -98,5 +118,9 @@ export function useDowntimeValueSuggest(
   const isNotSeen = (key: string, values: string[]): boolean =>
     values.some((value) => notSeen.value.has(pairKey(key, value)));
 
-  return { loadValues, partial, isNotSeen };
+  /** The display name of a stored service value, once an answer has named it. */
+  const labelOf = (key: string, value: string): string | undefined =>
+    key === LABELLED_DIMENSION ? labels.value.get(value.trim()) : undefined;
+
+  return { loadValues, partial, isNotSeen, labelOf };
 }

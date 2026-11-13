@@ -526,4 +526,23 @@ describe("getAnnotationsData", () => {
       distance: 0.2,
     });
   });
+
+  it("passes a derived deploy marker through with its colour, label and deploy key", () => {
+    const marker = {
+      name: "0.0.2",
+      xAxis: 1700000000000,
+      deployKey: "dk",
+      service: "web",
+      lineStyle: { type: "dashed", width: 1, color: "#d97706" },
+      label: { formatter: "0.0.2" },
+    };
+    const annotation = {
+      annotation_id: "deploy:dk:env:prod",
+      start_time: 1700000000000000,
+      deploy_marker: marker,
+    };
+    const { markLines, markAreas } = getAnnotationsData({ value: [annotation] }, "UTC");
+    expect(markAreas).toEqual([]);
+    expect(markLines).toEqual([{ ...marker, type: "xAxis", annotationDetails: annotation }]);
+  });
 });

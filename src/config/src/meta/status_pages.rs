@@ -615,8 +615,9 @@ pub fn incident_actions_with(
 }
 
 /// True once the failing streak clears either the run-count or the time-based
-/// confirmation bar.
-fn is_confirmed_failing(check: &EngineCheck, th: &Thresholds, now: i64) -> bool {
+/// confirmation bar. The status page snapshot shares it, so a muted check shows
+/// Maintenance exactly when the engine would have opened a notice for it.
+pub fn is_confirmed_failing(check: &EngineCheck, th: &Thresholds, now: i64) -> bool {
     if check.down_runs >= th.confirm_failures {
         return true;
     }

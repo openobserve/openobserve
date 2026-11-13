@@ -20,6 +20,14 @@ import searchService from "@/services/search";
 import useQuery from "@/composables/useQuery";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { b64EncodeUnicode } from "@/utils/zincutils";
+import config from "@/aws-exports";
+import serviceVersions from "@/services/service_versions";
+import { featureState } from "@/utils/featureGate";
+import {
+  deployMarkers,
+  unavailableMarkers,
+  type RumChartMarker,
+} from "@/enterprise/components/ServiceVersions/deployMarkers";
 import {
   ISSUES_LIMIT,
   buildDenominatorsSql,
@@ -84,6 +92,8 @@ const useErrorIssuesData = (t: TranslateFn) => {
   const trendBuckets: Ref<Record<string, number[]>> = ref({});
   const chartSeries: Ref<StackedBucket[]> = ref([]);
   const latestDeploy: Ref<DeployInfo | null> = ref(null);
+  // Exactly one producer per load: /deploys in ENT with a service, else the first-seen SQL.
+  const deployMarkerList: Ref<RumChartMarker[]> = ref([]);
   const errorTotals = ref({
     totalErrors: 0,
     errorSessions: 0,
@@ -303,10 +313,93 @@ const useErrorIssuesData = (t: TranslateFn) => {
   const clearAggregates = () => {
     chartSeries.value = [];
     latestDeploy.value = null;
+    deployMarkerList.value = [];
     errorTotals.value = { totalErrors: 0, errorSessions: 0, usersAffected: 0 };
     denominators.value = { totalSessions: 0, totalUsers: 0 };
     isLoadingChart.value = false;
     isLoadingKpis.value = false;
+  };
+
+  // A version seen before the window, or one that cannot be checked, is no deploy: a false marker is worse than none.
+  const firstSeenDeploy = async (
+    ctx: IssueQueryContext,
+    params: FetchIssuesParams,
+    intervalMicros: number,
+    signal: AbortSignal,
+  ): Promise<DeployInfo | null> => {
+    const hits = await runSearch(buildDeploysSql(ctx), params, 10, undefined, signal);
+    const candidate = pickLatestDeploy(
+      hits.map((hit: any) => ({
+        version: String(hit.version),
+        firstSeen: Number(hit.first_seen) || 0,
+      })),
+      params.startTime,
+      params.endTime,
+      intervalMicros,
+    );
+    if (!candidate) return null;
+    const lookbackSpan = params.endTime - params.startTime;
+    try {
+      const lookbackHits = await runSearch(
+        buildDeployLookbackSql(ctx, candidate.version),
+        params,
+        10,
+        { startTime: params.startTime - lookbackSpan, endTime: params.startTime - 1 },
+        signal,
+      );
+      return Number(lookbackHits[0]?.prior_events) > 0 ? null : candidate;
+    } catch {
+      return null;
+    }
+  };
+
+  const loadDeploys = async (
+    ctx: IssueQueryContext,
+    params: FetchIssuesParams,
+    intervalMicros: number,
+    signal: AbortSignal,
+  ): Promise<{ latest: DeployInfo | null; markers: RumChartMarker[] }> => {
+    const timezone = store.state.timezone || "UTC";
+    const versioned =
+      (config.isEnterprise === "true" || config.isCloud === "true") &&
+      featureState(store.state.zoConfig?.features, "traces") !== "locked";
+    if (versioned && params.service) {
+      try {
+        const { deploys } = (
+          await serviceVersions.deploys(
+            store.state.selectedOrganization.identifier,
+            { service: params.service, start_time: params.startTime, end_time: params.endTime },
+            signal,
+          )
+        ).data;
+        const markers = deployMarkers(deploys, "error_view_rate", timezone, t);
+        const newest = markers.reduce<RumChartMarker | null>(
+          (latest, marker) => (!latest || marker.at > latest.at ? marker : latest),
+          null,
+        );
+        return {
+          latest: newest ? { version: newest.version, firstSeen: newest.at } : null,
+          markers,
+        };
+      } catch (err) {
+        if (isAbortError(err)) throw err;
+        const latest = await firstSeenDeploy(ctx, params, intervalMicros, signal);
+        return { latest, markers: latest ? unavailableMarkers([latest], timezone, t) : [] };
+      }
+    }
+    const latest = await firstSeenDeploy(ctx, params, intervalMicros, signal);
+    return {
+      latest,
+      markers: latest
+        ? [
+            {
+              version: latest.version,
+              at: latest.firstSeen,
+              label: { formatter: t("rum.deployMarker", { version: latest.version }) },
+            },
+          ]
+        : [],
+    };
   };
 
   const fetchAll = async (params: FetchIssuesParams): Promise<void> => {
@@ -394,49 +487,14 @@ const useErrorIssuesData = (t: TranslateFn) => {
         runSearch(buildErrorsHistogramSql(ctx, interval), params, 2000, undefined, signal),
         runSearch(buildErrorKpisSql(ctx), params, 10, undefined, signal),
         runSearch(buildDenominatorsSql(ctx), params, 10, undefined, signal),
-        runSearch(buildDeploysSql(ctx), params, 10, undefined, signal),
+        loadDeploys(ctx, params, intervalMicros, signal),
       ]);
       if (currentRun !== runId) return;
 
-      const deploys: DeployInfo[] =
-        deploysR.status === "fulfilled"
-          ? deploysR.value.map((hit: any) => ({
-              version: String(hit.version),
-              firstSeen: Number(hit.first_seen) || 0,
-            }))
-          : [];
-      let deployCandidate = pickLatestDeploy(
-        deploys,
-        params.startTime,
-        params.endTime,
-        intervalMicros,
-      );
-      // Verify the candidate is genuinely new: MIN(_timestamp) is bounded by
-      // the window, so a long-lived version with sparse traffic can "first
-      // appear" mid-window and fake a deploy. Any events in the equal-length
-      // lookback range before the window disqualify it. Unverifiable (query
-      // error) also hides the marker — a false deploy is worse than none.
-      if (deployCandidate) {
-        const lookbackSpan = params.endTime - params.startTime;
-        try {
-          const lookbackHits = await runSearch(
-            buildDeployLookbackSql(ctx, deployCandidate.version),
-            params,
-            10,
-            {
-              startTime: params.startTime - lookbackSpan,
-              endTime: params.startTime - 1,
-            },
-            signal,
-          );
-          if (currentRun !== runId) return;
-          if (Number(lookbackHits[0]?.prior_events) > 0) deployCandidate = null;
-        } catch {
-          if (currentRun !== runId) return;
-          deployCandidate = null;
-        }
-      }
-      latestDeploy.value = deployCandidate;
+      const loaded =
+        deploysR.status === "fulfilled" ? deploysR.value : { latest: null, markers: [] };
+      latestDeploy.value = loaded.latest;
+      deployMarkerList.value = loaded.markers;
       const deployTs = latestDeploy.value?.firstSeen ?? null;
 
       // Deploy ts is known now — re-derive each issue's new/ongoing status.
@@ -485,6 +543,7 @@ const useErrorIssuesData = (t: TranslateFn) => {
     trendBuckets,
     chartSeries,
     latestDeploy,
+    deployMarkerList,
     deploySpikeFactor,
     kpis,
     issuesTruncated,

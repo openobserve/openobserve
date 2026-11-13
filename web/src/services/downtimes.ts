@@ -218,6 +218,8 @@ export interface ResourcesRequest {
 
 export interface ResourceValue {
   value: string;
+  /** Display name for a `service` value; conditions always store `value`. */
+  label?: string;
   last_seen: number;
   streams: string[];
 }
@@ -239,6 +241,8 @@ export interface ValuesRequest {
 
 export interface ValueSuggestion {
   value: string;
+  /** Display name for a `service` value; conditions always store `value`. */
+  label?: string;
   source: "inventory" | "registry" | "search";
   /** Alerts, anomaly detections and SLOs whose identity carries this value. */
   items: number;
