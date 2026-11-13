@@ -184,6 +184,36 @@ describe("formatRangeLabel", () => {
     expect(formatRangeLabel(q4, OPTS)).toBe("Q4 2026");
   });
 
+  it("keeps a typed period name before its dates, the year left to the name [D-NAME]", () => {
+    const q3 = {
+      startUs: ist("2026-07-01T00:00:00"),
+      endUs: ist("2026-10-01T00:00:00"),
+      name: "Q3 2026",
+      period: true,
+    };
+    const y2025 = {
+      startUs: ist("2025-01-01T00:00:00"),
+      endUs: ist("2026-01-01T00:00:00"),
+      name: "2025",
+      period: true,
+    };
+    expect(formatRangeLabel(q3, OPTS)).toBe("Q3 2026 · Jul 1 – Sep 30");
+    expect(formatRangeLabel(y2025, OPTS)).toBe("2025 · Jan 1 – Dec 31");
+  });
+
+  it("shows a running typed period cut to now from its first day, in minutes [D-NAME, V6]", () => {
+    const h2 = {
+      startUs: ist("2026-07-01T00:00:00"),
+      endUs: ist("2026-11-12T21:24:10.500"),
+      name: "H2 2026",
+      period: true,
+    };
+    expect(formatRangeLabel(h2, OPTS)).toBe("H2 2026 · Jul 1 – Nov 12, 21:24");
+    expect(formatRangeStamps(h2, OPTS)).toBe(
+      "Jul 1, 2026, 00:00:00.000 – Nov 12, 2026, 21:24:10.500",
+    );
+  });
+
   it("names no period for a range that ends inside an earlier, smaller one [V6]", () => {
     const janFeb = { startUs: ist("2026-01-01T00:00:00"), endUs: ist("2026-02-10T12:00:00") };
     const october = { startUs: ist("2026-10-01T00:00:00"), endUs: ist("2026-10-20T12:00:00") };

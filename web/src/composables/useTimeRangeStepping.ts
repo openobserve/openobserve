@@ -99,7 +99,7 @@ export interface TimeRangeSteppingDeps {
   normalizedCount: () => number;
   largestExactUnit: (unit: string, value: number) => [string, number];
   setRelativeDate: (period: string, value: number, commit?: boolean) => void;
-  saveDate: (dateType?: string | null) => void;
+  saveDate: (dateType?: string | null, rerun?: boolean) => void;
   getConsumableDateTime: () => PickerRange;
   openMenu: () => void;
   // Closes the open panel as a user dismissal does, so listeners waiting on hide still run.
@@ -170,7 +170,7 @@ export default function useTimeRangeStepping(
   };
 
   // The step names what the trigger showed, so the undo tooltip reads the range it returns to.
-  const captureUndo = () => {
+  const captureUndo = (ran = false) => {
     if (!props.undoable || props.hideRangeShift) return;
     const { startTime, endTime } = getConsumableDateTime();
     const applied = deps.appliedSelection();
@@ -182,6 +182,7 @@ export default function useTimeRangeStepping(
       relativeValue: applied.relativeValue,
       startUs: startTime,
       endUs: endTime,
+      ran,
     };
     if (undoStack.value.length === 0) liveOrigin = null;
     if (step.selectedType === "relative" && step.calendarToken === null) liveOrigin = step;
@@ -203,7 +204,7 @@ export default function useTimeRangeStepping(
       fields.writeAbsoluteFields(step.startUs, step.endUs);
       fields.holdUnshownInstants(step.startUs, step.endUs);
     }
-    saveDate(step.selectedType);
+    saveDate(step.selectedType, step.ran === true);
     closeMenu();
     deps.onUndo(step);
   };

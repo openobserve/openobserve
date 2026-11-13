@@ -536,6 +536,17 @@ describe("AutoRefreshInterval", () => {
       expect(wrapper.emitted("live")).toHaveLength(1);
     });
 
+    it("the compact trigger names the ended range, and Go live leads with a live dot and tips below", async () => {
+      await running({ rangeEndUs: (Date.now() - 60_000) * 1000, isCompact: true });
+      const btn = wrapper.find('[data-test="logs-search-bar-refresh-interval-btn"]');
+      expect(btn.find('[data-test="auto-refresh-trigger-label"]').text()).toBe(
+        "Paused · range ended",
+      );
+      expect(liveBtn().find('[data-test="auto-refresh-go-live-dot"]').exists()).toBe(true);
+      expect(liveBtn().attributes("icon-left")).toBeUndefined();
+      expect(liveBtn().findComponent({ name: "OTooltip" }).props("side")).toBe("bottom");
+    });
+
     it("Go live names the length it switches to", async () => {
       const endUs = (Date.now() - 60_000) * 1000;
       await running({ rangeEndUs: endUs, rangeStartUs: endUs - 15 * 60 * 1_000_000 });

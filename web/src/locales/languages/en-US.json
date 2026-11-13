@@ -23760,6 +23760,7 @@
     "shareCopyLive": "Copy live link",
     "shareCopyFixed": "Copy fixed link",
     "shareCopyWithRange": "Copy link and range",
+    "shareCopyWithRangeHint": "Adds “{line}”",
     "shareLiveHint": "{name} · moves with now",
     "shareKindLive": "live",
     "shareKindFixed": "fixed",

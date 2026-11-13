@@ -496,7 +496,7 @@ describe("DateTime layout", () => {
 
       expect(
         rows().map(
-          (row) => row.querySelector("span.text-text-secondary.shrink-0.tabular-nums")?.textContent,
+          (row) => row.querySelector('[data-test="date-time-list-row-hint"]')?.textContent,
         ),
       ).toEqual(["15mo", "15m"]);
       expect(el("date-time-resolved-name")?.textContent).toBe("Last 15 months");

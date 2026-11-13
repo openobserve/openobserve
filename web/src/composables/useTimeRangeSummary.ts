@@ -122,6 +122,13 @@ export default function useTimeRangeSummary(
     };
   };
 
+  // A typed period name stays beside its dates, which then leave out the year it names.
+  const namedLine = (start: number, end: number, name: string): SummaryLine => ({
+    ...fixedLine(start, end),
+    name,
+    range: formatRangeDates({ startUs: start, endUs: end, name, period: true }, labelOptions()),
+  });
+
   // A calendar period with no name of its own (`2w ago`) is named by its dates, which then show once.
   const liveLine = (
     period: string,
@@ -168,11 +175,16 @@ export default function useTimeRangeSummary(
     return { ...line, note: String(note), ready: true };
   };
 
-  const absoluteLine = (start: number, end: number, cutToNow = false): SummaryLine => {
+  const absoluteLine = (
+    start: number,
+    end: number,
+    cutToNow = false,
+    name?: string,
+  ): SummaryLine => {
     if (props.hideRelativeTime)
       return { ...resolvedDays({ startTime: start, endTime: end }), ready: true };
     const reading = shownReading.value;
-    const line = fixedLine(start, end);
+    const line = name ? namedLine(start, end, name) : fixedLine(start, end);
     const tag = shownTag.value;
     if (tag && "anchor" in tag && tag.anchor !== "to-now" && reading?.type === "timestamp") {
       const centre = reading.centreMicros ?? (start + end) / 2;
@@ -295,7 +307,7 @@ export default function useTimeRangeSummary(
       return { ...line, note: String(overLimitNote(inputText.value.trim())), warning: true };
     }
     if (plan.kind === "calendar") return calendarLine(plan.token, plan.name);
-    return absoluteLine(plan.start, plan.end, plan.cutToNow);
+    return absoluteLine(plan.start, plan.end, plan.cutToNow, plan.name);
   });
 
   const shownLine = computed<SummaryLine>(() => previewLine.value ?? resolvedLine.value);

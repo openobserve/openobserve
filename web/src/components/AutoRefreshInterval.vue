@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           v-if="isCompact"
           data-test="logs-search-bar-refresh-interval-btn"
-          size="icon-toolbar"
+          :size="isPausedEnded ? 'sm-toolbar' : 'icon-toolbar'"
           :variant="variant"
           :active="isAnimating"
           :aria-label="triggerAriaLabel"
@@ -44,7 +44,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
             size="sm"
           />
-          <OTooltip :content="compactTooltip" />
+          <span
+            v-if="isPausedEnded"
+            class="text-compact ms-1 leading-4 whitespace-nowrap max-md:hidden"
+            data-test="auto-refresh-trigger-label"
+            >{{ t("dateTime.refreshPausedRangeEnded") }}</span
+          >
+          <OTooltip :content="compactTooltip" side="bottom" />
         </OButton>
         <OButton
           v-else
@@ -142,11 +148,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="auto-refresh-go-live-btn"
       variant="outline"
       size="sm-toolbar"
-      icon-left="play-arrow"
       class="shrink-0"
       @click="$emit('live')"
-      >{{ t("dateTime.goLive") }}<OTooltip :content="goLiveTooltip"
-    /></OButton>
+    >
+      <span
+        class="bg-accent me-1.5 size-2 shrink-0 rounded-full"
+        aria-hidden="true"
+        data-test="auto-refresh-go-live-dot"
+      />{{ t("dateTime.goLive") }}<OTooltip :content="goLiveTooltip" side="bottom" />
+    </OButton>
   </div>
 </template>
 

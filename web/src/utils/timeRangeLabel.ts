@@ -48,6 +48,8 @@ export interface RangeLabelInput {
   name?: string | null;
   live?: boolean;
   calendar?: boolean;
+  /** The name is a typed period (`Q4 2026`) that already names its year. */
+  period?: boolean;
 }
 
 type Precision = "minute" | "second" | "ms";
@@ -75,6 +77,8 @@ interface Shape {
   precision: Precision;
   /** Full stamps name the year on both bounds. */
   repeatYear?: boolean;
+  /** A named period cut short shows its first day alone: `Oct 1 – Nov 12, 21:24`. */
+  startDayOnly?: boolean;
 }
 
 /** Dates part of a label: "Nov 12, 21:08:49 – 21:18:49", "Nov 4 – 6", "Oct 1 – Nov 12, 2026". */
@@ -127,6 +131,7 @@ export const formatRangeStamps = (range: RangeLabelInput, opts: RangeLabelOption
     withYear: true,
     precision: "ms",
     repeatYear: true,
+    startDayOnly: false,
   };
   return datesOf(shape);
 };
@@ -246,25 +251,39 @@ const shapeOf = (range: RangeLabelInput, opts: RangeLabelOptions): Shape => {
   const lastDay = wholeDays && isMidnight(end) ? civilOf(range.endUs - MICROS_PER_MS, zone) : end;
   const thisYear = civilOf((opts.nowMs ?? Date.now()) * MICROS_PER_MS, zone).year;
   const longPeriod = (range.calendar || Boolean(range.name)) && span >= MONTH_LONG_US;
-  const withYear =
-    opts.surface === "dashboard" ||
-    opts.surface === "print" ||
-    start.year !== thisYear ||
-    lastDay.year !== thisYear ||
-    longPeriod;
-  let precision: Precision = range.live
-    ? span < LIVE_SECONDS_BELOW_US
-      ? "second"
-      : "minute"
-    : neededPrecision(start, end);
+  const namedPeriod = Boolean(range.period && range.name && !range.live);
+  const withYear = namedPeriod
+    ? start.year !== lastDay.year
+    : opts.surface === "dashboard" ||
+      opts.surface === "print" ||
+      start.year !== thisYear ||
+      lastDay.year !== thisYear ||
+      longPeriod;
+  let precision: Precision =
+    range.live || namedPeriod
+      ? span < LIVE_SECONDS_BELOW_US
+        ? "second"
+        : "minute"
+      : neededPrecision(start, end);
   if (span < MS_BELOW_US) precision = "ms";
   else if (precision === "ms") precision = "second";
-  // The End field shows an exclusive midnight as 23:59:59, so a label with seconds does too.
+  // The End field shows an exclusive midnight as 23:59:59, so a fixed label shows the day's last minute or second too.
   const shownEnd =
-    !wholeDays && precision === "second" && isMidnight(end)
+    !wholeDays && !range.live && precision !== "ms" && isMidnight(end)
       ? civilOf(range.endUs - MICROS_PER_SECOND, zone)
       : end;
-  return { zone, locale, start, lastDay, end: shownEnd, wholeDays, withYear, precision };
+  const startDayOnly = namedPeriod && !wholeDays && isMidnight(start) && start.date !== end.date;
+  return {
+    zone,
+    locale,
+    start,
+    lastDay,
+    end: shownEnd,
+    wholeDays,
+    withYear,
+    precision,
+    startDayOnly,
+  };
 };
 
 const datesOf = (shape: Shape): string => {
@@ -284,7 +303,9 @@ const datesOf = (shape: Shape): string => {
   if (start.date !== end.date) {
     // One year, on the end, when both bounds share it.
     const startYear = withYear && (repeatYear || start.year !== end.year);
-    const startText = clean(dated(startYear).format(at(start)));
+    const startText = shape.startDayOnly
+      ? clean(new Intl.DateTimeFormat(locale, dayOptions(startYear)).format(day(start)))
+      : clean(dated(startYear).format(at(start)));
     return `${startText}${DASH}${clean(dated(withYear).format(at(end)))}`;
   }
   const startText = clean(dated(withYear).format(at(start)));

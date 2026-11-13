@@ -36,6 +36,8 @@ export const MAX_CUSTOM_RELATIVE_VALUE: Record<string, number> = {
   M: 120,
 };
 
+// How far past this browser's now a page's range may reach, for data or a sharer's clock running ahead; further is cut.
+const CLOCK_SKEW_MICROS = 24 * 60 * 60 * 1_000_000;
 // Dec 30, 9999 UTC, so the year stays 9999 or less in every zone.
 export const LATEST_INSTANT_US = Date.UTC(9999, 11, 30) * 1000;
 
@@ -46,6 +48,7 @@ export interface TimeRangeLimitProps {
   queryRangeRestrictionInHour: number;
   queryRangeRestrictionMsg: string;
   retentionDays: number | null;
+  futureAllowed?: boolean;
 }
 
 /** The bounds a picked range must stay within: the calendar's first and last day, retention and the page's range limit. */
@@ -69,11 +72,17 @@ export default function useTimeRangeLimits(props: TimeRangeLimitProps, clock: Ti
       ? absoluteToMicros(addCivilDays(props.maxDate, 1), "00:00:00")
       : Date.now() * 1000;
 
-  // Absolute-only pickers floored by minDate with no maxDate book ahead, so only their calendar and shift stop at now.
+  // Absolute-only pickers that allow the future, floored by minDate with no maxDate, book ahead; only their calendar and shift stop at now.
   const selectionCeilingMicros = () =>
-    props.disableRelative && props.minDate && !props.maxDate
+    props.futureAllowed && props.disableRelative && props.minDate && !props.maxDate
       ? Number.POSITIVE_INFINITY
       : forwardCeilingMicros();
+
+  const trustedCeilingMicros = () => {
+    if (props.maxDate) return forwardCeilingMicros();
+    const ceiling = selectionCeilingMicros();
+    return Number.isFinite(ceiling) ? ceiling : LATEST_INSTANT_US;
+  };
 
   // The calendar's own bounds for a start, named so a refusal says which one it hit.
   const startBoundError = (startMicros: number): I18nText | null => {
@@ -97,12 +106,15 @@ export default function useTimeRangeLimits(props: TimeRangeLimitProps, clock: Ti
     return { start: startUs, end: Math.min(endUs, selectionCeilingMicros()) };
   };
 
-  // A parent's range is trusted ahead of the browser clock and before the calendar, but only within years 1970-9999 that every zone can show.
+  // A parent's range is trusted before the calendar's floor and a clock skew past now, within the years every zone can show.
+  // Past that it is cut to now like typed text, as only a picker that books ahead may hold the future.
   const trustedRange = (startUs: number, endUs: number): { start: number; end: number } | null => {
     if (!Number.isFinite(startUs) || !Number.isFinite(endUs) || endUs <= startUs) return null;
-    const ceiling = props.maxDate ? forwardCeilingMicros() : LATEST_INSTANT_US;
-    if (startUs < 0 || startUs >= ceiling) return null;
-    return { start: startUs, end: Math.min(endUs, ceiling) };
+    const ceiling = Math.min(trustedCeilingMicros(), LATEST_INSTANT_US);
+    const slack = props.maxDate || ceiling === LATEST_INSTANT_US ? 0 : CLOCK_SKEW_MICROS;
+    if (startUs < 0 || startUs >= ceiling + slack) return null;
+    const end = endUs > ceiling + slack ? ceiling : endUs;
+    return end > startUs ? { start: startUs, end } : null;
   };
 
   const restrictionMessage = (): I18nText =>

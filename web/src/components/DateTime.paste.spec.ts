@@ -270,7 +270,8 @@ describe("DateTime paste", () => {
       vi.setSystemTime(new Date("2026-11-09T03:35:00Z"));
       wrapper!.vm.refreshTooltipNow();
       await flushPromises();
-      expect(start.value).toBe("02:35");
+      // From a live range the fields hold no seeded time, so a tick never overwrites what was typed.
+      expect(start.value).toBe("12:3");
     } finally {
       vi.useRealTimers();
     }
@@ -434,7 +435,8 @@ describe("DateTime paste", () => {
       expect(inMenu("date-time-resolved")?.getAttribute("data-preview")).toBe("true");
     });
 
-    it("lights nothing below the bar and keeps the applied range while the bar previews another", async () => {
+    it("lights only the row Enter takes and keeps the applied range while the bar previews another", async () => {
+      localStorage.clear();
       createWrapper();
       await openMenu();
       wrapper!.vm.pickChip("4h");
@@ -444,7 +446,9 @@ describe("DateTime paste", () => {
       await typeInto("2h");
 
       expect(inMenu("date-time-chips")).toBeNull();
-      expect(document.querySelectorAll("#date-time-menu [aria-selected='true']")).toHaveLength(0);
+      const lit = document.querySelectorAll("#date-time-menu [aria-selected='true']");
+      expect(lit).toHaveLength(1);
+      expect(lit[0].getAttribute("data-test")).toBe("date-time-list-reading");
       expect(wrapper!.vm.selectedType).toBe("relative");
       expect(wrapper!.vm.getConsumableDateTime().relativeTimePeriod).toBe("4h");
     });
@@ -1031,7 +1035,7 @@ describe("DateTime paste", () => {
 
         await typeInto("2h");
         expect(suggestList()).toBeNull();
-        expect(inMenu("date-time-list-reading")?.getAttribute("aria-selected")).toBe("false");
+        expect(inMenu("date-time-list-reading")?.getAttribute("aria-selected")).toBe("true");
       });
 
       it("offers a bare number as minutes, hours, days, weeks and months with their shorthand", async () => {
@@ -1592,7 +1596,7 @@ describe("DateTime paste", () => {
     });
 
     it("applies a typed future window on an absolute-only picker that books ahead", async () => {
-      createWrapper({ disableRelative: true, minDate: "2026/11/09" });
+      createWrapper({ disableRelative: true, minDate: "2026/11/09", futureAllowed: true });
       await openMenu();
 
       await typeInto("2026-11-12 09:00:00 to 2026-11-12 17:00:00");
@@ -2053,10 +2057,41 @@ describe("DateTime paste", () => {
       expect(warned()).toBe(true);
     });
 
+    it("falls back with a warning for a URL range wholly in the far future", async () => {
+      createWrapper({
+        defaultType: "absolute",
+        defaultAbsoluteTime: {
+          startTime: micros("3000-01-01T00:00:00Z"),
+          endTime: micros("3000-01-02T00:00:00Z"),
+        },
+      });
+      await flushPromises();
+
+      expect(lastEmit()).toMatchObject({ endTime: nowUs, userChangedValue: false });
+      expect(warned()).toBe(true);
+    });
+
+    it("cuts a URL range ending in the far future to now, and says so", async () => {
+      createWrapper({
+        defaultType: "absolute",
+        defaultAbsoluteTime: {
+          startTime: micros("2026-11-08T00:00:00Z"),
+          endTime: micros("3000-01-01T00:00:00Z"),
+        },
+      });
+      await flushPromises();
+
+      expect(lastEmit()).toMatchObject({
+        valueType: "absolute",
+        startTime: micros("2026-11-08T00:00:00Z"),
+        endTime: nowUs,
+      });
+      expect(warned()).toBe(true);
+    });
+
     it.each([
       ["before 1999", "1990-01-01T00:00:00Z", "1990-01-02T00:00:00Z"],
-      ["after now", "3000-01-01T00:00:00Z", "3000-01-02T00:00:00Z"],
-      ["ending past now", "2026-11-08T00:00:00Z", "3000-01-01T00:00:00Z"],
+      ["ending just past now", "2026-11-08T00:00:00Z", "2026-11-09T05:00:00Z"],
     ])("keeps a URL range %s as the parent asked", async (_case, from, to) => {
       createWrapper({
         defaultType: "absolute",
@@ -2267,8 +2302,8 @@ describe("DateTime paste", () => {
       expect(lastEmit()).toMatchObject({ relativeTimePeriod: "2M" });
     });
 
-    it("applies the token's rolling length when calendar presets are off", async () => {
-      createWrapper({ calendarPresets: false });
+    it("applies the token's rolling length on a recurring picker", async () => {
+      createWrapper({ calendarPresets: false, rollingCalendarWords: true });
       await openMenu();
 
       await typeAndEnter("last month");
@@ -2277,8 +2312,8 @@ describe("DateTime paste", () => {
       expect(lastEmit().valueType).not.toBe("absolute");
     });
 
-    it("applies today as the last day when calendar presets are off", async () => {
-      createWrapper({ calendarPresets: false });
+    it("applies today as the last day on a recurring picker", async () => {
+      createWrapper({ calendarPresets: false, rollingCalendarWords: true });
       await openMenu();
 
       await typeAndEnter("today");

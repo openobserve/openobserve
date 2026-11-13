@@ -435,9 +435,16 @@ const useLogs = (t: TranslateFn) => {
       return;
     }
 
+    // A shared link may carry ISO stamps instead of microseconds.
+    const urlMicros = (value: unknown): number => {
+      const text = String(value ?? "").trim();
+      if (/^\d+$/.test(text)) return Number(text);
+      const ms = Date.parse(text);
+      return Number.isFinite(ms) ? ms * 1000 : NaN;
+    };
     const date = {
-      startTime: Number(queryParams.from),
-      endTime: Number(queryParams.to),
+      startTime: urlMicros(queryParams.from),
+      endTime: urlMicros(queryParams.to),
       relativeTimePeriod: queryParams.period || null,
       type: queryParams.period ? "relative" : "absolute",
     };

@@ -639,6 +639,20 @@ describe("SearchBar — auto-run wiring (item 2)", () => {
       expect(logs.mock.calls[0][0]).toMatchObject({ reason: "zoom", kind: "explicit" });
     });
 
+    it("runs an undo of a change that ran, like a zoom, even with Auto Run off (D-UNDO)", async () => {
+      const { logs } = await setup({ liveMode: false });
+      await wrapper!.vm.updateDateTime({
+        valueType: "relative",
+        relativeTimePeriod: "24h",
+        startTime: 1,
+        endTime: 2,
+        userChangedValue: true,
+        rerun: true,
+      });
+      expect(logs).toHaveBeenCalledTimes(1);
+      expect(logs.mock.calls[0][0]).toMatchObject({ reason: "zoom", kind: "explicit" });
+    });
+
     it("a zoom to the unchanged range does not turn the next relative pick into a zoom (M3)", async () => {
       const { logs } = await setup();
       vi.useFakeTimers();

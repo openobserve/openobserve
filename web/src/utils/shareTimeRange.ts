@@ -41,16 +41,17 @@ export const shareTimeKinds = (defaultKind: ShareTimeKind, hasLive: boolean): Sh
   return defaultKind === "live" ? ["live", "fixed"] : ["fixed", "live"];
 };
 
-/** Two lines for a ticket: the link, then `{context} · {range} · {kind}`, so the reader knows what it opens. */
+/** The line naming what a shared link opens: `{context} · {range} · {kind}`. */
+export const rangeLineText = (options: { context: string; range: string; kind: string }): string =>
+  [options.context, options.range, options.kind].filter(Boolean).join(" · ");
+
+/** Two lines for a ticket: the link, then the range line, so the reader knows what it opens. */
 export const linkWithRangeText = (options: {
   url: string;
   context: string;
   range: string;
   kind: string;
-}): string => {
-  const line = [options.context, options.range, options.kind].filter(Boolean).join(" · ");
-  return `${options.url}\n${line}`;
-};
+}): string => `${options.url}\n${rangeLineText(options)}`;
 
 /** Bounds of a dashboard time object, whose Dates carry microseconds where milliseconds would be. */
 export const dashboardTimeUs = (

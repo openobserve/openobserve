@@ -79,8 +79,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="share-button-copy-with-range"
           @select="handleShareClick(kinds[0], true)"
         >
-          {{ t("dateTime.shareCopyWithRange") }}
+          <div class="flex min-w-0 flex-col">
+            <span>{{ t("dateTime.shareCopyWithRange") }}</span>
+            <span class="text-text-secondary max-w-88 text-xs whitespace-normal tabular-nums">{{
+              t("dateTime.shareCopyWithRangeHint", { line: kindRangeLine(kinds[0]) })
+            }}</span>
+          </div>
         </ODropdownItem>
+      </template>
+      <template v-if="$slots['menu-extra']">
+        <ODropdownSeparator />
+        <slot name="menu-extra" />
       </template>
     </ODropdown>
   </div>
@@ -132,7 +141,12 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
-import { linkWithRangeText, shareTimeKinds, type ShareTimeKind } from "@/utils/shareTimeRange";
+import {
+  linkWithRangeText,
+  rangeLineText,
+  shareTimeKinds,
+  type ShareTimeKind,
+} from "@/utils/shareTimeRange";
 
 export default defineComponent({
   name: "ShareButton",
@@ -221,13 +235,15 @@ export default defineComponent({
     },
   },
   emits: ["copy:success", "copy:error", "shorten:success", "shorten:error"],
-  setup(props, { emit }) {
+  setup(props, { emit, slots }) {
     const { t } = useI18nTyped();
     const store = useStore();
 
     const isLoading = ref(false);
     const kinds = computed(() => shareTimeKinds(props.defaultKind, !!props.liveUrl));
-    const hasMenu = computed(() => kinds.value.length > 1 || !!props.rangeContext);
+    const hasMenu = computed(
+      () => kinds.value.length > 1 || !!props.rangeContext || !!slots["menu-extra"],
+    );
     // Fixed always reads second, so the menu order stays put whichever kind the page defaults to.
     const menuKinds = computed<ShareTimeKind[]>(() =>
       kinds.value.includes("live") ? ["live", "fixed"] : ["fixed"],
@@ -254,15 +270,14 @@ export default defineComponent({
       }
       return t("search.linkCopiedSuccessfully");
     };
+    const kindRangeParts = (kind: ShareTimeKind) => ({
+      context: props.rangeContext,
+      range: kindRange(kind),
+      kind: kind === "fixed" ? t("dateTime.shareKindFixed") : t("dateTime.shareKindLive"),
+    });
+    const kindRangeLine = (kind: ShareTimeKind) => rangeLineText(kindRangeParts(kind));
     const clipboardText = (shortUrl: string, kind: ShareTimeKind, withRange: boolean) =>
-      withRange
-        ? linkWithRangeText({
-            url: shortUrl,
-            context: props.rangeContext,
-            range: kindRange(kind),
-            kind: kind === "fixed" ? t("dateTime.shareKindFixed") : t("dateTime.shareKindLive"),
-          })
-        : shortUrl;
+      withRange ? linkWithRangeText({ url: shortUrl, ...kindRangeParts(kind) }) : shortUrl;
     let copyingKind: ShareTimeKind = "fixed";
     let copyingWithRange = false;
     const buttonRef = ref<{ $el: HTMLElement } | null>(null);
@@ -478,6 +493,7 @@ export default defineComponent({
       menuKinds,
       kindTitle,
       kindHint,
+      kindRangeLine,
     };
   },
 });

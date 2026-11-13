@@ -61,6 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           hide-clipboard
           show-error
           :min-date="calendarDay()"
+          future-allowed
           data-test="oncall-members-away-window"
           @on:timezone-change="(zone: string) => (pickedZone = zone)"
         >

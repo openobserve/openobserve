@@ -328,30 +328,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :size="isMobile ? 'icon-toolbar' : 'sm-toolbar'"
                 :show-label="!isMobile"
                 data-test="dashboard-share-btn"
-              />
-              <ODropdown
-                v-if="store.state.zoConfig?.public_dashboards_enabled"
-                align="end"
-                side="bottom"
               >
-                <template #trigger>
-                  <OButton
-                    variant="outline"
-                    size="icon-toolbar"
-                    class="w-5"
-                    :aria-label="t('dashboard.viewDashboard.moreShareOptions')"
-                    data-test="dashboard-share-options-btn"
-                    icon-left="arrow-drop-down"
-                  />
+                <template v-if="store.state.zoConfig?.public_dashboards_enabled" #menu-extra>
+                  <ODropdownItem
+                    data-test="dashboard-publish-public-btn"
+                    icon-left="language"
+                    @select="showPublicLinksPanel = true"
+                  >
+                    {{ t("dashboard.publicDashboard.shareTooltip") }}
+                  </ODropdownItem>
                 </template>
-                <ODropdownItem
-                  data-test="dashboard-publish-public-btn"
-                  icon-left="language"
-                  @select="showPublicLinksPanel = true"
-                >
-                  {{ t("dashboard.publicDashboard.shareTooltip") }}
-                </ODropdownItem>
-              </ODropdown>
+              </ShareButton>
             </OButtonGroup>
             <PublicLinksPanel
               v-if="
