@@ -2315,3 +2315,54 @@ describe("license search banner mount", () => {
     );
   });
 });
+
+describe("MainLayout — org switch on a dashboard route", () => {
+  const StubDiv = defineComponent({ name: "StubDiv", setup: () => () => h("div") });
+  const switchOrgAt = async (routeName: string, path: string) => {
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path, name: routeName, component: StubDiv },
+        { path: "/dashboards", name: "dashboards", component: StubDiv },
+      ],
+    });
+    await router.push({ name: routeName, query: { dashboard: "d1", folder: "f1" } });
+    const wrapper = mount(MainLayout, {
+      global: {
+        plugins: [store, i18n, router],
+        stubs: {
+          AppHeader: StubDiv,
+          ONavbar: StubDiv,
+          O2AIChat: StubDiv,
+          WebinarBanner: StubDiv,
+          AnnouncementBanner: StubDiv,
+          ShortcutCheatsheet: StubDiv,
+          CommunitySlackInvite: StubDiv,
+          ThemeSwitcher: StubDiv,
+          PredefinedThemes: StubDiv,
+          SlackIcon: StubDiv,
+          ManagementIcon: StubDiv,
+          ODialog: StubDiv,
+          FirstDataNotice: StubDiv,
+        },
+      },
+    });
+    await flushPromises();
+    const vm = wrapper.vm as any;
+    vm.selectedOrg = { identifier: "other_org", label: "other_org" };
+    await vm.updateOrganization();
+    await flushPromises();
+    const route = router.currentRoute.value;
+    wrapper.unmount();
+    return route;
+  };
+
+  it.each([
+    ["viewDashboard", "/dashboards/view"],
+    ["addPanel", "/dashboards/add_panel"],
+  ])("sends %s to the dashboards list of the new org", async (name, path) => {
+    const route = await switchOrgAt(name, path);
+    expect(route.name).toBe("dashboards");
+    expect(route.query).toEqual({ org_identifier: "other_org" });
+  });
+});

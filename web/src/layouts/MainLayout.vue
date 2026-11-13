@@ -390,6 +390,7 @@ import { useHomeDashboard } from "@/composables/useHomeDashboard";
 
 // Back from a drill-out (Analytics to Session Viewer, Traces to a trace or its logs) must land on the same results without rerunning them.
 const KEPT_ALIVE_VIEWS = ["AppAnalytics", "AppTraces"];
+const DASHBOARD_SCOPED_ROUTES = ["viewDashboard", "addPanel"];
 
 let mainLayoutMixin: any = null;
 if (config.isCloud == "true") {
@@ -1331,13 +1332,18 @@ export default defineComponent({
       const orgIdentifier = selectedOrg.value.identifier;
       const queryParams =
         router.currentRoute.value.path.indexOf(".logs") > -1 ? router.currentRoute.value.query : {};
-      router.push({
-        path: router.currentRoute.value.path,
-        query: {
-          ...queryParams,
-          org_identifier: orgIdentifier,
-        },
-      });
+      if (DASHBOARD_SCOPED_ROUTES.includes(String(router.currentRoute.value.name))) {
+        // leave before the org changes: a dashboard id is org-scoped and would 404 in the new org
+        await router.push({ name: "dashboards", query: { org_identifier: orgIdentifier } });
+      } else {
+        router.push({
+          path: router.currentRoute.value.path,
+          query: {
+            ...queryParams,
+            org_identifier: orgIdentifier,
+          },
+        });
+      }
       useLocalOrganization(selectedOrg.value);
       store.dispatch("setSelectedOrganization", { ...selectedOrg.value });
       // setSelectedOrganization();
