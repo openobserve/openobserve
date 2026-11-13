@@ -135,7 +135,7 @@ pub struct UpdateUser {
     pub remove_lockout: bool,
 }
 
-/// The documented shape of `UpdateUser::role`: both fields may be absent from the request.
+// Not a doc comment: utoipa would use it as the request body description.
 #[derive(ToSchema)]
 pub struct UpdateUserRole {
     pub role: Option<String>,
