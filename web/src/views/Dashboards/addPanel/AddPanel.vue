@@ -88,7 +88,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :disable="disable"
               :auto-apply-dashboard="true"
               calendar-presets
-              class="max-md:[&_.date-time-label]:hidden"
               @hide="setTimeForVariables"
               data-test="dashboard-global-date-time-picker"
             />
@@ -375,6 +374,7 @@ import {
 import useAiChat from "@/composables/useAiChat";
 import useStreams from "@/composables/useStreams";
 import { checkIfConfigChangeRequiredApiCallOrNot } from "@/utils/dashboard/checkConfigChangeApiCall";
+import { urlTimeToMicros } from "@/utils/dashboard/urlTimeParams";
 import { usePanelLivePreview } from "@/composables/dashboard/usePanelLivePreview";
 import { useAutoRunToggle } from "@/composables/dashboard/useAutoRunToggle";
 import {
@@ -1179,8 +1179,8 @@ export default defineComponent({
      */
     const getSelectedDateFromQueryParams = (params: any) => ({
       valueType: params.period ? "relative" : params.from && params.to ? "absolute" : "relative",
-      startTime: params.from ? params.from : null,
-      endTime: params.to ? params.to : null,
+      startTime: params.from ? urlTimeToMicros(params.from) : null,
+      endTime: params.to ? urlTimeToMicros(params.to) : null,
       relativeTimePeriod: params.period ? params.period : "15m",
     });
 

@@ -48,6 +48,7 @@ import { resetTransient } from "@/utils/logs/transientSearchKeys";
 import { refreshFreeTextSchemas } from "@/composables/useLogs/freeTextSearch";
 import { decodeFtScan } from "@/utils/logs/freeTextScan";
 import { featureState } from "@/utils/featureGate";
+import { urlTimeToMicros } from "@/utils/dashboard/urlTimeParams";
 import {
   decodeColumns,
   endLogsArrival,
@@ -435,16 +436,9 @@ const useLogs = (t: TranslateFn) => {
       return;
     }
 
-    // A shared link may carry ISO stamps instead of microseconds.
-    const urlMicros = (value: unknown): number => {
-      const text = String(value ?? "").trim();
-      if (/^\d+$/.test(text)) return Number(text);
-      const ms = Date.parse(text);
-      return Number.isFinite(ms) ? ms * 1000 : NaN;
-    };
     const date = {
-      startTime: urlMicros(queryParams.from),
-      endTime: urlMicros(queryParams.to),
+      startTime: urlTimeToMicros(queryParams.from),
+      endTime: urlTimeToMicros(queryParams.to),
       relativeTimePeriod: queryParams.period || null,
       type: queryParams.period ? "relative" : "absolute",
     };

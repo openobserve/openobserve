@@ -159,7 +159,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :default-absolute-time="{ startTime: range.startTime, endTime: range.endTime }"
               :default-relative-time="range.relativeTimePeriod ?? undefined"
               data-test-name="dbm-table-health-date-time"
-              class="h-8 max-md:[&_.date-time-label]:hidden"
+              class="h-8"
               @on:date-change="onDateChange"
             />
             <ORefreshButton

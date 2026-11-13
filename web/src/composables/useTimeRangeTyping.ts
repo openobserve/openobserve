@@ -178,6 +178,7 @@ export default function useTimeRangeTyping(props: TimeRangeTypingProps, deps: Ti
   const {
     startBoundError,
     selectionCeilingMicros,
+    floorMicros,
     calendarExceedsRestriction,
     restrictionMessage,
     maxLimitText,
@@ -363,6 +364,20 @@ export default function useTimeRangeTyping(props: TimeRangeTypingProps, deps: Ti
     if (reading.type === "timestamp") return planAbsolute(reading.startMicros, reading.endMicros);
     const { start, end } = zonelessToMicros(reading, asUtc);
     return planAbsolute(start, end, null, reading.name);
+  };
+
+  // A yearless date past the ceiling reads as last year's, which the floor refuses; the text meant the coming one.
+  const planTyped = (reading: ParsedTimeInput, asUtc: boolean): InputPlan => {
+    const plan = planInput(reading, asUtc);
+    if (plan.kind !== "refused" || reading.type !== "absolute") return plan;
+    if (zonelessToMicros(reading, asUtc).start >= floorMicros()) return plan;
+    const ahead = parseTimeInput(inputText.value.trim(), {
+      ...parseOptions(),
+      ceilingMs: Number.POSITIVE_INFINITY,
+    });
+    if (ahead?.type !== "absolute") return plan;
+    const future = zonelessToMicros(ahead, asUtc).start >= ceilingMicros();
+    return future ? refusedPlan(t("common.timeRangeStartInFuture")) : plan;
   };
 
   // No locale: typed day/month order follows the browser's languages, as the week start does.
@@ -567,7 +582,7 @@ export default function useTimeRangeTyping(props: TimeRangeTypingProps, deps: Ti
   const inputPlan = computed<InputPlan | null>(() => {
     const reading = shownReading.value;
     if (!reading || !inputText.value.trim()) return null;
-    return planInput(reading, inputAsUtc.value);
+    return planTyped(reading, inputAsUtc.value);
   });
 
   const shownTag = computed<SuggestionTag>(() =>
@@ -868,7 +883,7 @@ export default function useTimeRangeTyping(props: TimeRangeTypingProps, deps: Ti
 
   // A refused reading says why on Enter; one over the query-range limit already says so in the preview.
   const applyReading = (reading: ParsedTimeInput, asUtc: boolean, tag: SuggestionTag = null) => {
-    const plan = planInput(reading, asUtc);
+    const plan = planTyped(reading, asUtc);
     if (plan.kind === "restricted") return;
     if (plan.kind === "refused") {
       inputRefusal.value = plan.message;

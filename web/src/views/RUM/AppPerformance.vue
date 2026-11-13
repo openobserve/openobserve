@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OToggleGroup>
       </FeatureLockExempt>
       <div
-        class="ms-auto flex shrink-0 items-center gap-2 max-md:max-w-full max-md:shrink max-md:flex-wrap max-md:justify-end max-md:[&_.date-time-label]:hidden"
+        class="ms-auto flex shrink-0 items-center gap-2 max-md:max-w-full max-md:shrink max-md:flex-wrap max-md:justify-end"
       >
         <template v-if="versionsEnabled">
           <DeployMarkersUnavailable @retry="refreshData" />
