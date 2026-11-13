@@ -134,6 +134,13 @@ const LOGIN_STATE_COOKIE: &str = "o2_login_state";
 #[cfg(feature = "enterprise")]
 const LOGIN_STATE_MAX_AGE_SECS: i64 = 600;
 
+#[cfg(feature = "enterprise")]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum LoginStateFailure {
+    Invalid { clear_cookie: bool },
+    StoreFailure,
+}
+
 #[derive(Serialize, serde::Deserialize, ToSchema)]
 pub struct HealthzResponse {
     status: String,
@@ -1368,15 +1375,6 @@ pub async fn redirect(
 
     use crate::request::{LoginFailure, audit_login_failure};
 
-    let code = match query.get("code") {
-        Some(code) => code,
-        None => {
-            return Response::builder()
-                .status(StatusCode::BAD_REQUEST)
-                .body(Body::from("no code in request"))
-                .unwrap();
-        }
-    };
     let mut audit_message = AuditMessage {
         login_ip: real_ip.map(|Extension(ip)| ip.0.to_string()),
         user_agent: super::users::login_user_agent(&headers),
@@ -1399,18 +1397,28 @@ pub async fn redirect(
     };
 
     let state_cookie = cookies.get(LOGIN_STATE_COOKIE).map(|c| c.value());
-    if let Err(msg) = consume_login_state(query.get("state"), state_cookie).await {
-        audit_login_failure(
-            audit_message,
-            LoginFailure::InvalidLoginState,
-            StatusCode::BAD_REQUEST,
-        )
-        .await;
-        return Response::builder()
-            .status(StatusCode::BAD_REQUEST)
-            .body(Body::from(msg))
-            .unwrap();
-    }
+    let state = match validate_login_state(query.get("state"), state_cookie).await {
+        Ok(state) => state,
+        Err(failure) => {
+            let response = login_state_failure_response(failure, &get_config());
+            let reason = match failure {
+                LoginStateFailure::Invalid { .. } => LoginFailure::InvalidLoginState,
+                LoginStateFailure::StoreFailure => LoginFailure::LoginStateStoreFailed,
+            };
+            audit_login_failure(audit_message, reason, response.status()).await;
+            return response;
+        }
+    };
+    let code = match query.get("code") {
+        Some(code) => code,
+        None => {
+            return Response::builder()
+                .status(StatusCode::BAD_REQUEST)
+                .body(Body::from("no code in request"))
+                .unwrap();
+        }
+    };
+    let _ = openobserve_core::kv::delete(PKCE_STATE_ORG, state).await;
 
     match exchange_code(code).await {
         Ok(login_data) => {
@@ -1612,12 +1620,8 @@ pub async fn dex_login() -> impl IntoResponse {
 
     let login_data: PreLoginData = get_dex_login();
     let state = login_data.state.clone();
-    let _ = openobserve_core::kv::set(PKCE_STATE_ORG, &state, state.clone().into()).await;
-
-    with_login_state_cookie(
-        common::meta::http::HttpResponse::json(login_data.url),
-        &state,
-    )
+    let saved = openobserve_core::kv::set(PKCE_STATE_ORG, &state, state.clone().into()).await;
+    dex_login_saved_response(&login_data.url, &state, saved)
 }
 
 /// Binds the login `state` to this browser so `/config/redirect` rejects a code started elsewhere.
@@ -1897,22 +1901,98 @@ fn login_state_matches(cookie: Option<&str>, state: &str) -> bool {
 }
 
 #[cfg(feature = "enterprise")]
-async fn consume_login_state(
-    state: Option<&String>,
+fn classify_login_state(
+    state: Option<&str>,
     cookie: Option<&str>,
-) -> Result<(), &'static str> {
+    saved: Result<Option<&[u8]>, ()>,
+) -> Result<(), LoginStateFailure> {
     let Some(state) = state else {
-        return Err("no state in request");
+        return Err(LoginStateFailure::Invalid {
+            clear_cookie: false,
+        });
     };
-    if !login_state_matches(cookie, state)
-        || openobserve_core::kv::get(PKCE_STATE_ORG, state)
-            .await
-            .is_err()
-    {
-        return Err("invalid state in request");
+    if !login_state_matches(cookie, state) {
+        return Err(LoginStateFailure::Invalid {
+            clear_cookie: false,
+        });
     }
-    let _ = openobserve_core::kv::delete(PKCE_STATE_ORG, state).await;
-    Ok(())
+    match saved {
+        Ok(Some(value)) if value == state.as_bytes() => Ok(()),
+        Ok(None) => Err(LoginStateFailure::Invalid { clear_cookie: true }),
+        Ok(Some(_)) => Err(LoginStateFailure::Invalid {
+            clear_cookie: false,
+        }),
+        Err(()) => Err(LoginStateFailure::StoreFailure),
+    }
+}
+
+#[cfg(feature = "enterprise")]
+fn login_state_failure_response(failure: LoginStateFailure, conf: &Config) -> Response {
+    match failure {
+        LoginStateFailure::Invalid { clear_cookie } => {
+            let location = format!(
+                "{}{}/web/login",
+                conf.common.web_url.trim_end_matches('/'),
+                conf.common.base_uri.trim_end_matches('/')
+            );
+            let mut response = Response::builder()
+                .status(StatusCode::FOUND)
+                .header(header::LOCATION, location);
+            if clear_cookie {
+                response = response.header(
+                    header::SET_COOKIE,
+                    login_state_cookie("", 0, conf).to_string(),
+                );
+            }
+            response.body(Body::empty()).unwrap()
+        }
+        LoginStateFailure::StoreFailure => Response::builder()
+            .status(StatusCode::SERVICE_UNAVAILABLE)
+            .body(Body::from("login state unavailable"))
+            .unwrap(),
+    }
+}
+
+#[cfg(feature = "enterprise")]
+fn dex_login_saved_response(url: &str, state: &str, saved: Result<(), anyhow::Error>) -> Response {
+    match saved {
+        Ok(()) => with_login_state_cookie(common::meta::http::HttpResponse::json(url), state),
+        Err(error) => {
+            log::error!("failed to save login state: {error}");
+            Response::builder()
+                .status(StatusCode::SERVICE_UNAVAILABLE)
+                .body(Body::from("login state unavailable"))
+                .unwrap()
+        }
+    }
+}
+
+#[cfg(feature = "enterprise")]
+async fn validate_login_state<'a>(
+    state: Option<&'a String>,
+    cookie: Option<&str>,
+) -> Result<&'a str, LoginStateFailure> {
+    let Some(state) = state else {
+        return Err(LoginStateFailure::Invalid {
+            clear_cookie: false,
+        });
+    };
+    if !login_state_matches(cookie, state) {
+        return Err(LoginStateFailure::Invalid {
+            clear_cookie: false,
+        });
+    }
+    let saved = openobserve_core::kv::get_optional(PKCE_STATE_ORG, state)
+        .await
+        .map_err(|error| {
+            log::error!("failed to load login state: {error}");
+        });
+    classify_login_state(
+        Some(state),
+        cookie,
+        saved.as_ref().map(|value| value.as_deref()).map_err(|_| ()),
+    )?;
+    Ok(state)
 }
 
 pub async fn logout(
@@ -2746,20 +2826,149 @@ mod tests {
 
     #[cfg(feature = "enterprise")]
     #[tokio::test]
-    async fn test_consume_login_state_rejects_without_kv_lookup() {
+    async fn test_validate_login_state_rejects_without_kv_lookup() {
         assert_eq!(
-            consume_login_state(None, Some("abc")).await,
-            Err("no state in request")
+            validate_login_state(None, Some("abc")).await,
+            Err(LoginStateFailure::Invalid {
+                clear_cookie: false
+            })
         );
         let state = "abc".to_string();
         assert_eq!(
-            consume_login_state(Some(&state), None).await,
-            Err("invalid state in request")
+            validate_login_state(Some(&state), None).await,
+            Err(LoginStateFailure::Invalid {
+                clear_cookie: false
+            })
         );
         assert_eq!(
-            consume_login_state(Some(&state), Some("abd")).await,
-            Err("invalid state in request")
+            validate_login_state(Some(&state), Some("abd")).await,
+            Err(LoginStateFailure::Invalid {
+                clear_cookie: false
+            })
         );
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_login_state_decisions() {
+        let state = "callback-state";
+        for (callback, cookie, saved, expected) in [
+            (
+                None,
+                Some(state),
+                Ok(Some(state.as_bytes())),
+                Err(LoginStateFailure::Invalid {
+                    clear_cookie: false,
+                }),
+            ),
+            (
+                Some(state),
+                None,
+                Ok(Some(state.as_bytes())),
+                Err(LoginStateFailure::Invalid {
+                    clear_cookie: false,
+                }),
+            ),
+            (
+                Some(state),
+                Some("other"),
+                Ok(Some(state.as_bytes())),
+                Err(LoginStateFailure::Invalid {
+                    clear_cookie: false,
+                }),
+            ),
+            (
+                Some(state),
+                Some(state),
+                Ok(None),
+                Err(LoginStateFailure::Invalid { clear_cookie: true }),
+            ),
+            (
+                Some(state),
+                Some(state),
+                Ok(Some(b"other".as_slice())),
+                Err(LoginStateFailure::Invalid {
+                    clear_cookie: false,
+                }),
+            ),
+            (Some(state), Some(state), Ok(Some(state.as_bytes())), Ok(())),
+            (
+                Some(state),
+                Some(state),
+                Err(()),
+                Err(LoginStateFailure::StoreFailure),
+            ),
+        ] {
+            assert_eq!(classify_login_state(callback, cookie, saved), expected);
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_login_state_failure_response() {
+        let mut conf = Config::default();
+        conf.common.web_url = "https://observe.example/".to_string();
+        conf.common.base_uri = "/o2".to_string();
+        conf.auth.cookie_secure_only = true;
+        conf.auth.cookie_same_site_lax = true;
+        for (decision, status, cleared) in [
+            (
+                LoginStateFailure::Invalid {
+                    clear_cookie: false,
+                },
+                StatusCode::FOUND,
+                false,
+            ),
+            (
+                LoginStateFailure::Invalid { clear_cookie: true },
+                StatusCode::FOUND,
+                true,
+            ),
+            (
+                LoginStateFailure::StoreFailure,
+                StatusCode::SERVICE_UNAVAILABLE,
+                false,
+            ),
+        ] {
+            let response = login_state_failure_response(decision, &conf);
+            assert_eq!(response.status(), status);
+            assert_eq!(
+                response
+                    .headers()
+                    .get(header::LOCATION)
+                    .map(|v| v.to_str().unwrap()),
+                (status == StatusCode::FOUND).then_some("https://observe.example/o2/web/login")
+            );
+            let cookie = response
+                .headers()
+                .get(header::SET_COOKIE)
+                .map(|v| v.to_str().unwrap());
+            assert_eq!(cookie.is_some(), cleared);
+            if let Some(cookie) = cookie {
+                assert!(cookie.contains("Max-Age=0"));
+                assert!(cookie.contains("Path=/"));
+                assert!(cookie.contains("Secure"));
+                assert!(cookie.contains("SameSite=Lax"));
+            }
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_failed_state_save_has_no_dex_url_or_cookie() {
+        let state = "state";
+        let url = "https://dex.example/login";
+        let failed =
+            dex_login_saved_response(url, state, Err(anyhow::anyhow!("store unavailable")));
+        assert_eq!(failed.status(), StatusCode::SERVICE_UNAVAILABLE);
+        assert!(failed.headers().get(header::SET_COOKIE).is_none());
+        let body = axum::body::to_bytes(failed.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        assert!(!String::from_utf8_lossy(&body).contains(url));
+        let saved = dex_login_saved_response(url, state, Ok(()));
+        assert_eq!(saved.status(), StatusCode::OK);
+        assert!(saved.headers().get(header::SET_COOKIE).is_some());
     }
 
     #[tokio::test]

@@ -65,6 +65,8 @@ export class OnCallTeamsPage {
       formAddEveryone: '[data-test="oncall-team-form-add-everyone"]',
       formShift: '[data-test="oncall-team-form-shift"]',
       formHandover: '[data-test="oncall-team-form-handover"]',
+      formHandoverDate: '[data-test="oncall-team-form-handover-date-group"]',
+      formHandoverYear: '[data-test="oncall-team-form-handover-date-group"] [data-reka-date-field-segment="year"]',
       formSecondary: '[data-test="oncall-team-form-secondary"]',
       formManageLink: '[data-test="oncall-team-form-manage-link"]',
       formDefault: '[data-test="oncall-team-form-default"]',
@@ -276,6 +278,14 @@ export class OnCallTeamsPage {
     await this.page.keyboard.press('Escape');
   }
 
+  getFormHandoverDate() { return this.page.locator(this.locators.formHandoverDate); }
+
+  /** One key at a time, because the year bug re-read the half-typed value after each digit. */
+  async typeFormHandoverYear(year) {
+    await this.page.locator(this.locators.formHandoverYear).click();
+    await this.page.keyboard.type(year, { delay: 150 });
+  }
+
   /** Creation only — once the team exists, membership has a screen of its own. */
   async addEveryone() {
     await this.page.locator(this.locators.formAddEveryone).click();
@@ -283,6 +293,14 @@ export class OnCallTeamsPage {
 
   async saveDrawer() {
     await this.getDrawerSave().click();
+  }
+
+  /** Save a new team; `staffed` is left pending so the caller can record the team for cleanup before waiting on the schedule write. */
+  async saveNewTeamAndReadWrites() {
+    const created = this.page.waitForResponse((r) => r.request().method() === 'POST' && /\/oncall\/teams$/.test(new URL(r.url()).pathname));
+    const staffed = this.page.waitForResponse((r) => r.request().method() === 'PUT' && /\/oncall\/teams\/[^/]+\/schedule$/.test(new URL(r.url()).pathname));
+    await this.saveDrawer();
+    return { team: await (await created).json(), staffed };
   }
 
   async cancelDrawer() {
