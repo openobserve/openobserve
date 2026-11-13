@@ -199,12 +199,14 @@ const compact = computed(() =>
         </OBadge>
       </div>
 
-      <StarterPackHomeRow
-        v-for="(item, index) in home.offered.value"
-        :key="item.pack.id"
-        :item="item"
-        :first="index === 0"
-      />
+      <div class="grid auto-rows-fr gap-3" data-test="home-pack-offer-rows">
+        <StarterPackHomeRow
+          v-for="(item, index) in home.offered.value"
+          :key="item.pack.id"
+          :item="item"
+          :first="index === 0"
+        />
+      </div>
     </section>
 
     <div v-if="!home.setUp.value.length && !home.loading.value" class="flex justify-end">
