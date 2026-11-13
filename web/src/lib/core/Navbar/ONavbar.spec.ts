@@ -196,7 +196,7 @@ describe("ONavbar", () => {
       // Data behaves like a link+subnav tile (click navigates, hover reveals).
       expect(data.attributes("data-mode")).toBe("link");
       expect(data.attributes("data-children")).toBe(
-        "logstreams,pipelines,functionList,enrichmentTables,fleet",
+        "logstreams,pipelines,functionList,enrichmentTables,starterPacks,fleet",
       );
       // The children `requires` removed still reach the group.
       expect(data.attributes("data-filtered")).toBe("workflows,ingestion");

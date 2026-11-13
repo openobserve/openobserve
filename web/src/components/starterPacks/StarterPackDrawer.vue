@@ -39,14 +39,14 @@ import { useAdaptedData } from "@/composables/starterPacks/useAdaptedData";
 import type { StarterPackFlow } from "@/composables/starterPacks/useStarterPackFlow";
 import StarterPackInstallDialog from "./StarterPackInstallDialog.vue";
 import StarterPackAdaptedRows from "./StarterPackAdaptedRows.vue";
-import StarterPackUndoDialog from "./StarterPackUndoDialog.vue";
+import StarterPackInlineConfirm from "./StarterPackInlineConfirm.vue";
 
 const props = defineProps<{
   flow: StarterPackFlow;
   clusters: string[];
 }>();
 const open = defineModel<boolean>("open", { default: false });
-const emit = defineEmits<{ "copy-link": [] }>();
+const emit = defineEmits<{ "copy-link": []; done: [] }>();
 
 type ShownKind = "dashboard" | "alert" | "savedView";
 type GroupId = "view" | ShownKind | "not" | "adapted";
@@ -119,8 +119,7 @@ const KINDS: ShownKind[] = ["dashboard", "alert", "savedView"];
 const flow = props.flow;
 const pack = flow.pack;
 const title = t(pack.titleKey);
-const confirmMode = ref<"undo" | "remove">("undo");
-const confirmOpen = ref(false);
+const inlineConfirm = ref<"undo" | "remove" | null>(null);
 const unticked = ref(new Set<string>());
 const startAlerts = ref(false);
 const expanded = ref<Partial<Record<GroupId, boolean>>>({});
@@ -346,7 +345,9 @@ const alertsPicked = computed(() => {
 const startOn = computed(() => startAlerts.value && alertsPicked.value > 0);
 const metaOf = (group: PackGroup) => {
   if (group.id !== "alert" || installed.value) return group.meta;
-  const count = group.rows.filter(({ skipped }) => !skipped).length;
+  const count = canPick.value
+    ? pickedIn(group)
+    : group.rows.filter(({ skipped }) => !skipped).length;
   return startOn.value
     ? t("starterPacks.whatGetsCreated.alertsStart", { count })
     : t("starterPacks.whatGetsCreated.alertsSilent", { count });
@@ -447,6 +448,13 @@ const reachLine = computed(() => {
     : t("starterPacks.drawer.reach");
 });
 const installedScope = computed(() => (pack.clusterScoped ? packScope(t, props.clusters) : ""));
+const openLabel = computed(() =>
+  t(
+    flow.dashboardItem.value?.id
+      ? "starterPacks.drawer.openDashboard"
+      : "starterPacks.libraryTabs.openPack",
+  ),
+);
 const ctaLabel = computed(() =>
   t("starterPacks.whatGetsCreated.cta", { title, count: picked.value }),
 );
@@ -489,16 +497,21 @@ const manage = () => {
 const startSetup = async () => {
   if (await flow.install(undefined, choice())) await finishLanding();
 };
-const askConfirm = (mode: "undo" | "remove") => {
-  confirmMode.value = mode;
-  confirmOpen.value = true;
+const confirmDone = () => {
+  inlineConfirm.value = null;
+  open.value = false;
+  emit("done");
 };
+watch(open, (isOpen) => {
+  if (!isOpen) inlineConfirm.value = null;
+});
 </script>
 
 <template>
   <ODialog
     v-model:open="modalOpen"
     size="md"
+    :persistent="flow.busy.value"
     :aria-title="t('starterPacks.drawer.title')"
     data-test="starter-pack-drawer"
   >
@@ -752,14 +765,22 @@ const askConfirm = (mode: "undo" | "remove") => {
     </div>
 
     <template #footer>
-      <div class="flex w-full items-center gap-2">
+      <StarterPackInlineConfirm
+        v-if="inlineConfirm"
+        :flow="flow"
+        :mode="inlineConfirm"
+        data-test="starter-pack-drawer-confirm"
+        @cancel="inlineConfirm = null"
+        @done="confirmDone"
+      />
+      <div v-else class="flex w-full items-center gap-2">
         <template v-if="installed">
           <OButton
             v-if="flow.canUndo.value"
             variant="ghost-destructive"
             size="sm-action"
             data-test="starter-pack-progress-undo-btn"
-            @click="askConfirm('undo')"
+            @click="inlineConfirm = 'undo'"
           >
             {{ t("starterPacks.landing.undo") }}
           </OButton>
@@ -768,7 +789,7 @@ const askConfirm = (mode: "undo" | "remove") => {
             variant="ghost-destructive"
             size="sm-action"
             data-test="starter-pack-page-remove-btn"
-            @click="askConfirm('remove')"
+            @click="inlineConfirm = 'remove'"
           >
             {{ t("starterPacks.landing.remove") }}
           </OButton>
@@ -799,7 +820,7 @@ const askConfirm = (mode: "undo" | "remove") => {
           data-test="starter-pack-drawer-open-btn"
           @click="finishLanding"
         >
-          {{ t("starterPacks.drawer.openDashboard") }}
+          {{ openLabel }}
         </OButton>
         <OButton
           v-else
@@ -819,14 +840,8 @@ const askConfirm = (mode: "undo" | "remove") => {
     :flow="flow"
     @open-landing="finishLanding"
     @manage="manage"
-    @undo="askConfirm('undo')"
+    @done="confirmDone"
     @retry="startSetup"
     @copy-link="emit('copy-link')"
-  />
-  <StarterPackUndoDialog
-    v-model:open="confirmOpen"
-    :flow="flow"
-    :mode="confirmMode"
-    @done="open = false"
   />
 </template>

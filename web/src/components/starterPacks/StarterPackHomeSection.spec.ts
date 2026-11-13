@@ -292,6 +292,6 @@ describe("StarterPackHomeSection", () => {
     await wrapper.get('[data-test="home-pack-card-copy-link-btn"]').trigger("click");
     expect(fake.copy).toHaveBeenCalledTimes(1);
     expect(fake.copy.mock.calls[0][0]).toBe(fake.flows.kubernetes.packLink());
-    expect(fake.copy.mock.calls[0][0]).toContain("/alert-library/packs/kubernetes");
+    expect(fake.copy.mock.calls[0][0]).toContain("/starter-packs/kubernetes");
   });
 });

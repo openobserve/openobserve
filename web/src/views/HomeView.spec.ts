@@ -22,7 +22,32 @@ import i18n from "@/locales";
 // the panel's own layout rules are FirstDataPanel.spec's; here only HomeView's reading of them is pinned
 const panel = vi.hoisted(() => ({ layout: "none" as string }));
 
-vi.mock("@/constants/starterPacks", () => ({ STARTER_PACKS_ENABLED: false }));
+const packs = vi.hoisted(() => ({ enabled: false, showSection: true }));
+vi.mock("@/constants/starterPacks", () => ({
+  get STARTER_PACKS_ENABLED() {
+    return packs.enabled;
+  },
+}));
+vi.mock("@/components/starterPacks/StarterPackHomeSection.vue", async () => {
+  const {
+    defineComponent: define,
+    h: render,
+    onMounted: mounted,
+    ref: vueRef,
+  } = await import("vue");
+  return {
+    default: define({
+      name: "StarterPackHomeSection",
+      emits: ["ready"],
+      setup(_props, { emit }) {
+        mounted(() =>
+          emit("ready", { showSection: vueRef(packs.showSection), showMenu: vueRef(false) }),
+        );
+        return () => render("div", { "data-test": "home-pack-section-stub" });
+      },
+    }),
+  };
+});
 vi.mock("@/components/ingestion/FirstDataPanel.vue", async () => {
   const { defineComponent: define, h: render } = await import("vue");
   const statusLine = define({
@@ -52,7 +77,7 @@ vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }))
 vi.mock("@/views/OverviewTab.vue", () => ({
   default: {
     name: "OverviewTab",
-    emits: ["sendToAiChat"],
+    emits: ["sendToAiChat", "not-monitored"],
     template: '<div data-test="overview-tab-stub" />',
   },
 }));
@@ -330,6 +355,46 @@ describe("HomeView", () => {
       } finally {
         vi.useRealTimers();
       }
+    });
+  });
+
+  describe("when nothing is watched yet", () => {
+    beforeEach(() => {
+      packs.enabled = true;
+      packs.showSection = true;
+    });
+    afterEach(() => {
+      packs.enabled = false;
+    });
+    const notMonitored = async (value: boolean) => {
+      wrapper.findComponent({ name: "OverviewTab" }).vm.$emit("not-monitored", value);
+      await flushPromises();
+    };
+    const panelShown = () =>
+      !wrapper.get('[data-test="home-overview-panel"]').attributes("style")?.includes("none");
+
+    for (const flag of [false, true]) {
+      it(`hides the Overview panel under the Starter Packs section (empty-data flag ${flag})`, async () => {
+        setFlag(flag);
+        wrapper = mountHome();
+        await flushPromises();
+        expect(has("home-pack-section-stub")).toBe(true);
+        expect(panelShown()).toBe(true);
+        await notMonitored(true);
+        expect(panelShown()).toBe(false);
+        expect(has("overview-tab-stub")).toBe(true);
+        await notMonitored(false);
+        expect(panelShown()).toBe(true);
+      });
+    }
+
+    it("keeps the Overview panel when the Starter Packs section is not shown", async () => {
+      packs.showSection = false;
+      setFlag(false);
+      wrapper = mountHome();
+      await flushPromises();
+      await notMonitored(true);
+      expect(panelShown()).toBe(true);
     });
   });
 

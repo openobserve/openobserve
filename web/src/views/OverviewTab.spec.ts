@@ -1560,6 +1560,7 @@ describe("OverviewTab", () => {
       expect(wrapper.find('[data-test="overview-not-monitored-alert-card"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="overview-not-monitored-anomaly-card"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="overview-not-monitored-logs-card"]').exists()).toBe(true);
+      expect(wrapper.emitted("not-monitored")?.at(-1)).toEqual([true]);
     });
 
     it("should show the per-section empty messages, not an all-clear claim, once one alert exists", async () => {
@@ -1574,6 +1575,7 @@ describe("OverviewTab", () => {
       expect(wrapper.find(EMPTY_STATE).text()).toContain(
         "No alert events in the selected time range",
       );
+      expect(wrapper.emitted("not-monitored")?.at(-1)).toEqual([false]);
     });
 
     it("should keep the cards and per-section messages, and not claim nothing is watched, when only the summary fails", async () => {

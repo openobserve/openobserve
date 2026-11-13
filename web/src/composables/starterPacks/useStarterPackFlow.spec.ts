@@ -125,6 +125,21 @@ describe("useStarterPackFlow", () => {
     fake.previewPack.mockResolvedValue({ items: [], names: {}, notIncluded: [] });
   });
 
+  it("titles an installed alert from the preview, falling back to its saved name", async () => {
+    fake.installs = [record()];
+    const flow = setup();
+    await flow.load();
+    expect(flow.alertTitle("al1", "cluster_cpu")).toBe("cluster_cpu");
+    fake.previewPack.mockResolvedValue({
+      items: [],
+      names: { a1: "Cluster CPU" },
+      notIncluded: [],
+    });
+    await flow.loadPreview();
+    expect(flow.alertTitle("al1", "cluster_cpu")).toBe("Cluster CPU");
+    expect(flow.alertTitle("other", "other_alert")).toBe("other_alert");
+  });
+
   it("completes setup, excludes what the preview left out, and lands on the built-in view", async () => {
     fake.previewPack.mockResolvedValue({
       items: [],
@@ -306,11 +321,12 @@ describe("useStarterPackFlow", () => {
     });
   });
 
-  it("falls back to the dashboards list when no dashboard fits", async () => {
+  it("lands on the pack page when the pack made no dashboard", async () => {
     const flow = setup({ zoConfig: { features: { kubernetes_monitoring: "locked" } } });
     await flow.land();
     expect(fake.push).toHaveBeenCalledWith({
-      name: "dashboards",
+      name: "starterPack",
+      params: { pack: "kubernetes" },
       query: { org_identifier: "org" },
     });
   });

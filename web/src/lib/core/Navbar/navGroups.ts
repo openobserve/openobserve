@@ -419,6 +419,13 @@ export const NAV_GROUPS: NavGroupDef[] = [
         name: "ingestion",
         requires: "ingestion",
       },
+      {
+        titleKey: "menu.starterPacks",
+        icon: "inventory-2",
+        name: "starterPacks",
+        feature: "alerts",
+        activeOnRoutes: ["starterPack"],
+      },
       // Lit on the config editor too, which is its own route rather than a tab of /fleet.
       {
         titleKey: "menu.fleet",

@@ -15,7 +15,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { STALE_AFTER_US, staleSinceUs } from "./usePackHealth";
+import { STALE_AFTER_US, staleSinceText, staleSinceUs } from "./usePackHealth";
 
 const NOW = 10 * STALE_AFTER_US;
 
@@ -36,5 +36,21 @@ describe("staleSinceUs", () => {
 
   it("says nothing without stats", () => {
     expect(staleSinceUs([{ name: "a" }], new Set(["a"]), NOW)).toBeNull();
+  });
+});
+
+describe("staleSinceText", () => {
+  it("shows day, short month and time, without the year or seconds", () => {
+    const at = new Date(2026, 10, 12, 10, 27, 55).getTime() * 1000;
+    const text = staleSinceText(at);
+    expect(text).toContain("12");
+    expect(text).toContain("Nov");
+    expect(text).toContain("10:27");
+    expect(text).not.toContain("2026");
+    expect(text).not.toContain(":55");
+  });
+
+  it("is empty when the data is fresh", () => {
+    expect(staleSinceText(null)).toBe("");
   });
 });

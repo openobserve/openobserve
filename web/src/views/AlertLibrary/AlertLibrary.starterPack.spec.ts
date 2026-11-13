@@ -70,7 +70,6 @@ vi.mock("@/composables/alerts/useAlertLibrary", async (importOriginal) => ({
   }),
 }));
 
-import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import AlertLibrary from "./AlertLibrary.vue";
 
 const router = createRouter({
@@ -83,7 +82,6 @@ const render = async () => {
     global: {
       provide: { store },
       plugins: [i18n, router],
-      stubs: { StarterPackLibraryTab: { template: '<div data-test="pack-tab" />' } },
     },
   });
   await flushPromises();
@@ -134,13 +132,11 @@ describe("AlertLibrary with Starter Packs on", () => {
     expect(ready(wrapper)).toContain("0");
   });
 
-  it("swaps the catalog for the Packs tab and keeps the section tabs", async () => {
+  it("keeps alerts only: no Packs or Dashboards tabs and no Find more", async () => {
     const wrapper = await render();
     expect(wrapper.find('[data-test="alert-section-tabs"]').exists()).toBe(true);
-    const tabs = wrapper.findAllComponents(OTabs).find((t) => t.props("modelValue") === "alerts");
-    tabs?.vm.$emit("change", "packs");
-    await flushPromises();
-    expect(wrapper.find('[data-test="pack-tab"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="alert-library-toolbar"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="alert-library-tabs"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="alert-library-toolbar"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="starter-pack-find-more-btn"]').exists()).toBe(false);
   });
 });

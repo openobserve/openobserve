@@ -41,6 +41,12 @@ vi.mock("@/aws-exports", () => ({
     isEnterprise: "false",
   },
 }));
+const starterPacks = vi.hoisted(() => ({ enabled: false }));
+vi.mock("@/constants/starterPacks", () => ({
+  get STARTER_PACKS_ENABLED() {
+    return starterPacks.enabled;
+  },
+}));
 
 // ---------------------------------------------------------------------------
 // Utility mocks
@@ -2974,6 +2980,22 @@ describe("useRoutes (router.ts)", () => {
       ["metrics", "metrics"],
     ])("tags %s with meta.licenseFeature %s", (name, feature) => {
       expect(findRoute(useRoutes().homeChildRoutes, name).meta.licenseFeature).toBe(feature);
+    });
+
+    it.each([
+      ["starterPacks", "alerts"],
+      ["starterPack", "alerts"],
+    ])("tags %s with meta.licenseFeature %s where Starter Packs ship", (name, feature) => {
+      starterPacks.enabled = true;
+      try {
+        expect(findRoute(useRoutes().homeChildRoutes, name).meta.licenseFeature).toBe(feature);
+      } finally {
+        starterPacks.enabled = false;
+      }
+    });
+
+    it.each(["starterPacks", "starterPack"])("registers no %s route in an OSS build", (name) => {
+      expect(findRoute(useRoutes().homeChildRoutes, name)).toBeUndefined();
     });
 
     it("tags the Database Monitoring shell itself", () => {

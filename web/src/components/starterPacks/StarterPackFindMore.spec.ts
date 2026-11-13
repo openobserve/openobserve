@@ -86,6 +86,7 @@ describe("StarterPackFindMore", () => {
     const wrapper = render();
     await wrapper.get('[data-test="starter-pack-find-more-btn"]').trigger("click");
     expect(fake.finder.check).toHaveBeenCalled();
+    expect(wrapper.emitted("opened")).toHaveLength(1);
   });
 
   it("says nothing new fits, checked just now, when no source matches", () => {

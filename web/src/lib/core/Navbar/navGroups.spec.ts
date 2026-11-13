@@ -1,12 +1,20 @@
 // Copyright 2026 OpenObserve Inc.
 
-import { afterAll, beforeAll, describe, it, expect } from "vitest";
+import { afterAll, beforeAll, describe, it, expect, vi } from "vitest";
 import type { RouteRecordRaw } from "vue-router";
 import config from "@/aws-exports";
 import useRoutes from "@/composables/shared/router";
 import { groupNavLinks, NAV_GROUPS, NAV_SUBNAV, GATE_PREDICATES } from "./navGroups";
 import type { NavGateContext } from "./ONavbar.types";
 import type { NavItem, RailEntry } from "./ONavbar.types";
+
+// The gate is fixed at import, before beforeAll can switch the build to enterprise.
+const starterPacks = vi.hoisted(() => ({ enabled: true }));
+vi.mock("@/constants/starterPacks", () => ({
+  get STARTER_PACKS_ENABLED() {
+    return starterPacks.enabled;
+  },
+}));
 
 const link = (name: string, extra: Partial<NavItem> = {}): NavItem => ({
   title: name,
@@ -95,6 +103,39 @@ describe("NAV_GROUPS against the real route table", () => {
       expect(feature).toBe(routeFeatures.get(name));
     },
   );
+});
+
+describe("Starter Packs menu item in an OSS build", () => {
+  const routeNames = (routes: RouteRecordRaw[]): unknown[] =>
+    routes.flatMap((route) => [route.name, ...routeNames(route.children ?? [])]);
+  // ONavGroup shows a flyout child only when router.hasRoute(child.name) holds.
+  const shownChildren = () => {
+    const { parentRoutes, homeChildRoutes } = useRoutes();
+    const names = new Set(routeNames([...parentRoutes, ...homeChildRoutes]));
+    return {
+      names,
+      menu: NAV_GROUPS.flatMap((g) => g.children)
+        .filter((c) => names.has(c.name))
+        .map((c) => c.name),
+    };
+  };
+
+  afterAll(() => {
+    starterPacks.enabled = true;
+  });
+
+  it("registers neither Starter Packs route, so the menu drops the item", () => {
+    starterPacks.enabled = false;
+    const { names, menu } = shownChildren();
+    expect(names.has("starterPacks")).toBe(false);
+    expect(names.has("starterPack")).toBe(false);
+    expect(menu).not.toContain("starterPacks");
+  });
+
+  it("shows the item where the routes are registered", () => {
+    starterPacks.enabled = true;
+    expect(shownChildren().menu).toContain("starterPacks");
+  });
 });
 
 describe("groupNavLinks", () => {
@@ -233,6 +274,7 @@ describe("groupNavLinks", () => {
       "functionList",
       "enrichmentTables",
       "ingestion",
+      "starterPacks",
       "fleet",
     ]);
   });
@@ -256,6 +298,7 @@ describe("groupNavLinks", () => {
       "functionList",
       "enrichmentTables",
       "ingestion",
+      "starterPacks",
       "fleet",
     ]);
   });
@@ -577,6 +620,7 @@ describe("groupNavLinks", () => {
       "pipelines",
       "functionList",
       "enrichmentTables",
+      "starterPacks",
       "fleet",
     ]);
   });
