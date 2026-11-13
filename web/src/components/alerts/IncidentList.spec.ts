@@ -73,6 +73,7 @@ import type { Incident } from "@/services/incidents";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
+import { labelRows } from "@/components/shared/ServiceNameLabel.fixtures";
 
 // ── stubs ─────────────────────────────────────────────────────────────────────
 
@@ -851,6 +852,52 @@ describe("IncidentList.vue", () => {
 
   // ── AI analysis column ─────────────────────────────
 
+  describe("Service display name", () => {
+    it("shows the display name in the service chip while the row keeps the key", async () => {
+      const row = labelRows.differs;
+      (incidentsService.list as any).mockResolvedValue({
+        data: {
+          incidents: [
+            createIncident({
+              id: "1",
+              group_values: { service: row.service_name },
+              group_values_display: { service: row.display_name },
+            }),
+          ],
+          total: 1,
+        },
+      });
+      wrapper = createWrapper();
+      await flushPromises();
+
+      const chip = wrapper.find('[data-test="incident-list-service-chip"]');
+      expect(chip.exists()).toBe(true);
+      // The stubbed tooltip renders its hover text inline, so the chip value is read from its props.
+      expect(chip.findComponent({ name: "ODimensionChip" }).props("value")).toBe(row.display_name);
+      expect((wrapper.vm as any).visibleIncidents[0].group_values.service).toBe(row.service_name);
+    });
+
+    it("leaves non-service dimensions as plain dimension chips", async () => {
+      (incidentsService.list as any).mockResolvedValue({
+        data: {
+          incidents: [
+            createIncident({
+              id: "1",
+              group_values: { "k8s-namespace": "prod" },
+              group_values_display: { service: "ignored" },
+            }),
+          ],
+          total: 1,
+        },
+      });
+      wrapper = createWrapper();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="incident-list-service-chip"]').exists()).toBe(false);
+      expect(wrapper.text()).not.toContain("ignored");
+    });
+  });
+
   describe("AI analysis column", () => {
     const liveRca = (): Incident["rca"] => ({
       run_id: "run-1",
@@ -1176,8 +1223,8 @@ describe("IncidentList.vue", () => {
         stream_name: "s1",
       });
       expect(chips.map((c) => c.props("dimKey"))).toEqual(["k8s-namespace", "service"]);
-      expect(chips.map((c) => c.props("keyLabel"))).toEqual([undefined, undefined]);
-      expect(chips.map((c) => c.props("tooltip"))).toEqual([true, true]);
+      expect(chips.map((c) => c.props("keyLabel"))).toEqual([undefined, "service"]);
+      expect(chips.map((c) => c.props("tooltip"))).toEqual([true, false]);
       expect(chips.map((c) => c.text())).toEqual(["k8s-namespace" + "prod", "service" + "api"]);
       expect(more.find('[data-test="o-tooltip"]').text().replace(/\s+/g, "")).toBe(
         "stream_name=s1",

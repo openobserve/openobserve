@@ -335,6 +335,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :request="request"
                 :folder-label="folderLabel"
                 :folder-name="targetFolderName"
+                :value-label="valueLabel"
                 :large-modules="largeModules"
               />
             </div>
@@ -385,6 +386,7 @@ import { useOrgId } from "@/composables/query";
 import { useAutoName } from "@/composables/useAutoName";
 import { useDowntimeItems, useTargetModuleLocks } from "@/composables/downtimes/useDowntimeItems";
 import { useDefaultDowntimeFolder } from "@/composables/downtimes/useDefaultDowntimeFolder";
+import { useDowntimeValueLabels } from "@/composables/downtimes/useDowntimeValueLabels";
 import { foldersQuery, optionalFoldersQuery } from "@/services/common.queries";
 import {
   downtimeDetailQuery,
@@ -412,6 +414,7 @@ import {
   defaultDowntimeValues,
   downtimeToFormValues,
   hasIdentity,
+  movePastWindow,
   unnarrowedModules,
   type DowntimeFormValues,
 } from "@/utils/downtimes/downtimeForm";
@@ -445,6 +448,7 @@ import DowntimeNotifySection from "./DowntimeNotifySection.vue";
 import DowntimePreviewPane from "./DowntimePreviewPane.vue";
 import DowntimeSummary from "./DowntimeSummary.vue";
 import { browserTimezone } from "@/utils/timezoneAliases";
+import { serverNowMs } from "@/composables/useAnnouncementBanners";
 import { useEditorDraft } from "@/composables/useEditorDraft";
 import EditorDraftDialogs from "@/components/common/drafts/EditorDraftDialogs.vue";
 
@@ -690,11 +694,13 @@ const resetToken = ref(0);
 const loadedFrom = ref("");
 const loadRow = (row: DowntimeDetail) => {
   loadedFrom.value = sourceId.value;
-  const loaded = downtimeToFormValues(row);
+  let loaded = downtimeToFormValues(row);
   if (!isEdit.value) {
     loaded.name = t("alerts.downtimes.copyOf", { name: row.name });
     // A duplicate is a new row, so it carries no version to check.
     loaded.version = undefined;
+    // A copy that ends at once mutes nothing, so a past one-time window moves to the next hour.
+    loaded = movePastWindow(loaded, serverNowMs());
   }
   form.reset(loaded);
   resetToken.value += 1;
@@ -743,8 +749,16 @@ const targetFolderName: FolderNameFn = (module, id) =>
     id,
   );
 
+const valueLabel = useDowntimeValueLabels(
+  orgId,
+  computed(() => values.value.folder_id || undefined),
+  () => buildCondition(values.value),
+);
+
 const autoName = useAutoName({
-  suggestion: computed(() => buildDowntimeAutoName(values.value, t, itemName, targetFolderName)),
+  suggestion: computed(() =>
+    buildDowntimeAutoName(values.value, t, itemName, targetFolderName, undefined, valueLabel.value),
+  ),
   currentValue: () => String(values.value.name ?? ""),
   apply: (name: string) => form.setFieldValue("name", name),
   enabled: () => !isEdit.value && !duplicateId.value,

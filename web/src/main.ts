@@ -19,7 +19,12 @@ import { VueQueryPlugin } from "@tanstack/vue-query";
 import store from "./stores";
 import App from "./App.vue";
 import createRouter from "./router";
-import i18n, { applyDocumentLocale, getLocale, loadLocaleMessages } from "./locales";
+import i18n, {
+  applyDocumentLocale,
+  getLocale,
+  loadLazyLocaleBlocks,
+  loadLocaleMessages,
+} from "./locales";
 import "./styles/tailwind.css";
 import "./styles/rtl.css";
 // Global generated-content stylesheet: syntax classes (.log-key, .log-string, …)
@@ -197,18 +202,14 @@ window.addEventListener("vite:preloadError", async (event) => {
   }
 });
 
-// Ensure the active locale's messages are loaded (en-us is bundled; any other
-// language is fetched as a code-split chunk) before the first render.
-loadLocaleMessages(activeLocale)
-  // On a locale-chunk load failure, fall back to the bundled en-us messages
-  // (no console noise). The app must mount regardless.
-  .catch(() => {})
-  .finally(() => {
-    app.mount("#app");
-    // reo.js is not needed to render, but the login callback identifies the user and then leaves the page.
-    const startReo = () => void reoInit();
-    if (/\/cb\/?$/.test(window.location.pathname)) startReo();
-    else if (typeof requestIdleCallback !== "undefined")
-      requestIdleCallback(startReo, { timeout: 5000 });
-    else setTimeout(startReo, 0);
-  });
+// Load the active locale and the lazy en-US blocks before the first render; a failed
+// chunk falls back to the bundled en-us messages (no console noise) and the app still mounts.
+Promise.allSettled([loadLocaleMessages(activeLocale), loadLazyLocaleBlocks()]).finally(() => {
+  app.mount("#app");
+  // reo.js is not needed to render, but the login callback identifies the user and then leaves the page.
+  const startReo = () => void reoInit();
+  if (/\/cb\/?$/.test(window.location.pathname)) startReo();
+  else if (typeof requestIdleCallback !== "undefined")
+    requestIdleCallback(startReo, { timeout: 5000 });
+  else setTimeout(startReo, 0);
+});

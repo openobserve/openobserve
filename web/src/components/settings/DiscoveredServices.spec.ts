@@ -18,8 +18,10 @@ import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { nextTick } from "vue";
 import { createStore } from "vuex";
 import { createI18n } from "vue-i18n";
-import DiscoveredServices from "./DiscoveredServices.vue";
+import DiscoveredServices, { DISCOVERED_COLUMN_SIZES } from "./DiscoveredServices.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
+import i18n from "@/locales";
 
 vi.mock("@/services/service_streams", () => ({
   default: {
@@ -433,6 +435,36 @@ describe("DiscoveredServices", () => {
       expect(wrapper.vm.filteredGroupCount).toBe(2);
       expect(wrapper.vm.totalInstances).toBe(3);
     });
+
+    it("gives the tile, the tab and the footer one service count, by display name", async () => {
+      const renamed = multiInstanceResponse.map((row) =>
+        row.service_name === "worker"
+          ? { ...row, service_name: "worker-v2", display_name: "api-server" }
+          : { ...row, display_name: "api-server", display_source: "trace" },
+      );
+      vi.mocked(serviceStreamsService.getServicesList).mockResolvedValue({
+        data: renamed,
+      } as any);
+      wrapper = mountComponent();
+      await flushPromises();
+      const vm = wrapper.vm as any;
+      const discovered = vm.tiles.find((tile: any) => tile.id === "discovered");
+      expect(vm.filteredGroupCount).toBe(2);
+      expect(vm.serviceCount).toBe(1);
+      expect(Number(discovered.value)).toBe(1);
+      expect(vm.shownServiceCount).toBe(1);
+      expect(vm.totalInstances).toBe(3);
+    });
+  });
+
+  describe("column widths at 1600 px", () => {
+    it("fit beside the settings menu, so Last seen is never cut", () => {
+      const TABLE_WIDTH_AT_1600 = 1230;
+      const { identity, telemetry, ...fixed } = DISCOVERED_COLUMN_SIZES;
+      const total = Object.values(fixed).reduce((sum, size) => sum + size, identity + telemetry);
+      expect(total).toBeLessThanOrEqual(TABLE_WIDTH_AT_1600);
+      expect(DISCOVERED_COLUMN_SIZES.last_seen).toBeGreaterThanOrEqual(130);
+    });
   });
 
   describe("per-service collapse", () => {
@@ -662,11 +694,10 @@ describe("DiscoveredServices", () => {
       await flushPromises();
       await nextTick();
 
-      // All three instance rows render with no expansion interaction: both
-      // workload set ids of api-server are visible immediately.
+      // All three instance rows render with no expansion interaction; the workload column shows the Kubernetes workload, not the identity set.
       const cellText = (sel: string) =>
         wrapper.findAll(`[data-test="o2-table-cell-${sel}"]`).map((c) => c.text());
-      expect(cellText("workload")).toEqual(["set-one", "set-two", "worker-set"]);
+      expect(cellText("workload")).toEqual(["api-server", "—", "worker"]);
 
       // The pivot merge collapses the repeated name: "api-server" appears in
       // exactly one service_name cell even though it owns two rows.
@@ -909,6 +940,28 @@ describe("DiscoveredServices", () => {
       // resetServices must not be called when org is missing
       expect(serviceStreamsService.resetServices).not.toHaveBeenCalled();
       expect(wrapper.vm.resetting).toBe(false);
+    });
+  });
+
+  describe("dimension names", () => {
+    it("names identity dimensions by their label, never by the raw key", async () => {
+      wrapper = mount(DiscoveredServices, {
+        global: { plugins: [i18n], provide: { store: mockStore }, stubs: globalStubs },
+      });
+      await flushPromises();
+      wrapper.vm.selectedService = mockServicesResponse[0];
+      await nextTick();
+
+      const labels = wrapper
+        .findComponent({ name: "ODrawer" })
+        .findAllComponents(ODimensionChip)
+        .map((chip) => chip.props("keyLabel"));
+      expect(labels).toEqual(["K8s Cluster", "K8s Deployment"]);
+      const options = wrapper.vm.allKeys.map((option: { label: string }) => option.label);
+      expect(options).toEqual(
+        expect.arrayContaining(["K8s Cluster", "K8s Deployment", "K8s StatefulSet"]),
+      );
+      expect(options).not.toContain("k8s-cluster");
     });
   });
 });

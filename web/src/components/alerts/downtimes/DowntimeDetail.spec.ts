@@ -25,6 +25,8 @@ import common from "@/services/common";
 import { queryClient } from "@/composables/query/queryClient";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import { formatWindowTime } from "@/utils/downtimes/schedule";
+import stage8 from "@/test/unit/fixtures/serviceVersions/stage8.json";
 
 vi.mock("@/services/downtimes", () => ({
   default: {
@@ -37,6 +39,7 @@ vi.mock("@/services/downtimes", () => ({
     move: vi.fn(),
     preview: vi.fn(),
     resources: vi.fn(),
+    values: vi.fn(),
   },
 }));
 
@@ -127,6 +130,21 @@ describe("DowntimeDetail", () => {
 
   afterEach(() => {
     document.body.innerHTML = "";
+  });
+
+  it("names the service in the condition chip by its display name and keeps the key on hover", async () => {
+    vi.mocked(downtimes.values).mockResolvedValue({ data: stage8.downtime_values } as never);
+    vi.mocked(downtimes.get).mockResolvedValue({
+      data: {
+        ...detail,
+        condition: { type: "pair", key: "service", operator: "=", value: "checkoutservice" },
+      },
+    } as never);
+    const { wrapper } = await mountDetail();
+    const chip = wrapper.get('[data-test="downtime-detail-condition"]');
+    expect(chip.text()).toContain("service=CheckoutService");
+    expect(chip.attributes("title")).toBe("service=checkoutservice");
+    wrapper.unmount();
   });
 
   it("renders the Suppressed tab from a 200 with two hits", async () => {
@@ -295,5 +313,65 @@ describe("DowntimeDetail", () => {
     );
     expect(wrapper.find('[data-test="downtime-detail-not-found"]').exists()).toBe(false);
     wrapper.unmount();
+  });
+  describe("recurring rows and an early end", () => {
+    const confirm = () => document.body.querySelector<HTMLElement>('[data-test="confirm-dialog"]');
+    const weekly = {
+      repeat: "weekly" as const,
+      starts_at: NOW_MICROS - 10 * 24 * HOUR_MICROS,
+      ends_at: null,
+      timezone: "UTC",
+      start_time_local: "02:00",
+      duration_secs: 3600,
+      weekdays: [1],
+    };
+
+    it("says End now of a series stops every future window", async () => {
+      vi.mocked(downtimes.get).mockResolvedValue({
+        data: { ...detail, schedule: weekly },
+      } as never);
+      const { wrapper } = await mountDetail();
+      await wrapper.get('[data-test="downtime-detail-end-now"]').trigger("click");
+      await flushPromises();
+      expect(confirm()?.textContent).toContain("This downtime repeats.");
+      expect(confirm()?.textContent).toContain("End now and stop future windows");
+      wrapper.unmount();
+    });
+
+    it("says Cancel of a scheduled series stops every future window", async () => {
+      vi.mocked(downtimes.get).mockResolvedValue({
+        data: { ...detail, schedule: weekly, status: "scheduled", current_window: null },
+      } as never);
+      const { wrapper } = await mountDetail();
+      await wrapper.get('[data-test="downtime-detail-cancel"]').trigger("click");
+      await flushPromises();
+      expect(confirm()?.textContent).toContain(
+        "This downtime repeats. Cancelling it stops every future window.",
+      );
+      wrapper.unmount();
+    });
+
+    it("keeps the one-time End now text", async () => {
+      vi.mocked(downtimes.get).mockResolvedValue({ data: detail } as never);
+      const { wrapper } = await mountDetail();
+      await wrapper.get('[data-test="downtime-detail-end-now"]').trigger("click");
+      await flushPromises();
+      expect(confirm()?.textContent).toContain("Notifications resume at once.");
+      expect(confirm()?.textContent).not.toContain("This downtime repeats.");
+      wrapper.unmount();
+    });
+
+    it("shows the real end after an early end, and labels the planned schedule", async () => {
+      const endedAt = NOW_MICROS - HOUR_MICROS / 2;
+      vi.mocked(downtimes.get).mockResolvedValue({
+        data: { ...detail, status: "ended_early", current_window: null, cancelled_at: endedAt },
+      } as never);
+      const { wrapper } = await mountDetail();
+      const stopped = wrapper.get('[data-test="downtime-detail-stopped-at"]');
+      expect(stopped.text()).toContain("Ended early at");
+      expect(stopped.text()).toContain(formatWindowTime(endedAt, "UTC"));
+      expect(wrapper.text()).toContain("Planned schedule");
+      wrapper.unmount();
+    });
   });
 });

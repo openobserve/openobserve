@@ -3236,8 +3236,9 @@ export class TracesPage {
     return this.page.locator(`${this.errorMessage} [data-test="error-detail-body"]`);
   }
 
+  // One catalog row per service and place, so the name can match several rows.
   servicesCatalogServiceLink(serviceName) {
-    return this.page.locator(`[data-test="services-catalog-service-link-${serviceName}"]`);
+    return this.page.locator(`[data-test="services-catalog-service-link-${serviceName}"]`).first();
   }
 
   async expectServicesCatalogServiceVisible(serviceName) {

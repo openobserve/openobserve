@@ -177,7 +177,9 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps, t: TranslateFn) {
         if (field.startsWith("_")) continue;
         if (value === null || value === undefined || value === "") continue;
 
-        conditions.push(buildSqlCondition(field, String(value)));
+        conditions.push(
+          buildSqlCondition(field, String(value), streamInfo.filter_spellings?.[field]),
+        );
       }
 
       // Always quote stream name to match dashboard behavior

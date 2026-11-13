@@ -24,6 +24,7 @@ import {
   MAX_NOTIFY_DESTINATIONS,
   MAX_TAGS_PER_TARGET,
   NOTIFICATION_EVENTS,
+  buildSchedule,
   hasIdentity,
   type DowntimeFormValues,
   type NotifyFormValues,
@@ -36,7 +37,9 @@ import {
   isYmd,
   localToUtcMicros,
   parseDuration,
+  producesWindow,
 } from "@/utils/downtimes/schedule";
+import { serverNowMs } from "@/composables/useAnnouncementBanners";
 
 export type { DowntimeFormValues } from "@/utils/downtimes/downtimeForm";
 
@@ -62,6 +65,15 @@ export const repeatGapSecs = (
 /** Answers the folder of a picked item, so an id outside the chosen folders is refused. */
 export interface AddDowntimeSchemaContext {
   itemFolder?: (module: TargetModule, id: string) => string | undefined;
+  /** The clock the end-in-past rule reads; the server clock by default. */
+  nowMs?: () => number;
+}
+
+/** A one-time window that already ended mutes nothing; with an SLO target it only corrects SLO data (D7). */
+export function endsInPast(v: DowntimeFormValues, nowMs: number): boolean {
+  if (v.schedule.repeat !== "none") return false;
+  const end = buildSchedule(v.schedule).ends_at;
+  return end != null && end <= nowMs * 1000;
 }
 
 type Issue = { path: (string | number)[]; message: string };
@@ -215,6 +227,11 @@ const onceIssues = (s: ScheduleFormValues, t: TranslateFn): Issue[] => {
   return [];
 };
 
+const pastIssues = (v: DowntimeFormValues, t: TranslateFn, nowMs: number): Issue[] =>
+  !v.modules.includes("slos") && endsInPast(v, nowMs)
+    ? [{ path: ["schedule", "end_date"], message: t("alerts.downtimes.validation.endInPast") }]
+    : [];
+
 const recurringIssues = (s: ScheduleFormValues, t: TranslateFn): Issue[] => {
   const issues: Issue[] = [];
   if (!isYmd(s.start_date)) {
@@ -252,6 +269,13 @@ const recurringIssues = (s: ScheduleFormValues, t: TranslateFn): Issue[] => {
     issues.push({
       path: ["schedule", "until_date"],
       message: t("alerts.downtimes.validation.untilAfterStart"),
+    });
+  }
+  // The server's "never produces a window" rule, on the field that fixes it: the daily form has no weekdays.
+  if (issues.length === 0 && !producesWindow(buildSchedule(s))) {
+    issues.push({
+      path: ["schedule", s.repeat === "weekly" ? "weekdays" : "until_date"],
+      message: t("alerts.downtimes.validation.neverProducesWindow"),
     });
   }
   return issues;
@@ -306,8 +330,9 @@ const scheduleIssues = (s: ScheduleFormValues, t: TranslateFn): Issue[] => {
 };
 
 /** Every rule of the create page; errors route to fields by path. */
-export const makeAddDowntimeSchema = (t: TranslateFn, ctx: AddDowntimeSchemaContext = {}) =>
-  z
+export const makeAddDowntimeSchema = (t: TranslateFn, ctx: AddDowntimeSchemaContext = {}) => {
+  const now = ctx.nowMs ?? serverNowMs;
+  return z
     .object({
       name: z.string().max(256, t("alerts.downtimes.validation.nameTooLong")),
       folder_id: z.string(),
@@ -331,14 +356,17 @@ export const makeAddDowntimeSchema = (t: TranslateFn, ctx: AddDowntimeSchemaCont
     })
     .superRefine((raw, zctx) => {
       const v = raw as DowntimeFormValues;
+      const schedule = scheduleIssues(v.schedule, t);
       const issues = [
         ...targetIssues(v, t, ctx),
         ...conditionIssues(v, t),
-        ...scheduleIssues(v.schedule, t),
+        ...schedule,
+        ...(schedule.length ? [] : pastIssues(v, t, now())),
         ...notifyIssues(v.notifications, v.schedule, t),
       ];
       for (const issue of issues) zctx.addIssue({ code: "custom", ...issue });
     });
+};
 
 /** The tab whose pane owns a field path, so a failed submit can open it. */
 export function tabForPath(

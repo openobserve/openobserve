@@ -1955,7 +1955,7 @@ pub async fn update_topology(
         .ok_or_else(|| Error::DbError(DbError::SeaORMError("Incident not found".to_string())))?;
 
     // Serialize topology to JSON - ONLY place this happens
-    let mut topology_json = serde_json::to_value(topology).map_err(|e| {
+    let mut topology_json = topology_for_storage(topology).map_err(|e| {
         Error::DbError(DbError::SeaORMError(format!(
             "Failed to serialize topology: {}",
             e
@@ -2227,6 +2227,17 @@ fn stale_incidents_query(cutoff: i64) -> sea_orm::Select<alert_incidents::Entity
             Expr::col(alert_incidents::Column::Status).ne(SimpleExpr::Constant("resolved".into())),
         )
         .filter(alert_incidents::Column::LastAlertAt.lt(cutoff))
+}
+
+/// Display names are computed on read, so the stored topology never carries them.
+fn topology_for_storage(
+    topology: &config::meta::alerts::incidents::IncidentTopology,
+) -> Result<serde_json::Value, serde_json::Error> {
+    let mut stored = topology.clone();
+    for node in &mut stored.nodes {
+        node.display_name = None;
+    }
+    serde_json::to_value(&stored)
 }
 
 #[cfg(test)]
@@ -2810,6 +2821,7 @@ mod tests {
             alert_count: 1,
             first_fired_at: 1000,
             last_fired_at: 1000,
+            display_name: None,
         };
 
         let node2 = AlertNode {
@@ -2819,6 +2831,7 @@ mod tests {
             alert_count: 1,
             first_fired_at: 1500,
             last_fired_at: 1500,
+            display_name: None,
         };
 
         let edge = AlertEdge {
@@ -3759,5 +3772,27 @@ mod tests {
             assert_eq!(reopened.resolved_at, None, "{kind}");
             drop_kind_schema(schema).await;
         }
+    }
+
+    #[test]
+    fn stored_topology_never_carries_display_names() {
+        use config::meta::alerts::incidents::{AlertNode, IncidentTopology};
+        let topology = IncidentTopology {
+            nodes: vec![AlertNode {
+                alert_id: "a".into(),
+                alert_name: "High latency".into(),
+                service_name: "checkoutservice".into(),
+                alert_count: 1,
+                first_fired_at: 1,
+                last_fired_at: 1,
+                display_name: Some("CheckoutService".into()),
+            }],
+            edges: vec![],
+            related_incident_ids: vec![],
+        };
+        let stored = topology_for_storage(&topology).unwrap();
+        assert_eq!(stored["nodes"][0]["service_name"], "checkoutservice");
+        assert!(stored["nodes"][0].get("display_name").is_none());
+        assert!(topology.nodes[0].display_name.is_some());
     }
 }

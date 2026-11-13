@@ -112,6 +112,8 @@ import { nextTick } from "vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
+import { labelRows } from "@/components/shared/ServiceNameLabel.fixtures";
+import { queryClient } from "@/composables/query/queryClient";
 import {
   rcaRunSummaryLive,
   rcaSteering,
@@ -206,6 +208,8 @@ describe("IncidentDetailDrawer.vue", () => {
               "mode",
               "externalActiveTab",
               "serviceName",
+              "displayServiceName",
+              "serviceDisplay",
               "matchedDimensions",
               "additionalDimensions",
               "matchedSetId",
@@ -1081,6 +1085,100 @@ describe("IncidentDetailDrawer.vue", () => {
         false,
       );
       expect(incidentsService.getCorrelatedStreams).toHaveBeenCalled();
+    });
+  });
+
+  describe("Service display name", () => {
+    const row = labelRows.differs;
+    let fetchSpy: ReturnType<typeof vi.spyOn> | undefined;
+    // A failed assertion must not leave fetchQuery stubbed for the on-call panel tests below.
+    afterEach(() => {
+      fetchSpy?.mockRestore();
+      fetchSpy = undefined;
+    });
+    const incidentWithDisplay = (display?: Record<string, string>) => ({
+      ...createIncidentWithAlerts({
+        id: "1",
+        group_values: { service: row.service_name },
+        alerts: [
+          {
+            ...createAlert({ alert_id: "alert-1" }),
+            stream_type: "logs",
+            stream_name: "default",
+          } as any,
+        ],
+      }),
+      ...(display ? { group_values_display: display } : {}),
+    });
+
+    it("renders the Dimensions service row with the display name", async () => {
+      (incidentsService.get as any).mockResolvedValue({
+        data: incidentWithDisplay({ service: row.display_name }),
+      });
+      wrapper = await createWrapper({}, {}, "1");
+      await flushPromises();
+      wrapper.vm.activeTab = "overview";
+      await flushPromises();
+
+      const cell = wrapper.find('[data-test="incident-detail-dimension-service"]');
+      expect(cell.exists()).toBe(true);
+      expect(cell.text()).toContain(row.display_name);
+      expect(cell.find('[data-test="svcver-service-name-detected"]').text()).toContain(
+        row.service_name,
+      );
+    });
+
+    it("passes the display to the correlation dashboard while serviceName stays the key", async () => {
+      (incidentsService.get as any).mockResolvedValue({ data: incidentWithDisplay() });
+      (incidentsService.getCorrelatedStreams as any).mockResolvedValue({
+        serviceName: row.service_name,
+        displayServiceName: row.display_name,
+        serviceDisplay: { display_source: "trace" },
+        matchedDimensions: {},
+        additionalDimensions: {},
+        logStreams: [],
+        metricStreams: [{ stream_name: "k8s_metrics", stream_type: "Metrics", filters: {} }],
+        traceStreams: [],
+        correlationData: {
+          service_name: row.service_name,
+          matched_dimensions: {},
+          additional_dimensions: {},
+          related_streams: { logs: [], metrics: [], traces: [], profiles: [] },
+        },
+      });
+      wrapper = await createWrapper({}, {}, "1");
+      await flushPromises();
+      await wrapper.vm.refreshCorrelation();
+      wrapper.vm.activeTab = "metrics";
+      await nextTick();
+      await flushPromises();
+
+      const dashboard = wrapper
+        .findAllComponents({ name: "TelemetryCorrelationDashboard" })
+        .find((c) => c.props("externalActiveTab") === "metrics");
+      expect(dashboard?.props("serviceName")).toBe(row.service_name);
+      expect(dashboard?.props("displayServiceName")).toBe(row.display_name);
+      expect(dashboard?.props("serviceDisplay")).toEqual({ display_source: "trace" });
+    });
+
+    it("keeps the synthetic dimension-match id internal and titles the fallback with the display", async () => {
+      (incidentsService.get as any).mockResolvedValue({
+        data: incidentWithDisplay({ service: row.display_name }),
+      });
+      (incidentsService.getCorrelatedStreams as any).mockResolvedValue(null);
+      fetchSpy = vi
+        .spyOn(queryClient, "fetchQuery")
+        .mockResolvedValue({ schema: [{ name: "service_name" }] } as never);
+      wrapper = await createWrapper({}, {}, "1");
+      await flushPromises();
+      await wrapper.vm.refreshCorrelation();
+      await flushPromises();
+
+      expect(wrapper.vm.correlationData.serviceName).toBe(`dimension-match-${row.service_name}`);
+      expect(wrapper.vm.correlationData.displayServiceName).toBe(row.display_name);
+      expect(wrapper.vm.correlationData.logStreams[0].filters).toEqual({
+        service_name: row.service_name,
+      });
     });
   });
 

@@ -178,10 +178,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <ErrorsOverTimeChart
               class="max-lg:min-h-40 lg:col-span-3"
               :buckets="chartSeries"
-              :deploy="latestDeploy"
+              :markers="deployMarkerList"
               :spike-factor="deploySpikeFactor"
               :focus="typeFilter"
               :loading="isLoadingChart"
+              @compare="compareMarker"
+              @retry="runQuery"
             />
             <ErrorsKpiCards class="lg:col-span-2" :kpis="kpis" :loading="isLoadingKpis" />
           </div>
@@ -295,6 +297,9 @@ import {
   defineAsyncComponent,
   watch,
 } from "vue";
+import { useVersionCompareDrawer } from "@/enterprise/composables/useVersionCompareDrawer";
+import { drawerQuery, rumTabApps } from "@/enterprise/components/ServiceVersions/rumStrip";
+import type { RumChartMarker } from "@/enterprise/components/ServiceVersions/deployMarkers";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import useBreakpoint from "@/composables/useBreakpoint";
 import { rangesFromServerError, type SqlErrorRange } from "@/utils/query/sqlDiagnostics";
@@ -424,7 +429,7 @@ const {
   issues,
   trendBuckets,
   chartSeries,
-  latestDeploy,
+  deployMarkerList,
   deploySpikeFactor,
   kpis,
   isLoadingIssues,
@@ -473,6 +478,18 @@ const tableErrors = computed(() =>
 const statusFilter = ref<IssueStatusFilter>("all");
 const typeFilter = ref<IssueTypeFilter>("all");
 const serviceFilter = ref("");
+watch(serviceFilter, (value) => (rumTabApps.errors = value), { immediate: true });
+const compareDrawer = useVersionCompareDrawer();
+// Error Tracking has no env filter, so the marker carries the where it was deployed to.
+const compareMarker = (marker: RumChartMarker) => {
+  if (!serviceFilter.value || !marker.where || !marker.deployKey) return;
+  void compareDrawer.open({
+    service: serviceFilter.value,
+    where: marker.where,
+    a: marker.version,
+    deployKey: marker.deployKey,
+  });
+};
 // Accumulated across runs so the list survives service-filtered queries.
 const serviceOptions: Ref<string[]> = ref([]);
 
@@ -834,7 +851,7 @@ function updateUrlQueryParams() {
   if (serviceFilter.value) query["service"] = serviceFilter.value;
 
   query["org_identifier"] = store.state.selectedOrganization.identifier;
-  router.push({ query });
+  router.push({ query: { ...query, ...drawerQuery(router.currentRoute.value.query) } });
 }
 
 useShortcuts([

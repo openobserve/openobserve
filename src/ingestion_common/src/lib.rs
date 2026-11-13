@@ -33,6 +33,7 @@ pub enum SystemJobType {
     AnomalyDetection,
     AlertCalibration,
     AutoObserve,
+    ServiceSignals,
 }
 
 impl SystemJobType {
@@ -46,6 +47,7 @@ impl SystemJobType {
             SystemJobType::AnomalyDetection => "anomaly_detection",
             SystemJobType::AlertCalibration => "alert_calibration",
             SystemJobType::AutoObserve => "autoobserve",
+            SystemJobType::ServiceSignals => "service_signals",
         }
     }
 }

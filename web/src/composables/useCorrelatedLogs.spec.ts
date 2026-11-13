@@ -312,6 +312,34 @@ describe("useCorrelatedLogs", () => {
     });
   });
 
+  describe("Service spellings", () => {
+    it("queries a log stream on every spelling of the service key", async () => {
+      const composable = useCorrelatedLogs(
+        {
+          ...props,
+          matchedDimensions: { service: "checkout" },
+          additionalDimensions: {},
+          logStreams: [
+            {
+              stream_name: "app-logs",
+              stream_type: "logs",
+              filters: { service: "checkout" },
+              filter_spellings: { service: ["checkout", "checkout.service"] },
+            },
+          ],
+        },
+        gt,
+      );
+
+      await composable.fetchCorrelatedLogs();
+
+      const sql = mockFetchQueryDataWithHttpStream.mock.calls[0][0].queryReq.query.sql;
+      expect(sql.join(" ")).toContain(
+        "lower(trim(\"service\")) IN ('checkout', 'checkout.service')",
+      );
+    });
+  });
+
   describe("Search Execution", () => {
     it("should set loading state during search", async () => {
       mockFetchQueryDataWithHttpStream.mockImplementation(async (_params: any, callbacks: any) => {

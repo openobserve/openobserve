@@ -167,3 +167,4 @@ ent PUT /api/v2/{org_id}/autoobserve/review/{decision_kind}/{cohort_id} | the ha
 ent GET /api/v2/{org_id}/autoobserve/settings/paging | the handler answers o2-enterprise PagingView, which derives no schema
 ent PUT /api/v2/{org_id}/autoobserve/settings/paging | the handler answers o2-enterprise PagingView, which derives no schema
 ent GET /api/v2/{org_id}/autoobserve/suggestions | the handler answers the o2-enterprise AutoObserve engine's response, which derives no schema
+all POST /api/v2/{org_id}/alerts/incidents | the handler answers serde_json::json!({incident_id, created}) built in place

@@ -2961,4 +2961,42 @@ describe("PanelSchemaRenderer", () => {
       expect(w.vm.failedAnnotationSources).toEqual(["Incidents"]);
     });
   });
+
+  it("adds clickable deploy lines without removing manual annotations or mutating search series", async () => {
+    vi.mocked(usePanelDataLoader).mockReturnValueOnce({
+      data: ref([[{ timestamp: 1000, count: 2 }]]),
+      loading: ref(false),
+      errorDetail: ref({ message: "", code: "" }),
+      metadata: ref({}),
+      resultMetaData: ref({}),
+      annotations: ref([]),
+      lastTriggeredAt: ref(null),
+      isCachedDataDifferWithCurrentTimeRange: ref(false),
+      searchRequestTraceIds: ref([]),
+      loadingProgressPercentage: ref(0),
+      isPartialData: ref(false),
+    } as any);
+    const open = vi.fn();
+    const marker = { xAxis: 1000, deployKey: "d2", version: "v2", where: "env:prod" };
+    wrapper = createWrapper({
+      panelSchema: {
+        ...defaultProps.panelSchema,
+        config: { chart_mark_lines: [marker], chart_mark_line_click: open },
+      },
+    });
+    await flushPromises();
+    const series = [{ type: "line", data: [[1000, 2]], markLine: { data: [{ yAxis: 10 }] } }];
+    wrapper.vm.panelData = { chartType: "line", options: { series } };
+    wrapper.vm.errorDetail = { message: "", code: "" };
+    await nextTick();
+    expect(wrapper.vm.chartRendererData.options.series[0].markLine.data).toEqual([
+      { yAxis: 10 },
+      marker,
+    ]);
+    expect(series[0].markLine.data).toEqual([{ yAxis: 10 }]);
+    wrapper
+      .findComponent({ name: "ChartRenderer" })
+      .vm.$emit("click", { componentType: "markLine", data: marker });
+    expect(open).toHaveBeenCalledWith(marker);
+  });
 });

@@ -28,7 +28,7 @@ import type {
   TargetModule,
 } from "@/services/downtimes";
 import { andEqPairs } from "./conditionBridge";
-import { MODULE_ORDER, type FolderNameFn } from "./targetSummary";
+import { MODULE_ORDER, pairText, type FolderNameFn, type ValueLabelFn } from "./targetSummary";
 import {
   durationInput,
   formatWindowTime,
@@ -442,6 +442,30 @@ export function downtimeToFormValues(d: Downtime): DowntimeFormValues {
   };
 }
 
+/** A Duplicate of a one-time window that already ended moves it to the next full hour with the same duration (D5). */
+export function movePastWindow(values: DowntimeFormValues, nowMs: number): DowntimeFormValues {
+  const s = values.schedule;
+  if (s.repeat !== "none") return values;
+  const built = buildSchedule(s);
+  const endsAt = built.ends_at;
+  if (endsAt == null || endsAt > nowMs * 1000) return values;
+  const startMs = nextFullHourMs(nowMs, s.timezone);
+  const span = Math.max(0, endsAt - built.starts_at);
+  const start = utcMicrosToLocal(startMs * 1000, s.timezone);
+  const end = utcMicrosToLocal(startMs * 1000 + span, s.timezone);
+  return {
+    ...values,
+    schedule: {
+      ...s,
+      ...LOADED_NONE,
+      start_date: start.date,
+      start_time: start.time,
+      end_date: end.date,
+      end_time: end.time,
+    },
+  };
+}
+
 /** Resolves a picked item's display name. */
 export type ItemNameFn = (module: TargetModule, id: string) => string | undefined;
 
@@ -450,9 +474,10 @@ const autoNameSubject = (
   t: TranslateFn,
   itemName?: ItemNameFn,
   folderName?: FolderNameFn,
+  valueLabel?: ValueLabelFn,
 ): string => {
   const firstEq = andEqPairs(buildCondition(values) ?? null).find((p) => p.key && p.value);
-  if (firstEq) return `${firstEq.key}=${firstEq.value}`;
+  if (firstEq) return pairText(firstEq.key, firstEq.value, valueLabel);
   const first = buildTargets(values)[0];
   if (!first) return "";
   if (first.tags?.length) return first.tags[0];
@@ -484,8 +509,9 @@ export function buildDowntimeAutoName(
   itemName?: ItemNameFn,
   folderName?: FolderNameFn,
   locale?: string,
+  valueLabel?: ValueLabelFn,
 ): string {
-  const subject = autoNameSubject(values, t, itemName, folderName);
+  const subject = autoNameSubject(values, t, itemName, folderName, valueLabel);
   if (!subject) return "";
   return `${subject} · ${autoNameWhen(values.schedule, t, locale)}`;
 }

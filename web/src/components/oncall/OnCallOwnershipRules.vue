@@ -43,7 +43,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-test="`oncall-routing-says-${row.rule_id}`"
         >
           <template #item="{ item }">
-            <ODimensionChip :dim-key="item.name" :key-label="item.label" :value="item.value" />
+            <span
+              v-if="item.name === SERVICE_DIMENSION && !item.prefix"
+              class="min-w-0"
+              :data-test="`oncall-routing-rule-service-${row.rule_id}`"
+              ><ServiceNameLabel
+                layout="chip"
+                :key-label="item.label"
+                v-bind="labelPropsForKey(item.value, servicesByKey.get(item.value))"
+            /></span>
+            <ODimensionChip
+              v-else
+              :dim-key="item.name"
+              :key-label="item.label"
+              :value="item.value"
+            />
           </template>
         </OnCallFitChips>
       </template>
@@ -267,10 +281,12 @@ import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import type { OwnershipRuleStats } from "@/ts/interfaces/oncall";
+import ServiceNameLabel from "@/components/shared/ServiceNameLabel.vue";
+import type { DiscoveredService, OwnershipRuleStats } from "@/ts/interfaces/oncall";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
-import { fieldLabel } from "@/utils/oncall";
+import { labelPropsForKey, serviceOptionParts } from "@/types/serviceRef";
+import { SERVICE_DIMENSION, fieldLabel } from "@/utils/oncall";
 
 interface RuleCondition {
   name: string;
@@ -279,6 +295,7 @@ interface RuleCondition {
   /** The chip's key segment, "starts with" folded in for a prefix claim. */
   label: string;
   value: string;
+  prefix: boolean;
 }
 
 const props = withDefaults(
@@ -297,6 +314,8 @@ const props = withDefaults(
     editable?: boolean;
     /** The host carries Test routing, so a row can open it pre-filled. */
     testable?: boolean;
+    /** Discovered services, so a service condition reads by its trace name. */
+    services?: DiscoveredService[];
   }>(),
   {
     rules: () => [],
@@ -308,7 +327,12 @@ const props = withDefaults(
     search: "",
     editable: true,
     testable: false,
+    services: () => [],
   },
+);
+
+const servicesByKey = computed(
+  () => new Map(props.services.map((service) => [service.name, service])),
 );
 
 const emit = defineEmits<{
@@ -455,6 +479,7 @@ function conditionsOf(rule: OwnershipRuleStats): RuleCondition[] {
         field,
         label: prefix ? String(t("oncall.ruleChipStartsWith", { field: raw(field) })) : field,
         value: prefix ? value.slice(0, -1) : value,
+        prefix,
       };
     });
 }
@@ -463,9 +488,14 @@ function conditionsOf(rule: OwnershipRuleStats): RuleCondition[] {
 function conditionsTip(rule: OwnershipRuleStats): I18nText {
   return raw(
     conditionsOf(rule)
-      .map((condition) => `${condition.label} = ${condition.value}`)
+      .map((condition) => `${condition.label} = ${conditionValueText(condition)}`)
       .join(" · "),
   );
+}
+
+function conditionValueText(condition: RuleCondition): string {
+  if (condition.name !== SERVICE_DIMENSION || condition.prefix) return condition.value;
+  return serviceOptionParts(condition.value, servicesByKey.value.get(condition.value)).display;
 }
 
 function fieldsTip(rule: OwnershipRuleStats): I18nText {
