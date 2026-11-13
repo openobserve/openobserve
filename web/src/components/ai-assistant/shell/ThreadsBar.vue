@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     ref="root"
     :aria-label="t('assistant.threadsBar.label')"
     data-test="threads-bar"
-    class="fixed end-[calc((var(--o-tray-end,0)+0.75)*1rem)] bottom-3 z-5000 flex max-w-[var(--o-threads-bar-max,none)] flex-col items-end gap-2"
+    class="fixed end-[calc((var(--o-tray-end,0)+1.5)*1rem)] bottom-6 z-5000 flex flex-col items-end gap-2 max-md:end-4 max-md:bottom-4"
   >
     <div
       v-if="expanded"
@@ -33,31 +33,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         liveIncidents ? 'w-[44rem] grid-cols-2' : 'w-[28rem] grid-cols-1',
       ]"
     >
-      <div
-        v-if="incidentsOn && !liveIncidents"
-        class="flex min-w-0 items-center gap-2 ps-1.5"
-        data-test="threads-bar-incidents-none"
-      >
-        <OText
-          variant="meta"
-          class="min-w-0 flex-1"
-          data-test="threads-bar-incidents-note"
-          :data-state="incidentsNote"
-          >{{ t(`assistant.threadsBar.${incidentsNote}`) }}</OText
-        >
-        <OText v-if="incidents.pageFull" variant="meta" data-test="threads-bar-incidents-full">{{
-          t("assistant.threadsBar.pageFull", { count: INCIDENT_PAGE })
-        }}</OText>
-        <OButton
-          variant="ghost-primary"
-          size="chip"
-          data-threads-item
-          data-test="threads-bar-incidents-all"
-          @click="openIncidentList"
-        >
-          {{ t("assistant.threadsBar.openIncidents") }}
-        </OButton>
-      </div>
       <div
         v-if="liveIncidents"
         class="flex min-w-0 flex-col gap-1"
@@ -140,113 +115,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </ul>
       </div>
     </div>
-    <div ref="row" class="flex max-w-full min-w-0 items-center gap-2">
-      <OButton
-        ref="toggleButton"
-        variant="outline"
-        size="sm"
-        :class="['shrink-0', PILL]"
-        :aria-expanded="expanded ? 'true' : 'false'"
-        icon-left="forum"
-        data-test="threads-bar-toggle"
-        @click="toggle"
-      >
-        {{ t("assistant.threadsBar.title") }}
-      </OButton>
-      <OButton
-        v-for="incident in incidents.shown"
-        :key="incident.id"
-        variant="outline"
-        size="sm"
-        :class="['max-w-40 min-w-0 gap-1.5', PILL]"
-        :data-test="`threads-bar-pill-incident-${incident.id}`"
-        @click="openIncident(incident.id)"
-      >
-        <AssistantStatusDot state="working" placement="inline" />
-        <OTruncatedText class="min-w-0">{{ incident.title || incident.id }}</OTruncatedText>
-      </OButton>
-      <OButton
-        v-if="incidents.more > 0"
-        variant="outline"
-        size="sm"
-        :class="['shrink-0', PILL]"
-        data-test="threads-bar-pill-more"
-        @click="expand"
-      >
-        {{ t("assistant.tray.more", { count: incidents.more }) }}
-      </OButton>
-      <OButton
-        v-for="pill in threads"
-        :key="pill.sid"
-        variant="outline"
-        size="sm"
-        :class="['max-w-48 min-w-0 gap-1.5', PILL]"
-        :data-test="`threads-bar-pill-thread-${pill.sid}`"
-        :data-signal="pill.signal"
-        @click="openThread(pill.sid)"
-      >
-        <AssistantStatusDot
-          v-if="SIGNAL[pill.signal]"
-          :state="SIGNAL[pill.signal]!"
-          placement="inline"
-        />
-        <OTruncatedText class="min-w-0">{{ pill.title }}</OTruncatedText>
-      </OButton>
-      <AssistantTray
-        ref="tray"
-        class="min-w-0"
-        inline
-        :order="order"
-        :visible-bars="visibleBars"
-        @restore="(sid) => emit('restore', sid)"
-        @close="(sid) => emit('close', sid)"
-      />
-    </div>
+    <AssistantFloatingLauncher
+      ref="launcher"
+      :items="launcherItems"
+      :expanded="expanded"
+      @toggle="toggle"
+      @restore="openThread"
+    />
   </section>
 </template>
 
 <script lang="ts">
-import type { AssistantSignal } from "@/components/ai-assistant/common/AssistantStatusDot.types";
 import type { Sid } from "@/composables/assistant";
-
-import type { ThreadPill } from "./threadsBar";
 
 export interface ThreadsBarProps {
   /** Minimised windows, oldest first. */
   order: Sid[];
-  visibleBars: number;
 }
-
-/** Running is the ring, waiting the attention dot, unread the neutral dot. */
-export const SIGNAL: Record<ThreadPill["signal"], AssistantSignal | null> = {
-  running: "working",
-  approval: "attention",
-  unread: "unread",
-  idle: null,
-};
-
-// The outline variant paints bg-transparent, which outranks a plain bg utility, so the opaque fills need !important.
-const PILL =
-  "bg-surface-base! enabled:hover:bg-button-outline-hover-bg! enabled:active:bg-button-outline-active-bg! shadow-lg";
-
-/** Root variable MainLayout pads the page with, in rem, so the bar never covers page content. */
-export const THREADS_BAR_INSET_VAR = "--o-threads-bar-inset";
-
-const MAIN_SELECTOR = "main[data-test='main-content']";
-
-// Gap kept between the bar and each side of the page area.
-const BAR_GAP_REM = 0.75;
 </script>
 
 <script setup lang="ts">
 import { useQuery } from "@tanstack/vue-query";
-import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
-import { useRouter } from "vue-router";
+import { computed, nextTick, ref, watch } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 
 import config from "@/aws-exports";
 import AssistantStatusDot from "@/components/ai-assistant/common/AssistantStatusDot.vue";
 import { useAssistantRuns, useAssistantStore } from "@/composables/assistant";
+import { fullThreadLocation, isHomeAskShown } from "@/composables/assistant/pure";
 import { useLicenseLock } from "@/composables/useFeatureLock";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -256,8 +153,21 @@ import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { incidentsQuery } from "@/services/incidents.queries";
 import { useI18nTyped } from "@/types/i18n";
 
-import AssistantTray, { trayState } from "./AssistantTray.vue";
-import { INCIDENT_PAGE, liveIncidentPills, threadPills } from "./threadsBar";
+import AssistantFloatingLauncher from "./AssistantFloatingLauncher.vue";
+import {
+  INCIDENT_PAGE,
+  liveIncidentPills,
+  threadPills,
+  trayState,
+  type ThreadPill,
+} from "./threadsBar";
+
+const SIGNAL = {
+  running: "working",
+  approval: "attention",
+  unread: "unread",
+  idle: null,
+} as const;
 
 // Open, the bar re-reads the open incidents every minute; collapsed, its pills refresh every five.
 const INCIDENT_REFRESH_OPEN_MS = 60_000;
@@ -270,15 +180,14 @@ const emit = defineEmits<{ restore: [sid: Sid]; close: [sid: Sid] }>();
 
 const { t } = useI18nTyped();
 const router = useRouter();
+const route = useRoute();
 const vuex = useStore();
 const store = useAssistantStore();
 const runs = useAssistantRuns();
 const incidentsLock = useLicenseLock("incidents");
 const root = ref<HTMLElement | null>(null);
 const panel = ref<HTMLElement | null>(null);
-const toggleButton = ref<{ $el?: HTMLElement } | null>(null);
-const tray = ref<InstanceType<typeof AssistantTray> | null>(null);
-const row = ref<HTMLElement | null>(null);
+const launcher = ref<{ focus: () => void } | null>(null);
 const expanded = ref(false);
 
 const org = computed<string>(() => vuex.state.selectedOrganization?.identifier ?? "");
@@ -298,11 +207,6 @@ const liveIncidents = computed(() => incidentsOn.value && incidents.value.shown.
 const incidents = computed(() =>
   liveIncidentPills(incidentsOn.value ? openIncidents.data.value?.incidents : null),
 );
-// No live run is a fact only once a page has arrived; until then the line says the list is loading or failed.
-const incidentsNote = computed<"noIncidents" | "incidentsLoading" | "incidentsFailed">(() => {
-  if (openIncidents.data.value) return "noIncidents";
-  return openIncidents.isError.value ? "incidentsFailed" : "incidentsLoading";
-});
 
 const threads = computed(() => {
   const fromRuns: ThreadPill[] = runs.rows.value
@@ -333,6 +237,13 @@ const minimisedPills = computed<ThreadPill[]>(() =>
     };
   }),
 );
+// Waiting chats first, then answering, then the rest; minimised ones newest first.
+const launcherItems = computed<ThreadPill[]>(() => {
+  const rank = { approval: 0, running: 1, unread: 2, idle: 2 } as const;
+  return [...threads.value, ...[...minimisedPills.value].reverse()].sort(
+    (a, b) => rank[a.signal] - rank[b.signal],
+  );
+});
 const hasItems = computed(
   () => incidents.value.shown.length > 0 || threads.value.length > 0 || props.order.length > 0,
 );
@@ -349,42 +260,6 @@ watch(panel, (el, prev) => {
   el?.addEventListener("keydown", onPanelKey);
 });
 
-// The bar is fixed over the page, so it publishes the band its row covers and fits itself inside the page area.
-let resizeObserver: ResizeObserver | null = null;
-
-watch(row, (el) => {
-  resizeObserver?.disconnect();
-  if (!el) {
-    publishLayout();
-    return;
-  }
-  resizeObserver ??= new ResizeObserver(publishLayout);
-  resizeObserver.observe(el);
-  const main = document.querySelector(MAIN_SELECTOR);
-  if (main) resizeObserver.observe(main);
-});
-
-window.addEventListener("resize", publishLayout);
-
-onBeforeUnmount(() => {
-  resizeObserver?.disconnect();
-  window.removeEventListener("resize", publishLayout);
-  document.documentElement.style.removeProperty(THREADS_BAR_INSET_VAR);
-});
-
-function publishLayout(): void {
-  const docStyle = document.documentElement.style;
-  const box = row.value?.getBoundingClientRect();
-  if (!box || box.height === 0) {
-    docStyle.removeProperty(THREADS_BAR_INSET_VAR);
-    return;
-  }
-  docStyle.setProperty(THREADS_BAR_INSET_VAR, String((window.innerHeight - box.top) / 16));
-  const main = document.querySelector(MAIN_SELECTOR)?.getBoundingClientRect();
-  if (main)
-    root.value?.style.setProperty("--o-threads-bar-max", `${main.width / 16 - 2 * BAR_GAP_REM}rem`);
-}
-
 function items(): HTMLElement[] {
   return [...(panel.value?.querySelectorAll<HTMLElement>("[data-threads-item]") ?? [])];
 }
@@ -400,7 +275,7 @@ async function expand(): Promise<void> {
 
 function collapse(): void {
   expanded.value = false;
-  toggleButton.value?.$el?.focus();
+  launcher.value?.focus();
 }
 
 function toggle(): void {
@@ -445,6 +320,7 @@ function openIncidentList(): void {
 // A minimised chat comes back as its window; any other thread opens as Float, or where it already shows.
 function openThread(sid: Sid): void {
   expanded.value = false;
+  if (isHomeAskShown(route)) return openOnHome(sid);
   if (props.order.includes(sid)) return emit("restore", sid);
   const row = runs.rows.value.find((candidate) => candidate.sid === sid);
   if (store.state.sessions[sid] && store.floatChat(sid).ok) return;
@@ -452,5 +328,11 @@ function openThread(sid: Sid): void {
   else void store.openSession({ sid }, { focus: true }).catch(() => undefined);
 }
 
-defineExpose({ el: root, tray });
+// Home's Ask box is the assistant there, so a thread opens on Home instead of in a window.
+function openOnHome(sid: Sid): void {
+  if (store.state.sessions[sid]) store.open({ kind: "full" }, { sid, focus: "composer" });
+  void router.push(fullThreadLocation(sid, route.query)).catch(() => undefined);
+}
+
+defineExpose({ el: root });
 </script>

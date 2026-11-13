@@ -250,6 +250,16 @@ html.theme-switching *::after {
     transform: none;
   }
 }
+@keyframes assistant-pop-in {
+  from {
+    opacity: 0;
+    transform: translate(0.75rem, 0.5rem) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
 @keyframes assistant-fade {
   from {
     opacity: 0;
@@ -307,6 +317,16 @@ html.theme-switching *::after {
   @media (prefers-reduced-motion: reduce) {
     animation: assistant-fade 0.2s ease-out both;
   }
+}
+@utility assistant-pop-in {
+  animation: assistant-pop-in 0.2s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation-delay: calc(var(--assistant-stagger-index, 0) * 50ms);
+  @media (prefers-reduced-motion: reduce) {
+    animation: assistant-fade 0.2s ease-out both;
+  }
+}
+@utility assistant-pop-in-* {
+  --assistant-stagger-index: --value(integer);
 }
 @utility assistant-fade-up-* {
   --assistant-stagger-index: --value(integer);

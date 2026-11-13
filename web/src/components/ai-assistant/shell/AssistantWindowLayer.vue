@@ -16,17 +16,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    v-if="mountable && shown"
+    v-if="mountable && onShellPage"
     data-test="assistant-window-layer"
     :inert="modalOpen || undefined"
     class="contents"
   >
     <AssistantWindow
-      v-for="win in openWindows"
+      v-for="win in windowsShown"
       :key="win.sid"
       :win="win"
       :area="area"
-      :band-rem="bandRem"
+      :band-rem="0"
       :focused="focusedSid === win.sid"
       :obscured="obscured[win.sid] ?? null"
       :tear-off="tearOffRequest?.sid === win.sid ? tearOffRequest : null"
@@ -38,22 +38,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @mode-started="(mode) => modeStarted(win.sid, mode)"
     />
     <ThreadsBar
-      v-show="!trayHidden"
+      v-show="!trayHidden && !chatOpen"
       ref="tray"
       :order="shell.trayOrder"
-      :visible-bars="trayBars"
       @restore="restore"
       @close="close"
     />
     <div
-      v-if="dropTarget === 'sidebar'"
+      v-if="lgUp && dropTarget === 'sidebar'"
       class="border-border-strong text-text-secondary fixed end-[calc(var(--o-tray-end,0)*1rem)] top-[calc(var(--o-drop-top,0)*1rem)] bottom-2 z-5000 flex w-48 items-center justify-center border-2 border-dashed text-sm"
       data-test="assistant-drop-sidebar"
     >
       {{ t("assistant.window.dropSidebar") }}
     </div>
     <div
-      v-else-if="dropTarget === 'tray'"
+      v-else-if="lgUp && dropTarget === 'tray'"
       class="border-border-strong text-text-secondary fixed end-[calc((var(--o-tray-end,0)+0.75)*1rem)] bottom-3 z-5000 flex h-10 w-60 items-center justify-center border-2 border-dashed text-sm"
       data-test="assistant-drop-tray"
     >
@@ -71,13 +70,7 @@ const MAIN_SELECTOR = "main[data-test='main-content']";
 const UNMOUNTED_GATES: ReadonlySet<string> = new Set(["loading", "not_entitled", "not_configured"]);
 
 // Only the assistant's own surfaces stay out of the focus-not-obscured check.
-const OWN_SURFACES = `${ASSISTANT_SURFACES_SELECTOR}, [data-test='assistant-tray']`;
-
-const FULL_TRAY_BARS = 4;
-
-const NARROW_TRAY_BARS = 2;
-
-const WIDE_VIEWPORT_REM = 80;
+const OWN_SURFACES = `${ASSISTANT_SURFACES_SELECTOR}, [data-test='threads-bar']`;
 </script>
 
 <script setup lang="ts">
@@ -86,7 +79,6 @@ import { useRoute } from "vue-router";
 
 import { isFullThreadRoute } from "@/composables/assistant/pure";
 import {
-  TRAY_FOOTPRINT_REM,
   coversFully,
   intersects,
   isRunning,
@@ -123,27 +115,24 @@ const modalOpen = ref(false);
 const trayHidden = ref(false);
 const obscured = reactive<Record<Sid, "collapsed" | "hidden">>({});
 const area = ref<PageArea>(readArea());
-const viewportRem = ref(window.innerWidth / 16);
 let pageFocus: HTMLElement | null = null;
 let mainSizes: ResizeObserver | null = null;
 let modalWatch: MutationObserver | null = null;
 
 const shell = computed(() => store.state.shell);
 const mountable = computed(() => !UNMOUNTED_GATES.has(capability.gate.value));
-const shown = computed(() => lgUp.value && !isFullThreadRoute(route));
+const onShellPage = computed(() => !isFullThreadRoute(route));
+// Floating windows need the wide shell; the launcher shows at every width.
+const windowsShown = computed(() => (lgUp.value ? openWindows.value : []));
 const openWindows = computed(() => openWindowsOf(shell.value));
+// The launcher stands in for chats that are not on screen, so it hides while the side panel or a window is open.
+const chatOpen = computed(
+  () => shell.value.placement.kind === "sidebar" || openWindows.value.length > 0,
+);
 const focusedSid = computed(() => {
   const focused = shell.value.lastFocusedContainer;
   return focused && focused !== "sidebar" ? focused.window : null;
 });
-// The bar also shows for threads and incident runs, so its element, not the tray order, reserves the band.
-const trayShown = computed(
-  () => shown.value && (shell.value.trayOrder.length > 0 || !!tray.value?.el),
-);
-const bandRem = computed(() => (trayShown.value ? TRAY_FOOTPRINT_REM : 0));
-const trayBars = computed(() =>
-  viewportRem.value >= WIDE_VIEWPORT_REM ? FULL_TRAY_BARS : NARROW_TRAY_BARS,
-);
 
 function readArea(): PageArea {
   const viewport = window.innerWidth / 16;
@@ -164,7 +153,6 @@ function writeAnchors(): void {
 
 function measure(): void {
   area.value = readArea();
-  viewportRem.value = window.innerWidth / 16;
   writeAnchors();
   store.fitWindowsToViewport();
 }
