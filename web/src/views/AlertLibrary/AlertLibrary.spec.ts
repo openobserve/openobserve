@@ -856,19 +856,18 @@ describe("AlertLibrary", () => {
       expect(toolbar().contains(wrapper.get(`[data-test="${BAR}"]`).element)).toBe(true);
     });
 
-    it("shares the search row, leaving the stat tiles alone", async () => {
-      // The strip's tiles are elastic, so hosting the controls there would make
-      // all three re-flow on the first tick — the same shift, moved sideways.
+    it("shares the search row, keeping the selection controls out of the chip strip", async () => {
+      // The chips sit on the search row; hosting the controls inside the strip would re-flow it.
       const wrapper = await mountView();
       await tick(wrapper, BOX);
 
       const searchRow = wrapper.get('[data-test="alert-library-toolbar"]').element;
+      const strip = wrapper.get('[data-test="alert-library-strip"]').element;
       expect(searchRow.contains(wrapper.get('[data-test="alert-library-search"]').element)).toBe(
         true,
       );
-      expect(searchRow.contains(wrapper.get('[data-test="alert-library-strip"]').element)).toBe(
-        false,
-      );
+      expect(searchRow.contains(strip)).toBe(true);
+      expect(strip.contains(wrapper.get(`[data-test="${BAR}"]`).element)).toBe(false);
       // The search field is the only elastic thing on the row, so it is the only
       // thing the controls take width from.
       expect(wrapper.get('[data-test="alert-library-search"]').classes()).toContain("flex-1");
