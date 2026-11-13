@@ -3244,7 +3244,7 @@ describe("span search around", () => {
   });
 
   it("opens logs for the span start ± the window with no span filter", async () => {
-    w = mountSidebar({ parentMode: "standalone" });
+    w = mountSidebar({ parentMode: "standalone", selectedLogStreams: ["app_logs"] });
     w.vm.setSpanSearchAroundChoice("t15");
     await w.find('[data-test="trace-details-sidebar-search-around-btn"]').trigger("click");
 
@@ -3280,6 +3280,21 @@ describe("span search around", () => {
       });
       const btn = w.find('[data-test="trace-details-sidebar-search-around-btn"]');
       expect(btn.attributes("disabled")).toBeDefined();
+      w.vm.searchAroundSpan();
+      expect(mockNavigateToLogs).not.toHaveBeenCalled();
+    } finally {
+      config.isEnterprise = enterprise;
+    }
+  });
+
+  it("is disabled with a reason when no log stream is picked and the selector is hidden", () => {
+    const enterprise = config.isEnterprise;
+    config.isEnterprise = "true";
+    try {
+      w = mountSidebar({ parentMode: "standalone", selectedLogStreams: [] });
+      const btn = w.find('[data-test="trace-details-sidebar-search-around-btn"]');
+      expect(btn.attributes("disabled")).toBeDefined();
+      expect(w.vm.searchAroundTooltip).toBe("Select Logs stream first");
       w.vm.searchAroundSpan();
       expect(mockNavigateToLogs).not.toHaveBeenCalled();
     } finally {

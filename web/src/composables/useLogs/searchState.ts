@@ -150,6 +150,9 @@ export interface SearchAroundData {
   indexTimestamp: number;
   size: number;
   histogramHide: boolean;
+  // A time-window search around sends this instead of the user's query for one run, leaving the editor as typed.
+  pendingWindowQuery?: string | null;
+  windowQuery?: string | null;
 }
 
 export interface SearchObjectData {
@@ -471,6 +474,8 @@ export const searchState = () => {
   const resetSearchAroundData = (): void => {
     searchObj.data.searchAround.indexTimestamp = -1;
     searchObj.data.searchAround.size = 0;
+    searchObj.data.searchAround.pendingWindowQuery = null;
+    searchObj.data.searchAround.windowQuery = null;
   };
 
   /**

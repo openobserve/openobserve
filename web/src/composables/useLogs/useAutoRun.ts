@@ -575,6 +575,7 @@ export function createAutoRun(deps: AutoRunDeps) {
   const pending: Record<"grid" | "patterns", PendingEntry | null> = { grid: null, patterns: null };
   let deferredRefresh = false;
   let missedTick = false;
+  let lastRunStartedMs: number | null = null;
   let userCancels = 0;
   let invalidation: string | null = null;
   let hitsTraceId: string | null = null;
@@ -807,6 +808,7 @@ export function createAutoRun(deps: AutoRunDeps) {
       meta.lastRunAttempt = { generation: gen.id, signature: cloneJson(input.signature) };
     }
     if (input.op !== "histogram") {
+      lastRunStartedMs = now();
       recordConsent(input.signature);
       meta.autoRunBlocked = null;
       meta.runPending = false;
@@ -1541,6 +1543,7 @@ export function createAutoRun(deps: AutoRunDeps) {
     onRefreshIntervalChanged,
     userCancelCount: () => userCancels,
     hasMissedTick: () => missedTick,
+    lastRunStartedMs: () => lastRunStartedMs,
     hasDeferredRefresh: () => deferredRefresh,
     hasPendingRequest: () => !!pending.grid || !!pending.patterns,
   };

@@ -1085,6 +1085,32 @@ describe("useSearchQuery › buildSearch › LIMIT in filter mode", () => {
   });
 });
 
+describe("useSearchQuery › getQueryReq › search-around window query", () => {
+  beforeEach(() => {
+    mockState = createMockState();
+    (mockState.searchObj.data.stream as any).streamLists = [{ name: "my-stream" }];
+    vi.clearAllMocks();
+  });
+
+  it("sends the window query for one run and its pages, never writing it into the editor", () => {
+    mockState.searchObj.meta.sqlMode = true;
+    const userQuery = `SELECT * FROM "my-stream" WHERE level = 'error'`;
+    mockState.searchObj.data.query = userQuery;
+    (mockState.searchObj.data as any).editorValue = userQuery;
+    (mockState.searchObj.data as any).searchAround = {
+      pendingWindowQuery: 'SELECT * FROM "my-stream"',
+      windowQuery: null,
+    };
+    const { getQueryReq } = useSearchQuery(gt);
+
+    expect(getQueryReq(false)?.query.sql).toBe('SELECT * FROM "my-stream"');
+    expect(getQueryReq(true)?.query.sql).toBe('SELECT * FROM "my-stream"');
+    expect(mockState.searchObj.data.query).toBe(userQuery);
+    expect((mockState.searchObj.data as any).editorValue).toBe(userQuery);
+    expect(getQueryReq(false)?.query.sql).toBe(userQuery);
+  });
+});
+
 describe("useSearchQuery › getQueryReq › highlightQuery", () => {
   let getQueryReq: ReturnType<typeof useSearchQuery>["getQueryReq"];
 

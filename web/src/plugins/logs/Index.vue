@@ -720,7 +720,7 @@ import config from "@/aws-exports";
 import { featureState, streamTypeFeature } from "@/utils/featureGate";
 import { inheritedRetentionDays } from "@/utils/dataRetention";
 import { combineStreamTimeLimits, type StreamLimitEntry } from "@/composables/useStreamTimeLimits";
-import { fixedRangeEnd, fixedRangeEnded } from "@/utils/autoRefreshPause";
+import { fixedRangeEnd, fixedRangeRefreshDone } from "@/utils/autoRefreshPause";
 import { useLicenseLocks } from "@/composables/useFeatureLock";
 import { verifyOrganizationStatus, deepCopy, addSpacesToOperators } from "@/utils/zincutils";
 import MainLayoutCloudMixin from "@/enterprise/mixins/mainLayout.mixin";
@@ -892,15 +892,18 @@ export default defineComponent({
   mixins: [MainLayoutCloudMixin],
   emits: ["sendToAiChat"],
   methods: {
-    setHistogramDate(date: any) {
+    setHistogramDate(date: any): boolean {
       this.searchBarRef?.markZoom?.(date);
-      this.searchBarRef.dateTimeRef.setCustomDate("absolute", date);
+      return this.searchBarRef.dateTimeRef.setCustomDate("absolute", date) !== false;
     },
-    // The setCustomDate behind setHistogramDate re-runs the search, so the filter is cleared first.
+    // The setCustomDate behind setHistogramDate re-runs the search, so the unfiltered query is armed first.
     onSearchAroundWindow(range: { startUs: number; endUs: number }) {
-      this.clearFilterForContext();
-      this.searchBarRef?.updateQuery?.();
-      this.setHistogramDate(searchAroundPickerRange(range, this.store.state.timezone));
+      this.armWindowQuery();
+      const applied = this.setHistogramDate(
+        searchAroundPickerRange(range, this.store.state.timezone),
+      );
+      // No run follows a refused window, so the armed query must not wait for the user's next one.
+      if (!applied) this.searchObj.data.searchAround.pendingWindowQuery = null;
     },
     searchData() {
       this.autoRun.engine.requestRun("run");
@@ -2092,7 +2095,7 @@ export default defineComponent({
 
     const onAutoIntervalTrigger = () => {
       // handle event for visualization page only
-      if (searchObj.meta.logsVisualizeToggle == "visualize" && !logsRangeEnded()) {
+      if (searchObj.meta.logsVisualizeToggle == "visualize") {
         handleRunQueryFn();
       }
     };
@@ -4069,14 +4072,16 @@ export default defineComponent({
     );
 
     // Logs keeps the last rolling period on an absolute range, so only the type marks it fixed.
-    const logsRangeEnded = () => {
+    const logsRefreshDone = () => {
       const { type, endTime } = searchObj.data.datetime ?? {};
-      return type === "absolute" && fixedRangeEnded(fixedRangeEnd({ type, endTime }), Date.now());
+      if (type !== "absolute") return false;
+      const lastRunMs = autoRun.engine.lastRunStartedMs();
+      return fixedRangeRefreshDone(fixedRangeEnd({ type, endTime }), lastRunMs, Date.now());
     };
     const pageHidden = () => document.visibilityState === "hidden";
     const stopRefreshPauses = [
       autoRun.engine.registerRefreshPause(pageHidden),
-      autoRun.engine.registerRefreshPause(logsRangeEnded),
+      autoRun.engine.registerRefreshPause(logsRefreshDone),
     ];
     // Ticks missed while hidden collapse into the engine's single missed tick.
     const onVisibilityChange = () => {
@@ -4162,7 +4167,7 @@ export default defineComponent({
       onJumpToStreamData(ts, ts + 1);
     };
 
-    const { searchAroundData, clearFilterForContext } = useSearchAround();
+    const { searchAroundData, armWindowQuery } = useSearchAround();
 
     const runSearchAround = (params: {
       key: unknown;
@@ -4357,7 +4362,7 @@ export default defineComponent({
       onPermalinkShowInContext,
       onPermalinkAddSearchTerm,
       runSearchAround,
-      clearFilterForContext,
+      armWindowQuery,
       onSharedPageGo,
       refreshHistogramChart,
       onChangeInterval,

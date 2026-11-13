@@ -46,6 +46,49 @@ export const searchAroundPickerRange = (
   end: toZonedTime(range.endUs / 1000, timezone).getTime(),
 });
 
+/** Swaps the parser's backtick identifiers for double quotes, leaving string literals as typed. */
+const quoteIdentifiers = (sql: string): string =>
+  sql.replace(/('(?:[^']|'')*')|`/g, (match, literal) => literal ?? '"');
+
+// A select node and every UNION branch after it; parser ASTs are untyped.
+const selectChain = (node: any): any[] => {
+  const chain: any[] = [];
+  for (let current = node; current && typeof current === "object"; current = current._next) {
+    chain.push(current);
+  }
+  return chain;
+};
+
+const dropWhere = (node: any): void => {
+  for (const select of selectChain(node)) {
+    select.where = null;
+    (select.with ?? []).forEach((cte: any) => dropWhere(cte?.stmt?.ast ?? cte?.stmt));
+    (select.from ?? []).forEach((source: any) => dropWhere(source?.expr?.ast));
+  }
+};
+
+/** The user's SQL with every WHERE and the outer ORDER BY/LIMIT removed, or null when it cannot be read. */
+export const unfilteredWindowQuery = (
+  sql: string,
+  parse: (sql: string) => unknown,
+  unparse: (ast: unknown) => string,
+): string | null => {
+  try {
+    const parsed: any = parse(sql);
+    const ast = Array.isArray(parsed) ? parsed[0] : parsed;
+    if (!ast?.from?.length) return null;
+    dropWhere(ast);
+    for (const select of selectChain(ast)) {
+      select.orderby = null;
+      select.limit = null;
+    }
+    const query = unparse(ast);
+    return query ? quoteIdentifiers(query) : null;
+  } catch {
+    return null;
+  }
+};
+
 export const useSearchAround = () => {
   // Safe only because useSearchAround() runs inside component setup (SearchResult.vue).
   const { t } = useI18nTyped();
@@ -116,7 +159,7 @@ export const useSearchAround = () => {
       } else if (searchObj.meta.sqlMode === true) {
         const parsedSQL = fnParsedSQL(query);
         parsedSQL.where = null;
-        sqlContext.push(b64EncodeUnicode(fnUnparsedSQL(parsedSQL).replace(/`/g, '"')) ?? "");
+        sqlContext.push(b64EncodeUnicode(quoteIdentifiers(fnUnparsedSQL(parsedSQL))) ?? "");
       } else {
         const parseQuery = [query];
         let queryFunctions = "";
@@ -294,22 +337,18 @@ export const useSearchAround = () => {
     }
   };
 
-  // A window around a row shows its neighbours, so the filter goes as on the records path; unparsable SQL is kept.
-  const clearFilterForContext = (): void => {
-    let query = "";
-    if (searchObj.meta.sqlMode === true) {
-      const parsedSQL = fnParsedSQL(searchObj.data.query);
-      if (!parsedSQL?.from?.length) return;
-      parsedSQL.where = null;
-      query = fnUnparsedSQL(parsedSQL).replace(/`/g, '"');
-      if (!query) return;
-    }
-    searchObj.data.query = query;
-    searchObj.data.editorValue = query;
+  // Like the records path, only the request drops the filter; unparsable SQL runs as typed.
+  const armWindowQuery = (): void => {
+    const query =
+      searchObj.meta.sqlMode === true
+        ? unfilteredWindowQuery(searchObj.data.query, fnParsedSQL, fnUnparsedSQL)
+        : "";
+    if (query === null) return;
+    searchObj.data.searchAround.pendingWindowQuery = query;
   };
 
   return {
     searchAroundData,
-    clearFilterForContext,
+    armWindowQuery,
   };
 };

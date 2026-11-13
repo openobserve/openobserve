@@ -1510,6 +1510,14 @@ describe("auto-refresh", () => {
     expect(ticks).toEqual([true, true]);
   });
 
+  it("remembers when the last run began, for the tail of a fixed range", () => {
+    const h = makeHarness();
+    expect(h.engine.lastRunStartedMs()).toBeNull();
+    h.engine.requestRun("run");
+    vi.runAllTimers();
+    expect(h.engine.lastRunStartedMs()).toBe(Date.now());
+  });
+
   it("is ineligible without an interval", () => {
     const h = makeHarness();
     expect(h.engine.requestRun("refresh")).toBe("skipped-ineligible");

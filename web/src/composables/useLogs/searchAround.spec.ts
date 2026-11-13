@@ -18,7 +18,8 @@ import { defineComponent } from "vue";
 import { mount, flushPromises } from "@vue/test-utils";
 import i18n from "@/locales";
 import { b64EncodeUnicode } from "@/utils/zincutils";
-import { searchAroundPickerRange, useSearchAround } from "./searchAround";
+import { Parser } from "@openobserve/node-sql-parser/build/datafusionsql";
+import { searchAroundPickerRange, unfilteredWindowQuery, useSearchAround } from "./searchAround";
 import { useLogsAutoRun } from "./logsAutoRun";
 
 const searchAroundMock = vi.hoisted(() => vi.fn());
@@ -115,20 +116,24 @@ describe("useSearchAround", () => {
     vi.clearAllMocks();
   });
 
-  it("clears the filter of a plain query and the WHERE of SQL for a window around a row", () => {
+  it("arms an unfiltered query for the next run and leaves the user's query and editor alone", () => {
     searchObj.value = buildSearchObj(["stream1"]);
     searchObj.value.data.query = "level = 'error'";
+    searchObj.value.data.editorValue = "level = 'error'";
     wrapper = mount(TestComponent, { global: { plugins: [i18n] } });
-    wrapper.vm.clearFilterForContext();
-    expect(searchObj.value.data.query).toBe("");
-    expect(searchObj.value.data.editorValue).toBe("");
+    wrapper.vm.armWindowQuery();
+    expect(searchObj.value.data.searchAround.pendingWindowQuery).toBe("");
+    expect(searchObj.value.data.query).toBe("level = 'error'");
+    expect(searchObj.value.data.editorValue).toBe("level = 'error'");
     wrapper.unmount();
 
     searchObj.value = buildSearchObj(["stream1"], true);
-    searchObj.value.data.query = `SELECT * FROM "stream1" WHERE level = 'error'`;
+    const sql = `SELECT * FROM "stream1" WHERE level = 'error'`;
+    searchObj.value.data.query = sql;
     wrapper = mount(TestComponent, { global: { plugins: [i18n] } });
-    wrapper.vm.clearFilterForContext();
-    expect(searchObj.value.data.query).toBe('SELECT * FROM "stream1"');
+    wrapper.vm.armWindowQuery();
+    expect(searchObj.value.data.searchAround.pendingWindowQuery).toBe('SELECT * FROM "stream1"');
+    expect(searchObj.value.data.query).toBe(sql);
   });
 
   it("searches around the hit's own stream when several streams are selected", async () => {
@@ -265,6 +270,52 @@ describe("useSearchAround", () => {
     expect(request.is_multistream).toBe(false);
     expect(decodeSql(request.query_context[0])).toContain('FROM "stream1"');
     expect(searchObj.value.data.queryResults.hits).toEqual([{ _timestamp: 1 }, { _timestamp: 2 }]);
+  });
+});
+
+describe("unfilteredWindowQuery", () => {
+  const parser = new Parser();
+  const parse = (sql: string) => parser.astify(sql);
+  const unparse = (ast: any) => parser.sqlify(ast);
+
+  it("drops every WHERE, including CTE, subquery and UNION branches", () => {
+    expect(
+      unfilteredWindowQuery(
+        `WITH a AS (SELECT * FROM "s" WHERE x = 1) SELECT * FROM (SELECT * FROM a WHERE y = 2) WHERE z = 3`,
+        parse,
+        unparse,
+      ),
+    ).toBe('WITH "a" AS (SELECT * FROM "s") SELECT * FROM (SELECT * FROM "a")');
+    expect(
+      unfilteredWindowQuery(
+        `SELECT * FROM "s" WHERE x = 1 UNION ALL SELECT * FROM "t" WHERE z = 3`,
+        parse,
+        unparse,
+      ),
+    ).toBe('SELECT * FROM "s" UNION ALL SELECT * FROM "t"');
+  });
+
+  it("drops the outer ORDER BY and LIMIT so the window shows in time order", () => {
+    expect(
+      unfilteredWindowQuery(`SELECT * FROM "s" WHERE x = 1 ORDER BY x LIMIT 5`, parse, unparse),
+    ).toBe('SELECT * FROM "s"');
+    expect(
+      unfilteredWindowQuery(
+        `SELECT * FROM "s" UNION ALL SELECT * FROM "t" ORDER BY x LIMIT 5`,
+        parse,
+        unparse,
+      ),
+    ).toBe('SELECT * FROM "s" UNION ALL SELECT * FROM "t"');
+  });
+
+  it("quotes identifiers without touching backticks inside string literals", () => {
+    expect(
+      unfilteredWindowQuery(`SELECT 'a \`b\`' AS c FROM "s" WHERE x = 1`, parse, unparse),
+    ).toBe(`SELECT 'a \`b\`' AS "c" FROM "s"`);
+  });
+
+  it("returns null for SQL it cannot read", () => {
+    expect(unfilteredWindowQuery("SELECT FROM WHERE", parse, unparse)).toBeNull();
   });
 });
 

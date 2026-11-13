@@ -392,7 +392,13 @@ export const useSearchQuery = (t: TranslateFn) => {
     if (Number.isNaN(searchObj.data.datetime.startTime))
       searchObj.data.datetime.startTime = "Invalid Date";
 
-    const queryReq: SearchRequestPayload | null = buildSearch();
+    const around = searchObj.data.searchAround;
+    if (around && !isPagination) {
+      around.windowQuery = around.pendingWindowQuery ?? null;
+      around.pendingWindowQuery = null;
+    }
+    const windowQuery = around?.windowQuery ?? undefined;
+    const queryReq: SearchRequestPayload | null = buildSearch(false, false, windowQuery);
     if (queryReq) {
       recordSeverityRequest(
         captureSeverityRequest(searchObj, !!queryReq.query?.quick_mode, () => fnParsedSQL()),
@@ -400,7 +406,9 @@ export const useSearchQuery = (t: TranslateFn) => {
     }
 
     // Keep the query's case: str_match and re_match highlight case-sensitively.
-    if (searchObj.meta.sqlMode) {
+    if (windowQuery !== undefined) {
+      searchObj.data.freeTextDecorations = null;
+    } else if (searchObj.meta.sqlMode) {
       searchObj.data.highlightQuery = searchObj.data.query.split(/where/i)?.[1] || "";
       searchObj.data.freeTextDecorations = null;
     } else {
@@ -687,7 +695,7 @@ export const useSearchQuery = (t: TranslateFn) => {
       }
 
       if (searchObj.meta.sqlMode == true) {
-        return handleSqlMode(query, req, readOnly);
+        return handleSqlMode(query, req, readOnly, filterOverride !== undefined);
       } else {
         return handleNonSqlMode(query, req, ignoreQuickMode, readOnly);
       }
@@ -732,12 +740,13 @@ export const useSearchQuery = (t: TranslateFn) => {
     query: string,
     req: any,
     readOnly: boolean = false,
+    overridden: boolean = false,
   ): SearchRequestPayload | null => {
     // Only mutate query in normal mode
-    if (!readOnly) {
+    if (!readOnly && !overridden) {
       searchObj.data.query = query;
     }
-    const parsedSQL: any = fnParsedSQL();
+    const parsedSQL: any = fnParsedSQL(query);
 
     if (parsedSQL != undefined) {
       if (!checkTimestampAlias(searchObj.data.query)) {

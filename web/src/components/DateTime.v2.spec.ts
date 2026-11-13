@@ -376,6 +376,82 @@ describe("DateTime v2", () => {
       expect(wrapper!.vm.selectedTime).toEqual({ startTime: "10:12:10", endTime: "10:14:30" });
       expect(el("date-time-preview-note")?.textContent).toBe("same window");
     });
+
+    it("keeps an applied fixed range at its instants when a pending live pick is dropped", async () => {
+      createWrapper({
+        autoApply: false,
+        defaultType: "absolute",
+        defaultAbsoluteTime: {
+          startTime: micros("2026-11-12T10:12:10Z"),
+          endTime: micros("2026-11-12T10:14:30Z"),
+        },
+      });
+      await flushPromises();
+      await openMenu();
+      wrapper!.vm.setDateType("relative");
+      await flushPromises();
+      expect(wrapper!.vm.selectedType).toBe("relative");
+
+      wrapper!.vm.timezone = "UTC";
+      await wrapper!.vm.onTimezoneChange();
+      await flushPromises();
+      wrapper!.vm.menuOpen = false;
+      wrapper!.vm.onMenuOpenChange(false);
+      await flushPromises();
+
+      expect(wrapper!.vm.selectedType).toBe("absolute");
+      expect(wrapper!.vm.getConsumableDateTime()).toMatchObject({
+        startTime: micros("2026-11-12T10:12:10Z"),
+        endTime: micros("2026-11-12T10:14:30Z"),
+      });
+    });
+  });
+
+  describe("Start and End fields", () => {
+    const openFixedCalendar = async () => {
+      createWrapper({
+        autoApply: false,
+        defaultType: "absolute",
+        defaultAbsoluteTime: {
+          startTime: micros("2026-11-12T04:30:00Z"),
+          endTime: micros("2026-11-12T08:30:00Z"),
+        },
+      });
+      await flushPromises();
+      await openMenu();
+      wrapper!.vm.openCalendar();
+      await flushPromises();
+    };
+
+    it("keeps Apply off while either field is unreadable, whatever the other field does", async () => {
+      await openFixedCalendar();
+
+      wrapper!.vm.onTimeFieldInvalid("start", true);
+      wrapper!.vm.onEndTimeEdit("12:00:00");
+      await flushPromises();
+      expect(wrapper!.vm.applyDisabled).toBe(true);
+
+      wrapper!.vm.onTimeFieldInvalid("end", true);
+      wrapper!.vm.onTimeFieldInvalid("end", false);
+      await flushPromises();
+      expect(wrapper!.vm.applyDisabled).toBe(true);
+
+      wrapper!.vm.onTimeFieldInvalid("start", false);
+      await flushPromises();
+      expect(wrapper!.vm.applyDisabled).toBe(false);
+    });
+
+    it("drops an unreadable-field error when the calendar closes", async () => {
+      await openFixedCalendar();
+      wrapper!.vm.onTimeFieldInvalid("start", true);
+      await flushPromises();
+      expect(wrapper!.vm.applyDisabled).toBe(true);
+
+      wrapper!.vm.closeCalendar();
+      await flushPromises();
+      expect(wrapper!.vm.applyDisabled).toBe(false);
+      expect(wrapper!.vm.summaryError).toBeNull();
+    });
   });
 
   describe("steps", () => {

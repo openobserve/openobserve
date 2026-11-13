@@ -14,7 +14,13 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it } from "vitest";
-import { autoRefreshState, fixedRangeEnd, fixedRangeEnded, owesCatchUp } from "./autoRefreshPause";
+import {
+  autoRefreshState,
+  fixedRangeEnd,
+  fixedRangeEnded,
+  fixedRangeRefreshDone,
+  owesCatchUp,
+} from "./autoRefreshPause";
 
 const NOW_MS = Date.UTC(2026, 10, 11, 7, 12);
 
@@ -23,6 +29,15 @@ describe("auto-refresh pause predicates", () => {
     expect(fixedRangeEnded(NOW_MS * 1000 - 1, NOW_MS)).toBe(true);
     expect(fixedRangeEnded(NOW_MS * 1000 + 60_000_000, NOW_MS)).toBe(false);
     expect(fixedRangeEnded(null, NOW_MS)).toBe(false);
+  });
+
+  it("stops refreshing an ended fixed range only after one run began at or past its end", () => {
+    const endUs = NOW_MS * 1000 - 1_000_000;
+    expect(fixedRangeRefreshDone(endUs, NOW_MS - 3000, NOW_MS)).toBe(false);
+    expect(fixedRangeRefreshDone(endUs, NOW_MS, NOW_MS)).toBe(true);
+    expect(fixedRangeRefreshDone(endUs, null, NOW_MS)).toBe(true);
+    expect(fixedRangeRefreshDone(NOW_MS * 1000 + 1, NOW_MS - 3000, NOW_MS)).toBe(false);
+    expect(fixedRangeRefreshDone(null, NOW_MS - 3000, NOW_MS)).toBe(false);
   });
 
   it("reads the end of an absolute picker payload and none of a rolling one", () => {
