@@ -17,10 +17,10 @@ const { ingestOtlpTraces, waitForSearch, deleteStream } = require('../../utils/t
 const MS = 1_000_000;
 
 // Each trace holds both services, so a filter on either one still lists both traces.
-function crossedTrace(rootService, childService, rootOperation) {
+function crossedTrace(rootService, childService, rootOperation, ageMs) {
   const traceId = generateTraceId();
   const rootId = generateSpanId();
-  const start = (Date.now() - 5000) * MS;
+  const start = (Date.now() - ageMs) * MS;
   const root = buildSpan({
     traceId, spanId: rootId, name: rootOperation, kind: SpanKind.SERVER,
     startTimeNs: start, endTimeNs: start + 100 * MS,
@@ -47,9 +47,10 @@ test.describe('Apply & Search from a span replaces the same field (#1578)', () =
     beta = { service: `e2e1578${runId}-beta`, root: `beta root ${runId}` };
     await navigateToBase(page);
     pm = new PageManager(page);
+    // Tied start times let the two rows swap order when Apply & Search re-runs the list, so a click could open the other trace.
     await ingestOtlpTraces(page.request, stream, buildTracePayload([
-      ...crossedTrace(alpha.service, beta.service, alpha.root),
-      ...crossedTrace(beta.service, alpha.service, beta.root),
+      ...crossedTrace(alpha.service, beta.service, alpha.root, 6000),
+      ...crossedTrace(beta.service, alpha.service, beta.root, 5000),
     ]));
     await waitForSearch(page.request, `SELECT COUNT(DISTINCT trace_id) AS traces FROM "${stream}"`, {
       size: 1,
