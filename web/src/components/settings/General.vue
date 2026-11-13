@@ -32,75 +32,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :loading="!settingsLoaded"
               data-test="general-settings-theme-row"
             >
-              <div class="flex w-full flex-wrap items-center gap-1.5">
-                <button
-                  type="button"
-                  class="group/chip bg-surface-subtle border-border-default hover:bg-surface-subtle-hover hover:border-accent focus-visible:outline-focus-ring-accent inline-flex cursor-pointer items-center gap-1 rounded-full border py-1.5 ps-1.5 pe-2 transition-all duration-200 outline-none hover:-translate-y-px hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-solid"
+              <div class="flex items-center gap-1.5 max-md:flex-wrap">
+                <OButton
+                  variant="outline"
+                  size="xs"
                   :aria-label="t('settings.general.lightColorLabel', { color: customLightColor })"
+                  type="button"
                   data-test="theme-light-chip"
                   @click="handleThemeChipClick('light')"
                 >
-                  <span
-                    class="color-circle relative flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-full shadow-sm"
-                    :style="{ backgroundColor: customLightColor }"
-                  >
-                    <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling it with text makes elevation bloom -->
-                    <OIcon
-                      name="palette"
-                      size="xs"
-                      class="opacity-0 filter-[drop-shadow(0_1px_1px_color-mix(in_srgb,var(--color-black)_30%,transparent))] transition-opacity duration-200 group-hover/chip:opacity-90 max-md:opacity-90"
+                  <template #icon-left>
+                    <span
+                      class="border-border-default size-4 shrink-0 rounded-full border"
+                      :style="{ backgroundColor: customLightColor }"
                     />
-                    <!-- eslint-enable local/no-hardcoded-px -->
-                  </span>
-                  <span class="chip-label text-text-body text-xs font-semibold">{{
-                    t("settings.light")
-                  }}</span>
-                  <span class="chip-value text-text-body font-mono text-xs font-medium">{{
-                    customLightColor
-                  }}</span>
-                </button>
-
-                <button
-                  type="button"
-                  class="group/chip bg-surface-subtle border-border-default hover:bg-surface-subtle-hover hover:border-accent focus-visible:outline-focus-ring-accent inline-flex cursor-pointer items-center gap-1 rounded-full border py-1.5 ps-1.5 pe-2 transition-all duration-200 outline-none hover:-translate-y-px hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-solid"
+                  </template>
+                  {{ t("settings.light") }}
+                  <span class="text-text-secondary font-mono">{{ customLightColor }}</span>
+                </OButton>
+                <OButton
+                  variant="outline"
+                  size="xs"
                   :aria-label="t('settings.general.darkColorLabel', { color: customDarkColor })"
+                  type="button"
                   data-test="theme-dark-chip"
                   @click="handleThemeChipClick('dark')"
                 >
-                  <span
-                    class="color-circle relative flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-full shadow-sm"
-                    :style="{ backgroundColor: customDarkColor }"
-                  >
-                    <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling it with text makes elevation bloom -->
-                    <OIcon
-                      name="palette"
-                      size="xs"
-                      class="opacity-0 filter-[drop-shadow(0_1px_1px_color-mix(in_srgb,var(--color-black)_30%,transparent))] transition-opacity duration-200 group-hover/chip:opacity-90 max-md:opacity-90"
+                  <template #icon-left>
+                    <span
+                      class="border-border-default size-4 shrink-0 rounded-full border"
+                      :style="{ backgroundColor: customDarkColor }"
                     />
-                    <!-- eslint-enable local/no-hardcoded-px -->
-                  </span>
-                  <span class="chip-label text-text-body text-xs font-semibold">{{
-                    t("settings.dark")
-                  }}</span>
-                  <span class="chip-value text-text-body font-mono text-xs font-medium">{{
-                    customDarkColor
-                  }}</span>
-                </button>
-
-                <button
-                  type="button"
-                  class="group/resetChip border-border-default hover:border-error-400 hover:bg-error-500/10 focus-visible:outline-focus-ring-accent inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border border-dashed bg-transparent opacity-60 transition-all duration-200 outline-none hover:-translate-y-px hover:rotate-180 hover:border-solid hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-solid"
+                  </template>
+                  {{ t("settings.dark") }}
+                  <span class="text-text-secondary font-mono">{{ customDarkColor }}</span>
+                </OButton>
+                <OButton
+                  variant="ghost-muted"
+                  size="icon-sm"
+                  icon-left="refresh"
                   :aria-label="t('settings.resetToDefaultColors')"
+                  type="button"
                   data-test="reset-theme-colors-btn"
                   @click="resetThemeColors"
                 >
-                  <OIcon
-                    name="refresh"
-                    size="sm"
-                    class="group-hover/resetChip:text-error-500 dark:group-hover/resetChip:text-error-400"
-                  />
                   <OTooltip :content="t('settings.resetToDefaultColors')" side="top" />
-                </button>
+                </OButton>
               </div>
             </OSettingRow>
           </OFormSection>

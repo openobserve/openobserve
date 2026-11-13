@@ -134,7 +134,8 @@ describe("OrgStorageEditor", () => {
     await selectProvider(wrapper, "AwsCredentials");
     expect(getForm(wrapper).state.values.selectedProvider).toBe("AwsCredentials");
 
-    await wrapper.find('[role="radiogroup"]').trigger("keydown", { key: "ArrowRight" });
+    await selectProvider(wrapper, "AzureCredentials");
+    expect(getForm(wrapper).state.values.selectedProvider).toBe("AzureCredentials");
     expect(
       wrapper
         .find('[data-test="storage-settings-provider-card-AzureCredentials"]')

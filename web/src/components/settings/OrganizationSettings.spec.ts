@@ -688,6 +688,24 @@ describe("OrganizationSettings", () => {
       expect(bar(wrapper).props("changeCount")).toBe(0);
     });
 
+    it("leaves retention out of a save that did not edit it, so an unread value cannot wipe the stored one", async () => {
+      for (const stored of [{ default: 30, logs: 14 }, undefined]) {
+        mockPostOrganizationSettings.mockClear();
+        mockStore.state.organizationData.organizationSettings = {
+          trace_id_field_name: "trace_id",
+          span_id_field_name: "span_id",
+          data_retention: stored,
+        };
+        const wrapper = createWrapper();
+        await wrapper.get('[data-test="settings-org-trace-id-input-field"]').setValue("traceid");
+        await getForm(wrapper).vm.form.handleSubmit();
+        await flushPromises();
+        expect(mockPostOrganizationSettings).toHaveBeenCalledTimes(1);
+        expect(mockPostOrganizationSettings.mock.calls[0][1]).not.toHaveProperty("data_retention");
+        wrapper.unmount();
+      }
+    });
+
     it("leaves the block and its payload out outside enterprise", async () => {
       config.isEnterprise = "false";
       const wrapper = createWrapper();

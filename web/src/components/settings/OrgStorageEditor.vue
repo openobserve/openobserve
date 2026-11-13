@@ -51,63 +51,53 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="plain"
                 required
                 :title="t('settings.orgStorageEditor.selectStorageProviderLabel')"
-                :description="`${t('storage_settings.selectProviderDesc')} ${t('settings.orgStorageEditor.selectProviderDescCont')}`"
               >
+                <template #description>
+                  {{ t("storage_settings.selectProviderDesc") }}
+                  {{ t("settings.orgStorageEditor.selectProviderDescCont") }}
+                </template>
                 <OBanner v-if="!isEditMode" variant="warning" icon="warning" class="mb-3">
                   {{ t("settings.orgStorageEditor.irreversibleWarnPre")
                   }}<strong>{{ t("settings.orgStorageEditor.irreversibleWarnEmphasis") }}</strong
                   >{{ t("settings.orgStorageEditor.irreversibleWarnPost") }}
                   {{ t("settings.orgStorageEditor.credentialsOnlyInfo") }}
                 </OBanner>
-                <div
-                  role="radiogroup"
-                  aria-required="true"
-                  :aria-label="t('settings.orgStorageEditor.selectStorageProviderLabel')"
-                  class="destination-type-grid grid grid-cols-[repeat(auto-fill,minmax(8.75rem,1fr))] gap-3"
-                  @keydown="providerRadio.onKeydown"
+                <ORadioGroup
+                  v-model="selectedProvider"
+                  required
+                  :label="t('settings.orgStorageEditor.selectStorageProviderLabel')"
+                  orientation="horizontal"
                 >
-                  <button
-                    v-for="(provider, position) in availableProviders"
-                    :key="provider.value"
-                    :ref="(el) => providerRadio.setOption(position, el)"
-                    type="button"
-                    role="radio"
-                    :aria-checked="selectedProvider === provider.value"
-                    :tabindex="providerRadio.tabStop(provider.value)"
-                    :data-test="`storage-settings-provider-card-${provider.value}`"
-                    class="group/card rounded-default focus-visible:ring-focus-ring-accent relative flex min-h-30 cursor-pointer flex-col items-center justify-center border-2 px-3 py-5 transition-all duration-300 outline-none hover:-translate-y-0.5 hover:shadow-md focus-visible:ring-4"
-                    :class="
-                      selectedProvider === provider.value
-                        ? 'selected bg-table-row-selected-bg border-accent shadow-md'
-                        : 'bg-surface-base border-border-default hover:border-card-glass-border'
-                    "
-                    @click="selectedProvider = provider.value"
+                  <div
+                    class="destination-type-grid grid w-full grid-cols-[repeat(auto-fill,minmax(8.75rem,1fr))] gap-3"
                   >
-                    <img
-                      v-if="provider.image"
-                      :src="provider.image"
-                      alt=""
-                      class="card-image mb-2 h-12 w-12 object-contain"
-                    />
-                    <OIcon
-                      v-else
-                      :name="provider.icon"
-                      size="lg"
-                      class="text-text-secondary group-[.selected]/card:text-card-glass-border mb-2 [transition:color_0.3s_ease]"
-                    />
-                    <div
-                      class="text-compact text-text-body mt-1 text-center [line-height:1.3] font-medium"
+                    <ORadio
+                      v-for="provider in availableProviders"
+                      :key="provider.value"
+                      :value="provider.value"
+                      variant="card"
+                      :data-test="`storage-settings-provider-card-${provider.value}`"
                     >
-                      {{ provider.label }}
-                    </div>
-                    <div
-                      v-if="selectedProvider === provider.value"
-                      class="check-icon bg-status-positive absolute top-1.5 right-1.5 z-1 flex h-5 w-5 items-center justify-center overflow-hidden rounded-full text-white"
-                    >
-                      <OIcon name="check" size="xs" />
-                    </div>
-                  </button>
-                </div>
+                      <template #label>
+                        <span class="flex flex-col items-center gap-2 text-center">
+                          <img
+                            v-if="provider.image"
+                            :src="provider.image"
+                            alt=""
+                            class="h-12 w-12 object-contain"
+                          />
+                          <OIcon
+                            v-else
+                            :name="provider.icon"
+                            size="lg"
+                            class="text-text-secondary"
+                          />
+                          <span>{{ provider.label }}</span>
+                        </span>
+                      </template>
+                    </ORadio>
+                  </div>
+                </ORadioGroup>
               </OFormSection>
             </OStep>
 
@@ -323,6 +313,8 @@ import orgStorageService from "@/services/org_storage";
 import { getImageURL } from "@/utils/zincutils";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import ORadioGroup from "@/lib/forms/Radio/ORadioGroup.vue";
+import ORadio from "@/lib/forms/Radio/ORadio.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OStepper from "@/lib/navigation/Stepper/OStepper.vue";
 import OStep from "@/lib/navigation/Stepper/OStep.vue";
@@ -333,7 +325,6 @@ import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { makeOrgStorageEditorSchema, type OrgStorageEditorForm } from "./OrgStorageEditor.schema";
-import { useRovingRadio } from "./useRovingRadio";
 
 const props = defineProps<{
   action: "add" | "edit";
@@ -439,14 +430,6 @@ const providerDefinitions: Array<{
 ];
 
 const canProceedStep1 = computed(() => !!selectedProvider.value);
-
-const providerRadio = useRovingRadio(
-  () => availableProviders.value.map((p) => p.value),
-  () => selectedProvider.value,
-  (value) => {
-    selectedProvider.value = value;
-  },
-);
 
 function nextStep() {
   if (step.value === 1 && canProceedStep1.value) step.value = 2;

@@ -387,6 +387,19 @@ describe("GenAiAgentMappingSettings", () => {
     },
   );
 
+  it("still saves a config whose stored fallback names predate the name check", async () => {
+    mockGet.mockResolvedValue(config(["service name", "my.agent"]));
+    mockSave.mockImplementation(async (body: GenAiAgentMappingConfig) => body);
+    const wrapper = await mountPage(document.body);
+    const version = wrapper.find('[data-test="gen-ai-version-fields-input"] textarea');
+    await version.setValue("service.version");
+    await version.trigger("blur");
+    await saveButton(wrapper).trigger("click");
+    await flushPromises();
+    expect(mockSave).toHaveBeenCalledTimes(1);
+    wrapper.unmount();
+  });
+
   it("shows the server's message when save rejects a pattern", async () => {
     mockGet.mockResolvedValue(config(["my.agent"]));
     const error = "invalid regex in 'regex (': unclosed group";

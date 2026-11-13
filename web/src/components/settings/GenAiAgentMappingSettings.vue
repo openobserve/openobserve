@@ -475,7 +475,23 @@ const leftFields = ref(new Set<FallbackKey>());
 const markLeft = (key: FallbackKey) => {
   leftFields.value = new Set(leftFields.value).add(key);
 };
-const isFallbackListValid = (text: string) => textToList(text).every((n) => FIELD_NAME.test(n));
+const savedConfig = ref("");
+// A name already saved stays accepted, so an older config can still be saved without retyping it.
+const savedFallbackNames = computed(() => {
+  if (!savedConfig.value) return new Set<string>();
+  const c: GenAiAgentMappingConfig = JSON.parse(savedConfig.value);
+  return new Set([
+    ...c.agent_name_fields,
+    ...c.agent_id_fields,
+    ...c.env_fields,
+    ...c.version_fields,
+    ...c.attribution_fields.user,
+    ...c.attribution_fields.feature,
+    ...c.attribution_fields.tenant,
+  ]);
+});
+const isFallbackListValid = (text: string) =>
+  textToList(text).every((n) => FIELD_NAME.test(n) || savedFallbackNames.value.has(n));
 const shownFallbackError = (key: FallbackKey, text: string) =>
   leftFields.value.has(key) && !isFallbackListValid(text)
     ? t("genAiAgentMapping.fallbackInvalid")
@@ -832,7 +848,6 @@ const saveConfig = async () => {
   }
 };
 
-const savedConfig = ref("");
 const markSaved = () => {
   savedConfig.value = JSON.stringify(draftConfig());
 };

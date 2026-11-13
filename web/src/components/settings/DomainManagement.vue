@@ -36,14 +36,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               product2: raw("JavaScript"),
             })
           }}
-          <button
+          <OButton
+            variant="link"
+            size="xs"
             type="button"
-            class="text-text-link focus-visible:outline-focus-ring-accent rounded-default cursor-pointer underline underline-offset-2 outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-solid"
             data-test="domain-management-claim-parser-help-btn"
             @click="showVrlInfo = true"
           >
             {{ t("settings.domainManagement.claimParserFormatLink") }}
-          </button>
+          </OButton>
         </template>
         <OSelect
           v-model="claimParserFunction"

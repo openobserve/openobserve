@@ -248,6 +248,10 @@ const changedRetentionRows = form.useStore((s: any) =>
 const changedFields = computed(() => changedScalars.value + changedRetentionRows.value);
 const changes = computed(() => changedFields.value + (formDirty.value ? 1 : 0));
 
+const retentionEdited = (value: OrganizationSettingsForm) =>
+  changedRetentionRows.value > 0 ||
+  String(value.default ?? "") !== String(form.options.defaultValues?.default ?? "");
+
 function discardCrossLinks() {
   crossLinks.value = savedCrossLinks.value;
 }
@@ -287,7 +291,10 @@ const saveOrgSettings = async (value: OrganizationSettingsForm) => {
       payload.red_insights_enabled = value.redInsightsEnabled;
       payload.ai_rca_thread_tool_output = value.aiRcaThreadToolOutput;
     }
-    if (showDataRetentionDefaults) payload.data_retention = toRetentionPayload(value);
+    // The backend replaces retention as a whole, so it is sent only when edited: an unread value must not wipe it.
+    if (showDataRetentionDefaults && retentionEdited(value)) {
+      payload.data_retention = toRetentionPayload(value);
+    }
 
     const crossLinksChanged = formDirty.value;
 
@@ -316,7 +323,8 @@ const saveOrgSettings = async (value: OrganizationSettingsForm) => {
         : {}),
     };
     if (showDataRetentionDefaults) {
-      updatedSettings.data_retention = fresh?.data?.data_retention ?? payload.data_retention;
+      updatedSettings.data_retention =
+        fresh?.data?.data_retention ?? payload.data_retention ?? updatedSettings.data_retention;
       if (fresh) updatedSettings.resolved_data_retention = fresh.resolved_data_retention;
     }
 
