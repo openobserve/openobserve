@@ -533,8 +533,7 @@ export class RolesPage {
 
     async switchTab(value) {
         await this.tab(value).click();
-        await expect(this.tab(value)).toHaveAttribute('data-state', 'active', { timeout: 10000 })
-            .catch(() => {});
+        await this.expectTabActive(value);
     }
 
     /**
