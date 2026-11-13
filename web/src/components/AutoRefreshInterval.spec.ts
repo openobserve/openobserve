@@ -552,13 +552,13 @@ describe("AutoRefreshInterval", () => {
       expect(label()).toBe("Auto: Off");
     });
 
-    it("a fixed range that ends mid-run stops at the first tick past its end", async () => {
+    it("a fixed range that ends mid-run fetches its tail at the first tick past its end, then stops", async () => {
       await running({ rangeEndUs: (Date.now() + 15_000) * 1000 });
       vi.advanceTimersByTime(10_000);
       expect(triggers()).toBe(1);
       vi.advanceTimersByTime(30_000);
       await wrapper.vm.$nextTick();
-      expect(triggers()).toBe(1);
+      expect(triggers()).toBe(2);
       expect(liveBtn().exists()).toBe(true);
     });
 
@@ -593,12 +593,16 @@ describe("AutoRefreshInterval", () => {
       expect(triggers()).toBe(0);
     });
 
-    it("an ended range owes no catch-up on return", async () => {
+    it("a range that ended while hidden owes only its tail on return", async () => {
       await running({ rangeEndUs: (Date.now() + 5_000) * 1000 });
       setVisibility("hidden");
       vi.advanceTimersByTime(60_000);
       setVisibility("visible");
-      expect(triggers()).toBe(0);
+      expect(triggers()).toBe(1);
+      setVisibility("hidden");
+      setVisibility("visible");
+      vi.advanceTimersByTime(60_000);
+      expect(triggers()).toBe(1);
     });
 
     it("stays stopped while kept alive in the background, through tab switches and range changes", async () => {

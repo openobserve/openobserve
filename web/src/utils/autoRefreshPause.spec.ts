@@ -46,10 +46,15 @@ describe("auto-refresh pause predicates", () => {
   });
 
   it("owes one catch-up on return only when a tick fell due while hidden", () => {
-    const base = { intervalSeconds: 30, nowMs: NOW_MS, rangeEnded: false };
+    const base = { intervalSeconds: 30, nowMs: NOW_MS, rangeEndUs: null };
     expect(owesCatchUp({ ...base, lastTickMs: NOW_MS - 31_000 })).toBe(true);
     expect(owesCatchUp({ ...base, lastTickMs: NOW_MS - 10_000 })).toBe(false);
     expect(owesCatchUp({ ...base, lastTickMs: null })).toBe(false);
-    expect(owesCatchUp({ ...base, lastTickMs: NOW_MS - 31_000, rangeEnded: true })).toBe(false);
+  });
+
+  it("owes an ended fixed range only its tail after the last query", () => {
+    const base = { intervalSeconds: 30, nowMs: NOW_MS, rangeEndUs: (NOW_MS - 5_000) * 1000 };
+    expect(owesCatchUp({ ...base, lastTickMs: NOW_MS - 10_000 })).toBe(true);
+    expect(owesCatchUp({ ...base, lastTickMs: NOW_MS - 1_000 })).toBe(false);
   });
 });

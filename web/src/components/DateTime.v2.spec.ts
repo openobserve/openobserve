@@ -171,6 +171,21 @@ describe("DateTime v2", () => {
     });
   });
 
+  describe("strip notes", () => {
+    it("shows the limit note and the short narrowed note together", async () => {
+      createWrapper({
+        queryRangeRestrictionInHour: 24,
+        narrowedByQuery: {
+          startUs: micros("2026-11-12T15:45:00Z"),
+          endUs: micros("2026-11-12T15:50:00Z"),
+        },
+      });
+      await openMenu();
+      expect(el("date-time-chips-note-limit")?.textContent).toContain("Max 1d");
+      expect(el("date-time-chips-note-narrowed")?.textContent?.trim()).toBe("narrowed");
+    });
+  });
+
   describe("presets", () => {
     it("gives dashboards long chips and quarter-first calendar rows", async () => {
       createWrapper({ preset: "dashboard" });
@@ -232,6 +247,38 @@ describe("DateTime v2", () => {
       rows()[0].click();
       await flushPromises();
       expect((el("date-time-input-field") as HTMLInputElement).value).toBe("2h");
+    });
+
+    it("copies the first example into the bar on Tab", async () => {
+      createWrapper();
+      await openMenu();
+      await typeInBar("checkout");
+
+      await pressInBar("Tab");
+      expect((el("date-time-input-field") as HTMLInputElement).value).toBe("2h");
+    });
+
+    it("names the examples list by its heading and keeps the row buttons out of the options", async () => {
+      localStorage.setItem(HISTORY_KEY, JSON.stringify([{ relative: "6h" }]));
+      createWrapper();
+      await openMenu();
+      const list = el("date-time-list")!;
+      const recent = el("date-time-list-recent-0")!;
+      recent.dispatchEvent(new MouseEvent("mousemove", { bubbles: true }));
+      await flushPromises();
+
+      for (const child of Array.from(list.children)) {
+        expect(
+          child.getAttribute("role") === "option" || child.getAttribute("aria-hidden"),
+        ).toBeTruthy();
+      }
+      for (const button of Array.from(recent.querySelectorAll("button"))) {
+        expect(button.closest('[aria-hidden="true"]')).not.toBeNull();
+      }
+
+      await typeInBar("checkout");
+      expect(el("date-time-list")!.getAttribute("aria-label")).toBe("No match yet. You can type:");
+      expect(el("date-time-list-heading")!.getAttribute("aria-hidden")).toBe("true");
     });
 
     it("says why unreadable text failed on Enter and counts it without the text", async () => {
@@ -363,6 +410,29 @@ describe("DateTime v2", () => {
       await flushPromises();
 
       expect((wrapper!.emitted("on:date-change") ?? []).length).toBe(emits + 1);
+      expect(lastEmit()).toMatchObject({ valueType: "relative", relativeTimePeriod: "10m" });
+      expect(wrapper!.vm.triggerLabel).toBe("Last 10 minutes");
+    });
+  });
+
+  describe("in-panel go live", () => {
+    it("keeps the live range after the panel closes on a picker that waits for Apply", async () => {
+      createWrapper({
+        autoApply: false,
+        defaultType: "absolute",
+        defaultAbsoluteTime: {
+          startTime: micros("2026-11-12T10:00:00Z"),
+          endTime: micros("2026-11-12T10:10:00Z"),
+        },
+      });
+      await flushPromises();
+      await openMenu();
+      el("date-time-live-btn")!.click();
+      await flushPromises();
+      wrapper!.vm.menuOpen = false;
+      wrapper!.vm.onMenuOpenChange(false);
+      await flushPromises();
+
       expect(lastEmit()).toMatchObject({ valueType: "relative", relativeTimePeriod: "10m" });
       expect(wrapper!.vm.triggerLabel).toBe("Last 10 minutes");
     });

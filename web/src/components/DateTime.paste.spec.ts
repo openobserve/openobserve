@@ -1910,7 +1910,7 @@ describe("DateTime paste", () => {
       expect(document.querySelector('#date-time-menu [data-test="date-time-live-btn"]')).toBeNull();
     });
 
-    it("stages Live in Apply mode", async () => {
+    it("applies Live at once in Apply mode, as the list has no Apply to stage it for", async () => {
       createWrapper({
         autoApply: false,
         defaultType: "absolute",
@@ -1926,10 +1926,8 @@ describe("DateTime paste", () => {
       button("date-time-live-btn").click();
       await flushPromises();
 
-      expect((wrapper!.emitted("on:date-change") ?? []).length).toBe(before);
-      expect(document.querySelector('[data-test="date-time-resolved"]')?.textContent).toContain(
-        "Last 2 hours",
-      );
+      expect((wrapper!.emitted("on:date-change") ?? []).length).toBe(before + 1);
+      expect(lastEmit()).toMatchObject({ valueType: "relative", relativeTimePeriod: "2h" });
     });
   });
 

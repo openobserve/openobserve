@@ -28,7 +28,7 @@ export interface DateRangeCalendarProps {
   compact?: boolean;
   /** BCP 47 locale for the month heading, weekday letters and day labels. */
   locale?: string;
-  /** First column of the week grid, 0 = Sunday; defaults to the locale's. */
+  /** First column of the week grid, 0 = Sunday (the default). */
   weekStartsOn?: 0 | 1 | 2 | 3 | 4 | 5 | 6;
   /** Accessible name of the grid. */
   calendarLabel?: string;

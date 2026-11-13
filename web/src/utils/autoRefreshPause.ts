@@ -44,14 +44,16 @@ export const autoRefreshState = (options: {
   return "running";
 };
 
-/** One catch-up is owed on return only if a tick fell due while the tab was hidden. */
+/** One query is owed if a tick fell due unseen; past a fixed range's end, only if the last one ran before that end. */
 export const owesCatchUp = (options: {
   intervalSeconds: number;
   lastTickMs: number | null;
   nowMs: number;
-  rangeEnded: boolean;
-}): boolean =>
-  options.intervalSeconds > 0 &&
-  !options.rangeEnded &&
-  options.lastTickMs !== null &&
-  options.nowMs - options.lastTickMs >= options.intervalSeconds * 1000;
+  rangeEndUs?: number | null;
+}): boolean => {
+  if (!(options.intervalSeconds > 0) || options.lastTickMs === null) return false;
+  if (fixedRangeEnded(options.rangeEndUs, options.nowMs)) {
+    return options.lastTickMs * 1000 < (options.rangeEndUs as number);
+  }
+  return options.nowMs - options.lastTickMs >= options.intervalSeconds * 1000;
+};

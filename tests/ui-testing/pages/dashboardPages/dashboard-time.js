@@ -1,5 +1,5 @@
 import { expect } from "@playwright/test";
-import { DATE_TIME_INPUT, isChipPeriod, periodChip, splitPeriodCode, typeRelativePeriod } from "../generalPages/relativePeriod.js";
+import { DATE_TIME_PANEL, hasPeriodChip, periodChip, splitPeriodCode, typeRelativePeriod } from "../generalPages/relativePeriod.js";
 
 //methods : setRelativeTimeRange
 
@@ -56,23 +56,21 @@ export default class DateTimeHelper {
     // Minutes= m	Hours= h	Days= d	Weeks= w	Months= M
 
     const [value, unit] = splitPeriodCode(rangeCode) ?? [];
-    const isChip = isChipPeriod(value, unit);
-    // A period without a chip is typed into the bar, so the bar is what to wait for.
-    const relBtn = isChip
-      ? periodChip(this.page, value, unit)
-      : this.page.locator(`#date-time-menu ${DATE_TIME_INPUT}`);
+    const panel = this.page.locator(DATE_TIME_PANEL).first();
 
     // ViewDashboard binds the picker's :disable to arePanelsLoading, so a click can land just after it goes disabled and silently never open the popover.
     await expect(async () => {
-      if (!(await relBtn.isVisible())) {
+      if (!(await panel.isVisible())) {
         await this.timePickerBtn.click({ timeout: 5000 });
       }
-      await expect(relBtn).toBeVisible({ timeout: 5000 });
+      await expect(panel).toBeVisible({ timeout: 5000 });
     // Budget covers maxquery's deliberately slow panels holding arePanelsLoading true; the inner click stays short so a swallowed click is re-tried fast.
     }).toPass({ timeout: 45000, intervals: [250, 500, 1000, 2000] });
 
+    // A period without a chip on this page (dashboards offer 24h … 1y) is typed into the bar.
+    const isChip = await hasPeriodChip(this.page, value, unit);
     // Use JS click — the dropdown can extend outside the viewport in the new layout
-    if (isChip) await relBtn.evaluate((el) => el.click());
+    if (isChip) await periodChip(this.page, value, unit).evaluate((el) => el.click());
     else await typeRelativePeriod(this.page, value, unit);
     await applyPickedDateTime(this.page);
   }

@@ -553,7 +553,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :initialTimezone="initialTimezone"
             :disable="arePanelsLoading"
             :retention-days="dashboardStreamLimits.retentionDays"
-            :query-range-restriction-in-hour="dashboardStreamLimits.queryRangeRestrictionInHour"
             calendar-presets
             preset="dashboard"
             zone-badge="always"
@@ -2629,7 +2628,7 @@ export default defineComponent({
         ? fixedShareLabel(bounds.startUs, bounds.endUs, store.state.timezone, "dashboard")
         : "";
     });
-    // Every panel's stream bounds the picker: the longest retention greys, the smallest query limit caps.
+    // The longest retention greys; a per-stream query limit stays a per-panel warning, never a clamp on every panel.
     const dashboardStreamLimits = useStreamTimeLimits(() =>
       (currentDashboardData.data?.tabs ?? []).flatMap((tab: any) =>
         (tab?.panels ?? []).flatMap((panel: any) =>

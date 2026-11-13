@@ -943,7 +943,7 @@ import {
 } from "@/utils/logs/convertLogData";
 import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
 import { useRouter } from "vue-router";
-import { searchAroundPickerRange, useSearchAround } from "@/composables/useLogs/searchAround";
+import { useSearchAround } from "@/composables/useLogs/searchAround";
 import { usePagination } from "@/composables/useLogs/usePagination";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import useStreamFields from "@/composables/useLogs/useStreamFields";
@@ -1076,6 +1076,7 @@ export default defineComponent({
     "update:datetime",
     "remove:searchTerm",
     "search:timeboxed",
+    "search:aroundwindow",
     "expandlog",
     "update:recordsPerPage",
     "update:columnSizes",
@@ -1269,8 +1270,7 @@ export default defineComponent({
       clearPermalink();
       this.searchObj.meta.showDetailTab = false;
       resetRowSelection(this.searchObj);
-      // The page's date handler calls setCustomDate, so the window lands in Recent and re-runs the search.
-      this.$emit("update:datetime", searchAroundPickerRange(range, this.store.state.timezone));
+      this.$emit("search:aroundwindow", range);
     },
     toggleErrorDetails() {
       this.disableMoreErrorDetails = !this.disableMoreErrorDetails;

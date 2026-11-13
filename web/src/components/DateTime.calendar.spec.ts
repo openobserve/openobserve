@@ -778,6 +778,32 @@ describe("DateTime calendar", () => {
       });
     });
 
+    it("blocks Apply and Enter on unreadable Start text and says how to type a time", async () => {
+      createWrapper(absoluteProps(false));
+      await flushPromises();
+      await openMenu();
+      const emits = (wrapper!.emitted("on:date-change") ?? []).length;
+
+      await commit("datetime-start-time", "noon-ish");
+
+      expect(el("date-time-apply-btn")!.disabled).toBe(true);
+      expect(document.body.textContent).toContain("Enter a time as HH:MM.");
+      expect(el("date-time-input-examples")?.textContent).toBe("for example 09:30 or 09:30:15");
+      expect(
+        document.querySelectorAll('[data-test="datetime-start-time"] [role="alert"]'),
+      ).toHaveLength(0);
+      timeField("datetime-start-time").dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+      );
+      await flushPromises();
+      expect(wrapper!.vm.menuOpen).toBe(true);
+      expect((wrapper!.emitted("on:date-change") ?? []).length).toBe(emits);
+
+      await commit("datetime-start-time", "08:00");
+      expect(el("date-time-apply-btn")!.disabled).toBe(false);
+      expect(document.body.textContent).not.toContain("Enter a time as HH:MM.");
+    });
+
     it("keeps the fields on the resolved range when the clock moves on", async () => {
       createWrapper({ autoApply: true });
       await flushPromises();

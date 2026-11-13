@@ -972,9 +972,8 @@ export default defineComponent({
 
     const searchAroundUser = () => String(store.state.userInfo?.email ?? "");
     const searchAroundChoice = ref<SearchAroundChoice>(readSearchAroundChoice(searchAroundUser()));
-    // All nine choices fit without scrolling where the viewport allows it.
     const SEARCH_AROUND_MENU_STYLE = {
-      maxHeight: "min(23rem, var(--reka-select-content-available-height, 23rem))",
+      maxHeight: "min(30rem, var(--reka-select-content-available-height, 30rem))",
     };
     const searchAroundTimeOptions = computed(() =>
       SEARCH_AROUND_SECONDS.map((seconds) => ({
@@ -1626,9 +1625,8 @@ export default defineComponent({
   width: 85vw;
 }
 
-/* Fits the longest option, "100 records", beside the chevron. */
 .select-noof-records {
-  width: 8.5rem;
+  width: 9.25rem;
 }
 
 /* keep(lib-override:otable): reaches into the OTable-rendered th/td DOM to

@@ -260,6 +260,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="xs"
                 class="h-full text-xs!"
                 data-test="trace-details-sidebar-search-around-btn"
+                :disabled="isViewLogsDisabled"
                 @click.stop="searchAroundSpan"
               >
                 {{ t("dateTime.searchAroundWindow") }}
@@ -2181,6 +2182,7 @@ export default defineComponent({
 
     // Unfiltered on purpose: the point is what else happened in the log streams near this span.
     const searchAroundSpan = () => {
+      if (isViewLogsDisabled.value) return;
       const choice = parseSearchAroundChoice(spanSearchAroundChoice.value);
       const spanStartUs = Math.floor(Number(props.span?.start_time) / 1000);
       if (choice?.kind !== "time" || !Number.isFinite(spanStartUs)) return;

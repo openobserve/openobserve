@@ -65,7 +65,8 @@ describe("search around a row", () => {
     expect(parseSearchAroundChoice("t1")).toEqual({ kind: "time", seconds: 60 });
     expect(parseSearchAroundChoice("r100")).toEqual({ kind: "records", count: 100 });
     expect(parseSearchAroundChoice("t7")).toBeNull();
-    expect(parseSearchAroundChoice("r1000")).toBeNull();
+    expect(parseSearchAroundChoice("r1000")).toEqual({ kind: "records", count: 1000 });
+    expect(parseSearchAroundChoice("r2000")).toBeNull();
     expect(parseSearchAroundChoice(5)).toBeNull();
   });
 

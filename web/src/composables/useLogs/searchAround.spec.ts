@@ -115,6 +115,22 @@ describe("useSearchAround", () => {
     vi.clearAllMocks();
   });
 
+  it("clears the filter of a plain query and the WHERE of SQL for a window around a row", () => {
+    searchObj.value = buildSearchObj(["stream1"]);
+    searchObj.value.data.query = "level = 'error'";
+    wrapper = mount(TestComponent, { global: { plugins: [i18n] } });
+    wrapper.vm.clearFilterForContext();
+    expect(searchObj.value.data.query).toBe("");
+    expect(searchObj.value.data.editorValue).toBe("");
+    wrapper.unmount();
+
+    searchObj.value = buildSearchObj(["stream1"], true);
+    searchObj.value.data.query = `SELECT * FROM "stream1" WHERE level = 'error'`;
+    wrapper = mount(TestComponent, { global: { plugins: [i18n] } });
+    wrapper.vm.clearFilterForContext();
+    expect(searchObj.value.data.query).toBe('SELECT * FROM "stream1"');
+  });
+
   it("searches around the hit's own stream when several streams are selected", async () => {
     const body = { _timestamp: 1700000000000000, _stream_name: "stream2" };
     const request = await run(["stream1", "stream2"], body);

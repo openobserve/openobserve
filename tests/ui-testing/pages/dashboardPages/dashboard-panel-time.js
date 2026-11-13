@@ -1,7 +1,7 @@
 import { expect } from "@playwright/test";
 import { applyPickedDateTime } from "./dashboard-time.js";
 import { settlePanelLeave } from "./panel-leave-dialog.js";
-import { isChipPeriod, openDateFields, periodChip, pickRelativePeriodCode, splitPeriodCode, typeRelativePeriod } from "../generalPages/relativePeriod.js";
+import { hasPeriodChip, openDateFields, periodChip, pickRelativePeriodCode, splitPeriodCode, typeRelativePeriod } from "../generalPages/relativePeriod.js";
 
 /**
  * Page Object for Panel Time Range operations
@@ -359,7 +359,7 @@ export default class DashboardPanelTime {
     // Page-level locators survive portal re-mounts; only one datetime menu can be
     // open at a time (Reka UI unmounts when closed), so these are unambiguous.
     const [presetValue, presetUnit] = splitPeriodCode(timeRange) ?? [];
-    const isChip = isChipPeriod(presetValue, presetUnit);
+    const isChip = await hasPeriodChip(this.page, presetValue, presetUnit);
     // A period without a chip is typed into the bar; the apply path below is unchanged.
     if (!isChip) await typeRelativePeriod(this.page, presetValue, presetUnit);
     const timeOptionLocator = periodChip(this.page, presetValue, presetUnit);

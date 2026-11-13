@@ -152,10 +152,12 @@ export const formatRangeCopyText = (
   opts: RangeLabelOptions = {},
 ): string => {
   const zone = safeTimezone(opts.timezone);
+  // Stamps hold milliseconds; the exclusive end rounds up so pasting the copy keeps the last sub-ms event.
+  const endUs = Math.ceil(range.endUs / MICROS_PER_MS) * MICROS_PER_MS;
   const startMs = Math.floor(range.startUs / MICROS_PER_MS);
-  const endMs = Math.floor(range.endUs / MICROS_PER_MS);
+  const endMs = endUs / MICROS_PER_MS;
   const start = civilOf(range.startUs, zone);
-  const end = civilOf(range.endUs, zone);
+  const end = civilOf(endUs, zone);
   const precision = range.live
     ? range.endUs - range.startUs < LIVE_SECONDS_BELOW_US
       ? "second"

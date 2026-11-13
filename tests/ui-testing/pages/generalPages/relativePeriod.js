@@ -3,22 +3,20 @@
 export const DATE_TIME_PANEL = '#date-time-menu';
 export const DATE_TIME_INPUT = '[data-test="date-time-input-field"]';
 
-// The picker's chips (TIME_RANGE_CHIPS); every other period is typed into the bar.
-const CHIP_PERIODS = new Set(['15-m', '1-h', '4-h', '24-h', '7-d', '30-d']);
-
 /** Splits a "6-d" style code into ["6", "d"], or returns null. */
 export function splitPeriodCode(code) {
     const match = String(code).match(/^(\d+)-([smhdwM])$/);
     return match ? [match[1], match[2]] : null;
 }
 
-export function isChipPeriod(value, unit) {
-    return CHIP_PERIODS.has(`${value}-${unit}`);
-}
-
 /** The chip for a period, e.g. ("15", "m") -> date-time-chip-15m. */
 export function periodChip(page, value, unit) {
     return page.locator(`${DATE_TIME_PANEL} [data-test="date-time-chip-${value}${unit}"]`).first();
+}
+
+/** Whether the open picker shows a chip for the period; chip sets differ by page (dashboards: 24h … 1y). */
+export async function hasPeriodChip(page, value, unit) {
+    return periodChip(page, value, unit).isVisible().catch(() => false);
 }
 
 /** Relative and Absolute share one panel, so a former tab click only waits for the open panel. */
@@ -49,7 +47,8 @@ export async function typeRelativePeriod(page, value, unit) {
 
 /** Picks a period in the open picker: a chip when one matches, else the typed shorthand. Both apply and close. */
 export async function pickRelativePeriod(page, value, unit, { clickOptions = {} } = {}) {
-    if (isChipPeriod(value, unit)) {
+    await waitForDateTimePanel(page);
+    if (await hasPeriodChip(page, value, unit)) {
         await periodChip(page, value, unit).click(clickOptions);
         return;
     }

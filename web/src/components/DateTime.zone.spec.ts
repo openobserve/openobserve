@@ -87,6 +87,40 @@ describe("DateTime pickerTimezone and hideClipboard", () => {
     }
   });
 
+  it("keeps the applied range when the zone changes and the panel closes without Apply", async () => {
+    createWrapper({ pickerTimezone: "Asia/Calcutta", autoApply: false });
+    await flushPromises();
+    wrapper!.vm.onMenuOpenChange(true);
+    wrapper!.vm.menuOpen = true;
+    await flushPromises();
+    wrapper!.vm.timezone = "UTC";
+    await wrapper!.vm.onTimezoneChange();
+    await flushPromises();
+    wrapper!.vm.menuOpen = false;
+    wrapper!.vm.onMenuOpenChange(false);
+    await flushPromises();
+
+    const range = wrapper!.vm.getConsumableDateTime();
+    expect(range.startTime).toBe(START);
+    expect(range.endTime).toBe(END);
+    expect(wrapper!.vm.selectedTime.startTime).toBe("00:00:00");
+  });
+
+  it("re-emits a linked fixed range as fixed when the link also names a zone", async () => {
+    createWrapper({
+      disableRelative: false,
+      defaultType: "absolute",
+      initialTimezone: "Asia/Calcutta",
+    });
+    await flushPromises();
+    const events = wrapper!.emitted("on:date-change") as Record<string, unknown>[][];
+    expect(events.length).toBeGreaterThan(0);
+    for (const [payload] of events) {
+      expect(payload.valueType).toBe("absolute");
+      expect(payload.startTime).toBe(START);
+    }
+  });
+
   it("drops the text input, copy and paste but keeps the zone select and the resolved range", async () => {
     createWrapper({ pickerTimezone: "Asia/Calcutta", hideClipboard: true, defaultOpen: true });
     await flushPromises();

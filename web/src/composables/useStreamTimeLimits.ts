@@ -16,6 +16,7 @@
 import { ref, watch, type Ref } from "vue";
 import { useStore } from "vuex";
 import useStreams from "@/composables/useStreams";
+import { useI18nTyped } from "@/types/i18n";
 import { inheritedRetentionDays } from "@/utils/dataRetention";
 
 export interface StreamRef {
@@ -61,7 +62,8 @@ export const combineStreamTimeLimits = (
 /** Reads the streams' settings from the stream cache and keeps their combined limits current. */
 export const useStreamTimeLimits = (streams: () => StreamRef[]): Ref<StreamTimeLimits> => {
   const store = useStore();
-  const { getStream } = useStreams();
+  const { t } = useI18nTyped();
+  const { getStream } = useStreams(t);
   const limits = ref<StreamTimeLimits>({
     retentionDays: undefined,
     queryRangeRestrictionInHour: 0,

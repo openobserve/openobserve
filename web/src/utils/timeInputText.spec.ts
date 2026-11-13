@@ -54,3 +54,12 @@ describe("formatTimeInputText", () => {
     expect(formatTimeInputText({ type: "relative", period: "15M" })).toBe("15mo");
   });
 });
+
+describe("calendar periods further back [#10]", () => {
+  it.each(["calendar:day:-3", "calendar:week:-3", "calendar:month:-3", "calendar:quarter:-3"])(
+    "writes %s as text that reads back",
+    (period) => {
+      expect(roundTrip({ type: "relative", period })).toEqual({ type: "relative", period });
+    },
+  );
+});
