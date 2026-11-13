@@ -887,6 +887,41 @@ describe("Index.vue (Main Traces Page)", () => {
       expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalled();
     });
 
+    it("names the range the shown results came from once the picker moves off it (V17)", async () => {
+      store.state.zoConfig.auto_query_enabled = true;
+      mockSearchObj.meta.liveMode = false;
+      const datetime = mockSearchObj.data.datetime;
+      try {
+        mockSearchObj.meta.lastRunSignature = tracesSearchRunSignature(mockSearchObj);
+        mockSearchObj.data.datetime = { ...datetime, relativeTimePeriod: "1h" };
+        wrapper = mountTraces();
+        await flushPromises();
+        expect(wrapper.vm.staleRangeText).toContain("Results are for");
+        expect(wrapper.vm.staleRangeText).toContain("15");
+      } finally {
+        mockSearchObj.data.datetime = datetime;
+        mockSearchObj.meta.lastRunSignature = null;
+      }
+    });
+
+    it("shows no range strip while Auto Run is on (V17)", async () => {
+      store.state.zoConfig.auto_query_enabled = true;
+      mockSearchObj.meta.liveMode = true;
+      localStorage.setItem("oo_toggle_auto_run", "true");
+      const datetime = mockSearchObj.data.datetime;
+      try {
+        mockSearchObj.meta.lastRunSignature = tracesSearchRunSignature(mockSearchObj);
+        mockSearchObj.data.datetime = { ...datetime, relativeTimePeriod: "1h" };
+        wrapper = mountTraces();
+        await flushPromises();
+        expect(wrapper.vm.staleRangeText).toBeNull();
+      } finally {
+        mockSearchObj.data.datetime = datetime;
+        mockSearchObj.meta.lastRunSignature = null;
+        mockSearchObj.meta.liveMode = false;
+      }
+    });
+
     it("still loads a shared link's stream with Auto Run off", async () => {
       store.state.zoConfig.auto_query_enabled = true;
       mockSearchObj.meta.liveMode = false;

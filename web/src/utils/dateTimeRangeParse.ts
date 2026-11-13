@@ -19,7 +19,7 @@ import { formatInTimeZone, fromZonedTime, getTimezoneOffset } from "date-fns-tz"
 
 import { parseCalendarToken } from "@/utils/dashboard/calendarPeriods";
 import { CALENDAR_RAIL_ITEMS } from "@/utils/timeRangeRail";
-import { weekStartsOn, type WeekDay } from "@/utils/weekStart";
+import { browserLanguage, weekStartsOn, type WeekDay } from "@/utils/weekStart";
 
 export interface AbsoluteRangeResult {
   type: "absolute";
@@ -29,7 +29,7 @@ export interface AbsoluteRangeResult {
   endTime: string;
   /** A single typed time the range was widened around; a zoned reader widens it in real time, as a DST day's civil clock skips or repeats. */
   centre?: { date: string; time: string };
-  /** The text gave a year, so its wall clock may be a pasted stamp from another zone. */
+  /** A machine stamp with its year, so its wall clock may come from another zone. */
   hasYear?: boolean;
   /** Real instants for text counted back from now, as the civil fields repeat an hour on a DST fall-back. */
   exact?: { startMicros: number; endMicros: number };
@@ -45,6 +45,8 @@ export interface TimestampRangeResult {
   endMicros: number;
   /** The zone the text wrote its times in (`UTC`, `UTC+05:30`, `Asia/Kolkata`); absent for epoch numbers. */
   sourceZone?: string;
+  /** A stamp that wrote its offset as `Z` or `+00:00`: read as UTC rather than typed in a zone. */
+  utcStamp?: boolean;
   /** The instant a lone pasted or typed time was widened around. */
   centreMicros?: number;
   epochUnit?: EpochUnit;
@@ -197,7 +199,9 @@ const TIME_ONLY_RE = /^(\d{2}):(\d{2})(?::(\d{2}(?:\.\d{1,6})?))?(Z|[+-]\d{2}(?:
 // The app's own log/trace timestamp display format (src/utils/date.ts formatTimestamp).
 const HUMAN_LOG_SINGLE_RE =
   /^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{1,2}),?\s+(\d{4})\s+(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,6}))?(?:\s+(Z|[+-]\d{2}(?::?\d{2})?))?$/i;
-const RELATIVE_RE = /^(?:(?:last|past)\s+)?(\d{1,6})?\s*([a-z]+)$/i;
+// A count may carry the digit grouping its label was shown with: `Last 2,025 minutes`.
+const RELATIVE_RE =
+  /^(?:(?:last|past)\s+)?(\d{1,3}(?:[,.\u00a0\u202f]\d{3})+|\d{1,6})?\s*([a-z]+)$/i;
 // Tried in order; each must split the text into exactly two sides, so a date's own `-` or `/` never counts as one.
 const BARE_DASH = /\s*-\s*/;
 const SPACED_DASH = /\s+-\s+/;
@@ -472,7 +476,7 @@ export function parseRelativeText(raw: string): string | null {
   const [, count, unitText] = match;
   if (!count && !/^(last|past)\s/i.test(raw.trim())) return null;
   const unit = unitText === "M" ? "M" : RELATIVE_UNITS[unitText.toLowerCase()];
-  const value = count ? Number(count) : 1;
+  const value = count ? Number(count.replace(/\D/g, "")) : 1;
   if (!unit || !(value >= 1)) return null;
   return `${value}${unit}`;
 }
@@ -860,7 +864,13 @@ function timeKey(time: string, subMicros = 0): string {
 }
 
 function withSourceZone(range: TimestampRangeResult, offset?: string): TimestampRangeResult {
-  return offset ? { ...range, sourceZone: offsetLabel(offsetMillis(offset) / MINUTE_MS) } : range;
+  if (!offset) return range;
+  const minutes = offsetMillis(offset) / MINUTE_MS;
+  return {
+    ...range,
+    sourceZone: offsetLabel(minutes),
+    ...(minutes === 0 ? { utcStamp: true } : {}),
+  };
 }
 
 function offsetLabel(minutes: number): string {
@@ -947,8 +957,7 @@ function toMicros(digits: string): number {
 
 function createContext(opts?: TimeInputOptions, flips: Partial<ParseContext> = {}): ParseContext {
   const now = opts?.now ?? new Date();
-  const locale =
-    opts?.locale ?? (typeof navigator === "undefined" ? undefined : navigator.language);
+  const locale = opts?.locale ?? browserLanguage();
   return {
     now,
     nowCivil: wallClockOf(now, opts?.timeZone),
@@ -1035,10 +1044,10 @@ function readTimeInput(raw: string, ctx: ParseContext): ParsedTimeInput | null {
   const business = readBusinessPeriod(pasted, ctx);
   if (business) return isWhollyFuture(business, ctx) && !ctx.keepFuture ? null : business;
   const stamped = readQueryString(pasted, ctx.seen) ?? readLegacy(pasted, ctx.seen);
-  if (stamped) return markYear(stamped);
+  if (stamped) return isStampText(pasted) ? markYear(stamped) : stamped;
   const natural = readNatural(pasted, ctx);
   if (natural) {
-    if (ctx.seen.year) return markYear(natural);
+    if (ctx.seen.year) return isStampText(pasted) ? markYear(natural) : natural;
     if (!isWhollyFuture(natural, ctx)) return natural;
     return ctx.keepFuture ? markFuture(natural) : null;
   }
@@ -1155,6 +1164,11 @@ function periodsBetween(from: number, to: number, unit: string): number {
   }
   const size = (unit === "w" ? 7 : 1) * DAY_MS;
   return Math.round((to - from) / size);
+}
+
+// Numbers alone (`4/11/26 10:00`) or a fraction of a second (the picker's own stamps) mark a machine stamp.
+function isStampText(text: string): boolean {
+  return !/[a-z]{3}/i.test(text) || /:\d{2}[.,]\d/.test(text);
 }
 
 function markYear(reading: ParsedTimeInput): ParsedTimeInput {

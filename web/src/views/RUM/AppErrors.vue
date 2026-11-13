@@ -774,7 +774,9 @@ const updateDateChange = (date: any) => {
     valueType: date.relativeTimePeriod ? "relative" : "absolute",
   };
   errorTrackingState.data.datetime = dateTime.value;
-  if (!isLoading.value.length && date.valueType === "relative") runQuery();
+  // The picker commits typed and calendar ranges only on Apply, so any user change runs.
+  const userApplied = date.valueType === "relative" || date.userChangedValue === true;
+  if (!isLoading.value.length && userApplied) runQuery();
 };
 
 const runQuery = () => {

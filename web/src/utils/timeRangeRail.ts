@@ -178,10 +178,11 @@ export const formatKnownPeriod = (
   const count = Number(rolling?.[1]);
   if (!rolling || !(count >= 1)) return null;
   // Years are stored as months, so whole years read back in the unit they were typed in.
+  const digits = new Intl.NumberFormat(locale);
   if (rolling[2] === "M" && count % 12 === 0) {
-    return t("common.pastYear", { count: count / 12 }, count / 12);
+    return t("common.pastYear", { count: digits.format(count / 12) }, count / 12);
   }
-  return t(PAST_PERIOD_KEYS[rolling[2]], { count }, count);
+  return t(PAST_PERIOD_KEYS[rolling[2]], { count: digits.format(count) }, count);
 };
 
 /** "Last 15 minutes" for a rolling period, the calendar label for a token, else the text as given. */

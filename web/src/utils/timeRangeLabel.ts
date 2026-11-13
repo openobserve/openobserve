@@ -50,6 +50,13 @@ export interface RangeLabelInput {
 
 type Precision = "minute" | "second" | "ms";
 
+// `toDate`: a period still running, shown from its start to the range's end.
+interface NamedPeriod {
+  name: string;
+  withDates: boolean;
+  toDate?: boolean;
+}
+
 interface Civil {
   date: string;
   time: string;
@@ -82,6 +89,19 @@ export const namedFixedPeriod = (
   opts: RangeLabelOptions = {},
 ): string | null => periodOf(startUs, endUs, opts)?.name ?? null;
 
+/** A named fixed range in two parts, as the summary row shows it: "Q4 2026" and "Oct 1 – Nov 12, 21:24". */
+export const namedFixedRange = (
+  startUs: number,
+  endUs: number,
+  opts: RangeLabelOptions = {},
+): { name: string; dates: string } | null => {
+  const period = periodOf(startUs, endUs, opts);
+  if (!period) return null;
+  const range = { startUs, endUs };
+  const dates = period.withDates ? periodDates(period, range, opts) : formatRangeDates(range, opts);
+  return { name: period.name, dates };
+};
+
 /** Live: the name, or "name · dates" when `showDates`. Fixed: "Q3 2026 · Jul 1 – Sep 30", "Sep 2026", "2025", else the dates. */
 export const formatRangeLabel = (
   range: RangeLabelInput,
@@ -95,9 +115,7 @@ export const formatRangeLabel = (
   const period = periodOf(range.startUs, range.endUs, opts);
   if (!period) return formatRangeDates(range, opts);
   if (!period.withDates) return period.name;
-  // The period's name already says the year, so its dates leave it out.
-  const shape = { ...shapeOf(range, opts), withYear: false };
-  return `${period.name} · ${datesOf(shape)}`;
+  return `${period.name} · ${periodDates(period, range, opts)}`;
 };
 
 /** Largest two units ("2m 20s", "12h 24m"); "1 ms" or "974 µs" under a second, never "0s". */
@@ -221,7 +239,12 @@ const shapeOf = (range: RangeLabelInput, opts: RangeLabelOptions): Shape => {
     : neededPrecision(start, end);
   if (span < MS_BELOW_US) precision = "ms";
   else if (precision === "ms") precision = "second";
-  return { zone, locale, start, lastDay, end, wholeDays, withYear, precision };
+  // The End field shows an exclusive midnight as 23:59:59, so a label with seconds does too.
+  const shownEnd =
+    !wholeDays && precision === "second" && isMidnight(end)
+      ? civilOf(range.endUs - MICROS_PER_SECOND, zone)
+      : end;
+  return { zone, locale, start, lastDay, end: shownEnd, wholeDays, withYear, precision };
 };
 
 const datesOf = (shape: Shape): string => {
@@ -249,6 +272,20 @@ const datesOf = (shape: Shape): string => {
   return `${startText}${DASH}${clean(clock.format(at(end)))}`;
 };
 
+// The period's name already says the year, so its dates leave it out.
+const periodDates = (period: NamedPeriod, range: RangeLabelInput, opts: RangeLabelOptions) => {
+  const shape = { ...shapeOf(range, opts), withYear: false };
+  return period.toDate ? sinceDates(shape) : datesOf(shape);
+};
+
+// "Oct 1 – Nov 12, 21:24": the start of a running period is its first day.
+const sinceDates = ({ locale, start, end }: Shape): string => {
+  const first = new Intl.DateTimeFormat(locale, dayOptions(false));
+  const last = new Intl.DateTimeFormat(locale, { ...dayOptions(false), ...clockOptions("minute") });
+  const startText = clean(first.format(new Date(`${start.date}T00:00:00Z`)));
+  return `${startText}${DASH}${clean(last.format(new Date(`${end.date}T${end.time}Z`)))}`;
+};
+
 const dayOptions = (withYear: boolean): Intl.DateTimeFormatOptions => ({
   month: "short",
   day: "numeric",
@@ -270,33 +307,65 @@ const clockText = (civil: Civil, precision: Precision): string => {
 };
 
 // A fixed range from a month's first midnight to a later one is that month, quarter, half or year.
-const periodOf = (
-  startUs: number,
-  endUs: number,
-  opts: RangeLabelOptions,
-): { name: string; withDates: boolean } | null => {
+const periodOf = (startUs: number, endUs: number, opts: RangeLabelOptions): NamedPeriod | null => {
   const zone = safeTimezone(opts.timezone);
   const locale = opts.locale ?? "en-US";
   const start = civilOf(startUs, zone);
   const end = civilOf(endUs, zone);
-  if (!isMidnight(start) || !isMidnight(end) || !start.date.endsWith("-01")) return null;
-  if (!end.date.endsWith("-01")) return null;
+  if (!isMidnight(start) || !start.date.endsWith("-01")) return null;
   const startMonth = Number(start.date.slice(5, 7)) - 1;
+  if (!isMidnight(end) || !end.date.endsWith("-01")) {
+    return startedPeriod(start, end, startMonth, endUs - startUs, opts);
+  }
   const months = (end.year - start.year) * 12 + Number(end.date.slice(5, 7)) - 1 - startMonth;
-  const number = new Intl.NumberFormat(locale, { useGrouping: false });
-  const year = number.format(start.year);
-  if (months === 12 && startMonth === 0) return { name: year, withDates: false };
-  if (months === 6 && startMonth % 6 === 0) {
-    return { name: `H${number.format(startMonth / 6 + 1)} ${year}`, withDates: true };
-  }
-  if (months === 3 && startMonth % 3 === 0) {
-    return { name: `Q${number.format(startMonth / 3 + 1)} ${year}`, withDates: true };
-  }
-  if (months !== 1) return null;
-  const month = new Intl.DateTimeFormat(locale, {
-    month: "short",
-    year: "numeric",
-    timeZone: "UTC",
-  }).format(new Date(`${start.date}T00:00:00Z`));
-  return { name: clean(month), withDates: false };
+  if (months === 1) return { name: monthName(start, locale), withDates: false };
+  const name = periodName(start.year, startMonth, months, locale);
+  return name ? { name, withDates: months !== 12 } : null;
 };
+
+// A typed `Q4` or `2026` runs from its period's start to now; it is named while that period is still running.
+const startedPeriod = (
+  start: Civil,
+  end: Civil,
+  startMonth: number,
+  spanUs: number,
+  opts: RangeLabelOptions,
+): NamedPeriod | null => {
+  if (spanUs < MICROS_PER_DAY || isMidnight(end)) return null;
+  const now = civilOf((opts.nowMs ?? Date.now()) * MICROS_PER_MS, safeTimezone(opts.timezone));
+  const at = (civil: Civil) => `${civil.date} ${civil.time}`;
+  for (const months of [1, 3, 6, 12]) {
+    if (startMonth % months !== 0) continue;
+    const next = startMonth + months;
+    const year = start.year + Math.floor(next / 12);
+    const periodEnd = `${year}-${String((next % 12) + 1).padStart(2, "0")}-01 00:00:00.000`;
+    if (at(end) >= periodEnd) continue;
+    if (at(now) >= periodEnd) return null;
+    const locale = opts.locale ?? "en-US";
+    const name =
+      months === 1 ? monthName(start, locale) : periodName(start.year, startMonth, months, locale);
+    return name ? { name, withDates: true, toDate: true } : null;
+  }
+  return null;
+};
+
+const periodName = (
+  startYear: number,
+  startMonth: number,
+  months: number,
+  locale: string,
+): string | null => {
+  const number = new Intl.NumberFormat(locale, { useGrouping: false });
+  const year = number.format(startYear);
+  if (months === 12 && startMonth === 0) return year;
+  if (months === 6 && startMonth % 6 === 0) return `H${number.format(startMonth / 6 + 1)} ${year}`;
+  if (months === 3 && startMonth % 3 === 0) return `Q${number.format(startMonth / 3 + 1)} ${year}`;
+  return null;
+};
+
+const monthName = (start: Civil, locale: string): string =>
+  clean(
+    new Intl.DateTimeFormat(locale, { month: "short", year: "numeric", timeZone: "UTC" }).format(
+      new Date(`${start.date}T00:00:00Z`),
+    ),
+  );

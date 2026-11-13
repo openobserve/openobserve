@@ -442,6 +442,17 @@ describe("Logs Index", async () => {
       expect(strip.text()).toContain(wrapper.vm.staleRangeText);
     });
 
+    it("keeps the strip above the no-events state (V5)", async () => {
+      await showStaleRange();
+      wrapper.vm.searchObj.data.queryResults = { hits: [] };
+      await flushPromises();
+      const empty = wrapper.find('[data-test="logs-search-no-events-found-text"]');
+      expect(empty.exists()).toBe(true);
+      const strip = empty.find('[data-test="logs-search-bar-stale-range-strip"]');
+      expect(strip.exists()).toBe(true);
+      expect(strip.text()).toContain(wrapper.vm.staleRangeText);
+    });
+
     it("runs the query from the strip", async () => {
       await showStaleRange();
       const handleRunQueryFn = vi.fn();

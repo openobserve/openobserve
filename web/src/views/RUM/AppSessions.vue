@@ -1451,7 +1451,9 @@ const updateDateChange = (date: any) => {
     valueType: date.relativeTimePeriod ? "relative" : "absolute",
   };
   sessionState.data.datetime = dateTime.value;
-  if (date.valueType === "relative" && isMounted.value) getSessions();
+  // The picker commits typed and calendar ranges only on Apply, so any user change runs.
+  const userApplied = date.valueType === "relative" || date.userChangedValue === true;
+  if (userApplied && isMounted.value) getSessions();
 };
 
 const splitterModel = ref(250);

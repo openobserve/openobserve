@@ -445,13 +445,17 @@ describe("DateTime Component", () => {
       wrapper.vm.selectedDate = { from: "2026/09/07", to: "2026/09/07" };
       wrapper.vm.selectedTime = { startTime: "22:00:00", endTime: "23:00:00" };
 
+      const before = wrapper.vm.getConsumableDateTime();
       wrapper.vm.shiftTimeRange("next");
 
-      // The window advances by its own duration (1h); the end must roll into the
-      // next day rather than wrapping back to "00:00:00" on the same date.
-      expect(wrapper.vm.selectedDate).toEqual({ from: "2026/09/07", to: "2026/09/08" });
-      expect(wrapper.vm.selectedTime).toEqual({ startTime: "23:00:00", endTime: "00:00:00" });
+      // The window advances by its own duration (1h); a midnight end shows as the day's last second.
+      expect(wrapper.vm.selectedDate).toEqual({ from: "2026/09/07", to: "2026/09/07" });
+      expect(wrapper.vm.selectedTime).toEqual({ startTime: "23:00:00", endTime: "23:59:59" });
       expect(wrapper.vm.selectedType).toBe("absolute");
+      expect(wrapper.vm.getConsumableDateTime()).toMatchObject({
+        startTime: before.endTime,
+        endTime: before.endTime + 3_600_000_000,
+      });
     });
 
     it("should shift the range backward across midnight with shiftTimeRange('prev')", () => {
@@ -462,10 +466,15 @@ describe("DateTime Component", () => {
       wrapper.vm.selectedDate = { from: "2026/09/08", to: "2026/09/08" };
       wrapper.vm.selectedTime = { startTime: "00:00:00", endTime: "01:00:00" };
 
+      const before = wrapper.vm.getConsumableDateTime();
       wrapper.vm.shiftTimeRange("prev");
 
-      expect(wrapper.vm.selectedDate).toEqual({ from: "2026/09/07", to: "2026/09/08" });
-      expect(wrapper.vm.selectedTime).toEqual({ startTime: "23:00:00", endTime: "00:00:00" });
+      expect(wrapper.vm.selectedDate).toEqual({ from: "2026/09/07", to: "2026/09/07" });
+      expect(wrapper.vm.selectedTime).toEqual({ startTime: "23:00:00", endTime: "23:59:59" });
+      expect(wrapper.vm.getConsumableDateTime()).toMatchObject({
+        startTime: before.startTime - 3_600_000_000,
+        endTime: before.startTime,
+      });
       expect(wrapper.vm.selectedType).toBe("absolute");
     });
 

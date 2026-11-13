@@ -24,11 +24,18 @@ import {
   stepListCursor,
   type TimeRangeListRow,
 } from "@/utils/timeRangeList";
-import { formatRangeDates, formatRangeDuration, formatRangeLabel } from "@/utils/timeRangeLabel";
+import {
+  formatRangeDates,
+  formatRangeDuration,
+  formatRangeLabel,
+  formatZoneOffset,
+} from "@/utils/timeRangeLabel";
 import {
   DEFAULT_ANCHOR_WINDOW,
   anchorRows,
+  anchorSearchAroundChoice,
   anchorWindowLabel,
+  dropZeroMilliseconds,
   readingAnchorMicros,
   type AnchorRow,
 } from "@/utils/timeRangeAnchor";
@@ -37,12 +44,14 @@ import {
   currentSearchAroundUser,
   readSearchAroundChoice,
   searchAroundAnchorId,
+  writeSearchAroundChoice,
 } from "@/utils/searchAroundWindow";
 import {
   SINGLE_WINDOW_MICROS,
   explainTimeInputFailure,
   parseRollingPeriod,
   parseTimeInput,
+  resolveZonedCivil,
   suggestTimeInput,
   type AbsoluteRangeResult,
   type ParsedTimeInput,
@@ -53,10 +62,13 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import type { TimeRangeZone } from "@/composables/useTimeRangeZone";
 import { MAX_CUSTOM_RELATIVE_VALUE, type TimeRangeLimits } from "@/composables/useTimeRangeLimits";
+import { MICROS_PER_HOUR } from "@/composables/useTimeRangeZone";
 
 // Typed text is read this long after the last keystroke, so the preview does not flicker per key.
 const INPUT_READ_DELAY_MS = 100;
 const MAX_SUGGESTIONS = 5;
+// A clock time alone (`11:38`), which reads as an instant whichever half of the day it means.
+const LONE_CLOCK_RE = /^\d{1,2}:\d{2}(?::\d{2}(?:\.\d+)?)?$/;
 
 // What Enter would do with a reading, worked out once so the preview and Enter never disagree.
 export type InputPlan =
@@ -64,7 +76,14 @@ export type InputPlan =
   | { kind: "calendar"; token: string }
   | { kind: "absolute"; start: number; end: number; calendarPeriod: string | null }
   | { kind: "refused"; message: I18nText }
-  | { kind: "restricted"; message: I18nText };
+  | {
+      kind: "restricted";
+      message: I18nText;
+      // The row's greyed meta: `Max 1d`, or `Outside 3-day retention` when `retention`.
+      reason: string;
+      retention?: boolean;
+      range?: { start: number; end: number };
+    };
 
 interface TimeInputSuggestionRow {
   key: string;
@@ -124,6 +143,7 @@ export default function useTimeRangeTyping(props: TimeRangeTypingProps, deps: Ti
     calendarExceedsRestriction,
     restrictionMessage,
     maxLimitText,
+    limitReason,
   } = limits;
 
   const inputText = ref("");
@@ -167,6 +187,16 @@ export default function useTimeRangeTyping(props: TimeRangeTypingProps, deps: Ti
     lastReadText = "";
   };
 
+  // How far a start in a DST gap was moved forward: `02:30` used as `03:30` is one hour.
+  const gapShiftMicros = (range: AbsoluteRangeResult, zoneName: string): number => {
+    const resolved = resolveZonedCivil(range.startDate, range.startTime, zoneName);
+    if (resolved.kind !== "gap") return 0;
+    const seconds = (time: string) =>
+      time.split(":").reduce((total, part) => total * 60 + Number(part), 0);
+    const shift = (seconds(resolved.usedTime) - seconds(range.startTime) + 86_400) % 86_400;
+    return shift * 1_000_000;
+  };
+
   const zonelessToMicros = (range: AbsoluteRangeResult, asUtc: boolean) => {
     if (range.exact && !asUtc)
       return { start: range.exact.startMicros, end: range.exact.endMicros };
@@ -175,13 +205,33 @@ export default function useTimeRangeTyping(props: TimeRangeTypingProps, deps: Ti
       const centre = absoluteToMicros(range.centre.date, range.centre.time, zoneName);
       return { start: centre - SINGLE_WINDOW_MICROS, end: centre + SINGLE_WINDOW_MICROS };
     }
-    return {
-      start: absoluteToMicros(range.startDate, range.startTime, zoneName),
-      end: absoluteToMicros(range.endDate, range.endTime, zoneName),
-    };
+    const start = absoluteToMicros(range.startDate, range.startTime, zoneName);
+    const end = absoluteToMicros(range.endDate, range.endTime, zoneName);
+    // A start moved forward out of a DST gap can pass its end; the end moves by the same gap.
+    return { start, end: end > start ? end : end + gapShiftMicros(range, zoneName) };
   };
 
   const refusedPlan = (message: I18nText): InputPlan => ({ kind: "refused", message });
+
+  const overLimitPlan = (start: number, end: number): InputPlan => ({
+    kind: "restricted",
+    message: restrictionMessage(),
+    reason: String(maxLimitText()),
+    range: { start, end },
+  });
+
+  // A 1 µs span at the end tests retention alone: only a range wholly before it is greyed.
+  const outsideRetentionPlan = (start: number, end: number): InputPlan | null => {
+    const reason = limitReason(end - 1, end);
+    if (reason === null) return null;
+    return {
+      kind: "restricted",
+      message: raw(reason),
+      reason,
+      retention: true,
+      range: { start, end },
+    };
+  };
 
   // Only the start is bounded: an end past the ceiling is cut to it.
   const planAbsolute = (
@@ -197,8 +247,10 @@ export default function useTimeRangeTyping(props: TimeRangeTypingProps, deps: Ti
       startBoundError(start) ?? (rawEnd <= start ? t("common.timeRangeEndBeforeStart") : null);
     if (refusal !== null) return refusedPlan(refusal);
     const end = Math.min(rawEnd, selectionCeilingMicros());
+    const outside = outsideRetentionPlan(start, end);
+    if (outside) return outside;
     if (exceedsRangeRestriction(start, end, props.queryRangeRestrictionInHour)) {
-      return { kind: "restricted", message: restrictionMessage() };
+      return overLimitPlan(start, end);
     }
     return { kind: "absolute", start, end, calendarPeriod };
   };
@@ -210,9 +262,9 @@ export default function useTimeRangeTyping(props: TimeRangeTypingProps, deps: Ti
     if (!props.calendarPresets || props.disableRelative) {
       return planAbsolute(range.startTime, range.endTime, token);
     }
-    if (calendarExceedsRestriction(token)) {
-      return { kind: "restricted", message: restrictionMessage() };
-    }
+    const outside = outsideRetentionPlan(range.startTime, range.endTime);
+    if (outside) return outside;
+    if (calendarExceedsRestriction(token)) return overLimitPlan(range.startTime, range.endTime);
     return { kind: "calendar", token };
   };
 
@@ -236,7 +288,7 @@ export default function useTimeRangeTyping(props: TimeRangeTypingProps, deps: Ti
         value > max ||
         exceedsRangeRestriction(span.startTime, span.endTime, props.queryRangeRestrictionInHour))
     ) {
-      return { kind: "restricted", message: restrictionMessage() };
+      return overLimitPlan(span.startTime, span.endTime);
     }
     return { kind: "rolling", unit, value, startTime: span.startTime, endTime: span.endTime };
   };
@@ -248,9 +300,9 @@ export default function useTimeRangeTyping(props: TimeRangeTypingProps, deps: Ti
     return planAbsolute(start, end);
   };
 
+  // No locale: typed day/month order follows the browser's languages, as the week start does.
   const parseOptions = () => ({
     now: new Date(),
-    locale: intlLocale.value,
     timeZone: zone.value,
   });
 
@@ -292,23 +344,44 @@ export default function useTimeRangeTyping(props: TimeRangeTypingProps, deps: Ti
   const suggestionBlocked = (reading: ParsedTimeInput) =>
     isFutureReading(reading) || planInput(reading, false).kind === "restricted";
 
-  // A rolling reading over the page limit stays listed, greyed, followed by the longest it allows.
+  const isOverLimit = (reading: ParsedTimeInput) => {
+    const plan = planInput(reading, false);
+    return plan.kind === "restricted" && !plan.retention;
+  };
+
+  // A rolling reading allows the last `limit`; a fixed one the limit's window ending where it ends.
+  const longestAllowed = (reading: ParsedTimeInput, hours: number): ParsedTimeInput | null => {
+    if (reading.type === "relative") {
+      const allowed: ParsedTimeInput = { type: "relative", period: formatLimitShorthand(hours) };
+      return planInput(allowed, false).kind === "rolling" ? allowed : null;
+    }
+    const plan = planInput(reading, false);
+    if (plan.kind !== "restricted" || !plan.range) return null;
+    const end = plan.range.end;
+    const allowed: ParsedTimeInput = {
+      type: "timestamp",
+      startMicros: end - hours * MICROS_PER_HOUR,
+      endMicros: end,
+    };
+    return planInput(allowed, false).kind === "absolute" ? allowed : null;
+  };
+
+  // A reading over the page limit stays listed, greyed, followed by the longest it allows.
   const withLongestAllowed = (readings: ParsedTimeInput[]): ParsedTimeInput[] => {
     const hours = props.queryRangeRestrictionInHour;
     if (!(hours > 0)) return readings;
-    const over = readings.findIndex(
-      (reading) => reading.type === "relative" && planInput(reading, false).kind === "restricted",
-    );
+    const over = readings.findIndex(isOverLimit);
     if (over < 0) return readings;
-    const allowed: ParsedTimeInput = { type: "relative", period: formatLimitShorthand(hours) };
-    if (planInput(allowed, false).kind !== "rolling") return readings;
+    const allowed = longestAllowed(readings[over], hours);
+    if (!allowed) return readings;
     return [...readings.slice(0, over + 1), allowed, ...readings.slice(over + 1)];
   };
 
   // The instant a lone pasted time stands for; a text with several readings (zone abbreviations, DST folds) lists those instead.
   const loneInstant = (text: string, options: ReturnType<typeof parseOptions>): number | null => {
     const reading = inputReading.value;
-    if (!reading || suggestTimeInput(text, options).length > 1) return null;
+    if (!reading) return null;
+    if (!LONE_CLOCK_RE.test(text) && suggestTimeInput(text, options).length > 1) return null;
     const centre = readingAnchorMicros(reading, zone.value);
     if (centre === null || !inputAsUtc.value || reading.type !== "absolute") return centre;
     const { start, end } = zonelessToMicros(reading, true);
@@ -411,17 +484,23 @@ export default function useTimeRangeTyping(props: TimeRangeTypingProps, deps: Ti
     suggestionsOpen.value ? (suggestionTags.value[activeSuggestion.value] ?? null) : null,
   );
 
+  // A DST repeated hour reads twice with the same clock, so its rows name their zone and offset.
+  const rowRangeLabel = (startUs: number, endUs: number, reading: ParsedTimeInput): string => {
+    const label = formatRangeLabel({ startUs, endUs }, { ...labelOptions(), surface: "row" });
+    if (reading.type !== "timestamp" || !reading.fold) return label;
+    const atMs = startUs / 1000;
+    const abbreviation = formatZoneAbbreviation(zone.value, atMs, intlLocale.value);
+    return `${label} ${abbreviation} (${formatZoneOffset(zone.value, atMs)})`;
+  };
+
   const suggestionRow = (reading: ParsedTimeInput, index: number): TimeInputSuggestionRow => {
     const plan = planInput(reading, inputAsUtc.value);
     const text = formatTimeInputText(reading);
     const key = `${index}-${text}`;
     const tag = suggestionTags.value[index] ?? null;
     if (reading.type === "timestamp" && reading.future) {
-      const label = formatRangeLabel(
-        { startUs: reading.startMicros, endUs: reading.endMicros },
-        { ...labelOptions(), surface: "row" },
-      );
-      return { key, label: reading.fold ? text : label, hint: "", relative: false };
+      const label = rowRangeLabel(reading.startMicros, reading.endMicros, reading);
+      return { key, label, hint: "", relative: false };
     }
     if (tag && "anchor" in tag && plan.kind === "absolute") {
       const span =
@@ -430,7 +509,7 @@ export default function useTimeRangeTyping(props: TimeRangeTypingProps, deps: Ti
               { startUs: plan.start, endUs: plan.end },
               { ...labelOptions(), surface: "row" },
             )
-          : formatClockSpan(plan.start, plan.end);
+          : dropZeroMilliseconds(formatClockSpan(plan.start, plan.end));
       return {
         key,
         label: String(anchorWindowLabel(tag.anchor, t)),
@@ -438,27 +517,20 @@ export default function useTimeRangeTyping(props: TimeRangeTypingProps, deps: Ti
         relative: false,
       };
     }
-    if (plan.kind === "rolling" || plan.kind === "restricted") {
+    if (plan.kind === "rolling" || (plan.kind === "restricted" && reading.type === "relative")) {
       const period = reading.type === "relative" ? reading.period : text.replace(/mo$/, "M");
       return { key, label: String(relativeLabel(period)), hint: text, relative: true };
     }
     if (plan.kind === "calendar") {
       return { key, label: String(relativeLabel(plan.token)), hint: text, relative: true };
     }
-    if (plan.kind !== "absolute") return { key, label: text, hint: "", relative: false };
-    const opts = { ...labelOptions(), surface: "row" as const };
-    const label =
-      reading.type === "timestamp" && reading.fold
-        ? text
-        : formatRangeLabel({ startUs: plan.start, endUs: plan.end }, opts);
-    const future = reading.type === "timestamp" && reading.future;
+    const range = plan.kind === "absolute" ? plan : plan.kind === "restricted" ? plan.range : null;
+    if (!range) return { key, label: text, hint: "", relative: false };
     const source = reading.type === "timestamp" ? reading.sourceZone : undefined;
     return {
       key,
-      label,
-      hint: future
-        ? String(t("dateTime.inTheFuture"))
-        : (source ?? formatRangeDuration(plan.start, plan.end)),
+      label: rowRangeLabel(range.start, range.end, reading),
+      hint: source ?? formatRangeDuration(range.start, range.end),
       relative: false,
     };
   };
@@ -470,14 +542,17 @@ export default function useTimeRangeTyping(props: TimeRangeTypingProps, deps: Ti
     const reading = inputReading.value;
     if (!readingOnly.value || suggestionsOpen.value || !reading || !typing.value) return [];
     const row = suggestionRow(reading, 0);
+    const plan = planInput(reading, inputAsUtc.value);
+    const reason = plan.kind === "restricted" ? plan.reason : null;
     return [
       {
         id: `reading-${row.key}`,
         kind: "reading" as const,
         label: row.label,
-        hint: row.relative ? row.hint : undefined,
-        meta: row.relative ? "" : row.hint,
-        disabled: false,
+        hint: row.relative && reason === null ? row.hint : undefined,
+        meta: reason ?? (row.relative ? "" : row.hint),
+        reason: reason !== null,
+        disabled: reason !== null,
         testId: "date-time-list-reading",
         group: -1,
       },
@@ -503,13 +578,14 @@ export default function useTimeRangeTyping(props: TimeRangeTypingProps, deps: Ti
       ? suggestionRows.value.map((row, index) => {
           const reading = inputSuggestions.value[index];
           const future = isFutureReading(reading);
-          const restricted = future || planInput(reading, inputAsUtc.value).kind === "restricted";
+          const plan = planInput(reading, inputAsUtc.value);
+          const restricted = future || plan.kind === "restricted";
           const tag = suggestionTags.value[index];
           const anchored = !!tag && "anchor" in tag;
           const meta = future
             ? String(t("dateTime.inTheFuture"))
-            : restricted
-              ? String(maxLimitText())
+            : plan.kind === "restricted"
+              ? plan.reason
               : tag && "longestAllowed" in tag
                 ? String(t("dateTime.longestAllowed"))
                 : row.relative
@@ -678,7 +754,7 @@ export default function useTimeRangeTyping(props: TimeRangeTypingProps, deps: Ti
   };
 
   // A refused reading says why on Enter; one over the query-range limit already says so in the preview.
-  const applyReading = (reading: ParsedTimeInput, asUtc: boolean) => {
+  const applyReading = (reading: ParsedTimeInput, asUtc: boolean, tag: SuggestionTag = null) => {
     const plan = planInput(reading, asUtc);
     if (plan.kind === "restricted") return;
     if (plan.kind === "refused") {
@@ -686,13 +762,16 @@ export default function useTimeRangeTyping(props: TimeRangeTypingProps, deps: Ti
       inputError.value = true;
       return;
     }
+    // The window picked becomes the Search around choice, so the next paste starts on it.
+    const choice = tag && "anchor" in tag ? anchorSearchAroundChoice(tag.anchor) : null;
+    if (choice) writeSearchAroundChoice(currentSearchAroundUser(store.state), choice);
     deps.applyPlan(plan);
     deps.finish();
   };
 
   const applySuggestion = (index: number) => {
     const reading = inputSuggestions.value[index];
-    if (reading) applyReading(reading, inputAsUtc.value);
+    if (reading) applyReading(reading, inputAsUtc.value, suggestionTags.value[index] ?? null);
   };
 
   // Tab takes the highlighted reading into the bar as unambiguous text, without applying it.
@@ -721,7 +800,13 @@ export default function useTimeRangeTyping(props: TimeRangeTypingProps, deps: Ti
     }
     const reading = shownReading.value;
     if (reading) {
-      applyReading(reading, inputAsUtc.value);
+      applyReading(reading, inputAsUtc.value, shownTag.value);
+      return;
+    }
+    // Text that reads as nothing only filtered the list, so Enter takes its first match.
+    const firstMatch = enabledListRow(-1, 1);
+    if (firstMatch >= 0) {
+      deps.pickListRow(firstMatch);
       return;
     }
     const text = inputText.value.trim();

@@ -7,6 +7,7 @@ import type {
   DateRangeCalendarExposed,
 } from "./ODateRangeCalendar.types";
 import { computed, nextTick, onMounted, ref, watch, type Ref } from "vue";
+import { raw } from "@/types/i18n";
 import {
   RangeCalendarRoot,
   RangeCalendarGrid,
@@ -23,6 +24,7 @@ import {
 } from "reka-ui";
 import type { DateRange, DateValue } from "reka-ui";
 import { parseDate } from "@internationalized/date";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 const props = defineProps<DateRangeCalendarProps>();
 
@@ -98,6 +100,39 @@ const unavailableFloor = computed(() =>
 
 const isDateUnavailable = (d: DateValue): boolean =>
   !!unavailableFloor.value && d.compare(unavailableFloor.value) < 0;
+
+// One Intl formatter per cell, so its digits match the heading's in every locale.
+const dayNumberFormat = computed(
+  () => new Intl.DateTimeFormat(props.locale, { day: "numeric", timeZone: "UTC" }),
+);
+const dayNameFormat = computed(
+  () =>
+    new Intl.DateTimeFormat(props.locale, {
+      weekday: "long",
+      month: "long",
+      day: "numeric",
+      year: "numeric",
+      timeZone: "UTC",
+    }),
+);
+const dayNumber = (d: DateValue): string => dayNumberFormat.value.format(d.toDate("UTC"));
+
+// A struck day says why in its name; other days keep reka's own label.
+const struckDayAttrs = (d: DateValue): Record<string, string> =>
+  isDateUnavailable(d) && props.unavailableReason
+    ? { "aria-label": `${dayNameFormat.value.format(d.toDate("UTC"))}, ${props.unavailableReason}` }
+    : {};
+
+// The struck day under the pointer or focus, which the one shared reason tooltip points at.
+const struckCell = ref<HTMLElement | null>(null);
+const showStruckReason = (event: Event, d: DateValue) => {
+  const cell = event.currentTarget;
+  if (!props.unavailableReason || !isDateUnavailable(d) || !(cell instanceof HTMLElement)) return;
+  struckCell.value = cell;
+};
+const hideStruckReason = () => {
+  struckCell.value = null;
+};
 
 // "Awaiting second click" — start is picked but end isn't. While in this
 // state, cells get a dashed-outline preview based on hover position.
@@ -291,7 +326,7 @@ onMounted(async () => {
             xmlns="http://www.w3.org/2000/svg"
             viewBox="0 0 16 16"
             fill="currentColor"
-            class="size-4"
+            class="size-4 rtl:-scale-x-100"
             aria-hidden="true"
           >
             <path
@@ -316,7 +351,7 @@ onMounted(async () => {
             xmlns="http://www.w3.org/2000/svg"
             viewBox="0 0 16 16"
             fill="currentColor"
-            class="size-4"
+            class="size-4 rtl:-scale-x-100"
             aria-hidden="true"
           >
             <path
@@ -332,6 +367,7 @@ onMounted(async () => {
         v-for="month in grid"
         :key="month.value.toString()"
         :class="fill ? 'w-full' : undefined"
+        :aria-label="calendarLabel"
       >
         <RangeCalendarGridHead>
           <RangeCalendarGridRow :class="rowClass">
@@ -359,8 +395,14 @@ onMounted(async () => {
                 :data-test="`daterangecalendar-cell-${d.toString()}`"
                 :data-preview="isCellInPreview(d) ? '' : undefined"
                 :data-preview-end="isPreviewEnd(d) ? '' : undefined"
-                :title="isDateUnavailable(d) ? unavailableReason : undefined"
-                @mouseenter="handleCellMouseEnter(d)"
+                v-bind="struckDayAttrs(d)"
+                @mouseenter="
+                  handleCellMouseEnter(d);
+                  showStruckReason($event, d);
+                "
+                @mouseleave="hideStruckReason"
+                @focus="showStruckReason($event, d)"
+                @blur="hideStruckReason"
                 :class="[
                   bandRange
                     ? 'text-compact relative mx-auto w-8'
@@ -371,12 +413,19 @@ onMounted(async () => {
                   compact ? 'h-6.5' : 'h-8',
                 ]"
                 class="rounded-default ring-offset-surface-base text-datepicker-day-text hover:bg-datepicker-day-hover-bg focus-visible:ring-datepicker-focus-ring data-selected:bg-datepicker-day-selected-bg data-selected:text-datepicker-day-selected-text data-outside-view:text-datepicker-day-outside-text data-unavailable:text-datepicker-day-disabled-text data-disabled:text-datepicker-day-disabled-text data-highlighted:bg-datepicker-day-range-bg data-highlighted:text-datepicker-day-range-text data-selection-start:bg-datepicker-day-selected-bg data-selection-start:text-datepicker-day-selected-text data-selection-end:bg-datepicker-day-selected-bg data-selection-end:text-datepicker-day-selected-text flex cursor-pointer items-center justify-center ring-offset-1 transition-[color,background-color,border-color,box-shadow] duration-150 outline-none focus-visible:ring-2 data-disabled:pointer-events-none data-disabled:cursor-not-allowed data-unavailable:cursor-not-allowed data-unavailable:line-through"
-                >{{ d.day }}</RangeCalendarCellTrigger
+                >{{ dayNumber(d) }}</RangeCalendarCellTrigger
               >
             </RangeCalendarCell>
           </RangeCalendarGridRow>
         </RangeCalendarGridBody>
       </RangeCalendarGrid>
+      <OTooltip
+        v-if="unavailableReason"
+        :anchor="struckCell"
+        :open="struckCell !== null"
+        :content="raw(unavailableReason)"
+        side="top"
+      />
     </template>
   </RangeCalendarRoot>
 </template>

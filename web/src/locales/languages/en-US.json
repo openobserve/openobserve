@@ -23652,7 +23652,9 @@
     "goLive": "Go live",
     "goLiveResumeTooltip": "Switch to Last {duration} and resume refresh",
     "goLiveResumeTooltipNoDuration": "Follow now and resume refresh",
-    "refreshPausedAria": "Auto refresh, paused: range ended"
+    "refreshPausedAria": "Auto refresh, paused: range ended",
+    "groupPinned": "Pinned",
+    "groupSuggestions": "Suggestions"
   },
   "shortcuts": {
     "then": "then",

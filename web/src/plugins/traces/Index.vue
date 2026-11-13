@@ -218,8 +218,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @action="() => searchData()"
                       />
                     </div>
-                    <div v-else data-test="logs-search-search-result" class="h-full!">
+                    <div v-else data-test="logs-search-search-result" class="flex h-full! flex-col">
+                      <StaleRangeStrip
+                        v-if="staleRangeText"
+                        :text="staleRangeText"
+                        data-test="traces-search-bar-stale-range-strip"
+                        @run="() => searchData()"
+                      />
                       <SearchResult
+                        class="min-h-0 flex-1"
                         ref="searchResultRef"
                         :pending="searchObj.loadingStream"
                         :show-error-only="showErrorOnly"
@@ -320,7 +327,15 @@ import {
   generateTraceContext,
 } from "@/utils/zincutils";
 import { buildViewTracesFilter, normalizeViewTracesPayload } from "./viewTracesHandoff";
-import { tracesRunIsStaged, tracesSearchRunSignature } from "./tracesSearchBar.utils";
+import {
+  tracesRunIsStaged,
+  tracesRunTimeSelection,
+  tracesSearchRunSignature,
+} from "./tracesSearchBar.utils";
+import StaleRangeStrip from "@/components/StaleRangeStrip.vue";
+import { liveTimeSelection, staleQueriedRange } from "@/utils/logsStaleRange";
+import { formatRangeLabel } from "@/utils/timeRangeLabel";
+import { formatPeriodLabel } from "@/utils/timeRangeRail";
 import { chartColor } from "@/utils/chartTheme";
 import useHttpStreaming from "@/composables/useStreamingSearch";
 import analytics from "@/services/product_analytics";
@@ -2034,6 +2049,25 @@ const onFiltersReset = () => {
   // SearchBar already cleared the map; a later baseline-only Drill down must use the current range.
   searchResultRef.value?.metricsDashboardRef?.clearOriginalTimeRange();
 };
+
+// With Auto Run off a picked range sits over the old results until Run, so say which range they are.
+const staleRangeText = computed(() => {
+  if (searchObj.loading) return null;
+  if (store.state.zoConfig?.auto_query_enabled && searchObj.meta.liveMode) return null;
+  const queried = staleQueriedRange(
+    tracesRunTimeSelection(searchObj.meta.lastRunSignature),
+    liveTimeSelection(searchObj.data.datetime ?? {}),
+  );
+  if (!queried) return null;
+  const range =
+    queried.type === "relative"
+      ? String(formatPeriodLabel(queried.period, store.state.timezone, t))
+      : formatRangeLabel(
+          { startUs: queried.startUs, endUs: queried.endUs },
+          { timezone: store.state.timezone, surface: "summary" },
+        );
+  return t("search.resultsAreForRange", { range });
+});
 
 const isStreamSelected = computed(() => {
   return searchObj.data.stream?.selectedStream?.value?.trim()?.length > 0;
