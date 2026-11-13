@@ -756,6 +756,83 @@ describe("IncidentList.vue", () => {
     });
   });
 
+  describe("status link from the Overview", () => {
+    const mountWithStatus = async (status: string) => {
+      router.currentRoute.value.query = { status } as any;
+      wrapper = createWrapper();
+      await flushPromises();
+      router.currentRoute.value.query = {};
+      return wrapper.vm as any;
+    };
+
+    it("shows exactly the open incidents for ?status=open, not the acknowledged ones", async () => {
+      const vm = await mountWithStatus("open");
+      expect(vm.statusFilter).toBe("open");
+      expect(vm.visibleIncidents.map((i: any) => i.id)).toEqual(["1"]);
+    });
+
+    it("strips ?status from the URL after reading it, keeping other keys", async () => {
+      const replace = vi.spyOn(router, "replace").mockResolvedValue(undefined as any);
+      router.currentRoute.value.query = { status: "open", org_identifier: "default" } as any;
+      wrapper = createWrapper();
+      await flushPromises();
+      router.currentRoute.value.query = {};
+      expect(replace).toHaveBeenCalledWith({ query: { org_identifier: "default" } });
+      replace.mockRestore();
+    });
+
+    it("keeps Active as open plus acknowledged and falls back to it for an unknown status", async () => {
+      expect((await mountWithStatus("active")).visibleIncidents).toHaveLength(2);
+      wrapper.unmount();
+      expect((await mountWithStatus("bogus")).statusFilter).toBe("active");
+    });
+
+    it("lets ?status win over the saved state and drops a saved severity facet", async () => {
+      store.state.incidents = {
+        incidents: {
+          searchQuery: "",
+          statusFilter: "resolved",
+          pagination: { page: 1, rowsPerPage: 20 },
+          organizationIdentifier: "default",
+        },
+        cachedData: [],
+        isInitialized: true,
+        shouldRefresh: false,
+      };
+      useListViewState("incidents", { severityFilter: "P3" }).severityFilter = "P3";
+      const vm = await mountWithStatus("open");
+      store.state.incidents = { incidents: {}, isInitialized: false };
+
+      expect(vm.statusFilter).toBe("open");
+      expect(vm.severityFilter).toBe("all");
+    });
+
+    it("starts without the saved search and page when ?status is present", async () => {
+      store.state.incidents = {
+        incidents: {
+          searchQuery: "saved",
+          statusFilter: "resolved",
+          pagination: { page: 4, rowsPerPage: 20 },
+          organizationIdentifier: "default",
+        },
+        cachedData: [],
+        isInitialized: true,
+        shouldRefresh: false,
+      };
+      const vm = await mountWithStatus("open");
+      store.state.incidents = { incidents: {}, isInitialized: false };
+
+      expect(vm.searchQuery).toBe("");
+      expect(vm.currentPage).toBe(1);
+    });
+
+    it("offers Open as a status toggle", async () => {
+      wrapper = createWrapper();
+      await flushPromises();
+      expect(wrapper.find('[data-test="incident-status-filter-open"]').exists()).toBe(true);
+    });
+  });
+
   // ── Page persistence across navigation (Vuex-backed, like searchQuery/statusFilter) ──
 
   describe("currentPage persistence", () => {

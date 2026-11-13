@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <li v-for="item in items" :key="item.key" class="flex min-w-0">
       <section
         :class="[
-          'rounded-surface flex min-w-0 flex-1 flex-col border transition-colors motion-reduce:transition-none',
+          'rounded-surface relative flex min-w-0 flex-1 flex-col border transition-colors motion-reduce:transition-none',
           SURFACE[item.cardTone ?? 'none'],
           item.selectable && !item.cardTone ? 'hover:border-border-strong' : '',
         ]"
@@ -35,7 +35,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="item.selectable && emit('select', item.key)"
         >
           <span class="flex flex-1 flex-col gap-1 p-3 text-start">
-            <span class="text-text-label text-xs">{{ item.label }}</span>
+            <span :class="['text-text-label text-xs', item.ask && askVisible ? 'pe-6' : '']">{{
+              item.label
+            }}</span>
             <OSkeleton v-if="item.loading" class="h-9 w-16" data-test="overview-tile-skeleton" />
             <span v-else class="flex min-w-0 flex-wrap items-baseline gap-x-1.5">
               <span
@@ -67,6 +69,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
           </span>
         </component>
+        <OverviewAskAiButton
+          v-if="item.ask"
+          kind="tile"
+          :item-key="item.key"
+          :label="item.label"
+          class="absolute end-1.5 top-1.5"
+          @ask="emit('askAi', item.ask)"
+        />
       </section>
     </li>
   </ul>
@@ -87,6 +97,9 @@ import {
   sectionView,
 } from "./overviewFormat";
 import { useOverviewTime } from "./useOverviewTime";
+import OverviewAskAiButton from "./OverviewAskAiButton.vue";
+import type { OverviewAskAiTarget } from "./overviewAskAi";
+import { useOverviewAskAi } from "./useOverviewAskAi";
 
 export type OverviewTarget =
   "firing" | "failing" | "incidents" | "pipelines" | "delivery" | "quiet";
@@ -118,6 +131,7 @@ interface TileItem {
   cardTone?: TileTone;
   loading: boolean;
   selectable: boolean;
+  ask?: OverviewAskAiTarget;
 }
 
 const TONE = {
@@ -149,10 +163,14 @@ const props = defineProps<{
   incidentsTotal: number;
 }>();
 
-const emit = defineEmits<{ select: [target: OverviewTarget] }>();
+const emit = defineEmits<{
+  select: [target: OverviewTarget];
+  askAi: [target: OverviewAskAiTarget];
+}>();
 
 const { t } = useI18nTyped();
 const { formatElapsed } = useOverviewTime();
+const { visible: askVisible } = useOverviewAskAi();
 
 const DASH = raw("—");
 
@@ -302,6 +320,7 @@ const items = computed<TileItem[]>(() => {
     tone: toneOf(data, tone),
     cardTone: hasProblem(data) ? (tone === TONE.warning ? "warning" : "danger") : undefined,
     selectable,
+    ask: hasProblem(data) ? { kind: "count", topic: key, count: Number(data.value) } : undefined,
   });
   return [
     tile("firing", t("overview.cards.firingAlerts"), firing, TONE.error, firing.ok),
