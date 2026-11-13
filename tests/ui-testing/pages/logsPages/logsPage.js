@@ -14139,4 +14139,21 @@ export class LogsPage {
         }, { timeout, intervals: [500, 1000, 1500] }).toBe(true);
         return rows;
     }
+
+    runQueryPrompt() {
+        return this.page.locator('[data-test="logs-search-apply-search-text"]');
+    }
+
+    async expectRunQueryPromptVisible(timeout = 30000) {
+        await expect(this.runQueryPrompt()).toBeVisible({ timeout });
+    }
+
+    async expectNoSearchResultGrid() {
+        await expect(this.page.locator('[data-test="logs-search-search-result"]')).toHaveCount(0);
+    }
+
+    async clickRunQueryPromptAction() {
+        await this.runQueryPrompt().locator('[data-test^="o2-empty-state-action-"]').first().click();
+    }
+
 }

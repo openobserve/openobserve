@@ -17,6 +17,26 @@ async function ingestTestData(page) {
   await _ingestData(page);
 }
 
+// SQL of every Visualize panel query the page sends from now on, read from the request body.
+function collectVisualizeSql(page) {
+  const seen = [];
+  page.on('request', (req) => {
+    const url = req.url();
+    if (req.method() !== 'POST' || !/\/(_search_stream|_search|result_schema)\?/.test(url)) return;
+    if (!url.includes('type=dashboards') && !url.includes('fallback_order_by_col')) return;
+    try {
+      const body = JSON.parse(req.postData() || '{}');
+      let sql = body?.query?.sql;
+      // With sql_base64_enabled the UI sends URL-safe base64.
+      if (sql && (body.encoding === 'base64' || body?.query?.encoding === 'base64')) {
+        sql = Buffer.from(sql.replace(/-/g, '+').replace(/_/g, '/').replace(/\./g, '='), 'base64').toString('utf-8');
+      }
+      if (sql) seen.push(sql);
+    } catch { /* non-JSON body */ }
+  });
+  return seen;
+}
+
 // ----- Test Suite -----
 
 test.describe("Logs Visualization State Persistence testcases", () => {
@@ -586,5 +606,42 @@ test.describe("Logs Visualization State Persistence testcases", () => {
     await pm.logsPage.expectNoSelectStarVisualizationToast();
 
     testLogger.info('Direct Visualize navigation emitted no SELECT * toast');
+  });
+  // ===== Visualize keeps the logs query's filters (ENT#493, ENT#2734) =====
+
+  test("Visualize from a SQL query keeps its NOT IN condition (ENT#493)", {
+    tag: ['@logs-visualize-persistence', '@all', '@logs', '@P1', '@bug-ent493']
+  }, async ({ page }) => {
+    const sql = `SELECT * FROM "e2e_automate" WHERE kubernetes_namespace_name NOT IN ('ovnb-ns-a', 'ovnb-ns-b')`;
+    await pm.logsPage.openLogsWithSqlQuery('e2e_automate', sql);
+    await pm.logsPage.applyQueryAndWaitForSearchResponse();
+
+    const visualizeSql = collectVisualizeSql(page);
+    await pm.logsPage.clickVisualizeToggle();
+    await pm.logsPage.expectVisualizeTabContentVisible();
+    // Pre-fix the generated chart query dropped the NOT IN, so the chart counted the excluded rows too.
+    await expect.poll(() => visualizeSql.join('\n'), { timeout: 30000 })
+      .toMatch(/kubernetes_namespace_name\s+NOT IN\s*\(\s*'ovnb-ns-a'\s*,\s*'ovnb-ns-b'\s*\)/i);
+  });
+
+  test("Visualize from a non-SQL filter keeps it in the chart query and Logs keeps the query (ENT#2734)", {
+    tag: ['@logs-visualize-persistence', '@all', '@logs', '@P1', '@bug-ent2734']
+  }, async ({ page }) => {
+    const filter = "kubernetes_namespace_name = 'monitoring'";
+    const query = encodeURIComponent(Buffer.from(filter).toString('base64'));
+    await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier()}&stream_type=logs&stream=e2e_automate&period=15m&sql_mode=false&query=${query}`);
+    await pm.logsPage.getQueryEditorTextWhenReady(filter);
+    await pm.logsPage.applyQueryAndWaitForSearchResponse();
+
+    const visualizeSql = collectVisualizeSql(page);
+    await pm.logsPage.clickVisualizeToggle();
+    await pm.logsPage.expectVisualizeTabContentVisible();
+    await expect.poll(() => visualizeSql.join('\n'), { timeout: 30000 })
+      .toMatch(/kubernetes_namespace_name\s*=\s*'monitoring'/i);
+
+    await pm.logsPage.clickLogsToggle();
+    // Pre-fix the filter vanished from the editor after the round trip.
+    const editor = await pm.logsPage.getQueryEditorTextWhenReady('monitoring', 15000);
+    expect(editor).toContain(filter);
   });
 });
