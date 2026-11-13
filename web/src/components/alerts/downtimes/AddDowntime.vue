@@ -412,6 +412,7 @@ import {
   defaultDowntimeValues,
   downtimeToFormValues,
   hasIdentity,
+  movePastWindow,
   unnarrowedModules,
   type DowntimeFormValues,
 } from "@/utils/downtimes/downtimeForm";
@@ -445,6 +446,7 @@ import DowntimeNotifySection from "./DowntimeNotifySection.vue";
 import DowntimePreviewPane from "./DowntimePreviewPane.vue";
 import DowntimeSummary from "./DowntimeSummary.vue";
 import { browserTimezone } from "@/utils/timezoneAliases";
+import { serverNowMs } from "@/composables/useAnnouncementBanners";
 import { useEditorDraft } from "@/composables/useEditorDraft";
 import EditorDraftDialogs from "@/components/common/drafts/EditorDraftDialogs.vue";
 
@@ -690,11 +692,13 @@ const resetToken = ref(0);
 const loadedFrom = ref("");
 const loadRow = (row: DowntimeDetail) => {
   loadedFrom.value = sourceId.value;
-  const loaded = downtimeToFormValues(row);
+  let loaded = downtimeToFormValues(row);
   if (!isEdit.value) {
     loaded.name = t("alerts.downtimes.copyOf", { name: row.name });
     // A duplicate is a new row, so it carries no version to check.
     loaded.version = undefined;
+    // A copy that ends at once mutes nothing, so a past one-time window moves to the next hour.
+    loaded = movePastWindow(loaded, serverNowMs());
   }
   form.reset(loaded);
   resetToken.value += 1;

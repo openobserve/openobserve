@@ -61,6 +61,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="downtime-schedule-end-time"
         />
       </div>
+      <p
+        v-if="pastSloOnly"
+        class="text-text-secondary text-xs"
+        data-test="downtime-schedule-past-slo-only"
+      >
+        {{ t("alerts.downtimes.validation.pastSloOnly") }}
+      </p>
     </template>
 
     <template v-else>
@@ -143,6 +150,8 @@ import {
 import type { Repeat } from "@/services/downtimes";
 import { ISO_WEEKDAYS, currentOrNextWindow, formatWindow } from "@/utils/downtimes/schedule";
 import { canonicalTimezone } from "@/utils/timezoneAliases";
+import { serverNowMs } from "@/composables/useAnnouncementBanners";
+import { endsInPast } from "./AddDowntime.schema";
 import OFormToggleGroup from "@/lib/core/ToggleGroup/OFormToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OFormDate from "@/lib/forms/Date/OFormDate.vue";
@@ -153,6 +162,11 @@ import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 const { t } = useI18nTyped();
 const form = inject(FORM_CONTEXT_KEY, null);
 const schedule = form.useStore((s: { values: DowntimeFormValues }) => s.values.schedule);
+const values = form.useStore((s: { values: DowntimeFormValues }) => s.values);
+// A past window with an SLO target is allowed: it only corrects SLO data (D7).
+const pastSloOnly = computed(
+  () => !!values.value?.modules.includes("slos") && endsInPast(values.value, serverNowMs()),
+);
 // The stored zone is an option under its own name, so a legacy `Asia/Calcutta` saves back unchanged.
 const { timezoneOptions } = useTimezoneOptions({ current: () => schedule.value?.timezone });
 const repeat = computed(() => schedule.value?.repeat);
