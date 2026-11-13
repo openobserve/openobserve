@@ -15,6 +15,7 @@
 
 // @vitest-environment jsdom
 
+import { liveQuery } from "@/components/autoobserve/v2/autoobserveRoute";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { computed, defineComponent, h } from "vue";
 import { flushPromises, mount, RouterLinkStub, type VueWrapper } from "@vue/test-utils";
@@ -90,7 +91,7 @@ import CreateProtocolCheck from "./CreateProtocolCheck.vue";
 
 const drawerRoute = {
   name: "autoobserve",
-  query: { page: "coverage", service: "svc-c", org_identifier: "default" },
+  query: liveQuery({ page: "coverage", service: "svc-c", org_identifier: "default" }),
 };
 
 const stubs = {
