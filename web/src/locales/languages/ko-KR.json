@@ -10,7 +10,8 @@
     "toastMessageGeneric": "라이선스에 이 기능이 포함되어 있지 않습니다. 관리자에게 라이선스 업데이트를 요청하세요.",
     "bannerMessage": "이 기능은 잠겨 있습니다. 라이선스에 {feature} 기능이 필요합니다.",
     "bannerMessageGeneric": "이 페이지에는 라이선스에 없는 기능이 필요합니다.",
-    "headerLocked": "잠김: {feature} 필요"
+    "headerLocked": "잠김: {feature} 필요",
+    "availableInEnterprise": "{feature}은(는) OpenObserve 엔터프라이즈에서 사용할 수 있습니다"
   },
   "emptyState": {
     "illustrations": {

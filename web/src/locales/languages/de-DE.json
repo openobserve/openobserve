@@ -10,7 +10,8 @@
     "toastMessageGeneric": "Ihre Lizenz enthält diese Funktion nicht. Bitten Sie Ihren Administrator, die Lizenz zu aktualisieren.",
     "bannerMessage": "Diese Funktion ist gesperrt. Sie setzt die Funktion {feature} in Ihrer Lizenz voraus.",
     "bannerMessageGeneric": "Diese Seite benötigt eine Funktion, die nicht in Ihrer Lizenz enthalten ist.",
-    "headerLocked": "Gesperrt: {feature} erforderlich"
+    "headerLocked": "Gesperrt: {feature} erforderlich",
+    "availableInEnterprise": "In OpenObserve Enterprise verfügbar: {feature}"
   },
   "emptyState": {
     "illustrations": {

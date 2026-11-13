@@ -10,7 +10,8 @@
     "toastMessageGeneric": "لا يتضمن ترخيصك هذه الميزة. اطلب من مسؤولك تحديث الترخيص.",
     "bannerMessage": "هذه الميزة مقفلة. تحتاج إلى ميزة {feature} في ترخيصك.",
     "bannerMessageGeneric": "تحتاج هذه الصفحة إلى ميزة غير مشمولة في ترخيصك.",
-    "headerLocked": "مقفل: يتطلب {feature}"
+    "headerLocked": "مقفل: يتطلب {feature}",
+    "availableInEnterprise": "متاح في OpenObserve Enterprise: {feature}"
   },
   "emptyState": {
     "illustrations": {

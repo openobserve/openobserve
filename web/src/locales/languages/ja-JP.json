@@ -10,7 +10,8 @@
     "toastMessageGeneric": "ライセンスにこの機能は含まれていません。管理者にライセンスの更新を依頼してください。",
     "bannerMessage": "この機能はロックされています。ライセンスに {feature} 機能が必要です。",
     "bannerMessageGeneric": "このページにはライセンスに含まれていない機能が必要です。",
-    "headerLocked": "ロック中: {feature} が必要"
+    "headerLocked": "ロック中: {feature} が必要",
+    "availableInEnterprise": "{feature} は OpenObserve Enterprise で利用できます"
   },
   "emptyState": {
     "illustrations": {

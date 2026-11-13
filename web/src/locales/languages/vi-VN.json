@@ -10,7 +10,8 @@
     "toastMessageGeneric": "Giấy phép của bạn không bao gồm tính năng này. Hãy yêu cầu quản trị viên cập nhật giấy phép.",
     "bannerMessage": "Tính năng này bị khóa. Cần có tính năng {feature} trong giấy phép của bạn.",
     "bannerMessageGeneric": "Trang này cần một tính năng không có trong giấy phép của bạn.",
-    "headerLocked": "Đã khóa: cần {feature}"
+    "headerLocked": "Đã khóa: cần {feature}",
+    "availableInEnterprise": "{feature} có trong OpenObserve Enterprise"
   },
   "emptyState": {
     "illustrations": {
