@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -13,6 +13,10 @@ const mountTable = (data: any[]) =>
   });
 
 describe("RoleTable member count columns", () => {
+  beforeEach(() => {
+    store.state.zoConfig = { ...store.state.zoConfig, service_account_enabled: true };
+  });
+
   it("opens the Users tab when the users count is clicked", async () => {
     const wrapper = mountTable([{ role_name: "ops", user_count: 3, service_account_count: 2 }]);
     await flushPromises();
@@ -75,6 +79,15 @@ describe("RoleTable member count columns", () => {
     expect(wrapper.find(pending).exists()).toBe(false);
     expect(wrapper.find('[data-test="iam-roles-ops-service-accounts-link"]').exists()).toBe(false);
     expect(wrapper.text()).toContain(i18n.global.t("iam.serviceAccounts"));
+    wrapper.unmount();
+  });
+
+  it("has no Service accounts column while service accounts are turned off", async () => {
+    store.state.zoConfig = { ...store.state.zoConfig, service_account_enabled: false };
+    const wrapper = mountTable([{ role_name: "ops", user_count: 3, service_account_count: null }]);
+    await flushPromises();
+    expect(wrapper.find('[data-test="iam-roles-ops-users-link"]').exists()).toBe(true);
+    expect(wrapper.text()).not.toContain(i18n.global.t("iam.serviceAccounts"));
     wrapper.unmount();
   });
 });

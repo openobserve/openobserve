@@ -2,6 +2,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
+import { useStore } from "vuex";
 import OTable from "@/lib/core/Table/OTable.vue";
 import { COL, type OTableColumnDef, type OTableRowAction } from "@/lib/core/Table/OTable.types";
 import ONameLinkCell from "@/lib/core/Table/cells/ONameLinkCell.vue";
@@ -68,6 +69,21 @@ const onEmptyStateAction = (id?: string) => {
   if (id === "create") emit("create");
 };
 
+const store = useStore();
+// Known before the counts load, so hiding the column for a disabled feature moves nothing later.
+const serviceAccountsEnabled = computed(() => !!store.state.zoConfig?.service_account_enabled);
+const serviceAccountColumn: OTableColumnDef = {
+  id: "service_account_count",
+  header: t("iam.serviceAccounts"),
+  accessorKey: "service_account_count",
+  sortable: true,
+  resizable: true,
+  hideable: true,
+  size: 150,
+  minSize: 150,
+  meta: { align: "right" },
+};
+
 const columns = computed<OTableColumnDef[]>(() => {
   const cols: OTableColumnDef[] = [
     {
@@ -88,17 +104,7 @@ const columns = computed<OTableColumnDef[]>(() => {
       size: COL.count,
       meta: { align: "right" },
     },
-    {
-      id: "service_account_count",
-      header: t("iam.serviceAccounts"),
-      accessorKey: "service_account_count",
-      sortable: true,
-      resizable: true,
-      hideable: true,
-      size: 150,
-      minSize: 150,
-      meta: { align: "right" },
-    },
+    ...(serviceAccountsEnabled.value ? [serviceAccountColumn] : []),
   ];
 
   if (props.assignTarget) {

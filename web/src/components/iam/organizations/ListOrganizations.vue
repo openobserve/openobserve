@@ -452,8 +452,6 @@ export default defineComponent({
 
     const { confirm } = useConfirmDialog();
 
-    // Returns true if the current user can delete the given org row.
-    // Only shown on cloud builds; user must be root or an admin of that org.
     // Same option shape as the header's organization switcher, which the layout then syncs to.
     const switchOrganization = (row: any) => {
       const org = (store.state.organizations ?? []).find(
@@ -478,6 +476,8 @@ export default defineComponent({
       });
     };
 
+    // Returns true if the current user can delete the given org row.
+    // Only shown on cloud builds; user must be root or an admin of that org.
     const canDeleteOrg = (row: any): boolean => {
       if (config.isCloud !== "true") return false;
       const role = row._userRole?.toLowerCase();
