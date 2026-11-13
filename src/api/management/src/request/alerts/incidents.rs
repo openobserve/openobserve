@@ -5439,6 +5439,9 @@ mod tests {
         )
         .await
         .unwrap();
+        infra::table::alert_incidents::mark_security_case(&org, &sid(&org, "case"))
+            .await
+            .unwrap();
         let stranger = || {
             Headers(UserEmail {
                 user_id: STEER_READER.to_string(),
