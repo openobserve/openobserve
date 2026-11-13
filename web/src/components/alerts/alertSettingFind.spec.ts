@@ -83,6 +83,7 @@ describe("searchAlertSettings", () => {
     ["folder", "folder"],
     ["group by", "groupBy"],
     ["multi", "groupBy"],
+    ["aggregation", "groupBy"],
     ["frequency", "checkEvery"],
     ["oncall", "oncall"],
   ])("finds %s by its old or visible name", (query, id) => {
