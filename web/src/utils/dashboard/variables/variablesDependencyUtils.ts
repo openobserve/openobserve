@@ -203,7 +203,6 @@ interface VariableRuntimeState {
     stream?: string;
     field?: string;
     query?: string;
-    custom_query?: boolean;
     filter?: Array<{
       filter?: string;
       value?: string;

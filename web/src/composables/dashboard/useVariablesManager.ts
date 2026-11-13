@@ -45,7 +45,6 @@ export interface VariableConfig {
     field?: string;
     max_record_size?: number;
     query_type?: "sql" | "promql";
-    custom_query?: boolean;
     query?: string;
     value_field?: string;
     label_field?: string;

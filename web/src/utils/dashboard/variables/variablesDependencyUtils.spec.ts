@@ -882,7 +882,7 @@ describe("Variables Dependency Utils", () => {
       name,
       type: "query_values",
       scope: "global" as const,
-      query_data: { custom_query: true, query_type: "sql", query },
+      query_data: { query },
     });
 
     it("reads only the custom query, not the inactive auto stream, field and filters", () => {
@@ -893,7 +893,6 @@ describe("Variables Dependency Utils", () => {
           name: "service",
           type: "query_values",
           query_data: {
-            custom_query: true,
             query: "SELECT service FROM logs WHERE region = '$region'",
             stream: "$env",
             field: "f",
@@ -905,7 +904,7 @@ describe("Variables Dependency Utils", () => {
       expect(graph.env.childVariables).toEqual([]);
     });
 
-    it("keeps reading stream, field and filters once switched back to auto", () => {
+    it("reads stream, field and filters when the query is blank", () => {
       const graph = buildVariablesDependencyGraph([
         { name: "region", type: "custom", query_data: undefined },
         { name: "env", type: "custom", query_data: undefined },
@@ -913,8 +912,7 @@ describe("Variables Dependency Utils", () => {
           name: "service",
           type: "query_values",
           query_data: {
-            custom_query: false,
-            query: "SELECT service FROM logs WHERE region = '$region'",
+            query: "  ",
             stream: "s",
             field: "f",
             filter: [{ name: "x", operator: "=", value: "$env" }],
@@ -967,7 +965,6 @@ describe("Variables Dependency Utils", () => {
             scope: "tabs",
             tabId: "t1",
             query_data: {
-              custom_query: true,
               query: 'label_values(up{cluster="$cluster"}, pod)',
               filter: [{ value: "$ignored" }],
             },

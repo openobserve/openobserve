@@ -762,7 +762,7 @@ describe("query variable 'All'", () => {
     { label: "Checkout", value: "checkout" },
     { label: "Payments", value: "payments" },
   ];
-  const customQuery = { type: "query_values", query_data: { custom_query: true } };
+  const customQuery = { type: "query_values", query_data: { query: "SELECT 1" } };
 
   it("sends the listed option values instead of the placeholder", () => {
     const { inst } = makeWithVariable({ ...customQuery, value: ["_o2_all_"], options });

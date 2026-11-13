@@ -73,10 +73,10 @@ const autoPromqlVariable = {
   },
 };
 
-const mountForm = async () => {
-  getDashboard.mockResolvedValue({ tabs: [], variables: { list: [autoPromqlVariable] } });
+const mountForm = async (variable: any = autoPromqlVariable) => {
+  getDashboard.mockResolvedValue({ tabs: [], variables: { list: [variable] } });
   const wrapper = mount(AddSettingVariable, {
-    props: { variableName: "job", dashboardVariablesList: [autoPromqlVariable] },
+    props: { variableName: variable.name, dashboardVariablesList: [variable] },
     global: { plugins: [i18n, store], provide: qLayoutInjections() },
     attachTo: document.body,
   });
@@ -122,6 +122,31 @@ describe("AddSettingVariable with the real query editor", () => {
     await click(wrapper, "dashboard-variable-query-mode-auto");
     expect(wrapper.find('[data-test="dashboard-variable-query-editor"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="dashboard-variable-field-select"]').exists()).toBe(true);
+    wrapper.unmount();
+  });
+
+  it("opens a saved query as custom SQL and saves it back without a mode or language key", async () => {
+    const customSql = {
+      name: "svc",
+      type: "query_values",
+      query_data: {
+        stream_type: "logs",
+        stream: "",
+        field: "",
+        max_record_size: null,
+        filter: [],
+        query: "SELECT svc FROM logs",
+      },
+    };
+    const wrapper = await mountForm(customSql);
+    expect(wrapper.find('[data-test="dashboard-variable-query-editor"]').exists()).toBe(true);
+    expect(editorText(wrapper)).toBe("SELECT svc FROM logs");
+    expect(wrapper.vm.variableData.query_data.query_type).toBe("sql");
+
+    const saved = (wrapper.vm as any).buildVariablePayload(wrapper.vm.variableData).query_data;
+    expect(saved.query).toBe("SELECT svc FROM logs");
+    expect(saved).not.toHaveProperty("custom_query");
+    expect(saved).not.toHaveProperty("query_type");
     wrapper.unmount();
   });
 

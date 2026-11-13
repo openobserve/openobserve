@@ -1106,7 +1106,7 @@ describe("AddSettingVariable", () => {
       await wrapper.vm.onQueryModeChange("custom");
       await flushPromises();
       expect(wrapper.vm.variableData.query_data.query).toBe(
-        `SELECT DISTINCT "host" FROM "default" WHERE env = '$env' AND (level = 'error' OR level = 'warn')`,
+        `SELECT DISTINCT "host" FROM "default" WHERE "env" = '$env' AND ("level" = 'error' OR "level" = 'warn')`,
       );
     });
 
@@ -1219,8 +1219,6 @@ describe("AddSettingVariable", () => {
       expect(payload.query_data).toEqual({
         stream_type: "logs",
         ...autoFields,
-        custom_query: true,
-        query_type: "sql",
         query: "SELECT service FROM logs",
         value_field: "service",
         label_field: "name",
@@ -1241,7 +1239,6 @@ describe("AddSettingVariable", () => {
       expect(payload.query_data).toEqual({
         stream_type: "metrics",
         ...autoFields,
-        custom_query: true,
         query_type: "promql",
         query: "label_values(job)",
       });

@@ -66,6 +66,7 @@ export const makeAddSettingVariableSchema = (t: (_key: string) => string) =>
           // Written by the filter builder instead of `filter` only when OR or nesting is used.
           filter_group: z.record(z.string(), z.any()).optional(),
           query_type: z.string().optional().default("sql"),
+          // Form-only mode; the saved variable is custom exactly when it has a non-empty query.
           custom_query: z.boolean().optional().default(false),
           query: z.string().optional().default(""),
           value_field: z.string().nullable().optional().default(""),

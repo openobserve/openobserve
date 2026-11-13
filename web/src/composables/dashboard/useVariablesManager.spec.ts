@@ -1392,7 +1392,7 @@ describe("useVariablesManager — query variables", () => {
       type: "query_values",
       scope: "global",
       multiSelect: true,
-      query_data: { custom_query: true, query_type: "sql", query: "SELECT svc FROM logs" },
+      query_data: { query: "SELECT svc FROM logs" },
       options: [{ label: "", value: "", selected: true }],
       ...overrides,
     }) as any;

@@ -2327,7 +2327,7 @@ describe("usePanelDataLoader", () => {
         const svc = {
           name: "svc",
           type: "query_values",
-          query_data: { custom_query: true },
+          query_data: { query: "SELECT 1" },
           multiSelect: true,
           value: ["checkout", "payments"],
           options: [],

@@ -578,7 +578,7 @@ describe("VariableQueryValueSelector", () => {
       expect(wrapper.vm.displayValue).toBe("<ALL>");
     });
 
-    const customQuery = { type: "query_values", query_data: { custom_query: true } };
+    const customQuery = { type: "query_values", query_data: { query: "SELECT 1" } };
 
     it("keeps '<ALL>' over an empty list for an auto query_values variable", () => {
       wrapper = createWrapper({ variableItem: { ...multiSelectVariableItem, options: [] } });

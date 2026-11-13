@@ -584,6 +584,8 @@ import { getScopeType } from "@/utils/dashboard/variables/variablesScopeUtils";
 import {
   buildAutoPromqlQuery,
   buildAutoSqlQuery,
+  hasCustomQuery,
+  isCustomQueryVariable,
   type QueryVariableData,
   type QueryVariableLanguage,
 } from "@/utils/dashboard/variables/queryVariableUtils";
@@ -1035,7 +1037,7 @@ export default defineComponent({
           filter: variable.query_data?.filter ?? [],
           filter_group: variable.query_data?.filter_group,
           query_type: variable.query_data?.query_type ?? "sql",
-          custom_query: variable.query_data?.custom_query === true,
+          custom_query: hasCustomQuery(variable.query_data),
           query: variable.query_data?.query ?? "",
           value_field: variable.query_data?.value_field ?? "",
           label_field: variable.query_data?.label_field ?? "",
@@ -1280,7 +1282,7 @@ export default defineComponent({
       if (v.type !== "query_values") delete v.query_data;
       if (v.query_data) v.query_data = buildQueryDataPayload(v.query_data);
       // A custom query's options come from its query; the form's placeholder option would show as a blank row.
-      if (v.query_data?.custom_query) v.options = [];
+      if (isCustomQueryVariable(v)) v.options = [];
       if (v.type !== "date") delete v.dateFormat;
       if (v.type !== "query_values" && v.type !== "custom") {
         v.multiSelect = false;
@@ -1315,8 +1317,9 @@ export default defineComponent({
       const language = query_type === "promql" && base.stream_type === "metrics" ? "promql" : "sql";
       // The builder writes filter_group only for OR or nesting, so the two never both apply.
       const rest = { ...base, ...(filter_group ? { filter_group } : { filter: filter ?? [] }) };
-      if (!custom_query) return language === "promql" ? { ...rest, query_type: language } : rest;
-      const payload: any = { ...rest, custom_query: true, query_type: language, query };
+      const typed = language === "promql" ? { ...rest, query_type: language } : rest;
+      if (!custom_query) return typed;
+      const payload: any = { ...typed, query };
       if (language === "sql" && value_field) payload.value_field = value_field;
       if (language === "sql" && label_field) payload.label_field = label_field;
       return payload;

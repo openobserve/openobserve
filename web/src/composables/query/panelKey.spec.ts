@@ -19,7 +19,7 @@ import { normalizeVariablesForCache, panelKeyDigest } from "./panelKey";
 const svc = (overrides: Record<string, unknown>) => ({
   name: "svc",
   type: "query_values",
-  query_data: { custom_query: true },
+  query_data: { query: "SELECT 1" },
   scope: "global",
   multiSelect: true,
   value: ["_o2_all_"],
