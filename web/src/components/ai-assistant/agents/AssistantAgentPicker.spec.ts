@@ -109,14 +109,8 @@ describe("AssistantAgentPicker", () => {
 
   it("is a pill naming the agent, lists one radio row per agent by name only, and checks the current one", () => {
     const { wrapper } = setup();
-    expect(trigger(wrapper).get('[data-test="assistant-agent-picker-name"]').text()).toBe(
-      "O2 Assistant",
-    );
-    expect(trigger(wrapper).classes()).toContain("rounded-full");
+    expect(trigger(wrapper).text()).toBe("O2 Assistant");
     expect(trigger(wrapper).classes()).not.toContain("opacity-60");
-    expect(trigger(wrapper).classes()).toEqual(
-      expect.arrayContaining(["bg-surface-subtle!", "text-text-heading!"]),
-    );
     expect(wrapper.text()).toContain("Agent");
     expect(wrapper.find('[data-test="assistant-agent-option-clause"]').exists()).toBe(false);
     expect(wrapper.findAll('[role="menuitemradio"]')).toHaveLength(3);

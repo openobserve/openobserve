@@ -1895,10 +1895,6 @@ describe("MainLayout — rail source", () => {
       ]);
     });
 
-    it("gives the v2 LLM observability item its own icon, never the assistant glyph", () => {
-      expect(source).toMatch(/icon: assistantV2 \? "insights" : "auto-awesome",/);
-    });
-
     it("gives Traces and Profiles different icons from the existing set", () => {
       const traces = /title: t\("menu\.traces"\),\s*icon: "([^"]+)"/.exec(source)?.[1];
       const profiles = /title: t\("menu\.profiles"\),\s*icon: "([^"]+)"/.exec(source)?.[1];

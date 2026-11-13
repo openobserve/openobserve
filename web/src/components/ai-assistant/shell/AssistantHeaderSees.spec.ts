@@ -34,9 +34,10 @@ vi.mock("@/composables/assistant", async () => {
 vi.mock("@/components/ai-assistant/context/AssistantContextSeesPopover.vue", () => ({
   default: {
     name: "AssistantContextSeesPopover",
-    props: ["sid", "placement", "label"],
+    props: ["sid", "placement", "label", "open"],
+    emits: ["update:open"],
     template:
-      '<button data-test="sees-stub" :data-sid="sid" :data-placement="placement" :data-label="label" />',
+      '<button data-test="sees-stub" :data-sid="sid" :data-placement="placement" :data-label="label" :data-open="String(open)" @click="$emit(\'update:open\', false)"><span v-if="$slots.anchor" data-anchor><slot name="anchor" /></span></button>',
   },
 }));
 
@@ -69,6 +70,16 @@ describe("AssistantHeaderSees", () => {
     expect(wrapper.get('[data-test="assistant-shell-sees"]').attributes("data-label")).toBe(
       "What the Assistant Sees",
     );
+  });
+
+  it("opened from the title menu, it hangs from a hidden anchor whatever the strip holds", async () => {
+    reactive(state).sessions = { s1: { composer: { chips: [streamChip], images: [] } } };
+    const wrapper = mount(AssistantHeaderSees, { props: { sid: "s1", open: false } });
+    const sees = wrapper.get('[data-test="assistant-shell-sees"]');
+    expect(sees.attributes("data-open")).toBe("false");
+    expect(sees.find("[data-anchor]").exists()).toBe(true);
+    await sees.trigger("click");
+    expect(wrapper.emitted("update:open")).toEqual([[false]]);
   });
 
   it("shows the header ⓘ when there is no session yet", () => {

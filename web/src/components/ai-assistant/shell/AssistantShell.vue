@@ -49,26 +49,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :toolbar="bare"
       >
         <template #container-actions="{ narrow }">
-          <AssistantOpenAsMenu
+          <AssistantModeButtons
             v-if="bare"
-            icon-only
             :placement="placement"
             :sheet="sheet"
             :sid="activeSid"
             :dock-host="host?.id"
           />
           <AssistantHeaderSees
-            v-if="headerSees"
+            v-if="headerSees && bare"
             :sid="activeSid"
-            :label="bare ? t('assistant.thread.toolbar.sees') : undefined"
+            :label="t('assistant.thread.toolbar.sees')"
           />
-          <AssistantOpenAsMenu
+          <AssistantModeButtons
             v-if="!narrow && !bare"
             :placement="placement"
             :sheet="sheet"
             :sid="activeSid"
             :dock-host="host?.id"
-            :labelled="placement === 'full'"
           />
           <slot name="container-actions" />
           <AssistantIconButton
@@ -82,13 +80,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #menu-layout>
           <ODropdownItem
             v-if="onlyFullPage"
-            :icon-left="assistantGlyph.openFull"
+            :icon-left="assistantGlyph.fullPage"
             data-test="assistant-shell-place-full"
             @select="sheetToFull"
           >
             {{ t("assistant.shell.fullPage") }}
           </ODropdownItem>
-          <AssistantOpenAsMenu
+          <AssistantModeButtons
             v-else
             bare
             :placement="placement"
@@ -105,13 +103,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @settings="shareDrawerOpen = true"
           />
         </template>
-        <template v-if="activeSid && state === 'conversation'" #title-anchor>
+        <!-- The bar holds New chat, Open as and × only, so what the assistant sees opens from the title menu -->
+        <template v-if="seesInMenu" #menu-sees>
+          <ODropdownItem
+            :icon-left="assistantGlyph.info"
+            data-test="assistant-thread-menu-sees"
+            @select="afterTitleMenu(() => (seesOpen = true))"
+          >
+            {{ t("assistant.context.title") }}
+          </ODropdownItem>
+        </template>
+        <template v-if="(activeSid && state === 'conversation') || seesInMenu" #title-anchor>
           <AssistantShareControl
+            v-if="activeSid && state === 'conversation'"
             v-model:open="shareQuickOpen"
             :sid="activeSid"
             variant="quick"
             @settings="openShareDrawer"
             @dismissed="threadHeader?.focusChats()"
+          />
+          <AssistantHeaderSees
+            v-if="seesInMenu"
+            :sid="activeSid"
+            :open="seesOpen"
+            @update:open="onSeesOpen"
           />
         </template>
       </AssistantThreadHeader>
@@ -119,25 +134,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OSkeleton v-if="state === 'loading'" type="text" class="ms-2 w-40" />
         <span class="flex-1" />
         <div class="flex shrink-0 items-center gap-1">
-          <ODropdown v-if="state === 'gate' && placement === 'sidebar'" align="end">
-            <template #trigger>
-              <AssistantIconButton
-                :label="t('assistant.shell.openAs')"
-                :icon="assistantGlyph.openFull"
-                data-test="assistant-open-as-button"
-              />
-            </template>
-            <ODropdownItem data-test="assistant-shell-open-in-full-view" @select="openInFullView">
-              {{ t("assistant.shell.fullPage") }}
-            </ODropdownItem>
-          </ODropdown>
-          <AssistantOpenAsMenu
+          <AssistantIconButton
+            v-if="state === 'gate' && placement === 'sidebar'"
+            :label="t('assistant.shell.fullPage')"
+            :icon="assistantGlyph.fullPage"
+            data-test="assistant-shell-open-in-full-view"
+            @click="openInFullView"
+          />
+          <AssistantModeButtons
             v-else-if="state !== 'gate'"
             :placement="placement"
             :sheet="sheet"
             :sid="activeSid"
             :dock-host="host?.id"
-            :labelled="placement === 'full'"
           />
           <slot name="container-actions" />
           <AssistantIconButton
@@ -266,7 +275,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @shared-links="shareManagerOpen = true"
     >
       <template #menu-layout>
-        <AssistantOpenAsMenu
+        <AssistantModeButtons
           bare
           :placement="placement"
           :sheet="sheet"
@@ -347,6 +356,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="assistant-shell-unavailable-row"
           @retry="retryHistory"
         />
+      </div>
+      <div
+        v-else-if="state === 'empty' && !startersShown"
+        class="flex min-h-full flex-col items-center justify-center gap-2 p-4"
+        data-test="assistant-shell-empty"
+      >
+        <img :src="aiLogo" alt="" class="size-20 dark:hidden" />
+        <img :src="aiLogoDark" alt="" class="hidden size-20 dark:block" />
+        <OText variant="card-title" as="p">{{ t("assistant.name") }}</OText>
       </div>
       <AssistantWelcome
         v-else-if="state === 'empty' && welcome"
@@ -634,6 +652,8 @@ import {
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 
+import aiLogoDark from "@/assets/images/common/o2_ai_logo_dark.svg";
+import aiLogo from "@/assets/images/common/o2_ai_logo.svg";
 import { provideAssistantSurface } from "@/components/ai-assistant/common/assistantSurface";
 import AssistantActionTimeline from "@/components/ai-assistant/approvals/AssistantActionTimeline.vue";
 import AssistantApprovalCard from "@/components/ai-assistant/approvals/AssistantApprovalCard.vue";
@@ -721,7 +741,6 @@ import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { trackAssistant } from "@/services/assistantAnalytics";
@@ -732,7 +751,7 @@ import { copyToClipboard } from "@/utils/clipboard";
 import { formatCount, formatOrgIsoDay, formatOrgTime } from "@/utils/formatters";
 
 import AssistantHeaderSees from "./AssistantHeaderSees.vue";
-import AssistantOpenAsMenu from "./AssistantOpenAsMenu.vue";
+import AssistantModeButtons from "./AssistantModeButtons.vue";
 import AssistantStatusRegion from "./AssistantStatusRegion.vue";
 import { closeLockedPanel, useLockedPanel } from "./lockedPanel";
 import { useOpeningMotion } from "./useOpeningMotion";
@@ -850,7 +869,9 @@ const closable = computed(() => props.placement !== "window" && props.placement 
 const chromeClasses = computed(() => {
   // A bare shell's controls sit in the chat's top corner, never on a bar.
   if (props.bare) return "flex shrink-0 items-center justify-end px-3 pt-3";
-  const base = "border-border-default flex shrink-0 items-center gap-1 border-b ps-1 pe-2";
+  // The panels' bar opens on the logo, which wants the panel's own inset, not a button's.
+  const start = props.placement === "sidebar" || props.placement === "docked" ? "ps-3" : "ps-1";
+  const base = `border-border-default flex shrink-0 items-center gap-1 border-b ${start} pe-2`;
   if (props.placement === "window")
     return [
       base,
@@ -984,6 +1005,10 @@ const visible = computed(() => {
 const headerSees = computed(
   () => (state.value === "empty" || state.value === "conversation") && !composerLocked.value,
 );
+const seesInMenu = computed(() => headerSees.value && !props.bare);
+const seesOpen = ref(false);
+// Home and the dock suggest prompts; the side panel and a window open on the logo alone.
+const startersShown = computed(() => props.placement === "full" || props.placement === "docked");
 
 // The opening plays only on the open that showed this container, never on a remount or a new chat.
 const { opening } = useOpeningMotion(() => visible.value);
@@ -1011,7 +1036,7 @@ const welcomeScope = effectScope();
 const welcome = shallowRef<ReturnType<typeof useAssistantStarters> | null>(null);
 const page = () => (props.placement === "full" ? "assistant" : String(route.name ?? ""));
 watch(
-  () => state.value === "empty",
+  () => state.value === "empty" && startersShown.value,
   (empty) => {
     if (!empty || welcome.value) return;
     welcome.value =
@@ -1622,19 +1647,29 @@ function closeChats(): void {
 }
 
 // The title menu hands focus back to its trigger after its exit animation, which would close a popover opened sooner.
-function openQuickShare(): void {
+function afterTitleMenu(show: () => void): void {
   const el = root.value;
-  if (!el || el.contains(document.activeElement)) {
-    shareQuickOpen.value = true;
-    return;
-  }
+  if (!el || el.contains(document.activeElement)) return show();
   const open = () => {
     clearTimeout(timer);
     el.removeEventListener("focusin", open);
-    shareQuickOpen.value = true;
+    show();
   };
   const timer = setTimeout(open, MENU_FOCUS_RETURN_MS);
   el.addEventListener("focusin", open);
+}
+
+function openQuickShare(): void {
+  afterTitleMenu(() => (shareQuickOpen.value = true));
+}
+
+// Its hidden anchor cannot take focus back, so a close that drops focus returns it to the title.
+function onSeesOpen(open: boolean): void {
+  seesOpen.value = open;
+  if (open) return;
+  void nextTick(() => {
+    if (document.activeElement === document.body) threadHeader.value?.focusChats();
+  });
 }
 
 function openShareDrawer(): void {

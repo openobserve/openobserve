@@ -217,7 +217,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               : 'primary'
           "
           size="xs"
-          :class="['max-lg:hidden', EDITION_YIELDS_TO_STRIP]"
+          class="max-lg:hidden"
           data-test="upgrade-to-enterprise-btn"
           @click="openEnterpriseDialog"
         >
@@ -548,10 +548,6 @@ import { featureLockedPath, menuState } from "@/utils/featureGate";
 import { useFeatureNames } from "@/composables/useFeatureLock";
 import { chartColor } from "@/utils/chartTheme";
 import { isAssistantV2 } from "@/composables/assistant/flags";
-
-// Below xl a waiting chat's header strip takes the static Edition badge's room before it would step aside.
-const EDITION_YIELDS_TO_STRIP =
-  "max-xl:group-has-[[data-test=assistant-decision-notice]]/header-right:hidden";
 
 export default defineComponent({
   name: "HeaderComponent",
@@ -897,7 +893,6 @@ export default defineComponent({
 
     return {
       securityAccess,
-      EDITION_YIELDS_TO_STRIP,
       assistantV2,
       isDark,
       t,

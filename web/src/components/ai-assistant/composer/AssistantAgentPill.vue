@@ -15,26 +15,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <span
-    :class="[AGENT_PILL_CLASS, disabled && 'text-text-body!']"
+  <OTag
+    type="assistantContext"
+    :label="agentName(agent, t)"
+    :icon="agentGlyph[agent]"
+    :disabled="disabled"
+    class="shrink-0"
     data-test="assistant-agent-pill"
     :data-agent="agent"
-  >
-    <OIcon
-      :name="agentGlyph[agent]"
-      size="xs"
-      :class="['text-ai-accent', disabled && 'opacity-45']"
-    />
-    <span class="truncate">{{ agentName(agent, t) }}</span>
-  </span>
+  />
 </template>
 
 <script lang="ts">
 import type { AgentId } from "@/composables/assistant";
-
-// The agent pill is the kit's one pill shape; repoGuards allows rounded-full only here and in the bottom row.
-export const AGENT_PILL_CLASS =
-  "bg-surface-subtle text-text-heading inline-flex h-7 max-w-48 min-w-0 items-center gap-1.5 rounded-full ps-1.5 pe-2 text-xs leading-none font-medium";
 
 // OButton has no class merge, so the pill's fill and text must outrank the ghost variant's transparent ones.
 export const AGENT_PICKER_CLASS =
@@ -49,7 +42,7 @@ export interface AssistantAgentPillProps {
 <script setup lang="ts">
 import { agentGlyph } from "@/components/ai-assistant/common/glyphs";
 import { agentName } from "@/composables/assistant/pure";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import { useI18nTyped } from "@/types/i18n";
 
 withDefaults(defineProps<AssistantAgentPillProps>(), { disabled: false });

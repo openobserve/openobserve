@@ -211,19 +211,19 @@ describe("AssistantWindow", () => {
       .mockReturnValue({ width: 382 } as DOMRect);
     const { wrapper } = setup();
     await flushPromises();
-    expect(wrapper.find('[data-test="assistant-open-as-button"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="assistant-shell-place-full"]').exists()).toBe(true);
     rect.mockRestore();
   });
 
   it("folds Open as into the title menu below 24 rem and keeps Minimise and Close direct (PO A15)", async () => {
     const wide = setup();
-    expect(wide.wrapper.find('[data-test="assistant-open-as-button"]').exists()).toBe(true);
+    expect(wide.wrapper.find('[data-test="assistant-shell-place-full"]').exists()).toBe(true);
     wide.wrapper.unmount();
     const { wrapper, store, sid } = setup();
     store.setWindowGeometry(sid, { ...store.windowOf(sid).geometry, wRem: 20 });
     await wrapper.setProps({ win: { ...store.windowOf(sid) } });
     await flushPromises();
-    expect(wrapper.find('[data-test="assistant-open-as-button"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="assistant-shell-place-full"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="assistant-window-minimise"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="assistant-window-close"]').exists()).toBe(true);
   });

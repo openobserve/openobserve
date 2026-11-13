@@ -332,9 +332,6 @@ describe("AssistantHeaderButton light", () => {
     expect(button(wrapper).attributes("data-state")).toBe("working");
     expect(button(wrapper).attributes("aria-label")).toBe("O2 Assistant, answering");
     expect(tooltip(wrapper)).toBe("Answering: Checkout 5xx");
-    expect(
-      wrapper.find('[data-test="assistant-header-status-light"]').attributes("data-shape"),
-    ).toBe("ring");
     store.setActive(null);
     const b = session(store, "Payments");
     store.state.sessions[b].turn = { state: "queued" };
@@ -368,7 +365,7 @@ describe("AssistantHeaderButton light", () => {
     const { wrapper } = setup("available", {}, { state: "needs_you", sid: "elsewhere" });
     await flushPromises();
     expect(button(wrapper).attributes("data-state")).toBe("needs_you");
-    expect(wrapper.find('[data-test="assistant-header-status-light"]').text()).toBe("");
+    expect(wrapper.find('[data-test="assistant-header-status-light"]').exists()).toBe(false);
   });
 
   it("ranks needs you above working and shows the count", async () => {
@@ -382,7 +379,7 @@ describe("AssistantHeaderButton light", () => {
     expect(button(wrapper).attributes("data-state")).toBe("needs_you");
     expect(button(wrapper).attributes("aria-label")).toBe("O2 Assistant, needs you, 1 waiting");
     expect(tooltip(wrapper)).toBe("Needs you");
-    expect(wrapper.find('[data-test="assistant-header-status-light"]').text()).toBe("1");
+    expect(wrapper.find('[data-test="assistant-header-status-light"]').exists()).toBe(false);
   });
 
   it("names the visible needs-you count so the label matches the content", async () => {
@@ -392,11 +389,7 @@ describe("AssistantHeaderButton light", () => {
       store.state.sessions[sid].turn = { state: "awaiting_approval", callId: title };
     }
     await flushPromises();
-    const count = wrapper.get('[data-test="assistant-header-status-light"]').text();
-    expect(count).toBe("2");
-    expect(button(wrapper).attributes("aria-label")).toBe(
-      `O2 Assistant, needs you, ${count} waiting`,
-    );
+    expect(button(wrapper).attributes("aria-label")).toBe("O2 Assistant, needs you, 2 waiting");
   });
 
   it("uses the one consent key when the decision is about paid usage", async () => {
@@ -421,9 +414,6 @@ describe("AssistantHeaderButton light", () => {
     };
     await flushPromises();
     expect(button(wrapper).attributes("aria-label")).toBe("O2 Assistant, last answer failed");
-    expect(
-      wrapper.find('[data-test="assistant-header-status-light"]').attributes("data-shape"),
-    ).toBe("glyph");
   });
 
   it("opens the container on the lit session", async () => {

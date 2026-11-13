@@ -21,15 +21,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :items="shownChips"
     :hidden-count="hiddenCount"
   >
-    <template v-if="timeShown" #leading>
-      <AssistantTimePrefix
-        v-model:open="timeOpen"
-        :window="context.window.value"
-        :page-window="pageWindow"
-        :timezone="timezone"
-        @change="applyTime"
-      />
-    </template>
     <template #chip="{ item }">
       <AssistantChipPopover
         :chip="item"
@@ -72,24 +63,16 @@ export { trayChipLimit } from "./AssistantChipTray.vue";
 </script>
 
 <script setup lang="ts">
-import { computed, inject, nextTick, ref, type ComponentPublicInstance } from "vue";
+import { computed, nextTick, ref, type ComponentPublicInstance } from "vue";
 import { useRoute } from "vue-router";
-import { useStore } from "vuex";
 
 import { imageChipOf } from "@/components/ai-assistant/composer/composerImages";
-import {
-  announceComposer,
-  composerTimeOpenKey,
-  useComposerLayout,
-} from "@/components/ai-assistant/composer/composerUi";
+import { announceComposer, useComposerLayout } from "@/components/ai-assistant/composer/composerUi";
 import { explorerLabel } from "@/components/ai-assistant/evidence/evidenceText";
 import {
   byteSize,
-  timeWindowOf,
   useAssistantContext,
-  useAssistantPlacement,
   useAssistantStore,
-  type ComposerState,
   type ContextChip,
 } from "@/composables/assistant";
 import { trackAssistant } from "@/services/assistantAnalytics";
@@ -101,37 +84,24 @@ import { explorerOf } from "@/utils/assistant/explorerRoutes";
 import AssistantChipPopover from "./AssistantChipPopover.vue";
 import AssistantChipTray, { useChipCollapse } from "./AssistantChipTray.vue";
 import AssistantContextChip from "./AssistantContextChip.vue";
-import AssistantTimePrefix from "./AssistantTimePrefix.vue";
 
 const props = defineProps<AssistantContextTrayProps>();
 
 const { t } = useI18nTyped();
 const store = useAssistantStore();
 const route = useRoute();
-const vuex = useStore();
 const context = useAssistantContext(() => props.sid, { store });
 const layout = useComposerLayout();
-const placement = useAssistantPlacement(store);
 // A generic SFC has no constructor type, and only its root element is read.
 const tray = ref<ComponentPublicInstance | null>(null);
 const root = computed<HTMLElement | null>(() => tray.value?.$el ?? null);
 const openId = ref<string | null>(null);
 const expanded = ref(false);
-const timeOpen = inject(composerTimeOpenKey, ref(false));
-// The page's own range shows in the ⓘ; the chip is only a range the user picked or is picking.
-const timeShown = computed(() => timeOpen.value || context.window.value.source === "custom");
 
 // Another user+org's chat is never shown or edited here (D21, F8).
 const session = computed(() => {
   const found = store.state.sessions[props.sid ?? ""];
   return found && found.userOrgKey === store.state.userOrgKey ? found : null;
-});
-const timezone = computed<string>(() => vuex.state.timezone || "UTC");
-
-// The page's own window, whatever the draft overrides it with; a page with no range offers no "Page time".
-const pageWindow = computed(() => {
-  const own = timeWindowOf(context.page.value, null);
-  return own.source === "page" ? own : null;
 });
 
 // Page context shows in the `i` and the placeholder; chips are only what the user added (composer §1).
@@ -196,24 +166,6 @@ async function tabOut(id: string): Promise<void> {
   );
   const next = button ? tabbable[tabbable.indexOf(button) + 1] : undefined;
   (next ?? button)?.focus();
-}
-
-// A time picked before the first keystroke starts the chat, as a pick of an agent does.
-function applyTime(range: ComposerState["timeOverride"]): void {
-  const sid =
-    session.value?.sid ??
-    (store.state.ready
-      ? store.createSession({
-          origin: {
-            entryKind: "empty_state",
-            objectKind: "none",
-            container: placement.container.value ?? "sidebar",
-          },
-        })
-      : null);
-  if (!sid) return;
-  store.setTimeOverride(sid, range);
-  changed("swap_time", context.timeChip.value, 0);
 }
 
 function trim(chip: ContextChip, includeInternal: boolean): void {

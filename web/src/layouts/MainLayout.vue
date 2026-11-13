@@ -1194,11 +1194,10 @@ export default defineComponent({
     // flag. Position: directly after Traces. Idempotent — safe to call from
     // multiple lifecycle hooks.
     const updateAIObservabilityMenu = () => {
-      // The assistant owns the sparkle glyph, so this LLM tooling entry gets its own name and icon.
       syncFeatureLink(
         {
-          title: assistantV2 ? t("menu.llmObservability") : t("menu.aiObservability"),
-          icon: assistantV2 ? "insights" : "auto-awesome",
+          title: t("menu.aiObservability"),
+          icon: "auto-awesome",
           link: "/ai",
           name: "aiObservability",
         },

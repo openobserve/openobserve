@@ -15,7 +15,6 @@
 
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { h } from "vue";
 
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
@@ -32,12 +31,13 @@ import { alertKeys } from "@/services/alerts.querykeys";
 import { dashboardKeys } from "@/services/dashboards.querykeys";
 import { pipelineKeys } from "@/services/pipelines.querykeys";
 import { streamKeys } from "@/services/stream.querykeys";
-import AssistantContextTray from "../context/AssistantContextTray.vue";
 import AssistantComposer, {
   PREFILL_CHOICE_CHARS,
   type AssistantComposerProps,
 } from "./AssistantComposer.vue";
-import AssistantComposerPlusMenu, { type ComposerPlusAction } from "./AssistantComposerPlusMenu.vue";
+import AssistantComposerPlusMenu, {
+  type ComposerPlusAction,
+} from "./AssistantComposerPlusMenu.vue";
 import { composerUi, noteCap, noteDraftCleared, resetComposerUiForTests } from "./composerUi";
 import { queuedOf, resetComposerQueueForTests } from "./useComposerQueue";
 import { HOLD_MS, SILENCE_MS, resetVoiceForTests, setVoiceOptIn } from "./useAssistantVoice";
@@ -224,9 +224,17 @@ describe("rows (§1, S1)", () => {
     expect(frame.contains(strip) && frame.contains(bar)).toBe(true);
     expect(strip.compareDocumentPosition(textarea().element) & FOLLOWING).toBeTruthy();
     expect(textarea().element.compareDocumentPosition(bar) & FOLLOWING).toBeTruthy();
-    expect(wrapper.get('[data-test="assistant-composer"]').classes()).toContain(
-      "[&>div]:rounded-2xl",
+    const classes = wrapper.get('[data-test="assistant-composer"]').classes();
+    expect(classes).toContain("[&>div]:rounded-surface");
+    expect(classes).toEqual(
+      expect.arrayContaining([
+        "[&>div]:focus-within:border-input-border-focus",
+        "[&>div]:focus-within:ring-1",
+        "[&>div]:motion-reduce:transition-none",
+      ]),
     );
+    expect(classes).not.toContain("[&>div]:focus-within:ring-3");
+    expect(bar.classList.contains("border-t")).toBe(true);
   });
 
   it("never moves the bar or a shown strip on a keystroke, a new line or a notice (F2)", async () => {
@@ -260,6 +268,7 @@ describe("rows (§1, S1)", () => {
     const right = wrapper.get('[data-test="assistant-composer-bar-right"]');
     expect(left.findAll("button, [data-test]").map((n) => n.attributes("data-test"))).toEqual([
       "assistant-composer-plus",
+      "assistant-context-chip-time",
       "assistant-agent-pill",
     ]);
     expect(
@@ -545,8 +554,7 @@ describe("states (`40` §1.3)", () => {
     for (const id of ["assistant-composer-plus", "assistant-send"])
       expect(wrapper.get(`[data-test="${id}"]`).attributes("aria-disabled")).toBe("true");
     const pill = wrapper.get('[data-test="assistant-agent-pill"]');
-    expect(pill.classes()).toContain("text-text-body!");
-    expect(pill.classes()).not.toContain("opacity-45");
+    expect(pill.text()).toBe("O2 Assistant");
     expect(wrapper.find('[data-test="assistant-composer-notice-goToRequest"]').exists()).toBe(
       false,
     );
@@ -1154,7 +1162,7 @@ describe("boards 04–06: inert field, error row, Stop and Send (S3, S4, S6, S7)
     store.state.sessions[sid].nextAgentId = "sre";
     await flushPromises();
     expect(send().attributes("aria-label")).toBe("Send to Investigator");
-    expect(wrapper.get('[data-test="assistant-agent-picker-name"]').text()).toBe("Investigator");
+    expect(wrapper.get('[data-test="assistant-agent-picker"]').text()).toBe("Investigator");
     store.state.sessions[sid].nextAgentId = null as never;
     store.state.sessions[sid].pendingApproval = { id: "c1" } as PendingApproval;
     store.startReply(sid, "c1");
@@ -1206,36 +1214,34 @@ describe("one frame, the + menu and long pastes (D4 §3.1, §3.6, §3.9)", () =>
     expect(textarea().attributes("aria-controls")).toMatch(/^assistant-mention-/);
   });
 
-  it("opens the tray's time picker from the + menu, keeps a picked range as a chip, and its ✕ returns focus", async () => {
+  it("opens the bottom time pill's picker from the + menu, and a pick changes the pill without a strip", async () => {
     fake.current = fakeAssistant();
     const sid = fake.current.store.createSession({
       origin: { entryKind: "header_button", objectKind: "none", container: "sidebar" },
     });
     const wrapper = mount(AssistantComposer, {
       props: { sid },
-      slots: { chips: () => h(AssistantContextTray, { sid }) },
       global: { plugins: [fakeRouter(), fakeVuex()] },
       attachTo: document.body,
     });
     mounted.push(wrapper);
     await flushPromises();
-    const chip = () => wrapper.find('[data-test="assistant-context-chip-time"]');
-    expect(wrapper.find('[data-test="assistant-composer-strip"]').exists()).toBe(false);
+    const pill = () => wrapper.get('[data-test="assistant-context-chip-time"]');
+    expect(pill().text()).toBe("Last 15 min");
     plus(wrapper, "time");
     await flushPromises();
-    expect(chip().text()).toBe("Last 15 min");
-    (document.body.querySelector('[data-test="assistant-context-time-24h"]') as HTMLElement).click();
+    expect(
+      document.body.querySelector('[data-test="assistant-context-time-picker"]'),
+    ).not.toBeNull();
+    (
+      document.body.querySelector('[data-test="assistant-context-time-24h"]') as HTMLElement
+    ).click();
     await flushPromises();
-    expect(chip().text()).toBe("Last 24 h");
-    const remove = wrapper.get<HTMLElement>('[data-test="assistant-context-chip-time-remove"]');
-    remove.element.focus();
-    await remove.trigger("click");
-    await flushPromises();
-    expect(fake.current.store.state.sessions[sid].composer.timeOverride).toBeNull();
+    expect(pill().text()).toBe("Last 24 h");
+    expect(fake.current.store.state.sessions[sid].composer.timeOverride).toMatchObject({
+      period: "24h",
+    });
     expect(wrapper.find('[data-test="assistant-composer-strip"]').exists()).toBe(false);
-    expect(document.activeElement).toBe(
-      wrapper.get('[data-test="assistant-composer-field"]').element,
-    );
   });
 
   it("shows the agent as a pill, which opens the agent menu once there is a choice", async () => {

@@ -17,10 +17,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     :class="[
-      'flex min-w-0 items-center gap-1',
+      'flex min-w-0 flex-wrap items-center gap-x-1 gap-y-1',
       divided
-        ? 'relative -mx-2 mt-1 h-10 px-2 pt-1.5 before:bg-gradient-brand-ribbon before:absolute before:inset-x-0 before:top-0 before:h-px before:opacity-50 before:content-[\'\']'
-        : 'h-8',
+        ? [
+            'relative -mx-2 mt-1 min-h-10 px-2 pt-1.5',
+            plain
+              ? 'border-border-default border-t'
+              : 'before:bg-gradient-brand-ribbon before:absolute before:inset-x-0 before:top-0 before:h-px before:opacity-50 before:content-[\'\']',
+          ]
+        : 'min-h-8',
     ]"
     data-test="assistant-composer-bar"
   >
@@ -42,9 +47,15 @@ export const ROUND_ACTION_CLASS = "rounded-full";
 </script>
 
 <script setup lang="ts">
-withDefaults(defineProps<{ /** A thin line above the controls, for Home's Ask box. */ divided?: boolean }>(), {
-  divided: false,
-});
+withDefaults(
+  defineProps<{
+    /** A thin line above the controls. */
+    divided?: boolean;
+    /** The line is a solid border instead of Home's gradient. */
+    plain?: boolean;
+  }>(),
+  { divided: false, plain: false },
+);
 
 defineSlots<{ agent?: () => unknown; default?: () => unknown }>();
 </script>

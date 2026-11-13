@@ -25,21 +25,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :content-class="composerPopoverClass(layout.tight)"
   >
     <template #trigger>
-      <OButton
-        variant="ghost"
-        size="xs"
+      <OTag
+        type="assistantContext"
+        :label="agentName(shownAgent, t)"
+        :icon="agentGlyph[shownAgent]"
+        clickable
         :disabled="disabled"
         :data-pending="pending ? '' : undefined"
-        :class="[AGENT_PILL_CLASS, AGENT_PICKER_CLASS, TOUCH_TARGET_CLASS]"
+        :class="['shrink-0 motion-safe:transition-colors', CHIP_HIT_AREA_CLASS]"
         data-test="assistant-agent-picker"
         @keydown.up.prevent="menuOpen = true"
-      >
-        <OIcon :name="agentGlyph[shownAgent]" size="xs" class="text-ai-accent" />
-        <span class="truncate" data-test="assistant-agent-picker-name">{{
-          agentName(shownAgent, t)
-        }}</span>
-        <OIcon :name="assistantGlyph.expand" size="xs" class="text-text-secondary" />
-      </OButton>
+      />
     </template>
     <ODropdownGroup :label="t('assistant.agent.picker.heading')">
       <template v-if="sharedPolicy" #label-action>
@@ -116,14 +112,11 @@ import { computed, nextTick, ref, watch } from "vue";
 import { useStore } from "vuex";
 
 import { agentGlyph, assistantGlyph } from "@/components/ai-assistant/common/glyphs";
-import { TOUCH_TARGET_CLASS } from "@/components/ai-assistant/common/touchTarget";
-import AssistantAgentPill, {
-  AGENT_PICKER_CLASS,
-  AGENT_PILL_CLASS,
-} from "@/components/ai-assistant/composer/AssistantAgentPill.vue";
+import AssistantAgentPill from "@/components/ai-assistant/composer/AssistantAgentPill.vue";
 import AssistantAskAdminPopover from "@/components/ai-assistant/gate/AssistantAskAdminPopover.vue";
 import {
   announceComposer,
+  CHIP_HIT_AREA_CLASS,
   composerPopoverClass,
   useComposerLayout,
 } from "@/components/ai-assistant/composer/composerUi";
@@ -141,6 +134,7 @@ import {
   rosterOffersChoice,
 } from "@/composables/assistant/pure";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";

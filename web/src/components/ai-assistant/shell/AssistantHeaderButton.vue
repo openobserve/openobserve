@@ -43,26 +43,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-state="view.state"
           :aria-label="view.name"
           :class="[
+            'group text-ai-accent! hover:shadow-ai-accent/35 dark:shadow-ai-accent/20 dark:hover:shadow-ai-accent/35 [background:var(--color-gradient-ai-subtle)]! [transition:background_0.3s_ease,box-shadow_0.3s_ease,color_0.3s_ease] hover:text-white! hover:shadow-md hover:[background:var(--color-gradient-ai)]! dark:text-white! dark:shadow-md dark:hover:shadow-md',
             'relative max-md:min-h-11 max-md:min-w-11 pointer-coarse:min-h-11 pointer-coarse:min-w-11',
             view.state === 'open' ? 'border-border-strong border' : '',
           ]"
           @click="onClick"
         >
           <span class="relative inline-flex">
-            <OIcon
-              :name="assistantGlyph.assistant"
-              size="sm"
-              :class="view.state === 'off' ? 'text-text-muted' : ''"
+            <img
+              alt=""
+              :src="
+                getImageURL(
+                  isDark ? 'images/common/ai_icon_dark.svg' : 'images/common/ai_icon_gradient.svg',
+                )
+              "
+              :class="[
+                'h-5 w-5 shrink-0 [transition:transform_0.6s_ease] group-hover:rotate-180 group-hover:brightness-0 group-hover:invert group-hover:[transition:filter_0.3s_ease]',
+                view.state === 'off' ? 'opacity-50 grayscale' : '',
+              ]"
             />
-            <span v-if="view.signal" class="absolute -end-1 -top-1 inline-flex">
-              <AssistantStatusDot
-                :state="view.signal"
-                :count="view.count"
-                data-test="assistant-header-status-light"
-              />
-            </span>
             <span
-              v-else-if="view.badge"
+              v-if="view.badge"
               aria-hidden="true"
               class="rounded-default bg-surface-base text-text-secondary absolute -end-1.5 -top-1.5 inline-flex size-3.5 items-center justify-center"
             >
@@ -92,11 +93,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="shortcutId"
       ref="region"
       data-test="assistant-header-status-region"
-    />
-    <AssistantDecisionNotice
-      v-if="shortcutId"
-      @announce="(text) => region?.announce(text)"
-      @hidden="buttonEl()?.focus()"
     />
     <ODialog
       v-if="lgUp"
@@ -170,7 +166,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import type { AssistantSession, GateReason } from "@/composables/assistant";
 import type { I18nText } from "@/types/i18n";
-import type { AssistantSignal } from "@/components/ai-assistant/common/AssistantStatusDot.types";
 
 export type HeaderButtonState =
   "loading" | "hidden" | "idle" | "open" | "working" | "needs_you" | "unread" | "locked" | "off";
@@ -184,8 +179,6 @@ interface HeaderView {
   state: HeaderButtonState;
   name: I18nText;
   tooltip: I18nText;
-  signal: AssistantSignal | null;
-  count?: number;
   badge: "locked" | "notSetUp" | null;
   /** Only another org's chats lit it. */
   otherOrg?: boolean;
@@ -210,19 +203,21 @@ function isRunning(session: AssistantSession): boolean {
 
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from "vue";
-import { useRoute } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 
 import { provideAssistantSurface } from "@/components/ai-assistant/common/assistantSurface";
 import AssistantIconButton from "@/components/ai-assistant/common/AssistantIconButton.vue";
-import AssistantStatusDot from "@/components/ai-assistant/common/AssistantStatusDot.vue";
 import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
-import AssistantDecisionNotice from "@/components/ai-assistant/runs/AssistantDecisionNotice.vue";
 import AssistantGateState, {
   gateLearnOpen,
   type GateCta,
 } from "@/components/ai-assistant/gate/AssistantGateState.vue";
-import { isFullThreadRoute } from "@/composables/assistant/pure";
+import {
+  fullThreadLocation,
+  isFullThreadRoute,
+  isHomeAskShown,
+} from "@/composables/assistant/pure";
 import {
   openAssistant,
   openWindowsOf,
@@ -236,6 +231,8 @@ import {
   useAssistantStore,
 } from "@/composables/assistant";
 import useBreakpoint from "@/composables/useBreakpoint";
+import { useTheme } from "@/composables/useTheme";
+import { getImageURL } from "@/utils/zincutils";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
@@ -255,6 +252,7 @@ import { useLockedPanel } from "./lockedPanel";
 provideAssistantSurface();
 
 const { t } = useI18nTyped();
+const { isDark } = useTheme();
 const { product } = useAssistantName();
 const store = useAssistantStore();
 const history = useAssistantHistory();
@@ -265,6 +263,7 @@ const lockedPanel = useLockedPanel();
 // The open chord lives here, not in the async host, so it works from the moment the button does.
 useAssistantOpenChord({ gate: capability.gate, assistantCanChat: capability.assistantCanChat });
 const route = useRoute();
+const router = useRouter();
 const vuex = useStore();
 const { lgUp, mdUp } = useBreakpoint();
 const button = ref<InstanceType<typeof OButton> | null>(null);
@@ -305,7 +304,7 @@ function titleOf(sid: string | null): I18nText {
 }
 
 function plain(state: HeaderButtonState, name: I18nText, tooltip: I18nText): HeaderView {
-  return { state, name, tooltip, signal: null, badge: null, dialog: null };
+  return { state, name, tooltip, badge: null, dialog: null };
 }
 
 function gateView(): HeaderView | null {
@@ -373,8 +372,6 @@ function lightView(): HeaderView {
           : t(open ? "assistant.header.needsYouNameOpen" : "assistant.header.needsYouName", p),
         consent ? t("assistant.turn.waitingConsent") : t("assistant.notice.decision"),
       ),
-      signal: "attention",
-      ...(waiting > 0 && { count: waiting }),
     };
   }
   if (light.state === "working") {
@@ -394,7 +391,6 @@ function lightView(): HeaderView {
             ? t("assistant.header.stateWorking", { title })
             : name,
       ),
-      signal: "working",
     };
   }
   if (light.state === "unread") {
@@ -406,7 +402,6 @@ function lightView(): HeaderView {
             t("assistant.header.failedName", p),
             t("assistant.header.stateFailed", title),
           ),
-          signal: "failed",
         }
       : {
           ...plain(
@@ -414,7 +409,6 @@ function lightView(): HeaderView {
             t("assistant.header.readyName", p),
             t("assistant.header.stateDone", title),
           ),
-          signal: "unread",
         };
   }
   const others = otherOrgView();
@@ -451,12 +445,10 @@ function otherOrgView(): HeaderView | null {
         t("assistant.header.needsYouCountName", { ...p, count: waiting }),
         t("assistant.notice.decision"),
       ),
-      signal: "attention",
-      count: waiting,
       otherOrg: true,
     };
   const name = t("assistant.header.answeringName", p);
-  return { ...plain("working", name, name), signal: "working", otherOrg: true };
+  return { ...plain("working", name, name), otherOrg: true };
 }
 
 function buttonEl(): HTMLElement | null {
@@ -510,6 +502,11 @@ function toggleSidebar(): boolean {
 function openOnLitSession(invoker: HTMLElement | null, sid?: string): void {
   const light = store.headerLight.value;
   const target = sid ?? (light.state !== "open" && light.state !== "idle" ? light.sid : null);
+  // Home's AI tab has its own chat, so a windowed chat opens full-page there instead of in a window.
+  if (target && store.windowOf(target) && isHomeAskShown(route)) {
+    store.open({ kind: "full" }, { sid: target, focus: "composer" });
+    return void router.push(fullThreadLocation(target, route.query));
+  }
   // A lit chat in a window opens where it lives: raised, or back from the tray.
   if (store.windowOf(target)) return store.restoreWindow(target as string);
   if (target && store.state.sessions[target]) store.setActive(target);
@@ -584,7 +581,7 @@ function toastHidden(): void {
   for (const session of mine.value) {
     const turnId = session.turnMeta.turnId;
     if (!turnId || isShown(session.sid)) continue;
-    // A waiting chat speaks through the decision notice, so only a finished answer toasts.
+    // A waiting chat speaks through the header light, so only a finished answer toasts.
     const kind = toastKind(session);
     if (!kind || toasted.has(`${turnId}:${kind}`)) continue;
     toasted.add(`${turnId}:${kind}`);

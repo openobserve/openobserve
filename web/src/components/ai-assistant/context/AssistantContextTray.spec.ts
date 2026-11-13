@@ -15,7 +15,6 @@
 
 import { enableAutoUnmount, flushPromises, mount } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ref } from "vue";
 
 import type { ContextChip } from "@/composables/assistant";
 import { contextRegistry } from "@/composables/contextProviders/registry";
@@ -23,11 +22,7 @@ import { trackAssistant } from "@/services/assistantAnalytics";
 import { raw } from "@/types/i18n";
 
 import { fakeAssistant, fakeRouter, fakeVuex } from "../__tests__/fakeAssistant";
-import {
-  composerTimeOpenKey,
-  composerUi,
-  resetComposerUiForTests,
-} from "../composer/composerUi";
+import { composerUi, resetComposerUiForTests } from "../composer/composerUi";
 import AssistantContextTray, { trayChipLimit } from "./AssistantContextTray.vue";
 
 const { fake, breakpoint } = vi.hoisted(() => ({
@@ -139,49 +134,9 @@ describe("AssistantContextTray", () => {
       "aria-label": "Context for your next message",
     });
     expect(labels()).toEqual([]);
-    expect(wrapper.find('[data-test="assistant-context-chip-time"]').exists()).toBe(false);
     store.addChip(sid, ROW);
     await flushPromises();
     expect(labels()).toEqual(["Log row · cart · 13:57"]);
-  });
-
-  it("shows a picked range first as a chip whose ✕ goes back to the page's time", async () => {
-    const { wrapper, store, sid } = await setup();
-    store.setTimeOverride(sid, { from: 1, to: 3_600_001, period: "1h" });
-    await flushPromises();
-    const chip = wrapper.get('[data-test="assistant-context-chip-time"]');
-    expect(chip.text()).toBe("Last 1 h");
-    expect(chip.attributes("aria-label")).toBe("Time range, Last 1 h, custom");
-    await wrapper.get('[data-test="assistant-context-chip-time-remove"]').trigger("click");
-    await flushPromises();
-    expect(store.state.sessions[sid].composer.timeOverride).toBeNull();
-    expect(wrapper.find('[data-test="assistant-context-chip-time"]').exists()).toBe(false);
-  });
-
-  it("shows the page's range as a chip with its picker open while the + menu asks for it", async () => {
-    const open = ref(false);
-    fake.current = fakeAssistant();
-    const sid = fake.current.store.createSession({
-      origin: { entryKind: "header_button", objectKind: "none", container: "sidebar" },
-    });
-    const wrapper = mount(AssistantContextTray, {
-      props: { sid },
-      global: { plugins: [fakeRouter(), fakeVuex()], provide: { [composerTimeOpenKey]: open } },
-      attachTo: document.body,
-    });
-    await flushPromises();
-    expect(wrapper.find('[data-test="assistant-context-chip-time"]').exists()).toBe(false);
-    open.value = true;
-    await flushPromises();
-    expect(wrapper.get('[data-test="assistant-context-chip-time"]').text()).toBe("Last 15 min");
-    expect(document.body.querySelector('[data-test="assistant-context-time-picker"]')).not.toBeNull();
-    (document.body.querySelector('[data-test="assistant-context-time-24h"]') as HTMLElement).click();
-    await flushPromises();
-    expect(open.value).toBe(false);
-    expect(fake.current.store.state.sessions[sid].composer.timeOverride).toMatchObject({
-      period: "24h",
-    });
-    expect(wrapper.get('[data-test="assistant-context-chip-time"]').text()).toBe("Last 24 h");
   });
 
   it("removes a staged chip with Delete and moves focus to the next chip (CT-08 AC 4)", async () => {

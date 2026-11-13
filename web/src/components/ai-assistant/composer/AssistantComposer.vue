@@ -38,6 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :state="state"
         :inert="inertKind !== null"
         :opening="opening"
+        tall
         :readonly="inertKind !== null"
         :placeholder="placeholder"
         :input-attrs="textboxAttrs"
@@ -80,14 +81,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </AssistantComposerStrip>
         </template>
         <template #bar>
-          <AssistantComposerBottomRow>
+          <AssistantComposerBottomRow divided plain>
             <template #agent>
               <AssistantComposerPlusMenu
                 :actions="plusActions"
                 :disabled="inertKind !== null"
                 @select="onPlus"
               />
-              <AssistantAgentPicker :sid="sid" :disabled="inertKind !== null || accessLost" />
+              <span class="flex min-w-0 shrink-0 items-center gap-2">
+                <AssistantSessionTime :sid="sid" :disabled="inertKind !== null || accessLost" />
+                <AssistantAgentPicker :sid="sid" :disabled="inertKind !== null || accessLost" />
+              </span>
             </template>
             <AssistantDictationWave v-if="voice.mine.value" :elapsed-ms="voice.elapsedMs.value" />
             <AssistantDictateButton
@@ -252,8 +256,11 @@ import { getUUIDv7 } from "@/utils/uuid";
 import AssistantComposerBottomRow, { ROUND_ACTION_CLASS } from "./AssistantComposerBottomRow.vue";
 import { attachImageFiles, imageTooBigLine, type ImageCap } from "./composerImages";
 import AssistantComposerFrame from "./AssistantComposerFrame.vue";
-import AssistantComposerPlusMenu, { type ComposerPlusAction } from "./AssistantComposerPlusMenu.vue";
+import AssistantComposerPlusMenu, {
+  type ComposerPlusAction,
+} from "./AssistantComposerPlusMenu.vue";
 import AssistantComposerStrip from "./AssistantComposerStrip.vue";
+import AssistantSessionTime from "@/components/ai-assistant/context/AssistantSessionTime.vue";
 import AssistantDictateButton from "./AssistantDictateButton.vue";
 import AssistantDictationTail from "./AssistantDictationTail.vue";
 import AssistantDictationWave from "./AssistantDictationWave.vue";
@@ -274,7 +281,6 @@ import {
   composerRowOf,
   composerTimeOpenKey,
   composerUi,
-  focusIn,
   moveDraft,
   forgetComposerUi,
   noteCap,
@@ -361,13 +367,10 @@ const attached = computed(() => stagedChips.value.length > 0 || images.value.len
 // With no chips the panel header carries the ⓘ, so the strip shows it only beside chips and never beside a notice.
 const chipsShown = computed(() => composerStripHoldsSees(composer.value));
 const seesShown = computed(() => !notice.value && chipsShown.value);
-// The + menu opens the tray's time picker; the chip stays only for a range the user picked.
+// The + menu opens the time pill's picker.
 const timeOpen = ref(false);
-const timeShown = computed(() => timeOpen.value || context.window.value.source === "custom");
-// An empty box draws no strip: it holds only a notice, or the chips and time the user added.
-const stripShown = computed(
-  () => !!notice.value || (!replying.value && (chipsShown.value || timeShown.value)),
-);
+// An empty box draws no strip: it holds only a notice, or the chips the user added.
+const stripShown = computed(() => !!notice.value || (!replying.value && chipsShown.value));
 // A bare `@` is an unfinished mention, not a question (CT-05).
 const hasContent = computed(() => /[^@\s]/.test(text.value) || attached.value);
 const storageBlocked = computed(() => store.drafts.storageBlocked.value);
@@ -1678,17 +1681,6 @@ watch(recallOpen, (open, was) => {
     root.value?.querySelector<HTMLElement>('[data-test="assistant-composer-plus"]')?.focus(),
   );
 });
-
-// A cleared or dismissed time chip leaves the strip; focus that was on it or in its picker lands in the textbox.
-watch(
-  timeShown,
-  async (shown) => {
-    if (shown || !focusIn(root.value)) return;
-    await nextTick();
-    if (document.activeElement === document.body) focusInput();
-  },
-  { flush: "pre" },
-);
 
 watch(
   () => Object.keys(store.state.sessions).join("\n"),

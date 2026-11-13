@@ -128,20 +128,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="analysis?.copyReport()"
           />
           <AssistantIconButton
-            v-if="readAloud.supported"
-            :label="
-              readAloud.state.value === 'playing'
-                ? t('assistant.message.pauseReading')
-                : t('assistant.message.readAloud')
-            "
-            :icon="
-              readAloud.state.value === 'playing' ? assistantGlyph.pause : assistantGlyph.readAloud
-            "
-            :on="readAloud.state.value === 'playing'"
-            data-test="assistant-rca-thread-read-aloud"
-            @click="readAloud.toggle()"
-          />
-          <AssistantIconButton
             :label="t('assistant.message.shareAnswer')"
             :icon="assistantGlyph.shareLink"
             :done="linkCopied ? t('assistant.message.linkCopied') : undefined"
@@ -183,7 +169,6 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import IncidentRCAAnalysis from "@/components/alerts/IncidentRCAAnalysis.vue";
 import AssistantIconButton from "@/components/ai-assistant/common/AssistantIconButton.vue";
 import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
-import { useReadAloud } from "@/components/ai-assistant/transcript/useReadAloud";
 import { useIncidentRca, type RcaTriggerRequest } from "@/composables/useIncidentRca";
 import type { IncidentWithAlerts } from "@/services/incidents";
 import { incidentQuery } from "@/services/incidents.queries";
@@ -258,8 +243,6 @@ const title = computed(() =>
 
 const finishedReport = computed(() => !rca.live.value && rca.reportText.value.length > 0);
 
-const readAloud = useReadAloud(() => rca.reportText.value);
-
 const reanalyze = async (options: RcaTriggerRequest) => {
   const before = rca.summary.value?.run_id ?? null;
   await rca.trigger(options);
@@ -295,6 +278,5 @@ const shareLink = async () => {
 
 onUnmounted(() => {
   clearTimeout(linkTimer);
-  readAloud.stop();
 });
 </script>
