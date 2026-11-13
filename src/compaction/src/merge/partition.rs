@@ -31,10 +31,7 @@ use tokio::{
     task::JoinHandle,
 };
 
-use super::{
-    policy::{BatchLimits, MergePolicy},
-    stream::MergeWindow,
-};
+use super::policy::{BatchLimits, MergePolicy, MergeWindow};
 use crate::{
     bloom::compact::RetiredBlooms,
     worker::{MergeBatch, MergeSender},
@@ -57,23 +54,21 @@ pub(super) struct RoundOutcome {
 /// Merges every partition of the window, `file_merge_thread_num` of them at a time.
 pub(super) async fn merge_partitions(
     worker_tx: mpsc::Sender<(MergeSender, MergeBatch)>,
-    window: &Arc<MergeWindow>,
-    policy: &MergePolicy,
+    policy: &Arc<MergePolicy>,
     scan_schema: Arc<Schema>,
     files: Vec<FileKey>,
 ) -> Result<RoundOutcome, anyhow::Error> {
     let semaphore = Arc::new(Semaphore::new(get_config().limit.file_merge_thread_num));
-    let partitions = group_by_partition(files, window);
+    let partitions = group_by_partition(files, policy.window());
     let mut tasks = Vec::with_capacity(partitions.len());
     for (prefix, files) in partitions {
         let permit = semaphore.clone().acquire_owned().await.unwrap();
         let worker_tx = worker_tx.clone();
-        let window = window.clone();
         let policy = policy.clone();
         let scan_schema = scan_schema.clone();
         let task: JoinHandle<anyhow::Result<RoundOutcome>> = tokio::task::spawn(async move {
             let _permit = permit;
-            merge_partition(&worker_tx, &window, &policy, &scan_schema, prefix, files).await
+            merge_partition(&worker_tx, &policy, &scan_schema, prefix, files).await
         });
         tasks.push(task);
     }
@@ -96,19 +91,17 @@ pub(super) async fn merge_partitions(
 /// One partition's round: plan its batches, run them on the workers, commit the results.
 async fn merge_partition(
     worker_tx: &mpsc::Sender<(MergeSender, MergeBatch)>,
-    window: &MergeWindow,
     policy: &MergePolicy,
     scan_schema: &Arc<Schema>,
     prefix: String,
     files: Vec<FileKey>,
 ) -> anyhow::Result<RoundOutcome> {
+    let window = policy.window();
     let cfg = get_config();
     let strategy = MergeStrategy::from(&cfg.compact.strategy);
     let limits = BatchLimits::from_config(&cfg, &strategy, window.is_incremental);
     let files = sort_for_strategy(files, &strategy);
-    let plan = policy
-        .plan(files, &limits, scan_schema, &window.stream())
-        .await;
+    let plan = policy.plan(files, &limits, scan_schema).await;
     let batches: Vec<MergeBatch> = plan
         .batches
         .into_iter()
@@ -133,15 +126,6 @@ async fn merge_partition(
         retired_blooms,
         needs_another_round: plan.needs_another_round,
     })
-}
-
-fn sort_for_strategy(mut files: Vec<FileKey>, strategy: &MergeStrategy) -> Vec<FileKey> {
-    match strategy {
-        MergeStrategy::FileSize => files.sort_by_key(|k| k.meta.original_size),
-        MergeStrategy::FileTime => files.sort_by_key(|k| k.meta.min_ts),
-        MergeStrategy::TimeRange => files = sort_by_time_range(files),
-    }
-    files
 }
 
 /// Sends the batches to the merge workers and waits for every result.
@@ -338,6 +322,15 @@ fn retirement_events(new_files: Vec<FileKey>, retire_files: &[FileKey]) -> Vec<F
     }));
     events.sort_by(|a, b| a.key.cmp(&b.key));
     events
+}
+
+fn sort_for_strategy(mut files: Vec<FileKey>, strategy: &MergeStrategy) -> Vec<FileKey> {
+    match strategy {
+        MergeStrategy::FileSize => files.sort_by_key(|k| k.meta.original_size),
+        MergeStrategy::FileTime => files.sort_by_key(|k| k.meta.min_ts),
+        MergeStrategy::TimeRange => files = sort_by_time_range(files),
+    }
+    files
 }
 
 /// sort by time range without overlapping

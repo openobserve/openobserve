@@ -23,19 +23,23 @@ mod size_bounded;
 use std::sync::Arc;
 
 use arrow_schema::Schema;
-#[cfg(feature = "enterprise")]
-use config::meta::promql::DownsamplingRule;
+use chrono::{TimeZone, Utc};
 use config::{
     Config,
-    meta::stream::{FileKey, MergeStrategy, PartitionTimeLevel, StreamType},
-    utils::time::day_micros,
+    meta::stream::{
+        FileKey, MergeStrategy, PartitionTimeLevel, StreamParams, StreamSettings, StreamType,
+    },
+    utils::time::{hour_micros, now_micros},
 };
+#[cfg(feature = "enterprise")]
+use config::{meta::promql::DownsamplingRule, utils::time::day_micros};
+use infra::schema::get_partition_time_level_at;
 use metrics_index::{MetricsFileLayout, metrics_index_stream};
 #[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::common::downsampling::get_largest_downsampling_rule;
+use o2_enterprise::enterprise::common::downsampling::get_matching_downsampling_rules;
 use search::merge::MergeMode;
 
-use super::job::job_range_end;
+use super::job::{job_range_end, scheduling_level};
 
 /// One planned merge: the files and the mode they merge in.
 pub(super) type PlannedBatch = (Vec<FileKey>, MergeMode);
@@ -92,106 +96,245 @@ impl RoundPlan {
     }
 }
 
-/// The rule one window (an hour or a day of a stream) merges under.
-#[derive(Debug, Clone)]
-pub(super) enum MergePolicy {
-    /// Groups up to the size target, each written in the given mode: logs, traces, plain metrics.
-    SizeBounded(MergeMode),
-    /// Open hour of a metrics-index stream: the pending ingester files become hash-merged files.
-    MetricsOpenHour,
-    /// Closed hour of a metrics-index stream: indexed files, after pre-merges while over the cap.
-    MetricsClosedHour,
-    /// Closed metrics window under a downsampling rule: every file in one batch.
-    #[cfg(feature = "enterprise")]
-    Downsampling(DownsamplingRule),
+#[derive(Debug)]
+pub(super) struct MergePolicy {
+    window: MergeWindow,
+    rule: MergeRule,
 }
 
 impl MergePolicy {
-    /// The rule for the window of `stream_name` that ends at `range_end_ts`, `closed` once settled.
-    pub(super) fn select(
-        stream_type: StreamType,
-        stream_name: &str,
+    pub(super) fn resolve(
+        stream: &StreamParams,
         schema: &Schema,
-        _range_end_ts: i64,
-        closed: bool,
+        settings: Option<&StreamSettings>,
+        offset: i64,
+    ) -> Self {
+        let offset = offset - offset % hour_micros(1);
+        let job_level = scheduling_level(stream.stream_type, settings, offset);
+        let partition_level = get_partition_time_level_at(stream.stream_type, settings, offset);
+        let now = now_micros();
+        let window = MergeWindow::new(
+            stream,
+            offset,
+            job_level,
+            partition_level,
+            is_incremental(
+                job_range_end(offset, job_level),
+                now,
+                crate::settle_micros(),
+            ),
+        );
+        #[cfg(feature = "enterprise")]
+        let rules = if stream.stream_type == StreamType::Metrics && !window.is_incremental {
+            get_matching_downsampling_rules(&stream.stream_name)
+        } else {
+            Vec::new()
+        };
+        Self::from_window(
+            window,
+            schema,
+            #[cfg(feature = "enterprise")]
+            partition_level,
+            #[cfg(feature = "enterprise")]
+            now,
+            #[cfg(feature = "enterprise")]
+            &rules,
+        )
+    }
+
+    fn from_window(
+        window: MergeWindow,
+        schema: &Schema,
+        #[cfg(feature = "enterprise")] partition_level: PartitionTimeLevel,
+        #[cfg(feature = "enterprise")] now: i64,
+        #[cfg(feature = "enterprise")] rules: &[&DownsamplingRule],
     ) -> Self {
         #[cfg(feature = "enterprise")]
-        if closed
-            && stream_type == StreamType::Metrics
-            && let Some(rule) = get_largest_downsampling_rule(stream_name, _range_end_ts)
-        {
-            return Self::Downsampling(rule.clone());
-        }
-        if metrics_index_stream(stream_type, schema) {
-            return if closed {
-                Self::MetricsClosedHour
-            } else {
-                Self::MetricsOpenHour
-            };
-        }
-        Self::SizeBounded(MergeMode::for_stream(stream_type, stream_name))
-    }
-
-    /// True when the rule plans over every file of the window, those at the size target included.
-    pub(super) fn reads_whole_window(&self) -> bool {
-        match self {
-            Self::SizeBounded(_) => size_bounded::READS_WHOLE_WINDOW,
-            Self::MetricsOpenHour => metrics_open_hour::READS_WHOLE_WINDOW,
-            Self::MetricsClosedHour => metrics_closed_hour::READS_WHOLE_WINDOW,
+        let (window, downsampling_rule) = {
+            let mut window = window;
+            let (read_level, rule) = downsampling_window(&window, partition_level, now, rules);
+            if read_level != partition_level {
+                (window.date_start, window.date_end) = date_range(window.offset, read_level);
+            }
+            (window, rule)
+        };
+        let rule = MergeRule::select(
+            schema,
+            &window,
             #[cfg(feature = "enterprise")]
-            Self::Downsampling(_) => true,
-        }
+            downsampling_rule,
+        );
+        Self { window, rule }
     }
 
-    /// The batches one partition's `files` merge in this round.
     pub(super) async fn plan(
         &self,
         files: Vec<FileKey>,
         limits: &BatchLimits<'_>,
         schema: &Arc<Schema>,
-        stream: &str,
     ) -> RoundPlan {
-        let mut plan = match self {
-            Self::SizeBounded(mode) => size_bounded::plan(&files, limits, mode),
-            Self::MetricsOpenHour => metrics_open_hour::plan(files, limits),
-            Self::MetricsClosedHour => {
-                metrics_closed_hour::plan(files, limits, schema, stream).await
+        let mut plan = match &self.rule {
+            MergeRule::SizeBounded(mode) => size_bounded::plan(&files, limits, mode),
+            MergeRule::MetricsOpenHour => metrics_open_hour::plan(files, limits),
+            MergeRule::MetricsClosedHour => {
+                metrics_closed_hour::plan(files, limits, schema, &self.window.stream()).await
             }
             #[cfg(feature = "enterprise")]
-            Self::Downsampling(rule) => {
+            MergeRule::Downsampling(rule) => {
                 RoundPlan::new(vec![(files, MergeMode::Downsampling(rule.clone()))])
             }
         };
-        // a rule may plan a batch of no files: nothing to merge
         plan.batches.retain(|(files, _)| !files.is_empty());
         plan
     }
-}
 
-/// The level the window is read at: a closed 00:00 metrics job spans its day once `has_rule(day
-/// end)`.
-pub(super) fn window_level(
-    stream_type: StreamType,
-    offset: i64,
-    closed: bool,
-    day_level: PartitionTimeLevel,
-    has_rule: impl Fn(i64) -> bool,
-) -> PartitionTimeLevel {
-    if closed
-        && stream_type == StreamType::Metrics
-        && offset % day_micros(1) == 0
-        && has_rule(job_range_end(offset, PartitionTimeLevel::Daily))
-    {
-        return PartitionTimeLevel::Daily;
+    pub(super) fn window(&self) -> &MergeWindow {
+        &self.window
     }
-    day_level
+
+    pub(super) fn reads_whole_window(&self) -> bool {
+        match &self.rule {
+            MergeRule::SizeBounded(_) => size_bounded::READS_WHOLE_WINDOW,
+            MergeRule::MetricsOpenHour => metrics_open_hour::READS_WHOLE_WINDOW,
+            MergeRule::MetricsClosedHour => metrics_closed_hour::READS_WHOLE_WINDOW,
+            #[cfg(feature = "enterprise")]
+            MergeRule::Downsampling(_) => true,
+        }
+    }
 }
 
-pub(super) fn has_downsampling_rule(_stream_name: &str, _max_ts: i64) -> bool {
+#[derive(Debug)]
+enum MergeRule {
+    SizeBounded(MergeMode),
+    MetricsOpenHour,
+    MetricsClosedHour,
     #[cfg(feature = "enterprise")]
-    return get_largest_downsampling_rule(_stream_name, _max_ts).is_some();
-    #[cfg(not(feature = "enterprise"))]
-    false
+    Downsampling(DownsamplingRule),
+}
+
+impl MergeRule {
+    fn select(
+        schema: &Schema,
+        window: &MergeWindow,
+        #[cfg(feature = "enterprise")] downsampling_rule: Option<&DownsamplingRule>,
+    ) -> Self {
+        #[cfg(feature = "enterprise")]
+        if let Some(rule) = downsampling_rule {
+            return Self::Downsampling(rule.clone());
+        }
+        if metrics_index_stream(window.stream_type, schema) {
+            return if window.is_incremental {
+                Self::MetricsOpenHour
+            } else {
+                Self::MetricsClosedHour
+            };
+        }
+        Self::SizeBounded(MergeMode::for_stream(
+            window.stream_type,
+            &window.stream_name,
+        ))
+    }
+}
+
+#[derive(Debug)]
+pub(super) struct MergeWindow {
+    pub(super) org_id: String,
+    pub(super) stream_type: StreamType,
+    pub(super) stream_name: String,
+    pub(super) offset: i64,
+    pub(super) job_end: i64,
+    pub(super) is_incremental: bool,
+    pub(super) merges_by_day: bool,
+    pub(super) date_start: String,
+    pub(super) date_end: String,
+}
+
+impl MergeWindow {
+    pub(super) fn stream(&self) -> String {
+        format!("{}/{}/{}", self.org_id, self.stream_type, self.stream_name)
+    }
+
+    fn new(
+        stream: &StreamParams,
+        offset: i64,
+        job_level: PartitionTimeLevel,
+        read_level: PartitionTimeLevel,
+        is_incremental: bool,
+    ) -> Self {
+        let offset = offset - offset % hour_micros(1);
+        let (date_start, date_end) = date_range(offset, read_level);
+        Self {
+            org_id: stream.org_id.to_string(),
+            stream_type: stream.stream_type,
+            stream_name: stream.stream_name.to_string(),
+            offset,
+            job_end: job_range_end(offset, job_level),
+            is_incremental,
+            // A wider read range must not combine hourly partitions into daily output.
+            merges_by_day: job_level == PartitionTimeLevel::Daily,
+            date_start,
+            date_end,
+        }
+    }
+}
+
+#[cfg(feature = "enterprise")]
+fn downsampling_window<'a>(
+    window: &MergeWindow,
+    partition_level: PartitionTimeLevel,
+    now: i64,
+    rules: &[&'a DownsamplingRule],
+) -> (PartitionTimeLevel, Option<&'a DownsamplingRule>) {
+    if window.is_incremental || window.stream_type != StreamType::Metrics {
+        return (partition_level, None);
+    }
+    if window.offset % day_micros(1) == 0 {
+        let rule = rule_at(
+            rules,
+            now,
+            job_range_end(window.offset, PartitionTimeLevel::Daily),
+        );
+        if rule.is_some() || partition_level == PartitionTimeLevel::Daily {
+            return (PartitionTimeLevel::Daily, rule);
+        }
+    }
+    (
+        partition_level,
+        rule_at(rules, now, job_range_end(window.offset, partition_level)),
+    )
+}
+
+#[cfg(feature = "enterprise")]
+fn rule_at<'a>(
+    rules: &[&'a DownsamplingRule],
+    now: i64,
+    range_end: i64,
+) -> Option<&'a DownsamplingRule> {
+    rules
+        .iter()
+        .copied()
+        .find(|rule| now - rule.offset * 1_000_000 > range_end)
+}
+
+fn date_range(offset: i64, level: PartitionTimeLevel) -> (String, String) {
+    let offset_time = Utc.timestamp_nanos(offset * 1000);
+    if level == PartitionTimeLevel::Daily {
+        (
+            offset_time.format("%Y/%m/%d/00").to_string(),
+            offset_time.format("%Y/%m/%d/23").to_string(),
+        )
+    } else {
+        (
+            offset_time.format("%Y/%m/%d/%H").to_string(),
+            offset_time.format("%Y/%m/%d/%H").to_string(),
+        )
+    }
+}
+
+fn is_incremental(job_end: i64, now: i64, settle_delay: i64) -> bool {
+    let hour = hour_micros(1);
+    let end = job_end - job_end % hour + hour;
+    now - end <= settle_delay
 }
 
 /// Legacy metrics files never join a hash-ordered batch: sorting them would
@@ -224,8 +367,10 @@ fn mergeable_chunks(files: Vec<FileKey>, max_files: usize) -> Vec<Vec<FileKey>> 
 
 #[cfg(test)]
 mod tests {
-    use chrono::{TimeZone, Utc};
-    use config::{meta::stream::FileMeta, utils::time::hour_micros};
+    use config::{
+        meta::stream::{FileMeta, PartitionTimeLevelChange},
+        utils::time::day_micros,
+    };
 
     use super::*;
 
@@ -297,69 +442,376 @@ mod tests {
         file
     }
 
-    #[test]
-    fn test_select_policy_by_stream_and_window_state() {
-        let plain = Schema::empty();
-        let hashed = Schema::new(vec![arrow_schema::Field::new(
+    pub(super) fn test_policy(rule: MergeRule) -> MergePolicy {
+        MergePolicy {
+            window: MergeWindow {
+                org_id: "default".to_string(),
+                stream_type: StreamType::Metrics,
+                stream_name: "test".to_string(),
+                offset: day(),
+                job_end: day() + hour_micros(1) - 1,
+                is_incremental: matches!(rule, MergeRule::MetricsOpenHour),
+                merges_by_day: false,
+                date_start: "2026/08/18/00".to_string(),
+                date_end: "2026/08/18/00".to_string(),
+            },
+            rule,
+        }
+    }
+
+    fn day() -> i64 {
+        Utc.with_ymd_and_hms(2026, 8, 18, 0, 0, 0)
+            .unwrap()
+            .timestamp_micros()
+    }
+
+    fn resolve_at(
+        stream: &StreamParams,
+        schema: &Schema,
+        offset: i64,
+        partition_level: PartitionTimeLevel,
+        now: i64,
+    ) -> MergePolicy {
+        let job_level = if stream.stream_type.support_dynamic_partition() {
+            partition_level
+        } else {
+            PartitionTimeLevel::Hourly
+        };
+        let window = MergeWindow::new(
+            stream,
+            offset,
+            job_level,
+            partition_level,
+            is_incremental(job_range_end(offset, job_level), now, 10),
+        );
+        MergePolicy::from_window(
+            window,
+            schema,
+            #[cfg(feature = "enterprise")]
+            partition_level,
+            #[cfg(feature = "enterprise")]
+            now,
+            #[cfg(feature = "enterprise")]
+            &[],
+        )
+    }
+
+    fn indexed_schema() -> Schema {
+        Schema::new(vec![arrow_schema::Field::new(
             config::meta::promql::HASH_LABEL,
             arrow_schema::DataType::UInt64,
             false,
-        )]);
-        let select = |stream_type, name, schema, closed| {
-            MergePolicy::select(stream_type, name, schema, 0, closed)
-        };
-        assert!(matches!(
-            select(StreamType::Traces, "app", &plain, true),
-            MergePolicy::SizeBounded(MergeMode::Classic)
-        ));
-        assert!(matches!(
-            select(StreamType::Filelist, "x", &plain, false),
-            MergePolicy::SizeBounded(MergeMode::FileList)
-        ));
-        assert!(matches!(
-            select(StreamType::Metrics, "cpu", &plain, true),
-            MergePolicy::SizeBounded(MergeMode::Classic)
-        ));
-        assert!(matches!(
-            select(StreamType::Metrics, "cpu", &hashed, false),
-            MergePolicy::MetricsOpenHour
-        ));
-        assert!(matches!(
-            select(StreamType::Metrics, "cpu", &hashed, true),
-            MergePolicy::MetricsClosedHour
-        ));
-        assert!(!MergePolicy::SizeBounded(MergeMode::Classic).reads_whole_window());
-        assert!(MergePolicy::MetricsOpenHour.reads_whole_window());
-        assert!(MergePolicy::MetricsClosedHour.reads_whole_window());
+        )])
     }
 
     #[test]
-    fn test_window_level_whole_day_only_for_downsampling() {
-        let day = Utc
-            .with_ymd_and_hms(2026, 8, 18, 0, 0, 0)
-            .unwrap()
-            .timestamp_micros();
-        let day_end = day + day_micros(1) - 1;
-        let metrics = StreamType::Metrics;
+    fn test_resolve_policy_by_stream_and_window_state() {
+        let plain = Schema::empty();
+        let hashed = indexed_schema();
+        let resolve = |stream_type, name, schema, closed| {
+            resolve_at(
+                &StreamParams::new("default", name, stream_type),
+                schema,
+                day(),
+                PartitionTimeLevel::Hourly,
+                day() + hour_micros(1) + 10 + i64::from(closed),
+            )
+        };
+        assert!(matches!(
+            resolve(StreamType::Traces, "app", &plain, true).rule,
+            MergeRule::SizeBounded(MergeMode::Classic)
+        ));
+        assert!(matches!(
+            resolve(StreamType::Filelist, "x", &plain, false).rule,
+            MergeRule::SizeBounded(MergeMode::FileList)
+        ));
+        assert!(matches!(
+            resolve(StreamType::Metrics, "cpu", &plain, true).rule,
+            MergeRule::SizeBounded(MergeMode::Classic)
+        ));
+        assert!(matches!(
+            resolve(StreamType::Metrics, "cpu", &hashed, false).rule,
+            MergeRule::MetricsOpenHour
+        ));
+        assert!(matches!(
+            resolve(StreamType::Metrics, "cpu", &hashed, true).rule,
+            MergeRule::MetricsClosedHour
+        ));
+        assert!(!test_policy(MergeRule::SizeBounded(MergeMode::Classic)).reads_whole_window());
+        assert!(test_policy(MergeRule::MetricsOpenHour).reads_whole_window());
+        assert!(test_policy(MergeRule::MetricsClosedHour).reads_whole_window());
+    }
 
-        // the rule is asked about the end of the day, not of hour 00
+    #[test]
+    fn test_resolve_window_preserves_job_and_read_ranges() {
+        let plain = Schema::empty();
         let hourly = PartitionTimeLevel::Hourly;
-        let level = window_level(metrics, day, true, hourly, |max_ts| max_ts == day_end);
-        assert_eq!(level, PartitionTimeLevel::Daily);
-
-        // no rule for the day end: the plain hour-00 merge stays hourly
-        let level = window_level(metrics, day, true, hourly, |_| false);
-        assert_eq!(level, PartitionTimeLevel::Hourly);
-        // other hours, open hours and other stream types never widen
-        let level = window_level(metrics, day + hour_micros(5), true, hourly, |_| true);
-        assert_eq!(level, PartitionTimeLevel::Hourly);
-        let level = window_level(metrics, day, false, hourly, |_| true);
-        assert_eq!(level, PartitionTimeLevel::Hourly);
-        let level = window_level(StreamType::Logs, day, true, hourly, |_| true);
-        assert_eq!(level, PartitionTimeLevel::Hourly);
-        // the level of the day holds without a rule, whatever the job
         let daily = PartitionTimeLevel::Daily;
-        let level = window_level(StreamType::Logs, day, false, daily, |_| false);
-        assert_eq!(level, PartitionTimeLevel::Daily);
+        for (stream_type, job_level, read_level, offset, start, end) in [
+            (
+                StreamType::Logs,
+                hourly,
+                hourly,
+                day() + hour_micros(10) + 123,
+                "10",
+                "10",
+            ),
+            (
+                StreamType::Logs,
+                daily,
+                daily,
+                day() + hour_micros(10) + 123,
+                "00",
+                "23",
+            ),
+            (StreamType::Metrics, hourly, hourly, day(), "00", "00"),
+            (
+                StreamType::Filelist,
+                hourly,
+                daily,
+                day() + hour_micros(10),
+                "00",
+                "23",
+            ),
+            (
+                StreamType::Metadata,
+                hourly,
+                PartitionTimeLevel::Unset,
+                day() + hour_micros(5),
+                "05",
+                "05",
+            ),
+        ] {
+            let policy = resolve_at(
+                &StreamParams::new("default", "cpu", stream_type),
+                &plain,
+                offset,
+                read_level,
+                day() + day_micros(2),
+            );
+            let window = policy.window();
+            let aligned = offset - offset % hour_micros(1);
+            assert_eq!(window.offset, aligned);
+            assert_eq!(window.job_end, job_range_end(aligned, job_level));
+            assert_eq!(window.date_start, format!("2026/08/18/{start}"));
+            assert_eq!(window.date_end, format!("2026/08/18/{end}"));
+            assert_eq!(window.merges_by_day, job_level == daily);
+            assert!(!window.is_incremental);
+        }
+    }
+
+    #[test]
+    fn test_resolve_settle_boundary_uses_the_scheduled_job_end() {
+        let schema = indexed_schema();
+        for job_level in [PartitionTimeLevel::Hourly, PartitionTimeLevel::Daily] {
+            let job_end = job_range_end(day(), job_level);
+            for (delta, incremental) in [(-1, true), (0, true), (1, false)] {
+                let policy = resolve_at(
+                    &StreamParams::new("default", "cpu", StreamType::Metrics),
+                    &schema,
+                    day(),
+                    job_level,
+                    job_end + 1 + 10 + delta,
+                );
+                assert_eq!(policy.window().is_incremental, incremental);
+                assert_eq!(policy.window().job_end, job_end);
+                assert_eq!(
+                    matches!(policy.rule, MergeRule::MetricsOpenHour),
+                    incremental
+                );
+                assert_eq!(
+                    matches!(policy.rule, MergeRule::MetricsClosedHour),
+                    !incremental
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_resolve_uses_historical_partition_settings() {
+        let plain = Schema::empty();
+        let mut settings = StreamSettings::default();
+        settings.partition_time_level.changes = vec![
+            PartitionTimeLevelChange {
+                since: day(),
+                level: PartitionTimeLevel::Daily,
+            },
+            PartitionTimeLevelChange {
+                since: day() + day_micros(1),
+                level: PartitionTimeLevel::Hourly,
+            },
+        ];
+        for (offset, expected_end, merges_by_day) in [
+            (day() + hour_micros(5), "2026/08/18/23", true),
+            (
+                day() + day_micros(1) + hour_micros(5),
+                "2026/08/19/05",
+                false,
+            ),
+        ] {
+            let policy = MergePolicy::resolve(
+                &StreamParams::new("default", "test", StreamType::Logs),
+                &plain,
+                Some(&settings),
+                offset,
+            );
+            assert_eq!(policy.window().date_end, expected_end);
+            assert_eq!(policy.window().merges_by_day, merges_by_day);
+            let level = if merges_by_day {
+                PartitionTimeLevel::Daily
+            } else {
+                PartitionTimeLevel::Hourly
+            };
+            assert_eq!(policy.window().job_end, job_range_end(offset, level));
+        }
+        let policy = MergePolicy::resolve(
+            &StreamParams::new("default", "test", StreamType::Filelist),
+            &plain,
+            Some(&settings),
+            day() + hour_micros(5),
+        );
+        assert_eq!(policy.window().date_end, "2026/08/18/23");
+        assert_eq!(policy.window().job_end, day() + hour_micros(6) - 1);
+        assert!(!policy.window().merges_by_day);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_resolve_downsampling_scope_and_priority() {
+        let schema = indexed_schema();
+        let older = DownsamplingRule {
+            rule: None,
+            function: config::meta::promql::Function::Avg,
+            offset: 36 * 3600,
+            step: 300,
+        };
+        let newer = DownsamplingRule {
+            offset: 12 * 3600,
+            step: 60,
+            ..older.clone()
+        };
+        let zero_age = DownsamplingRule {
+            offset: 0,
+            ..newer.clone()
+        };
+        let hourly = PartitionTimeLevel::Hourly;
+        let daily = PartitionTimeLevel::Daily;
+        let now = day() + day_micros(2);
+        for (label, offset, level, now, rules, end, step) in [
+            (
+                "midnight day",
+                day(),
+                hourly,
+                now,
+                vec![&older, &newer],
+                "23",
+                Some(60),
+            ),
+            (
+                "midnight hour fallback",
+                day(),
+                hourly,
+                now,
+                vec![&older],
+                "00",
+                Some(300),
+            ),
+            (
+                "other hour",
+                day() + hour_micros(5),
+                hourly,
+                now,
+                vec![&older, &newer],
+                "05",
+                Some(300),
+            ),
+            (
+                "daily job",
+                day() + hour_micros(5),
+                daily,
+                now,
+                vec![&older, &newer],
+                "23",
+                Some(60),
+            ),
+            (
+                "open hour",
+                day(),
+                hourly,
+                day() + hour_micros(1) + 10,
+                vec![&zero_age],
+                "00",
+                None,
+            ),
+            ("no rule", day(), hourly, now, Vec::new(), "00", None),
+        ] {
+            let window = MergeWindow::new(
+                &StreamParams::new("default", "cpu", StreamType::Metrics),
+                offset,
+                level,
+                level,
+                is_incremental(job_range_end(offset, level), now, 10),
+            );
+            let policy = MergePolicy::from_window(window, &schema, level, now, &rules);
+            assert_eq!(
+                policy.window().date_end,
+                format!("2026/08/18/{end}"),
+                "{label}"
+            );
+            assert_eq!(
+                policy.window().job_end,
+                job_range_end(offset, level),
+                "{label}"
+            );
+            assert_eq!(policy.window().merges_by_day, level == daily, "{label}");
+            match (policy.rule, step) {
+                (MergeRule::Downsampling(rule), Some(step)) => {
+                    assert_eq!(rule.step, step, "{label}")
+                }
+                (MergeRule::MetricsOpenHour | MergeRule::MetricsClosedHour, None) => {}
+                (rule, expected) => panic!("{label}: {rule:?}, expected step {expected:?}"),
+            }
+        }
+        let window = MergeWindow::new(
+            &StreamParams::new("default", "cpu", StreamType::Logs),
+            day(),
+            hourly,
+            hourly,
+            false,
+        );
+        let policy = MergePolicy::from_window(window, &schema, hourly, now, &[&newer]);
+        assert_eq!(policy.window().date_end, "2026/08/18/00");
+        assert!(matches!(
+            policy.rule,
+            MergeRule::SizeBounded(MergeMode::Classic)
+        ));
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_resolve_downsampling_age_boundary_is_strict() {
+        let schema = indexed_schema();
+        let rule = DownsamplingRule {
+            rule: None,
+            function: config::meta::promql::Function::Avg,
+            offset: 3600,
+            step: 60,
+        };
+        let offset = day() + hour_micros(5);
+        let end = job_range_end(offset, PartitionTimeLevel::Hourly);
+        for delta in [-1, 0, 1] {
+            let hourly = PartitionTimeLevel::Hourly;
+            let now = end + hour_micros(1) + delta;
+            let window = MergeWindow::new(
+                &StreamParams::new("default", "cpu", StreamType::Metrics),
+                offset,
+                hourly,
+                hourly,
+                is_incremental(end, now, 10),
+            );
+            let policy = MergePolicy::from_window(window, &schema, hourly, now, &[&rule]);
+            assert_eq!(matches!(policy.rule, MergeRule::Downsampling(_)), delta > 0);
+            assert!(!policy.window().is_incremental);
+        }
     }
 }

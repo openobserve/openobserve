@@ -190,7 +190,7 @@ mod tests {
     use config::meta::stream::{FileMeta, MergeStrategy};
 
     use super::{
-        super::{MergePolicy, tests::*},
+        super::{MergeRule, tests::*},
         *,
     };
 
@@ -210,10 +210,39 @@ mod tests {
         files: Vec<FileKey>,
         strategy: MergeStrategy,
     ) -> Vec<PlannedBatch> {
-        MergePolicy::MetricsClosedHour
-            .plan(files, &limits(&strategy, 0, false), &schema(), "test")
+        test_policy(MergeRule::MetricsClosedHour)
+            .plan(files, &limits(&strategy, 0, false), &schema())
             .await
             .batches
+    }
+
+    #[tokio::test]
+    async fn test_legacy_batches_preserve_the_pre_merge_followup() {
+        let mut files: Vec<FileKey> = (1..=5)
+            .map(|id| hash_file(&format!("hash-sorted-v1-{id}.parquet"), 30))
+            .collect();
+        files.extend([
+            metrics_file("legacy-1.parquet", 300),
+            metrics_file("legacy-2.parquet", 300),
+        ]);
+        let strategy = MergeStrategy::FileTime;
+        let mut limits = limits(&strategy, 0, false);
+        limits.max_merge_groups = 2;
+        let plan = test_policy(MergeRule::MetricsClosedHour)
+            .plan(files, &limits, &schema())
+            .await;
+        assert!(plan.needs_another_round);
+        assert_eq!(plan.batches.len(), 3);
+        assert!(matches!(plan.batches[0].1, MergeMode::Classic));
+        assert_eq!(
+            names(&plan.batches[0].0),
+            ["legacy-1.parquet", "legacy-2.parquet"]
+        );
+        assert!(
+            plan.batches[1..]
+                .iter()
+                .all(|(_, mode)| matches!(mode, MergeMode::MetricsHashMerged))
+        );
     }
 
     #[test]

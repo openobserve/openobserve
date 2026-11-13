@@ -57,7 +57,7 @@ mod tests {
     use config::meta::stream::MergeStrategy;
 
     use super::{
-        super::{MergePolicy, tests::*},
+        super::{MergeRule, tests::*},
         *,
     };
 
@@ -71,13 +71,8 @@ mod tests {
             .collect();
         files.push(metrics_file("hash-sorted-v1-5.parquet", 300));
         files.push(metrics_file("hash-sorted-v1-6.parquet", 300));
-        let batches = MergePolicy::MetricsOpenHour
-            .plan(
-                files,
-                &limits(&MergeStrategy::FileTime, 0, true),
-                &schema(),
-                "test",
-            )
+        let batches = test_policy(MergeRule::MetricsOpenHour)
+            .plan(files, &limits(&MergeStrategy::FileTime, 0, true), &schema())
             .await
             .batches;
         assert_eq!(batches.len(), 1, "{batches:?}");
@@ -97,8 +92,8 @@ mod tests {
         files.push(metrics_file("legacy.parquet", 100));
         let strategy = MergeStrategy::FileTime;
         let limits = limits(&strategy, 0, true);
-        let batches = MergePolicy::MetricsOpenHour
-            .plan(files.clone(), &limits, &schema(), "s")
+        let batches = test_policy(MergeRule::MetricsOpenHour)
+            .plan(files.clone(), &limits, &schema())
             .await
             .batches;
         assert_eq!(batches.len(), 1, "{batches:?}");
@@ -116,8 +111,8 @@ mod tests {
         );
         files.retain(|f| !f.key.ends_with("hash-sorted-v1-01.parquet"));
         assert!(
-            MergePolicy::MetricsOpenHour
-                .plan(files, &limits, &schema(), "s")
+            test_policy(MergeRule::MetricsOpenHour)
+                .plan(files, &limits, &schema())
                 .await
                 .batches
                 .is_empty(),

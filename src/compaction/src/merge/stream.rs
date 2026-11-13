@@ -19,96 +19,19 @@
 use std::sync::Arc;
 
 use ::datafusion::arrow::datatypes::Schema;
-use chrono::{DateTime, TimeZone, Utc};
 use config::{
-    meta::stream::{FileKey, PartitionTimeLevel, StreamSettings, StreamType},
+    meta::stream::{FileKey, StreamParams, StreamType},
     metrics,
-    utils::time::hour_micros,
 };
-use infra::{
-    file_list as infra_file_list,
-    schema::{get_partition_time_level_at, get_settings},
-};
+use infra::{file_list as infra_file_list, schema::get_settings};
 use search_service::file_list;
 use tokio::sync::mpsc;
 
 use super::{
-    job::{job_range_end, scheduling_level},
-    partition::merge_partitions,
-    policy::{MergePolicy, has_downsampling_rule, window_level},
+    partition::{RoundOutcome, merge_partitions},
+    policy::{MergePolicy, MergeWindow},
 };
-use crate::{
-    bloom::compact::RetiredBlooms,
-    worker::{MergeBatch, MergeSender},
-};
-
-/// One job's merge window: the stream, the range it covers and whether it is still open.
-pub(super) struct MergeWindow {
-    pub(super) org_id: String,
-    pub(super) stream_type: StreamType,
-    pub(super) stream_name: String,
-    /// The job offset, aligned to its hour.
-    pub(super) offset: i64,
-    pub(super) job_end: i64,
-    /// The range can still receive files: only full-size groups are sealed.
-    pub(super) is_incremental: bool,
-    /// A daily day was written hourly: its files merge as one group, written to DD/00.
-    pub(super) merges_by_day: bool,
-    pub(super) date_start: String,
-    pub(super) date_end: String,
-    /// End of the range the files are read from; the merge rule is selected by it.
-    pub(super) range_end_ts: i64,
-}
-
-impl MergeWindow {
-    fn resolve(
-        org_id: &str,
-        stream_type: StreamType,
-        stream_name: &str,
-        settings: Option<&StreamSettings>,
-        offset: i64,
-    ) -> Self {
-        let offset = offset - offset % hour_micros(1);
-        let job_level = scheduling_level(stream_type, settings, offset);
-        let job_end = job_range_end(offset, job_level);
-        let is_incremental = !crate::is_past_hour(job_end);
-        let partition_time_level = window_level(
-            stream_type,
-            offset,
-            !is_incremental,
-            get_partition_time_level_at(stream_type, settings, offset),
-            |max_ts| has_downsampling_rule(stream_name, max_ts),
-        );
-        let offset_time: DateTime<Utc> = Utc.timestamp_nanos(offset * 1000);
-        let (date_start, date_end) = if partition_time_level == PartitionTimeLevel::Daily {
-            (
-                offset_time.format("%Y/%m/%d/00").to_string(),
-                offset_time.format("%Y/%m/%d/23").to_string(),
-            )
-        } else {
-            (
-                offset_time.format("%Y/%m/%d/%H").to_string(),
-                offset_time.format("%Y/%m/%d/%H").to_string(),
-            )
-        };
-        Self {
-            org_id: org_id.to_string(),
-            stream_type,
-            stream_name: stream_name.to_string(),
-            offset,
-            job_end,
-            is_incremental,
-            merges_by_day: job_level == PartitionTimeLevel::Daily,
-            date_start,
-            date_end,
-            range_end_ts: job_range_end(offset, partition_time_level),
-        }
-    }
-
-    pub(super) fn stream(&self) -> String {
-        format!("{}/{}/{}", self.org_id, self.stream_type, self.stream_name)
-    }
-}
+use crate::worker::{MergeBatch, MergeSender};
 
 /// Runs one merge round of a job's window: plan, merge, commit, then settle the job.
 pub async fn merge_by_stream(
@@ -133,30 +56,23 @@ pub async fn merge_by_stream(
     );
 
     let settings = get_settings(org_id, stream_name, stream_type).await;
-    let window = Arc::new(MergeWindow::resolve(
-        org_id,
-        stream_type,
-        stream_name,
+    let policy = Arc::new(MergePolicy::resolve(
+        &StreamParams::new(org_id, stream_name, stream_type),
+        &schema,
         settings.as_deref(),
         offset,
     ));
-    let policy = MergePolicy::select(
-        stream_type,
-        stream_name,
-        &schema,
-        window.range_end_ts,
-        !window.is_incremental,
-    );
-    let files = window_files(&window, &policy).await?;
+    let files = window_files(&policy).await?;
     if files.is_empty() {
         mark_job_done(job_id).await;
         return Ok(());
     }
 
     let scan_schema = Arc::new(schema.with_metadata(Default::default()));
-    let outcome = merge_partitions(worker_tx, &window, &policy, scan_schema, files).await?;
-    build_blooms(&window, outcome.needs_another_round, outcome.retired_blooms).await;
-    settle_job(&window, job_id, outcome.needs_another_round).await;
+    let outcome = merge_partitions(worker_tx, &policy, scan_schema, files).await?;
+    let needs_another_round = outcome.needs_another_round;
+    build_blooms(policy.window(), outcome).await;
+    settle_job(policy.window(), job_id, needs_another_round).await;
 
     let time = start.elapsed().as_secs_f64();
     metrics::COMPACT_USED_TIME
@@ -173,10 +89,8 @@ async fn mark_job_done(job_id: i64) {
 }
 
 /// The files of the window the policy plans over.
-async fn window_files(
-    window: &MergeWindow,
-    policy: &MergePolicy,
-) -> Result<Vec<FileKey>, anyhow::Error> {
+async fn window_files(policy: &MergePolicy) -> Result<Vec<FileKey>, anyhow::Error> {
+    let window = policy.window();
     let max_original_size = if policy.reads_whole_window() {
         i64::MAX
     } else {
@@ -204,11 +118,7 @@ async fn window_files(
 }
 
 /// Builds the window's bloom filters; a failure only leaves files on the regular search path.
-async fn build_blooms(
-    window: &MergeWindow,
-    needs_another_round: bool,
-    retired_blooms: RetiredBlooms,
-) {
+async fn build_blooms(window: &MergeWindow, outcome: RoundOutcome) {
     let stream = window.stream();
     let date_start = &window.date_start;
     let build_start = std::time::Instant::now();
@@ -218,8 +128,8 @@ async fn build_blooms(
         &window.stream_name,
         date_start,
         // a window due another round is rewritten then: its blooms would go unreferenced at once
-        window.is_incremental || needs_another_round,
-        retired_blooms,
+        window.is_incremental || outcome.needs_another_round,
+        outcome.retired_blooms,
     )
     .await
     {
