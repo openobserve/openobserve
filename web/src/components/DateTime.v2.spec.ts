@@ -147,6 +147,21 @@ describe("DateTime v2", () => {
       expect(el("date-time-zone-badge")?.textContent).toBe("UTC+05:30");
     });
 
+    it("gives the zone badge the offset at the range's start, not at now", async () => {
+      store.state.timezone = "America/New_York";
+      createWrapper({
+        zoneBadge: "always",
+        defaultType: "absolute",
+        defaultAbsoluteTime: {
+          startTime: micros("2026-07-01T04:00:00Z"),
+          endTime: micros("2026-10-01T04:00:00Z"),
+        },
+      });
+      await flushPromises();
+
+      expect(el("date-time-zone-badge")?.textContent).toBe("UTC-04:00");
+    });
+
     it("names the window each step moves to, and says when next is already at now", async () => {
       createWrapper({ defaultRelativeTime: "15m" });
       await flushPromises();

@@ -15,7 +15,11 @@
 
 import type { I18nText, TranslateFn } from "@/types/i18n";
 import { resolveZonedCivil, type ParsedTimeInput } from "@/utils/dateTimeRangeParse";
-import { searchAroundSecondsLabel } from "@/utils/searchAroundWindow";
+import {
+  searchAroundSecondsLabel,
+  searchAroundTimeChoice,
+  type SearchAroundChoice,
+} from "@/utils/searchAroundWindow";
 
 const MICROS_PER_SECOND = 1_000_000;
 
@@ -63,3 +67,12 @@ export const anchorWindowLabel = (id: AnchorRow["id"], t: TranslateFn): I18nText
     (ANCHOR_WINDOWS.find((window) => window.id === id)?.halfWidthUs ?? 0) / MICROS_PER_SECOND;
   return searchAroundSecondsLabel(seconds, t);
 };
+
+/** The Search around choice an anchor window stands for; null for `From here to now`. */
+export const anchorSearchAroundChoice = (id: AnchorRow["id"]): SearchAroundChoice | null => {
+  const window = ANCHOR_WINDOWS.find((entry) => entry.id === id);
+  return window ? searchAroundTimeChoice(window.halfWidthUs / MICROS_PER_SECOND) : null;
+};
+
+/** Drops the `.000` an exact stamp gives a whole second, which an epoch in seconds never had. */
+export const dropZeroMilliseconds = (text: string): string => text.replace(/\.000(?!\d)/g, "");

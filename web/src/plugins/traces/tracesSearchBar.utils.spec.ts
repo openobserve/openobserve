@@ -13,6 +13,7 @@ import {
   isDatetimeChanged,
   tracesRunIsStaged,
   tracesRunSignature,
+  tracesRunTimeSelection,
   tracesSearchRunSignature,
   tracesToolbarLayout,
 } from "./tracesSearchBar.utils";
@@ -286,6 +287,26 @@ describe("tracesRunIsStaged", () => {
     const obj = searchObj("service_name = 'b'", false);
     obj.meta.lastRunSignature = null;
     expect(tracesRunIsStaged(obj, false)).toBe(false);
+  });
+});
+
+describe("tracesRunTimeSelection", () => {
+  const sign = (datetime: any) =>
+    tracesRunSignature({ editorValue: "", stream: "s", sqlMode: false, datetime });
+
+  it("reads the period of a relative run", () => {
+    const run = sign({ type: "relative", relativeTimePeriod: "15m", startTime: 1, endTime: 2 });
+    expect(tracesRunTimeSelection(run)).toEqual({ type: "relative", period: "15m" });
+  });
+
+  it("reads the bounds of an absolute run", () => {
+    const run = sign({ type: "absolute", relativeTimePeriod: "15m", startTime: 10, endTime: 20 });
+    expect(tracesRunTimeSelection(run)).toEqual({ type: "absolute", startUs: 10, endUs: 20 });
+  });
+
+  it("reads nothing from a missing or broken signature", () => {
+    expect(tracesRunTimeSelection(null)).toBeNull();
+    expect(tracesRunTimeSelection("not json")).toBeNull();
   });
 });
 

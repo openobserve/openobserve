@@ -37,7 +37,7 @@ export interface DateRangeCalendarProps {
   nextLabel?: string;
   /** Moves focus into the grid on mount: the selected start, else today. */
   autoFocus?: boolean;
-  /** Days before this one (YYYY/MM/DD) are struck and cannot be picked, with `unavailableReason` as their title. */
+  /** Days before this one (YYYY/MM/DD) are struck and cannot be picked; `unavailableReason` is their tooltip and ends their name. */
   unavailableBefore?: string;
   unavailableReason?: string;
 }

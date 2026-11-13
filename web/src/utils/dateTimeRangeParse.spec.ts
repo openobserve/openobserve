@@ -723,6 +723,7 @@ describe("parseTimeInput", () => {
       endMicros: micros + 300_000_000,
       centreMicros: micros,
       sourceZone: "UTC",
+      utcStamp: true,
     });
     expect(parseTimeInput("1762437600")).toEqual({
       type: "timestamp",

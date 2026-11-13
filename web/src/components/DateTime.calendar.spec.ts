@@ -319,10 +319,11 @@ describe("DateTime calendar", () => {
       wrapper!.vm.selectedTime.startTime = "09:15:00";
       wrapper!.vm.selectedTime.endTime = "10:30:00";
       await flushPromises();
-      expect(wrapper!.vm.triggerLabel).toBe("Oct 3, 09:15 – 10:30");
+      expect(wrapper!.vm.triggerLabel).toBe("Last 15 minutes");
       el("date-time-apply-btn")!.click();
       await flushPromises();
 
+      expect(wrapper!.vm.triggerLabel).toBe("Oct 3, 09:15 – 10:30");
       expect(lastEmit()).toMatchObject({
         valueType: "absolute",
         startTime: micros("2026-10-03T03:45:00Z"),
@@ -346,7 +347,7 @@ describe("DateTime calendar", () => {
       expect(wrapper!.vm.triggerLabel).toBe(applied);
     });
 
-    it("holds auto-apply while the day is pending and applies that day on close", async () => {
+    it("applies nothing on an auto-apply picker that closes on a pending day without Apply (V1)", async () => {
       createWrapper({ autoApply: true });
       await flushPromises();
       await openMenu();
@@ -361,18 +362,16 @@ describe("DateTime calendar", () => {
       wrapper!.vm.onMenuOpenChange(false);
       wrapper!.vm.menuOpen = false;
       await flushPromises();
-      expect(lastEmit()).toMatchObject({
-        valueType: "absolute",
-        startTime: micros("2026-10-03T03:45:00Z"),
-        endTime: micros("2026-10-03T05:00:00Z"),
-      });
-      expect(wrapper!.vm.selectedType).toBe("absolute");
+      expect((wrapper!.emitted("on:date-change") ?? []).length).toBe(emitsBefore);
+      expect(wrapper!.vm.selectedType).toBe("relative");
+      expect(wrapper!.vm.triggerLabel).toBe("Last 15 minutes");
     });
 
-    it("applies a range completed by the second click as before", async () => {
+    it("applies a range completed by the second click only on Apply (V1)", async () => {
       createWrapper({ autoApply: true });
       await flushPromises();
       await openMenu();
+      const emitsBefore = (wrapper!.emitted("on:date-change") ?? []).length;
 
       calendar().vm.$emit("update:pendingDate", "2026/10/03");
       await flushPromises();
@@ -380,7 +379,11 @@ describe("DateTime calendar", () => {
       calendar().vm.$emit("update:endDate", "2026/10/05");
       calendar().vm.$emit("update:pendingDate", null);
       await flushPromises();
+      expect((wrapper!.emitted("on:date-change") ?? []).length).toBe(emitsBefore);
+      expect(wrapper!.vm.triggerLabel).toBe("Last 15 minutes");
 
+      wrapper!.vm.applyAndClose();
+      await flushPromises();
       expect(lastEmit()).toMatchObject({ valueType: "absolute" });
       expect(wrapper!.vm.selectedDate).toEqual({ from: "2026/10/03", to: "2026/10/05" });
     });
@@ -479,11 +482,10 @@ describe("DateTime calendar", () => {
 
       calendar().vm.$emit("update:pendingDate", "2026/10/03");
       await flushPromises();
-      expect(wrapper!.vm.triggerLabel).toBe("Oct 3");
-      wrapper!.vm.onMenuOpenChange(false);
-      wrapper!.vm.menuOpen = false;
+      wrapper!.vm.applyAndClose();
       await flushPromises();
 
+      expect(wrapper!.vm.triggerLabel).toBe("Oct 3");
       expect(lastEmit()).toMatchObject({
         valueType: "absolute",
         startTime: micros("2026-10-02T18:30:00Z"),
@@ -502,6 +504,8 @@ describe("DateTime calendar", () => {
       calendar().vm.$emit("update:endDate", "2026/10/05");
       calendar().vm.$emit("update:pendingDate", null);
       await flushPromises();
+      wrapper!.vm.applyAndClose();
+      await flushPromises();
 
       expect(lastEmit()).toMatchObject({
         valueType: "absolute",
@@ -510,7 +514,7 @@ describe("DateTime calendar", () => {
       });
     });
 
-    it("keeps the times of an absolute range when a day is clicked", async () => {
+    it("starts a clicked day at 00:00 even when the absolute range had other times (V2)", async () => {
       createWrapper({
         autoApply: true,
         defaultType: "absolute",
@@ -524,19 +528,24 @@ describe("DateTime calendar", () => {
 
       calendar().vm.$emit("update:pendingDate", "2026/10/03");
       await flushPromises();
-      wrapper!.vm.onMenuOpenChange(false);
-      wrapper!.vm.menuOpen = false;
+      expect(wrapper!.vm.selectedTime).toEqual({ startTime: "00:00:00", endTime: "23:59:59" });
+      wrapper!.vm.applyAndClose();
       await flushPromises();
 
       expect(lastEmit()).toMatchObject({
-        startTime: micros("2026-10-03T03:45:00Z"),
-        endTime: micros("2026-10-03T05:00:00Z"),
+        startTime: micros("2026-10-02T18:30:00Z"),
+        endTime: micros("2026-10-03T18:30:00Z"),
       });
     });
 
     const closeMenu = async () => {
       wrapper!.vm.onMenuOpenChange(false);
       wrapper!.vm.menuOpen = false;
+      await flushPromises();
+    };
+
+    const apply = async () => {
+      wrapper!.vm.applyAndClose();
       await flushPromises();
     };
 
@@ -548,7 +557,7 @@ describe("DateTime calendar", () => {
       el("daterangecalendar-cell-2026-10-08")!.click();
       await flushPromises();
       expect(wrapper!.vm.pendingDay).toBe("2026/10/08");
-      await closeMenu();
+      await apply();
 
       expect(lastEmit()).toMatchObject({
         valueType: "absolute",
@@ -578,6 +587,7 @@ describe("DateTime calendar", () => {
       await flushPromises();
       second.click();
       await flushPromises();
+      await apply();
 
       expect(lastEmit()).toMatchObject({
         valueType: "absolute",
@@ -605,9 +615,9 @@ describe("DateTime calendar", () => {
         startTime: "00:00:00",
         endTime: "23:59:59",
       });
-      expect(wrapper!.vm.triggerLabel).toBe("Oct 3");
       expect(el("date-time-resolved")?.textContent).not.toContain("0s");
-      await closeMenu();
+      await apply();
+      expect(wrapper!.vm.triggerLabel).toBe("Oct 3");
       expect(lastEmit()).toMatchObject({
         startTime: micros("2026-10-02T18:30:00Z"),
         endTime: micros("2026-10-03T18:30:00Z"),
@@ -677,8 +687,11 @@ describe("DateTime calendar", () => {
       expect(document.body.textContent).toContain("End must be after start.");
 
       await commit("datetime-end-time", "15:00:00");
-      expect(lastEmit()).toMatchObject({ endTime: micros("2026-10-06T09:30:00Z") });
       expect(document.body.textContent).not.toContain("End must be after start.");
+      expect((wrapper!.emitted("on:date-change") ?? []).length).toBe(emitsBefore);
+      wrapper!.vm.applyAndClose();
+      await flushPromises();
+      expect(lastEmit()).toMatchObject({ endTime: micros("2026-10-06T09:30:00Z") });
     });
 
     it("moves End with a Start typed past it, keeping the duration", async () => {
@@ -692,6 +705,8 @@ describe("DateTime calendar", () => {
         startTime: "15:00:00",
         endTime: "17:00:00",
       });
+      wrapper!.vm.applyAndClose();
+      await flushPromises();
       expect(lastEmit()).toMatchObject({
         startTime: micros("2026-10-06T09:30:00Z"),
         endTime: micros("2026-10-06T11:30:00Z"),
@@ -712,6 +727,8 @@ describe("DateTime calendar", () => {
       await openMenu();
 
       await commit("datetime-start-time", "08:00:00");
+      wrapper!.vm.applyAndClose();
+      await flushPromises();
 
       expect(lastEmit()).toMatchObject({
         startTime: micros("2026-10-08T02:30:00Z"),
@@ -741,7 +758,7 @@ describe("DateTime calendar", () => {
       expect(document.body.textContent).not.toContain("End must be after start.");
     });
 
-    it("moves End past midnight for a later Start on a clicked day, as on a settled range", async () => {
+    it("keeps a later Start typed on a clicked day inside that whole day (V2)", async () => {
       createWrapper(absoluteProps(true));
       await flushPromises();
       await openMenu();
@@ -752,12 +769,14 @@ describe("DateTime calendar", () => {
 
       await commit("datetime-start-time", "23:00:00");
 
-      expect(wrapper!.vm.pendingDay).toBeNull();
-      expect(wrapper!.vm.selectedDate).toEqual({ from: "2026/10/03", to: "2026/10/04" });
+      expect(wrapper!.vm.pendingDay).toBe("2026/10/03");
+      wrapper!.vm.applyAndClose();
+      await flushPromises();
+      expect(wrapper!.vm.selectedDate).toEqual({ from: "2026/10/03", to: "2026/10/03" });
       expect(lastEmit()).toMatchObject({
         valueType: "absolute",
         startTime: micros("2026-10-03T17:30:00Z"),
-        endTime: micros("2026-10-03T19:30:00Z"),
+        endTime: micros("2026-10-03T18:30:00Z"),
       });
     });
 
@@ -871,24 +890,26 @@ describe("DateTime calendar", () => {
       });
     });
 
-    it("applies the seeded range once the user edits it", async () => {
+    it("applies the edited seeded range on Apply, not while it is edited (V1)", async () => {
       createWrapper({ autoApply: true, defaultRelativeTime: "calendar:month:-1" });
       await flushPromises();
       await openMenu();
       expect(wrapper!.vm.selectedDate).toEqual({ from: "2026/09/01", to: "2026/09/30" });
       expect(wrapper!.vm.selectedTime).toEqual({ startTime: "00:00:00", endTime: "23:59:59" });
 
+      const emitsBefore = (wrapper!.emitted("on:date-change") ?? []).length;
       wrapper!.vm.onStartTimeEdit("06:00:00");
+      wrapper!.vm.onEndTimeEdit("23:00:00");
+      await flushPromises();
+      expect((wrapper!.emitted("on:date-change") ?? []).length).toBe(emitsBefore);
+
+      wrapper!.vm.applyAndClose();
       await flushPromises();
       expect(lastEmit()).toMatchObject({
         valueType: "absolute",
         startTime: micros("2026-09-01T00:30:00Z"),
-        endTime: micros("2026-09-30T18:30:00Z"),
+        endTime: micros("2026-09-30T17:30:00Z"),
       });
-
-      wrapper!.vm.onEndTimeEdit("23:00:00");
-      await flushPromises();
-      expect(lastEmit()).toMatchObject({ endTime: micros("2026-09-30T17:30:00Z") });
     });
   });
 
@@ -1086,6 +1107,8 @@ describe("DateTime calendar", () => {
       calendar().vm.$emit("update:startDate", "2026/10/06");
       calendar().vm.$emit("update:endDate", "2026/10/08");
       calendar().vm.$emit("update:pendingDate", null);
+      await flushPromises();
+      wrapper!.vm.applyAndClose();
       await flushPromises();
 
       expect(lastEmit()).toMatchObject({

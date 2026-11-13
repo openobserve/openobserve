@@ -84,7 +84,6 @@ export interface TimeRangeSteppingDeps {
   relativePeriod: Ref<string>;
   relativeValue: Ref<number>;
   pendingDay: Ref<string | null>;
-  menuOpen: Ref<boolean>;
   pendingRange: ComputedRef<PickerRange | null>;
   triggerLabel: ComputedRef<unknown>;
   // The selection last applied, which an undo step returns to.
@@ -100,6 +99,8 @@ export interface TimeRangeSteppingDeps {
   saveDate: (dateType?: string | null) => void;
   getConsumableDateTime: () => PickerRange;
   openMenu: () => void;
+  // Closes the open panel as a user dismissal does, so listeners waiting on hide still run.
+  closeMenu: () => void;
   onUndo: (step: TimeRangeUndoStep) => void;
 }
 
@@ -118,10 +119,10 @@ export default function useTimeRangeStepping(
     relativePeriod,
     relativeValue,
     pendingDay,
-    menuOpen,
     pendingRange,
     saveDate,
     getConsumableDateTime,
+    closeMenu,
   } = deps;
   const {
     zone,
@@ -192,8 +193,8 @@ export default function useTimeRangeStepping(
       fields.writeAbsoluteFields(step.startUs, step.endUs);
       fields.holdUnshownInstants(step.startUs, step.endUs);
     }
-    menuOpen.value = false;
     saveDate(step.selectedType);
+    closeMenu();
     deps.onUndo(step);
   };
 
@@ -233,24 +234,24 @@ export default function useTimeRangeStepping(
     selectedDate.value.to = end.date;
     selectedTime.value.endTime = end.time;
     fields.forgetSeededEnd();
-    menuOpen.value = false;
-    if (!props.autoApply) saveDate("absolute");
+    saveDate("absolute");
+    closeMenu();
     return true;
   };
 
-  // A chain of steps that began on a rolling range goes back to it once `]` reaches now.
+  // A chain of steps that began on a rolling range goes back to it once `]` reaches where it began, or now.
   const returnToLiveOrigin = (endUs: number): boolean => {
     const origin = undoStack.value[0];
     if (props.maxDate || !origin || origin.selectedType !== "relative") return false;
-    if (origin.calendarToken !== null || endUs < Date.now() * 1000 - MICROS_PER_SECOND)
-      return false;
+    const reach = Math.min(origin.endUs, Date.now() * 1000) - MICROS_PER_SECOND;
+    if (origin.calendarToken !== null || endUs < reach) return false;
     captureUndo();
     selectedType.value = "relative";
     calendarToken.value = null;
     relativePeriod.value = origin.relativePeriod;
     relativeValue.value = origin.relativeValue;
-    menuOpen.value = false;
     saveDate("relative");
+    closeMenu();
     return true;
   };
 
@@ -268,12 +269,11 @@ export default function useTimeRangeStepping(
     }
     captureUndo();
     calendarToken.value = shifted;
-    menuOpen.value = false;
     saveDate("relative");
+    closeMenu();
   };
 
   // Moves the range by its own length as an absolute range; a user step, so it is not marked programmatic.
-  // With autoApply the date watcher saves it, otherwise it is saved here.
   const shiftTimeRange = (direction: "prev" | "next") => {
     if (selectedType.value === "relative" && calendarToken.value !== null) {
       shiftCalendarPeriod(calendarToken.value, direction);
@@ -292,17 +292,11 @@ export default function useTimeRangeStepping(
       if (returnToLiveOrigin(endTime + delta)) return;
     }
     captureUndo();
-    const startDateTime = convertUnixTime(startTime + delta);
-    const endDateTime = convertUnixTime(endTime + delta);
-
-    selectedDate.value.from = startDateTime.date;
-    selectedDate.value.to = endDateTime.date;
-    selectedTime.value.startTime = startDateTime.time;
-    selectedTime.value.endTime = endDateTime.time;
+    // Written as instants, so the sub-second bounds the fields cannot show move with the range.
+    fields.writeInstants(startTime + delta, endTime + delta);
     selectedType.value = "absolute";
-
-    menuOpen.value = false;
-    if (!props.autoApply) saveDate("absolute");
+    saveDate("absolute");
+    closeMenu();
   };
 
   const isNextShiftDisabled = () => {
@@ -357,8 +351,8 @@ export default function useTimeRangeStepping(
     calendarToken.value = null;
     relativePeriod.value = next[0];
     relativeValue.value = next[1];
-    menuOpen.value = false;
     saveDate("relative");
+    closeMenu();
   };
 
   const zoomOutAbsolute = () => {
@@ -380,15 +374,23 @@ export default function useTimeRangeStepping(
     const end = Math.min(start + width, ceiling);
     if (start === startTime && end === endTime) return;
     captureUndo();
-    fields.writeAbsoluteFields(start, end);
+    fields.writeInstants(start, end);
     selectedType.value = "absolute";
     calendarToken.value = null;
-    menuOpen.value = false;
     saveDate("absolute");
+    closeMenu();
   };
+
+  // At the page's limit zoom cannot widen, so it is off instead of answering with a toast.
+  const zoomOutBlocked = computed(() => {
+    const range = pendingRange.value;
+    if (!range || !(range.endTime > range.startTime)) return false;
+    return range.endTime - range.startTime >= restrictionLimitMicros();
+  });
 
   // A rolling period doubles its count; any other range doubles around its centre.
   const zoomOut = () => {
+    if (zoomOutBlocked.value) return;
     // An absolute-only picker shows only its dates, so they are what zoom widens.
     if (props.disableRelative) selectedType.value = "absolute";
     if (selectedType.value === "relative" && calendarToken.value === null) zoomOutRelative();
@@ -435,9 +437,11 @@ export default function useTimeRangeStepping(
             ? windowText(range.endTime, Math.min(range.endTime + span, ceiling))
             : "",
       },
-      zoom: valid
-        ? t("dateTime.zoomOutTo", { duration: formatRangeDuration(0, span * 2) })
-        : t("common.timeRangeZoomOut"),
+      zoom: zoomOutBlocked.value
+        ? limits.maxLimitText()
+        : valid
+          ? t("dateTime.zoomOutTo", { duration: formatRangeDuration(0, span * 2) })
+          : t("common.timeRangeZoomOut"),
     };
   });
 
@@ -503,6 +507,7 @@ export default function useTimeRangeStepping(
     isNextShiftDisabled,
     goLive,
     zoomOut,
+    zoomOutBlocked,
     showUndo,
     undoTooltip,
     liveDurationLabel,

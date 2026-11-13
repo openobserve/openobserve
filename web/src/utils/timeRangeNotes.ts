@@ -41,6 +41,7 @@ export const readingNote = (
   if (reading.type === "timestamp") {
     if (reading.future) return { kind: "future" };
     if (reading.epochUnit) return { kind: "epoch", unit: reading.epochUnit };
+    if (reading.utcStamp) return { kind: "utc" };
     return reading.sourceZone ? { kind: "typedZone", zone: reading.sourceZone } : null;
   }
   if (reading.fiscalStartMonth) return { kind: "fiscal", startMonth: reading.fiscalStartMonth };

@@ -17,8 +17,8 @@ import { computed, ref, type ComputedRef, type Ref } from "vue";
 import { convertToUtcTimestamp } from "@/utils/zincutils";
 import { parseCalendarToken, resolveCalendarPeriod } from "@/utils/dashboard/calendarPeriods";
 import { formatDurationMicros } from "@/utils/timeRangeRail";
-import { formatRangeDates, formatRangeDuration, namedFixedPeriod } from "@/utils/timeRangeLabel";
-import { anchorWindowLabel } from "@/utils/timeRangeAnchor";
+import { formatRangeDates, formatRangeDuration, namedFixedRange } from "@/utils/timeRangeLabel";
+import { anchorWindowLabel, dropZeroMilliseconds } from "@/utils/timeRangeAnchor";
 import { formatReadingNote, readingNote } from "@/utils/timeRangeNotes";
 import { capRollingPeriod, type ParsedTimeInput } from "@/utils/dateTimeRangeParse";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
@@ -113,25 +113,25 @@ export default function useTimeRangeSummary(
 
   const fixedLine = (start: number, end: number): SummaryLine => {
     const opts = labelOptions();
-    const named = namedFixedPeriod(start, end, opts);
-    const dates = formatRangeDates({ startUs: start, endUs: end }, opts);
+    const named = namedFixedRange(start, end, opts);
     return {
-      name: named ?? dates,
-      range: named ? dates : "",
+      name: named?.name ?? formatRangeDates({ startUs: start, endUs: end }, opts),
+      range: named?.dates ?? "",
       duration: formatRangeDuration(start, end),
       fixed: !props.disableRelative,
     };
   };
 
-  const liveLine = (period: string, start: number, end: number): SummaryLine => ({
-    name: String(relativeLabel(period)),
-    range: formatRangeDates(
+  // A calendar period with no name of its own (`2w ago`) is named by its dates, which then show once.
+  const liveLine = (period: string, start: number, end: number): SummaryLine => {
+    const name = String(relativeLabel(period));
+    const range = formatRangeDates(
       { startUs: start, endUs: end, live: true, calendar: parseCalendarToken(period) !== null },
       labelOptions(),
-    ),
-    duration: "",
-    live: true,
-  });
+    );
+    const same = range.replace(/\s/g, "") === name.replace(/\s/g, "");
+    return { name, range: same ? "" : range, duration: "", live: true };
+  };
 
   const resolvedLine = computed<SummaryLine>(() => {
     const range = pendingRange.value;
@@ -169,13 +169,21 @@ export default function useTimeRangeSummary(
       line.name = String(
         t("dateTime.aroundInstant", {
           window: String(anchorWindowLabel(tag.anchor, t)),
-          instant: clock.formatExactInstant(centre),
+          instant: dropZeroMilliseconds(clock.formatExactInstant(centre)),
         }),
       );
       line.range = "";
       line.duration = "";
     }
     const first = inputReading.value;
+    if (tag && "longestAllowed" in tag) {
+      return {
+        ...line,
+        note: String(overLimitNote(inputText.value.trim())),
+        warning: true,
+        ready: true,
+      };
+    }
     return { ...line, note: noteFor(tag ? first : reading, inputAsUtc.value), ready: true };
   };
 
@@ -245,9 +253,8 @@ export default function useTimeRangeSummary(
     const plan = typing.inputPlan.value;
     if (!plan) return reversedLine();
     if (plan.kind === "refused" || plan.kind === "restricted") {
-      const typed = inputText.value.trim();
-      const rolling = plan.kind === "restricted" && shownReading.value?.type === "relative";
-      const message = rolling ? overLimitNote(typed) : plan.message;
+      const overLimit = plan.kind === "restricted" && !plan.retention;
+      const message = overLimit ? overLimitNote(inputText.value.trim()) : plan.message;
       return { name: "", range: "", duration: "", note: String(message), warning: true };
     }
     if (plan.kind === "rolling") {

@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, it, expect } from "vitest";
+import { afterEach, describe, it, expect, vi } from "vitest";
 import {
   capRollingPeriod,
   explainTimeInputFailure,
@@ -442,5 +442,30 @@ describe("parser review pass 2", () => {
 
   it("still reads the current fiscal year [#5]", () => {
     expect(read("FY26")).toBe("A 2026/01/01 00:00:00..2027/01/01 00:00:00");
+  });
+});
+
+describe("run 1 fixes", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it("reads day and month in the browser's first language when no locale is given [V24]", () => {
+    vi.spyOn(navigator, "languages", "get").mockReturnValue(["en-GB", "en-US"]);
+    expect(show(parseTimeInput("4/11", { now: NOW, timeZone: "UTC" }))).toBe(
+      "A 2026/11/04 00:00:00..2026/11/05 00:00:00",
+    );
+  });
+
+  it("reads a count shown with digit grouping back as the same period [P1]", () => {
+    expect(show(parseTimeInput("Last 2,025 minutes", US))).toBe("2025m");
+  });
+
+  it("marks a stamp written in UTC as read in UTC [P2]", () => {
+    const reading = parseTimeInput("2026-11-10T10:00:00Z", US);
+    expect(reading?.type === "timestamp" && reading.utcStamp).toBe(true);
+  });
+
+  it("keeps a human-written date with its year out of the machine stamps [P2]", () => {
+    const reading = parseTimeInput("Nov 6, 2026 14:02:11", US);
+    expect(reading?.type === "absolute" && reading.hasYear).toBeFalsy();
   });
 });

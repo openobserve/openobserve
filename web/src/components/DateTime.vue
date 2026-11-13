@@ -117,6 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
       <div
         id="date-time-menu"
+        ref="menuEl"
         class="date-time-dialog z-10001 flex h-82 max-h-(--reka-popover-content-available-height) w-110 max-w-[min(27.5rem,calc(100vw-1.5rem))] flex-col"
         @keydown.capture="onPickerKeydown"
         @paste="onPickerPaste"
@@ -319,7 +320,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
         <div class="border-border-default min-h-0 flex-1 border-y" data-test="date-time-body">
-          <div v-if="calendarMode" class="h-full overflow-hidden px-3 py-1">
+          <div v-if="calendarMode" class="h-full overflow-y-auto px-3 py-1">
             <ODateRangeCalendar
               ref="calendarRef"
               band-range
@@ -363,7 +364,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   focusable-unavailable
                   :tooltip="chip.reason ? raw(chip.reason) : undefined"
                   :aria-label="chip.title"
-                  class="o-time-chip data-[state=on]:bg-accent! data-[state=on]:text-text-inverse! data-disabled:border-border-default h-6! tabular-nums data-disabled:border data-disabled:bg-transparent! max-md:h-8! max-md:min-w-10"
+                  class="o-time-chip data-[state=on]:bg-accent! data-[state=on]:text-text-inverse! data-disabled:border-border-default h-6! tabular-nums data-disabled:border data-disabled:bg-transparent! max-md:h-8! max-md:min-w-10 forced-colors:data-[state=on]:bg-[color:Highlight]! forced-colors:data-[state=on]:text-[color:HighlightText]! forced-colors:data-[state=on]:forced-color-adjust-none"
                   :data-test="`date-time-chip-${chip.label}`"
                   >{{ raw(chip.label) }}<OTooltip v-if="!chip.disabled" :content="chip.title"
                 /></OToggleGroupItem>
@@ -471,7 +472,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
             <div v-else class="flex-1" />
-            <OTooltip :content="needsStartDate ? t('dateTime.pickStartDate') : undefined">
+            <OTooltip :content="applyBlockedReason">
               <OButton
                 data-test="date-time-apply-btn"
                 variant="primary"
@@ -552,7 +553,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   icon-left="zoom-out"
                   class="enabled:text-text-secondary! disabled:text-text-disabled!"
                   :aria-label="stepTooltip.zoom"
-                  :disabled="disable"
+                  :disabled="disable || zoomOutBlocked"
                   @click="zoomOut"
                 />
               </OTooltip>
@@ -606,11 +607,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="date-time-zoom-out-btn"
         variant="ghost"
         size="icon-xs-sq"
-        class="border-button-outline-border enabled:hover:bg-interactive-hover-bg! disabled:text-text-disabled! h-auto! border-s! max-md:hidden"
+        class="border-button-outline-border enabled:hover:bg-interactive-hover-bg! disabled:text-text-disabled! h-auto! border-s! max-md:hidden forced-colors:disabled:text-[color:GrayText]!"
         :class="showUndo ? 'rounded-none!' : 'rounded-s-none!'"
         icon-left="zoom-out"
         :aria-label="stepTooltip.zoom"
-        :disabled="disable"
+        :disabled="disable || zoomOutBlocked"
         @click.prevent.stop="zoomOut"
       />
     </OTooltip>
@@ -672,7 +673,7 @@ import {
   isRelativeHistoryEntry,
   type TimeRangeHistoryEntry,
 } from "@/composables/useTimeRangeHistory";
-import type { TimeRangePreset } from "@/utils/timeRangeList";
+import type { TimeRangeListRow, TimeRangePreset } from "@/utils/timeRangeList";
 import { instantFromShiftedMs } from "@/utils/timeRangeZoom";
 import {
   formatRangeCopyText,
@@ -941,6 +942,7 @@ export default defineComponent({
     let appliedSinceOpen = false;
     // The panel aligns to the whole ‹ trigger › group, not the trigger alone.
     const groupEl = ref<HTMLElement | null>(null);
+    const menuEl = ref<HTMLElement | null>(null);
     const inputBar = ref<{ focus: () => void } | null>(null);
     const menuOpen = ref(false);
     // Index into the list rows below the suggestions; -1 while the cursor is in the bar.
@@ -1277,6 +1279,9 @@ export default defineComponent({
         pendingDay.value;
       },
       () => {
+        // In the open panel only Apply, Enter or a pick applies; a parent's setter still does.
+        if (menuOpen.value && isUserInitiated) return;
+        if (absoluteFieldsKey() === savedFieldsKey) return;
         if (
           props.autoApply &&
           selectedType.value === "absolute" &&
@@ -1417,6 +1422,8 @@ export default defineComponent({
     };
 
     let saveCount = 0;
+    // The fields as last saved, so a step that saves its own write is not saved again by the date watcher.
+    let savedFieldsKey: string | null = null;
     const appliedSpeech = ref("");
     // Callers often follow a setter with setDateType or refresh, so a setter's correction is emitted only if no save followed it.
     const emitCorrectionLater = () => {
@@ -1479,6 +1486,7 @@ export default defineComponent({
 
     const saveDate = (dateType?: string | null) => {
       saveCount += 1;
+      savedFieldsKey = selectedType.value === "absolute" ? absoluteFieldsKey() : null;
       // The resolved line and the seeded Start/End read this clock, so they match the range emitted now.
       if (selectedType.value === "relative") refreshTooltipNow();
       markApplied();
@@ -1624,18 +1632,20 @@ export default defineComponent({
     const labelSurface = computed(() => (props.preset === "dashboard" ? "dashboard" : "toolbar"));
     const datesShown = computed(() => props.showDates ?? props.preset === "dashboard");
 
-    // What the trigger names: the selection while it is in force or edited, else the applied one.
+    // Panel edits are not in force until applied, so the open panel's trigger names the applied range.
+    const showsApplied = computed(() => menuOpen.value || !props.autoApply);
+
     const triggerRange = computed<RangeLabelInput | null>(() => {
-      const showsApplied = !props.autoApply && !menuOpen.value;
-      const shownType = showsApplied ? appliedType.value : selectedType.value;
+      const shownApplied = showsApplied.value;
+      const shownType = shownApplied ? appliedType.value : selectedType.value;
       if (shownType === "absolute") {
-        const range = showsApplied ? appliedRange.value : pendingRange.value;
+        const range = shownApplied ? appliedRange.value : pendingRange.value;
         if (!range || !Number.isFinite(range.startTime) || !Number.isFinite(range.endTime)) {
           return null;
         }
         return { startUs: range.startTime, endUs: range.endTime };
       }
-      const period = showsApplied
+      const period = shownApplied
         ? (appliedCalendarToken.value ?? appliedPeriod.value)
         : currentRelativePeriod();
       if (!period) return null;
@@ -1654,8 +1664,7 @@ export default defineComponent({
       if (props.triggerText) return props.triggerText;
       const range = triggerRange.value;
       if (props.disableRelative || !range) {
-        const showsApplied = !props.autoApply && !menuOpen.value;
-        return showsApplied
+        return showsApplied.value
           ? appliedDisplayValue.value || getDisplayValue.value
           : getDisplayValue.value;
       }
@@ -1907,6 +1916,7 @@ export default defineComponent({
         copyRange();
         return;
       }
+      if (moveListCursorToEnd(event)) return;
       if (event.key !== "Escape") return;
       const target = event.target;
       // A pin's name field cancels its own edit.
@@ -1938,6 +1948,18 @@ export default defineComponent({
         event.preventDefault();
         closeMenu();
       }
+    };
+
+    // With the cursor in the list, Home and End go to its first and last row instead of the bar's caret.
+    const moveListCursorToEnd = (event: KeyboardEvent): boolean => {
+      if (listCursor.value < 0 || (event.key !== "Home" && event.key !== "End")) return false;
+      if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return false;
+      const enabled = listRows.value.flatMap((row, index) => (row.disabled ? [] : [index]));
+      if (enabled.length === 0) return false;
+      event.preventDefault();
+      event.stopPropagation();
+      listCursor.value = event.key === "Home" ? enabled[0] : enabled[enabled.length - 1];
+      return true;
     };
 
     // Seconds through days roll up into the largest offered unit that holds the count exactly, so 60m lights the 1h chip.
@@ -2069,6 +2091,9 @@ export default defineComponent({
     onDeactivated(stopClock);
     onBeforeUnmount(stopClock);
     onBeforeUnmount(cancelPendingRead);
+    // OPopover's content is reka's dialog, which takes no attributes from here.
+    watch(menuEl, (panel) => panel?.closest("[role='dialog']")?.setAttribute("aria-modal", "true"));
+
     const onMenuOpenChange = (open: boolean) => {
       if (open) {
         refreshTooltipNow();
@@ -2088,14 +2113,13 @@ export default defineComponent({
         onBeforeShow();
         onShow();
       } else {
-        if (props.autoApply && commitPendingDay()) saveDate("absolute");
         pendingDay.value = null;
         clearInput();
         listCursor.value = -1;
         editingPinRowId.value = null;
-        if (!props.autoApply || selectedType.value !== appliedSelection.selectedType) {
-          restoreAppliedSelection();
-        } else if (selectionKey.value !== rangeKeyAtOpen) {
+        restoreAppliedSelection();
+        // A typed period applied by Enter is recorded here, once the panel it was typed in closes.
+        if (props.autoApply && appliedSinceOpen && selectionKey.value !== rangeKeyAtOpen) {
           recordSelection();
         }
         onBeforeHide();
@@ -2118,10 +2142,15 @@ export default defineComponent({
     };
 
     // A pick closes the panel the way a user dismissal does, so listeners waiting on hide still run.
+    // Reka returns focus only on its own dismissals, so focus inside the panel goes back to the trigger here.
     const closeMenu = () => {
       if (!menuOpen.value) return;
+      const hadFocus = !!menuEl.value?.contains(document.activeElement);
       menuOpen.value = false;
       onMenuOpenChange(false);
+      nextTick(() => {
+        if (hadFocus && !menuOpen.value) triggerElement.value?.focus();
+      });
     };
 
     const openMenu = () => {
@@ -2135,7 +2164,8 @@ export default defineComponent({
       commitPendingDay();
       saveDate(null);
       recordSelection();
-      menuOpen.value = false;
+      rangeKeyAtOpen = selectionKey.value;
+      closeMenu();
     };
 
     const openCalendar = () => {
@@ -2258,6 +2288,7 @@ export default defineComponent({
       isNextShiftDisabled,
       goLive,
       zoomOut,
+      zoomOutBlocked,
       showUndo,
       undoTooltip,
       liveDurationLabel,
@@ -2271,7 +2302,6 @@ export default defineComponent({
       relativePeriod,
       relativeValue,
       pendingDay,
-      menuOpen,
       pendingRange,
       triggerLabel,
       appliedSelection: () => appliedSelection,
@@ -2283,14 +2313,18 @@ export default defineComponent({
       saveDate,
       getConsumableDateTime,
       openMenu,
+      closeMenu,
       onUndo: (step) => emit("on:undo", step),
     });
 
     // A badge when the zone differs from the browser's, or always where the page asks (dashboards, print).
+    // Offset at the range's start, so a summer range opened in winter still shows its summer offset.
     const zoneBadgeText = computed(() => {
       if (!zone.value || props.hideRelativeTimezone) return "";
-      if (props.zoneBadge === "always") return formatZoneOffset(zone.value, tooltipNow.value);
-      return zone.value !== browserTz ? formatZoneBadge(zone.value, tooltipNow.value) : "";
+      const startUs = triggerRange.value?.startUs;
+      const atMs = startUs !== undefined ? Math.floor(startUs / 1000) : tooltipNow.value;
+      if (props.zoneBadge === "always") return formatZoneOffset(zone.value, atMs);
+      return zone.value !== browserTz ? formatZoneBadge(zone.value, atMs) : "";
     });
 
     const zoneShortLabel = computed(() => {
@@ -2311,9 +2345,37 @@ export default defineComponent({
         selectedType.value === "relative" &&
         pendingDay.value === null,
     );
+    // The days a calendar pick would apply, and those its pointer or focus previews, against the page's limits.
+    const calendarLimit = computed<{ selection: string | null; preview: string | null }>(() => {
+      if (!calendarMode.value || selectedType.value !== "absolute") {
+        return { selection: null, preview: null };
+      }
+      const range = pendingRange.value;
+      const selection = range ? limits.limitReason(range.startTime, range.endTime) : null;
+      const pending = pendingDay.value;
+      const hovered = calendarPreviewDay.value;
+      if (pending === null || hovered === null) return { selection, preview: null };
+      const [from, to] = pending <= hovered ? [pending, hovered] : [hovered, pending];
+      const preview = limits.limitReason(
+        absoluteToMicros(from, selectedTime.value.startTime),
+        endFieldToMicros(to, "23:59:59"),
+      );
+      return { selection, preview };
+    });
+
     const applyDisabled = computed(
-      () => needsStartDate.value || unreadableFields.value.start || unreadableFields.value.end,
+      () =>
+        needsStartDate.value ||
+        unreadableFields.value.start ||
+        unreadableFields.value.end ||
+        calendarLimit.value.selection !== null,
     );
+
+    const applyBlockedReason = computed<I18nText | undefined>(() => {
+      if (needsStartDate.value) return t("dateTime.pickStartDate");
+      const reason = calendarLimit.value.selection;
+      return reason ? raw(reason) : undefined;
+    });
 
     // The native change fires after keydown, so blurring commits the typed text before Apply reads it.
     const onTimeFieldEnter = (event: KeyboardEvent) => {
@@ -2333,11 +2395,14 @@ export default defineComponent({
         };
       }
       if (timeFieldError.value) return { message: timeFieldError.value.message };
-      if (!unreadableFields.value.start && !unreadableFields.value.end) return null;
-      return {
-        message: t("components.time.invalid", { format: raw("HH:MM") }),
-        examples: t("common.timeFieldExamples"),
-      };
+      if (unreadableFields.value.start || unreadableFields.value.end) {
+        return {
+          message: t("components.time.invalid", { format: raw("HH:MM") }),
+          examples: t("common.timeFieldExamples"),
+        };
+      }
+      const limit = calendarLimit.value.preview ?? calendarLimit.value.selection;
+      return limit ? { message: raw(limit) } : null;
     });
 
     const showLiveButton = computed(
@@ -2348,7 +2413,28 @@ export default defineComponent({
         resolvedLine.value.fixed === true,
     );
 
-    // Spoken in the panel: the preview, or the cursor row and its place in the list.
+    const rowGroupName = (row: TimeRangeListRow): I18nText => {
+      if (row.kind === "pinned") return t("dateTime.groupPinned");
+      if (row.kind === "recent") return t("common.timeRangeRecent");
+      if (row.kind === "calendar") return t("common.timeRangeCalendar");
+      return t("dateTime.groupSuggestions");
+    };
+
+    // The range a row applies, live when it is a period, for its spoken kind and length.
+    const rowRange = (
+      row: TimeRangeListRow,
+    ): { startUs: number; endUs: number; live: boolean } | null => {
+      let entry: TimeRangeHistoryEntry | null = row.period ? { relative: row.period } : null;
+      if (row.kind === "pinned") entry = rail.pinOf(row.id)?.range ?? null;
+      else if (row.kind === "recent")
+        entry = rail.recentEntry(row.id.slice("recent-".length)) ?? null;
+      if (!entry) return null;
+      if (!isRelativeHistoryEntry(entry)) return { ...entry, live: false };
+      const range = resolveRelativePeriod(entry.relative, tooltipNow.value);
+      return range ? { startUs: range.startTime, endUs: range.endTime, live: true } : null;
+    };
+
+    // Spoken in the panel: the preview, or the cursor row with its kind, length, group and place.
     const panelSpeech = computed(() => {
       const row = activeRow.value >= 0 ? shownRows.value[activeRow.value] : null;
       if (row) {
@@ -2356,7 +2442,15 @@ export default defineComponent({
           n: activeRow.value + 1,
           total: shownRows.value.length,
         });
-        return [row.label, row.meta, String(position)].filter(Boolean).join(", ");
+        const range = rowRange(row);
+        const head = [
+          row.label,
+          range ? kindText(range.live) : "",
+          range ? formatRangeDuration(range.startUs, range.endUs) : "",
+          row.reason ? row.meta : "",
+        ];
+        const place = [String(rowGroupName(row)), String(position)].join(", ");
+        return `${head.filter(Boolean).join(", ")}. ${place}.`;
       }
       const line = previewLine.value;
       if (!line) return "";
@@ -2502,7 +2596,10 @@ export default defineComponent({
       calendarRef,
       calendarPreviewDay,
       applyDisabled,
+      applyBlockedReason,
       needsStartDate,
+      zoomOutBlocked,
+      menuEl,
       onTimeFieldInvalid,
       onTimeFieldEnter,
       summaryError,

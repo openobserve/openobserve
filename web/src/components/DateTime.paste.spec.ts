@@ -307,33 +307,31 @@ describe("DateTime paste", () => {
     expect(autoFocus.defaultPrevented).toBe(false);
   });
 
-  it("refuses a pasted range over the query-range limit with the restriction toast only", async () => {
+  it("applies the longest allowed range on Enter for a pasted range over the limit, with no toast", async () => {
     createWrapper({ queryRangeRestrictionInHour: 24, queryRangeRestrictionMsg: "Max 24 hours" });
     await openMenu();
-    const emitsBefore = (wrapper!.emitted("on:date-change") ?? []).length;
 
     firePaste(document.querySelector("#date-time-menu")!, "2024/01/01 - 2024/01/31");
     await flushPromises();
-    expect(previewNote()).toBe("Max 24 hours");
+    expect(previewNote()).toBe("2024/01/01 - 2024/01/31 is over the 1-day limit");
     await enterOnBar();
 
-    expect((wrapper!.emitted("on:date-change") ?? []).length).toBe(emitsBefore);
-    expect(wrapper!.vm.menuOpen).toBe(true);
+    expect(lastEmit()).toMatchObject({
+      startTime: Date.parse("2024-01-31T00:00:00Z") * 1000,
+      endTime: Date.parse("2024-02-01T00:00:00Z") * 1000,
+    });
     expect(document.querySelector('[data-test="date-time-input-error"]')).toBeNull();
     expect(toastMock).not.toHaveBeenCalled();
   });
 
-  it("says why a pasted range over the limit is refused when the page gives no message", async () => {
+  it("says a pasted range is over the limit when the page gives no message", async () => {
     createWrapper({ queryRangeRestrictionInHour: 24 });
     await openMenu();
-    const emitsBefore = (wrapper!.emitted("on:date-change") ?? []).length;
 
     firePaste(document.querySelector("#date-time-menu")!, "2024/01/01 - 2024/01/31");
     await flushPromises();
-    await enterOnBar();
 
-    expect((wrapper!.emitted("on:date-change") ?? []).length).toBe(emitsBefore);
-    expect(previewNote()).toBe("This range is longer than the 24-hour limit");
+    expect(previewNote()).toBe("2024/01/01 - 2024/01/31 is over the 1-day limit");
   });
 
   it("refuses a pasted range whose end is not after its start", async () => {
@@ -777,18 +775,22 @@ describe("DateTime paste", () => {
       expect(lastEmit()).toMatchObject({ relativeTimePeriod: "1d" });
     });
 
-    it("refuses a typed range longer than the query-range limit and says why", async () => {
+    it("says a typed range is over the limit and applies the longest allowed on Enter", async () => {
       createWrapper({ queryRangeRestrictionInHour: 24, queryRangeRestrictionMsg: "Max 24 hours" });
       await flushPromises();
       await openMenu();
-      const before = emitCount();
 
       await typeInto("2024/01/01 - 2024/01/31");
+      expect(inMenu("date-time-preview-note")?.textContent).toBe(
+        "2024/01/01 - 2024/01/31 is over the 1-day limit",
+      );
       await pressEnter();
 
-      expect(emitCount()).toBe(before);
       expect(inMenu("date-time-input-error")).toBeNull();
-      expect(inMenu("date-time-preview-note")?.textContent).toBe("Max 24 hours");
+      expect(lastEmit()).toMatchObject({
+        startTime: micros("2024-01-31T00:00:00Z"),
+        endTime: micros("2024-02-01T00:00:00Z"),
+      });
       expect(toastMock).not.toHaveBeenCalled();
     });
 
@@ -1435,10 +1437,16 @@ describe("DateTime paste", () => {
       await openMenu();
 
       await typeInto("2026-11-06 10:00 to 2026-11-06 14:00");
+      expect(inMenu("date-time-preview-note")?.textContent).toBe(
+        "2026-11-06 10:00 to 2026-11-06 14:00 is over the 2-hour limit",
+      );
       await pressEnter();
 
       expect(inMenu("date-time-input-error")).toBeNull();
-      expect(inMenu("date-time-preview-note")?.textContent).toBe("Max 2 hours");
+      expect(lastEmit()).toMatchObject({
+        startTime: micros("2026-11-06T12:00:00Z"),
+        endTime: micros("2026-11-06T14:00:00Z"),
+      });
       expect(toastMock).not.toHaveBeenCalled();
     });
 
@@ -1528,18 +1536,19 @@ describe("DateTime paste", () => {
       expect(inMenu("date-time-preview-note")?.textContent).toBe("typed in UTC+05:30");
     });
 
-    it("offers the as-UTC reading only for zoneless text that gives a year", async () => {
+    it("offers the as-UTC reading only for a zoneless machine stamp", async () => {
       store.state.timezone = "Asia/Calcutta";
       createWrapper();
       await openMenu();
 
       await typeInto("Nov 6 14:02");
-      expect(inMenu("date-time-resolved-name")?.textContent).toBe(
-        "± 5 min around Nov 6, 14:02:00.000",
-      );
+      expect(inMenu("date-time-resolved-name")?.textContent).toBe("± 5 min around Nov 6, 14:02:00");
       expect(inMenu("date-time-as-utc-toggle")).toBeNull();
 
       await typeInto("Nov 6 2026 14:02");
+      expect(inMenu("date-time-as-utc-toggle")).toBeNull();
+
+      await typeInto("2026-11-06 14:02");
       expect(inMenu("date-time-as-utc-toggle")).not.toBeNull();
     });
 
@@ -1956,7 +1965,7 @@ describe("DateTime paste", () => {
     it.each([
       ["999999M", "120M", "Last 10 years"],
       ["1200M", "120M", "Last 10 years"],
-      ["9999999m", "3650d", "Last 3650 days"],
+      ["9999999m", "3650d", "Last 3,650 days"],
     ])(
       "caps a URL period of %s to %s, as Custom does, and says so",
       async (period, capped, label) => {

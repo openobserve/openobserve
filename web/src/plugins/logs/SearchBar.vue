@@ -3269,6 +3269,12 @@ export default defineComponent({
     const updateDateTime = async (value: object) => {
       if (suppressUpdateDateTime) return;
       const isZoom = takeZoom(value);
+      // Refresh pauses while results are stale, so going live from an ended range must run once to resume it.
+      const resumesRefresh =
+        value.userChangedValue === true &&
+        !!value.relativeTimePeriod &&
+        searchObj.data.datetime?.type === "absolute" &&
+        Number(searchObj.meta.refreshInterval) > 0;
       if (value.userChangedValue === true) noteUserScopeChange();
       ignoreAutoTrigger = searchObj.shouldIgnoreWatcher;
       if (
@@ -3286,13 +3292,14 @@ export default defineComponent({
           searchObj.data.datetime.queryRangeRestrictionInHour * 60 * 60 * 1000000;
 
         if (parseInt(newStartTime) > parseInt(value.startTime)) {
-          // User-visible warning so the silent rewrite isn't invisible.
-          toast({
-            variant: "warning",
-            message: t("logs.searchBar.rangeExceedsLimit", {
-              hours: searchObj.data.datetime.queryRangeRestrictionInHour,
-            }),
-          });
+          // The picker names the limit on a user's pick, so only a URL or view clamp needs the toast.
+          if (value.userChangedValue !== true)
+            toast({
+              variant: "warning",
+              message: t("logs.searchBar.rangeExceedsLimit", {
+                hours: searchObj.data.datetime.queryRangeRestrictionInHour,
+              }),
+            });
 
           value.startTime = newStartTime;
 
@@ -3373,7 +3380,9 @@ export default defineComponent({
         ignoreAutoTrigger === false &&
         (isLogsResultsMode() || searchObj.meta.logsVisualizeToggle === "patterns")
       ) {
-        requestTimeRun(value.valueType, isZoom);
+        // "run" is explicit and would execute unsaved editor edits.
+        if (resumesRefresh && !searchObj.meta.editorDirty) autoRun.request("run");
+        else requestTimeRun(value.valueType, isZoom);
       }
     };
 

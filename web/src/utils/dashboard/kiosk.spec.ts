@@ -194,8 +194,8 @@ describe("kiosk helpers", () => {
   });
 
   it("labels relative periods and rejects anything else", () => {
-    expect(formatRelativePeriod("15m", t)).toBe('common.pastMinute:{"count":15}');
-    expect(formatRelativePeriod("2d", t)).toBe('common.pastDay:{"count":2}');
+    expect(formatRelativePeriod("15m", t)).toBe('common.pastMinute:{"count":"15"}');
+    expect(formatRelativePeriod("2d", t)).toBe('common.pastDay:{"count":"2"}');
     expect(formatRelativePeriod("now-1h", t)).toBeNull();
     expect(formatRelativePeriod(undefined, t)).toBeNull();
   });

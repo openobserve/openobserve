@@ -55,7 +55,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
       >
         <template #title>
-          <span data-test="dashboard-name-title">{{ currentDashboardData.data?.title }}</span>
+          <span ref="dashboardTitleEl" data-test="dashboard-name-title">{{
+            currentDashboardData.data?.title
+          }}</span>
           <OBadge
             v-if="isEditingLayout"
             variant="primary-soft"
@@ -546,7 +548,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ref="dateTimePicker"
             :shortcuts="!kioskMode && store.state.printMode !== true"
             class="dashboard-icons"
-            :class="{ 'min-w-0 flex-1': hasTimeRow }"
+            :class="{ 'min-w-0 flex-1': hasTimeRow && isMobile }"
             size="sm"
             :modelValue="timeGate.picked.value ?? selectedDate"
             :auto-apply-dashboard="true"
@@ -757,6 +759,7 @@ import { fixedRangeEnd } from "@/utils/autoRefreshPause";
 import { formatPeriodLabel } from "@/utils/timeRangeRail";
 import analytics from "@/services/product_analytics";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
+import { useHeaderTitleRoom } from "@/composables/dashboard/useHeaderTitleRoom";
 import {
   onBeforeRouteLeave,
   onBeforeRouteUpdate,
@@ -939,8 +942,13 @@ export default defineComponent({
       store.dispatch("setKioskMode", true);
     }
     const kioskMode = computed(() => store.state.kioskMode === true);
+    const dashboardTitleEl = ref<HTMLElement | null>(null);
+    const { crowded: titleCrowded } = useHeaderTitleRoom(dashboardTitleEl);
     const hasTimeRow = computed(
-      () => isMobile.value && !kioskMode.value && store.state.printMode !== true,
+      () =>
+        (isMobile.value || titleCrowded.value) &&
+        !kioskMode.value &&
+        store.state.printMode !== true,
     );
     const kioskFit = computed(() => isFitEnabled(route.query.fit));
     const { active: kioskPointerActive } = useIdleReveal(kioskMode);
@@ -3059,6 +3067,7 @@ export default defineComponent({
     return {
       isMobile,
       hasTimeRow,
+      dashboardTitleEl,
       currentDashboardData,
       dashboardRemountKey,
       toggleFullscreen,

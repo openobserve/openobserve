@@ -23,6 +23,9 @@ import type { TimeRangeLimits } from "@/composables/useTimeRangeLimits";
 
 type TimeField = "start" | "end";
 
+// Endings that complete a partly typed time (`1` → `100`, `12:` → `12:00`), milliseconds included.
+const TIME_COMPLETIONS = ["", "0", "00", ":00", "0:00", ":00:00", "0:00:00"];
+
 interface ShownEnd {
   date: string;
   time: string;
@@ -46,6 +49,12 @@ export interface TimeRangeFieldsDeps {
   // The absolute range a full stamp pasted into Start or End reads as, if any.
   readPastedStamp: (text: string) => { start: number; end: number } | null;
 }
+
+const canBecomeTime = (text: string): boolean =>
+  TIME_COMPLETIONS.some((ending) => {
+    const full = `${text}${ending}`.replace(/\.\d{0,3}$/, "");
+    return parseTypedTime(full) !== null;
+  });
 
 /** The Start/End fields: the civil dates and times they hold, the instants they stand for, and their edit rules. */
 export default function useTimeRangeFields(deps: TimeRangeFieldsDeps) {
@@ -249,13 +258,6 @@ export default function useTimeRangeFields(deps: TimeRangeFieldsDeps) {
     seededEnd = null;
   };
 
-  // A relative range's times were seeded, not chosen, so days picked from it cover whole days.
-  const markCalendarEdit = () => {
-    if (selectedType.value === "absolute") return;
-    markAbsoluteEdit();
-    setWholeDayTimes();
-  };
-
   const timesReversedOn = (from: string, to: string, startTime: string, endTime: string) => {
     if (!startTime || !endTime) return false;
     const start = convertToUtcTimestamp(`${from} ${startTime}`, zone.value);
@@ -287,23 +289,29 @@ export default function useTimeRangeFields(deps: TimeRangeFieldsDeps) {
   };
 
   const onCalendarStartDate = (value: string) => {
-    markCalendarEdit();
+    markAbsoluteEdit();
     selectedDate.value.from = value;
   };
 
+  // The second pick ends its day at 23:59:59; Start keeps what the first pick or a typed time set.
   const onCalendarEndDate = (value: string) => {
-    markCalendarEdit();
+    markAbsoluteEdit();
     selectedDate.value.to = value;
+    selectedTime.value.endTime = "23:59:59";
+    seededEnd = null;
+    endBeforeCut = null;
     fitPickedDays(selectedDate.value.from, value);
     endBeforeCut = null;
   };
 
-  // A clicked day replaces whatever the box read, and is staged as the whole day it will commit as.
+  // A first pick starts a new range at 00:00, whatever times the old one had, and is staged as that whole day.
   const onCalendarPendingDay = (value: string | null) => {
     pendingDay.value = value;
     if (value === null) return;
-    markCalendarEdit();
+    markAbsoluteEdit();
     deps.clearInput();
+    setWholeDayTimes();
+    endBeforeCut = null;
     fitPickedDays(value, value);
   };
 
@@ -365,6 +373,7 @@ export default function useTimeRangeFields(deps: TimeRangeFieldsDeps) {
       seededEnd = null;
     }
     timeFieldError.value = null;
+    unreadableFields.value.start = false;
     endBeforeCut = null;
     markAbsoluteEdit();
     selectedTime.value.startTime = value;
@@ -377,14 +386,17 @@ export default function useTimeRangeFields(deps: TimeRangeFieldsDeps) {
       return;
     }
     timeFieldError.value = null;
+    unreadableFields.value.end = false;
     endBeforeCut = null;
     markAbsoluteEdit();
     selectedTime.value.endTime = value;
   };
 
   // The field refuses milliseconds, so the preview says where they can be typed.
+  // Text no further typing can make readable is flagged at once, not only when the field commits.
   const onTimeFieldTyping = (field: TimeField, event: Event) => {
     const text = (event.target as HTMLInputElement | null)?.value.trim() ?? "";
+    unreadableFields.value[field] = text !== "" && !canBecomeTime(text);
     const ms = /\.\d{1,3}$/.test(text);
     const parsed = parseTypedTime(ms ? text.replace(/\.\d{1,3}$/, "") : text);
     if (!parsed) {

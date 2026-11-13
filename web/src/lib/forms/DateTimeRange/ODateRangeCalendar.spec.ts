@@ -358,14 +358,42 @@ describe("ODateRangeCalendar", () => {
       expect(document.activeElement?.getAttribute("data-value")).toBe("2026-12-15");
     });
 
-    it("strikes days before the retention floor and says why", () => {
+    it("strikes days before the retention floor and says why in a tooltip and the name (V23)", async () => {
       wrapper = mount(ODateRangeCalendar, {
         props: { unavailableBefore: "2026/11/05", unavailableReason: "Outside 7-day retention" },
         attachTo: document.body,
       });
       expect(cell("2026-11-04").attributes("data-unavailable")).toBeDefined();
-      expect(cell("2026-11-04").attributes("title")).toBe("Outside 7-day retention");
+      expect(cell("2026-11-04").attributes("aria-label")).toBe(
+        "Wednesday, November 4, 2026, Outside 7-day retention",
+      );
       expect(cell("2026-11-05").attributes("data-unavailable")).toBeUndefined();
+      expect(cell("2026-11-05").attributes("aria-label")).not.toContain("retention");
+
+      await cell("2026-11-04").trigger("mouseenter");
+      await new Promise((resolve) => setTimeout(resolve));
+      expect(document.body.textContent).toContain("Outside 7-day retention");
+      await cell("2026-11-04").trigger("mouseleave");
+      await cell("2026-11-05").trigger("focus");
+      await new Promise((resolve) => setTimeout(resolve));
+      expect(document.querySelector("[role='tooltip']")).toBeNull();
+    });
+
+    it("labels the grid and draws day numbers in the locale's digits (P6, P8)", () => {
+      wrapper = mount(ODateRangeCalendar, {
+        props: { locale: "ar-EG", calendarLabel: "Date range" },
+        attachTo: document.body,
+      });
+      expect(document.querySelector("[role='application']")?.getAttribute("aria-label")).toBe(
+        "Date range",
+      );
+      const expected = new Intl.DateTimeFormat("ar-EG", { day: "numeric", timeZone: "UTC" }).format(
+        new Date(Date.UTC(2026, 10, 4)),
+      );
+      expect(cell("2026-11-04").text()).toBe(expected);
+      expect(wrapper.find('[data-test="daterangecalendar-prev"] svg').classes()).toContain(
+        "rtl:-scale-x-100",
+      );
     });
   });
 });

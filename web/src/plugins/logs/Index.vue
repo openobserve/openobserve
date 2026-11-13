@@ -309,6 +309,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="flex h-full flex-col"
                       data-test="logs-search-no-events-found-text"
                     >
+                      <StaleRangeStrip
+                        v-if="staleRangeText"
+                        :text="staleRangeText"
+                        data-test="logs-search-bar-stale-range-strip"
+                        shortcut-id="logsRunQuery"
+                        @run="() => searchBarRef?.handleRunQueryFn?.()"
+                      />
                       <LogsPermalinkBanner
                         @retry="onPermalinkRetry"
                         @show-lines="onPermalinkShowLines"
@@ -403,21 +410,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @search-job="onGuardSearchJob"
                         @select-stream="onSelectStream"
                       />
-                      <div
+                      <StaleRangeStrip
                         v-if="staleRangeText"
-                        class="flex min-w-0 items-center gap-2 px-2.5 pt-2"
+                        :text="staleRangeText"
                         data-test="logs-search-bar-stale-range-strip"
-                      >
-                        <OInlineNotice
-                          class="min-w-0"
-                          variant="warning"
-                          :text="staleRangeText"
-                          :action-label="t('search.runQuery')"
-                          action-data-test="logs-search-bar-stale-range-strip-run"
-                          @action="() => searchBarRef?.handleRunQueryFn?.()"
-                        />
-                        <OShortcut id="logsRunQuery" class="shrink-0 max-md:hidden" />
-                      </div>
+                        shortcut-id="logsRunQuery"
+                        @run="() => searchBarRef?.handleRunQueryFn?.()"
+                      />
                       <div v-if="showSearchCancelledNotice" class="flex items-center px-2.5 pt-2">
                         <OBadge
                           variant="default-soft"
@@ -812,8 +811,7 @@ import {
 import { useLogsUrlSync } from "@/composables/useLogs/useLogsUrlSync";
 import { useSearchAround, searchAroundPickerRange } from "@/composables/useLogs/searchAround";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
-import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
-import OShortcut from "@/lib/core/Shortcut/OShortcut.vue";
+import StaleRangeStrip from "@/components/StaleRangeStrip.vue";
 import { liveTimeSelection, staleQueriedRange } from "@/utils/logsStaleRange";
 import { formatRangeLabel } from "@/utils/timeRangeLabel";
 import { formatPeriodLabel } from "@/utils/timeRangeRail";
@@ -886,8 +884,7 @@ export default defineComponent({
     LogsErrorState,
     LogsAutoRunGuard,
     OBadge,
-    OInlineNotice,
-    OShortcut,
+    StaleRangeStrip,
   },
   mixins: [MainLayoutCloudMixin],
   emits: ["sendToAiChat"],

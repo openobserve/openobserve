@@ -23,7 +23,8 @@ interface WeekInfoLocale {
   weekInfo?: { firstDay: number };
 }
 
-const browserLanguage = (): string | undefined => {
+/** The browser's first language: the source of week start and of typed day/month order. */
+export const browserLanguage = (): string | undefined => {
   if (typeof navigator === "undefined") return undefined;
   return navigator.languages?.[0] ?? navigator.language;
 };

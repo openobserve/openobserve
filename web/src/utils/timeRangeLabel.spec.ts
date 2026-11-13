@@ -167,6 +167,29 @@ describe("formatRangeLabel", () => {
     expect(namedFixedPeriod(q3.startUs, q3.endUs, { timezone: "UTC" })).toBeNull();
   });
 
+  it("names a started period that runs to now, with its end to the minute [V6]", () => {
+    const now = ist("2026-11-12T21:24:10.512");
+    const q4 = { startUs: ist("2026-10-01T00:00:00"), endUs: now };
+    const year = { startUs: ist("2026-01-01T00:00:00"), endUs: now };
+    const h2 = { startUs: ist("2026-07-01T00:00:00"), endUs: now };
+    expect(formatRangeLabel(q4, OPTS)).toBe("Q4 2026 · Oct 1 – Nov 12, 21:24");
+    expect(formatRangeLabel(year, OPTS)).toBe("2026 · Jan 1 – Nov 12, 21:24");
+    expect(formatRangeLabel(h2, OPTS)).toBe("H2 2026 · Jul 1 – Nov 12, 21:24");
+    expect(namedFixedPeriod(q4.startUs, q4.endUs, OPTS)).toBe("Q4 2026");
+  });
+
+  it("names no period for a range that ends inside an earlier, smaller one [V6]", () => {
+    const janFeb = { startUs: ist("2026-01-01T00:00:00"), endUs: ist("2026-02-10T12:00:00") };
+    const october = { startUs: ist("2026-10-01T00:00:00"), endUs: ist("2026-10-20T12:00:00") };
+    expect(formatRangeLabel(janFeb, OPTS)).toBe("Jan 1, 00:00 – Feb 10, 12:00");
+    expect(formatRangeLabel(october, OPTS)).toBe("Oct 1, 00:00 – Oct 20, 12:00");
+  });
+
+  it("shows a midnight end as the last second when the label shows seconds [P4]", () => {
+    const range = { startUs: ist("2026-11-04T10:00:15"), endUs: ist("2026-11-07T00:00:00") };
+    expect(formatRangeDates(range, OPTS)).toBe("Nov 4, 10:00:15 – Nov 6, 23:59:59");
+  });
+
   it("shows a bare fixed range as its dates", () => {
     const range = { startUs: ist("2026-11-12T21:08:49"), endUs: ist("2026-11-12T21:18:49") };
     expect(formatRangeLabel(range, OPTS)).toBe("Nov 12, 21:08:49 – 21:18:49");

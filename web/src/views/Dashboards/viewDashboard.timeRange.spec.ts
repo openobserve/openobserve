@@ -339,6 +339,22 @@ describe("ViewDashboard time range gate", () => {
       expect(route.query.period).toBe("1h");
     });
 
+    it("runs a calendar range applied in the open panel once the panel closes (V3)", async () => {
+      await mountDashboard();
+      const end = Date.parse("2026-11-12T00:00:00Z") * 1000;
+      const range = absolute(end - 2 * 24 * 60 * MINUTE, end);
+
+      picker().vm.$emit("show");
+      await pick(range);
+      expect(wrapper.vm.selectedDate.relativeTimePeriod).toBe("15m");
+
+      picker().vm.$emit("hide");
+      await flushPromises();
+      expect(wrapper.vm.selectedDate).toMatchObject({ startTime: range.startTime });
+      expect(globalSpan()).toBe(2 * 24 * 60 * MINUTE);
+      expect(refreshButton().props("variant")).toBe("primary");
+    });
+
     it("leaves Refresh unflagged after a pick, since nothing waits", async () => {
       await mountDashboard();
 
