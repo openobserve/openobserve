@@ -13667,7 +13667,7 @@
     "addAnomalyMode": "Add Anomaly Detection",
     "editAnomalyMode": "Edit Anomaly Detection",
     "nameRequired": "Alert name is required.",
-    "nameNoSpecialChars": "Alert name cannot contain ':', '#', '?', '&', '%', quotes or space characters. Use underscores (_) instead.",
+    "nameNoSpecialChars": "Alert name cannot contain ':', '#', '?', '&', '%', '/', quotes or space characters. Use underscores (_) instead.",
     "anomalyNamePlaceholder": "Anomaly name",
     "anomalyName": "Anomaly Name",
     "anomalyNameRequired": "Anomaly name is required.",

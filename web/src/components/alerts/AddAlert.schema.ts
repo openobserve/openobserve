@@ -50,7 +50,7 @@ import { validateExpression } from "./composite/expression";
 //   stream name        → alerts.validation.streamNameRequired
 
 /** Unsupported characters in an alert name. Requiredness = min 1 AND this regex. */
-export const ALERT_NAME_UNSUPPORTED_CHARS = /[:#?\s'"%&]+/;
+export const ALERT_NAME_UNSUPPORTED_CHARS = /[:#?\s'"%&/]+/;
 
 export const isBlank = (v: unknown): boolean =>
   v === undefined || v === null || (typeof v === "string" && v.trim() === "");
