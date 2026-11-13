@@ -32,13 +32,15 @@ common.workspace = true
 config.workspace = true
 db.workspace = true
 flate2.workspace = true
+futures.workspace = true
 hashbrown.workspace = true
 http-body-util.workspace = true
 infra.workspace = true
 ingestion-common.workspace = true
 log.workspace = true
-object_store.workspace = true
+md5.workspace = true
 o2_enterprise = { workspace = true, optional = true, default-features = false }
+object_store.workspace = true
 openobserve-api-common.workspace = true
 openobserve-core.workspace = true
 opentelemetry-proto.workspace = true
@@ -50,3 +52,6 @@ snap.workspace = true
 tokio.workspace = true
 tower.workspace = true
 utoipa.workspace = true
+
+[dev-dependencies]
+urlencoding.workspace = true

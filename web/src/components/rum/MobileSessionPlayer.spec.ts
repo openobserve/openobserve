@@ -288,20 +288,22 @@ describe("MobileSessionPlayer image wireframes", () => {
   const mountRef = (props: Record<string, any>, extra: Record<string, any> = {}) =>
     mountPlayer({ timeline: tl([imageSegment({ resourceId: RESOURCE_ID, ...extra })]), ...props });
 
-  it("renders an image that is referenced only by resourceId", () => {
-    const wrapper = mountRef({ applicationId: "app-1" });
-    const img = wrapper.find("img");
-    expect(img.exists()).toBe(true);
-    expect(img.attributes("src")).toContain(RESOURCE_ID);
-    wrapper.unmount();
-  });
-
   it("builds the resource URL from the endpoint, org and application", () => {
     const org = encodeURIComponent(store.state.selectedOrganization.identifier);
     const wrapper = mountRef({ applicationId: "my app/1" });
     expect(wrapper.find("img").attributes("src")).toBe(
       `${store.state.API_ENDPOINT}/api/${org}/rum/replay_resources/my%20app%2F1/${RESOURCE_ID}`,
     );
+    wrapper.unmount();
+  });
+
+  it("does not emit a protocol-relative URL when the endpoint is /", () => {
+    const original = store.state.API_ENDPOINT;
+    store.state.API_ENDPOINT = "/";
+    const wrapper = mountRef({ applicationId: "app-1" });
+    const src = wrapper.find("img").attributes("src");
+    store.state.API_ENDPOINT = original;
+    expect(src?.startsWith("/api/")).toBe(true);
     wrapper.unmount();
   });
 
@@ -317,6 +319,24 @@ describe("MobileSessionPlayer image wireframes", () => {
       applicationId: "app-1",
     });
     expect(wrapper.find("img").exists()).toBe(false);
+    wrapper.unmount();
+  });
+
+  it("falls back to the placeholder when the image resource fails to load", async () => {
+    const wrapper = mountRef({ applicationId: "app-1" });
+    await wrapper.find("img").trigger("error");
+    await wrapper.vm.$nextTick();
+    expect(wrapper.find("img").exists()).toBe(false);
+    expect(wrapper.find(".bg-white > div").exists()).toBe(true);
+    wrapper.unmount();
+  });
+
+  it("retries a failed image when a new timeline batch arrives", async () => {
+    const wrapper = mountRef({ applicationId: "app-1" });
+    await wrapper.find("img").trigger("error");
+    expect(wrapper.find("img").exists()).toBe(false);
+    await wrapper.setProps({ timeline: tl([imageSegment({ resourceId: RESOURCE_ID })]) });
+    expect(wrapper.find("img").exists()).toBe(true);
     wrapper.unmount();
   });
 
