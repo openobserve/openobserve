@@ -4,14 +4,6 @@ const PageManager = require('../../../pages/page-manager.js');
 const { getOrgIdentifier } = require('../../utils/cloud-auth.js');
 const { ingestTestData } = require('../../utils/data-ingestion.js');
 
-function trackSearches(page) {
-  const urls = [];
-  page.on('request', (req) => {
-    if (req.method() === 'POST' && /\/_search(_stream)?\?/.test(req.url())) urls.push(req.url());
-  });
-  return urls;
-}
-
 test.describe('Logs auto refresh popover switches refreshing on and off (OSS#16430)', () => {
   test.describe.configure({ mode: 'serial' });
   let pm;
@@ -30,7 +22,7 @@ test.describe('Logs auto refresh popover switches refreshing on and off (OSS#164
     tag: ['@bug-16430', '@P2', '@regression', '@logsRegression'],
   }, async ({ page }) => {
     const refresh = pm.logsAutoRefreshPage;
-    const searches = trackSearches(page);
+    const searches = refresh.trackSearchUrls();
     // The interval only schedules runs once the first run has rendered and nothing is in flight.
     await refresh.waitForIdleResults();
 

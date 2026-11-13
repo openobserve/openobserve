@@ -713,6 +713,18 @@ export class ServiceGraphPage {
     await expect(this.page.locator(this.streamSelector)).toBeVisible({ timeout });
   }
 
+  /** Returns a live list of the stream_name of every topology response from now on. */
+  trackTopologyStreams() {
+    const streams = [];
+    // Responses, not requests: a load still in flight makes the component skip the next one.
+    this.page.on('response', (res) => {
+      if (res.url().includes('/traces/service_graph/topology/current')) {
+        streams.push(new URL(res.url()).searchParams.get('stream_name'));
+      }
+    });
+    return streams;
+  }
+
   async selectStreamFromDropdown(streamName) {
     await this.page.locator(this.streamSelector).click();
     await this.page.getByRole('option', { name: streamName, exact: true }).click();

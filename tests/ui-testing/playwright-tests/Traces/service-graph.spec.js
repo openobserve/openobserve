@@ -15,6 +15,7 @@ const {
   countTopologyNodes,
   SERVICE_GRAPH_READY_FLOOR_MS,
 } = require('../utils/service-graph-ingestion.js');
+const { ingestOtlpTraces, deleteStream, stringAttr } = require('../utils/traces-api.js');
 
 const SERVICE_GRAPH_WAIT_MS = SERVICE_GRAPH_READY_FLOOR_MS + 120000;
 
@@ -553,7 +554,6 @@ test.describe("Service Graph testcases", { tag: '@enterprise' }, () => {
 
 test.describe('Service Graph stream switch refetches the topology (ENT#1282)', { tag: '@enterprise' }, () => {
   test.describe.configure({ mode: 'serial' });
-  const { ingestOtlpTraces, deleteStream, stringAttr } = require('../utils/traces-api.js');
   const secondStream = `ovn_b_sg_${Date.now().toString(36)}`;
 
   test.beforeAll(async ({ request }) => {
@@ -581,25 +581,18 @@ test.describe('Service Graph stream switch refetches the topology (ENT#1282)', {
     test.setTimeout(480000);
     await navigateToBase(page);
     const pm = new PageManager(page);
-    const topology = [];
-    // Responses, not requests: a load still in flight makes the component skip the next one.
-    page.on('response', (res) => {
-      if (res.url().includes('/traces/service_graph/topology/current')) {
-        topology.push(new URL(res.url()).searchParams.get('stream_name'));
-      }
-    });
+    const topology = pm.serviceGraphPage.trackTopologyStreams();
     await pm.serviceGraphPage.navigateToServiceGraphUrl('default');
     await pm.serviceGraphPage.expectStreamSelectorVisible();
     await expect.poll(() => topology.includes('default'), { timeout: 120000 }).toBe(true);
-    const pick = (stream) => pm.serviceGraphPage.selectStreamFromDropdown(stream);
 
     // Pre-fix the topology was only refetched after clicking Graph View again.
     const before = topology.length;
-    await pick(secondStream);
+    await pm.serviceGraphPage.selectStreamFromDropdown(secondStream);
     await expect.poll(() => topology.slice(before), { timeout: 120000 }).toContain(secondStream);
 
     const back = topology.length;
-    await pick('default');
+    await pm.serviceGraphPage.selectStreamFromDropdown('default');
     await expect.poll(() => topology.slice(back), { timeout: 120000 }).toContain('default');
   });
 });
