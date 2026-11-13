@@ -29,6 +29,7 @@ import {
   clearIdentityConfigCache,
   clearAllIdentityConfigCache,
 } from "@/utils/identityConfig";
+import { correlationDisplayProps, type ServiceDisplayFields } from "@/types/serviceRef";
 
 // Types matching backend API responses
 export interface Incident {
@@ -37,6 +38,8 @@ export interface Incident {
   status: "open" | "acknowledged" | "resolved";
   severity: "P1" | "P2" | "P3" | "P4";
   group_values?: Record<string, string>;
+  /** Display names keyed like `group_values`; never sent back, `group_values` stays the key. */
+  group_values_display?: Record<string, string>;
   key_type?: "Primary" | "Secondary" | "AlertId";
   topology_context?: IncidentTopology;
   first_alert_at: number;
@@ -673,6 +676,7 @@ export interface AlertNode {
   alert_id: string;
   alert_name: string;
   service_name: string;
+  display_name?: string;
   alert_count: number;
   first_fired_at: number;
   last_fired_at: number;
@@ -754,6 +758,8 @@ export interface IncidentStats {
 // Telemetry correlation types
 export interface IncidentCorrelatedStreams {
   serviceName: string;
+  displayServiceName?: string;
+  serviceDisplay?: Omit<ServiceDisplayFields, "display_name">;
   matchedDimensions: Record<string, string>;
   additionalDimensions: Record<string, string>;
   logStreams: StreamInfo[];
@@ -1060,15 +1066,8 @@ const incidents = {
     }
 
     const request: CorrelationRequest = {
-      source_stream:
-        // filteredDimensions only contains "service" key if present (not variations)
-        filteredDimensions.service ||
-        // Fallback to original dimensions for service name variations
-        allDimensions.serviceName ||
-        allDimensions["service.name"] ||
-        allDimensions["service_name"] ||
-        "default",
-      source_type: "logs",
+      source_stream: "",
+      source_type: "incident",
       available_dimensions: filteredDimensions,
     };
 
@@ -1090,6 +1089,7 @@ const incidents = {
 
     return {
       serviceName: correlationData.service_name,
+      ...correlationDisplayProps(correlationData),
       matchedDimensions: correlationData.matched_dimensions || {},
       additionalDimensions: correlationData.additional_dimensions || {},
       logStreams: correlationData.related_streams.logs || [],

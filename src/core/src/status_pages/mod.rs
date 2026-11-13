@@ -351,12 +351,14 @@ pub async fn mark_false_positive(
     org_id: &str,
     notice_id: &str,
     snooze_hours: i64,
+    reason: &str,
     actor: &str,
 ) -> Result<(), anyhow::Error> {
     o2_enterprise::enterprise::status_pages::notices::mark_false_positive(
         org_id,
         notice_id,
         snooze_hours,
+        reason,
         actor,
     )
     .await
@@ -367,8 +369,20 @@ pub async fn mark_false_positive(
     _org_id: &str,
     _notice_id: &str,
     _snooze_hours: i64,
+    _reason: &str,
     _actor: &str,
 ) -> Result<(), anyhow::Error> {
+    enterprise_required()
+}
+
+/// Undoes [`mark_false_positive`]: the incident and its downtime count again. Licensed.
+#[cfg(feature = "enterprise")]
+pub async fn undo_false_positive(org_id: &str, notice_id: &str) -> Result<(), anyhow::Error> {
+    o2_enterprise::enterprise::status_pages::notices::undo_false_positive(org_id, notice_id).await
+}
+
+#[cfg(not(feature = "enterprise"))]
+pub async fn undo_false_positive(_org_id: &str, _notice_id: &str) -> Result<(), anyhow::Error> {
     enterprise_required()
 }
 

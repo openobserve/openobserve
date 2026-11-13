@@ -24,6 +24,7 @@ import common from "@/services/common";
 import { queryClient } from "@/composables/query/queryClient";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import analytics from "@/services/product_analytics";
+import stage8 from "@/test/unit/fixtures/serviceVersions/stage8.json";
 
 vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
@@ -44,6 +45,7 @@ vi.mock("@/services/downtimes", () => ({
     move: vi.fn(),
     preview: vi.fn(),
     resources: vi.fn(),
+    values: vi.fn(),
   },
 }));
 
@@ -176,6 +178,24 @@ describe("DowntimeList", () => {
     await flushPromises();
     expect(downtimes.list).toHaveBeenCalledTimes(2);
     expect(activeCount()).toContain("1");
+    wrapper.unmount();
+  });
+
+  it("words each condition as the detail does, with and without a display name", async () => {
+    vi.mocked(downtimes.values).mockResolvedValue({ data: stage8.downtime_values } as never);
+    const cases = [
+      ["service", "checkoutservice", "service=CheckoutService"],
+      ["env", "prod", "env=prod"],
+    ] as const;
+    const rows = cases.map(([key, value], i) =>
+      row({ id: `dt-${i}`, condition: { type: "pair", key, operator: "=", value } }),
+    );
+    vi.mocked(downtimes.list).mockResolvedValue(page(rows) as never);
+    const wrapper = await mountList();
+    for (const [i, [, , text]] of cases.entries()) {
+      const chip = `[data-test="downtime-list-dt-${i}-targets-condition"]`;
+      await vi.waitFor(() => expect(wrapper.get(chip).text()).toContain(text));
+    }
     wrapper.unmount();
   });
 

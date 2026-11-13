@@ -21,41 +21,56 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <h3 :id="headingId" class="text-text-heading m-0 text-base font-bold">
         {{ t("alerts.incidents.rcaSummary.proposedActions") }}
       </h3>
-      <span class="text-text-secondary text-xs">{{ actions.length }}</span>
       <span class="text-text-secondary text-xs">
-        · {{ t("alerts.incidents.rcaSummary.proposedActionsNote") }}
+        {{ actions.length }} · {{ t("alerts.incidents.rcaSummary.proposedActionsNote") }}
       </span>
     </div>
 
     <ol
       class="rounded-default border-border-default bg-surface-base divide-border-default m-0 list-none divide-y border p-0"
     >
-      <li
+      <RcaFoldRow
         v-for="(action, idx) in actions"
         :key="idx"
         data-test="rca-proposed-action"
-        class="px-3.5 py-2.5"
+        :open="opened.has(idx)"
+        @update:open="toggle(idx)"
       >
-        <span class="text-text-heading text-sm font-semibold">{{ action.title }}</span>
-        <span data-test="rca-proposed-action-kind" class="text-text-secondary text-xs">
-          · {{ rcaActionKindLabel(action.kind) }}
-        </span>
-        <p v-if="action.detail" class="text-text-secondary text-compact m-0 [text-wrap:pretty]">
-          {{ action.detail }}
-        </p>
-      </li>
+        {{ action.title }}
+        <template v-if="action.kind !== 'other'" #meta>
+          <span data-test="rca-proposed-action-kind" class="text-text-secondary shrink-0 text-xs">
+            {{ rcaActionKindLabel(action.kind) }}
+          </span>
+        </template>
+        <template #body>
+          <p
+            data-test="rca-proposed-action-detail"
+            class="text-text-secondary text-compact m-0 [text-wrap:pretty]"
+          >
+            {{ action.detail || t("alerts.incidents.rcaSummary.noImpact") }}
+          </p>
+        </template>
+      </RcaFoldRow>
     </ol>
   </section>
 </template>
 
 <script setup lang="ts">
-import { useId } from "vue";
+import { ref, useId } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import type { RcaProposedAction } from "@/services/incidents";
 import { rcaActionKindLabel } from "@/utils/incidents/rcaSummary";
+import RcaFoldRow from "./RcaFoldRow.vue";
 
 defineProps<{ actions: RcaProposedAction[] }>();
 
 const { t } = useI18nTyped();
 const headingId = useId();
+
+const opened = ref(new Set<number>());
+const toggle = (idx: number) => {
+  const next = new Set(opened.value);
+  if (!next.delete(idx)) next.add(idx);
+  opened.value = next;
+};
 </script>

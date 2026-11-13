@@ -42,60 +42,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <p
-        v-if="step.note"
-        data-test="rca-thread-step-note"
-        class="text-text-body text-compact m-0 [text-wrap:pretty] break-words whitespace-pre-line"
-      >
-        <template v-for="(segment, idx) in noteSegments" :key="idx">
-          <template v-if="segment.kind === 'text'">
-            <code
-              v-if="segment.code"
-              class="rounded-default bg-surface-subtle text-text-code px-1 font-mono text-xs"
-              :class="{ 'font-bold': segment.bold, italic: segment.italic }"
-              >{{ segment.text }}</code
-            >
-            <strong
-              v-else-if="segment.bold"
-              class="font-bold"
-              :class="{ italic: segment.italic }"
-              >{{ segment.text }}</strong
-            >
-            <em v-else-if="segment.italic">{{ segment.text }}</em>
-            <span v-else>{{ segment.text }}</span>
-          </template>
-          <button
-            v-else-if="evidenceNumbers?.has(segment.id)"
-            type="button"
-            data-test="rca-citation-chip"
-            class="rounded-default border-border-control text-text-heading bg-surface-base hover:bg-surface-subtle-hover text-3xs mx-0.5 inline-flex h-4.5 min-w-5 cursor-pointer items-center justify-center border px-1 align-baseline font-mono font-semibold"
-            :aria-label="
-              t('alerts.incidents.rcaSummary.openEvidence', {
-                number: evidenceNumbers.get(segment.id),
-              })
-            "
-            @click="$emit('open-evidence', evidenceNumbers.get(segment.id) as number)"
-          >
-            {{ evidenceNumbers.get(segment.id) }}
-          </button>
-          <span
-            v-else-if="evidenceNumbers"
-            data-test="rca-citation-unverified"
-            class="rounded-default border-status-warning-text text-status-warning-text bg-surface-base text-3xs mx-0.5 inline-flex h-4.5 items-center border border-dashed px-1 align-baseline font-mono font-semibold"
-          >
-            {{ t("alerts.incidents.rcaSummary.notVerifiedId", { id: segment.id }) }}
-          </span>
-          <span
-            v-else
-            data-test="rca-citation-chip"
-            class="rounded-default border-border-default text-text-heading bg-surface-base text-3xs mx-0.5 inline-flex h-4.5 min-w-5 items-center justify-center border px-1 align-baseline font-mono font-semibold"
-          >
-            {{ segment.id }}
-          </span>
-        </template>
-        <span v-if="step.note_truncated" class="text-text-secondary">…</span>
-      </p>
-
-      <p
         v-if="status === 'running'"
         data-test="rca-thread-step-working"
         class="text-text-secondary text-compact m-0"
@@ -104,18 +50,120 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("alerts.incidents.rcaThread.working") }}
       </p>
 
-      <template v-if="step.tool_calls.length > 0">
-        <button
-          type="button"
+      <div
+        v-if="step.tool_calls.length > 0 || (step.note && !conclusion)"
+        class="text-text-secondary flex flex-wrap items-center gap-1.5 text-xs"
+      >
+        <OButton
+          v-if="step.tool_calls.length > 0"
           data-test="rca-thread-step-calls-toggle"
-          class="text-text-secondary flex cursor-pointer items-center gap-1 self-start border-none bg-transparent p-0 text-xs"
+          variant="ghost-muted"
+          size="xs"
+          :icon-right="callsOpen ? 'expand-less' : 'expand-more'"
           :aria-expanded="callsOpen"
           :aria-controls="callsListId"
           @click="callsOpen = !callsOpen"
         >
-          <OIcon :name="callsOpen ? 'expand-less' : 'expand-more'" size="sm" />
           {{ callsLabel }}
-        </button>
+        </OButton>
+        <span v-if="step.tool_calls.length > 0 && step.note && !conclusion" aria-hidden="true"
+          >·</span
+        >
+        <OButton
+          v-if="step.note && !conclusion"
+          data-test="rca-thread-step-note-toggle"
+          variant="ghost-muted"
+          size="xs"
+          :icon-right="noteOpen ? 'expand-less' : 'expand-more'"
+          :aria-expanded="noteOpen"
+          @click="toggleNote"
+        >
+          {{
+            noteOpen ? t("alerts.incidents.rcaLight.hideNote") : t("alerts.incidents.rcaLight.note")
+          }}
+        </OButton>
+      </div>
+      <div
+        v-if="step.note && (noteOpen || conclusion)"
+        :data-test="conclusion ? 'rca-thread-conclusion' : undefined"
+        class="flex flex-col items-start gap-0.5"
+        :class="{ 'border-border-strong border-s-2 ps-3': conclusion }"
+      >
+        <span v-if="conclusion" class="text-text-secondary text-2xs font-bold">
+          {{ t("alerts.incidents.rcaLight.conclusion") }}
+        </span>
+        <p
+          ref="noteEl"
+          data-test="rca-thread-step-note"
+          class="text-text-body text-compact m-0 [text-wrap:pretty] wrap-anywhere whitespace-pre-line"
+          :class="{ 'line-clamp-3': conclusion && !conclusionOpen }"
+        >
+          <template v-for="(segment, idx) in noteSegments" :key="idx">
+            <template v-if="segment.kind === 'text'">
+              <code
+                v-if="segment.code"
+                class="rounded-default bg-surface-subtle text-text-code px-1 font-mono text-xs wrap-anywhere"
+                :class="{ 'font-bold': segment.bold, italic: segment.italic }"
+                >{{ segment.text }}</code
+              >
+              <strong
+                v-else-if="segment.bold"
+                class="font-bold"
+                :class="{ italic: segment.italic }"
+                >{{ segment.text }}</strong
+              >
+              <em v-else-if="segment.italic">{{ segment.text }}</em>
+              <span v-else>{{ segment.text }}</span>
+            </template>
+            <OButton
+              v-else-if="evidenceNumbers?.has(segment.id)"
+              data-test="rca-citation-chip"
+              variant="outline"
+              size="icon-xs-sq"
+              class="mx-0.5 align-baseline font-mono"
+              :aria-label="
+                t('alerts.incidents.rcaSummary.openEvidence', {
+                  number: evidenceNumbers.get(segment.id),
+                })
+              "
+              @click="$emit('open-evidence', evidenceNumbers.get(segment.id) as number)"
+            >
+              {{ evidenceNumbers.get(segment.id) }}
+            </OButton>
+            <span
+              v-else-if="evidenceNumbers"
+              data-test="rca-citation-unverified"
+              class="rounded-default border-status-warning-text text-status-warning-text bg-surface-base text-3xs mx-0.5 inline-flex h-4.5 items-center border border-dashed px-1 align-baseline font-mono font-semibold"
+            >
+              {{ t("alerts.incidents.rcaSummary.notVerifiedId") }}
+            </span>
+            <span
+              v-else
+              data-test="rca-citation-chip"
+              class="rounded-default border-border-default text-text-heading bg-surface-base text-3xs mx-0.5 inline-flex h-4.5 min-w-5 items-center justify-center border px-1 align-baseline font-mono font-semibold"
+            >
+              {{ segment.id }}
+            </span>
+          </template>
+          <span v-if="step.note_truncated" class="text-text-secondary">…</span>
+        </p>
+        <OButton
+          v-if="conclusion && (noteClamped || conclusionOpen)"
+          data-test="rca-thread-conclusion-toggle"
+          variant="ghost-primary"
+          size="xs"
+          :aria-expanded="conclusionOpen"
+          @click="conclusionOpen = !conclusionOpen"
+        >
+          {{
+            conclusionOpen
+              ? t("alerts.incidents.rcaLight.showLess")
+              : t("alerts.incidents.rcaLight.showMore")
+          }}
+        </OButton>
+      </div>
+
+      <template v-if="step.tool_calls.length > 0">
         <ul
           v-if="callsOpen"
           :id="callsListId"
@@ -130,13 +178,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, ref, useId, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, useId, watch } from "vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { useI18nTyped } from "@/types/i18n";
 import type { RcaStep } from "@/services/incidents";
+import { formatTimestampInTimezone } from "@/utils/date";
 import {
-  formatRcaClock,
   formatRcaDuration,
   isInterruptedStep,
   splitRcaNote,
@@ -155,8 +204,12 @@ const props = withDefaults(
     finished?: boolean;
     /** Evidence id → entry number from the run's summary; null when no summary is loaded, so chips show the raw id. */
     evidenceNumbers?: Map<string, number> | null;
+    /** The app's time zone. */
+    timezone?: string;
+    /** The submitted run's last note: shown as the conclusion, cut at three lines. */
+    conclusion?: boolean;
   }>(),
-  { runWaiting: false, finished: true, evidenceNumbers: null },
+  { runWaiting: false, finished: true, evidenceNumbers: null, timezone: "UTC", conclusion: false },
 );
 
 defineEmits<{
@@ -216,14 +269,52 @@ const statusLabel = computed(() => {
   }
 });
 
-const startedClock = computed(() => formatRcaClock(props.step.started_at));
+const startedClock = computed(() =>
+  props.step.started_at === null
+    ? ""
+    : formatTimestampInTimezone(props.step.started_at, "HH:mm:ss", props.timezone),
+);
 
-const noteSegments = computed(() => splitRcaNote(props.step.note ?? ""));
+// Agent headings read as bold lines; the note has no block markup otherwise.
+const noteSegments = computed(() =>
+  splitRcaNote((props.step.note ?? "").replace(/^#{1,6}\s+(.+)$/gm, "**$1**")),
+);
+
+// A finished step's note folds; the running step's stays open so the work shows.
+const noteOpen = ref(status.value === "running");
+const noteToggled = ref(false);
+const toggleNote = () => {
+  noteOpen.value = !noteOpen.value;
+  noteToggled.value = true;
+};
+const conclusionOpen = ref(false);
+const noteEl = ref<HTMLElement | null>(null);
+const noteClamped = ref(false);
+const measureNote = async () => {
+  await nextTick();
+  const el = noteEl.value;
+  noteClamped.value = !!el && el.scrollHeight > el.clientHeight + 1;
+};
+onMounted(measureNote);
+// Becoming the conclusion mounts or clamps the note without changing its text.
+watch([() => props.step.note, () => props.conclusion, noteEl], measureNote);
+// The note can mount after this step does, so the observer follows the element, not the mount.
+let noteObserver: ResizeObserver | null = null;
+watch(noteEl, (el) => {
+  noteObserver?.disconnect();
+  noteObserver = null;
+  if (!el || typeof ResizeObserver === "undefined") return;
+  noteObserver = new ResizeObserver(() => void measureNote());
+  noteObserver.observe(el);
+});
+onBeforeUnmount(() => noteObserver?.disconnect());
 
 // Only the running step starts open (reference: "Default open only for the running step").
 const callsOpen = ref(status.value === "running");
 watch(status, (next, previous) => {
-  if (previous === "running" && next !== "running") callsOpen.value = false;
+  if (previous !== "running" || next === "running") return;
+  callsOpen.value = false;
+  if (!noteToggled.value) noteOpen.value = false;
 });
 
 const callsLabel = computed(() => {

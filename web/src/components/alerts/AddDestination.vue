@@ -545,6 +545,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :type="dtVal"
       :template-content="previewContent"
       :show-body="previewShowsBody"
+      :generic-sample="isPrebuiltDestination && !previewShowsBody"
       :recipients="previewRecipients"
       data-test="destination-preview-modal"
     />

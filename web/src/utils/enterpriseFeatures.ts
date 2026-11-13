@@ -321,6 +321,10 @@ export function isFeatureKey(key: string): key is FeatureKey {
   return Object.prototype.hasOwnProperty.call(FEATURE_GATES, key);
 }
 
+export function featureGateLabelKey(key: FeatureKey): I18nKey {
+  return FEATURE_GATES[key].labelKey;
+}
+
 /** Every registered key — `FeatureKey` is a type, erased at runtime, so
     tooling that has to iterate "all of them" (the completeness test, any
     future lint rule) reads this instead of hand-maintaining its own copy. */

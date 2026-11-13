@@ -72,7 +72,16 @@ describe("syntheticResultsSchema query builders", () => {
     expect(sql).toContain(`FILTER (WHERE ${SYNTHETIC_FIELDS.status} = '${STATUS_VALUES.warning}')`);
     expect(sql).toContain(`FILTER (WHERE ${SYNTHETIC_FIELDS.status} = '${STATUS_VALUES.failed}')`);
     expect(sql).toContain(`FILTER (WHERE ${SYNTHETIC_FIELDS.status} = '${STATUS_VALUES.error}')`);
-    expect(sql).toContain(`approx_percentile_cont(${SYNTHETIC_FIELDS.duration}, 0.95)`);
+    // Durations cover only runs that tested the site, so a Not measured bucket is a gap.
+    expect(sql).toContain(
+      `approx_percentile_cont(CASE WHEN ${SYNTHETIC_FIELDS.status} != '${STATUS_VALUES.error}' THEN ${SYNTHETIC_FIELDS.duration} END, 0.95)`,
+    );
+  });
+
+  it("should leave Not measured rows out of the p95 SQL", () => {
+    expect(buildP95Sql("mon-1")).toContain(
+      `${SYNTHETIC_FIELDS.status} != '${STATUS_VALUES.error}'`,
+    );
   });
 
   it("should include retried_runs clause when attempts field exists in schema", () => {
@@ -280,11 +289,11 @@ describe("mapHistogram", () => {
   const start = 1_700_000_000_000_000;
   const end = start + HOUR;
 
-  it("should zero-fill the full grid when the stream is sparse", () => {
+  it("should fill the full grid with gaps when the stream is sparse", () => {
     const buckets = mapHistogram([], start, end);
     expect(buckets.length).toBeGreaterThan(1);
     expect(buckets.every((b) => b.failedRuns === 0)).toBe(true);
-    expect(buckets.every((b) => b.uptimePct === 100)).toBe(true);
+    expect(buckets.every((b) => b.uptimePct === null && b.p95Ms === null)).toBe(true);
     // Strictly time-ordered.
     for (let i = 1; i < buckets.length; i++) {
       expect(buckets[i].tsMs).toBeGreaterThan(buckets[i - 1].tsMs);
@@ -315,6 +324,25 @@ describe("mapHistogram", () => {
     expect(populated?.avgMs).toBe(1500);
     expect(populated?.p95Ms).toBe(2940);
     expect(populated?.uptimePct).toBeCloseTo(80, 5);
+  });
+
+  it("should count only runs that tested the site and leave a Not measured bucket as a gap", () => {
+    const stepMs = 5 * 60 * 1000;
+    const slotMs = Math.floor(start / 1000 / stepMs) * stepMs;
+    const key = (n: number) => new Date(slotMs + n * stepMs).toISOString().slice(0, 19);
+    const buckets = mapHistogram(
+      [
+        { ts: key(0), total_runs: 4, passed_runs: 3, error_runs: 1, avg_duration: 90 },
+        { ts: key(1), total_runs: 2, error_runs: 2, avg_duration: null, p95_duration: null },
+      ],
+      start,
+      end,
+    );
+    expect(buckets[0].uptimePct).toBe(100);
+    expect(buckets[0].avgMs).toBe(90);
+    expect(buckets[1].errorRuns).toBe(2);
+    expect(buckets[1].uptimePct).toBeNull();
+    expect(buckets[1].p95Ms).toBeNull();
   });
 });
 
@@ -1820,5 +1848,43 @@ describe("start load (row 0)", () => {
       expect(result.stepGroups.every((g) => g.flakyCount === 0)).toBe(true);
       expect(result.stepGroups.map((g) => g.name).sort()).toEqual(["Open cart", "Sign in"]);
     });
+  });
+});
+
+describe("confirm jobs in uptime", () => {
+  it("should count a failure and its passing confirm job as one up result", () => {
+    const kpi = deriveKpiFromHistogram(
+      [{ total_runs: 2, passed_runs: 1, failed_runs: 1, confirm_runs: 1 }],
+      null,
+      null,
+    );
+    expect(kpi.uptimePct).toBe(100);
+  });
+
+  it("should count a failure and its failing confirm job as one down result", () => {
+    const kpi = deriveKpiFromHistogram(
+      [{ total_runs: 3, passed_runs: 1, failed_runs: 2, confirm_runs: 1 }],
+      null,
+      null,
+    );
+    expect(kpi.uptimePct).toBe(50);
+  });
+
+  it("should stay at 100 when a bucket holds only the passing confirm job", () => {
+    const start = Date.UTC(2026, 0, 1) * 1000;
+    const key = new Date(start / 1000).toISOString().slice(0, 19);
+    const [bucket] = mapHistogram(
+      [{ ts: key, total_runs: 1, passed_runs: 1, confirm_runs: 1 }],
+      start,
+      start + 60_000_000,
+    );
+    expect(bucket.uptimePct).toBe(100);
+  });
+
+  it("should ask for confirm rows only when the stream has the field", () => {
+    expect(buildHistogramSql("m", "1 minute")).not.toContain("confirm_runs");
+    expect(buildHistogramSql("m", "1 minute", false, false, undefined, false, true)).toContain(
+      "trigger_type = 'confirm'",
+    );
   });
 });

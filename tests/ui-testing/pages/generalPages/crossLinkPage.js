@@ -1,5 +1,6 @@
 import { expect } from '@playwright/test';
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
+const { getAuthHeaders, getOrgIdentifier } = require('../../playwright-tests/utils/cloud-auth.js');
 
 export class CrossLinkPage {
     constructor(page) {
@@ -191,6 +192,40 @@ export class CrossLinkPage {
             await btn.click();
             await settingsTab.waitFor({ state: 'visible', timeout: 30000 });
         }
+    }
+
+    async openStreamDetailsByType(streamName, streamType) {
+        const org = process.env['ORGNAME'] || 'default';
+        const baseUrl = (process.env['ZO_BASE_URL'] || '').replace(/\/+$/, '');
+        await this.page.goto(`${baseUrl}/web/streams?org_identifier=${org}`);
+        const filter = this.page.locator('[data-test="log-stream-type-filter"]');
+        await expect(filter).toBeVisible({ timeout: 30000 });
+        const label = streamType.charAt(0).toUpperCase() + streamType.slice(1);
+        const toggle = filter.getByRole('button', { name: label });
+        await toggle.click();
+        await expect(toggle).toHaveAttribute('data-state', 'on');
+        const nameCells = this.page.locator('[data-test^="log-stream-name-cell-"]');
+        // The search box refetches the list after a debounce, which can drop a fill made while the list reloads.
+        await expect(async () => {
+            await this.page.locator('[data-test="streams-search-stream-input-field"]').fill(streamName);
+            await expect(nameCells).toHaveCount(1, { timeout: 5000 });
+        }).toPass({ timeout: 30000 });
+        await expect(this.page.locator(`[data-test="log-stream-name-cell-${streamName}"]`)).toBeVisible();
+        await this.page.locator('[data-test="log-stream-schema-btn"]').first().click();
+    }
+
+    /** The configuration tab renders in the same strip as the cross-linking one, so its presence means the strip is complete. */
+    async expectStreamDetailsTabsLoaded() {
+        await expect(this.page.locator('[data-test="schema-settings-tab"]')).toBeVisible({ timeout: 30000 });
+        await expect(this.page.locator('[data-test="schema-configuration-tab"]')).toBeVisible({ timeout: 30000 });
+    }
+
+    async expectCrossLinkingTabAbsent(message) {
+        await expect(this.page.locator('[data-test="schema-cross-linking-tab"]'), message).toHaveCount(0);
+    }
+
+    async expectAddCrossLinkVisible() {
+        await expect(this.page.locator(this.addCrossLinkBtn).first()).toBeVisible({ timeout: 15000 });
     }
 
     async isCrossLinkingTabVisible() {
@@ -534,6 +569,16 @@ export class CrossLinkPage {
         await this.page.locator(this.orgSettingsSaveBtn).click();
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
+    }
+
+    // ZO_ENABLE_CROSS_LINKING is a server env flag; the unauthenticated /config does not carry it, the org config does.
+    async isCrossLinkingEnabledOnServer() {
+        const res = await this.page.request.get(
+            `${process.env.ZO_BASE_URL}/api/${getOrgIdentifier()}/config`,
+            { headers: getAuthHeaders() },
+        );
+        if (!res.ok()) throw new Error(`GET /api/${getOrgIdentifier()}/config answered HTTP ${res.status()}`);
+        return (await res.json())?.enable_cross_linking === true;
     }
 
     // ============================================================

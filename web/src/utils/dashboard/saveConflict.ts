@@ -430,8 +430,13 @@ const RELATIVE_STEPS: [Intl.RelativeTimeFormatUnit, number][] = [
 ];
 
 /** Localised "4 minutes ago" for a past epoch-ms value. */
-export const formatRelativeTime = (ms: number, locale: string, now = Date.now()) => {
-  const rtf = new Intl.RelativeTimeFormat(locale, { numeric: "auto" });
+export const formatRelativeTime = (
+  ms: number,
+  locale: string,
+  now = Date.now(),
+  style: Intl.RelativeTimeFormatStyle = "long",
+) => {
+  const rtf = new Intl.RelativeTimeFormat(locale, { numeric: "auto", style });
   let amount = Math.round((ms - now) / 1000);
   for (const [unit, size] of RELATIVE_STEPS) {
     if (Math.abs(amount) < size) return rtf.format(Math.min(amount, 0), unit);

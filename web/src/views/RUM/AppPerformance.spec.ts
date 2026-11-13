@@ -4,6 +4,7 @@ import { createStore } from "vuex";
 import { createI18n } from "vue-i18n";
 import { createRouter, createWebHistory } from "vue-router";
 import { nextTick } from "vue";
+import { rumHintContext, rumTabApps } from "@/enterprise/components/ServiceVersions/rumStrip";
 import AppPerformance from "./AppPerformance.vue";
 import ShareButton from "@/components/common/ShareButton.vue";
 
@@ -297,54 +298,6 @@ describe("AppPerformance.vue", () => {
   });
 
   describe("Route Handling", () => {
-    // Note: This test is skipped because loadDashboard in onMounted has a bug
-    // that prevents the tab from being set correctly based on route
-    it.skip("should set correct tab based on route name on mount", async () => {
-      // Test overview route
-      await router.push({ name: "rumPerformanceSummary" });
-      await router.isReady();
-
-      const overviewWrapper = mount(AppPerformance, {
-        global: {
-          plugins: [store, router, i18n],
-          stubs: {
-            AutoRefreshInterval: { template: "<div></div>" },
-            AppTabs: { template: "<div></div>" },
-            DateTimePickerDashboard: { template: "<div></div>" },
-            "router-view": { template: "<div></div>" },
-            "keep-alive": { template: "<div></div>" },
-          },
-        },
-      });
-
-      await nextTick();
-      await nextTick();
-      expect(overviewWrapper.vm.activePerformanceTab).toBe("overview");
-      overviewWrapper.unmount();
-
-      // Test web vitals route
-      await router.push({ name: "rumPerformanceWebVitals" });
-      await router.isReady();
-
-      const webVitalsWrapper = mount(AppPerformance, {
-        global: {
-          plugins: [store, router, i18n],
-          stubs: {
-            AutoRefreshInterval: { template: "<div></div>" },
-            AppTabs: { template: "<div></div>" },
-            DateTimePickerDashboard: { template: "<div></div>" },
-            "router-view": { template: "<div></div>" },
-            "keep-alive": { template: "<div></div>" },
-          },
-        },
-      });
-
-      await nextTick();
-      await nextTick();
-      expect(webVitalsWrapper.vm.activePerformanceTab).toBe("web_vitals");
-      webVitalsWrapper.unmount();
-    });
-
     it("should default to overview for unknown routes", async () => {
       await router.push({ name: "unknownRoute" });
 
@@ -366,6 +319,25 @@ describe("AppPerformance.vue", () => {
       await nextTick();
       expect(newWrapper.vm.activePerformanceTab).toBe("overview");
       newWrapper.unmount();
+    });
+
+    it("keeps the compare-drawer keys when a tab change rewrites the route", async () => {
+      await router.replace({
+        name: "rumPerformanceSummary",
+        query: {
+          org_identifier: "test-org-123",
+          period: "15m",
+          cmp: "0.0.2..0.0.1",
+          cmpSvc: "storefront",
+        },
+      });
+      const routerPushSpy = vi.spyOn(router, "push");
+      wrapper.vm.activePerformanceTab = "web_vitals";
+      await nextTick();
+      expect(routerPushSpy).toHaveBeenCalledWith({
+        name: "rumPerformanceWebVitals",
+        query: expect.objectContaining({ cmp: "0.0.2..0.0.1", cmpSvc: "storefront" }),
+      });
     });
 
     it("should update route when active tab changes", async () => {
@@ -600,16 +572,6 @@ describe("AppPerformance.vue", () => {
   });
 
   describe("Lifecycle Hooks", () => {
-    // Note: loadDashboard has a bug - it references variablesData but never defines it
-    // This test is skipped until the component is fixed
-    it.skip("should have loadDashboard method available", async () => {
-      expect(wrapper.vm.loadDashboard).toBeInstanceOf(Function);
-
-      // Call loadDashboard and verify it executes without error
-      await wrapper.vm.loadDashboard();
-      expect(wrapper.vm.currentDashboardData.data).toBeDefined();
-    });
-
     it("should dispatch resize event on activation", async () => {
       vi.spyOn(window, "dispatchEvent");
 
@@ -665,6 +627,58 @@ describe("AppPerformance.vue", () => {
       expect(wrapper.vm.isVariablesChanged).toBe(true);
       expect(refreshButton().props("variant")).toBe("warning");
       expect(refreshTooltip().props("disabled")).toBe(false);
+    });
+  });
+
+  describe("version strip and no-version hint source", () => {
+    it("follows the Overview Service filter, not a stale dashboard variable", async () => {
+      wrapper.vm.onVariablesManagerReady({
+        committedVariablesData: { global: [{ name: "service", value: "storefront" }] },
+      });
+      await router.replace({
+        name: "rumPerformanceSummary",
+        query: { org_identifier: "test-org-123", period: "15m", ov_service: "shop-web" },
+      });
+      await nextTick();
+      expect(wrapper.vm.versionScope.app).toBe("shop-web");
+      expect(rumTabApps.performance).toBe("shop-web");
+    });
+    it("names no single app when the Overview filter holds several or none", async () => {
+      await router.replace({
+        name: "rumPerformanceSummary",
+        query: { org_identifier: "test-org-123", ov_service: ["shop-web", "storefront"] },
+      });
+      await nextTick();
+      expect(wrapper.vm.versionScope.app).toBe("");
+    });
+    it("reports its env and relative range for the hint in the version strip", async () => {
+      await router.replace({
+        name: "rumPerformanceSummary",
+        query: {
+          org_identifier: "test-org-123",
+          period: "15m",
+          ov_service: "shop-web",
+          ov_env: "prod",
+        },
+      });
+      await nextTick();
+      expect({ ...rumHintContext }).toEqual({ env: "prod", period: "15m" });
+      wrapper.vm.selectedDate = {
+        valueType: "absolute",
+        startTime: 1,
+        endTime: 2,
+        relativeTimePeriod: null,
+      };
+      await nextTick();
+      expect(rumHintContext.period).toBe("");
+    });
+    it("reads the dashboard variable on a dashboard tab", async () => {
+      wrapper.vm.onVariablesManagerReady({
+        committedVariablesData: { global: [{ name: "service", value: "storefront" }] },
+      });
+      wrapper.vm.activePerformanceTab = "web_vitals";
+      await nextTick();
+      expect(wrapper.vm.versionScope.app).toBe("storefront");
     });
   });
 });

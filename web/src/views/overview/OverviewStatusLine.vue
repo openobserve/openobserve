@@ -22,31 +22,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <span class="font-medium" :class="look.tone" data-test="overview-status-text">{{
       headline
     }}</span>
-    <template v-for="item in status.items" :key="item.key">
-      <span class="text-text-secondary" aria-hidden="true">{{ raw("·") }}</span>
-      <OButton
-        variant="ghost-primary"
-        size="xs"
-        :data-test="`overview-status-item-${item.key}`"
-        @click="emit('select', item.key)"
-      >
-        {{ t(`overview.status.items.${item.key}`, { count: item.count }, item.count) }}
-      </OButton>
-    </template>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed } from "vue";
-import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
-import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
-import type { AttentionKey, OverviewStatus, OverviewStatusKind } from "./overviewFormat";
+import { useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
+import type { OverviewStatus, OverviewStatusKind } from "./overviewFormat";
 
 const props = defineProps<{ status: OverviewStatus }>();
-
-const emit = defineEmits<{ select: [key: AttentionKey] }>();
 
 const { t } = useI18nTyped();
 
@@ -70,6 +56,5 @@ const HEADLINES: Record<OverviewStatusKind, I18nKey> = {
 
 const look = computed(() => LOOKS[props.status.kind]);
 
-// the counts are in unlike units, so they stay on the items and are never summed into the headline
 const headline = computed<I18nText>(() => t(HEADLINES[props.status.kind]));
 </script>

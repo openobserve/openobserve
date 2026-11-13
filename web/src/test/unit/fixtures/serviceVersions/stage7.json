@@ -1,0 +1,1613 @@
+{
+  "compare_e2": {
+    "aliases_applied": [],
+    "arms": {
+      "a": {
+        "basis": "fine",
+        "coverage": "ok",
+        "deploy_key": "dk-4",
+        "end_time": 1794335580000000,
+        "first_seen": 1794335300041322,
+        "has_rollup": true,
+        "image": null,
+        "image_ref": null,
+        "last_seen": 1794335509917355,
+        "signals": {
+          "rum": true,
+          "traces": false
+        },
+        "start_time": 1794335330000000,
+        "traffic_share": null,
+        "version": "0.0.2",
+        "version_key": "vk-4"
+      },
+      "b": {
+        "basis": "fine",
+        "coverage": "ok",
+        "end_time": 1794335300000000,
+        "first_seen": 1794335200041322,
+        "has_rollup": true,
+        "image": null,
+        "image_ref": null,
+        "last_seen": 1794335299917355,
+        "signals": {
+          "rum": true,
+          "traces": false
+        },
+        "start_time": 1794335200041322,
+        "traffic_share": null,
+        "version": "0.0.1",
+        "where_key": "env:prod"
+      }
+    },
+    "baseline_reason": {
+      "deploy_key": "dk-4"
+    },
+    "baseline_rule": "previous",
+    "deploy_key": "dk-4",
+    "env": "prod",
+    "inp_targets": {
+      "error": null,
+      "reason": null,
+      "rows": [
+        {
+          "a": {
+            "n": 2000,
+            "p75_ms": 258.5489777218679
+          },
+          "b": {
+            "n": 800,
+            "p75_ms": 220.3197303970499
+          },
+          "page": "/pricing",
+          "target": "button#plan-toggle"
+        },
+        {
+          "a": {
+            "n": 2000,
+            "p75_ms": 184.02540356483058
+          },
+          "b": {
+            "n": 800,
+            "p75_ms": 156.8152682592586
+          },
+          "page": "/docs/:id",
+          "target": "input#search"
+        },
+        {
+          "a": {
+            "n": 2000,
+            "p75_ms": 128.388626697638
+          },
+          "b": {
+            "n": 800,
+            "p75_ms": 109.40498728445999
+          },
+          "page": "/",
+          "target": "a.nav-link"
+        }
+      ],
+      "status": "ok",
+      "truncated": false
+    },
+    "live_verdict": {
+      "baseline": {
+        "env": null,
+        "image": null,
+        "initial_image": null,
+        "initial_rule": "none",
+        "initial_version": null,
+        "rule": "previous",
+        "switched_at": null,
+        "traffic_share": null,
+        "version": "0.0.1",
+        "version_images": 0,
+        "where_key": "env:prod"
+      },
+      "checks_done": 5,
+      "deploy": {
+        "at": 1794335300000000,
+        "from_image": null,
+        "from_version": "0.0.1",
+        "kind": "deploy"
+      },
+      "deploy_key": "dk-4",
+      "env": "prod",
+      "env_source": "rum",
+      "frozen_at": null,
+      "headline": {
+        "base": 178.69199660606063,
+        "ci_kind": "histogram_band",
+        "hi": 46.474957722496214,
+        "lo": 22.949193590382578,
+        "metric": "inp_p75",
+        "new": 213.40407226250002,
+        "unit": "ms"
+      },
+      "image": null,
+      "metrics": [],
+      "needs": {
+        "have": null,
+        "metric": null,
+        "need": null
+      },
+      "new_error_sample": null,
+      "new_error_types": 0,
+      "reason": null,
+      "reason_code": "new_error_types",
+      "recheck": {
+        "at": null,
+        "verdict": null
+      },
+      "regions": [
+        {
+          "cluster": "svcver-s10-golden7",
+          "verdict": "regressed"
+        }
+      ],
+      "restricted": false,
+      "rollback_outcome": null,
+      "sample": {
+        "n_base": 2400,
+        "n_new": 6000,
+        "since": 1794335330000000
+      },
+      "second": {
+        "base": null,
+        "metric": null,
+        "new": null,
+        "unit": "count"
+      },
+      "service": "storefront",
+      "signal": "rum",
+      "state": "evaluating",
+      "verdict": "regressed",
+      "verdict_key": "live",
+      "version": "0.0.2",
+      "version_images": 0,
+      "version_key": "vk-4",
+      "where_key": "env:prod",
+      "windows": {
+        "a": {
+          "end_time": 1794335632874047,
+          "start_time": 1794335330000000
+        },
+        "b": null
+      }
+    },
+    "mode": "sequential",
+    "no_env": false,
+    "notes": [],
+    "pages": {
+      "error": null,
+      "reason": null,
+      "rows": [
+        {
+          "cls_p75": {
+            "a": 0.033171863425806455,
+            "b": 0.120685346250646,
+            "ci_kind": "histogram_band",
+            "delta": -0.08751348282483955,
+            "hi": -0.05840260406000789,
+            "insufficient": false,
+            "lo": -0.1166243615896712,
+            "reason": null,
+            "straddles_zero": false
+          },
+          "inp_p75": {
+            "a": 184.63428879785332,
+            "b": 158.4304536470588,
+            "ci_kind": "histogram_band",
+            "delta": 26.203835150794507,
+            "hi": 91.11412532701439,
+            "insufficient": false,
+            "lo": -38.70645502542538,
+            "reason": null,
+            "straddles_zero": true
+          },
+          "lcp_p75": {
+            "a": 1.6756212194893112,
+            "b": 2.016210327804878,
+            "ci_kind": "histogram_band",
+            "delta": -0.34058910831556677,
+            "hi": 0.3579316878139529,
+            "insufficient": false,
+            "lo": -1.0391099044450864,
+            "reason": null,
+            "straddles_zero": true
+          },
+          "new_error_types": 0,
+          "page": "/docs/:id",
+          "views": {
+            "a": 1995,
+            "b": 799
+          },
+          "worst": {
+            "delta": -0.7251376040558123,
+            "metric": "cls_p75"
+          }
+        },
+        {
+          "cls_p75": {
+            "a": 0.033171863425806455,
+            "b": 0.12085616569109948,
+            "ci_kind": "histogram_band",
+            "delta": -0.08768430226529303,
+            "hi": -0.05854110324694726,
+            "insufficient": false,
+            "lo": -0.1168275012836388,
+            "reason": null,
+            "straddles_zero": false
+          },
+          "inp_p75": {
+            "a": 131.34048427586208,
+            "b": 109.1432787037037,
+            "ci_kind": "histogram_band",
+            "delta": 22.197205572158367,
+            "hi": 67.69844456986581,
+            "insufficient": false,
+            "lo": -23.304033425549076,
+            "reason": null,
+            "straddles_zero": true
+          },
+          "lcp_p75": {
+            "a": 1.6764889983333333,
+            "b": 2.019742513604336,
+            "ci_kind": "histogram_band",
+            "delta": -0.3432535152710025,
+            "hi": 0.3560997854748119,
+            "insufficient": false,
+            "lo": -1.042606816016817,
+            "reason": null,
+            "straddles_zero": true
+          },
+          "new_error_types": 0,
+          "page": "/",
+          "views": {
+            "a": 1992,
+            "b": 797
+          },
+          "worst": {
+            "delta": -0.7255260976043905,
+            "metric": "cls_p75"
+          }
+        }
+      ],
+      "status": "ok"
+    },
+    "rum": {
+      "cls_p75": {
+        "a": 0.033171863425806455,
+        "b": 0.12079873117897481,
+        "band_a": "good",
+        "band_b": "needs_improvement",
+        "band_crossed": true,
+        "ci_kind": "histogram_band",
+        "delta": -0.08762686775316836,
+        "hi": -0.08300774991502492,
+        "insufficient": false,
+        "lo": -0.09224598559131181,
+        "straddles_zero": false
+      },
+      "error_detail": {
+        "reason": null,
+        "status": "ok"
+      },
+      "error_types": {
+        "early": false,
+        "fixed": [],
+        "insufficient": false,
+        "introduced": [
+          {
+            "count": 300,
+            "error_message": "pricingTable is undefined",
+            "error_type": "TypeError",
+            "fingerprint": "b2df1feb9bf8f7643d483c63ebf4374c",
+            "page": "/pricing",
+            "sample_error_id": "bdf45da350256ed0",
+            "sample_ts": 1794335579132232
+          }
+        ],
+        "shared": [
+          {
+            "count_a": 300,
+            "count_b": 240,
+            "delta": 60,
+            "error_message": "Script error.",
+            "error_type": "TypeError",
+            "fingerprint": "6ef2d42105feaa7d346817b72bca6b4f"
+          }
+        ]
+      },
+      "errors": {
+        "a": 600,
+        "b": 240
+      },
+      "inp_p75": {
+        "a": 213.40407226250002,
+        "b": 178.69199660606063,
+        "band_a": "needs_improvement",
+        "band_b": "good",
+        "band_crossed": true,
+        "ci_kind": "histogram_band",
+        "delta": 34.712075656439396,
+        "hi": 46.474957722496214,
+        "insufficient": false,
+        "lo": 22.949193590382578,
+        "straddles_zero": false
+      },
+      "insufficient": false,
+      "lcp_p75": {
+        "a": 1.676289737929393,
+        "b": 2.0190754296014495,
+        "band_a": "good",
+        "band_b": "good",
+        "band_crossed": false,
+        "ci_kind": "histogram_band",
+        "delta": -0.3427856916720564,
+        "hi": -0.23192473664613117,
+        "insufficient": false,
+        "lo": -0.4536466466979817,
+        "straddles_zero": false
+      },
+      "reason": null,
+      "session_windows": {
+        "a": 6005,
+        "b": 2401
+      },
+      "status": "complete",
+      "views": {
+        "a": 6001,
+        "b": 2402
+      }
+    },
+    "rum_breakdown": {
+      "dims": {
+        "browser": {
+          "reason": null,
+          "status": "ok",
+          "values": [
+            {
+              "a": {
+                "error_views": 201,
+                "views": 2011
+              },
+              "b": {
+                "error_views": 80,
+                "views": 807
+              },
+              "cls_p75": {
+                "a": 0.03319972986653323,
+                "b": 0.1218249374481268,
+                "ci_kind": "sketch_band",
+                "delta": -0.08862520758159355,
+                "hi": -0.08707496090844695,
+                "insufficient": false,
+                "lo": -0.09017545425474015,
+                "reason": null,
+                "straddles_zero": false
+              },
+              "inp_p75": {
+                "a": 258.5489777218679,
+                "b": 220.3197303970499,
+                "ci_kind": "sketch_band",
+                "delta": 38.22924732481798,
+                "hi": 43.017934406007164,
+                "insufficient": false,
+                "lo": 33.44056024362881,
+                "reason": null,
+                "straddles_zero": false
+              },
+              "lcp_p75": {
+                "a": 1.6609535575144478,
+                "b": 2.0287067818024176,
+                "ci_kind": "sketch_band",
+                "delta": -0.3677532242879698,
+                "hi": -0.3308566208948011,
+                "insufficient": false,
+                "lo": -0.4046498276811385,
+                "reason": null,
+                "straddles_zero": false
+              },
+              "value": "Chrome"
+            }
+          ]
+        },
+        "country": {
+          "reason": "field_absent",
+          "status": "insufficient",
+          "values": []
+        }
+      },
+      "error": null,
+      "reason": null,
+      "status": "ok",
+      "truncated": false
+    },
+    "rum_series": {
+      "a": {
+        "cls_p75": {
+          "floor": 500,
+          "n": 6000,
+          "points": [
+            {
+              "n": 240,
+              "t": 1794335280000000,
+              "value": 0.03314547010540541
+            }
+          ],
+          "reason": null,
+          "status": "ok",
+          "value": 0.033171863425806455
+        },
+        "end_time": 1794335580000000,
+        "inp_p75": {
+          "floor": 500,
+          "n": 6000,
+          "points": [
+            {
+              "n": 240,
+              "t": 1794335280000000,
+              "value": 212.98613893333334
+            }
+          ],
+          "reason": null,
+          "status": "ok",
+          "value": 213.40407226250002
+        },
+        "lcp_p75": {
+          "floor": 500,
+          "n": 6000,
+          "points": [
+            {
+              "n": 240,
+              "t": 1794335280000000,
+              "value": 1.6760368511881187
+            }
+          ],
+          "reason": null,
+          "status": "ok",
+          "value": 1.676289737929393
+        },
+        "start_time": 1794335330000000,
+        "version": "0.0.2",
+        "where_key": "env:prod"
+      },
+      "b": {
+        "cls_p75": {
+          "floor": 500,
+          "n": 2400,
+          "points": [
+            {
+              "n": 480,
+              "t": 1794335160000000,
+              "value": 0.12073934244347827
+            }
+          ],
+          "reason": null,
+          "status": "ok",
+          "value": 0.12079873117897481
+        },
+        "end_time": 1794335300000000,
+        "inp_p75": {
+          "floor": 500,
+          "n": 2400,
+          "points": [
+            {
+              "n": 480,
+              "t": 1794335160000000,
+              "value": 178.71527
+            }
+          ],
+          "reason": null,
+          "status": "ok",
+          "value": 178.69199660606063
+        },
+        "lcp_p75": {
+          "floor": 500,
+          "n": 2400,
+          "points": [
+            {
+              "n": 480,
+              "t": 1794335160000000,
+              "value": 2.017176905675676
+            }
+          ],
+          "reason": null,
+          "status": "ok",
+          "value": 2.0190754296014495
+        },
+        "start_time": 1794335200041322,
+        "version": "0.0.1",
+        "where_key": "env:prod"
+      },
+      "error": null,
+      "interval_secs": 60,
+      "reason": null,
+      "status": "ok",
+      "units": {
+        "cls_p75": "unitless",
+        "inp_p75": "ms",
+        "lcp_p75": "s"
+      }
+    },
+    "service": "storefront",
+    "stored_verdict": {
+      "baseline": {
+        "env": "prod",
+        "image": null,
+        "initial_image": null,
+        "initial_rule": "previous",
+        "initial_version": "0.0.1",
+        "rule": "previous",
+        "switched_at": null,
+        "traffic_share": null,
+        "version": "0.0.1",
+        "version_images": 0,
+        "where_key": "env:prod"
+      },
+      "checks_done": 4,
+      "deploy": {
+        "at": 1794335300000000,
+        "from_image": null,
+        "from_version": "0.0.1",
+        "kind": "deploy"
+      },
+      "deploy_key": "dk-4",
+      "env": "prod",
+      "env_source": "rum",
+      "frozen_at": null,
+      "headline": {
+        "base": 178.69199660606063,
+        "ci_kind": "histogram_band",
+        "hi": 46.48334711588517,
+        "lo": 22.957094281244014,
+        "metric": "inp_p75",
+        "new": 213.41221730462522,
+        "unit": "ms"
+      },
+      "image": null,
+      "metrics": [
+        {
+          "badge": "same",
+          "band_base": null,
+          "band_new": null,
+          "base_value": 0.12079873117897481,
+          "ci_kind": "histogram_band",
+          "delta": -0.08762733657354996,
+          "hi": -0.08300823280001797,
+          "lo": -0.09224644034708193,
+          "metric": "cls_p75",
+          "n_base": 2400,
+          "n_new": 6720,
+          "new_value": 0.03317139460542486,
+          "updated_at": 1794335580000000,
+          "verdict_key": "vd-3"
+        },
+        {
+          "badge": "possible",
+          "band_base": null,
+          "band_new": null,
+          "base_value": 178.69199660606063,
+          "ci_kind": "histogram_band",
+          "delta": 34.72022069856459,
+          "hi": 46.48334711588517,
+          "lo": 22.957094281244014,
+          "metric": "inp_p75",
+          "n_base": 2400,
+          "n_new": 6720,
+          "new_value": 213.41221730462522,
+          "updated_at": 1794335580000000,
+          "verdict_key": "vd-3"
+        }
+      ],
+      "needs": {
+        "have": null,
+        "metric": null,
+        "need": null
+      },
+      "new_error_sample": null,
+      "new_error_types": 0,
+      "reason": null,
+      "reason_code": "new_error_types",
+      "recheck": {
+        "at": null,
+        "verdict": null
+      },
+      "regions": [
+        {
+          "cluster": "svcver-s10-golden7",
+          "verdict": "regressed"
+        }
+      ],
+      "restricted": false,
+      "rollback_outcome": null,
+      "sample": {
+        "n_base": 2400,
+        "n_new": 6720,
+        "since": 1794335330000000
+      },
+      "second": {
+        "base": null,
+        "metric": null,
+        "new": null,
+        "unit": "count"
+      },
+      "service": "storefront",
+      "signal": "rum",
+      "state": "evaluating",
+      "verdict": "regressed",
+      "verdict_key": "vd-3",
+      "version": "0.0.2",
+      "version_images": 0,
+      "version_key": "vk-4",
+      "where_key": "env:prod",
+      "windows": {
+        "a": {
+          "end_time": 1794335580000000,
+          "start_time": 1794335330000000
+        },
+        "b": {
+          "end_time": 1794335300000000,
+          "start_time": 1794335050000000
+        }
+      }
+    },
+    "where_key": "env:prod"
+  },
+  "compare_e2_web": {
+    "aliases_applied": [],
+    "arms": {
+      "a": {
+        "basis": "fine",
+        "coverage": "ok",
+        "deploy_key": "dk-4",
+        "end_time": 1794335580000000,
+        "first_seen": 1794335300041322,
+        "has_rollup": true,
+        "image": null,
+        "image_ref": null,
+        "last_seen": 1794335509917355,
+        "signals": {
+          "rum": true,
+          "traces": false
+        },
+        "start_time": 1794335330000000,
+        "traffic_share": null,
+        "version": "0.0.2",
+        "version_key": "vk-4"
+      },
+      "b": {
+        "basis": "fine",
+        "coverage": "ok",
+        "end_time": 1794335300000000,
+        "first_seen": 1794335200041322,
+        "has_rollup": true,
+        "image": null,
+        "image_ref": null,
+        "last_seen": 1794335299917355,
+        "signals": {
+          "rum": true,
+          "traces": false
+        },
+        "start_time": 1794335200041322,
+        "traffic_share": null,
+        "version": "0.0.1",
+        "where_key": "env:prod"
+      }
+    },
+    "baseline_reason": {
+      "deploy_key": "dk-4"
+    },
+    "baseline_rule": "previous",
+    "deploy_key": "dk-4",
+    "env": "prod",
+    "inp_targets": {
+      "error": null,
+      "reason": null,
+      "rows": [],
+      "status": "ok",
+      "truncated": false
+    },
+    "live_verdict": {
+      "baseline": {
+        "env": null,
+        "image": null,
+        "initial_image": null,
+        "initial_rule": "none",
+        "initial_version": null,
+        "rule": "previous",
+        "switched_at": null,
+        "traffic_share": null,
+        "version": "0.0.1",
+        "version_images": 0,
+        "where_key": "env:prod"
+      },
+      "checks_done": 5,
+      "deploy": {
+        "at": 1794335300000000,
+        "from_image": null,
+        "from_version": "0.0.1",
+        "kind": "deploy"
+      },
+      "deploy_key": "dk-4",
+      "env": "prod",
+      "env_source": "rum",
+      "frozen_at": null,
+      "headline": {
+        "base": 178.69199660606063,
+        "ci_kind": "histogram_band",
+        "hi": 46.474957722496214,
+        "lo": 22.949193590382578,
+        "metric": "inp_p75",
+        "new": 213.40407226250002,
+        "unit": "ms"
+      },
+      "image": null,
+      "metrics": [],
+      "needs": {
+        "have": null,
+        "metric": null,
+        "need": null
+      },
+      "new_error_sample": null,
+      "new_error_types": 0,
+      "reason": null,
+      "reason_code": "new_error_types",
+      "recheck": {
+        "at": null,
+        "verdict": null
+      },
+      "regions": [
+        {
+          "cluster": "svcver-s10-golden7",
+          "verdict": "regressed"
+        }
+      ],
+      "restricted": false,
+      "rollback_outcome": null,
+      "sample": {
+        "n_base": 2400,
+        "n_new": 6000,
+        "since": 1794335330000000
+      },
+      "second": {
+        "base": null,
+        "metric": null,
+        "new": null,
+        "unit": "count"
+      },
+      "service": "storefront",
+      "signal": "rum",
+      "state": "evaluating",
+      "verdict": "regressed",
+      "verdict_key": "live",
+      "version": "0.0.2",
+      "version_images": 0,
+      "version_key": "vk-4",
+      "where_key": "env:prod",
+      "windows": {
+        "a": {
+          "end_time": 1794335633752305,
+          "start_time": 1794335330000000
+        },
+        "b": null
+      }
+    },
+    "mode": "sequential",
+    "no_env": false,
+    "notes": [],
+    "pages": {
+      "error": null,
+      "reason": null,
+      "rows": [],
+      "status": "ok"
+    },
+    "rum": {
+      "cls_p75": {
+        "a": 0.033171863425806455,
+        "b": 0.12079873117897481,
+        "band_a": "good",
+        "band_b": "needs_improvement",
+        "band_crossed": true,
+        "ci_kind": "histogram_band",
+        "delta": -0.08762686775316836,
+        "hi": -0.08300774991502492,
+        "insufficient": false,
+        "lo": -0.09224598559131181,
+        "straddles_zero": false
+      },
+      "error_detail": {
+        "reason": null,
+        "status": "ok"
+      },
+      "error_types": {
+        "early": false,
+        "fixed": [],
+        "insufficient": false,
+        "introduced": [
+          {
+            "count": 300,
+            "error_message": "pricingTable is undefined",
+            "error_type": "TypeError",
+            "fingerprint": "b2df1feb9bf8f7643d483c63ebf4374c",
+            "page": "/pricing",
+            "sample_error_id": "bdf45da350256ed0",
+            "sample_ts": 1794335579132232
+          }
+        ],
+        "shared": [
+          {
+            "count_a": 300,
+            "count_b": 240,
+            "delta": 60,
+            "error_message": "Script error.",
+            "error_type": "TypeError",
+            "fingerprint": "6ef2d42105feaa7d346817b72bca6b4f"
+          }
+        ]
+      },
+      "errors": {
+        "a": 600,
+        "b": 240
+      },
+      "inp_p75": {
+        "a": 213.40407226250002,
+        "b": 178.69199660606063,
+        "band_a": "needs_improvement",
+        "band_b": "good",
+        "band_crossed": true,
+        "ci_kind": "histogram_band",
+        "delta": 34.712075656439396,
+        "hi": 46.474957722496214,
+        "insufficient": false,
+        "lo": 22.949193590382578,
+        "straddles_zero": false
+      },
+      "insufficient": false,
+      "lcp_p75": {
+        "a": 1.676289737929393,
+        "b": 2.0190754296014495,
+        "band_a": "good",
+        "band_b": "good",
+        "band_crossed": false,
+        "ci_kind": "histogram_band",
+        "delta": -0.3427856916720564,
+        "hi": -0.23192473664613117,
+        "insufficient": false,
+        "lo": -0.4536466466979817,
+        "straddles_zero": false
+      },
+      "reason": null,
+      "session_windows": {
+        "a": 6005,
+        "b": 2401
+      },
+      "status": "complete",
+      "views": {
+        "a": 6001,
+        "b": 2402
+      }
+    },
+    "rum_breakdown": {
+      "dims": {
+        "browser": {
+          "reason": null,
+          "status": "ok",
+          "values": []
+        },
+        "country": {
+          "reason": "field_absent",
+          "status": "insufficient",
+          "values": []
+        }
+      },
+      "error": null,
+      "reason": null,
+      "status": "ok",
+      "truncated": false
+    },
+    "rum_series": {
+      "a": {
+        "cls_p75": {
+          "floor": 500,
+          "n": 6000,
+          "points": [
+            {
+              "n": 240,
+              "t": 1794335280000000,
+              "value": 0.03314547010540541
+            }
+          ],
+          "reason": null,
+          "status": "ok",
+          "value": 0.033171863425806455
+        },
+        "end_time": 1794335580000000,
+        "inp_p75": {
+          "floor": 500,
+          "n": 6000,
+          "points": [
+            {
+              "n": 240,
+              "t": 1794335280000000,
+              "value": 212.98613893333334
+            },
+            {
+              "n": 1440,
+              "t": 1794335340000000,
+              "value": 213.60809432089553
+            },
+            {
+              "n": 1440,
+              "t": 1794335400000000,
+              "value": 213.3596225576208
+            },
+            {
+              "n": 1440,
+              "t": 1794335460000000,
+              "value": 213.3596225576208
+            },
+            {
+              "n": 1440,
+              "t": 1794335520000000,
+              "value": 213.3596225576208
+            }
+          ],
+          "reason": null,
+          "status": "ok",
+          "value": 213.40407226250002
+        },
+        "lcp_p75": {
+          "floor": 500,
+          "n": 6000,
+          "points": [
+            {
+              "n": 240,
+              "t": 1794335280000000,
+              "value": 1.6760368511881187
+            }
+          ],
+          "reason": null,
+          "status": "ok",
+          "value": 1.676289737929393
+        },
+        "start_time": 1794335330000000,
+        "version": "0.0.2",
+        "where_key": "env:prod"
+      },
+      "b": {
+        "cls_p75": {
+          "floor": 500,
+          "n": 2400,
+          "points": [
+            {
+              "n": 480,
+              "t": 1794335160000000,
+              "value": 0.12073934244347827
+            }
+          ],
+          "reason": null,
+          "status": "ok",
+          "value": 0.12079873117897481
+        },
+        "end_time": 1794335300000000,
+        "inp_p75": {
+          "floor": 500,
+          "n": 2400,
+          "points": [
+            {
+              "n": 480,
+              "t": 1794335160000000,
+              "value": 178.71527
+            },
+            {
+              "n": 1440,
+              "t": 1794335220000000,
+              "value": 178.69980646979866
+            },
+            {
+              "n": 480,
+              "t": 1794335280000000,
+              "value": 178.64401022680414
+            }
+          ],
+          "reason": null,
+          "status": "ok",
+          "value": 178.69199660606063
+        },
+        "lcp_p75": {
+          "floor": 500,
+          "n": 2400,
+          "points": [
+            {
+              "n": 480,
+              "t": 1794335160000000,
+              "value": 2.017176905675676
+            }
+          ],
+          "reason": null,
+          "status": "ok",
+          "value": 2.0190754296014495
+        },
+        "start_time": 1794335200041322,
+        "version": "0.0.1",
+        "where_key": "env:prod"
+      },
+      "error": null,
+      "interval_secs": 60,
+      "reason": null,
+      "status": "ok",
+      "units": {
+        "cls_p75": "unitless",
+        "inp_p75": "ms",
+        "lcp_p75": "s"
+      }
+    },
+    "service": "storefront",
+    "stored_verdict": {
+      "baseline": {
+        "env": "prod",
+        "image": null,
+        "initial_image": null,
+        "initial_rule": "previous",
+        "initial_version": "0.0.1",
+        "rule": "previous",
+        "switched_at": null,
+        "traffic_share": null,
+        "version": "0.0.1",
+        "version_images": 0,
+        "where_key": "env:prod"
+      },
+      "checks_done": 4,
+      "deploy": {
+        "at": 1794335300000000,
+        "from_image": null,
+        "from_version": "0.0.1",
+        "kind": "deploy"
+      },
+      "deploy_key": "dk-4",
+      "env": "prod",
+      "env_source": "rum",
+      "frozen_at": null,
+      "headline": {
+        "base": 178.69199660606063,
+        "ci_kind": "histogram_band",
+        "hi": 46.48334711588517,
+        "lo": 22.957094281244014,
+        "metric": "inp_p75",
+        "new": 213.41221730462522,
+        "unit": "ms"
+      },
+      "image": null,
+      "metrics": [
+        {
+          "badge": "same",
+          "band_base": null,
+          "band_new": null,
+          "base_value": 0.12079873117897481,
+          "ci_kind": "histogram_band",
+          "delta": -0.08762733657354996,
+          "hi": -0.08300823280001797,
+          "lo": -0.09224644034708193,
+          "metric": "cls_p75",
+          "n_base": 2400,
+          "n_new": 6720,
+          "new_value": 0.03317139460542486,
+          "updated_at": 1794335580000000,
+          "verdict_key": "vd-3"
+        },
+        {
+          "badge": "same",
+          "band_base": null,
+          "band_new": null,
+          "base_value": 2.0190754296014495,
+          "ci_kind": "histogram_band",
+          "delta": -0.3427965796580868,
+          "hi": -0.2319359512717424,
+          "lo": -0.45365720804443116,
+          "metric": "lcp_p75",
+          "n_base": 2400,
+          "n_new": 6720,
+          "new_value": 1.6762788499433627,
+          "updated_at": 1794335580000000,
+          "verdict_key": "vd-3"
+        }
+      ],
+      "needs": {
+        "have": null,
+        "metric": null,
+        "need": null
+      },
+      "new_error_sample": null,
+      "new_error_types": 0,
+      "reason": null,
+      "reason_code": "new_error_types",
+      "recheck": {
+        "at": null,
+        "verdict": null
+      },
+      "regions": [
+        {
+          "cluster": "svcver-s10-golden7",
+          "verdict": "regressed"
+        }
+      ],
+      "restricted": false,
+      "rollback_outcome": null,
+      "sample": {
+        "n_base": 2400,
+        "n_new": 6720,
+        "since": 1794335330000000
+      },
+      "second": {
+        "base": null,
+        "metric": null,
+        "new": null,
+        "unit": "count"
+      },
+      "service": "storefront",
+      "signal": "rum",
+      "state": "evaluating",
+      "verdict": "regressed",
+      "verdict_key": "vd-3",
+      "version": "0.0.2",
+      "version_images": 0,
+      "version_key": "vk-4",
+      "where_key": "env:prod",
+      "windows": {
+        "a": {
+          "end_time": 1794335580000000,
+          "start_time": 1794335330000000
+        },
+        "b": {
+          "end_time": 1794335300000000,
+          "start_time": 1794335050000000
+        }
+      }
+    },
+    "traces": {
+      "endpoint_detail": {
+        "reason": null,
+        "status": "ok"
+      },
+      "endpoints": [],
+      "error_rate": {
+        "a": 0,
+        "b": 0,
+        "ci_kind": "variance",
+        "delta": 0,
+        "hi": 0,
+        "insufficient": true,
+        "lo": 0,
+        "straddles_zero": true
+      },
+      "insufficient": true,
+      "p95": {
+        "a": 0,
+        "b": 0,
+        "ci_kind": "variance",
+        "delta": 0,
+        "hi": 0,
+        "insufficient": true,
+        "lo": 0,
+        "straddles_zero": true
+      },
+      "p99": {
+        "a": 0,
+        "b": 0,
+        "ci_kind": "variance",
+        "delta": 0,
+        "hi": 0,
+        "insufficient": true,
+        "lo": 0,
+        "straddles_zero": true
+      },
+      "reason": "below_min_count",
+      "requests": {
+        "a": 0,
+        "b": 0,
+        "rate_a": 0,
+        "rate_b": 0
+      },
+      "status": "complete"
+    },
+    "where_key": "env:prod"
+  },
+  "deploys_rum": {
+    "deploys": [
+      {
+        "at": 1794335300000000,
+        "badge": "evaluating",
+        "deploy_key": "dk-4",
+        "env": "prod",
+        "env_source": "rum",
+        "from_image": null,
+        "from_version": "0.0.1",
+        "image": null,
+        "image_ref": null,
+        "kind": "deploy",
+        "no_env": false,
+        "overlaps_previous": false,
+        "previous_image": null,
+        "previous_last_seen": 1794335299917355,
+        "previous_version": "0.0.1",
+        "provisional": false,
+        "regions": ["svcver-s10-golden7"],
+        "signal_first_seen": {
+          "rum": 1794335300041322,
+          "traces": null
+        },
+        "verdict": {
+          "baseline": {
+            "env": "prod",
+            "image": null,
+            "initial_image": null,
+            "initial_rule": "previous",
+            "initial_version": "0.0.1",
+            "rule": "previous",
+            "switched_at": null,
+            "traffic_share": null,
+            "version": "0.0.1",
+            "version_images": 0,
+            "where_key": "env:prod"
+          },
+          "checks_done": 4,
+          "deploy": {
+            "at": 1794335300000000,
+            "from_image": null,
+            "from_version": "0.0.1",
+            "kind": "deploy"
+          },
+          "deploy_key": "dk-4",
+          "env": "prod",
+          "env_source": "rum",
+          "frozen_at": null,
+          "headline": {
+            "base": 178.69199660606063,
+            "ci_kind": "histogram_band",
+            "hi": 46.48334711588517,
+            "lo": 22.957094281244014,
+            "metric": "inp_p75",
+            "new": 213.41221730462522,
+            "unit": "ms"
+          },
+          "image": null,
+          "metrics": [
+            {
+              "badge": "same",
+              "band_base": null,
+              "band_new": null,
+              "base_value": 0.12079873117897481,
+              "ci_kind": "histogram_band",
+              "delta": -0.08762733657354996,
+              "hi": -0.08300823280001797,
+              "lo": -0.09224644034708193,
+              "metric": "cls_p75",
+              "n_base": 2400,
+              "n_new": 6720,
+              "new_value": 0.03317139460542486,
+              "updated_at": 1794335580000000,
+              "verdict_key": "vd-3"
+            },
+            {
+              "badge": "possible",
+              "band_base": null,
+              "band_new": null,
+              "base_value": 178.69199660606063,
+              "ci_kind": "histogram_band",
+              "delta": 34.72022069856459,
+              "hi": 46.48334711588517,
+              "lo": 22.957094281244014,
+              "metric": "inp_p75",
+              "n_base": 2400,
+              "n_new": 6720,
+              "new_value": 213.41221730462522,
+              "updated_at": 1794335580000000,
+              "verdict_key": "vd-3"
+            },
+            {
+              "badge": "same",
+              "band_base": null,
+              "band_new": null,
+              "base_value": 2.0190754296014495,
+              "ci_kind": "histogram_band",
+              "delta": -0.3427965796580868,
+              "hi": -0.2319359512717424,
+              "lo": -0.45365720804443116,
+              "metric": "lcp_p75",
+              "n_base": 2400,
+              "n_new": 6720,
+              "new_value": 1.6762788499433627,
+              "updated_at": 1794335580000000,
+              "verdict_key": "vd-3"
+            }
+          ],
+          "needs": {
+            "have": null,
+            "metric": null,
+            "need": null
+          },
+          "new_error_sample": null,
+          "new_error_types": 0,
+          "reason": null,
+          "reason_code": "new_error_types",
+          "recheck": {
+            "at": null,
+            "verdict": null
+          },
+          "regions": [
+            {
+              "cluster": "svcver-s10-golden7",
+              "verdict": "regressed"
+            }
+          ],
+          "restricted": false,
+          "rollback_outcome": null,
+          "sample": {
+            "n_base": 2400,
+            "n_new": 6720,
+            "since": 1794335330000000
+          },
+          "second": {
+            "base": null,
+            "metric": null,
+            "new": null,
+            "unit": "count"
+          },
+          "service": "storefront",
+          "signal": "rum",
+          "state": "evaluating",
+          "verdict": "regressed",
+          "verdict_key": "vd-3",
+          "version": "0.0.2",
+          "version_images": 0,
+          "version_key": "vk-4",
+          "where_key": "env:prod",
+          "windows": {
+            "a": {
+              "end_time": 1794335580000000,
+              "start_time": 1794335330000000
+            },
+            "b": {
+              "end_time": 1794335300000000,
+              "start_time": 1794335050000000
+            }
+          }
+        },
+        "version": "0.0.2",
+        "where_key": "env:prod"
+      }
+    ]
+  },
+  "envs": {
+    "can_edit": true,
+    "envs": [
+      {
+        "env": "prod",
+        "inferred": false,
+        "no_env": false,
+        "services": 3,
+        "sources": ["namespace", "rum"],
+        "versions": 5,
+        "wheres": 2
+      }
+    ],
+    "scope_counts": {
+      "cluster": 1,
+      "service": 1,
+      "where": 1
+    },
+    "scope_versions": {
+      "cluster": 2,
+      "service": 2,
+      "where": 2
+    }
+  },
+  "overrides": {
+    "overrides": [],
+    "total": 1
+  },
+  "services_rum": {
+    "envs": [
+      {
+        "env": "prod",
+        "no_env": false,
+        "where_keys": ["env:prod", "k8s:eu-a/shop-cloud-prod"]
+      }
+    ],
+    "registry_status": "ok",
+    "services": [
+      {
+        "active_version_keys": {
+          "0.0.1": "vk-6",
+          "0.0.2": "vk-4"
+        },
+        "active_versions": ["0.0.2", "0.0.1"],
+        "current_compare_disabled": false,
+        "current_compare_disabled_reason": null,
+        "current_image": null,
+        "current_image_ref": null,
+        "current_version": "0.0.2",
+        "current_version_images": 0,
+        "current_version_source": "rum.version",
+        "env": "prod",
+        "env_inferred": "prod",
+        "env_inferred_source": "rum",
+        "env_is_inferred": false,
+        "env_source": "rum",
+        "env_source_value": "env=prod",
+        "envs": ["prod"],
+        "last_good_image": null,
+        "last_good_version": null,
+        "newest_compare_disabled": false,
+        "newest_compare_disabled_reason": null,
+        "newest_first_seen": 1794335300041322,
+        "newest_image": null,
+        "newest_image_ref": null,
+        "newest_verdict": {
+          "baseline": {
+            "env": "prod",
+            "image": null,
+            "initial_image": null,
+            "initial_rule": "previous",
+            "initial_version": "0.0.1",
+            "rule": "previous",
+            "switched_at": null,
+            "traffic_share": null,
+            "version": "0.0.1",
+            "version_images": 0,
+            "where_key": "env:prod"
+          },
+          "checks_done": 4,
+          "deploy": {
+            "at": 1794335300000000,
+            "from_image": null,
+            "from_version": "0.0.1",
+            "kind": "deploy"
+          },
+          "deploy_key": "dk-4",
+          "env": "prod",
+          "env_source": "rum",
+          "frozen_at": null,
+          "headline": {
+            "base": 178.69199660606063,
+            "ci_kind": "histogram_band",
+            "hi": 46.48334711588517,
+            "lo": 22.957094281244014,
+            "metric": "inp_p75",
+            "new": 213.41221730462522,
+            "unit": "ms"
+          },
+          "image": null,
+          "metrics": [
+            {
+              "badge": "same",
+              "band_base": null,
+              "band_new": null,
+              "base_value": 0.12079873117897481,
+              "ci_kind": "histogram_band",
+              "delta": -0.08762733657354996,
+              "hi": -0.08300823280001797,
+              "lo": -0.09224644034708193,
+              "metric": "cls_p75",
+              "n_base": 2400,
+              "n_new": 6720,
+              "new_value": 0.03317139460542486,
+              "updated_at": 1794335580000000,
+              "verdict_key": "vd-3"
+            },
+            {
+              "badge": "same",
+              "band_base": null,
+              "band_new": null,
+              "base_value": 2.0190754296014495,
+              "ci_kind": "histogram_band",
+              "delta": -0.3427965796580868,
+              "hi": -0.2319359512717424,
+              "lo": -0.45365720804443116,
+              "metric": "lcp_p75",
+              "n_base": 2400,
+              "n_new": 6720,
+              "new_value": 1.6762788499433627,
+              "updated_at": 1794335580000000,
+              "verdict_key": "vd-3"
+            }
+          ],
+          "needs": {
+            "have": null,
+            "metric": null,
+            "need": null
+          },
+          "new_error_sample": null,
+          "new_error_types": 0,
+          "reason": null,
+          "reason_code": "new_error_types",
+          "recheck": {
+            "at": null,
+            "verdict": null
+          },
+          "regions": [
+            {
+              "cluster": "svcver-s10-golden7",
+              "verdict": "regressed"
+            }
+          ],
+          "restricted": false,
+          "rollback_outcome": null,
+          "sample": {
+            "n_base": 2400,
+            "n_new": 6720,
+            "since": 1794335330000000
+          },
+          "second": {
+            "base": null,
+            "metric": null,
+            "new": null,
+            "unit": "count"
+          },
+          "service": "storefront",
+          "signal": "rum",
+          "state": "evaluating",
+          "verdict": "regressed",
+          "verdict_key": "vd-3",
+          "version": "0.0.2",
+          "version_images": 0,
+          "version_key": "vk-4",
+          "where_key": "env:prod",
+          "windows": {
+            "a": {
+              "end_time": 1794335580000000,
+              "start_time": 1794335330000000
+            },
+            "b": {
+              "end_time": 1794335300000000,
+              "start_time": 1794335050000000
+            }
+          }
+        },
+        "newest_version": "0.0.2",
+        "newest_version_images": 0,
+        "newest_version_key": "vk-4",
+        "newest_version_source": "rum.version",
+        "no_env": false,
+        "override_key": null,
+        "previous_image": null,
+        "previous_version": "0.0.1",
+        "scope_key": "sk-2",
+        "service": "storefront",
+        "signals": ["rum"],
+        "tracking_started": true,
+        "verdict_counts": {
+          "regressed": 1
+        },
+        "where": {
+          "k8s_cluster": "",
+          "k8s_namespace": "",
+          "kind": "env"
+        },
+        "where_key": "env:prod"
+      }
+    ],
+    "stripped_versions": 0,
+    "tracking": {
+      "epoch": 1794335200000000,
+      "warmup_ends_at": 1794335280000000
+    },
+    "verdict_counts": {
+      "regressed": 1
+    },
+    "verdict_status": "ok"
+  },
+  "unresolved": {
+    "no_version": [
+      {
+        "env": "prod",
+        "service": "shop-web",
+        "signals": ["rum"],
+        "where_key": "env:prod"
+      }
+    ],
+    "placeholder_names": []
+  }
+}

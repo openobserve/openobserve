@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     t("settings.correlation.service")
                   }}</span>
                   {{ t("settings.serviceIdentitySetup.fieldAlias") }}
-                  <span class="text-xs opacity-60"
+                  <span class="text-text-secondary text-xs"
                     >({{ detectedServiceFields.length + unseenServiceFields.length }})</span
                   >
                 </template>
@@ -438,7 +438,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon name="check-circle" size="sm" />
             <div class="text-compact min-w-0 flex-1 leading-tight">
               {{ t("settings.serviceIdentitySetup.workloadDetectedUsingFields") }}
-              <span class="text-xs opacity-60">({{ trackedAliasIds.length }})</span>
+              <span class="text-text-secondary text-xs">({{ trackedAliasIds.length }})</span>
             </div>
             <OIcon
               :name="trackedAliasExpanded ? 'keyboard-arrow-up' : 'keyboard-arrow-down'"
@@ -635,8 +635,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :key="val"
                     class="text-2xs box-border inline-flex h-5.5 max-w-[calc(50%-0.25rem)] cursor-pointer items-center gap-1 rounded-full border px-2 py-0.5 transition-opacity hover:opacity-70"
                     :class="card.theme.pill"
-                    @click.stop="openInsightDialogByIdx(val, idx)"
-                    ><OTruncatedText>{{ val }}</OTruncatedText
+                    :data-test="valuePillTestId(card.dim, val)"
+                    @click.stop="openInsightDialogForCard(val, card)"
+                    ><ServiceNameLabel
+                      v-if="isServiceGroup(card.dim)"
+                      layout="inline"
+                      v-bind="serviceValueLabel(val)" /><OTruncatedText v-else>{{
+                      val
+                    }}</OTruncatedText
                     ><span v-if="card.dim" class="ms-0.5 inline-flex shrink-0 gap-0.5"
                       ><span
                         v-for="st in getValueStreamTypes(card.dim.group_id, val)"
@@ -671,11 +677,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :key="val"
                         class="text-2xs inline-flex max-w-full min-w-0 cursor-pointer items-center gap-1 rounded-full border px-2 py-0.5 transition-opacity hover:opacity-70"
                         :class="card.theme.pill"
+                        :data-test="valuePillTestId(card.dim, val)"
                         @click.stop="
-                          openInsightDialogByIdx(val, idx);
+                          openInsightDialogForCard(val, card);
                           dimCardMoreMenuOpen[idx] = false;
                         "
-                        ><OTruncatedText>{{ val }}</OTruncatedText
+                        ><ServiceNameLabel
+                          v-if="isServiceGroup(card.dim)"
+                          layout="inline"
+                          v-bind="serviceValueLabel(val)" /><OTruncatedText v-else>{{
+                          val
+                        }}</OTruncatedText
                         ><span v-if="card.dim" class="ms-0.5 inline-flex shrink-0 gap-0.5"
                           ><span
                             v-for="st in getValueStreamTypes(card.dim.group_id, val)"
@@ -763,6 +775,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <ODrawer
           data-test="service-identity-setup-insight-drawer"
           v-model:open="insightDialogOpen"
+          :title="insightDrawerName"
           :width="insightPanelWidthPct"
         >
           <!-- #header kept: first line combines plain subtitle text with an inline theme-colored badge
@@ -770,29 +783,62 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                Cannot be expressed cleanly with title + sub-title props alone. -->
           <template #header>
             <div class="min-w-0 flex-1">
-              <div class="flex items-center text-base">
+              <div
+                class="flex items-center text-base"
+                data-test="service-identity-setup-insight-header"
+              >
                 {{ insightData.subtitle }}
                 <span
                   :class="[
                     'rounded-default ms-2 inline-block px-2 py-0.5 font-semibold',
                     'text-status-info-text bg-status-info-bg',
                   ]"
+                  data-test="service-identity-setup-insight-title"
                 >
-                  {{ insightData.title }}
+                  {{ insightTitle }}
                   <OTooltip
-                    v-if="insightData.title.length > 25"
-                    :content="raw(insightData.title)"
+                    v-if="insightTitle.length > 25"
+                    :content="raw(insightTitle)"
                     side="top"
                   />
                 </span>
               </div>
               <div
-                v-if="!(insightData as any).isCardLevel && insightData.coverage !== null"
+                v-if="insightServiceDisplay?.detected"
+                class="text-text-secondary mt-0.5 text-xs"
+                data-test="service-identity-setup-insight-detected"
+              >
+                {{ t("serviceVersions.names.detectedAs", { name: raw(insightDialogValue) }) }}
+              </div>
+              <div
+                v-if="
+                  !(insightData as any).isCardLevel &&
+                  (insightData.coverage !== null || coverageLineState(insightData) !== 'ready')
+                "
                 class="mt-1 flex items-center gap-1.5 text-xs"
                 :class="'text-text-secondary'"
               >
-                <OIcon name="verified" size="xs" class="text-status-positive" />
+                <OIcon
+                  v-if="coverageLineState(insightData) !== 'failed'"
+                  name="verified"
+                  size="xs"
+                  class="text-status-positive"
+                />
+                <OSkeleton
+                  v-if="coverageLineState(insightData) === 'loading'"
+                  type="text"
+                  animation="none"
+                  class="h-3 w-28"
+                  data-test="service-identity-setup-insight-coverage-loading"
+                />
                 <span
+                  v-else-if="coverageLineState(insightData) === 'failed'"
+                  role="alert"
+                  class="text-status-error-text"
+                  data-test="service-identity-setup-insight-coverage-failed"
+                  >{{ t("settings.serviceIdentitySetup.serviceCountFailed") }}</span
+                >
+                <span v-else data-test="service-identity-setup-insight-coverage"
                   >{{
                     t("settings.serviceIdentitySetup.percentOfServices", {
                       coverage: insightData.coverage,
@@ -812,7 +858,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 !(insightData as any).isCardLevel && (insightData as any).streamDetails?.length > 0
               "
             >
-              <div class="mb-3 shrink-0">
+              <div class="mb-3 shrink-0" data-test="service-identity-setup-insight-sources">
                 <div class="text-2xs text-text-label mb-2 font-medium tracking-wide">
                   {{ t("settings.serviceIdentitySetup.streamSources") }}
                 </div>
@@ -892,20 +938,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               "
             >
               <!-- Explanation -->
-              <div
-                class="text-2xs rounded-default mb-2 flex shrink-0 items-center gap-1.5 px-2.5 py-1.5"
-                :class="'bg-status-info-bg text-text-secondary'"
-              >
-                <OIcon name="info" size="xs" />
-                <span
+              <InfoNotice class="mb-2 shrink-0" data-test="service-identity-setup-insight-notice">
+                <span data-test="service-identity-setup-insight-explain"
                   >{{ t("settings.serviceIdentitySetup.relatedValuesPre") }}
                   <strong>{{ formatDimLabels((insightData as any).relatedDimensions) }}</strong>
                   {{ t("settings.serviceIdentitySetup.valuesCoOccurringWith") }}
-                  <strong>{{ insightData.title }}</strong
+                  <strong>{{ insightTitle }}</strong
                   >.</span
                 >
-              </div>
-              <div class="flex min-h-0 flex-1 py-3">
+              </InfoNotice>
+              <div
+                class="flex min-h-0 flex-1 py-3"
+                data-test="service-identity-setup-insight-related"
+              >
                 <div
                   v-for="(dim, dimIdx) in insightRelatedDimensions"
                   :key="dim.label + dimIdx"
@@ -1145,10 +1190,13 @@ import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRenderer.vue";
 import serviceStreamsService from "@/services/service_streams";
 import { serviceStreamKeys } from "@/services/service_streams.querykeys";
+import { servicesListQuery } from "@/services/service_streams.queries";
+import { bySignalOrder, serviceNameCount, serviceValueCount } from "@/utils/serviceCount";
 import { queryClient } from "@/composables/query/queryClient";
 import { clearIdentityConfigCache } from "@/utils/identityConfig";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import InfoNotice from "@/components/shared/InfoNotice.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -1172,6 +1220,9 @@ import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+import ServiceNameLabel from "@/components/shared/ServiceNameLabel.vue";
+import { labelPropsForKey, showsDetectedAs } from "@/types/serviceRef";
+import { dimensionLabel } from "@/utils/dimensionLabels";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1179,6 +1230,8 @@ interface SuggestedConfig {
   distinguish_by: string[];
   reason: string;
 }
+
+type CountState = "loading" | "ready" | "failed";
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -1209,6 +1262,14 @@ const suggestionDismissed = ref(false);
 
 /** Detailed analytics data mapped by dimension name */
 const dimensionAnalytics = ref<Record<string, DimensionAnalytics>>({});
+
+/** Trace display name per `service` value; counts, coverage and drill-downs stay keyed by value. */
+const valueDisplay = ref<Record<string, string>>({});
+// Discovered Services counts the same list by display name; the service card's denominator must agree with it.
+const discoveredServiceCount = ref<number | null>(null);
+const discoveredServices = ref<Parameters<typeof serviceValueCount>[0]>([]);
+const discoveredServiceCountState = ref<CountState>("loading");
+let discoveredServiceCountRead = 0;
 
 /** Section 2: pill-based field configuration */
 const addingToEnv = ref<string>("");
@@ -1570,22 +1631,64 @@ const dimCards = computed(() => {
     .filter((c) => c.count > 0 || c.values.length > 0);
 });
 
-/** Open insight dialog by card index */
-function openInsightDialogByIdx(value: string, idx: number) {
-  const levels: Array<"primary" | "secondary" | "tertiary"> = ["primary", "secondary", "tertiary"];
-  openInsightDialog(value, levels[idx] ?? "tertiary");
+function isServiceGroup(group?: { group_id: string } | null): boolean {
+  return group?.group_id === "service";
+}
+
+/** Services every dimension's coverage is out of: the discovered-services count, the one the list and tiles show. */
+function serviceTotal(): number | null {
+  return discoveredServiceCountState.value === "ready" ? discoveredServiceCount.value : null;
+}
+
+/** Discovered services carrying one value, from the same list as the total so the share never passes 100%. */
+function valueServiceCount(group: FoundGroup | null | undefined, value: string): number | null {
+  if (!group || discoveredServiceCountState.value !== "ready") return null;
+  return serviceValueCount(discoveredServices.value, group.group_id, value);
+}
+
+function serviceTotalState(group: FoundGroup | null | undefined): CountState {
+  return group ? discoveredServiceCountState.value : "ready";
+}
+
+/** Which coverage line an insight shows: a skeleton while its total loads, the failed message, or the counts. */
+function coverageLineState(insight: { totalState?: CountState } | null | undefined): CountState {
+  return insight?.totalState ?? "ready";
+}
+
+function valuePillTestId(group: { group_id: string } | null | undefined, value: string) {
+  return isServiceGroup(group) ? `service-identity-setup-value-pill-${value}` : undefined;
+}
+
+/** Pills carry no candidates, so an ambiguous name stays one pill and its list lives in Discovered Services. */
+function serviceValueLabel(value: string) {
+  const display = valueDisplay.value[value];
+  return labelPropsForKey(value, display ? { display_name: display } : null);
+}
+
+/** Opens the clicked card's own dimension, since card indexes shift once empty cards are filtered out. */
+function openInsightDialogForCard(
+  value: string,
+  card: { dim: FoundGroup; level: "primary" | "secondary" | "tertiary" },
+) {
+  openInsightDialog(value, card.level, card.dim.group_id);
 }
 
 /** Workload insight popup state */
 const insightDialogOpen = ref(false);
 const insightDialogValue = ref("");
 const insightDialogLevel = ref<"primary" | "secondary" | "tertiary">("primary");
+const insightDialogGroupId = ref("");
 /** Tracks selected pill per dimension column for drill-down filtering (dimIdx → selected value) */
 const insightSelectedDim = ref<Record<number, string>>({});
 
-function openInsightDialog(value: string, level: "primary" | "secondary" | "tertiary") {
+function openInsightDialog(
+  value: string,
+  level: "primary" | "secondary" | "tertiary",
+  groupId?: string,
+) {
   insightDialogValue.value = value;
   insightDialogLevel.value = level;
+  insightDialogGroupId.value = groupId ?? levelDim(level)?.group_id ?? "";
   insightSelectedDim.value = {}; // Reset drill-down selections
   insightDialogOpen.value = true;
 
@@ -1638,12 +1741,73 @@ function formatDimLabels(dims: any[]): string {
   });
 }
 
+function levelDim(level: "primary" | "secondary" | "tertiary") {
+  return level === "primary"
+    ? primaryDim.value
+    : level === "secondary"
+      ? secondaryDim.value
+      : tertiaryDim.value;
+}
+
+/** The clicked dimension when it ranks past the three drill levels, which have their own insights. */
+const insightExtraGroup = computed(() => {
+  const index = rankedDims.value.findIndex((g) => g.group_id === insightDialogGroupId.value);
+  return index >= 3 ? rankedDims.value[index] : undefined;
+});
+
 /** Build insight data for the currently open popup */
+const insightServiceDisplay = computed(() => {
+  const value = insightDialogValue.value;
+  const group = insightExtraGroup.value ?? levelDim(insightDialogLevel.value);
+  const display = value && isServiceGroup(group) ? valueDisplay.value[value] : undefined;
+  return display ? { name: display, detected: showsDetectedAs(value, display) } : null;
+});
+
+/** One value of a dimension ranked past the drill levels; its related values come from its own analytics. */
+function rankedValueInsight(group: FoundGroup, value: string) {
+  const dim = dimensionAnalytics.value[group.group_id];
+  const children = dim?.value_children?.[value] ?? {};
+  const colors = ["blue", "teal", "purple"];
+  const relatedDimensions: RelatedDimension[] = rankedDims.value
+    .filter((other) => other.group_id !== group.group_id && children[other.group_id]?.length)
+    .slice(0, 3)
+    .map((other) => ({
+      label: raw(other.display),
+      level: "related",
+      color: colors[Math.min(rankedDims.value.indexOf(other), 2)],
+      values: [...children[other.group_id]].sort(),
+      groupId: other.group_id,
+    }));
+  return {
+    title: value,
+    subtitle: group.display,
+    coverage: getValueCoverage(group, value),
+    count: valueServiceCount(group, value),
+    total: serviceTotal(),
+    totalState: serviceTotalState(group),
+    childLabel: "",
+    childCountLabel: "",
+    children: [] as { name: string; count: number }[],
+    maxChildCount: 1,
+    relatedDimensions,
+    isCardLevel: false,
+    streamTypes: getValueStreamTypes(group.group_id, value),
+    streamDetails: getValueStreamDetails(group.group_id, value),
+  };
+}
+
+const insightTitle = computed(() => insightServiceDisplay.value?.name ?? insightData.value.title);
+// The header slot replaces the visible title, so this only names the drawer for assistive tech.
+const insightDrawerName = computed(() =>
+  raw(`${insightData.value.subtitle} ${insightTitle.value}`.trim()),
+);
+
 const insightData = computed(() => {
   const val = insightDialogValue.value;
   const level = insightDialogLevel.value;
   const cards = primaryDimCards.value;
   const isCardLevel = val === "";
+  if (insightExtraGroup.value) return rankedValueInsight(insightExtraGroup.value, val);
 
   if (level === "primary") {
     const group = primaryDim.value;
@@ -1683,8 +1847,8 @@ const insightData = computed(() => {
 
     const card = cards[val];
     const coverage = group ? getValueCoverage(group, val) : null;
-    const count = dim?.value_counts?.[val] ?? null;
-    const total = dim?.service_count ?? null;
+    const count = valueServiceCount(group, val);
+    const total = group ? serviceTotal() : null;
 
     const streamDetails = group ? getValueStreamDetails(group.group_id, val) : [];
 
@@ -1737,6 +1901,7 @@ const insightData = computed(() => {
       coverage,
       count,
       total,
+      totalState: serviceTotalState(group),
       childLabel: secondaryDim.value ? pluralize(secondaryDim.value.display) : "",
       childCountLabel: tertiaryDim.value ? pluralize(tertiaryDim.value.display).toLowerCase() : "",
       children,
@@ -1783,8 +1948,8 @@ const insightData = computed(() => {
     }
 
     const coverage = group ? getValueCoverage(group, val) : null;
-    const count = dim?.value_counts?.[val] ?? null;
-    const total = dim?.service_count ?? null;
+    const count = valueServiceCount(group, val);
+    const total = group ? serviceTotal() : null;
     const parents: string[] = [];
     for (const [pVal, card] of Object.entries(cards)) {
       if (card.childValues.includes(val)) parents.push(pVal);
@@ -1824,6 +1989,7 @@ const insightData = computed(() => {
       coverage,
       count,
       total,
+      totalState: serviceTotalState(group),
       childLabel: primaryDim.value
         ? t("settings.serviceIdentitySetup.foundIn", {
             dimension: pluralize(primaryDim.value.display).toLowerCase(),
@@ -1868,8 +2034,8 @@ const insightData = computed(() => {
   }
 
   const coverage = group ? getValueCoverage(group, val) : null;
-  const count = dim?.value_counts?.[val] ?? null;
-  const total = dim?.service_count ?? null;
+  const count = valueServiceCount(group, val);
+  const total = group ? serviceTotal() : null;
   const locations = getTertiaryLocations(val);
 
   const streamDetails = group ? getValueStreamDetails(group.group_id, val) : [];
@@ -1907,6 +2073,7 @@ const insightData = computed(() => {
     coverage,
     count,
     total,
+    totalState: serviceTotalState(group),
     childLabel: t("settings.runsIn"),
     childCountLabel: "",
     children: [] as { name: string; count: number }[],
@@ -1968,6 +2135,8 @@ const insightChartData = computed(() => {
 
   return {
     options: {
+      // A count donut has nothing to animate, and a mid-animation frame misstates its counts.
+      animation: false,
       tooltip: {
         trigger: "item",
         enterable: true,
@@ -2396,13 +2565,7 @@ const resolvedTrackedAliases = computed(() => {
     .map((id) => {
       let label = labelMap.get(id);
       if (!label) {
-        // Fallback: convert ID to readable label (e.g., "k8s-cluster" → "K8s Cluster")
-        label = raw(
-          id
-            .split("-")
-            .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
-            .join(" "),
-        );
+        label = dimensionLabel(id, t);
         console.warn(
           `[ServiceIdentitySetup] No label found for tracked alias "${id}", using fallback: "${label}"`,
         );
@@ -2559,7 +2722,8 @@ function getValueStreamDetails(
       result.push({ streamType, streamNames: names.sort() });
     }
   }
-  return result;
+  // Response maps keep no stable order, so a fixed signal order keeps every load identical.
+  return bySignalOrder(result, (entry) => entry.streamType);
 }
 
 /** Get deduplicated unique values for a group across all stream types/names */
@@ -2581,12 +2745,10 @@ function getGroupValues(group: FoundGroup): string[] {
  * This is the "within-group" breakdown, not global coverage.
  */
 function getValueCoverage(group: FoundGroup | undefined, value: string): number | null {
-  if (!group) return null;
-  const dim = dimensionAnalytics.value[group.group_id];
-  if (!dim?.value_counts || !dim.service_count) return null;
-  const count = dim.value_counts[value];
-  if (count == null) return null;
-  return Math.round((count / dim.service_count) * 100);
+  const total = group ? serviceTotal() : null;
+  const count = valueServiceCount(group, value);
+  if (total == null || count == null) return null;
+  return total > 0 ? Math.round((count / total) * 100) : 0;
 }
 
 /** For a secondary dim value, collect all tertiary values across all primary parents */
@@ -2746,8 +2908,33 @@ const isDirty = computed(() => {
 
 // ─── API Calls ────────────────────────────────────────────────────────────────
 
+async function loadDiscoveredServiceCount() {
+  const read = ++discoveredServiceCountRead;
+  discoveredServiceCountState.value = "loading";
+  try {
+    const list = await queryClient.fetchQuery(servicesListQuery(props.orgIdentifier));
+    if (read !== discoveredServiceCountRead) return;
+    discoveredServices.value = list
+      .filter((record) => typeof record.service_name === "string")
+      .map((record) => ({
+        service_name: record.service_name,
+        display_name: record.display_name,
+        all_dimensions: record.all_dimensions,
+        disambiguation: record.disambiguation,
+      }));
+    discoveredServiceCount.value = serviceNameCount(discoveredServices.value);
+    discoveredServiceCountState.value = "ready";
+  } catch {
+    if (read !== discoveredServiceCountRead) return;
+    discoveredServices.value = [];
+    discoveredServiceCount.value = null;
+    discoveredServiceCountState.value = "failed";
+  }
+}
+
 async function loadData() {
   loading.value = true;
+  void loadDiscoveredServiceCount();
   try {
     // 1. Load Analytics (which now includes available_groups)
     const analyticsRes = await serviceStreamsService.getDimensionAnalytics(props.orgIdentifier);
@@ -2758,6 +2945,7 @@ async function loadData() {
     const dedupedGroups = deduplicateAndSortGroups(rawGroups);
     availableGroups.value = dedupedGroups;
     serviceFieldSources.value = summary.service_field_sources ?? [];
+    valueDisplay.value = summary.value_display ?? {};
 
     if (summary.dimensions) {
       dimensionAnalytics.value = summary.dimensions.reduce(
@@ -2825,6 +3013,7 @@ async function refreshAvailableGroups() {
     const summary: DimensionAnalyticsSummary = res.data;
     availableGroups.value = deduplicateAndSortGroups(summary.available_groups ?? []);
     serviceFieldSources.value = summary.service_field_sources ?? [];
+    valueDisplay.value = summary.value_display ?? {};
     if (summary.dimensions) {
       dimensionAnalytics.value = summary.dimensions.reduce(
         (acc, dim) => {

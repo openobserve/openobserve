@@ -25,6 +25,10 @@ export class RumPerformancePage {
         );
         this.overviewEmpty = page.locator('[data-test="performance-summary-empty"]');
         this.dashboardPanels = page.locator('[data-test="dashboard-panel-container"]');
+        this.browserOverviewEmpty = page.locator('[data-test="rum-overview-page-empty"]');
+        this.browserOverviewKpis = page.locator(
+            '[data-test="rum-overview-kpis"]:not([aria-busy="true"]):not(:has([data-test="rum-overview-kpis-error"])):not(:has([data-test="rum-overview-kpis-forbidden"]))',
+        );
         this.errorsDashboard = page.locator('[data-test="performance-error-dashboard"]');
         this.errorsSchemaLoading = page.locator('[data-test="errors-dashboard-schema-loading"]');
         this.errorsEmpty = page.locator('[data-test="errors-dashboard-empty"]');
@@ -96,6 +100,15 @@ export class RumPerformancePage {
         await this.tabLocator(value).click();
     }
 
+    /** Lists every address the page moved to, so a redirect that later settles elsewhere still shows; start it before the first goto. */
+    watchAddressChanges() {
+        const urls = [];
+        this.page.on('framenavigated', (frame) => {
+            if (frame === this.page.mainFrame()) urls.push(frame.url());
+        });
+        return urls;
+    }
+
     async expectActiveTab(value, timeoutMs = 10000) {
         await expect(this.tabLocator(value)).toHaveAttribute('data-state', 'on', {
             timeout: timeoutMs,
@@ -118,9 +131,14 @@ export class RumPerformancePage {
 
     async expectOverviewResolved(timeoutMs = 30000) {
         await expect(this.overviewSchemaLoading).toBeHidden({ timeout: timeoutMs });
-        await expect(this.overviewEmpty.or(this.dashboardPanels).first()).toBeVisible({
-            timeout: timeoutMs,
-        });
+        // Once _rumdata has browser fields the summary swaps its panels for the browser overview.
+        await expect(
+            this.overviewEmpty
+                .or(this.dashboardPanels)
+                .or(this.browserOverviewEmpty)
+                .or(this.browserOverviewKpis)
+                .first(),
+        ).toBeVisible({ timeout: timeoutMs });
     }
 
     async expectErrorsDashboardMounted(timeoutMs = 30000) {

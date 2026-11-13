@@ -404,6 +404,9 @@ pub struct ResourceValue {
     pub last_seen: i64,
     /// Flattened from `ServiceStreams` as `<type>/<name>`.
     pub streams: Vec<String>,
+    /// Display name for a `service` value; `value` stays the key a condition stores.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize, ToSchema)]
@@ -436,6 +439,9 @@ pub struct ValueSuggestion {
     /// Newest sighting in microseconds, when a source knows one.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub last_seen: Option<i64>,
+    /// Display name for a `service` value; `value` stays the key a condition stores.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, ToSchema)]
@@ -527,6 +533,12 @@ pub struct ActiveDowntime {
     pub end_on_clear: Option<EndOnClear>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub source: Option<MuteSource>,
+    /// The downtime's own folder, which its detail route checks access on.
+    #[serde(default)]
+    pub folder_id: String,
+    /// Whether ending this downtime unmutes the row it was looked up for and no other row.
+    #[serde(default)]
+    pub end_here: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
@@ -554,6 +566,13 @@ pub struct ListDowntimesQuery {
     pub alert_id: Option<String>,
     pub page: Option<usize>,
     pub page_size: Option<usize>,
+}
+
+/// Query of both cancel routes: a `version` other than the stored one makes the cancel a 409.
+#[derive(Clone, Debug, Default, Deserialize, IntoParams)]
+#[into_params(parameter_in = Query)]
+pub struct CancelDowntimeQuery {
+    pub version: Option<i64>,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, ToSchema)]
@@ -1084,5 +1103,43 @@ mod tests {
         let extend: AlertMuteExtendRequest =
             serde_json::from_str(r#"{"version":3,"until_clear":true}"#).unwrap();
         assert!(extend.until_clear && extend.minutes.is_none());
+    }
+
+    #[test]
+    fn an_active_downtime_from_an_older_node_reads_end_here_false_and_no_folder() {
+        let old: ActiveDowntime =
+            serde_json::from_str(r#"{"id":"d1","name":"n","ends_at":9,"version":2}"#).unwrap();
+        assert!(!old.end_here);
+        assert_eq!(old.folder_id, "");
+        assert_eq!(old.version, 2);
+        let new = ActiveDowntime {
+            folder_id: "ops".to_string(),
+            end_here: true,
+            ..old
+        };
+        let json = serde_json::to_value(&new).unwrap();
+        assert_eq!(json["folder_id"], "ops");
+        assert_eq!(json["end_here"], true);
+        let back: ActiveDowntime = serde_json::from_value(json).unwrap();
+        assert_eq!(back, new);
+    }
+
+    #[test]
+    fn value_suggestion_label_skipped_when_absent() {
+        let mut v = ValueSuggestion {
+            value: "checkoutservice".to_string(),
+            source: "registry".to_string(),
+            items: 0,
+            last_seen: None,
+            label: None,
+        };
+        assert_eq!(
+            serde_json::to_string(&v).unwrap(),
+            r#"{"value":"checkoutservice","source":"registry","items":0}"#
+        );
+        v.label = Some("CheckoutService".to_string());
+        let json = serde_json::to_value(&v).unwrap();
+        assert_eq!(json["label"], "CheckoutService");
+        assert_eq!(json["value"], "checkoutservice");
     }
 }

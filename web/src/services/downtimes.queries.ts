@@ -180,8 +180,8 @@ export const downtimeValuesQuery = (
 
 // ── Writes ──────────────────────────────────────────────────────────────────
 
-/** A downtime changes the Muted chip on every list it can cover. */
-const mutedListKeys = (org: string) => [
+/** Every list that shows a Muted chip, which a mute, an End or an Extend changes. */
+export const mutedListKeys = (org: string) => [
   downtimeKeys.all(org),
   alertKeys.all(org),
   anomalyKeys.all(org),
@@ -204,8 +204,8 @@ export const quickMuteMutation = (org: string) =>
 
 export const cancelDowntimeMutation = (org: string) =>
   mutationOptions({
-    mutationFn: (vars: { id: string; folder?: string }) =>
-      downtimes.cancel(org, vars.id, vars.folder),
+    mutationFn: (vars: { id: string; folder?: string; version?: number }) =>
+      downtimes.cancel(org, vars.id, vars.folder, vars.version),
     meta: { invalidates: [...mutedListKeys(org), announcementKeys.all(org)], silentError: true },
   });
 

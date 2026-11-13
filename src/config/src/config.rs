@@ -148,7 +148,13 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 148: add alert_incidents.security_case, backfilled from SIEM detections and case group keys.
 // 149: add alert_incidents.historical, set on a security case only backfilled firings opened.
 // 150: add budget to online_eval_jobs.
-pub const DB_SCHEMA_VERSION: u64 = 150;
+// 151: add last_run_class, last_run_class_at and last_tested_at to synthetics.
+// 152: add false_alarm_by, false_alarm_at and false_alarm_reason to status_page_notices.
+// 153: add gap_since, gap_runs, gap_notified_at and gap_resumed_at to synthetics.
+// 154: add synthetics.status_recovered_at and status_streak_sig, and
+//      status_page_notices.false_alarm_recovered_at.
+// 155: create the service version, identity, alias, deploy and verdict tables.
+pub const DB_SCHEMA_VERSION: u64 = 155;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -1127,6 +1133,7 @@ pub struct Config {
     pub public_dashboards: PublicDashboards,
     pub alert_composite: AlertComposite,
     pub db_monitoring: DatabaseMonitoring,
+    pub service_versions: ServiceVersions,
     pub self_profiles: SelfProfiles,
     pub public_ai_chat: PublicAiChat,
 }
@@ -1238,6 +1245,17 @@ pub struct DatabaseMonitoring {
         help = "Rollup window and job cadence in seconds. This is also the freshness floor: rolled-up data is up to one interval stale, and the read path covers the remainder with a live delta query over un-rolled-up spans. Lowering it shrinks that delta (cheaper reads, fresher pages) at the cost of a more frequent rollup job and more `_o2_db_stats` rows."
     )]
     pub rollup_interval_secs: u64,
+}
+
+/// Service versions as a whole; a per-org switch is not offered.
+#[derive(Debug, Serialize, EnvConfig, Default)]
+pub struct ServiceVersions {
+    #[env_config(
+        name = "ZO_SERVICE_VERSIONS_ENABLED",
+        default = true,
+        help = "Enable Service Versions: span stamping at ingest, the version registry flush and the service signals processor. false pauses all three and keeps every stored row and cursor; true resumes from the saved cursors."
+    )]
+    pub enabled: bool,
 }
 
 /// Public (unauthenticated) dashboards; clamped in `check_public_dashboards_config`.
@@ -2182,7 +2200,7 @@ pub struct Common {
     /// server legitimately needs to send notifications to itself.
     #[env_config(name = "ZO_SSRF_ALLOW_LOOPBACK", default = false)]
     pub ssrf_allow_loopback: bool,
-    // This will completely skip ssrf checks, not just localhost
+    /// Skips SSRF checks and lets any org's VRL call `http_request`, `dns_lookup`, `reverse_dns`.
     #[env_config(name = "ZO_SKIP_SSRF_CHECKS", default = false)]
     pub skip_ssrf_checks: bool,
     /// Comma-separated CIDRs that only send-only destinations may reach; changes need a restart.
@@ -3544,6 +3562,12 @@ pub struct Compact {
     pub pending_jobs_metric_interval: u64,
     #[env_config(name = "ZO_COMPACT_MAX_GROUP_FILES", default = 10000)]
     pub max_group_files: usize,
+    #[env_config(
+        name = "ZO_COMPACT_METRICS_MAX_GROUPS",
+        default = 100,
+        help = "Max sorted inputs (ingester files plus chains of already merged files) one metrics merge opens at once; a closed hour holding more is first pre-merged into hash-merged files. 0 disables the cap, other values below 10 are raised to 10"
+    )]
+    pub metrics_max_groups: usize,
     #[env_config(
         name = "ZO_COMPACT_RETENTION_ALLOWED_HOURS",
         default = "",
@@ -5202,6 +5226,10 @@ fn check_compact_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
     if cfg.compact.old_data_min_files < 1 {
         cfg.compact.old_data_min_files = 10;
+    }
+    // 0 disables the cap; a smaller cap would pre-merge an hour over too many rounds
+    if (1..10).contains(&cfg.compact.metrics_max_groups) {
+        cfg.compact.metrics_max_groups = 10;
     }
     if cfg.compact.file_list_deleted_batch_size == 0 {
         cfg.compact.file_list_deleted_batch_size = 1000;

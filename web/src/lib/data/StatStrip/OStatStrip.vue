@@ -46,6 +46,8 @@ const props = withDefaults(
     resetKey?: string | number | null;
     /** Default for every item's `compactValue` (an item's own setting wins). */
     compactValues?: boolean;
+    /** Puts each label under its value, for strips too narrow to fit them side by side. */
+    stacked?: boolean;
   }>(),
   {
     items: () => [],
@@ -118,6 +120,7 @@ const onCardClick = (item: StatItem) => {
           ? ['max-w-56 shrink grow-0 basis-auto', compact ? 'min-w-32' : 'min-w-40']
           : ['grow max-lg:shrink-0 max-lg:basis-auto', compact ? 'basis-36' : 'basis-52']
       "
+      :stacked="stacked"
       :label="item.label"
       :value="item.value"
       :sub="item.sub"

@@ -28,7 +28,7 @@ import type {
   TargetModule,
 } from "@/services/downtimes";
 import { andEqPairs } from "./conditionBridge";
-import { MODULE_ORDER, type FolderNameFn } from "./targetSummary";
+import { MODULE_ORDER, pairText, type FolderNameFn, type ValueLabelFn } from "./targetSummary";
 import {
   durationInput,
   formatWindowTime,
@@ -474,9 +474,10 @@ const autoNameSubject = (
   t: TranslateFn,
   itemName?: ItemNameFn,
   folderName?: FolderNameFn,
+  valueLabel?: ValueLabelFn,
 ): string => {
   const firstEq = andEqPairs(buildCondition(values) ?? null).find((p) => p.key && p.value);
-  if (firstEq) return `${firstEq.key}=${firstEq.value}`;
+  if (firstEq) return pairText(firstEq.key, firstEq.value, valueLabel);
   const first = buildTargets(values)[0];
   if (!first) return "";
   if (first.tags?.length) return first.tags[0];
@@ -508,8 +509,9 @@ export function buildDowntimeAutoName(
   itemName?: ItemNameFn,
   folderName?: FolderNameFn,
   locale?: string,
+  valueLabel?: ValueLabelFn,
 ): string {
-  const subject = autoNameSubject(values, t, itemName, folderName);
+  const subject = autoNameSubject(values, t, itemName, folderName, valueLabel);
   if (!subject) return "";
   return `${subject} · ${autoNameWhen(values.schedule, t, locale)}`;
 }

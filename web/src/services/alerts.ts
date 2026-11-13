@@ -39,6 +39,10 @@ const alertPath = (org: string, alertId: string) =>
 // The route permission check reads the alert folder from `?folder=`.
 const inFolder = (folder?: string) => (folder ? { params: { folder } } : {});
 
+// A cancel at a stale version is a 409 `version_changed` that ends nothing.
+const atVersion = (folder?: string, version?: number) =>
+  version === undefined ? inFolder(folder) : { params: { ...(folder ? { folder } : {}), version } };
+
 const ALERT_ACTION_CODES = new Set<string>([
   "ack_refused",
   "mute_refused",
@@ -328,13 +332,8 @@ const alerts = {
   /** Evaluation counts per time bucket, alert and outcome (`interval` in seconds). */
   getHistorySummary: (
     org_identifier: string,
-    query: {
-      start_time: number;
-      end_time: number;
-      interval?: number;
-      alert_ids?: string;
-      siem?: boolean;
-    },
+    query: AlertHistorySummaryQuery,
+    signal?: AbortSignal,
   ) => {
     const params = new URLSearchParams({
       start_time: String(query.start_time),
@@ -343,7 +342,7 @@ const alerts = {
     if (query.interval) params.append("interval", String(query.interval));
     if (query.alert_ids) params.append("alert_ids", query.alert_ids);
     if (query.siem) params.append("siem", "true");
-    return http().get(`/api/v2/${org_identifier}/alerts/history/summary?${params}`);
+    return http().get(`/api/v2/${org_identifier}/alerts/history/summary?${params}`, { signal });
   },
   // Semantic field groups management
   getSemanticGroups: (org_identifier: string) => {
@@ -446,11 +445,17 @@ const alerts = {
       body,
       inFolder(folder),
     ),
-  cancelAlertMute: (org: string, alertId: string, downtimeId: string, folder?: string) =>
+  cancelAlertMute: (
+    org: string,
+    alertId: string,
+    downtimeId: string,
+    folder?: string,
+    version?: number,
+  ) =>
     http().post(
       `${alertPath(org, alertId)}/mute/${encodeURIComponent(downtimeId)}/cancel`,
       undefined,
-      inFolder(folder),
+      atVersion(folder, version),
     ),
 };
 
@@ -464,6 +469,15 @@ export function alertActionErrorOf(error: unknown): AlertActionError | null {
   return typeof code === "string" && ALERT_ACTION_CODES.has(code)
     ? (response.data as AlertActionError)
     : null;
+}
+
+/** Evaluation counts per bucket; times in microseconds, `interval` in seconds. */
+export interface AlertHistorySummaryQuery {
+  start_time: number;
+  end_time: number;
+  interval?: number;
+  alert_ids?: string;
+  siem?: boolean;
 }
 
 export interface AlertHistoryQuery {

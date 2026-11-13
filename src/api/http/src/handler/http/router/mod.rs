@@ -46,8 +46,9 @@ use openobserve_api_management::request::profiling;
 use openobserve_api_management::request::{
     alerts, announcements, authz, dashboards, db_monitoring, downtimes, folders, gen_ai_health,
     ingest_rejections, kv, metrics_usage, model_pricing, organization, public_dashboards,
-    query_history, rum_analytics, sample_data, security, service_accounts, service_streams,
-    short_url, slack, slos, sourcemaps, status, status_pages, stream, synthetics, users,
+    query_history, rum_analytics, sample_data, security, service_accounts, service_identity,
+    service_streams, service_versions, short_url, slack, slos, sourcemaps, status, status_pages,
+    stream, synthetics, users,
 };
 #[cfg(feature = "cloud")]
 use openobserve_api_management::request::{cloud, organization::billing_group};
@@ -1573,7 +1574,7 @@ fn service_route_table() -> Router {
         .route("/v2/{org_id}/alerts/auto_investigate/decisions", get(alerts::auto_investigate::list_auto_investigate_decisions))
 
         // Alerts - incidents must be before alerts to avoid route conflicts
-        .route("/v2/{org_id}/alerts/incidents", get(alerts::incidents::list_incidents))
+        .route("/v2/{org_id}/alerts/incidents", get(alerts::incidents::list_incidents).post(alerts::incidents::create_incident))
         .route("/v2/{org_id}/alerts/incidents/stats", get(alerts::incidents::get_incident_stats))
         .route("/v2/{org_id}/alerts/incidents/external-alerts/{external_alert_id}/payload", get(alerts::incidents::get_external_alert_payload))
         .route("/v2/{org_id}/alerts/incidents/{incident_id}", get(alerts::incidents::get_incident))
@@ -1926,6 +1927,57 @@ fn service_route_table() -> Router {
         }
     }
 
+    router = router
+        .route("/{org_id}/service_versions", get(service_versions::list))
+        .route(
+            "/{org_id}/service_versions/deploys",
+            get(service_versions::deploys),
+        )
+        .route(
+            "/{org_id}/service_versions/verdicts",
+            get(service_versions::verdicts),
+        )
+        .route(
+            "/{org_id}/service_versions/_services",
+            get(service_versions::services),
+        )
+        .route(
+            "/{org_id}/service_versions/{version_key}",
+            delete(service_versions::delete),
+        )
+        .route(
+            "/{org_id}/service_identity/overrides",
+            get(service_identity::overrides).put(service_identity::put_override),
+        )
+        .route(
+            "/{org_id}/service_identity/overrides/{rule_key}",
+            delete(service_identity::delete_override),
+        )
+        .route(
+            "/{org_id}/service_identity/envs",
+            get(service_identity::envs),
+        )
+        .route(
+            "/{org_id}/service_identity/unresolved",
+            get(service_identity::unresolved),
+        )
+        .route(
+            "/{org_id}/service_identity/aliases",
+            get(service_identity::list_aliases).post(service_identity::create_alias),
+        )
+        .route(
+            "/{org_id}/service_identity/aliases/_bulk",
+            post(service_identity::bulk_aliases),
+        )
+        .route(
+            "/{org_id}/service_identity/aliases/_undo",
+            post(service_identity::undo_aliases),
+        )
+        .route(
+            "/{org_id}/service_identity/aliases/{alias_key}",
+            put(service_identity::update_alias).delete(service_identity::delete_alias),
+        );
+
     #[cfg(feature = "enterprise")]
     {
         router = fleet_routes(router)
@@ -2132,7 +2184,8 @@ fn service_route_table() -> Router {
             )
             .route(
                 "/{org_id}/status_pages/notices/{nid}/mark_false_positive",
-                post(status_pages::admin::mark_false_positive),
+                post(status_pages::admin::mark_false_positive)
+                    .delete(status_pages::admin::undo_false_positive),
             )
             .route(
                 "/{org_id}/status_pages/{id}/domains",
@@ -2419,7 +2472,8 @@ fn search_routes_with(llm_eval: bool) -> Router {
             "/{org_id}/db_monitoring/instance_metrics",
             get(db_monitoring::handler::get_dbm_instance_metrics),
         )
-        .route("/{org_id}/db_monitoring/badges", get(db_monitoring::handler::get_dbm_badges));
+        .route("/{org_id}/db_monitoring/badges", get(db_monitoring::handler::get_dbm_badges))
+        .route("/{org_id}/service_versions/compare", post(service_versions::compare));
     #[cfg(feature = "enterprise")]
     let router = {
         let router = router

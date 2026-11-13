@@ -5,6 +5,7 @@
     "browser": "chrome",
     "run_files": [
       "alerts-help-drawer.spec.js",
+      "alerts-firing-tab.spec.js",
       "alerts-import.spec.js",
       "alerts-metrics-notification.spec.js",
       "dl-email-destinations.spec.js",
@@ -44,6 +45,7 @@
   },
   {
     "testfolder": "Alerts-Composite-Library",
+    "_comment": "list-quick-filter-cards.spec.js counts every pipeline and public link of the org, so no spec in this shard may create either.",
     "actual_folder": "Alerts",
     "browser": "chrome",
     "run_files": [
@@ -57,7 +59,8 @@
       "alerts-composite-preview.spec.js",
       "alerts-clone-dialog.spec.js",
       "alerts-save-query-mode.spec.js",
-      "alerts-evaluation-chart.spec.js"
+      "alerts-evaluation-chart.spec.js",
+      "list-quick-filter-cards.spec.js"
     ],
     "disabled": []
   },
@@ -403,7 +406,8 @@
       "logs-query-editor-keyboard.spec.js",
       "logsCrossLinks.spec.js",
       "logsFieldValuePaging.spec.js",
-      "logsFreeText.spec.js"
+      "logsFreeText.spec.js",
+      "logsFilterBuilder.spec.js"
     ],
     "disabled": [
       {
@@ -611,7 +615,8 @@
       "traceQueryEditor.spec.js",
       "traces-autocomplete-suggestions.spec.js",
       "traces-autocomplete-filter-mode.spec.js",
-      "traceDetails.spec.js"
+      "traceDetails.spec.js",
+      "tracesFilterBuilder.spec.js"
     ],
     "disabled": []
   },
@@ -639,8 +644,7 @@
       "slo-crud.spec.js",
       "slo-form-validation.spec.js",
       "slo-required-fields.spec.js",
-      "slo-alert-sli.spec.js",
-      "slo-import.spec.js"
+      "slo-alert-sli.spec.js"
     ],
     "disabled": []
   },

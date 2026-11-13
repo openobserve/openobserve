@@ -43,7 +43,7 @@ import {
 import { parseShorthand } from "@/utils/query/filterBarParser";
 import { leafConditions } from "./codecs/types";
 import { arityFor, type FilterEditorConfig } from "./filterProfiles";
-import type { FilterBarExtraSection } from "./QueryFilterBar.types";
+import type { FilterBarExtraSection, FilterValueLabel } from "./QueryFilterBar.types";
 
 export type FilterBarStep = "field" | "operator" | "value";
 
@@ -74,6 +74,7 @@ export interface FilterBarEditorOptions {
   loadValues: Ref<((field: string, search: string) => Promise<string[]>) | undefined>;
   /** Values offered before the loaded ones for every field, e.g. dashboard `$variables`. */
   extraValues?: Ref<((field: string) => string[]) | undefined>;
+  valueLabel?: Ref<((field: string, value: string) => FilterValueLabel | undefined) | undefined>;
   /** Host rows listed above the fields while the bar is empty and nothing is typed. */
   extraSuggestions?: Ref<FilterBarExtraSection | undefined>;
   selectExtra?: (key: string, event: MouseEvent | KeyboardEvent) => void;
@@ -344,11 +345,16 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
     const pinned = editedValue.value !== null ? [editedValue.value] : typedPicks;
     const source = [...pinned, ...loaded.filter((v) => !pinned.includes(v))];
     const ranked = rankByMatch(source, needle).slice(0, MAX_ROWS);
-    const rows: ChipInputSuggestion[] = ranked.map((value) => ({
-      key: value,
-      label: raw(value === "" ? t("filterBar.emptyValue") : value),
-      selected: multiValue.value && chosen.has(value),
-    }));
+    const named = (value: string) => options.valueLabel?.value?.(draft.value?.field ?? "", value);
+    const rows: ChipInputSuggestion[] = ranked.map((value) => {
+      const name = named(value);
+      return {
+        key: value,
+        label: raw(name?.label || (value === "" ? t("filterBar.emptyValue") : value)),
+        ...(name?.detail ? { detail: name.detail } : {}),
+        selected: multiValue.value && chosen.has(value),
+      };
+    });
     if (needle && !source.includes(needle)) {
       const row: ChipInputSuggestion = {
         key: CUSTOM_KEY,

@@ -65,7 +65,7 @@ test.describe('RUM session replay with a missing segment (#14694)', () => {
     await player.expectPlaybackReachesWithoutFaults(recorded.playableEndSec, faults, 90000);
   });
 
-  test('a replay missing its first segment opens at the first full snapshot instead of a blank player', { tag: TAGS }, async ({ page }) => {
+  test('a replay missing its first segment opens at the first full snapshot instead of a blank player', { tag: [...TAGS, '@bug-5410'] }, async ({ page }) => {
     const recorded = sessions.firstMissing;
     const player = new RumReplayPlayerPage(page);
     const faults = await player.openSession(recorded.sessionId, { startTimeUs: recorded.viewerStartUs });

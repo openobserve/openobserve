@@ -204,8 +204,13 @@ pub async fn lookup_cases(
         if !super::is_siem_alert(&org_id, &alert_id).await {
             continue;
         }
-        match infra::table::alert_incidents::find_open_incident_containing_alert(&org_id, &alert_id)
-            .await
+        // A detection that once fired as ops still holds its old ops incident beside its case.
+        match infra::table::alert_incidents::find_open_incident_containing_alert(
+            &org_id,
+            &alert_id,
+            infra::table::alert_incidents::CaseFilter::OnlyCases,
+        )
+        .await
         {
             Ok(Some(case)) => {
                 cases.insert(

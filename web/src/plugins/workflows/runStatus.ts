@@ -23,7 +23,13 @@ export const RUN_TIME_SHORT = "MMM d, HH:mm";
 export const RUN_TIME_LONG = "MMM d, yyyy HH:mm";
 
 /** Why a run never executed or never finished; drives the second line under its status chip. */
-export type RunReason = "expired" | "worker_lost" | "workflow_disabled" | "run_timeout";
+export type RunReason =
+  | "expired"
+  | "worker_lost"
+  | "workflow_disabled"
+  | "endpoint_disabled"
+  | "credential_revoked"
+  | "run_timeout";
 
 /** "all", "http_request", or a trigger kind such as "alert_fired". */
 export type RunTriggerFilter = string;
@@ -38,12 +44,16 @@ export const RUN_REASON_KEYS: Record<RunReason, I18nKey> = {
   expired: "workflow.history.reasonExpired",
   worker_lost: "workflow.history.reasonWorkerLost",
   workflow_disabled: "workflow.history.reasonWorkflowDisabled",
+  endpoint_disabled: "workflow.history.reasonEndpointDisabled",
+  credential_revoked: "workflow.history.reasonCredentialRevoked",
   run_timeout: "workflow.history.reasonRunTimeout",
 };
 
 const LEDGER_REASONS: ReadonlySet<string> = new Set([
   "worker_lost",
   "workflow_disabled",
+  "endpoint_disabled",
+  "credential_revoked",
   "run_timeout",
 ]);
 
@@ -51,6 +61,8 @@ const LEDGER_REASONS: ReadonlySet<string> = new Set([
 const NO_DATA_CODES: ReadonlySet<string> = new Set([
   "worker_lost",
   "workflow_disabled",
+  "endpoint_disabled",
+  "credential_revoked",
   "run_timeout",
   "payload_missing",
   "run_failed",

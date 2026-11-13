@@ -26,8 +26,9 @@ import "../../__mocks__/index";
 // NOTE: this preloads @/locales' import graph (utils/cookies, constants/key, js-cookie,
 // vue-i18n) into the module cache before every spec, so specs cannot vi.mock() those
 // modules — vi.spyOn() the shared instance instead (see utils/cookies.spec.ts).
-import i18n from "@/locales";
+import i18n, { loadLazyLocaleBlocks } from "@/locales";
 config.global.plugins = [...(config.global.plugins ?? []), i18n];
+await loadLazyLocaleBlocks();
 
 // Mirrors main.ts: components call `useQuery`/`useMutation` with no explicit
 // client, so the plugin has to provide one. It is the app's own client — the

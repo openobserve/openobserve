@@ -63,37 +63,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-else
       class="rounded-default border-border-default bg-surface-base divide-border-default m-0 list-none divide-y overflow-hidden border p-0"
     >
-      <li
+      <RcaFoldRow
         v-for="entry in shown"
         :key="entry.number"
         :ref="(el) => setRowRef(entry.number, el)"
         data-test="rca-evidence-entry"
         :data-number="entry.number"
         :class="{ 'bg-surface-tint-accent': opened.has(entry.number) }"
+        :open="opened.has(entry.number)"
+        @update:open="toggle(entry.number)"
       >
-        <button
-          type="button"
-          data-test="rca-evidence-row"
-          class="text-text-heading hover:bg-surface-subtle-hover grid w-full cursor-pointer grid-cols-[1.75rem_1.25rem_4rem_minmax(0,1fr)_auto_1.25rem] items-center gap-x-2.5 border-none bg-transparent py-2 ps-3.5 pe-3 text-start"
-          :aria-expanded="opened.has(entry.number)"
-          :aria-controls="rowId(entry.number)"
-          @click="toggle(entry.number)"
-        >
+        <template #lead>
           <span
-            class="rounded-default border-border-control text-3xs inline-grid h-5 min-w-5.5 place-items-center border font-mono font-semibold"
+            class="rounded-default border-border-control text-3xs inline-grid h-5 min-w-5.5 shrink-0 place-items-center border font-mono font-semibold"
           >
             {{ entry.number }}
           </span>
-          <OIcon :name="rcaEvidenceKindIcon(entry.kind)" size="sm" class="text-icon-color" />
-          <span
-            class="text-text-secondary text-3xs min-w-0 truncate font-mono font-bold uppercase"
-            :title="entry.kind"
-            >{{ entry.kind }}</span
-          >
-          <span class="text-compact min-w-0 truncate">
-            {{ rcaEvidenceTitle(entry) }}
-            <span class="text-text-secondary">· {{ entry.result_summary }}</span>
-          </span>
+        </template>
+        <span class="font-normal"><RcaInlineText :text="claim(entry)" /></span>
+        <template #meta>
           <RcaPill :tone="entry.decisive ? 'strong' : 'neutral'">
             {{
               entry.decisive
@@ -101,21 +89,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 : t("alerts.incidents.rcaSummary.supporting")
             }}
           </RcaPill>
-          <OIcon
-            :name="opened.has(entry.number) ? 'expand-less' : 'expand-more'"
-            size="sm"
-            class="text-icon-color"
-          />
-        </button>
-        <div v-if="opened.has(entry.number)" :id="rowId(entry.number)" class="ps-12.5 pe-3.5 pb-3">
+        </template>
+        <template #body>
           <RcaEvidenceCard
             :entry="entry"
             :hypotheses="hypotheses"
             :org="org"
+            with-header
             @open-hypothesis="$emit('open-hypothesis', $event)"
           />
-        </div>
-      </li>
+        </template>
+      </RcaFoldRow>
     </ul>
 
     <div
@@ -163,7 +147,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, nextTick, ref, useId, type ComponentPublicInstance } from "vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import { useI18nTyped } from "@/types/i18n";
@@ -174,11 +157,12 @@ import type {
 } from "@/services/incidents";
 import {
   filterRcaEvidence,
-  rcaEvidenceKindIcon,
-  rcaEvidenceTitle,
+  rcaEvidenceClaim,
   type RcaEvidenceFilter,
 } from "@/utils/incidents/rcaSummary";
 import RcaEvidenceCard from "./RcaEvidenceCard.vue";
+import RcaFoldRow from "./RcaFoldRow.vue";
+import RcaInlineText from "./RcaInlineText.vue";
 import RcaPill from "./RcaPill.vue";
 
 const props = defineProps<{
@@ -195,7 +179,6 @@ defineEmits<{
 
 const { t } = useI18nTyped();
 const headingId = useId();
-const baseId = useId();
 
 const filter = ref<RcaEvidenceFilter>("all");
 const decisiveCount = computed(() => props.evidence.filter((entry) => entry.decisive).length);
@@ -215,11 +198,13 @@ const toggle = (number: number) => {
   if (!next.delete(number)) next.add(number);
   opened.value = next;
 };
-const rowId = (number: number) => `${baseId}-${number}`;
+
+const claim = rcaEvidenceClaim;
 
 const rows = new Map<number, HTMLElement>();
 const setRowRef = (number: number, el: Element | ComponentPublicInstance | null) => {
-  if (el instanceof HTMLElement) rows.set(number, el);
+  const node = el && "$el" in el ? el.$el : el;
+  if (node instanceof HTMLElement) rows.set(number, node);
   else rows.delete(number);
 };
 

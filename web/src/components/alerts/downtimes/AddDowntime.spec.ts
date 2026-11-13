@@ -10,6 +10,9 @@ import common from "@/services/common";
 import { queryClient } from "@/composables/query/queryClient";
 import { isoWeekday, utcMicrosToLocal } from "@/utils/downtimes/schedule";
 import AlertDestinationsField from "@/components/alerts/AlertDestinationsField.vue";
+import DowntimeConditionSection from "./DowntimeConditionSection.vue";
+import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
+import stage8 from "@/test/unit/fixtures/serviceVersions/stage8.json";
 
 // The route guard opens this page only with downtimes on.
 vi.mock("@/composables/downtimes/useDowntimesEnabled", async () => {
@@ -464,6 +467,32 @@ describe("AddDowntime", () => {
     expect(
       dialog()?.querySelector('[data-test="add-downtime-mute-all-window"]')?.textContent,
     ).toMatch(/^\s*Window: Once · /);
+    wrapper.unmount();
+  });
+
+  it("titles and summarises a service condition by the service's display name", async () => {
+    vi.mocked(downtimes.values).mockResolvedValue({ data: stage8.downtime_values } as never);
+    const { wrapper } = await mountPage();
+    const section = wrapper.findComponent(DowntimeConditionSection);
+    const form = (section.vm.$ as unknown as { provides: Record<symbol, any> }).provides[
+      FORM_CONTEXT_KEY as symbol
+    ];
+    form.setFieldValue("condition_open", true);
+    await flushPromises();
+    form.setFieldValue("condition", {
+      type: "pair",
+      key: "service",
+      operator: "=",
+      value: "checkoutservice",
+    });
+    await flushPromises();
+    expect(wrapper.get('[data-test="add-downtime-name-value"]').text()).toMatch(
+      /^service=CheckoutService · once /,
+    );
+    expect(wrapper.text()).toContain("alerts with service=CheckoutService stop notifying.");
+    // The condition chip keeps the stored key; only the title and summary use the display name.
+    const builder = wrapper.get('[data-test="downtime-condition"]').text();
+    expect(wrapper.text().replace(builder, "")).not.toContain("service=checkoutservice");
     wrapper.unmount();
   });
 

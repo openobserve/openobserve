@@ -138,7 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="flex items-center justify-center gap-1">
               <OButton
                 variant="ghost"
-                size="icon-sm"
+                size="icon-xs-sq"
                 icon-left="edit"
                 :title="t('announcements.card.edit')"
                 :aria-label="t('announcements.card.edit')"
@@ -147,7 +147,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               <OButton
                 variant="ghost"
-                size="icon-sm"
+                size="icon-xs-sq"
                 icon-left="content-copy"
                 :aria-label="duplicateLabel(row)"
                 :data-test="`announcement-list-duplicate-${row.index}`"
@@ -163,7 +163,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
               <OButton
                 variant="ghost-destructive"
-                size="icon-sm"
+                size="icon-xs-sq"
                 icon-left="delete"
                 :title="t('announcements.card.remove')"
                 :aria-label="t('announcements.card.remove')"

@@ -136,6 +136,7 @@ import { queryClient } from "@/composables/query/queryClient";
 import { streamProbeQuery } from "@/services/stream.queries";
 import { useSampleDataSession } from "@/composables/sampleData/useSampleDataSession";
 import { firstDataStorageKey } from "@/composables/firstEvent/useFirstDataNotice";
+import { b64DecodeUnicode } from "@/utils/zincutils";
 
 // OverviewTab renders only O2 `lib` components.
 
@@ -1191,6 +1192,63 @@ describe("OverviewTab", () => {
       await flushPromises();
       expect(visibleSkeletons()).toEqual([]);
     });
+
+    describe("the service card's view-traces drill", () => {
+      let push: ReturnType<typeof vi.spyOn>;
+
+      beforeEach(() => {
+        push = vi.spyOn(router, "push").mockResolvedValue(undefined as never);
+      });
+
+      afterEach(() => {
+        push.mockRestore();
+      });
+
+      const drillFilterFor = async (node: Record<string, unknown>) => {
+        vi.mocked(serviceGraphService.getCurrentTopology).mockResolvedValue({
+          data: { nodes: [{ stream_name: "default", requests: 10, ...node }], edges: [] },
+        } as never);
+        wrapper = mountOverviewTab();
+        await flushPromises();
+        const buttons = wrapper.find(SERVICES).findAll('button[title="View Traces"]');
+        expect(buttons).toHaveLength(1);
+        await buttons[0].trigger("click");
+        expect(push).toHaveBeenCalledTimes(1);
+        const query = (push.mock.calls[0][0] as { query: Record<string, string> }).query;
+        expect(query.stream).toBe("default");
+        return b64DecodeUnicode(query.query);
+      };
+
+      it("should filter an inferred node on infer_service_name", async () => {
+        const filter = await drillFilterFor({
+          id: "postgres",
+          label: "postgres",
+          service_type: "database",
+          error_rate: 0,
+        });
+        expect(filter).toBe("infer_service_name = 'postgres'");
+      });
+
+      it("should keep service_name for a gen-AI model node", async () => {
+        const filter = await drillFilterFor({
+          id: "gpt-4o-mini",
+          label: "gpt-4o-mini",
+          service_type: "model",
+          error_rate: 0,
+        });
+        expect(filter).toBe("service_name = 'gpt-4o-mini'");
+      });
+
+      it("should still append the error filter when the node is error-flagged", async () => {
+        const inferred = await drillFilterFor({
+          id: "redis",
+          label: "redis",
+          service_type: "database",
+          error_rate: 6.2,
+        });
+        expect(inferred).toBe("infer_service_name = 'redis' AND span_status = 'ERROR'");
+      });
+    });
   });
   describe("load failures", () => {
     const LOAD_ERROR = '[data-test="overview-load-error-empty-state"]';
@@ -2152,7 +2210,7 @@ describe("OverviewTab", () => {
       expect(wrapper.findComponent({ name: "ORefreshButton" }).props("tooltip")).toBeUndefined();
     });
 
-    it("should show zero firing, failing and pipeline tiles and only the quiet streams on the status line", async () => {
+    it("should show zero firing, failing and pipeline tiles and leave the problem summary to the cards", async () => {
       wrapper = mountOverviewTab();
       await flushPromises();
 
@@ -2160,15 +2218,7 @@ describe("OverviewTab", () => {
         expect(wrapper.get(`${tile(key)} [data-test="overview-tile-value"]`).text()).toBe("0");
       }
       expect(wrapper.get(`${tile("quiet")} [data-test="overview-tile-value"]`).text()).toBe("3");
-      expect(wrapper.find('[data-test="overview-status-clear"]').exists()).toBe(false);
-      expect(wrapper.find('[data-test="overview-status-danger"]').exists()).toBe(false);
-      expect(
-        wrapper
-          .get('[data-test="overview-status-warning"] [data-test="overview-status-text"]')
-          .text(),
-      ).toBe("Needs attention");
-      const items = wrapper.findAll('[data-test^="overview-status-item-"]');
-      expect(items.map((i) => i.text())).toEqual(["3 quiet streams"]);
+      expect(wrapper.find('[data-test^="overview-status-"]').exists()).toBe(false);
     });
 
     it.each([
@@ -2433,6 +2483,34 @@ describe("OverviewTab", () => {
       push.mockRestore();
     });
 
+    it("opens the incidents entry points on the open status and View all unfiltered", async () => {
+      enterprise();
+      vi.mocked(incidentsService.list).mockResolvedValue({
+        data: mockOverview.buildIncidentList(),
+      } as never);
+      const push = vi.spyOn(router, "push").mockResolvedValue(undefined);
+      wrapper = mountOverviewTab();
+      await flushPromises();
+
+      for (const id of ["overview-headline-incidents", "overview-alerts-box-incidents"]) {
+        push.mockClear();
+        await wrapper.get(`[data-test="${id}"]`).trigger("click");
+        expect(push, id).toHaveBeenCalledWith(
+          expect.objectContaining({
+            name: "incidentList",
+            query: expect.objectContaining({ status: "open" }),
+          }),
+        );
+      }
+
+      push.mockClear();
+      await wrapper.get('[data-test="overview-incidents-view-all"]').trigger("click");
+      const viewAll = push.mock.calls[0][0] as { name: string; query: Record<string, unknown> };
+      expect(viewAll.name).toBe("incidentList");
+      expect(viewAll.query).not.toHaveProperty("status");
+      push.mockRestore();
+    });
+
     it("shows a specific empty message for each section with no data", async () => {
       enterprise();
       wrapper = mountOverviewTab();
@@ -2535,12 +2613,11 @@ describe("OverviewTab", () => {
       wrapper.get(a).element.compareDocumentPosition(wrapper.get(b).element) &
       Node.DOCUMENT_POSITION_FOLLOWING;
 
-    it("orders status, tiles, alerts and health, streams and limit, signals, then the time range", async () => {
+    it("orders tiles, alerts and health, streams and limit, signals, then the time range", async () => {
       givenRecentEvents();
       await mountWith(buildOverview());
 
       const order = [
-        '[data-test="overview-status-danger"]',
         '[data-test="overview-headline-strip"]',
         '[data-test="overview-alerts-health-grid"]',
         '[data-test="overview-streams-limit-grid"]',
@@ -2623,66 +2700,80 @@ describe("OverviewTab", () => {
       expect(pair().find(RECENT_EVENTS).exists()).toBe(true);
     });
 
-    it("says what needs attention, in the strip's order, with no summed total, and links each one", async () => {
-      const push = vi.spyOn(router, "push").mockResolvedValue(undefined);
+    it("does not repeat the headline cards in a status line when something needs attention", async () => {
       await mountWith(buildOverview());
 
-      const line = wrapper.get('[data-test="overview-status-danger"]');
-      expect(wrapper.get('[data-test="overview-status-text"]').text()).toBe("Needs attention");
-      expect(wrapper.get('[data-test="overview-status-text"]').classes()).toContain(
-        "text-status-negative",
-      );
-      expect(line.find("svg").exists()).toBe(true);
-      const items = wrapper.findAll('[data-test^="overview-status-item-"]');
-      expect(items.map((i) => i.text())).toEqual([
-        "3 alerts firing",
-        "4 rules failing",
-        "2 pipelines with errors",
-        "3 quiet streams",
-      ]);
-      await wrapper.get('[data-test="overview-status-item-pipelines"]').trigger("click");
-      expect(push).toHaveBeenCalledWith(expect.objectContaining({ name: "pipelines" }));
+      expect(wrapper.find('[data-test^="overview-status-"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test^="overview-status-item-"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="overview-headline-strip"]').exists()).toBe(true);
+    });
+
+    it("opens each alerts card box and tile on the list filtered to the rows it counts", async () => {
+      const push = vi.spyOn(router, "push").mockResolvedValue(undefined);
+      await mountWith(buildOverview());
+      const lastQuery = () => (push.mock.lastCall![0] as any).query;
+
+      const cases: [string, string, Record<string, string>][] = [
+        ["overview-alerts-box-failing", "alertList", { state: "error" }],
+        ["overview-headline-failing", "alertList", { state: "error" }],
+        ["overview-headline-delivery", "alertList", { state: "notify_failed" }],
+        ["overview-headline-firing", "alertList", { state: "firing" }],
+        ["overview-alerts-box-critical", "alertList", { state: "firing", level: "critical" }],
+        ["overview-alerts-box-warning", "alertList", { state: "firing", level: "warning" }],
+        ["overview-headline-pipelines", "pipelines", { state: "errored" }],
+        ["overview-headline-quiet", "logstreams", {}],
+      ];
+      for (const [id, name, query] of cases) {
+        await wrapper.get(`[data-test="${id}"]`).trigger("click");
+        expect(push.mock.lastCall![0], id).toEqual(expect.objectContaining({ name }));
+        expect(lastQuery(), id).toEqual(expect.objectContaining(query));
+      }
       push.mockRestore();
     });
 
-    it("sends the alerts card boxes and the delivery tile where their headline tiles go", async () => {
+    it("opens firing rows and the data health rows on their matching filters", async () => {
       const push = vi.spyOn(router, "push").mockResolvedValue(undefined);
       await mountWith(buildOverview());
+      const lastQuery = () => (push.mock.lastCall![0] as any).query;
 
-      await wrapper.get('[data-test="overview-alerts-box-failing"]').trigger("click");
-      expect(push).toHaveBeenLastCalledWith(expect.objectContaining({ name: "alertList" }));
-      await wrapper.get('[data-test="overview-headline-delivery"]').trigger("click");
-      expect(push).toHaveBeenLastCalledWith(expect.objectContaining({ name: "alertList" }));
-      await wrapper.get('[data-test="overview-alerts-box-critical"]').trigger("click");
-      expect(push).toHaveBeenLastCalledWith(expect.objectContaining({ name: "alertList" }));
+      const firingRow = wrapper.get(
+        '[data-test^="overview-alerts-firing-"]:not([data-test*="level"])',
+      );
+      await firingRow.trigger("click");
+      expect(lastQuery()).toEqual(expect.objectContaining({ state: "firing" }));
+
+      const health: [string, string, Record<string, string>][] = [
+        ["failing", "alertList", { state: "error" }],
+        ["delivery", "alertList", { state: "notify_failed" }],
+        ["pipelines", "pipelines", { state: "errored" }],
+        ["quiet", "logstreams", {}],
+      ];
+      for (const [key, name, query] of health) {
+        await wrapper.get(`[data-test="overview-data-health-row-${key}"]`).trigger("click");
+        expect(push.mock.lastCall![0], key).toEqual(expect.objectContaining({ name }));
+        expect(lastQuery(), key).toEqual(expect.objectContaining(query));
+      }
+
+      await wrapper.get('[data-test="overview-alerts-view-all"]').trigger("click");
+      expect(lastQuery()).not.toHaveProperty("state");
       push.mockRestore();
     });
 
-    it("uses the warning look when only streams went quiet", async () => {
-      const base = buildHealthyOverview();
-      await mountWith(base);
-
-      expect(wrapper.find('[data-test="overview-status-danger"]').exists()).toBe(false);
-      const text = wrapper.get(
-        '[data-test="overview-status-warning"] [data-test="overview-status-text"]',
-      );
-      expect(text.text()).toBe("Needs attention");
-      expect(text.classes()).toContain("text-status-warning-text");
-      expect(wrapper.get('[data-test="overview-status-item-quiet"]').text()).toBe(
-        "3 quiet streams",
-      );
+    it("opens the unfiltered pipelines list from the data health header link", async () => {
+      const push = vi.spyOn(router, "push").mockResolvedValue(undefined);
+      await mountWith(buildOverview());
+      await wrapper.get('[data-test="overview-data-health-view-all"]').trigger("click");
+      expect(push.mock.lastCall![0]).toEqual(expect.objectContaining({ name: "pipelines" }));
+      expect((push.mock.lastCall![0] as any).query).not.toHaveProperty("state");
+      push.mockRestore();
     });
 
-    it("uses the singular for a single problem", async () => {
-      const base = quietFree();
-      await mountWith({
-        ...base,
-        pipelines: { status: "ok", data: { ...base.pipelines.data!, errored: 1 } },
-      });
+    it("shows no status line when only streams went quiet", async () => {
+      await mountWith(buildHealthyOverview());
 
-      expect(wrapper.get('[data-test="overview-status-item-pipelines"]').text()).toBe(
-        "1 pipeline with errors",
-      );
+      expect(wrapper.find('[data-test^="overview-status-"]').exists()).toBe(false);
+      const quiet = '[data-test="overview-headline-quiet"] [data-test="overview-tile-value"]';
+      expect(wrapper.get(quiet).text()).toBe("3");
     });
 
     it("says nothing needs attention, with an icon, when every check is clear", async () => {
@@ -2776,6 +2867,109 @@ describe("OverviewTab", () => {
       expect(drawer().props("open")).toBe(false);
       expect(drawer().props("alertDetails")).toBeNull();
       expect(drawer().props("alertId")).toBe("");
+    });
+  });
+  describe("Ask AI hand-off", () => {
+    const aiOn = () => {
+      config.isEnterprise = "true";
+      store.commit("setConfig", {
+        ...store.state.zoConfig,
+        incidents_enabled: true,
+        ai_enabled: true,
+        features: { ai_assistant: "enabled" },
+      });
+    };
+    const mountWithProblems = async () => {
+      vi.mocked(overviewService.getOrgOverview).mockResolvedValue({
+        data: buildOverview(),
+      } as never);
+      vi.mocked(incidentsService.list).mockResolvedValue({
+        data: mockOverview.buildIncidentList(),
+      } as never);
+      wrapper = mountOverviewTab();
+      await flushPromises();
+    };
+    const ask = (id: string) => wrapper.find(`[data-test="overview-ask-ai-${id}"]`);
+
+    it("offers Ask AI next to Investigate on an open incident and emits its hand-off", async () => {
+      aiOn();
+      await mountWithProblems();
+
+      await ask("incident-incident-1").trigger("click");
+
+      const [payload] = wrapper.emitted("sendToAiChat")![0] as [Record<string, any>];
+      expect(payload).toMatchObject({ newChat: true, autoSend: false });
+      expect(payload.query).toContain("Checkout service degraded");
+      expect(payload.context).toMatchObject({
+        currentPage: "incidents",
+        incident_id: "incident-1",
+        title: "Checkout service degraded",
+        severity: "P1",
+        alert_count: 4,
+        group_values: { "k8s-namespace": "prod" },
+        org_id: store.state.selectedOrganization.identifier,
+        generated_at: buildOverview().generated_at,
+      });
+      expect(payload.context).not.toHaveProperty("level");
+      expect(ask("incident-incident-1").attributes("aria-label")).toBe(
+        "Ask AI about Checkout service degraded",
+      );
+      expect(typeof payload.context.start_time).toBe("number");
+      expect(payload.context.end_time).toBeGreaterThan(payload.context.start_time);
+    });
+
+    it("labels an untitled incident the same in the row, button and hand-off", async () => {
+      aiOn();
+      const list = mockOverview.buildIncidentList();
+      vi.mocked(overviewService.getOrgOverview).mockResolvedValue({
+        data: buildOverview(),
+      } as never);
+      vi.mocked(incidentsService.list).mockResolvedValue({
+        data: { ...list, incidents: list.incidents.map((i: any) => ({ ...i, title: "" })) },
+      } as never);
+      wrapper = mountOverviewTab();
+      await flushPromises();
+
+      expect(ask("incident-incident-1").attributes("aria-label")).toBe(
+        "Ask AI about Untitled incident",
+      );
+      await ask("incident-incident-1").trigger("click");
+      const [payload] = wrapper.emitted("sendToAiChat")![0] as [Record<string, any>];
+      expect(payload.query).toContain("Untitled incident");
+    });
+
+    it("turns a headline card into a hand-off with the range and snapshot time", async () => {
+      aiOn();
+      await mountWithProblems();
+
+      await ask("tile-failing").trigger("click");
+
+      const [payload] = wrapper.emitted("sendToAiChat")![0] as [Record<string, any>];
+      expect(payload.query).toBe("Why did 4 alert rules fail their last evaluation?");
+      expect(payload.context).toMatchObject({
+        currentPage: "Alerts",
+        kind: "failing",
+        count: 4,
+        org_id: store.state.selectedOrganization.identifier,
+      });
+    });
+
+    it("turns a firing alert row into a hand-off", async () => {
+      aiOn();
+      await mountWithProblems();
+
+      await ask("alert-high_cpu").trigger("click");
+
+      const [payload] = wrapper.emitted("sendToAiChat")![0] as [Record<string, any>];
+      expect(payload.context).toMatchObject({ alert_name: "high_cpu", stream: "cpu_usage" });
+    });
+
+    it("shows no Ask AI button anywhere when AI is off", async () => {
+      aiOn();
+      store.commit("setConfig", { ...store.state.zoConfig, ai_enabled: false, features: {} });
+      await mountWithProblems();
+
+      expect(wrapper.find('[data-test^="overview-ask-ai-"]').exists()).toBe(false);
     });
   });
 });
