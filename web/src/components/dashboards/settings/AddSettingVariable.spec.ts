@@ -563,6 +563,29 @@ describe("AddSettingVariable", () => {
       );
     });
 
+    it("offers PromQL only the metric's labels, not its storage columns", async () => {
+      wrapper.vm.form.setFieldValue("query_data.stream_type", "metrics");
+      wrapper.vm.form.setFieldValue("query_data.query_type", "promql");
+      await flushPromises();
+      wrapper.vm.data.currentFieldsList = [
+        { name: "__hash__", type: "Utf8" },
+        { name: "__name__", type: "Utf8" },
+        { name: "_timestamp", type: "Int64" },
+        { name: "cluster", type: "Utf8" },
+        { name: "value", type: "Float64" },
+      ];
+      await flushPromises();
+      expect(builder().props("fields")).toEqual([{ name: "cluster", type: "string" }]);
+      const fieldOptions = wrapper
+        .findComponent('[data-test="dashboard-variable-field-select"]')
+        .props("options")
+        .map((option: any) => option.name);
+      expect(fieldOptions).toContain("cluster");
+      expect(fieldOptions).not.toContain("__hash__");
+      expect(fieldOptions).not.toContain("_timestamp");
+      expect(fieldOptions).not.toContain("value");
+    });
+
     it("loads no values while the stream is itself a $variable", async () => {
       wrapper.vm.form.setFieldValue("query_data.stream_type", "logs");
       wrapper.vm.form.setFieldValue("query_data.stream", "$stream");

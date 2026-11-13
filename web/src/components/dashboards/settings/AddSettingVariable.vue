@@ -555,6 +555,7 @@ import { addVariable, getDashboard, updateVariable } from "../../../utils/common
 import { useRoute } from "vue-router";
 import { useLoading } from "../../../composables/useLoading";
 import { useDashboardSettingsDraft } from "./dashboardSettingsDraft";
+import { INTERNAL_FIELDS } from "@/utils/metrics/metricFamily";
 import { stableStringify } from "@/utils/drafts/editorDraftStore";
 import DashboardHeader from "./common/DashboardHeader.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -1675,8 +1676,17 @@ export default defineComponent({
 
     const filterBuilderRef = ref<FilterBuilderExpose | null>(null);
 
+    // A metrics stream's schema holds storage columns beside its labels; PromQL can only match labels.
+    const streamFields = computed(() =>
+      queryLanguage.value === "promql"
+        ? (data.currentFieldsList ?? []).filter(
+            (field: any) => !INTERNAL_FIELDS.has(field?.name) && !field?.name?.startsWith("__"),
+          )
+        : (data.currentFieldsList ?? []),
+    );
+
     const filterFields = computed<FilterField[]>(() =>
-      (data.currentFieldsList ?? [])
+      streamFields.value
         .filter((field: any) => field?.name)
         .map((field: any) => ({ name: field.name, type: toFilterFieldType(field.type) })),
     );
@@ -1740,7 +1750,7 @@ export default defineComponent({
       const variableItems = dashboardVariablesFilterItems.value.map((v: any) => ({
         name: v.value,
       }));
-      return [...variableItems, ...(data.currentFieldsList || [])];
+      return [...variableItems, ...streamFields.value];
     });
 
     const mergedFieldOptionsWithLabel = computed(() =>
