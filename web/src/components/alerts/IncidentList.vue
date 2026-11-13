@@ -69,6 +69,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <template #icon-left><OIcon name="radio-button-unchecked" size="sm" /></template>
                 {{ t("alerts.incidents.filterActive") }}
               </OToggleGroupItem>
+              <OToggleGroupItem value="open" size="sm" data-test="incident-status-filter-open">
+                <template #icon-left><OIcon name="error-outline" size="sm" /></template>
+                {{ t("alerts.incidents.statusOpen") }}
+              </OToggleGroupItem>
               <OToggleGroupItem
                 value="resolved"
                 size="sm"
@@ -509,16 +513,17 @@ export default defineComponent({
         ? t("alerts.downtimes.incident.notLoadedTooltip", { id })
         : t("alerts.downtimes.incident.mutedBy", { name: nameOf(id) });
     const searchQuery = ref("");
-    // Primary filter groups the lifecycle like other list pages: Active covers
-    // both open and acknowledged (still needs attention), Resolved is done.
-    const validStatuses = ["all", "active", "resolved"];
-    // Default to "active" so the page opens focused on incidents that need
-    // attention (a saved state or ?status= query still wins).
-    const statusFilter = ref(
-      validStatuses.includes(route.query.status as string)
-        ? (route.query.status as string)
-        : "active",
-    );
+    // Active covers open and acknowledged; Open is open only, matching the Overview count.
+    const validStatuses = ["all", "active", "open", "resolved"];
+    // Default to "active"; a valid ?status= query wins over the saved state.
+    const urlStatus = validStatuses.includes(route.query.status as string)
+      ? (route.query.status as string)
+      : null;
+    if (route.query.status !== undefined) {
+      const { status: _status, ...rest } = route.query;
+      router.replace({ query: rest });
+    }
+    const statusFilter = ref(urlStatus ?? "active");
     const isRestoringState = ref(false);
     const viewState = useListViewState("incidents", {
       severityFilter: "all",
@@ -536,7 +541,8 @@ export default defineComponent({
       savePageState();
     };
     // Severity facet — independent of status ("all" | "P1".."P4").
-    const severityFilter = ref(viewState.severityFilter);
+    // A status link lands on every severity of that status, so the saved facet is dropped.
+    const severityFilter = ref(urlStatus ? "all" : viewState.severityFilter);
     watch([severityFilter, pageSize, sortBy, sortOrder], () => {
       Object.assign(viewState, {
         severityFilter: severityFilter.value,
@@ -669,6 +675,9 @@ export default defineComponent({
       const rows = searchedIncidents.value;
       if (statusFilter.value === "active") {
         return rows.filter((i) => i.status === "open" || i.status === "acknowledged");
+      }
+      if (statusFilter.value === "open") {
+        return rows.filter((i) => i.status === "open");
       }
       if (statusFilter.value === "resolved") {
         return rows.filter((i) => i.status === "resolved");
@@ -1081,13 +1090,13 @@ export default defineComponent({
         if (cachedData && cachedData.length > 0) {
           allIncidents.value = cachedData;
         }
-        if (savedState.searchQuery !== undefined) {
+        if (savedState.searchQuery !== undefined && !urlStatus) {
           searchQuery.value = savedState.searchQuery;
         }
-        if (savedState.statusFilter !== undefined) {
+        if (savedState.statusFilter !== undefined && !urlStatus) {
           statusFilter.value = savedState.statusFilter;
         }
-        if (savedState.pagination?.page) {
+        if (savedState.pagination?.page && !urlStatus) {
           currentPage.value = savedState.pagination.page;
         }
         return true;

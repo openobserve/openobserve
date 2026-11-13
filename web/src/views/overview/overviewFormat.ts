@@ -30,7 +30,7 @@ import type {
 
 export type OverviewView = "loading" | "error" | "forbidden" | "locked" | "empty" | "ok";
 
-export type OverviewDestination = "alerts" | "pipelines" | "streams";
+export type OverviewDestination = "failing" | "delivery" | "pipelines" | "streams";
 
 export const TOP_STREAMS_LIMIT = 6;
 

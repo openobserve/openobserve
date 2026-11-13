@@ -15,6 +15,8 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { mount } from "@vue/test-utils";
+import config from "@/aws-exports";
+import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
 import OverviewHeadlineStrip from "./OverviewHeadlineStrip.vue";
 import { buildOverview } from "./overviewFixtures";
@@ -31,7 +33,7 @@ const mountStrip = (props: Partial<Props> = {}) =>
       incidentsTotal: 6,
       ...props,
     } as Props,
-    global: { plugins: [i18n] },
+    global: { plugins: [i18n, store] },
   });
 
 const tile = (w: ReturnType<typeof mountStrip>, key: string) =>
@@ -370,4 +372,84 @@ describe("OverviewHeadlineStrip", () => {
     await tile(w, "delivery").trigger("click");
     expect(w.emitted("select")).toEqual([["firing"], ["failing"], ["incidents"], ["delivery"]]);
   });
+});
+
+describe("OverviewHeadlineStrip Ask AI", () => {
+  let zo: Record<string, unknown>;
+  let flag: string;
+  const askBtn = (w: ReturnType<typeof mountStrip>, key: string) =>
+    w.find(`[data-test="overview-ask-ai-tile-${key}"]`);
+  const mountAi = (props: Partial<Props> = {}) =>
+    mount(OverviewHeadlineStrip, {
+      props: {
+        overview: buildOverview(),
+        pending: false,
+        failed: false,
+        incidentsState: "ok",
+        incidentsTotal: 6,
+        ...props,
+      } as Props,
+      global: { plugins: [i18n, store] },
+    });
+
+  beforeEach(() => {
+    zo = { ...store.state.zoConfig };
+    flag = config.isEnterprise;
+    config.isEnterprise = "true";
+    store.commit("setConfig", { ...zo, ai_enabled: true, features: { ai_assistant: "enabled" } });
+  });
+  afterEach(() => {
+    config.isEnterprise = flag;
+    store.commit("setConfig", zo);
+  });
+
+  it("offers Ask AI on every tile in a problem state and not on a zero tile", () => {
+    const w = mountAi();
+    for (const key of ["firing", "failing", "incidents", "pipelines", "quiet"])
+      expect(askBtn(w, key).exists(), key).toBe(true);
+    expect(askBtn(w, "delivery").exists()).toBe(false);
+  });
+
+  it("keeps the button a sibling of the clickable tile, never inside it", () => {
+    const w = mountAi();
+    const btn = askBtn(w, "firing");
+    expect(btn.element.closest('[data-test="overview-headline-firing"]')).toBeNull();
+    expect(btn.element.closest('[data-test="overview-tile-card-firing"]')).not.toBeNull();
+  });
+
+  it("emits the count target without a level", async () => {
+    const w = mountAi();
+    await askBtn(w, "firing").trigger("click");
+    await askBtn(w, "quiet").trigger("click");
+    expect(w.emitted("askAi")).toEqual([
+      [{ kind: "count", topic: "firing", count: 3 }],
+      [{ kind: "count", topic: "quiet", count: 3 }],
+    ]);
+    await askBtn(w, "failing").trigger("click");
+    expect(w.emitted("askAi")![0][0]).not.toHaveProperty("level");
+    expect(askBtn(w, "firing").attributes("aria-label")).toBe("Ask AI about Firing alerts");
+    expect(w.emitted("select")).toBeUndefined();
+  });
+
+  it("is hidden when AI is disabled", () => {
+    store.commit("setConfig", { ...zo, ai_enabled: false, features: {} });
+    expect(askBtn(mountAi(), "firing").exists()).toBe(false);
+  });
+
+  it.each([
+    ["loading", { pending: true }],
+    ["failed", { failed: true }],
+    ["forbidden", { forbidden: true }],
+  ])("is hidden while the section is %s", (_name, props) => {
+    const w = mountAi(props as Partial<Props>);
+    for (const key of ["firing", "failing", "pipelines", "quiet"])
+      expect(askBtn(w, key).exists(), key).toBe(false);
+  });
+
+  it.each(["locked", "loading", "error", "forbidden", "unavailable"] as const)(
+    "hides the incidents button when incidents are %s",
+    (state) => {
+      expect(askBtn(mountAi({ incidentsState: state }), "incidents").exists()).toBe(false);
+    },
+  );
 });
