@@ -17,11 +17,11 @@ import { raw, type I18nKey, type I18nText, type TranslateFn } from "@/types/i18n
 import type { AutoObserveIncidentItem } from "@/services/autoobserve";
 import type {
   IncidentAlert,
-  IncidentEvent,
   RcaBand,
   RcaHypothesisStatus,
   RcaSummarySuspectChange,
 } from "@/services/incidents";
+import type { IncidentEvent } from "@/services/incidents.queries";
 import type {
   Analysis,
   HypothesisVerdict,

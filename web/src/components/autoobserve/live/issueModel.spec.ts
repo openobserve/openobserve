@@ -17,7 +17,8 @@ import { describe, expect, it } from "vitest";
 import "@/locales";
 import { gt } from "@/types/i18n";
 import type { AutoObserveIncidentItem } from "@/services/autoobserve";
-import type { IncidentAlert, IncidentEvent } from "@/services/incidents";
+import type { IncidentAlert } from "@/services/incidents";
+import type { IncidentEvent } from "@/services/incidents.queries";
 import {
   TIMELINE_CAP,
   issueComparisonMissing,

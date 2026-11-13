@@ -726,13 +726,6 @@ export interface IncidentWithAlerts extends Incident {
   composite_alerts?: CompositeAlertSummary[];
 }
 
-/** One entry of `GET …/incidents/{id}/events`; `timestamp` is in microseconds. */
-export interface IncidentEvent {
-  type: string;
-  timestamp: number;
-  data?: { user_id?: string; comment?: string; [key: string]: unknown } | null;
-}
-
 export interface ExternalAlertPayload {
   id: string;
   detected_source: string;
