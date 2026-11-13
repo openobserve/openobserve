@@ -124,6 +124,7 @@ export interface Preview {
   /** The revision the caller saw, sent back as `expected_revision`; 0 before any decision. */
   revision: number;
   current: DecisionView | null;
+  offer_fingerprint?: string;
   locked?: Refusal;
   /** Sent for an apply only. */
   change?: ChangePreview;
@@ -143,6 +144,7 @@ export interface DecisionRequest {
   until_reopened?: boolean;
   /** Records an apply the editor's Save already wrote. */
   applied_via?: "editor";
+  offer_fingerprint?: string;
   expected_revision?: number;
   /** One per dialog, so a double click or a retry writes once. */
   request_id?: string;
@@ -215,6 +217,11 @@ export const isRouteDisabled = (error: unknown): boolean => statusOf(error) === 
 export const isItemGone = (error: unknown): boolean =>
   statusOf(error) === 404 &&
   (error as { response?: { data?: { error?: unknown } } }).response?.data?.error === "not_found";
+
+export const isOfferChanged = (error: unknown): boolean =>
+  statusOf(error) === 409 &&
+  (error as { response?: { data?: { error?: unknown } } }).response?.data?.error ===
+    "offer_changed";
 
 /** A refusal carries `decision_refused`; any other 403 is the access layer's own. */
 export function refusalOf(error: unknown): Refusal | null {

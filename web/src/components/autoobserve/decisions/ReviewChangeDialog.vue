@@ -25,16 +25,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :secondary-button-label="t('common.cancel')"
     secondary-button-variant="outline"
     :primary-button-label="
-      canApplyHere ? t('insight.decisions.apply.button') : t('insight.decisions.apply.edit')
+      reviewRequired
+        ? t('insight.decisions.apply.reviewAgain')
+        : canApplyHere
+          ? t('insight.decisions.apply.button')
+          : t('insight.decisions.apply.edit')
     "
-    :primary-button-data-test="canApplyHere ? 'review-change-apply' : 'review-change-edit'"
-    :primary-button-disabled="canApplyHere && !applicable"
+    :primary-button-data-test="
+      reviewRequired
+        ? 'review-change-review-again'
+        : canApplyHere
+          ? 'review-change-apply'
+          : 'review-change-edit'
+    "
+    :primary-button-disabled="
+      reviewRequired ? preview.isFetching.value : canApplyHere && !applicable
+    "
     :primary-button-loading="canApplyHere ? applying : opening"
     data-test="review-change-dialog"
     @update:open="emit('update:open', $event)"
     @click:neutral="openEditor"
     @click:secondary="emit('update:open', false)"
-    @click:primary="canApplyHere ? apply() : openEditor()"
+    @click:primary="reviewRequired ? reviewAgain() : canApplyHere ? apply() : openEditor()"
   >
     <div class="flex flex-col gap-3">
       <p
@@ -133,6 +145,7 @@ import {
 } from "@/composables/autoobserve/useDecisionRoute";
 import {
   isItemGone,
+  isOfferChanged,
   isRouteDisabled,
   refusalOf,
   type FieldChange,
@@ -147,7 +160,7 @@ import {
 } from "@/components/alert_calibration/applySuggestion";
 import { alertFolderOf, editAlertRoute } from "@/components/alert_calibration/alertEditorLink";
 import { decisionCopy } from "../insight/insightCopy";
-import { recordApplied, type ReviewChangeTarget } from "./appliedChanges";
+import { recordApplied, reviewedOfferNotice, type ReviewChangeTarget } from "./appliedChanges";
 
 type Variant = "info" | "warning" | "error";
 
@@ -169,6 +182,7 @@ const decisions = computed(() => decisionCopy(t, locale.value));
 
 const applying = ref(false);
 const opening = ref(false);
+const reviewRequired = ref(false);
 const writeNotice = ref<{ variant: Variant; text: I18nText } | null>(null);
 let requestId = newRequestId();
 
@@ -177,6 +191,7 @@ watch(
   (open) => {
     if (!open) return;
     writeNotice.value = null;
+    reviewRequired.value = false;
     requestId = newRequestId();
   },
 );
@@ -285,6 +300,7 @@ const isLocked = computed(() => !!preview.data.value?.locked || !!refusalOf(prev
 const applicable = computed(
   () =>
     !!preview.data.value?.change &&
+    !!preview.data.value.offer_fingerprint &&
     preview.data.value.may &&
     !preview.data.value.locked &&
     !preview.isFetching.value &&
@@ -292,6 +308,7 @@ const applicable = computed(
 );
 
 const writeNoticeOf = (error: unknown): { variant: Variant; text: I18nText } => {
+  if (isOfferChanged(error)) return reviewedOfferNotice(t);
   const response = (error as { response?: { status?: number; data?: { error?: unknown } } })
     ?.response;
   if (response?.status === 409 && response.data?.error === "alert_changed")
@@ -316,6 +333,7 @@ async function apply() {
         id: props.target.findingId,
         action: "apply",
         expected_revision: current.revision,
+        offer_fingerprint: current.offer_fingerprint,
         request_id: requestId,
       },
       title,
@@ -324,17 +342,27 @@ async function apply() {
       org,
       view: result.decision,
       title,
-      fields: fields.value,
+      fields: current.change?.fields ?? fields.value,
       alertId: props.target.alertId,
     });
     emit("update:open", false);
   } catch (error) {
     writeNotice.value = writeNoticeOf(error);
+    reviewRequired.value = isOfferChanged(error);
     // A conflict or a gone finding means the alert moved on, so the values shown are re-read.
-    if (isItemGone(error) || statusOf(error) === 409) void preview.refetch();
+    if (!reviewRequired.value && (isItemGone(error) || statusOf(error) === 409))
+      void preview.refetch();
   } finally {
     applying.value = false;
   }
+}
+
+async function reviewAgain() {
+  const result = await preview.refetch();
+  if (result.isError) return;
+  writeNotice.value = null;
+  reviewRequired.value = false;
+  requestId = newRequestId();
 }
 
 // The editor reads the same stored change, and its Save records the apply with applied_via editor.

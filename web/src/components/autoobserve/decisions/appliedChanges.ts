@@ -15,6 +15,7 @@
 
 import { computed, ref, type MaybeRefOrGetter, toValue } from "vue";
 import type { AppliedEvidence, DecisionView, FieldChange } from "@/services/autoobserveDecisions";
+import type { I18nText, TranslateFn } from "@/types/i18n";
 import type { ApplySuggestion } from "@/components/alert_calibration/applySuggestion";
 
 /** What "Review change" opens: the finding, its alert and the change the finding stores. */
@@ -100,3 +101,8 @@ export const useAppliedChanges = (
     }
     return [...rows.values()].sort((a, b) => b.view.decided_at - a.view.decided_at);
   });
+
+export const reviewedOfferNotice = (t: TranslateFn): { variant: "error"; text: I18nText } => ({
+  variant: "error",
+  text: t("insight.decisions.apply.offerChanged"),
+});

@@ -34412,6 +34412,8 @@
         "acknowledgedFirst": "{count} of the {of} acknowledged firings would no longer alert, the first on {first}. Check it before applying.",
         "note": "Only the settings above change; the rest of the alert stays as it is. You can undo it while nobody else has changed the alert.",
         "changed": "This alert changed. Open it to review.",
+        "offerChanged": "The suggested change was updated. Review it again.",
+        "reviewAgain": "Review again",
         "loading": "Checking what this changes…",
         "loadFailed": "Couldn't check what this changes, so it can't be applied here. Edit it in the alert editor instead.",
         "offline": "Apply isn't available here yet. Edit it in the alert editor; nothing changes until you save.",
