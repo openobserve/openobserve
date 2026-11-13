@@ -42,6 +42,7 @@ vectorscan = [
     "search_service/vectorscan",
     "stream/vectorscan",
 ]
+mimalloc = ["dep:libmimalloc-sys"]
 cpu-profiling = ["openobserve-core/cpu-profiling"]
 profiling = ["cpu-profiling", "openobserve-core/profiling"]
 
@@ -67,6 +68,7 @@ http.workspace = true
 infra.workspace = true
 ingester.workspace = true
 itertools.workspace = true
+libmimalloc-sys = { workspace = true, optional = true, features = ["extended"] }
 log.workspace = true
 mime.workspace = true
 o2_dex = { workspace = true, optional = true }

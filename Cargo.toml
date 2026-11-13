@@ -49,7 +49,7 @@ cloud = [
     "openobserve-core/cloud",
     "openobserve-jobs/cloud",
 ]
-mimalloc = ["dep:mimalloc"]
+mimalloc = ["dep:mimalloc", "openobserve-api-management/mimalloc"]
 jemalloc = ["dep:tikv-jemallocator"]
 cpu-profiling = [
     "openobserve-api-http/cpu-profiling",
@@ -147,7 +147,7 @@ log.workspace = true
 maxminddb.workspace = true
 md5.workspace = true
 memchr.workspace = true
-mimalloc = { version = "0.1.48", features = ["v3"], optional = true }
+mimalloc = { version = "0.1.52", optional = true }
 opentelemetry.workspace = true
 opentelemetry_sdk.workspace = true
 opentelemetry-otlp.workspace = true
@@ -485,6 +485,7 @@ lettre = { version = "0.11", default-features = false, features = [
     "tokio1-rustls-tls",
     "aws-lc-rs",
 ] }
+libmimalloc-sys = "0.1.49"
 log = "0.4"
 md5 = "0.8.0"
 memchr = "2.7"

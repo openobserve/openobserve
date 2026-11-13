@@ -115,6 +115,7 @@ fn create_cli_app() -> Command {
                 Command::new("offline").about("offline node"),
                 Command::new("online").about("online node"),
                 Command::new("flush").about("flush memtable to disk"),
+                Command::new("release-memory").about("force mimalloc to return freed memory to the OS"),
                 Command::new("status").about("show node status"),
                 Command::new("list").about("list cached nodes").args([
                     arg!("metrics", 'm', "metrics", "show node metrics", false).action(ArgAction::SetTrue),
@@ -483,6 +484,9 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                 Some(("flush", _)) => {
                     super::http::node_flush().await?;
                 }
+                Some(("release-memory", _)) => {
+                    super::http::node_release_memory().await?;
+                }
                 Some(("status", _)) => {
                     super::http::node_status().await?;
                 }
@@ -839,6 +843,18 @@ mod tests {
         assert_eq!(name, "node");
         let (sub_name, _) = sub_matches.subcommand().unwrap();
         assert_eq!(sub_name, "offline");
+    }
+
+    #[test]
+    fn test_node_release_memory_command() {
+        let app = create_test_app();
+        let matches = app
+            .try_get_matches_from(["openobserve", "node", "release-memory"])
+            .unwrap();
+        let (name, sub_matches) = matches.subcommand().unwrap();
+        assert_eq!(name, "node");
+        let (sub_name, _) = sub_matches.subcommand().unwrap();
+        assert_eq!(sub_name, "release-memory");
     }
 
     #[test]

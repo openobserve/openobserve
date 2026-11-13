@@ -119,6 +119,26 @@ pub async fn node_flush() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+pub async fn node_release_memory() -> Result<(), anyhow::Error> {
+    let response = request("/node/release_memory", None, reqwest::Method::PUT).await?;
+    let Some(body) = response else {
+        return Err(anyhow::anyhow!("node release memory failed"));
+    };
+    let response: serde_json::Value = serde_json::from_str(&body)?;
+    let field = |key: &str| response.get(key).and_then(|v| v.as_f64()).unwrap_or(0.0);
+    println!(
+        "rss: {} -> {} (released {}), mimalloc commit: {} -> {} (released {}), took: {} ms",
+        bytes_to_human_readable(field("rss_before")),
+        bytes_to_human_readable(field("rss_after")),
+        signed_bytes(field("rss_released")),
+        bytes_to_human_readable(field("commit_before")),
+        bytes_to_human_readable(field("commit_after")),
+        signed_bytes(field("commit_released")),
+        field("elapsed_ms"),
+    );
+    Ok(())
+}
+
 pub async fn node_status() -> Result<(), anyhow::Error> {
     let url = "/node/status";
     let response = request(url, None, reqwest::Method::GET).await?;
@@ -396,6 +416,14 @@ pub async fn node_reload(modules: Vec<String>) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+fn signed_bytes(bytes: f64) -> String {
+    if bytes < 0.0 {
+        format!("-{}", bytes_to_human_readable(-bytes))
+    } else {
+        bytes_to_human_readable(bytes)
+    }
+}
+
 async fn request(
     url: &str,
     body: Option<Vec<u8>>,
@@ -437,6 +465,13 @@ mod tests {
     use prettytable::{Cell, Row, Table};
 
     use super::*;
+
+    #[test]
+    fn signed_bytes_keeps_the_sign_of_growth() {
+        assert_eq!(signed_bytes(2048.0), "2.00 KB");
+        assert_eq!(signed_bytes(-2048.0), "-2.00 KB");
+        assert_eq!(signed_bytes(0.0), "0 B");
+    }
 
     #[tokio::test]
     async fn test_query_invalid_time_range() {
