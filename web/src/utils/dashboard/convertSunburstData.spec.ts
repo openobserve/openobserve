@@ -20,7 +20,7 @@ import { buildSQLChartQuery } from "./dashboardAutoQueryBuilder";
 import { labelColorOn } from "./chartLabelContrast";
 
 vi.mock("./convertCustomChartData", () => ({
-  runJavaScriptCode: vi.fn(),
+  prepareCustomChartRun: vi.fn(),
   validateUserCode: vi.fn(() => null),
 }));
 // The converter and ECharts must measure text alike, as the browser canvas does for both.

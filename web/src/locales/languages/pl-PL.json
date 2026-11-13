@@ -9870,7 +9870,6 @@
       "duplicatePanelId": "Znaleziono zduplikowane ID panelu: {id}",
       "panelMissingLayoutI": "Panel {id} nie ma wartości layout.i",
       "duplicateLayoutI": "Znaleziono zduplikowaną wartość layout.i w karcie {tabId}: {value}",
-      "customChartCallbacksDropped": "Wykres niestandardowy: zignorowano {count} wywołanie zwrotne funkcji w kodzie tego panelu. Zapisany kod wykresu nie może uruchamiać wywołań zwrotnych w aplikacji; użyj zwykłych wartości. | Wykres niestandardowy: zignorowano {count} wywołań zwrotnych funkcji w kodzie tego panelu. Zapisany kod wykresu nie może uruchamiać wywołań zwrotnych w aplikacji; użyj zwykłych wartości.",
       "unsafeCodeDetected": "Wykryto niebezpieczny kod: {error}",
       "forbiddenFunctionCall": "Użycie '{name}()' jest niedozwolone.",
       "forbiddenInsideSetTimeout": "Użycie {name} wewnątrz 'setTimeout()' jest niedozwolone.",

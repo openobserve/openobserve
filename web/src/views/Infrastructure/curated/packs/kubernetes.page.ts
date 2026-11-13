@@ -17,6 +17,7 @@
 
 import { GROUP, STALENESS_24H_US, type CuratedPageManifest, type CuratedPanelDef } from "../types";
 import { explorerDrilldown } from "./drilldown";
+import { CUSTOM_CHART_DRILLDOWN_EVENTS } from "@/utils/dashboard/customChartSandbox";
 
 const CLUSTER = "${f:k8s-cluster}";
 const NODE = "${f:k8s-node-name}";
@@ -25,12 +26,12 @@ const POD = "${f:k8s-pod-name}";
 const CONTAINER = "${f:k8s-container-name}";
 
 /** The fleet quadrant's bubble click, carrying `detail.cluster`; CuratedPageView routes it so the SPA is never torn down. */
-export const FLEET_DRILLDOWN_EVENT = "o2-curated-cluster-drilldown";
+export const FLEET_DRILLDOWN_EVENT = CUSTOM_CHART_DRILLDOWN_EVENTS.cluster;
 
 /** The tab a fleet-quadrant bubble drills into. */
 export const FLEET_DRILLDOWN_TAB = "health";
 
-// Author JS for the fleet quadrant: the ${theme:} tokens are resolved by translateTitles (useCuratedPage.ts) because the sandbox CSP blocks every stylesheet.
+// Author JS for the fleet quadrant: the ${theme:} tokens are resolved by translateTitles (useCuratedPage.ts) because the sandbox frame has none of the app's stylesheets.
 /* eslint-disable local/no-hardcoded-px -- the tooltip CSS below is serialised by ECharts into its own container, where no CSS cascade resolves rem */
 const FLEET_QUADRANT_JS = `
 var byCluster = {};
@@ -170,7 +171,6 @@ var state = function (p) {
 var STATE_COLOR = { ok: HEALTHY, warn: WARNING, crit: CRITICAL, cost: COST };
 var STATE_LABEL = { ok: "Healthy", warn: "Isolated fault", crit: "Fault pattern", cost: "Over-provisioned" };
 
-// Sizes are baked into each data item, never a symbolSize callback: a function crossing the sandbox is serialized and loses this closure.
 // sqrt so AREA, not radius, tracks allocatable cores — a radius-linear bubble overstates a big cluster fourfold.
 var radius = function (cores) {
   return 9 + 25 * Math.sqrt((cores > 0 ? cores : 0) / maxCores);
@@ -272,7 +272,6 @@ option = {
     padding: [8, 12],
     textStyle: { color: TIP_TEXT, fontSize: 12 },
     extraCssText: "max-width: 500px; user-select: text; border-radius: 8px !important;",
-    // No \`&&\` and no HTML entities in this body: DOMPurify.sanitize runs over the serialized function text and would escape them into a syntax error.
     formatter: function (p) {
       if (!p.data) return "";
       var d = p.data.meta;
@@ -363,16 +362,12 @@ option = {
       },
     },
   ],
-  // The handler below is serialized with NO closure, so the axis chrome has to cross as data rather than as captured vars.
+  // Read back by \`finished\` from the live chart option, so the handler and the seeded grid share one source.
   o2_layout: { axisLeft: AXIS_LEFT, axisTop: AXIS_TOP, axisBottom: AXIS_BOTTOM, axisRight: AXIS_RIGHT },
-  // Serialized across the sandbox and rebuilt by CustomChartRenderer in the PARENT, which is the only reason this can reach the page at all.
   o2_events: {
     // Announces the pick and lets CuratedPageView route it: location.assign here would tear down and reload the whole SPA.
-    // Reaches the document off the chart's own DOM node: every global here would be a free identifier the sandbox never passes in.
-    // No "<" and no "&" ANYWHERE in this body: DOMPurify.sanitize runs over the serialized function text, escaping "&" and TRUNCATING the function at "<".
-    // The sandbox cannot read the canvas — only \`data\` and \`echarts\` are in scope at build time — so the square is solved HERE, where a live chart exists.
+    // The option is built before the chart has a size, so the square is solved HERE, where a live chart exists.
     // \`finished\` fires after every render including every resize(), which is what makes this responsive at all.
-    // No "<" and no "&" in this body either: it crosses the same DOMPurify pass as the click handler.
     finished: function (params, chart) {
       // ECharts returns a KNOWN component as an array but hands an unrecognised top-level key straight back as the object it was given.
       var raw = chart.getOption().o2_layout;
@@ -381,7 +376,6 @@ option = {
       var w = chart.getWidth();
       var h = chart.getHeight();
       var side = Math.min(w - cfg.axisLeft - cfg.axisRight, h - cfg.axisTop - cfg.axisBottom);
-      // Clamped via Math.max, never a less-than test: that operator would be TRUNCATED by the DOMPurify pass this handler crosses.
       side = Math.max(side, 40);
       var slackX = Math.max(w - cfg.axisLeft - cfg.axisRight - side, 0);
       var slackY = Math.max(h - cfg.axisTop - cfg.axisBottom - side, 0);
@@ -395,7 +389,6 @@ option = {
         containLabel: false,
       };
       // Re-entrancy guard: setOption paints, painting fires \`finished\` again, so an unconditional apply never settles.
-      // Counted rather than chained with a boolean-and, which DOMPurify would escape into an entity and break the parse.
       var live = (chart.getOption().grid || [])[0] || {};
       var same = 0;
       if (live.left === next.left) same += 1;
@@ -404,8 +397,7 @@ option = {
       if (live.bottom === next.bottom) same += 1;
       if (same === 4) return;
       // Deferred because ECharts rejects a setOption issued inside the render pass with "should not be called during main process".
-      // Re-measured inside the timer: CustomChartRenderer re-applies the STATIC seeded option on every data refresh, so the size
-      // captured above can already be stale by the time this runs, which paints the plot as a narrow strip.
+      // Re-measured inside the timer: every data refresh re-applies the seeded option, so the size captured above can be stale.
       setTimeout(function () {
         var lw = chart.getWidth();
         var lh = chart.getHeight();
@@ -429,11 +421,8 @@ option = {
       if (!params.data) return;
       var meta = params.data.meta;
       if (!meta) return;
-      var doc = chart.getDom().ownerDocument;
-      // Bubbles because the listener sits on the document, not on this chart's container.
-      doc.dispatchEvent(
-        new CustomEvent("${FLEET_DRILLDOWN_EVENT}", { detail: { cluster: String(meta.name) }, bubbles: true }),
-      );
+      // The frame has no route to the page; the parent validates the drilldown and CuratedPageView routes it.
+      o2.drilldown("cluster", { cluster: String(meta.name) });
     },
   },
 };

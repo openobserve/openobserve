@@ -9870,7 +9870,6 @@
       "duplicatePanelId": "Tìm thấy ID panel trùng lặp: {id}",
       "panelMissingLayoutI": "Panel {id} thiếu giá trị layout.i",
       "duplicateLayoutI": "Tìm thấy giá trị layout.i trùng lặp trong tab {tabId}: {value}",
-      "customChartCallbacksDropped": "Biểu đồ tùy chỉnh: {count} hàm callback trong mã của panel này đã bị bỏ qua. Mã biểu đồ đã lưu không thể chạy callback trong ứng dụng; hãy dùng giá trị thường thay thế. | Biểu đồ tùy chỉnh: {count} hàm callback trong mã của panel này đã bị bỏ qua. Mã biểu đồ đã lưu không thể chạy callback trong ứng dụng; hãy dùng giá trị thường thay thế.",
       "unsafeCodeDetected": "Phát hiện mã không an toàn: {error}",
       "forbiddenFunctionCall": "Không được phép sử dụng '{name}()'.",
       "forbiddenInsideSetTimeout": "Không được phép sử dụng {name} bên trong 'setTimeout()'.",

@@ -9870,7 +9870,6 @@
       "duplicatePanelId": "ID de panneau en double trouvé : {id}",
       "panelMissingLayoutI": "Le panneau {id} n'a pas de valeur layout.i",
       "duplicateLayoutI": "Valeur layout.i en double trouvée dans l'onglet {tabId} : {value}",
-      "customChartCallbacksDropped": "Graphique personnalisé : {count} fonction de rappel dans le code de ce panneau a été ignorée. Le code de graphique stocké ne peut pas exécuter de fonctions de rappel dans l'application ; utilisez des valeurs simples à la place. | Graphique personnalisé : {count} fonctions de rappel dans le code de ce panneau ont été ignorées. Le code de graphique stocké ne peut pas exécuter de fonctions de rappel dans l'application ; utilisez des valeurs simples à la place.",
       "unsafeCodeDetected": "Code non sécurisé détecté : {error}",
       "forbiddenFunctionCall": "L'utilisation de '{name}()' n'est pas autorisée.",
       "forbiddenInsideSetTimeout": "L'utilisation de {name} dans 'setTimeout()' n'est pas autorisée.",

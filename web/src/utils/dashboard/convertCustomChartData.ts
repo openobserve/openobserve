@@ -18,21 +18,13 @@ import * as walk from "acorn-walk";
 import { ref } from "vue";
 
 import { gt } from "@/types/i18n";
-import echartsUrl from "echarts/dist/echarts.min.js?url";
-import dompurifyUrl from "dompurify/dist/purify.min.js?url";
+import type { CustomChartRun } from "./customChartSandbox";
 
 // Single-panel refresh targets, each mapped to whether its load has settled; emptied once all have.
 export const panelRefreshTargets = new Map<string, boolean>();
 
 // Bumped when a single-panel refresh ends, so charts that skipped a run meanwhile can replay it.
 export const panelRefreshEpoch = ref(0);
-
-// import.meta.url is this chunk's URL, so relative ?url paths resolve to the correct assets directory.
-const sandboxEchartsUrl = new URL(echartsUrl, import.meta.url).href;
-const sandboxDompurifyUrl = new URL(dompurifyUrl, import.meta.url).href;
-
-// Exact first-party chart code allowed to run its callbacks in the app origin; stored dashboard code never is.
-const trustedCustomChartCode = new Set<string>();
 
 /** Read-only dashboard state handed to custom chart code as `context`. */
 export interface CustomChartContext {
@@ -59,222 +51,19 @@ export const settlePanelRefresh = (panelId: string | undefined) => {
   }
 };
 
-/** Runs the panel's chart code in a sandboxed iframe and resolves with its ECharts option. */
-export const runJavaScriptCode = (
-  panelSchema: any,
-  searchQueryData: any,
+/** Builds a panel run for the sandbox renderer; throws CustomChartSkippedError while another panel refreshes. */
+export const prepareCustomChartRun = (
+  panelSchema: { id?: string; customChartContent?: string },
+  searchQueryData: unknown,
   context?: CustomChartContext,
-) => {
-  return new Promise((resolve, reject) => {
-    if (isSkippedByPanelRefresh(panelSchema.id)) {
-      reject(new CustomChartSkippedError());
-      return;
-    }
-
-    const iframe = document.createElement("iframe");
-    iframe.style.display = "none";
-    iframe.setAttribute("sandbox", "allow-scripts");
-    document.body.appendChild(iframe);
-
-    let userCode = panelSchema.customChartContent;
-
-    // **Validation before execution**
-    const validationError = validateUserCode(userCode);
-    if (validationError) {
-      reject(new Error(gt("dashboard.utils.unsafeCodeDetected", { error: validationError })));
-      document.body.removeChild(iframe);
-      return;
-    }
-
-    // Generate a nonce
-    const nonce = Math.random().toString(36).substring(2);
-    const fnTag = `__o2_fn_${randomHex()}`;
-    const readyToken = randomHex();
-    const trusted = trustedCustomChartCode.has(userCode);
-
-    // The sandbox iframe has no access to the app's i18n instance, so the messages it
-    // posts back are translated here and injected as a frozen JSON literal.
-    const sandboxMessages = JSON.stringify({
-      cspViolationPrefix: gt("dashboard.utils.cspViolationPrefix"),
-      executionTimeout: gt("dashboard.utils.executionTimeout"),
-      executionErrorPrefix: gt("dashboard.utils.executionErrorPrefix"),
-      cspViolationBlocked: gt("dashboard.utils.cspViolationBlocked"),
-    });
-
-    const scriptContent = `
-  <meta http-equiv="Content-Security-Policy" content="
-    default-src 'none';
-    script-src 'self' 'nonce-${nonce}';
-    style-src 'none';
-    frame-src 'none';
-    connect-src 'none';
-  ">
-
-  <script src="${sandboxEchartsUrl}" nonce="${nonce}"></script>
-  <script src="${sandboxDompurifyUrl}" nonce="${nonce}"></script>
-  <script nonce="${nonce}">
-    const i18nMessages = ${sandboxMessages};
-    let securityPolicyError = false;
-    let cspViolationDetected = false;
-
-    window.onerror = function(message, source, lineno, colno, error) {
-      parent.postMessage({ type: 'error', message: message.toString() }, '*');
-    };
-
-    // Detect CSP Violations
-    document.addEventListener("securitypolicyviolation", (event) => {
-      securityPolicyError = true;
-      cspViolationDetected = true;
-      parent.postMessage({ 
-        type: 'error', 
-        message: i18nMessages.cspViolationPrefix + event.violatedDirective + ' blocked ' + event.blockedURI
-      }, '*');
-    });
-
-    // Handle script execution with a timeout
-    let executed = false;
-    window.addEventListener('message', (event) => {
-      // A sibling custom-chart frame can post here too; only the parent may hand over code.
-      if (event.source !== parent || executed) return;
-      if (event.data && event.data.type === 'connect' && event.ports && event.ports[0]) {
-        executed = true;
-        const port = event.ports[0];
-        port.onmessage = (portEvent) => {
-          port.close();
-          execute(portEvent.data);
-        };
-      }
-    });
-
-    function execute(payload) {
-      if (payload && payload.type === 'execute') {
-        try {
-          const data = JSON.parse(payload.data);
-          const deepFreeze = (obj) => {
-            if (typeof obj === 'object' && obj !== null) {
-              Object.values(obj).forEach(deepFreeze);
-              Object.freeze(obj);
-            }
-            return obj;
-          };
-          const context = deepFreeze(JSON.parse(payload.context || '{}'));
-          const fnTag = payload.fnTag;
-
-          const convertFunctionsToString = (obj) => {
-            if (typeof obj === 'function') {
-              try {
-                return { [fnTag]: DOMPurify.sanitize(obj.toString()) };
-              } catch (e) {
-                return undefined;
-              }
-            }
-            if (Array.isArray(obj)) return obj.map(convertFunctionsToString);
-            if (typeof obj === 'object' && obj !== null) {
-              return Object.fromEntries(
-                Object.entries(obj).map(([key, value]) => [key, convertFunctionsToString(value)])
-              );
-            }
-            return obj;
-          };
-
-
-          // Execution timeout to prevent infinite loops
-          const timeout = setTimeout(() => {
-            parent.postMessage({ type: 'error', message: i18nMessages.executionTimeout }, '*');
-          }, 2000);
-
-          (function(data, echarts, context) {
-            try {
-              ${userCode};
-            } catch (err) {
-              parent.postMessage({ type: 'error', message: i18nMessages.executionErrorPrefix + err.message }, '*');
-              return;
-            }
-
-            clearTimeout(timeout); // Clear timeout if execution completes
-            
-            // Ensure CSP violations are detected before responding
-            setTimeout(() => {
-              
-              if (securityPolicyError || cspViolationDetected) {
-                parent.postMessage({ type: 'error', message: i18nMessages.cspViolationBlocked }, '*');
-              } else {
-                parent.postMessage({ type: 'success', result: JSON.stringify(convertFunctionsToString(option)) }, '*');
-              }
-            }, 0); // Delay to ensure CSP events have time to process
-
-          })(data, window.echarts, context);
-
-        } catch (error) {
-          parent.postMessage({ type: 'error', message: error.message }, '*');
-        }
-      }
-    }
-
-    parent.postMessage({ type: 'ready', token: '${readyToken}' }, '*');
-  </script>
-    `;
-
-    iframe.srcdoc = scriptContent;
-
-    const channel = new MessageChannel();
-    let connected = false;
-
-    window.addEventListener("message", function handler(event) {
-      if (event.source !== iframe.contentWindow) return;
-      const type = event.data?.type;
-
-      if (type === "ready") {
-        // The token is known only to the srcdoc written above, which sends it before any chart code runs.
-        if (connected || event.data.token !== readyToken) return;
-        connected = true;
-        // An opaque-origin frame only accepts "*", so the payload goes over a port bound to this document.
-        iframe.contentWindow?.postMessage({ type: "connect" }, "*", [channel.port2]);
-        channel.port1.postMessage({
-          type: "execute",
-          code: userCode,
-          fnTag,
-          data: JSON.stringify(searchQueryData),
-          context: JSON.stringify(context ?? {}),
-        });
-        return;
-      }
-      if (type !== "error" && (type !== "success" || !connected)) return;
-
-      window.removeEventListener("message", handler);
-      channel.port1.close();
-      setTimeout(() => {
-        document.body.removeChild(iframe);
-      }, 2000);
-
-      if (type === "success") {
-        try {
-          const dropped = { count: 0 };
-          const options = rehydrateFunctions(
-            JSON.parse(event.data.result),
-            fnTag,
-            trusted,
-            dropped,
-          );
-          if (dropped.count) {
-            console.warn(
-              gt(
-                "dashboard.utils.customChartCallbacksDropped",
-                { count: dropped.count },
-                dropped.count,
-              ),
-            );
-          }
-          resolve(options);
-        } catch (error) {
-          reject(error);
-        }
-      } else {
-        console.error("Error executing code", event.data.message);
-        reject(new Error(event.data.message));
-      }
-    });
-  });
+): CustomChartRun => {
+  if (isSkippedByPanelRefresh(panelSchema.id)) throw new CustomChartSkippedError();
+  return {
+    code: panelSchema.customChartContent ?? "",
+    data: searchQueryData,
+    context,
+    panelId: panelSchema.id,
+  };
 };
 
 export const validateUserCode = (code: string): string | null => {
@@ -397,46 +186,3 @@ export const validateUserCode = (code: string): string | null => {
     return gt("dashboard.utils.invalidJavaScriptSyntax");
   }
 };
-
-/** Marks first-party chart code (curated packs, bundled templates) whose function callbacks may run in the app. */
-export const trustCustomChartCode = (code: string): string => {
-  trustedCustomChartCode.add(code);
-  return code;
-};
-
-export const isTrustedCustomChartCode = (code: string): boolean => trustedCustomChartCode.has(code);
-
-/** Turns sandbox-tagged functions back into callables for trusted code; drops them otherwise, counting each in `dropped`. */
-export const rehydrateFunctions = (
-  value: unknown,
-  fnTag: string,
-  trusted: boolean,
-  dropped: { count: number } = { count: 0 },
-): unknown => {
-  if (Array.isArray(value)) {
-    return value.map((item) => rehydrateFunctions(item, fnTag, trusted, dropped));
-  }
-  if (typeof value !== "object" || value === null) {
-    return value;
-  }
-  if (Object.prototype.hasOwnProperty.call(value, fnTag)) {
-    const source = (value as Record<string, unknown>)[fnTag];
-    if (!trusted || typeof source !== "string") {
-      dropped.count++;
-      return undefined;
-    }
-    return new Function(`return ${source}`)();
-  }
-  return Object.fromEntries(
-    Object.entries(value).map(([key, child]) => [
-      key,
-      rehydrateFunctions(child, fnTag, trusted, dropped),
-    ]),
-  );
-};
-
-// crypto.randomUUID needs a secure context; plain-http deployments still need an unguessable tag.
-const randomHex = (): string =>
-  Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) =>
-    b.toString(16).padStart(2, "0"),
-  ).join("");

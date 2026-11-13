@@ -117,11 +117,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data="panelData.chartType == 'logs' ? panelData : null"
           :config="panelSchema.config"
         />
-        <CustomChartRenderer
+        <CustomChartSandboxRenderer
           v-else-if="panelSchema.type == 'custom_chart'"
-          :data="panelData"
+          :run="customChartRun"
           class="flex h-full w-full flex-col"
-          @error="errorDetail = $event"
+          @error="onCustomChartError"
         />
         <ChartRenderer
           v-else
@@ -385,6 +385,7 @@ import {
   defineAsyncComponent,
   onMounted,
   onUnmounted,
+  toRaw,
   type PropType,
 } from "vue";
 import { useStore } from "vuex";
@@ -400,6 +401,7 @@ import {
   panelRefreshEpoch,
   type CustomChartContext,
 } from "@/utils/dashboard/convertCustomChartData";
+import type { CustomChartRun } from "@/utils/dashboard/customChartSandbox";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import { getDataValue } from "@/utils/dashboard/aliasUtils";
 import { showsMissingValue } from "@/utils/dashboard/tableConfigUtils";
@@ -502,7 +504,7 @@ const AddAnnotation = defineAsyncComponent(() => {
 // Statically imported by several route-level components, so it cannot be
 // code-split into its own chunk — import it statically to avoid the mixed
 // dynamic/static import build warning.
-import CustomChartRenderer from "./panels/CustomChartRenderer.vue";
+import CustomChartSandboxRenderer from "./panels/CustomChartSandboxRenderer.vue";
 
 const AlertContextMenu = defineAsyncComponent(() => {
   return import("./AlertContextMenu.vue");
@@ -539,7 +541,7 @@ export default defineComponent({
     FlameGraphPanelRenderer,
     LogsPanelRenderer,
     AddAnnotation,
-    CustomChartRenderer,
+    CustomChartSandboxRenderer,
     LoadingProgress,
     PanelChartPlaceholder,
     OButton,
@@ -1553,6 +1555,20 @@ export default defineComponent({
     // Conversions can resolve out of order; only the most recently started may land.
     let conversionGeneration = 0;
     let customChartRunSkipped = false;
+    // Clearing the error remounts the renderer; re-running the failed run would re-set the error after Apply cleared it.
+    const failedCustomChartRun = shallowRef<CustomChartRun | null>(null);
+    const customChartRun = computed<CustomChartRun | null>(() => {
+      const run = panelData.value?.chartType === "custom_chart" ? panelData.value.run : null;
+      return run && toRaw(run) !== failedCustomChartRun.value ? run : null;
+    });
+    const onCustomChartError = (
+      detail: { message: string; code: string },
+      run: CustomChartRun | null,
+    ) => {
+      if (!run || toRaw(run) !== toRaw(customChartRun.value)) return;
+      failedCustomChartRun.value = toRaw(run);
+      errorDetail.value = detail;
+    };
     const convertPanelDataCommon = async (applyOverlay = false) => {
       // Converting the empty pre-load buffer would publish an empty result to the header and curated tiles.
       if (isAwaitingFirstLoad.value) return;
@@ -2746,6 +2762,8 @@ export default defineComponent({
       searchRequestTraceIds,
       errorDetail,
       panelData,
+      customChartRun,
+      onCustomChartError,
       noData,
       noDataTitle,
       customNoDataText,

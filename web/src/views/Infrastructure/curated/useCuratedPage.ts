@@ -34,7 +34,6 @@ import { workloadStateFromNames, type WorkloadState } from "@/composables/useWor
 import { gt, raw } from "@/types/i18n";
 import { chartColor } from "@/utils/chartTheme";
 import { colorToRgba } from "@/utils/dashboard/colorPalette";
-import { trustCustomChartCode } from "@/utils/dashboard/convertCustomChartData";
 import {
   buildDashboard,
   resolveManifest,
@@ -763,9 +762,7 @@ function translateTitles(
           title: gt(panel.title),
           ...(typeof panel.customChartContent === "string"
             ? {
-                customChartContent: trustCustomChartCode(
-                  substituteThemeTokens(panel.customChartContent),
-                ),
+                customChartContent: substituteThemeTokens(panel.customChartContent),
               }
             : {}),
         })),
@@ -777,8 +774,8 @@ function translateTitles(
 /**
  * Resolve `${theme:NAME}` in author JS to a concrete colour.
  *
- * The custom-chart sandbox runs under `default-src 'none'; style-src 'none'`, so no
- * stylesheet reaches it and it can never resolve a `--color-*` token itself. Deliberately
+ * The custom-chart sandbox frame loads none of the app's stylesheets, so it can never
+ * resolve a `--color-*` token itself. Deliberately
  * NOT substituteQuery: that ends in tidyMatchers, PromQL brace surgery that turns
  * `option = {}` into `option = ;`.
  */
