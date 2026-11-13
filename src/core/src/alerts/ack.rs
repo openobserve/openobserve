@@ -910,20 +910,48 @@ pub(crate) async fn firing_incident(org_id: &str, alert_id: &str) -> Option<Stri
     }
 }
 
-/// The incident the alert's firing belongs to: the episode's, else the open one by alert id.
+/// A firing's incident: the episode's when of the alert's kind, else an open one of that kind,
+/// else the episode's. Acknowledgement and the alert list both pick by this, so they agree.
+#[cfg(feature = "enterprise")]
+pub async fn pick_firing_incident<E>(
+    episode: Option<(String, Option<bool>)>,
+    detection: bool,
+    open_of_kind: impl AsyncFnOnce() -> Result<Option<String>, E>,
+) -> Result<Option<String>, E> {
+    match episode {
+        Some((id, marked)) if episode_stands(marked, detection) => Ok(Some(id)),
+        // A converted alert's old incident still pages until a firing opens one of its new kind.
+        episode => Ok(open_of_kind().await?.or(episode.map(|(id, _)| id))),
+    }
+}
+
+/// Whether an episode incident with this marker (`None`: no such incident) needs no kind lookup.
+#[cfg(feature = "enterprise")]
+pub fn episode_stands(marked: Option<bool>, detection: bool) -> bool {
+    marked != Some(!detection)
+}
+
 #[cfg(feature = "enterprise")]
 async fn firing_incident_checked(org_id: &str, alert_id: &str) -> Result<Option<String>, AckError> {
+    let detection = db::alerts::alert::any_siem_alert(org_id, [alert_id]).await;
     let episode = infra::table::alert_states::get(alert_id, ROLLUP_GROUP_KEY)
         .await?
         .and_then(|s| s.episode_incident_id);
-    if episode.is_some() {
-        return Ok(episode);
-    }
-    Ok(
-        infra::table::alert_incidents::find_open_incident_containing_alert(org_id, alert_id)
-            .await?
-            .map(|m| m.id),
-    )
+    let episode = match episode {
+        Some(id) => {
+            let marked = infra::table::alert_incidents::security_case_of(org_id, &id).await?;
+            Some((id, marked))
+        }
+        None => None,
+    };
+    let cases = infra::table::alert_incidents::CaseFilter::of_kind(detection);
+    pick_firing_incident(episode, detection, async || {
+        let open = infra::table::alert_incidents::find_open_incident_containing_alert(
+            org_id, alert_id, cases,
+        );
+        Ok(open.await?.map(|m| m.id))
+    })
+    .await
 }
 
 /// The rows an ack can name: a multi-alert's firing groups, else the alert's own row.

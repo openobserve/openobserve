@@ -355,7 +355,7 @@ import {
 import type { HypothesisVerdict } from "./data/facts";
 
 type BarKind = NonNullable<Analysis["comparison"]>["rows"][number]["kind"];
-type StepKind = Exclude<UnfoldKind, "outcome" | "forecast">;
+type StepKind = Exclude<UnfoldKind, "outcome" | "forecast" | "alert" | "fold">;
 
 interface TrailStep {
   key: string;

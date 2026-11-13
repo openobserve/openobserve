@@ -84,8 +84,26 @@ describe("RcaEvidenceList (03 VE23–VE30)", () => {
 
     expect(numbers(wrapper)).toEqual([1, 2, 3, 4, 5, 6, 7]);
     expect(wrapper.text()).toContain("7 · 4 decisive");
-    const row = wrapper.find('[data-test="rca-evidence-row"]').text();
-    expect(row).toMatch(/^1\s*SQL\s*Logs · checkout_api\s*· 1 rows\s*Decisive/);
+    wrapper.unmount();
+  });
+
+  it("each row leads with the claim it supports; kind, source and query open below", async () => {
+    const wrapper = mountList();
+    const row = wrapper.find('[data-test="rca-fold-row-toggle"]');
+
+    expect(row.text()).toMatch(/^1\s*Errors begin 116 s after the rollout\.\s*Decisive$/);
+    expect(row.text()).not.toContain("SQL");
+    await row.trigger("click");
+    const card = wrapper.find('[data-number="1"] [data-test="rca-evidence-card"]');
+    expect(card.text()).toContain("1 rows");
+    wrapper.unmount();
+  });
+
+  it("an entry no hypothesis cites leads with its source and result", () => {
+    const wrapper = mountList([rcaEvidenceEntry({ number: 1, citations: [] })], []);
+    expect(wrapper.find('[data-test="rca-fold-row-toggle"]').text()).toMatch(
+      /^1\s*Logs · checkout_api · 2 rows · took 41 ms\s*Decisive$/,
+    );
     wrapper.unmount();
   });
 
@@ -110,13 +128,12 @@ describe("RcaEvidenceList (03 VE23–VE30)", () => {
 
   it("a row toggles its card", async () => {
     const wrapper = mountList();
-    const row = wrapper.findAll('[data-test="rca-evidence-row"]')[1];
+    const row = wrapper.findAll('[data-test="rca-fold-row-toggle"]')[1];
 
     await row.trigger("click");
-    expect(row.attributes("aria-expanded")).toBe("true");
+    expect(row.element.closest("button")?.getAttribute("aria-expanded")).toBe("true");
     const card = wrapper.find('[data-number="2"] [data-test="rca-evidence-card"]');
     expect(card.exists()).toBe(true);
-    expect(wrapper.find(`[id="${row.attributes("aria-controls")}"]`).exists()).toBe(true);
 
     await row.trigger("click");
     expect(wrapper.find('[data-test="rca-evidence-card"]').exists()).toBe(false);

@@ -3879,43 +3879,49 @@ async fn enrich_with_incidents(
     list: &mut [ListAlertsResponseBodyItem],
     rollups: &StdHashMap<String, AlertState>,
 ) -> Result<(), infra::errors::Error> {
+    use infra::table::alert_incidents::CaseFilter;
+    use openobserve_core::alerts::ack::{episode_stands, pick_firing_incident};
+
     use crate::models::alerts::responses::AlertIncidentLink;
 
-    let firing: Vec<_> = list
-        .iter()
-        .filter_map(|item| {
-            let id = item.alert_id.to_string();
-            let rollup = rollups.get(&id).filter(|r| r.is_firing())?;
-            Some((id, rollup.episode_incident_id.clone()))
-        })
-        .collect();
-    let episodes: Vec<String> = firing.iter().filter_map(|(_, e)| e.clone()).collect();
-    let unlinked: Vec<String> = firing
-        .iter()
-        .filter(|(_, e)| e.is_none())
-        .map(|(id, _)| id.clone())
-        .collect();
+    let mut firing = Vec::new();
+    for item in list.iter() {
+        let id = item.alert_id.to_string();
+        if let Some(rollup) = rollups.get(&id).filter(|r| r.is_firing()) {
+            let detection = db::alerts::alert::any_siem_alert(org_id, [id.as_str()]).await;
+            firing.push((id, rollup.episode_incident_id.clone(), detection));
+        }
+    }
+    let episodes: Vec<String> = firing.iter().filter_map(|(_, e, _)| e.clone()).collect();
     let by_episode = infra::table::alert_incidents::get_many(org_id, &episodes).await?;
+    let marked = |id: &String| by_episode.get(id).map(|m| m.security_case);
+    // Only an alert whose episode is missing or of the other kind needs the batched lookup.
+    let unlinked: StdHashMap<_, _> = firing
+        .iter()
+        .filter(|(_, e, d)| !e.as_ref().is_some_and(|e| episode_stands(marked(e), *d)))
+        .map(|(id, _, d)| (id.clone(), CaseFilter::of_kind(*d)))
+        .collect();
     let by_alert =
         infra::table::alert_incidents::find_open_incidents_containing_alerts(org_id, &unlinked)
             .await?;
-    let links: StdHashMap<String, AlertIncidentLink> = firing
-        .into_iter()
-        .filter_map(|(id, episode)| {
-            let model = match episode {
-                Some(incident_id) => by_episode.get(&incident_id),
-                None => by_alert.get(&id),
-            }?;
-            Some((
-                id,
-                AlertIncidentLink {
-                    id: model.id.clone(),
-                    title: model.title.clone(),
-                    status: model.status.parse().unwrap_or_default(),
-                },
-            ))
-        })
-        .collect();
+    let mut links = StdHashMap::new();
+    for (id, episode, detection) in firing {
+        let open = by_alert.get(&id);
+        let episode = episode.map(|e| (e.clone(), marked(&e)));
+        let of_kind = async || Ok::<_, std::convert::Infallible>(open.map(|m| m.id.clone()));
+        let Ok(Some(picked)) = pick_firing_incident(episode, detection, of_kind).await else {
+            continue;
+        };
+        let Some(model) = open.filter(|m| m.id == picked).or(by_episode.get(&picked)) else {
+            continue;
+        };
+        let link = AlertIncidentLink {
+            id: model.id.clone(),
+            title: model.title.clone(),
+            status: model.status.parse().unwrap_or_default(),
+        };
+        links.insert(id, link);
+    }
     for item in list.iter_mut() {
         if let Some(link) = links.get(&item.alert_id.to_string()) {
             item.incident = Some(link.clone());
@@ -4908,6 +4914,59 @@ mod tests {
             .map(String::as_str)
             .collect();
         assert_eq!(left, vec!["anomaly_id", "name", "threshold"]);
+    }
+
+    /// A detection converted from ops: its old incident until a case opens, then the case.
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn the_list_links_a_converted_alert_to_the_incident_acknowledgement_targets() {
+        use config::meta::{
+            alerts::{
+                alert::{Alert, SIEM_ATTRIBUTE},
+                state::{AlertState, ROLLUP_GROUP_KEY},
+            },
+            self_reporting::usage::RunOutcome,
+        };
+        use infra::table::alert_incidents::{add_alert_to_incident, create, mark_security_case};
+
+        crate::request::security::tests::meta_store().await;
+        let org = format!("convert_{}", config::ider::uuid());
+        let mut item = row("a1", serde_json::json!({}));
+        let id = item.alert_id.to_string();
+        let mut alert = Alert::default();
+        alert.context_attributes = Some([(SIEM_ATTRIBUTE.into(), "true".into())].into());
+        let key = db::alerts::alert::cache_alert_key(&org, &id);
+        let cached = (Default::default(), alert);
+        common::infra::config::ALERTS
+            .write()
+            .await
+            .insert(key, cached);
+        let hold = async |case: bool| {
+            let held = create(&org, "P2", serde_json::json!({}), "alert_id", 1, None).await;
+            let held = held.unwrap().id;
+            if case {
+                mark_security_case(&org, &held).await.unwrap();
+            }
+            add_alert_to_incident(&held, &id, "a1", "internal", 1, "alert_id")
+                .await
+                .unwrap();
+            held
+        };
+        let ops = hold(false).await;
+        let mut rollup = AlertState::empty(&id, ROLLUP_GROUP_KEY);
+        rollup.last_outcome = Some(RunOutcome::Firing);
+        rollup.episode_incident_id = Some(ops.clone());
+        let rollups = super::StdHashMap::from([(id.clone(), rollup)]);
+        let mut linked = async || {
+            let list = std::slice::from_mut(&mut item);
+            super::enrich_with_incidents(&org, list, &rollups)
+                .await
+                .unwrap();
+            item.incident.as_ref().map(|link| link.id.clone())
+        };
+        assert_eq!(linked().await, Some(ops));
+        let case = hold(true).await;
+        assert_eq!(linked().await, Some(case));
     }
 
     fn status(err: AlertError) -> StatusCode {

@@ -16,6 +16,7 @@
 import { raw, type I18nKey, type I18nText, type TranslateFn } from "@/types/i18n";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import type { AutoObserveCellState } from "@/services/autoobserve";
+import type { UnfoldCard, UnfoldOutcome, UnfoldTone } from "./unfold.types";
 import {
   AUTONOMY,
   DAY_DATE,
@@ -112,33 +113,7 @@ export interface Firing {
   sampleTimes: string[];
 }
 
-export type UnfoldKind =
-  "metric" | "log" | "trace" | "change" | "unwatched" | "forecast" | "outcome";
-export type UnfoldOutcome =
-  "paged" | "asked" | "notified" | "held" | "fixFailed" | "fixed" | "resolved" | "open";
-export type UnfoldTone = "danger" | "warning" | "info" | "success" | "neutral";
-
-// lane is a service name, or null for the team's lane; minute orders the chain and is null for anything without a clock time.
-export interface UnfoldCard {
-  id: string;
-  kind: UnfoldKind;
-  outcome?: UnfoldOutcome;
-  lane: string | null;
-  at: string;
-  minute: number | null;
-  title: I18nText;
-  detail?: I18nText;
-  tag?: I18nKey;
-  tone: UnfoldTone;
-  times?: string[];
-  count?: number;
-  peak?: I18nText;
-  threshold?: I18nText;
-  points?: number[];
-  projected?: number;
-  after?: string;
-  via?: I18nText;
-}
+export type { UnfoldCard, UnfoldKind, UnfoldOutcome, UnfoldTone } from "./unfold.types";
 
 export interface Issue {
   id: string;
