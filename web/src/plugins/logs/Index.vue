@@ -443,6 +443,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :stream-doc-time-range="streamDocTimeRange"
                           :query-window-us="queryWindowUs"
                           @update:datetime="setHistogramDate"
+                          @search:aroundwindow="onSearchAroundWindow"
                           @update:scroll="getMoreData"
                           @update:recordsPerPage="getMoreDataRecordsPerPage"
                           @expandlog="toggleExpandLog"
@@ -685,7 +686,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <LogsPermalinkDrawer
       @search-around="runSearchAround"
-      @search:aroundwindow="onPermalinkAroundWindow"
+      @search:aroundwindow="onSearchAroundWindow"
       @add-search-term="onPermalinkAddSearchTerm"
       @send-to-ai-chat="sendToAiChat"
     />
@@ -895,8 +896,10 @@ export default defineComponent({
       this.searchBarRef?.markZoom?.(date);
       this.searchBarRef.dateTimeRef.setCustomDate("absolute", date);
     },
-    // The drawer has already cleared the permalink before it emits.
-    onPermalinkAroundWindow(range: { startUs: number; endUs: number }) {
+    // The setCustomDate behind setHistogramDate re-runs the search, so the filter is cleared first.
+    onSearchAroundWindow(range: { startUs: number; endUs: number }) {
+      this.clearFilterForContext();
+      this.searchBarRef?.updateQuery?.();
       this.setHistogramDate(searchAroundPickerRange(range, this.store.state.timezone));
     },
     searchData() {
@@ -4159,7 +4162,7 @@ export default defineComponent({
       onJumpToStreamData(ts, ts + 1);
     };
 
-    const { searchAroundData } = useSearchAround();
+    const { searchAroundData, clearFilterForContext } = useSearchAround();
 
     const runSearchAround = (params: {
       key: unknown;
@@ -4354,7 +4357,7 @@ export default defineComponent({
       onPermalinkShowInContext,
       onPermalinkAddSearchTerm,
       runSearchAround,
-      clearPermalink,
+      clearFilterForContext,
       onSharedPageGo,
       refreshHistogramChart,
       onChangeInterval,

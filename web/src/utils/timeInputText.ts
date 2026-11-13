@@ -31,7 +31,8 @@ const calendarText = (token: string): string | null => {
   const period = parseCalendarToken(token);
   if (!period) return null;
   const { unit, offset } = period;
-  if (unit === "day") return offset === 0 ? "today" : offset === -1 ? "yesterday" : null;
+  if (unit === "day")
+    return offset === 0 ? "today" : offset === -1 ? "yesterday" : `now${offset}d/d`;
   if (offset === 0) return `this ${unit}`;
   if (offset === -1) return `previous ${unit}`;
   return `${-offset} ${unit}s ago`;

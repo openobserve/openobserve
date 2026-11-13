@@ -282,3 +282,35 @@ describe("formatFoldLabel [#10]", () => {
     expect(formatFoldLabel(us("2026-11-01T06:30:00Z"), NY)).toBe("01:30 EST (UTC-05:00)");
   });
 });
+
+describe("copy text and labels read back [review pass 1]", () => {
+  const read = (text: string, timezone: string) =>
+    parseTimeInput(text, { now: new Date(NOW_MS), timeZone: timezone });
+
+  it("reads a copy across the DST fall-back hour to the same instants [#1]", () => {
+    const startUs = us("2026-11-01T05:30:00Z");
+    const endUs = us("2026-11-01T06:10:00Z");
+    const text = formatRangeCopyText({ startUs, endUs }, { ...OPTS, timezone: NY });
+    expect(read(text, NY)).toMatchObject({
+      type: "timestamp",
+      startMicros: startUs,
+      endMicros: endUs,
+    });
+  });
+
+  it("reads a fixed-period label back as that period [#5]", () => {
+    const range = { startUs: ist("2026-07-01T00:00:00"), endUs: ist("2026-10-01T00:00:00") };
+    const label = formatRangeLabel(range, OPTS);
+    expect(label).toBe("Q3 2026 · Jul 1 – Sep 30");
+    expect(read(label, IST)).toMatchObject({ startDate: "2026/07/01", endDate: "2026/10/01" });
+  });
+
+  it("never copies an end before the last sub-millisecond event [#11]", () => {
+    const startUs = ist("2026-11-12T21:08:49.948");
+    const endUs = startUs + 600_000_000 + 400;
+    const text = formatRangeCopyText({ startUs, endUs }, OPTS);
+    const reading = read(text, IST) as { startMicros: number; endMicros: number };
+    expect(reading.startMicros).toBeLessThanOrEqual(startUs);
+    expect(reading.endMicros).toBeGreaterThanOrEqual(endUs);
+  });
+});

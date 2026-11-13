@@ -170,6 +170,22 @@ describe("DateTime Component", () => {
       expect(lastPayload.userChangedValue).toBe(false);
     });
 
+    it("stamps a clamp from a query limit that arrives after mount as programmatic", async () => {
+      wrapper = createWrapper({ autoApply: true, defaultRelativeTime: "7d" });
+      await wrapper.vm.$nextTick();
+      await wrapper.vm.$nextTick();
+      store.state.savedViewFlag = false;
+      const before = wrapper.emitted("on:date-change")?.length ?? 0;
+
+      await wrapper.setProps({ queryRangeRestrictionInHour: 24 });
+
+      const events = wrapper.emitted("on:date-change")!;
+      expect(events.length).toBeGreaterThan(before);
+      const lastPayload = events[events.length - 1][0];
+      expect(lastPayload.relativeTimePeriod).toBe("1d");
+      expect(lastPayload.userChangedValue).toBe(false);
+    });
+
     it("should test getConsumableDateTime function for relative type", () => {
       wrapper = createWrapper();
 

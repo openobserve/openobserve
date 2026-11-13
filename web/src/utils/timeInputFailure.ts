@@ -26,7 +26,7 @@ const LENGTH_BUCKETS: readonly [number, ParseFailureEvent["length_bucket"]][] = 
   [40, "21-40"],
 ];
 const MONTH_WORD_RE =
-  /\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\b|\b(?:q[1-4]|h[12]|fy\d{2,4})\b/i;
+  /\b(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sept?(?:ember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\b|\b(?:q[1-4]|h[12]|fy\d{2,4})\b/i;
 
 /** What a failed Enter looked like, so the grammar can learn; it never carries the text. */
 export interface ParseFailureEvent {

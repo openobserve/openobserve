@@ -20,14 +20,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     ref="scroller"
     role="listbox"
     tabindex="-1"
-    :aria-label="t('dateTime.timeRanges')"
+    :aria-label="heading || t('dateTime.timeRanges')"
     data-test="date-time-list"
     class="h-full overflow-y-auto overscroll-contain py-1 outline-none"
     :class="CUE_CLASSES[cue ?? 'none']"
     @scroll.passive="updateCue"
   >
+    <!-- A listbox holds only options, so the heading reaches screen readers as the list's name. -->
     <div
       v-if="heading"
+      aria-hidden="true"
       class="text-text-secondary px-3 pt-1 pb-1.5 text-xs"
       data-test="date-time-list-heading"
     >
@@ -65,9 +67,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :side-offset="12"
           :content="raw(row.tooltip)"
         />
+        <!-- An option holds no controls; Alt+P and Delete pin and remove from the keyboard. -->
         <span
           v-if="row.kind !== 'example'"
           class="inline-flex size-5 shrink-0 items-center justify-center"
+          aria-hidden="true"
         >
           <OButton
             v-if="row.kind === 'pinned' && row.id !== editingId"

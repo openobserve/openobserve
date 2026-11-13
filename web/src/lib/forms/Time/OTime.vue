@@ -36,7 +36,7 @@ const props = withDefaults(defineProps<TimeProps>(), {
   format24: false,
   hideIcon: false,
   revertRefused: false,
-  embedded: false,
+  hideMessage: false,
 });
 
 const emit = defineEmits<TimeEmits>();
@@ -80,8 +80,9 @@ const effectiveError = computed(
 );
 const hasError = computed(() => !!effectiveError.value);
 const messageId = computed(() => `${inputId.value}-message`);
+const shownError = computed(() => (props.hideMessage ? null : effectiveError.value));
 const hasMessage = computed(
-  () => !!(effectiveError.value && effectiveError.value.trim()) || !!props.helpText,
+  () => !!(shownError.value && shownError.value.trim()) || !!props.helpText,
 );
 
 // ── Popover state ──────────────────────────────────────────────
@@ -330,27 +331,13 @@ function handleNativeTimeChange(e: Event) {
 }
 
 // Beside a prefix the time never shrinks below its content, which includes the AM/PM field on a 12-hour clock, so only the prefix ellipsizes.
-// Embedded, the time takes exactly its digits' width so a narrow half still shows the whole date.
-const inputClasses = computed(() => {
-  const base = "text-datepicker-text bg-transparent outline-none";
-  if (props.embedded) {
-    return [
-      base,
-      "font-medium tabular-nums shrink-0 ps-1 pe-0",
-      props.prefix ? "w-[8.5ch]" : "min-w-0 flex-1",
-    ];
-  }
-  return [
-    base,
-    props.prefix ? "min-w-max flex-auto shrink-0 ps-1" : "min-w-0 flex-1 ps-2",
-    props.clearable || props.hideIcon ? "pe-2" : "pe-3",
-  ];
-});
+const inputClasses = computed(() => [
+  "text-datepicker-text bg-transparent outline-none",
+  props.prefix ? "min-w-max flex-auto shrink-0 ps-1" : "min-w-0 flex-1 ps-2",
+  props.clearable || props.hideIcon ? "pe-2" : "pe-3",
+]);
 
-const prefixClasses = computed(() => {
-  if (props.embedded) return "text-text-secondary";
-  return ["text-datepicker-text", props.hideIcon ? "ps-2" : "ps-1.5"];
-});
+const prefixClasses = computed(() => ["text-datepicker-text", props.hideIcon ? "ps-2" : "ps-1.5"]);
 
 // ── Field wrapper classes ──────────────────────────────────────
 const heightClasses: Record<NonNullable<TimeProps["size"]>, string> = {
@@ -358,14 +345,7 @@ const heightClasses: Record<NonNullable<TimeProps["size"]>, string> = {
   md: "h-8.5 text-sm",
 };
 
-// Embedded, the parent draws the border and the focus ring sits on the whole caption-and-time block.
-const fieldClasses = computed(() => {
-  if (props.embedded)
-    return ["flex items-center w-full h-5 text-sm", isDisabled.value ? "opacity-60" : ""];
-  return boxedFieldClasses.value;
-});
-
-const boxedFieldClasses = computed(() => [
+const fieldClasses = computed(() => [
   "flex items-center w-full rounded-default border transition-[color,background-color,border-color,box-shadow] duration-150",
   "ring-offset-1 ring-offset-surface-base",
   "bg-datepicker-bg",
@@ -382,25 +362,15 @@ const boxedFieldClasses = computed(() => [
 </script>
 
 <template>
-  <div
-    v-bind="wrapperAttrs"
-    class="flex w-full flex-col"
-    :class="
-      embedded
-        ? 'rounded-default focus-within:ring-focus-ring-accent gap-0.5 px-2.5 py-1.5 focus-within:ring-2 focus-within:ring-inset'
-        : 'gap-1'
-    "
-  >
+  <div v-bind="wrapperAttrs" class="flex w-full flex-col gap-1">
     <label
       v-if="$slots.label || label || $slots.tooltip"
       :for="inputId"
       :class="[
-        'o-input-label flex items-center gap-1 leading-tight',
-        embedded
-          ? 'text-text-secondary text-2xs font-medium'
-          : disabled
-            ? 'text-compact text-input-label-text-disabled font-normal'
-            : 'text-compact text-input-label-text font-medium',
+        'o-input-label text-compact flex items-center gap-1 leading-tight',
+        disabled
+          ? 'text-input-label-text-disabled font-normal'
+          : 'text-input-label-text font-medium',
       ]"
     >
       <slot name="label">{{ label }}</slot
@@ -730,14 +700,14 @@ const boxedFieldClasses = computed(() => [
       </PopoverPortal>
     </PopoverRoot>
 
-    <div v-if="effectiveError || helpText" class="flex items-center gap-2">
+    <div v-if="shownError || helpText" class="flex items-center gap-2">
       <span
-        v-if="effectiveError && effectiveError.trim()"
+        v-if="shownError && shownError.trim()"
         :id="messageId"
         class="text-datepicker-error-text text-xs leading-snug"
         role="alert"
       >
-        {{ effectiveError }}
+        {{ shownError }}
       </span>
       <span v-else-if="helpText" :id="messageId" class="text-datepicker-label text-xs leading-snug">
         {{ helpText }}

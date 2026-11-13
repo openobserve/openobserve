@@ -117,9 +117,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
       <div
         id="date-time-menu"
-        role="dialog"
-        aria-modal="true"
-        :aria-label="t('common.selectDateRange')"
         class="date-time-dialog z-10001 flex h-82 max-h-(--reka-popover-content-available-height) w-110 max-w-[min(27.5rem,calc(100vw-1.5rem))] flex-col"
         @keydown.capture="onPickerKeydown"
         @paste="onPickerPaste"
@@ -371,13 +368,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >{{ raw(chip.label) }}<OTooltip v-if="!chip.disabled" :content="chip.title"
                 /></OToggleGroupItem>
               </OToggleGroup>
-              <OTooltip v-if="chipsNote" :content="chipsNote.tooltip" side="right">
+              <OTooltip
+                v-for="(note, noteIndex) in chipsNotes"
+                :key="note.testId"
+                :content="note.tooltip"
+                side="right"
+              >
                 <span
-                  class="text-text-secondary ms-auto inline-flex min-w-0 shrink items-center gap-1 text-xs"
-                  :data-test="chipsNote.testId"
+                  class="text-text-secondary inline-flex min-w-0 shrink items-center gap-1 text-xs"
+                  :class="{ 'ms-auto': noteIndex === 0 }"
+                  :data-test="note.testId"
                 >
-                  <OIcon :name="chipsNote.icon" size="xs" class="shrink-0" />
-                  <span class="truncate">{{ chipsNote.text }}</span>
+                  <OIcon :name="note.icon" size="xs" class="shrink-0" />
+                  <span class="truncate">{{ note.text }}</span>
                 </span>
               </OTooltip>
             </div>
@@ -428,11 +431,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 format24
                 revert-refused
                 :error="timeFieldError?.field === 'start'"
+                hide-message
                 :model-value="selectedTime.startTime"
                 with-seconds
                 optional-seconds
                 data-test="datetime-start-time"
                 @input="onTimeFieldTyping('start', $event)"
+                @invalid="onTimeFieldInvalid('start', $event)"
                 @update:model-value="onStartTimeEdit"
                 @focus="timeFieldFocused = true"
                 @blur="onTimeFieldBlur"
@@ -453,18 +458,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 format24
                 revert-refused
                 :error="timeFieldError?.field === 'end'"
+                hide-message
                 :model-value="selectedTime.endTime"
                 with-seconds
                 optional-seconds
                 data-test="datetime-end-time"
                 @input="onTimeFieldTyping('end', $event)"
+                @invalid="onTimeFieldInvalid('end', $event)"
                 @update:model-value="onEndTimeEdit"
                 @focus="timeFieldFocused = true"
                 @blur="onTimeFieldBlur"
               />
             </div>
             <div v-else class="flex-1" />
-            <OTooltip :content="applyDisabled ? t('dateTime.pickStartDate') : undefined">
+            <OTooltip :content="needsStartDate ? t('dateTime.pickStartDate') : undefined">
               <OButton
                 data-test="date-time-apply-btn"
                 variant="primary"
@@ -1038,7 +1045,7 @@ export default defineComponent({
     const calendarRef = ref<DateRangeCalendarExposed | null>(null);
     // The End time a picked day not over yet replaced with now, restored if another day is picked instead.
     let endBeforeCut: string | null = null;
-    // The Absolute column as the panel opened, restored when it closes with nothing applied, since showing a relative pick overwrites it.
+    // The Start/End fields as the panel opened, restored when it closes with nothing applied, since showing a relative pick overwrites it.
     let absoluteAtOpen: {
       date: { from: string; to: string };
       time: { startTime: string; endTime: string };
@@ -1049,6 +1056,8 @@ export default defineComponent({
     const inputError = ref(false);
     // Why readable text was refused, shown instead of the generic unreadable message.
     const inputRefusal = ref<I18nText | null>(null);
+    // A stamped range with its end not after its start reads as nothing, so the summary row says why.
+    const inputReversed = ref(false);
     const inputErrorText = computed(() => inputRefusal.value ?? t("common.timeRangeInputError"));
     const inputAsUtc = ref(false);
     // Text typed into Start or End commits on change, so the clock must not reseed a field still being typed in.
@@ -1056,7 +1065,11 @@ export default defineComponent({
     // The panel aligns to the whole ‹ trigger › group, not the trigger alone.
     const groupEl = ref<HTMLElement | null>(null);
     // The Start or End field whose last edit was refused, and why.
-    const timeFieldError = ref<{ field: "start" | "end"; message: I18nText } | null>(null);
+    const timeFieldError = ref<{
+      field: "start" | "end";
+      message: I18nText;
+      examples?: I18nText;
+    } | null>(null);
     // A readable time still being typed in Start or End, previewed in the summary before the field commits it.
     const typedFieldTime = ref<{ field: "start" | "end"; time: string; ms: boolean } | null>(null);
     // The bar's current reading and its alternatives; nothing applies until Enter or a pick.
@@ -1073,7 +1086,7 @@ export default defineComponent({
     const readPending = ref(false);
     // A paste replaces the bar's text only when Enter or a paste last read exactly that text.
     let lastReadText = "";
-    // Fields written by the picker itself (seeding the Absolute column, a Recent pick) are not user edits for auto-apply.
+    // Fields written by the picker itself (seeding Start/End, a Recent pick) are not user edits for auto-apply.
     let isSeedingAbsolute = false;
     let seededEnd: { date: string; time: string } | null = null;
     // Civil fields hold a DST fall-back's repeated hour only once, so an applied instant they cannot show is kept while they stay as written.
@@ -1129,13 +1142,12 @@ export default defineComponent({
         heldInstants = null;
         writeAbsoluteFields(fixed.startUTC, fixed.endUTC);
         holdUnshownInstants(fixed.startUTC, fixed.endUTC);
-        if (appliedType.value === "absolute") {
-          appliedRange.value = { startTime: fixed.startUTC, endTime: fixed.endUTC };
-        }
+        redrawAbsoluteAtOpen();
         // After the flush in which the redrawn fields settle, or the selection watcher clears it.
         nextTick(() => (zoneRedrawn.value = true));
       } else if (props.autoApply) {
-        saveDate("relative");
+        // Read after the await: a linked fixed range is only set once the picker mounts.
+        saveDate(selectedType.value);
       }
 
       emit("on:timezone-change", selectedTimezone);
@@ -1427,28 +1439,30 @@ export default defineComponent({
         limit: formatLimitShorthand(props.queryRangeRestrictionInHour),
       });
 
-    // One note at the strip's end: the page limit greys chips, else the query narrows the range (P4).
-    const chipsNote = computed(() => {
+    // Notes at the strip's end: the page limit when it greys chips, and the query's narrowing (P4), short when both show.
+    const chipsNotes = computed(() => {
+      const notes: { icon: string; text: string; tooltip: I18nText; testId: string }[] = [];
       if (chipItems.value.some((chip) => chip.disabled) && props.queryRangeRestrictionInHour > 0) {
-        return {
-          icon: "lock" as const,
+        notes.push({
+          icon: "lock",
           text: String(maxLimitText()),
           tooltip: restrictionMessage(),
           testId: "date-time-chips-note-limit",
-        };
+        });
       }
       const narrowed = props.narrowedByQuery;
-      if (!narrowed || !(narrowed.endUs > narrowed.startUs)) return null;
+      if (!narrowed || !(narrowed.endUs > narrowed.startUs)) return notes;
       const range = formatRangeLabel(
         { startUs: narrowed.startUs, endUs: narrowed.endUs },
         { ...labelOptions(), surface: "row" },
       );
-      return {
-        icon: "filter-alt" as const,
-        text: String(t("dateTime.narrowedByQuery")),
+      notes.push({
+        icon: "filter-alt",
+        text: String(t(notes.length > 0 ? "dateTime.narrowed" : "dateTime.narrowedByQuery")),
         tooltip: t("dateTime.queryKeeps", { range }),
         testId: "date-time-chips-note-narrowed",
-      };
+      });
+      return notes;
     });
 
     const periodUnits = ["s", "m", "h", "d", "w", "M"];
@@ -1799,14 +1813,8 @@ export default defineComponent({
       });
     };
 
-    /**
-     * Promote the pending selection to the applied one, so the trigger button
-     * starts advertising it. Called from every path that actually puts a range
-     * into force — Apply, `refresh()`, mount, and the parent-invoked setters.
-     * NOT called from `onCustomPeriodSelect` / the popup's absolute inputs when
-     * `autoApply` is off: those stay pending until Apply. `setRelativeDate` also
-     * applies under `applyPresets`.
-     */
+    // The trigger shows only what is in force, so this runs on every path that applies a range.
+    // Panel edits without autoApply stay pending until Apply.
     const markApplied = () => {
       appliedSinceOpen = true;
       appliedPeriod.value =
@@ -1827,6 +1835,19 @@ export default defineComponent({
         calendarToken: calendarToken.value,
         relativePeriod: relativePeriod.value,
         relativeValue: relativeValue.value,
+      };
+    };
+
+    // Closing without Apply restores the fields seen at open, so a zone change redraws them from the applied instants.
+    const redrawAbsoluteAtOpen = () => {
+      const applied = appliedRange.value;
+      if (absoluteAtOpen === null || appliedSinceOpen || applied === null) return;
+      const start = convertUnixTime(applied.startTime);
+      const end = convertUnixTime(shownEndMicros(applied.startTime, applied.endTime));
+      absoluteAtOpen = {
+        date: { from: start.date, to: end.date },
+        time: { startTime: start.time, endTime: end.time },
+        seededEnd: null,
       };
     };
 
@@ -2507,6 +2528,7 @@ export default defineComponent({
       const text = inputText.value.trim();
       suggestionTags.value = [];
       readingOnly.value = false;
+      inputReversed.value = false;
       if (!text) {
         inputReading.value = null;
         inputSuggestions.value = [];
@@ -2537,6 +2559,10 @@ export default defineComponent({
         )
         .slice(0, MAX_SUGGESTIONS);
       readingOnly.value = suggested.length === 0 && needsReadingRow(inputReading.value);
+      inputReversed.value =
+        !inputReading.value &&
+        suggested.length === 0 &&
+        explainTimeInputFailure(text, options) === "reversed";
       const offered = readingOnly.value && inputReading.value ? [inputReading.value] : suggested;
       const readings = withLongestAllowed(offered);
       inputSuggestions.value = readings;
@@ -2555,6 +2581,7 @@ export default defineComponent({
       listCursor.value = -1;
       inputError.value = false;
       inputRefusal.value = null;
+      inputReversed.value = false;
       inputAsUtc.value = false;
       suggestionsDismissed.value = false;
       inputSuggestions.value = [];
@@ -2710,12 +2737,23 @@ export default defineComponent({
         : line;
     });
 
+    const reversedLine = (): SummaryLine | null =>
+      inputReversed.value && inputText.value.trim() && !inputError.value
+        ? {
+            name: "",
+            range: "",
+            duration: "",
+            note: String(t("common.timeRangeEndBeforeStart")),
+            warning: true,
+          }
+        : null;
+
     // What Enter would apply, in the summary row; the panel's buttons and calendar keep showing the applied range.
     const previewLine = computed<SummaryLine | null>(() => {
       if (typedFieldLine.value) return typedFieldLine.value;
       if (calendarPickLine.value) return calendarPickLine.value;
       const plan = inputPlan.value;
-      if (!plan) return null;
+      if (!plan) return reversedLine();
       if (plan.kind === "refused" || plan.kind === "restricted") {
         const typed = inputText.value.trim();
         const rolling = plan.kind === "restricted" && shownReading.value?.type === "relative";
@@ -3060,6 +3098,15 @@ export default defineComponent({
       return true;
     };
 
+    // Examples have no cursor, so Tab takes the first one into the bar.
+    const tabToExample = (event: KeyboardEvent): boolean => {
+      const first = exampleRows.value[0];
+      if (!first) return false;
+      event.preventDefault();
+      takeExample(first.label);
+      return true;
+    };
+
     const onInputKeydown = (event: KeyboardEvent) => {
       if (event.isComposing) return;
       if (listCursor.value >= 0 && onCursorRowKey(event)) return;
@@ -3072,8 +3119,10 @@ export default defineComponent({
       if (event.key === "Tab" && readTimer !== null) {
         readInputText();
         if (suggestionsOpen.value) event.preventDefault();
+        else if (!event.shiftKey) tabToExample(event);
         return;
       }
+      if (event.key === "Tab" && !event.shiftKey && tabToExample(event)) return;
       if (event.key === "ArrowDown" || event.key === "ArrowUp") {
         if (moveCursor(event.key === "ArrowDown" ? 1 : -1)) event.preventDefault();
         return;
@@ -3142,9 +3191,8 @@ export default defineComponent({
       const [unit, value] = toRelativeUnit(span);
       clearUndo();
       pendingDay.value = null;
-      // From outside the panel (auto-refresh's Go live) there is no Apply to wait for, so it commits.
-      const commit = props.autoApply || props.applyPresets || !menuOpen.value;
-      setRelativeDate(unit, Math.min(value, MAX_CUSTOM_RELATIVE_VALUE[unit]), commit);
+      // Live has no Apply step on any picker, and an uncommitted pick would be undone when the panel closes.
+      setRelativeDate(unit, Math.min(value, MAX_CUSTOM_RELATIVE_VALUE[unit]), true);
     };
 
     const writeAbsoluteFields = (startMicros: number, endMicros: number) => {
@@ -3254,9 +3302,7 @@ export default defineComponent({
       });
     };
 
-    // Converts a parsed absolute date[+time] string, interpreted as wall-clock
-    // time in the currently selected timezone, to epoch microseconds — the
-    // inverse of convertUnixTime.
+    // Wall-clock date and time in the picker zone to epoch µs, the inverse of convertUnixTime.
     // One rule for the bar and the Start/End fields: a gap time moves forward, a repeated one takes its first instant.
     const absoluteToMicros = (date: string, time: string, zoneName = zone.value): number => {
       try {
@@ -3426,7 +3472,7 @@ export default defineComponent({
       });
     };
 
-    // An edit in the Absolute column makes the selection absolute; the shown values were the relative one's.
+    // An edit in Start/End makes the selection absolute; the shown values were the relative one's.
     const markAbsoluteEdit = () => {
       if (selectedType.value === "absolute") return;
       selectedType.value = "absolute";
@@ -3561,6 +3607,20 @@ export default defineComponent({
       const time = formatTypedTime(parsed);
       const current = field === "start" ? selectedTime.value.startTime : selectedTime.value.endTime;
       typedFieldTime.value = time === current && !ms ? null : { field, time, ms };
+    };
+
+    // Only an unreadable entry carries examples, so a refusal set by the edit handlers is left alone.
+    const onTimeFieldInvalid = (field: "start" | "end", invalid: boolean) => {
+      if (invalid) {
+        typedFieldTime.value = null;
+        timeFieldError.value = {
+          field,
+          message: t("components.time.invalid", { format: raw("HH:MM") }),
+          examples: t("common.timeFieldExamples"),
+        };
+      } else if (timeFieldError.value?.field === field && timeFieldError.value.examples) {
+        timeFieldError.value = null;
+      }
     };
 
     const onTimeFieldBlur = () => {
@@ -3802,7 +3862,9 @@ export default defineComponent({
       );
     };
 
+    // Limits arrive after mount, so a clamp here is never the user's pick.
     const computeRelativePeriod = () => {
+      markProgrammaticDateChange();
       computeRelativeMaxima();
       if (selectedType.value === "relative") {
         if (calendarExceedsRestriction(calendarToken.value)) {
@@ -3873,7 +3935,7 @@ export default defineComponent({
     let rangeKeyAtOpen: string | null = null;
     const menuOpen = ref(false);
 
-    // While the open panel holds a relative selection, the Absolute column shows the range it resolves to.
+    // While the open panel holds a relative selection, Start/End show the range it resolves to.
     watch(
       () => [
         menuOpen.value,
@@ -4236,7 +4298,6 @@ export default defineComponent({
       return top ? t("dateTime.backTo", { range: top.label }) : t("dateTime.undo");
     });
 
-    // A badge only when the picker's zone differs from the browser's, so a stranger zone is never silent (P7).
     // A badge when the zone differs from the browser's (P7), or always where the page asks (dashboards, print).
     const zoneBadgeText = computed(() => {
       if (!zone.value || props.hideRelativeTimezone) return "";
@@ -4312,18 +4373,24 @@ export default defineComponent({
     const weekStart = computed(() => weekStartsOn());
 
     // From a live range the calendar has no start yet, so there is nothing to apply.
-    const applyDisabled = computed(
+    const needsStartDate = computed(
       () =>
         calendarMode.value &&
         !props.disableRelative &&
         selectedType.value === "relative" &&
         pendingDay.value === null,
     );
+    const applyDisabled = computed(
+      () => needsStartDate.value || Boolean(timeFieldError.value?.examples),
+    );
 
-    // Enter in Start or End applies once the field has committed its value.
-    const onTimeFieldEnter = () => {
+    // The native change fires after keydown, so blurring commits the typed text before Apply reads it.
+    const onTimeFieldEnter = (event: KeyboardEvent) => {
+      const field = event.target as HTMLInputElement | null;
+      field?.blur();
       nextTick(() => {
         if (timeFieldError.value === null && !applyDisabled.value) applyAndClose();
+        else field?.focus();
       });
     };
 
@@ -4334,7 +4401,9 @@ export default defineComponent({
           examples: inputRefusal.value ? undefined : t("common.timeRangeInputExamples"),
         };
       }
-      return timeFieldError.value ? { message: timeFieldError.value.message } : null;
+      if (!timeFieldError.value) return null;
+      const { message, examples } = timeFieldError.value;
+      return { message, examples };
     });
 
     const showLiveButton = computed(
@@ -4376,11 +4445,9 @@ export default defineComponent({
               ? windowText(range.endTime, Math.min(range.endTime + span, ceiling))
               : "",
         },
-        zoom: String(
-          valid
-            ? t("dateTime.zoomOutTo", { duration: formatRangeDuration(0, span * 2) })
-            : t("common.timeRangeZoomOut"),
-        ),
+        zoom: valid
+          ? t("dateTime.zoomOutTo", { duration: formatRangeDuration(0, span * 2) })
+          : t("common.timeRangeZoomOut"),
       };
     });
 
@@ -4537,6 +4604,8 @@ export default defineComponent({
       calendarRef,
       calendarPreviewDay,
       applyDisabled,
+      needsStartDate,
+      onTimeFieldInvalid,
       onTimeFieldEnter,
       summaryError,
       showLiveButton,
@@ -4550,7 +4619,7 @@ export default defineComponent({
       onTriggerHover,
       copyDisabled,
       copyShortcut,
-      chipsNote,
+      chipsNotes,
       listHeading,
       setCursorRow,
     };

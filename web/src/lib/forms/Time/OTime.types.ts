@@ -48,8 +48,8 @@ export interface TimeProps {
   hideIcon?: boolean;
   /** In 24h mode, shows the model again after a typed value the parent did not accept. */
   revertRefused?: boolean;
-  /** Drops the field's own border and background and shows the label as a small caption above the time, for a field inside a box the parent draws. */
-  embedded?: boolean;
+  /** Keeps the error border but drops the message line, for a parent that shows the error itself. */
+  hideMessage?: boolean;
   /** Control size */
   size?: TimeSize;
   /** HTML id */

@@ -3269,6 +3269,24 @@ describe("span search around", () => {
     expect(w.vm.spanSearchAroundChoice).toBe("t5");
   });
 
+  it("is disabled with View Logs when no log stream is picked", async () => {
+    const enterprise = config.isEnterprise;
+    config.isEnterprise = "false";
+    try {
+      w = mountSidebar({
+        parentMode: "standalone",
+        showLogStreamSelector: true,
+        selectedLogStreams: [],
+      });
+      const btn = w.find('[data-test="trace-details-sidebar-search-around-btn"]');
+      expect(btn.attributes("disabled")).toBeDefined();
+      w.vm.searchAroundSpan();
+      expect(mockNavigateToLogs).not.toHaveBeenCalled();
+    } finally {
+      config.isEnterprise = enterprise;
+    }
+  });
+
   it("is not offered outside the standalone trace page", () => {
     w = mountSidebar({ parentMode: "embedded" });
     expect(w.find('[data-test="trace-details-sidebar-search-around-btn"]').exists()).toBe(false);

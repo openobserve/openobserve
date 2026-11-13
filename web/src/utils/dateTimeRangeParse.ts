@@ -191,11 +191,11 @@ const ABSOLUTE_SINGLE_RE = /^(\d{4}\/\d{2}\/\d{2})(?:\s+(\d{2}:\d{2}(?::\d{2})?)
 // Only whole epoch units count; 11, 12, 14, 15, 17 and 18 digits are a typo, not a time.
 const TIMESTAMP_SINGLE_RE = /^(\d{10}|\d{13}|\d{16}|\d{19})$/;
 const ISO_SINGLE_RE =
-  /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2})(?::(\d{2}(?:\.\d{1,3})?))?)?(Z|[+-]\d{2}(?::?\d{2})?)?$/;
-const TIME_ONLY_RE = /^(\d{2}):(\d{2})(?::(\d{2}(?:\.\d{1,3})?))?(Z|[+-]\d{2}(?::?\d{2})?)?$/;
+  /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2})(?::(\d{2}(?:\.\d{1,6})?))?)?(Z|[+-]\d{2}(?::?\d{2})?)?$/;
+const TIME_ONLY_RE = /^(\d{2}):(\d{2})(?::(\d{2}(?:\.\d{1,6})?))?(Z|[+-]\d{2}(?::?\d{2})?)?$/;
 // The app's own log/trace timestamp display format (src/utils/date.ts formatTimestamp).
 const HUMAN_LOG_SINGLE_RE =
-  /^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{1,2}),?\s+(\d{4})\s+(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,3}))?(?:\s+(Z|[+-]\d{2}(?::?\d{2})?))?$/i;
+  /^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{1,2}),?\s+(\d{4})\s+(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,6}))?(?:\s+(Z|[+-]\d{2}(?::?\d{2})?))?$/i;
 const RELATIVE_RE = /^(?:(?:last|past)\s+)?(\d{1,6})?\s*([a-z]+)$/i;
 // Tried in order; each must split the text into exactly two sides, so a date's own `-` or `/` never counts as one.
 const BARE_DASH = /\s*-\s*/;
@@ -533,7 +533,7 @@ export function resolveZonedCivil(date: string, time: string, zone: string): Zon
   };
 }
 
-function readRangeStamp(raw: string): ParsedDateRange | null {
+function readRangeStamp(raw: string, seen?: ParseContext["seen"]): ParsedDateRange | null {
   const s = raw.trim();
 
   const json = parseJsonRange(s);
@@ -546,7 +546,7 @@ function readRangeStamp(raw: string): ParsedDateRange | null {
     if (parts.length !== 2) continue;
     const dashed = separator === SPACED_DASH || separator === BARE_DASH;
     if (dashed && OFFSET_LIKE_END_RE.test(parts[1].trim())) continue;
-    const range = combineRangePoints(parsePoint(parts[0]), parsePoint(parts[1]));
+    const range = combineRangePoints(parsePoint(parts[0]), parsePoint(parts[1]), seen);
     if (range) return range;
   }
   return null;
@@ -650,16 +650,17 @@ function parseIsoSingle(raw: string): IsoSingleParsed | null {
   const [, year, month, day, hour, minute, second, offset] = m;
 
   if (!isValidDateTimeParts(year, month, day, hour, minute, second)) return null;
+  const msSecond = second && millisSecond(second);
 
   if (offset) {
     // Explicit offset already IS the instant — ignores the picker's timezone.
     const normalizedOffset = normalizeOffset(offset);
-    const iso = `${year}-${month}-${day}T${hour ?? "00"}:${minute ?? "00"}:${second ?? "00"}${normalizedOffset}`;
+    const iso = `${year}-${month}-${day}T${hour ?? "00"}:${minute ?? "00"}:${msSecond ?? "00"}${normalizedOffset}`;
     const ms = Date.parse(iso);
     if (Number.isNaN(ms)) return null;
     return {
       hasOffset: true,
-      micros: ms * 1000,
+      micros: ms * 1000 + subMillisMicros(second),
       offset: normalizedOffset,
       date: `${year}/${month}/${day}`,
     };
@@ -668,8 +669,18 @@ function parseIsoSingle(raw: string): IsoSingleParsed | null {
   return {
     hasOffset: false,
     date: `${year}/${month}/${day}`,
-    time: hour ? `${hour}:${minute}:${second ?? "00"}` : undefined,
+    time: hour ? `${hour}:${minute}:${msSecond ?? "00"}` : undefined,
   };
+}
+
+// Date.parse and civil times hold milliseconds, so a µs fraction's rest is added to the instant separately.
+function millisSecond(second: string): string {
+  return second.replace(/(\.\d{3})\d+$/, "$1");
+}
+
+function subMillisMicros(second?: string): number {
+  const fraction = second?.split(".")[1] ?? "";
+  return Number(fraction.slice(3, 6).padEnd(3, "0"));
 }
 
 function parseHumanLogSingle(raw: string): IsoSingleParsed | null {
@@ -678,7 +689,8 @@ function parseHumanLogSingle(raw: string): IsoSingleParsed | null {
   const [, monthAbbr, day, year, hour, minute, second, ms, offset] = m;
   const month = MONTH_INDEX[monthAbbr.toLowerCase()];
   const dd = day.padStart(2, "0");
-  const secWithMs = ms ? `${second}.${ms}` : second;
+  const fraction = ms ? `${second}.${ms}` : second;
+  const secWithMs = millisSecond(fraction);
 
   if (!isValidDateTimeParts(year, month, dd, hour, minute, secWithMs)) return null;
 
@@ -689,7 +701,7 @@ function parseHumanLogSingle(raw: string): IsoSingleParsed | null {
     if (Number.isNaN(parsedMs)) return null;
     return {
       hasOffset: true,
-      micros: parsedMs * 1000,
+      micros: parsedMs * 1000 + subMillisMicros(fraction),
       offset: normalizedOffset,
       date: `${year}/${month}/${dd}`,
     };
@@ -709,7 +721,7 @@ function parseTimeOnly(s: string): RangePoint | null {
   if (!isValidDateTimeParts("2000", "01", "01", hour, minute, second)) return null;
   return {
     kind: "time",
-    time: `${hour}:${minute}:${second}`,
+    time: `${hour}:${minute}:${millisSecond(second)}`,
     offset: offset ? normalizeOffset(offset) : undefined,
   };
 }
@@ -763,15 +775,20 @@ function instantFromOffsetParts(date: string, time: string, offset: string): num
 function combineRangePoints(
   start: RangePoint | null,
   end: RangePoint | null,
+  seen?: ParseContext["seen"],
 ): ParsedDateRange | null {
   if (!start || !end) return null;
   if (start.kind === "instant" && end.kind === "instant") {
+    if (end.micros <= start.micros) return markReversed(seen);
     return withSourceZone(
       { type: "timestamp", startMicros: start.micros, endMicros: end.micros },
       start.offset ?? end.offset,
     );
   }
   if (start.kind === "civil" && end.kind === "civil") {
+    if (end.time && civilKey(end.date, end.time) <= civilKey(start.date, start.time)) {
+      return markReversed(seen);
+    }
     // A dateless end covers its whole day, so it ends at the next midnight, as the search end is exclusive.
     return {
       type: "absolute",
@@ -804,6 +821,15 @@ function combineRangePoints(
   return endMicros === null
     ? null
     : withSourceZone({ type: "timestamp", startMicros: start.micros, endMicros }, start.offset);
+}
+
+function markReversed(seen?: ParseContext["seen"]): null {
+  if (seen) seen.reversed = true;
+  return null;
+}
+
+function civilKey(date: string, time = "00:00:00"): string {
+  return `${date.replace(/-/g, "/")} ${time}`;
 }
 
 function withSourceZone(range: TimestampRangeResult, offset?: string): TimestampRangeResult {
@@ -981,7 +1007,7 @@ function readTimeInput(raw: string, ctx: ParseContext): ParsedTimeInput | null {
   if (snapped) return snapped;
   const business = readBusinessPeriod(pasted, ctx);
   if (business) return business;
-  const stamped = readQueryString(pasted) ?? readLegacy(pasted);
+  const stamped = readQueryString(pasted, ctx.seen) ?? readLegacy(pasted, ctx.seen);
   if (stamped) return markYear(stamped);
   const natural = readNatural(pasted, ctx);
   if (natural) {
@@ -1113,7 +1139,10 @@ function markFuture(reading: ParsedTimeInput): ParsedTimeInput {
 }
 
 // Copied live text names its range first; any other `text (…)` is read by what is inside.
+// A `name · dates` label reads by its name when that reads, else by its dates.
 function readNamedCopy(text: string, ctx: ParseContext): ParsedTimeInput | null {
+  const label = text.split(" · ");
+  if (label.length === 2) return readTimeInput(label[0], ctx) ?? readTimeInput(label[1], ctx);
   const match = text.match(NAMED_COPY_RE);
   if (!match) return null;
   const head = readTimeInput(match[1], ctx);
@@ -1139,7 +1168,10 @@ function readBusinessPeriod(text: string, ctx: ParseContext, back = 0): Absolute
   }
   const fiscal = text.match(FISCAL_RE);
   if (fiscal) {
-    const year = fiscal[1].length === 2 ? 2000 + Number(fiscal[1]) : Number(fiscal[1]);
+    // A two-digit fiscal year is the nearest one, as the next is often named ahead (FY27 in 2026).
+    const past = fullYear(fiscal[1], ctx);
+    const year =
+      fiscal[1].length === 2 && past + 100 - thisYear < thisYear - past ? past + 100 : past;
     const period = wholeMonths(
       year,
       FISCAL_START_MONTH - 1,
@@ -1249,23 +1281,23 @@ function unwrap(text: string): string {
   return wrapped && WRAPPER_PAIRS[wrapped[1]] === wrapped[3] ? wrapped[2].trim() : text;
 }
 
-// Log lines carry comma milliseconds and µs/ns fractions, which the stamp readers take as plain milliseconds.
+// Log lines carry comma fractions and nanoseconds; a search keeps microseconds, so the rest is cut.
 function normalizePasted(text: string): string {
   const apache = text.match(APACHE_STAMP_RE);
   const stamp = apache
     ? `${apache[3]}-${MONTH_INDEX[apache[2].toLowerCase()] ?? "00"}-${apache[1]}T${apache[4]}${apache[5]}`
     : text;
   return stamp
-    .replace(/(\d{2}:\d{2}:\d{2}),(\d{1,9})\b/, "$1.$2")
-    .replace(/(\d{2}:\d{2}:\d{2}\.\d{3})\d{1,6}/, "$1");
+    .replace(/(\d{2}:\d{2}:\d{2}),(\d{1,9})\b/g, "$1.$2")
+    .replace(/(\d{2}:\d{2}:\d{2}\.\d{6})\d{1,3}/g, "$1");
 }
 
-function readLegacy(text: string): ParsedTimeInput | null {
+function readLegacy(text: string, seen?: ParseContext["seen"]): ParsedTimeInput | null {
   const calendar = parseCalendarWords(text);
   if (calendar) return { type: "relative", period: calendar };
   const relative = parseRelativeText(text);
   if (relative) return { type: "relative", period: relative };
-  const range = readRangeStamp(text);
+  const range = readRangeStamp(text, seen);
   if (range) return range;
   const single = readSingleStamp(text) ?? parseEpochFraction(text);
   return single ? singleToWindow(single) : null;
@@ -1279,7 +1311,7 @@ function parseEpochFraction(text: string): StampedSingle | null {
 }
 
 // The app's own URLs carry `period=` for a rolling range and `from=&to=` (epoch µs) for a fixed one.
-function readQueryString(text: string): ParsedTimeInput | null {
+function readQueryString(text: string, seen?: ParseContext["seen"]): ParsedTimeInput | null {
   if (!/(?:^|[?&])(?:period|from|to)=/.test(text)) return null;
   const params = new URLSearchParams(text.slice(text.indexOf("?") + 1).split("#")[0]);
   const period = params.get("period");
@@ -1289,7 +1321,7 @@ function readQueryString(text: string): ParsedTimeInput | null {
   }
   const from = params.get("from");
   const to = params.get("to");
-  return from && to ? combineRangePoints(parsePoint(from), parsePoint(to)) : null;
+  return from && to ? combineRangePoints(parsePoint(from), parsePoint(to), seen) : null;
 }
 
 // A pasted log line: the longest leading stamp with seconds, when the rest reads as log text.
@@ -1385,11 +1417,13 @@ function spellDayClockRange(text: string): string | null {
   return `${match[1]} ${clock(match[2])} to ${match[1]} ${clock(match[3])}`;
 }
 
-// `N weeks|months|years ago` names that calendar period, as the rail's Last row does.
+// `N weeks|months|quarters|years ago` names that calendar period, as the rail's Last row does.
 function readCalendarNatural(text: string): string | null {
   const lower = text.toLowerCase();
   const word = EXTRA_CALENDAR_WORDS[lower] ?? parseCalendarWords(lower);
   if (word) return word;
+  const quarters = lower.match(/^([1-9]\d{0,5})\s*quarters?\s+ago$/);
+  if (quarters) return `calendar:quarter:-${quarters[1]}`;
   const ago = text.match(/^(.+?)\s*ago$/i);
   const duration = ago ? parseDuration(ago[1]) : null;
   const unit = duration?.counted ? AGO_CALENDAR_UNITS[duration.unit] : undefined;
@@ -1562,9 +1596,15 @@ function resolveRange(leftText: string, rightText: string, ctx: ParseContext): C
   const startZone = startSpec.zone ?? endSpec.zone;
   const endZone = endSpec.zone ?? startSpec.zone;
   const start = resolvePoint(startSpec, ctx, startZone);
-  const end = start ? resolveRangeEnd(endSpec, startSpec, start.start, ctx, endZone) : null;
-  if (start && end !== null && end <= start.start) ctx.seen.reversed = true;
-  if (!start || end === null || end <= start.start) return null;
+  if (!start) return null;
+  // Across a DST change the sides name different offsets, so the end is compared on its own zone's clock.
+  const from =
+    startZone && endZone && startZone !== endZone
+      ? civilIn(endZone, zonedMicros(start.start, startZone) / 1000)
+      : start.start;
+  const end = resolveRangeEnd(endSpec, startSpec, from, ctx, endZone);
+  if (end !== null && end <= from) ctx.seen.reversed = true;
+  if (end === null || end <= from) return null;
   return {
     start: start.start,
     end,
@@ -1648,9 +1688,9 @@ function resolvePoint(spec: PointSpec, ctx: ParseContext, zone = spec.zone): Res
   if (spec.instant !== undefined) return { start: spec.instant, end: spec.instant, instant: true };
   if (spec.span) return { start: spec.span[0], end: spec.span[1], instant: false };
   if (spec.clock) {
-    const clockCtx = zone ? { ...ctx, nowCivil: nowCivilIn(zone, ctx) } : ctx;
+    const clockCtx = zone ? { ...ctx, nowCivil: civilIn(zone, ctx.now.getTime()) } : ctx;
     const at = spec.day
-      ? clockOnDay(spec.clock, resolveDay(spec.day, ctx)?.start, clockCtx)
+      ? clockOnDay(spec.clock, resolveDay(spec.day, clockCtx)?.start, clockCtx)
       : clockMostRecent(spec.clock, clockCtx);
     return at === null ? null : { start: at, end: at, instant: true };
   }
@@ -1662,9 +1702,9 @@ function resolvePoint(spec: PointSpec, ctx: ParseContext, zone = spec.zone): Res
 }
 
 // A clock that names its zone is past or future on that zone's wall clock, not the picker's.
-function nowCivilIn(zone: Zone, ctx: ParseContext): number {
-  if (zone.kind === "offset") return ctx.now.getTime() + zone.minutes * MINUTE_MS;
-  return wallClockOf(ctx.now, zone.name);
+function civilIn(zone: Zone, instantMs: number): number {
+  if (zone.kind === "offset") return instantMs + zone.minutes * MINUTE_MS;
+  return wallClockOf(new Date(instantMs), zone.name);
 }
 
 function startOfDay(civil: number): number {
@@ -1702,8 +1742,12 @@ function resolveDate(
     return null;
   }
   const year = new Date(ctx.nowCivil).getUTCFullYear();
-  const span = spanIn(year);
-  return span && span.start > ctx.nowCivil ? spanIn(year - 1) : span;
+  // A yearless Feb 29 falls back to the latest leap year; leap years are at most eight apart.
+  for (let candidate = year; candidate > year - 9; candidate--) {
+    const span = spanIn(candidate);
+    if (span && span.start <= ctx.nowCivil) return span;
+  }
+  return null;
 }
 
 function dateSpan(
@@ -1787,7 +1831,7 @@ function parseShiftedPoint(text: string, ctx: ParseContext): PointSpec | null {
 }
 
 function extractZone(text: string, ctx: ParseContext): { rest: string; zone?: Zone } | null {
-  const iana = text.match(/^(.*\d)\s+([A-Za-z]+(?:\/[A-Za-z0-9_+-]+)+)$/);
+  const iana = text.match(/^(.*(?:\d|[ap]m))\s+([A-Za-z]+(?:\/[A-Za-z0-9_+-]+)+)$/i);
   if (iana) {
     // The typed name is kept, as the reading names it back and ICU may alias it (Kolkata to Calcutta).
     const zone: Zone = { kind: "iana", name: iana[2] };
@@ -1806,7 +1850,7 @@ function extractZone(text: string, ctx: ParseContext): { rest: string; zone?: Zo
   if (numeric && (numeric[2] || !/^\d{1,2}:\d{2}/.test(numeric[1]))) {
     return withOffset(numeric[1], numeric[3], numeric[4], numeric[5]);
   }
-  const abbreviation = text.match(/^(.*\d)\s+([A-Za-z]{2,5})$/);
+  const abbreviation = text.match(/^(.*(?:\d|[ap]m))\s+([A-Za-z]{2,5})$/i);
   const upper = abbreviation?.[2].toUpperCase();
   if (abbreviation && upper && ZONE_ABBREVIATIONS[upper]) {
     ctx.seen.abbreviation = upper;

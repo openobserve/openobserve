@@ -377,6 +377,14 @@ export default defineComponent({
     // A kept-alive page in the background must not tick, whatever its range or the tab does.
     let inactive = false;
 
+    const owesQuery = (nowMs: number) =>
+      owesCatchUp({
+        intervalSeconds: Number(selectedValue.value),
+        lastTickMs,
+        nowMs,
+        rangeEndUs: props.rangeEndUs,
+      });
+
     const resetTimers = () => {
       clearInterval(intervalInstance);
       clock.value = Date.now();
@@ -384,12 +392,14 @@ export default defineComponent({
       if (selectedValue.value == 0 || !props.trigger || refreshState.value !== "running") return;
       lastTickMs = Date.now();
       intervalInstance = window?.setInterval(() => {
-        lastTickMs = Date.now();
-        clock.value = lastTickMs;
+        const now = Date.now();
+        clock.value = now;
         if (refreshState.value !== "running") {
           clearInterval(intervalInstance);
-          return;
+          // The tick that crosses a fixed range's end still fetches the tail since the last query.
+          if (!isPausedEnded.value || !owesQuery(now)) return;
         }
+        lastTickMs = now;
         caughtUp.value = false;
         emit("trigger");
       }, selectedValue.value * 1000);
@@ -402,15 +412,9 @@ export default defineComponent({
         clearInterval(intervalInstance);
         return;
       }
-      const owed =
-        props.trigger &&
-        owesCatchUp({
-          intervalSeconds: Number(selectedValue.value),
-          lastTickMs,
-          nowMs: Date.now(),
-          rangeEnded: fixedRangeEnded(props.rangeEndUs, Date.now()),
-        });
-      if (owed) {
+      const now = Date.now();
+      if (props.trigger && owesQuery(now)) {
+        lastTickMs = now;
         caughtUp.value = true;
         emit("trigger");
       }

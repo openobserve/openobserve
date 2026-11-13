@@ -52,7 +52,7 @@ const maskStringsAndComments = (sql: string, timestampColumn: string) =>
   });
 
 /** The window a SQL query keeps inside the picker's range when it filters on the timestamp column, else null. */
-// Bounds are ANDed; with an OR anywhere the query may keep more than one side shows, so nothing is claimed.
+// Bounds are ANDed; an OR or a NOT anywhere may keep more than the bounds show, so nothing is claimed.
 export const queryNarrowedRange = (
   sql: string | null | undefined,
   timestampColumn: string,
@@ -60,7 +60,7 @@ export const queryNarrowedRange = (
 ): MicrosRange | null => {
   if (!sql || !timestampColumn) return null;
   const masked = maskStringsAndComments(sql, timestampColumn);
-  if (/\bor\b/i.test(masked)) return null;
+  if (/\bor\b|(?<!\bis\s+)\bnot\b/i.test(masked)) return null;
   const column = `(?<![\\w"'])"?${escapeName(timestampColumn)}"?(?![\\w'])`;
   let { startUs, endUs } = picker;
   const raise = (us: number | null) => {

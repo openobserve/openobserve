@@ -294,7 +294,22 @@ export const useSearchAround = () => {
     }
   };
 
+  // A window around a row shows its neighbours, so the filter goes as on the records path; unparsable SQL is kept.
+  const clearFilterForContext = (): void => {
+    let query = "";
+    if (searchObj.meta.sqlMode === true) {
+      const parsedSQL = fnParsedSQL(searchObj.data.query);
+      if (!parsedSQL?.from?.length) return;
+      parsedSQL.where = null;
+      query = fnUnparsedSQL(parsedSQL).replace(/`/g, '"');
+      if (!query) return;
+    }
+    searchObj.data.query = query;
+    searchObj.data.editorValue = query;
+  };
+
   return {
     searchAroundData,
+    clearFilterForContext,
   };
 };

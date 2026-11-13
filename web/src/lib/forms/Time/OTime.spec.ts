@@ -519,28 +519,16 @@ describe("OTime", () => {
     expect(wrapper.find("input").attributes("size")).toBeUndefined();
   });
 
-  it("draws no box of its own when embedded and shows the label as a caption over the time", () => {
+  it("keeps the error border but leaves the message to the parent with hideMessage", async () => {
     wrapper = mount(OTime, {
-      props: {
-        modelValue: "14:02:11",
-        withSeconds: true,
-        format24: true,
-        hideIcon: true,
-        prefix: "Nov 6,",
-        label: "Start",
-        embedded: true,
-      },
-      attrs: { "data-test": "t" },
+      props: { modelValue: "14:02:11", withSeconds: true, format24: true, hideMessage: true },
       attachTo: document.body,
     });
-    const field = wrapper.find('[role="group"]');
-    expect(field.classes()).not.toContain("border");
-    expect(field.classes().some((name) => name.startsWith("bg-"))).toBe(false);
-    expect(wrapper.find("label").classes()).toEqual(
-      expect.arrayContaining(["text-2xs", "text-text-secondary"]),
-    );
-    expect(wrapper.find('[data-test="t-prefix"]').classes()).toContain("text-text-secondary");
-    expect(wrapper.classes()).toContain("focus-within:ring-2");
-    expect(wrapper.find("input").element.value).toBe("14:02:11");
+    const input = wrapper.find("input");
+    input.element.value = "99:99";
+    await input.trigger("change");
+    expect(wrapper.emitted("invalid")?.at(-1)).toEqual([true]);
+    expect(wrapper.find('[role="alert"]').exists()).toBe(false);
+    expect(input.attributes("aria-invalid")).toBe("true");
   });
 });

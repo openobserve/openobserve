@@ -385,6 +385,9 @@ describe("DetailTable Component", () => {
         ["20 records", "r20"],
         ["50 records", "r50"],
         ["100 records", "r100"],
+        ["200 records", "r200"],
+        ["500 records", "r500"],
+        ["1000 records", "r1000"],
       ]);
     });
 

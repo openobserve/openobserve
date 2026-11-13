@@ -18,7 +18,7 @@ const KEY_PREFIX = "o2.searchAroundChoice";
 
 /** Half-widths offered, in seconds; `s` choices name seconds and `t` choices minutes, as stored before. */
 export const SEARCH_AROUND_SECONDS = [5, 30, 60, 300, 900] as const;
-export const SEARCH_AROUND_RECORDS = [10, 20, 50, 100] as const;
+export const SEARCH_AROUND_RECORDS = [10, 20, 50, 100, 200, 500, 1000] as const;
 
 /** `s30` is ± 30 seconds, `t5` is ± 5 minutes around the row, `r20` is the 20 records around it. */
 export type SearchAroundChoice = `s${number}` | `t${number}` | `r${number}`;

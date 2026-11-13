@@ -78,3 +78,13 @@ describe("reportParseFailure", () => {
     });
   });
 });
+
+describe("month words [#12]", () => {
+  it.each(["decide", "market", "junk", "mayday"])("does not count %s", (text) => {
+    expect(describeParseFailure(text, "unreadable").has_month_word).toBe(false);
+  });
+
+  it.each(["march 4", "Sept", "dec", "FY26"])("counts %s", (text) => {
+    expect(describeParseFailure(text, "unreadable").has_month_word).toBe(true);
+  });
+});

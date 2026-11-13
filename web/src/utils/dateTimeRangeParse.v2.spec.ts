@@ -310,3 +310,81 @@ describe("DST in the picker zone [#10]", () => {
     ]);
   });
 });
+
+describe("code review pass 1 [parser]", () => {
+  const micros = (iso: string, extra = 0) => Date.parse(iso) * 1000 + extra;
+
+  it.each([
+    [
+      "2026-11-10T10:00:00.123456Z to 2026-11-10T11:00:00.123456Z",
+      micros("2026-11-10T10:00:00.123Z", 456),
+      micros("2026-11-10T11:00:00.123Z", 456),
+    ],
+    [
+      "2026-11-10T10:00:00.123456789Z - 2026-11-10T11:00:00.123456789Z",
+      micros("2026-11-10T10:00:00.123Z", 456),
+      micros("2026-11-10T11:00:00.123Z", 456),
+    ],
+  ])("keeps every stamp's sub-millisecond fraction in %s [#2 #11]", (text, start, end) => {
+    expect(parseTimeInput(text, US)).toMatchObject({
+      type: "timestamp",
+      startMicros: start,
+      endMicros: end,
+    });
+  });
+
+  it("reads comma milliseconds on both stamps [#2]", () => {
+    expect(read("2026-11-10 10:00:00,123 to 2026-11-10 11:00:00,456")).toBe(
+      "A 2026/11/10 10:00:00.123..2026/11/10 11:00:00.456",
+    );
+  });
+
+  it("keeps the microseconds of one pasted stamp [#11]", () => {
+    expect(parseTimeInput("2026-11-10T10:00:00.123456Z", US)).toMatchObject({
+      centreMicros: micros("2026-11-10T10:00:00.123Z", 456),
+    });
+  });
+
+  it.each(["10am PST", "3pm America/New_York", "yesterday 9am EST", "yesterday 9am-5pm EST"])(
+    "reads a zone after a meridiem clock in %s [#3]",
+    (text) => {
+      expect(parseTimeInput(text, US)).not.toBeNull();
+    },
+  );
+
+  it("resolves a named-zone day in that zone [#4]", () => {
+    const opts = { ...US, now: new Date("2026-11-13T20:00:00Z"), timeZone: "Asia/Kolkata" };
+    expect(read("today 10:00 UTC", opts)).toBe(
+      "T 2026-11-13T09:55:00.000Z..2026-11-13T10:05:00.000Z",
+    );
+    expect(read("yesterday 9-17 UTC", opts)).toBe(
+      "T 2026-11-12T09:00:00.000Z..2026-11-12T17:00:00.000Z",
+    );
+  });
+
+  it.each(["2026-02-01T00:00:00Z to 2026-01-01T00:00:00Z", "1793599800 to 1793511000"])(
+    "refuses the reversed stamped range %s [#7]",
+    (text) => {
+      expect(parseTimeInput(text, US)).toBeNull();
+      expect(explainTimeInputFailure(text, US)).toBe("reversed");
+    },
+  );
+
+  it("compares a dated end in another offset by instant [#1]", () => {
+    expect(read("2026-11-01 01:30 UTC-04:00 to 2026-11-01 01:10 UTC-05:00")).toBe(
+      "T 2026-11-01T05:30:00.000Z..2026-11-01T06:10:00.000Z",
+    );
+  });
+
+  it("reads FY99 by the two-digit year rule [#8]", () => {
+    expect(read("FY99")).toBe("A 1999/01/01 00:00:00..2000/01/01 00:00:00");
+  });
+
+  it("reads a yearless Feb 29 as the latest leap day [#9]", () => {
+    expect(read("Feb 29")).toBe("A 2024/02/29 00:00:00..2024/03/01 00:00:00");
+  });
+
+  it("reads a `N quarters ago` calendar period [#10]", () => {
+    expect(read("3 quarters ago")).toBe("calendar:quarter:-3");
+  });
+});

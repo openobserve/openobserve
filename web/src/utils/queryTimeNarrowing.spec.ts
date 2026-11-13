@@ -121,3 +121,18 @@ describe("a query that narrows the picker's range", () => {
     expect(read("=")).toEqual({ startUs: at(9), endUs: at(9) + 1 });
   });
 });
+
+describe("a negated bound [#6]", () => {
+  it("is not read as a narrowing", () => {
+    const sql = `SELECT * FROM t WHERE NOT _timestamp >= ${at(9)}`;
+    expect(queryNarrowedRange(sql, "_timestamp", picker)).toBeNull();
+  });
+
+  it("still reads a bound beside an IS NOT NULL test", () => {
+    const sql = `SELECT * FROM t WHERE _timestamp >= ${at(9)} AND host IS NOT NULL`;
+    expect(queryNarrowedRange(sql, "_timestamp", picker)).toEqual({
+      startUs: at(9),
+      endUs: picker.endUs,
+    });
+  });
+});
