@@ -157,7 +157,11 @@ describe("HomeChatsRail", () => {
     );
     expect(tools).toEqual(expect.arrayContaining(["gap-2"]));
     expect(wrapper.get('[data-test="home-chats-rail-header"]').classes()).toEqual(
-      expect.arrayContaining(["px-2", "justify-between"].filter((c) => c !== "justify-between")),
+      expect.arrayContaining(["px-3"]),
+    );
+    expect(list).toEqual(expect.arrayContaining(["px-3"]));
+    expect(wrapper.get('[data-test="assistant-history-item"]').classes()).toEqual(
+      expect.arrayContaining(["-mx-3", "px-3"]),
     );
     expect(wrapper.find('[data-test="assistant-history-views"]').exists()).toBe(false);
   });

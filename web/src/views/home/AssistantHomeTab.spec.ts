@@ -39,6 +39,8 @@ const mocks = vi.hoisted(() => ({
   listOrgRcaRuns: vi.fn(),
   railMounted: vi.fn(),
   focusAsk: vi.fn(),
+  addContext: vi.fn(),
+  openAssistant: vi.fn(),
 }));
 
 vi.mock("./useAgentHomeState", async () => {
@@ -103,9 +105,12 @@ vi.mock("@/composables/useBreakpoint", async () => {
 vi.mock("@/composables/assistant", () => ({
   useAssistantRuns: () => {
     mocks.runtimeRead();
-    return { rows: { value: mocks.runRows } };
+    return { rows: { value: mocks.runRows }, active: { value: 0 }, cap: { value: 3 } };
   },
-  openAssistant: vi.fn(),
+  useAssistantStore: () => ({ state: { userOrgKey: null } }),
+  contextChipFor: () => null,
+  byteSize: (value: unknown) => JSON.stringify(value).length,
+  openAssistant: (...args: unknown[]) => mocks.openAssistant(...args),
 }));
 vi.mock("@/services/rca_runs_org", () => ({ listOrgRcaRuns: mocks.listOrgRcaRuns }));
 vi.mock("vue-router", () => ({
@@ -120,8 +125,22 @@ vi.mock("@/components/ai-assistant/welcome/AssistantLauncher.vue", () => ({
   default: {
     name: "AssistantLauncher",
     props: ["layout", "pageRange"],
-    methods: { focusAsk: () => mocks.focusAsk(), fill: () => undefined },
-    template: '<div data-test="launcher-stub" :data-layout="layout" />',
+    data: () => ({ chips: [] as { id: string }[] }),
+    methods: {
+      focusAsk: () => mocks.focusAsk(),
+      addContext(this: { chips: { id: string }[] }, chip: { id: string }) {
+        mocks.addContext(chip);
+        if (!this.chips.some((held) => held.id === chip.id)) this.chips.push(chip);
+      },
+      removeContext(this: { chips: { id: string }[] }, id: string) {
+        this.chips = this.chips.filter((held) => held.id !== id);
+      },
+      hasContext(this: { chips: { id: string }[] }, id: string) {
+        return this.chips.some((held) => held.id === id);
+      },
+    },
+    template:
+      '<div data-test="launcher-stub" :data-layout="layout" :data-chips="chips.map((c) => c.id).join(\',\')" />',
   },
 }));
 vi.mock("./AgentHomeAskNote.vue", () => ({
@@ -183,6 +202,8 @@ describe("AssistantHomeTab", () => {
     mocks.listOrgRcaRuns.mockReset();
     mocks.railMounted.mockReset();
     mocks.focusAsk.mockReset();
+    mocks.addContext.mockReset();
+    mocks.openAssistant.mockReset().mockResolvedValue({ ok: true, sid: "s-1" });
     localStorage.clear();
     store.state.currentuser.role = "admin";
   });
@@ -487,8 +508,67 @@ describe("AssistantHomeTab", () => {
       set(mocks.committed, null);
       const loading = mountTab();
       await flushPromises();
-      expect(loading.find('[data-test="home-attention-loading"]').exists()).toBe(true);
+      const card = loading.get('[data-test="home-attention-loading"]');
+      expect(card.attributes("aria-busy")).toBe("true");
+      expect(card.findAll('[data-test="home-attention-skeleton-row"]')).toHaveLength(3);
       expect(loading.find('[data-test="home-attention-empty"]').exists()).toBe(false);
+    });
+
+    it("puts a row into the Ask box as a chip with Add to Chat, and takes it out with a second press", async () => {
+      set(mocks.rows, [serviceRow("checkout", { coverage: "none" }), alertRow("hot")]);
+      const wrapper = mountTab();
+      await flushPromises();
+      const add = (key: string) =>
+        wrapper.get(`[data-test="home-attention-row-${key}"] [data-test="home-attention-add"]`);
+      const chips = () => wrapper.get('[data-test="launcher-stub"]').attributes("data-chips");
+      await add("service:checkout").trigger("click");
+      await add("alert:hot").trigger("click");
+      expect(chips()).toBe("attention:service:checkout,attention:alert:hot");
+      expect(mocks.addContext.mock.calls.map(([chip]) => [chip.kind, chip.sent])).toEqual([
+        ["report", "serialized"],
+        ["alert", "whitelist"],
+      ]);
+      expect(mocks.addContext.mock.calls[0][0].data).toMatchObject({ service: "checkout" });
+      expect(add("service:checkout").attributes("aria-pressed")).toBe("true");
+      expect(add("service:checkout").attributes("aria-label")).toContain("From Chat");
+      await add("service:checkout").trigger("click");
+      expect(chips()).toBe("attention:alert:hot");
+      expect(add("service:checkout").attributes("aria-pressed")).toBe("false");
+      expect(mocks.push).not.toHaveBeenCalled();
+    });
+
+    it("hands a row to the assistant with Investigate, and opens the row itself when no chat can take it", async () => {
+      set(mocks.rows, [serviceRow("checkout", { coverage: "none" })]);
+      const wrapper = mountTab();
+      await flushPromises();
+      const investigate = () =>
+        wrapper.get(
+          '[data-test="home-attention-row-service:checkout"] [data-test="home-attention-investigate"]',
+        );
+      await investigate().trigger("click");
+      await flushPromises();
+      expect(mocks.openAssistant).toHaveBeenCalledTimes(1);
+      expect(mocks.openAssistant.mock.calls[0][0]).toMatchObject({
+        entryVerb: "troubleshoot",
+        intent: "send",
+        objectKind: "service_edge",
+        payload: { text: expect.stringContaining("checkout") },
+      });
+      expect(mocks.push).not.toHaveBeenCalled();
+      mocks.openAssistant.mockResolvedValue({ ok: false, reason: "not_entitled" });
+      await investigate().trigger("click");
+      await flushPromises();
+      expect(mocks.push.mock.calls.at(-1)?.[0]).toMatchObject({ name: "traces" });
+    });
+
+    it("offers no Add to Chat or Investigate where the Ask box is off", async () => {
+      set(mocks.state, "budget");
+      set(mocks.offReason, "budget");
+      const wrapper = mountTab();
+      await flushPromises();
+      expect(wrapper.findAll('[data-test="home-attention-open"]').length).toBeGreaterThan(0);
+      expect(wrapper.find('[data-test="home-attention-add"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="home-attention-investigate"]').exists()).toBe(false);
     });
 
     it("still shows the rows that loaded when another source failed", async () => {
@@ -514,7 +594,9 @@ describe("AssistantHomeTab", () => {
         anomalyRow("spike"),
       ]);
       const open = async (w: ReturnType<typeof mountTab>, key: string) => {
-        await w.get(`[data-test="home-attention-row-${key}"] button`).trigger("click");
+        await w
+          .get(`[data-test="home-attention-row-${key}"] [data-test="home-attention-open"]`)
+          .trigger("click");
         await flushPromises();
       };
       const wrapper = mountTab();

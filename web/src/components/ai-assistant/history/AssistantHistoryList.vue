@@ -18,7 +18,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     ref="root"
     :class="[
-      '@container flex h-full min-h-0 min-w-0 flex-col gap-2 p-2',
+      '@container flex h-full min-h-0 min-w-0 flex-col gap-2',
+      bare ? 'px-3 py-2' : 'p-2',
       mode === 'rail' && 'pt-0',
       mode === 'rail' && !bare && 'bg-surface-panel',
     ]"
@@ -138,7 +139,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OButton>
     </div>
 
-    <div ref="scroller" class="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto">
+    <div
+      ref="scroller"
+      :class="['flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto', bare && '-mx-3 px-3']"
+    >
       <h2 v-if="mode === 'rail'" class="sr-only">{{ t("assistant.history.title") }}</h2>
       <OText v-if="keptNotice" variant="meta" as="p" data-test="assistant-history-kept">
         {{ t("assistant.history.localOnly.keptOnSignOut") }}

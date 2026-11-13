@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :class="[
       'group/row rounded-default hover:bg-surface-subtle relative flex min-w-0 items-center gap-1',
       current && 'bg-surface-subtle',
-      compact && '-mx-2 px-2',
+      compact && '-mx-3 px-3',
     ]"
     :aria-busy="pending ? 'true' : undefined"
     :data-sid="row.sid"
@@ -304,7 +304,7 @@ const KEBAB_CLASS = [
 ];
 // The compact kebab sits over the time, so the time reaches the row's end; a touch screen keeps it in line.
 const COMPACT_KEBAB_CLASS =
-  "absolute! end-2 group-focus-within/row:opacity-100 pointer-coarse:static!";
+  "absolute! end-3 group-focus-within/row:opacity-100 pointer-coarse:static!";
 // The time steps aside wherever the kebab shows over it, and is never narrower than the kebab.
 const COMPACT_TRAIL_CLASS = [
   "w-12 text-end",

@@ -204,6 +204,8 @@ export interface NowRowMeta {
   service: string | null;
   repeats: number;
   flapping: boolean;
+  /** When an incident opened, in microseconds; a row's own `changedAt` is when Home first listed it. */
+  openedAt?: number;
 }
 </script>
 
