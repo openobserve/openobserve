@@ -44,6 +44,61 @@ async function waitForInstantQuery(request, query, timeout = 60_000) {
     .toBeGreaterThan(0);
 }
 
+// Where 3×ZO_MAX_FILE_RETENTION_TIME is under 10m this window ends before PromQL's WAL floor, so its rows show only once flushed.
+async function waitForShiftedRange(request, query, timeout = 120_000) {
+  await expect
+    .poll(
+      () => {
+        const nowSec = Math.floor(Date.now() / 1000);
+        const range = `start=${nowSec - 25 * 60}&end=${nowSec - 10 * 60}&step=60s`;
+        return promql(request, `query_range?query=${encodeURIComponent(query)}&${range}`);
+      },
+      { timeout, intervals: [1000, 2000, 5000], message: `${query} never appeared in the 10m-shifted query_range window` },
+    )
+    .toBeGreaterThan(0);
+}
+
+// Shift by minutes: PromQL reads unflushed rows only for a window ending after now − 3×ZO_MAX_FILE_RETENTION_TIME (30m by default).
+async function seedTimeShiftMetric(request) {
+  const now = Date.now();
+  const rows = [];
+  for (let i = 0; i <= 80; i++) {
+    rows.push({
+      __name__: TIME_SHIFT_METRIC,
+      __type__: 'gauge',
+      host: 'ts-a',
+      _timestamp: now - (80 - i) * 30_000,
+      value: 20 + (i % 5),
+    });
+  }
+  await postRows(request, rows);
+  await waitForInstantQuery(request, TIME_SHIFT_METRIC);
+  await waitForShiftedRange(request, TIME_SHIFT_METRIC);
+}
+
+// method has 2 values (a breakdown without topk); status pins "500" for Add-to-filter.
+async function seedDetailMetrics(request) {
+  const now = Date.now();
+  const series = [];
+  for (const method of ['GET', 'POST']) {
+    for (const status of ['200', '500']) {
+      for (const instance of ['i-1', 'i-2', 'i-3']) series.push({ method, status, instance });
+    }
+  }
+  const rows = [];
+  for (let i = 0; i <= 40; i++) {
+    const ts = now - (40 - i) * 15_000;
+    series.forEach((labels, s) => {
+      rows.push({ __name__: DETAIL_METRIC, __type__: 'counter', ...labels, _timestamp: ts, value: (s + 1) * 10 * i });
+      rows.push({ __name__: RELATED_METRIC, __type__: 'counter', ...labels, _timestamp: ts, value: (s + 1) * i });
+    });
+    rows.push({ __name__: RELATED_GAUGE, __type__: 'gauge', instance: 'i-1', _timestamp: ts, value: i % 7 });
+  }
+  await postRows(request, rows);
+  await waitForInstantQuery(request, DETAIL_METRIC);
+  await waitForInstantQuery(request, RELATED_METRIC);
+}
+
 /** Seconds between the first and last finite sample across every series of an SSE query_range body. */
 function sampleSpanSeconds(sseBody) {
   const stamps = [];
@@ -91,8 +146,8 @@ async function waitForPanelShiftedSeries(request, offsetMinutes, timeout = 240_0
     .toBeGreaterThanOrEqual(600);
 }
 
-// Shift by minutes: PromQL reads unflushed rows only for a window ending after now − 3×ZO_MAX_FILE_RETENTION_TIME (30m by default).
-async function seedTimeShiftMetric(request) {
+// Back-filled rows older than the WAL floor show only once flushed (~3 min on shared envs), so gate on the panel's own shifted request.
+async function seedTimeShiftMetricForPanel(request, offsetMinutes = 10) {
   const now = Date.now();
   const rows = [];
   for (let i = 0; i <= 80; i++) {
@@ -106,30 +161,7 @@ async function seedTimeShiftMetric(request) {
   }
   await postRows(request, rows);
   await waitForInstantQuery(request, TIME_SHIFT_METRIC);
-  await waitForPanelShiftedSeries(request, 10);
-}
-
-// method has 2 values (a breakdown without topk); status pins "500" for Add-to-filter.
-async function seedDetailMetrics(request) {
-  const now = Date.now();
-  const series = [];
-  for (const method of ['GET', 'POST']) {
-    for (const status of ['200', '500']) {
-      for (const instance of ['i-1', 'i-2', 'i-3']) series.push({ method, status, instance });
-    }
-  }
-  const rows = [];
-  for (let i = 0; i <= 40; i++) {
-    const ts = now - (40 - i) * 15_000;
-    series.forEach((labels, s) => {
-      rows.push({ __name__: DETAIL_METRIC, __type__: 'counter', ...labels, _timestamp: ts, value: (s + 1) * 10 * i });
-      rows.push({ __name__: RELATED_METRIC, __type__: 'counter', ...labels, _timestamp: ts, value: (s + 1) * i });
-    });
-    rows.push({ __name__: RELATED_GAUGE, __type__: 'gauge', instance: 'i-1', _timestamp: ts, value: i % 7 });
-  }
-  await postRows(request, rows);
-  await waitForInstantQuery(request, DETAIL_METRIC);
-  await waitForInstantQuery(request, RELATED_METRIC);
+  await waitForPanelShiftedSeries(request, offsetMinutes);
 }
 
 module.exports = {
@@ -139,4 +171,5 @@ module.exports = {
   RELATED_GAUGE,
   seedTimeShiftMetric,
   seedDetailMetrics,
+  seedTimeShiftMetricForPanel,
 };

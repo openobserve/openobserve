@@ -18,7 +18,7 @@ import {
 } from "./utils/configPanelHelpers.js";
 import { verifyColorOnCanvas, applyAndWaitForRender } from "./utils/canvasHelpers.js";
 const testLogger = require('../utils/test-logger.js');
-const { TIME_SHIFT_METRIC, seedTimeShiftMetric } = require('../utils/metrics-explore-seed.js');
+const { TIME_SHIFT_METRIC, seedTimeShiftMetricForPanel } = require('../utils/metrics-explore-seed.js');
 
 test.describe.configure({ mode: "parallel" });
 // No file-level `retries` override: it would add retries locally (project default 0) and hide flakes during development.
@@ -68,7 +68,7 @@ test.describe("ConfigPanel — Advanced Settings", () => {
     // Minutes, not a day: see seedTimeShiftMetric for why.
     // The seed waits up to 4 min for the back-filled rows to flush.
     test.setTimeout(480_000);
-    await seedTimeShiftMetric(page.request);
+    await seedTimeShiftMetricForPanel(page.request);
 
     await buildPromQLPanel(page, pm, dashboardName, { chartType: "line", query: TIME_SHIFT_METRIC });
     await pm.dashboardPanelConfigs.openConfigPanel();

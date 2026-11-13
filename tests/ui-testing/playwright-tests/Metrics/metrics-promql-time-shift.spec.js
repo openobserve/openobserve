@@ -2,7 +2,7 @@
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
-const { TIME_SHIFT_METRIC, seedTimeShiftMetric } = require('../utils/metrics-explore-seed.js');
+const { TIME_SHIFT_METRIC, seedTimeShiftMetricForPanel } = require('../utils/metrics-explore-seed.js');
 
 const SHIFT_SUFFIX = ' (10 Minutes ago)';
 
@@ -10,7 +10,7 @@ test.describe('Metrics editor — PromQL time shift', () => {
   test.beforeAll(async ({ request }) => {
     // The seed waits up to 4 min for the back-filled rows to flush.
     test.setTimeout(330_000);
-    await seedTimeShiftMetric(request);
+    await seedTimeShiftMetricForPanel(request);
   });
 
   test.afterEach(async ({}, testInfo) => {

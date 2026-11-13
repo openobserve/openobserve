@@ -54,6 +54,7 @@ export class ReportFoldersPage {
     this.moveFolderSelectPopover = page.locator(
       '[data-test="reports-index-dropdown-stream_type-popover"]'
     );
+    this.moveFolderSelectSearch = page.locator('[data-test="reports-index-dropdown-stream_type-search"]');
     this.moveSubmitBtn = page.locator(
       '[data-test="report-move-to-another-folder-dialog"] [data-test="o-dialog-primary-btn"]'
     );
@@ -304,6 +305,8 @@ export class ReportFoldersPage {
     const option = this.page.locator(
       `[data-test="reports-index-dropdown-stream_type-option"][data-test-value="${folderId}"]`
     );
+    // Only ~17 options render, so a destination outside that window exists in the DOM only after the search narrows the list.
+    await this.moveFolderSelectSearch.fill(folderName);
     await option.waitFor({ state: 'visible', timeout: 5000 });
     await option.click();
 

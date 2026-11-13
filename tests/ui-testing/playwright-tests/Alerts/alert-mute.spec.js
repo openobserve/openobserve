@@ -4,7 +4,7 @@
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
-const { seedAlertFixtures, deleteAlerts } = require('../utils/alerts-api-helpers.js');
+const { seedAlertFixtures, deleteAlerts, api, urls } = require('../utils/alerts-api-helpers.js');
 const {
   createFiringSingle, createFiringMulti, waitFiring, waitGroupsFiring, listItem, downtime,
   pollUntil, endMutes, shoot,
@@ -12,6 +12,24 @@ const {
 
 const SYSTEM = 'system@openobserve.ai';
 const HOUR_US = 3600 * 1e6;
+
+// Ended quick mutes are kept, and enough of them push a new row off the Downtimes list's first page.
+async function deleteMutesOf(page, alertIds) {
+  const { v2 } = urls();
+  for (const id of alertIds) {
+    const r = await api(page, 'get', `${v2}/downtimes?alert_id=${encodeURIComponent(id)}&page_size=500`).catch(() => null);
+    if (!r?.ok()) {
+      testLogger.warn('alert mute cleanup: listing downtimes failed', { alertId: id, status: r?.status() });
+      continue;
+    }
+    // alert_id also matches rows whose condition covers the alert, so only rows that name it are deleted.
+    const rows = ((await r.json()).items ?? []).filter((d) => (d.targets ?? []).some((t) => (t.ids ?? []).includes(id)));
+    for (const d of rows) {
+      const del = await api(page, 'delete', `${v2}/downtimes/${d.id}?folder=${encodeURIComponent(d.folder_id || 'default')}`).catch(() => null);
+      if (!del?.ok()) testLogger.warn('alert mute cleanup: delete failed', { id: d.id, status: del?.status() });
+    }
+  }
+}
 
 test.describe.configure({ mode: 'serial' });
 
@@ -32,6 +50,7 @@ test.describe('Quick Mute from an alert', { tag: ['@alerts', '@alerts-mute', '@P
 
   test.afterEach(async ({ page }) => {
     await endMutes(page, names);
+    await deleteMutesOf(page, created);
     await deleteAlerts(page, created);
     created.length = 0;
     names.length = 0;
@@ -128,6 +147,8 @@ test.describe('Quick Mute from an alert', { tag: ['@alerts', '@alerts-mute', '@P
     await expect(ack.downtimeCell(chip.id, 'when')).toContainText(/by \d{1,2}:\d{2}\s?[AP]M tomorrow/);
     await expect(ack.downtimeCell(chip.id, 'targets')).toContainText('city=mumbai');
     await shoot(page, 'mk19-list-until-clear-active');
+    // Ended rows sort oldest first, so narrow the list to this mute now; the term survives the refresh below.
+    await pm.downtimesPage.search((await downtime(page, chip.id)).name);
 
     // Only bangalore keeps breaching, so mumbai clears at its next run.
     const ended = await pollUntil(page, () => downtime(page, chip.id), (d) => !!d?.cancelled_at,
