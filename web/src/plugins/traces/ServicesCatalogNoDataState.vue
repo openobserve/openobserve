@@ -24,7 +24,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   with the traces search "no events" state.
 -->
 <template>
-  <OEmptyState v-if="jumpTarget" preset="no-services-catalog" size="hero">
+  <OEmptyState
+    v-if="noTraceStream"
+    preset="no-services-catalog"
+    size="hero"
+    :description="t('emptyState.noServicesCatalog.noTraceStream')"
+    :hide-action="true"
+  />
+  <OEmptyState v-else-if="jumpTarget" preset="no-services-catalog" size="hero">
     <template #actions>
       <EmptyStateActionCard
         icon="schedule"
@@ -44,6 +51,8 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
 import useJumpToLatestData from "@/composables/useJumpToLatestData";
 
+// An org with no trace stream gets no advice to widen the range or switch streams; neither can help.
+defineProps<{ noTraceStream?: boolean }>();
 const { t } = useI18nTyped();
 const { jumpTarget, jumpTargetSublabel } = useJumpToLatestData(t);
 

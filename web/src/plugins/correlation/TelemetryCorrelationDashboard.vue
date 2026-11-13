@@ -23,38 +23,71 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-model:open="isOpen"
     side="right"
     :width="90"
-    :title="t('correlation.correlatedStreamsFor', { service: serviceName })"
+    :title="t('correlation.correlatedStreamsFor', { service: titleName })"
     :sub-title="formatTimeRange(timeRange)"
     @update:open="(v) => !v && onClose()"
   >
-    <template #header-left>
-      <OIcon name="link" size="md" />
+    <template #header>
+      <CorrelationServiceHeader
+        :service-name="serviceName"
+        :display-service-name="displayServiceName"
+        :service-display="serviceDisplay"
+        :scope="versionScope"
+        :by-pod="versionByPod"
+        :time-range="timeRange"
+        @close="onClose"
+      />
     </template>
 
     <!-- Dimensions Display - Stable (matched) and Unstable (additional) -->
     <div class="border-card-glass-border border-b border-solid px-4 py-2">
       <div class="flex flex-wrap items-center gap-3">
         <span class="text-xs font-semibold opacity-70"> {{ t("correlation.filters") }}: </span>
-        <div v-for="(value, key) in pendingDimensions" :key="key" class="flex items-center gap-2">
+        <div v-for="(value, key) in pendingDimensions" :key="key" class="flex flex-col gap-0.5">
+          <div class="flex items-center gap-2">
+            <span
+              class="text-xs font-semibold"
+              :class="unstableDimensionKeys.has(key) ? 'opacity-60' : 'opacity-100'"
+            >
+              {{ key }}:
+            </span>
+            <OSelect
+              v-model="pendingDimensions[key]"
+              :options="getDimensionOptions(key, value)"
+              labelKey="label"
+              valueKey="value"
+              @update:model-value="onPendingDimensionChange"
+              class="dimension-dropdown"
+              style="min-width: 7.5rem"
+            />
+            <OTooltip
+              v-if="unstableDimensionKeys.has(key)"
+              :content="t('correlation.unstableDimensionNote')"
+              side="top"
+            />
+          </div>
           <span
-            class="text-xs font-semibold"
-            :class="unstableDimensionKeys.has(key) ? 'opacity-60' : 'opacity-100'"
+            v-if="key === serviceDimensionKey && serviceFilterNote"
+            class="text-text-secondary text-2xs"
+            data-test="svcver-correlation-service-note"
+            >{{ serviceFilterNote }}</span
           >
-            {{ key }}:
-          </span>
+        </div>
+        <div
+          v-if="versionOptions.length > 1"
+          class="flex items-center gap-2"
+          data-test="svcver-correlation-version-filter"
+        >
+          <span class="text-xs font-semibold">{{
+            t("serviceVersions.correlation.versionFilter")
+          }}</span>
           <OSelect
-            v-model="pendingDimensions[key]"
-            :options="getDimensionOptions(key, value)"
+            v-model="versionFilter"
+            :options="versionOptions"
             labelKey="label"
             valueKey="value"
-            @update:model-value="onPendingDimensionChange"
             class="dimension-dropdown"
             style="min-width: 7.5rem"
-          />
-          <OTooltip
-            v-if="unstableDimensionKeys.has(key)"
-            :content="t('correlation.unstableDimensionNote')"
-            side="top"
           />
         </div>
         <!-- Apply Button -->
@@ -79,7 +112,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model:active-subject="activeSubject"
       overflow-mode="responsive"
       :get-subject-button-label="getSubjectButtonLabel"
-    />
+    >
+      <template v-if="sourcePodVersion" #chip-actions>
+        <CorrelationSourcePodVersion :pod="versionPlace.pod || ''" :version="sourcePodVersion" />
+      </template>
+    </CorrelationEventHeader>
 
     <!-- Tabs (only in dialog mode, hidden in embedded-tabs mode) -->
     <div class="px-page-edge">
@@ -386,6 +423,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Traces Tab Panel -->
         <OTabPanel name="traces">
+          <CorrelationVersionsLine :versions="versionsSummary.versions" :service="titleName" />
           <!-- Refresh Button -->
 
           <!-- Loading State -->
@@ -455,7 +493,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     t("correlation.dimensionBasedCorrelation")
                   }}</span>
                   <span class="text-text-secondary text-xs">{{
-                    t("correlation.tracesFromService", { service: serviceName })
+                    t("correlation.tracesFromService", { service: titleName })
                   }}</span>
                 </div>
                 <div class="ms-auto flex items-center gap-2">
@@ -498,6 +536,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :loading="false"
                 :show-header="false"
                 :show-cell-actions="false"
+                :version-column="true"
                 @row-click="openTraceInNewWindow"
               />
             </div>
@@ -520,7 +559,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("correlation.correlatedTraces") }}
             </div>
             <div class="text-sm opacity-70">
-              {{ t("correlation.correlatedTracesFor", { service: serviceName }) }}
+              {{ t("correlation.correlatedTracesFor", { service: titleName }) }}
             </div>
           </div>
         </OTabPanel>
@@ -551,7 +590,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model:active-subject="activeSubject"
       overflow-mode="responsive"
       :get-subject-button-label="getSubjectButtonLabel"
-    />
+    >
+      <template v-if="sourcePodVersion" #chip-actions>
+        <CorrelationSourcePodVersion :pod="versionPlace.pod || ''" :version="sourcePodVersion" />
+      </template>
+    </CorrelationEventHeader>
 
     <!-- Tab Panels (no tabs in embedded mode, controlled by parent) -->
     <OCard
@@ -852,132 +895,145 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OSplitter>
       </div>
 
-      <div v-if="activeTab == 'traces'" class="h-full">
-        <!-- Loading State -->
-        <div v-if="tracesLoading" class="flex h-full flex-col items-center justify-center py-20">
-          <OSpinner size="xl" class="mb-4" />
-          <div class="text-base">{{ t("correlation.loadingTraces") }}</div>
-        </div>
-
-        <!-- Error State -->
-        <div v-else-if="tracesError" class="flex h-full flex-col items-center justify-center py-20">
-          <OIcon name="error-outline" class="mb-4" style="width: 3.75rem; height: 3.75rem" />
-          <div class="mb-2 text-base">
-            {{ t("correlation.tracesError") }}
+      <div v-if="activeTab == 'traces'" class="flex h-full flex-col">
+        <CorrelationVersionsLine
+          v-model:version="versionFilter"
+          class="shrink-0"
+          :versions="versionsSummary.versions"
+          :service="titleName"
+          :filter-options="versionOptions"
+        />
+        <div class="min-h-0 flex-1">
+          <!-- Loading State -->
+          <div v-if="tracesLoading" class="flex h-full flex-col items-center justify-center py-20">
+            <OSpinner size="xl" class="mb-4" />
+            <div class="text-base">{{ t("correlation.loadingTraces") }}</div>
           </div>
-          <div class="text-text-secondary text-sm">{{ tracesError }}</div>
-          <OButton variant="outline" size="sm-action" class="mt-4" @click="loadCorrelatedTraces">
-            <OIcon name="refresh" size="xs" class="me-1" />
-            {{ t("correlation.retryButton") }}
-          </OButton>
-        </div>
 
-        <!-- Direct Trace Correlation - Full Span List -->
-        <div
-          v-else-if="traceCorrelationMode === 'direct' && traceSpanList.length > 0"
-          class="telemetry-correlation-traces h-full overflow-auto"
-        >
-          <TraceDetails
-            mode="embedded"
-            :shortcuts-active="shortcutsActive"
-            :trace-id-prop="extractedTraceId || ''"
-            :stream-name-prop="sortedTraceStreams[0] ? sortedTraceStreams[0].stream_name : ''"
-            :span-list-prop="traceSpanList"
-            :start-time-prop="computedTraceStartTime"
-            :end-time-prop="computedTraceEndTime"
-            :correlated-log-stream="sortedLogStreams[0] ? sortedLogStreams[0].stream_name : ''"
-            :show-back-button="false"
-            :show-timeline="false"
-            :show-log-stream-selector="false"
-            :show-share-button="false"
-            :show-close-button="false"
-            :show-expand-button="true"
-            :enable-correlation-links="true"
-            :initial-timeline-expanded="false"
-          />
-        </div>
+          <!-- Error State -->
+          <div
+            v-else-if="tracesError"
+            class="flex h-full flex-col items-center justify-center py-20"
+          >
+            <OIcon name="error-outline" class="mb-4" style="width: 3.75rem; height: 3.75rem" />
+            <div class="mb-2 text-base">
+              {{ t("correlation.tracesError") }}
+            </div>
+            <div class="text-text-secondary text-sm">{{ tracesError }}</div>
+            <OButton variant="outline" size="sm-action" class="mt-4" @click="loadCorrelatedTraces">
+              <OIcon name="refresh" size="xs" class="me-1" />
+              {{ t("correlation.retryButton") }}
+            </OButton>
+          </div>
 
-        <!-- Dimension-based Correlation - Traces List -->
-        <div
-          v-else-if="traceCorrelationMode === 'dimension-based' && tracesForDimensions.length > 0"
-          class="flex h-full flex-col"
-        >
-          <!-- Header -->
-          <div class="border-card-glass-border bg-surface-panel border-b border-solid p-3">
-            <div class="flex items-center gap-3">
-              <OIcon name="hub" size="md" />
-              <div class="flex flex-col">
-                <span class="text-sm font-semibold">{{
-                  t("correlation.dimensionBasedCorrelation")
-                }}</span>
-                <span class="text-text-secondary text-xs">{{
-                  t("correlation.tracesFromService", { service: serviceName })
-                }}</span>
+          <!-- Direct Trace Correlation - Full Span List -->
+          <div
+            v-else-if="traceCorrelationMode === 'direct' && traceSpanList.length > 0"
+            class="telemetry-correlation-traces h-full overflow-auto"
+          >
+            <TraceDetails
+              mode="embedded"
+              :shortcuts-active="shortcutsActive"
+              :trace-id-prop="extractedTraceId || ''"
+              :stream-name-prop="sortedTraceStreams[0] ? sortedTraceStreams[0].stream_name : ''"
+              :span-list-prop="traceSpanList"
+              :start-time-prop="computedTraceStartTime"
+              :end-time-prop="computedTraceEndTime"
+              :correlated-log-stream="sortedLogStreams[0] ? sortedLogStreams[0].stream_name : ''"
+              :show-back-button="false"
+              :show-timeline="false"
+              :show-log-stream-selector="false"
+              :show-share-button="false"
+              :show-close-button="false"
+              :show-expand-button="true"
+              :enable-correlation-links="true"
+              :initial-timeline-expanded="false"
+            />
+          </div>
+
+          <!-- Dimension-based Correlation - Traces List -->
+          <div
+            v-else-if="traceCorrelationMode === 'dimension-based' && tracesForDimensions.length > 0"
+            class="flex h-full flex-col"
+          >
+            <!-- Header -->
+            <div class="border-card-glass-border bg-surface-panel border-b border-solid p-3">
+              <div class="flex items-center gap-3">
+                <OIcon name="hub" size="md" />
+                <div class="flex flex-col">
+                  <span class="text-sm font-semibold">{{
+                    t("correlation.dimensionBasedCorrelation")
+                  }}</span>
+                  <span class="text-text-secondary text-xs">{{
+                    t("correlation.tracesFromService", { service: titleName })
+                  }}</span>
+                </div>
+                <OTag type="fieldTag" value="primary">
+                  {{ tracesForDimensions.length }} {{ t("menu.traces") }}
+                </OTag>
+                <div class="ms-auto flex items-center gap-2">
+                  <OTooltip v-if="tracesLocked" :content="tracesLockedReason">
+                    <span class="inline-flex">
+                      <OButton
+                        variant="ghost"
+                        size="sm-action"
+                        disabled
+                        icon-left="lock"
+                        data-test="correlation-view-traces-page"
+                        class="text-xs"
+                      >
+                        {{ t("correlation.viewInTraces") }}
+                      </OButton>
+                    </span>
+                  </OTooltip>
+                  <OButton
+                    v-else
+                    variant="ghost"
+                    size="sm-action"
+                    icon-left="open-in-new"
+                    @click="openTracesPage"
+                    data-test="correlation-view-traces-page"
+                    class="text-xs"
+                  >
+                    {{ t("correlation.viewInTraces") }}
+                  </OButton>
+                </div>
               </div>
-              <OTag type="fieldTag" value="primary">
-                {{ tracesForDimensions.length }} {{ t("menu.traces") }}
-              </OTag>
-              <div class="ms-auto flex items-center gap-2">
-                <OTooltip v-if="tracesLocked" :content="tracesLockedReason">
-                  <span class="inline-flex">
-                    <OButton
-                      variant="ghost"
-                      size="sm-action"
-                      disabled
-                      icon-left="lock"
-                      data-test="correlation-view-traces-page"
-                      class="text-xs"
-                    >
-                      {{ t("correlation.viewInTraces") }}
-                    </OButton>
-                  </span>
-                </OTooltip>
-                <OButton
-                  v-else
-                  variant="ghost"
-                  size="sm-action"
-                  icon-left="open-in-new"
-                  @click="openTracesPage"
-                  data-test="correlation-view-traces-page"
-                  class="text-xs"
-                >
-                  {{ t("correlation.viewInTraces") }}
-                </OButton>
-              </div>
+            </div>
+
+            <!-- Traces List -->
+            <div class="flex-1">
+              <TracesSearchResultList
+                :hits="tracesForDimensions"
+                :loading="false"
+                :show-header="false"
+                :show-cell-actions="false"
+                :version-column="true"
+                @row-click="openTraceInNewWindow"
+              />
             </div>
           </div>
 
-          <!-- Traces List -->
-          <div class="flex-1">
-            <TracesSearchResultList
-              :hits="tracesForDimensions"
-              :loading="false"
-              :show-header="false"
-              :show-cell-actions="false"
-              @row-click="openTraceInNewWindow"
+          <!-- No Traces Found State -->
+          <div v-else-if="traceCorrelationMode !== null" class="h-full">
+            <OEmptyState
+              size="hero"
+              illustration="trace"
+              :title="t('correlation.noTracesFound')"
+              :description="t('correlation.noTracesDescription')"
+              data-test="correlation-no-traces-state"
             />
           </div>
-        </div>
 
-        <!-- No Traces Found State -->
-        <div v-else-if="traceCorrelationMode !== null" class="h-full">
-          <OEmptyState
-            size="hero"
-            illustration="trace"
-            :title="t('correlation.noTracesFound')"
-            :description="t('correlation.noTracesDescription')"
-            data-test="correlation-no-traces-state"
-          />
-        </div>
-
-        <!-- Initial State (waiting for tab to be shown) -->
-        <div v-else class="flex h-full flex-col items-center justify-center py-20">
-          <OIcon name="account-tree" class="mb-4" style="width: 3.75rem; height: 3.75rem" />
-          <div class="text-base">
-            {{ t("correlation.correlatedTraces") }}
-          </div>
-          <div class="text-text-secondary mt-2 text-sm">
-            {{ t("correlation.correlatedTracesFor", { service: serviceName }) }}
+          <!-- Initial State (waiting for tab to be shown) -->
+          <div v-else class="flex h-full flex-col items-center justify-center py-20">
+            <OIcon name="account-tree" class="mb-4" style="width: 3.75rem; height: 3.75rem" />
+            <div class="text-base">
+              {{ t("correlation.correlatedTraces") }}
+            </div>
+            <div class="text-text-secondary mt-2 text-sm">
+              {{ t("correlation.correlatedTracesFor", { service: titleName }) }}
+            </div>
           </div>
         </div>
       </div>
@@ -1111,7 +1167,7 @@ import {
 } from "@/utils/telemetryCorrelation";
 import streamService from "@/services/stream";
 import searchService from "@/services/search";
-import { b64EncodeUnicode, getUUID, timestampToTimezoneDate } from "@/utils/zincutils";
+import { b64EncodeUnicode, getUUID } from "@/utils/zincutils";
 import {
   buildSubjectButtons,
   streamMatchesPatterns,
@@ -1139,6 +1195,17 @@ import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import CorrelationServiceHeader from "./CorrelationServiceHeader.vue";
+import CorrelationSourcePodVersion from "./CorrelationSourcePodVersion.vue";
+import CorrelationVersionsLine from "./CorrelationVersionsLine.vue";
+import { useCorrelationVersions } from "./useCorrelationVersions";
+import {
+  placeFromDimensions,
+  timeRangeParams,
+  versionCondition,
+  withTraceVersions,
+} from "./correlationVersions";
+import { qualifiedName, showsDetectedAs, type ServiceDisplayFields } from "@/types/serviceRef";
 
 const RenderDashboardCharts = defineAsyncComponent(
   () => import("@/views/Dashboards/RenderDashboardCharts.vue"),
@@ -1151,6 +1218,8 @@ export interface TimeRange {
 
 export interface TelemetryCorrelationDashboardProps {
   serviceName: string;
+  displayServiceName?: string;
+  serviceDisplay?: Omit<ServiceDisplayFields, "display_name">;
   matchedDimensions: Record<string, string>;
   additionalDimensions?: Record<string, string>; // Unstable dimensions (pod-id, etc.) - shown with _o2_all option
   matchedSetId?: string; // Identity set selected by best-coverage resolution ("k8s", "aws", "gcp", "azure", ...)
@@ -2023,6 +2092,96 @@ const currentOrgIdentifier = computed(() => {
   return store.state.selectedOrganization.identifier;
 });
 
+const titleName = computed(() =>
+  qualifiedName(
+    props.displayServiceName || props.serviceName,
+    props.serviceDisplay?.display_qualifier,
+  ),
+);
+const serviceDimensionKey = computed(() => {
+  const serviceFields = semanticGroups.value.find((group) => group.id === "service")?.fields ?? [];
+  const keys = Object.keys(props.matchedDimensions ?? {}).filter(
+    (key) => props.matchedDimensions[key]?.toLowerCase() === props.serviceName.toLowerCase(),
+  );
+  return keys.find((key) => serviceFields.includes(key)) ?? keys[0] ?? null;
+});
+const serviceFilterNote = computed(() => {
+  if (!showsDetectedAs(props.serviceName, props.displayServiceName)) return "";
+  return props.serviceDisplay?.display_source === "trace"
+    ? t("serviceVersions.names.traceNameDetectedAs", { name: props.serviceName })
+    : t("serviceVersions.names.detectedAs", { name: props.serviceName });
+});
+const versionPlace = computed(() =>
+  placeFromDimensions(
+    [
+      props.chipDimensions,
+      props.matchedDimensions,
+      props.additionalDimensions,
+      props.availableDimensions,
+    ],
+    semanticGroups.value,
+  ),
+);
+const versionTraceFilter = computed(() =>
+  Object.entries(sortedTraceStreams.value[0]?.filters ?? {})
+    .filter(([, value]) => value !== SELECT_ALL_VALUE)
+    .map(([field, value]) =>
+      buildSqlCondition(field, value, sortedTraceStreams.value[0]?.filter_spellings?.[field]),
+    )
+    .join(" AND "),
+);
+const {
+  scope: versionScope,
+  byPod: versionByPod,
+  summary: versionsSummary,
+} = useCorrelationVersions({
+  org: currentOrgIdentifier,
+  user: computed(() => store.state.userInfo?.email || ""),
+  displayName: computed(() => props.displayServiceName),
+  displaySource: computed(() => props.serviceDisplay?.display_source),
+  place: versionPlace,
+  traceStream: computed(() => sortedTraceStreams.value[0]?.stream_name),
+  traceFilter: versionTraceFilter,
+  startTime: computed(() => props.timeRange.startTime),
+  endTime: computed(() => props.timeRange.endTime),
+  enabled: isOpen,
+  scopeEnabled: computed(() => props.mode === "dialog"),
+  logTime: computed(() => {
+    const at = Number(props.sourceEvent?.timestamp);
+    return Number.isFinite(at) && at > 0 ? at : undefined;
+  }),
+});
+const sourcePodVersion = computed(() =>
+  versionPlace.value.pod ? versionsSummary.value.sourcePodVersion : null,
+);
+const versionFilter = ref<string>(SELECT_ALL_VALUE);
+// The version the shown dimension-based traces were fetched with, so a filter change refetches once.
+let tracesVersion: string = SELECT_ALL_VALUE;
+const versionOptions = computed(() =>
+  versionsSummary.value.versions.length
+    ? [
+        { label: t("serviceVersions.correlation.allVersions"), value: SELECT_ALL_VALUE },
+        ...versionsSummary.value.versions.map((entry) => ({
+          label: raw(entry.version),
+          value: entry.version,
+        })),
+      ]
+    : [],
+);
+const withVersionFilter = (parts: string[]) =>
+  (versionFilter.value === SELECT_ALL_VALUE
+    ? parts
+    : [...parts, versionCondition(versionFilter.value)]
+  ).join(" AND ");
+watch([versionFilter, () => tracesLoading.value], () => {
+  if (
+    !tracesLoading.value &&
+    traceCorrelationMode.value === "dimension-based" &&
+    tracesVersion !== versionFilter.value
+  )
+    loadCorrelatedTraces();
+});
+
 const currentTimeObj = computed(() => {
   // props.timeRange is in microseconds (16 digits), just like TracesAnalysisDashboard
   // Date constructor expects milliseconds, so we create Date objects with microseconds
@@ -2086,7 +2245,12 @@ const getDimensionOptions = (key: string, currentValue: string) => {
     });
   }
 
-  return options;
+  if (key !== serviceDimensionKey.value) return options;
+  return options.map((option) =>
+    option.value.toLowerCase() === props.serviceName.toLowerCase()
+      ? { ...option, label: raw(titleName.value) }
+      : option,
+  );
 };
 
 // Fetch metric schemas for all streams in one call
@@ -2191,6 +2355,7 @@ const loadDashboard = async () => {
 
     const config: MetricsCorrelationConfig = {
       serviceName: props.serviceName,
+      displayServiceName: titleName.value,
       matchedDimensions: activeDimensions.value,
       metricStreams: selectedMetricStreams.value,
       logStreams: sortedLogStreams.value,
@@ -2296,6 +2461,7 @@ const addMetricPanels = async (addedStreams: StreamInfo[]) => {
 
       const config: MetricsCorrelationConfig = {
         serviceName: props.serviceName,
+        displayServiceName: titleName.value,
         matchedDimensions: activeDimensions.value,
         metricStreams: streamsNeedingGeneration,
         logStreams: sortedLogStreams.value,
@@ -2369,6 +2535,7 @@ const addMetricPanels = async (addedStreams: StreamInfo[]) => {
     // Regenerate per-group dashboards so the group tabs stay up to date
     const groupConfig: MetricsCorrelationConfig = {
       serviceName: props.serviceName,
+      displayServiceName: titleName.value,
       matchedDimensions: activeDimensions.value,
       metricStreams: selectedMetricStreams.value,
       logStreams: sortedLogStreams.value,
@@ -2417,24 +2584,8 @@ const onClose = () => {
 };
 
 // Helper function to format time range
-const formatTimeRange = (range: TimeRange) => {
-  // range.startTime and range.endTime are in microseconds (16 digits)
-  // Convert to milliseconds by dividing by 1000, then render in the
-  // user-selected timezone (falls back to UTC).
-  const timezone = store.state.timezone || "UTC";
-  const formatTime = (micros: number) =>
-    timestampToTimezoneDate(Math.floor(micros / 1000), timezone, "HH:mm:ss");
-
-  // Calculate duration in microseconds, then convert to minutes
-  const durationMicros = range.endTime - range.startTime;
-  const durationMinutes = Math.round(durationMicros / 1000 / 60000);
-
-  return t("correlation.timeRangeWithDuration", {
-    start: formatTime(range.startTime),
-    end: formatTime(range.endTime),
-    minutes: durationMinutes,
-  });
-};
+const formatTimeRange = (range: TimeRange) =>
+  t("correlation.timeRangeWithDuration", timeRangeParams(range, store.state.timezone || "UTC"));
 
 // ============= TRACE CORRELATION FUNCTIONS =============
 
@@ -2780,10 +2931,13 @@ const fetchTracesByDimensions = (): Promise<any[]> => {
   const filterParts: string[] = [];
   if (traceStreamInfo.filters) {
     for (const [fieldName, value] of Object.entries(traceStreamInfo.filters)) {
-      filterParts.push(buildSqlCondition(fieldName, value));
+      filterParts.push(
+        buildSqlCondition(fieldName, value, traceStreamInfo.filter_spellings?.[fieldName]),
+      );
     }
   }
-  const filter = filterParts.join(" AND ");
+  const filter = withVersionFilter(filterParts);
+  tracesVersion = versionFilter.value;
 
   // Cancel any previous in-flight stream
   if (currentTracesStreamTraceId) {
@@ -2820,7 +2974,7 @@ const fetchTracesByDimensions = (): Promise<any[]> => {
             data: (_: any, response: any) => {
               const hits: any[] = response.content?.results?.hits || [];
               if (hits.length > 0) {
-                accumulated.push(...formatTracesMetaData(hits));
+                accumulated.push(...withTraceVersions(formatTracesMetaData(hits), hits));
               }
             },
             error: (_: any, err: any) => {
@@ -2905,11 +3059,13 @@ const openTracesPage = () => {
 
   if (traceStreamInfo?.filters) {
     for (const [fieldName, value] of Object.entries(traceStreamInfo.filters)) {
-      filterParts.push(buildSqlCondition(fieldName, value));
+      filterParts.push(
+        buildSqlCondition(fieldName, value, traceStreamInfo.filter_spellings?.[fieldName]),
+      );
     }
   }
 
-  const filterQuery = filterParts.join(" AND ");
+  const filterQuery = withVersionFilter(filterParts);
 
   // Build the URL to open traces page with filters
   const route = router.resolve({

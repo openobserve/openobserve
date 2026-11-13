@@ -181,6 +181,24 @@ pub fn forget_org(org: &str) {
     remove_snapshot_file(&snapshot_path(org));
 }
 
+/// Skips orgs being deleted, then mirrors the two sources `check_ingestion_allowed` reads.
+#[cfg_attr(not(feature = "cloud"), allow(clippy::needless_bool))]
+pub(crate) async fn org_allowed(org: &str) -> bool {
+    if super::super::org_being_deleted(org) || crate::db::file_list::BLOCKED_ORGS.contains(org) {
+        return false;
+    }
+    #[cfg(feature = "cloud")]
+    match crate::organization::is_org_in_free_trial_period(org).await {
+        Ok(true) => {}
+        Ok(false) => return false,
+        Err(e) => {
+            log::warn!("[ServiceGraph] org {org}: trial check failed, skipped this tick: {e}");
+            return false;
+        }
+    }
+    true
+}
+
 async fn discover() -> Vec<(String, Vec<String>)> {
     let orgs = match crate::organization::list_all_orgs(None).await {
         Ok(orgs) => orgs,
@@ -216,24 +234,6 @@ async fn discover() -> Vec<(String, Vec<String>)> {
         }
     }
     out
-}
-
-/// Skips orgs being deleted, then mirrors the two sources `check_ingestion_allowed` reads.
-#[cfg_attr(not(feature = "cloud"), allow(clippy::needless_bool))]
-async fn org_allowed(org: &str) -> bool {
-    if super::super::org_being_deleted(org) || crate::db::file_list::BLOCKED_ORGS.contains(org) {
-        return false;
-    }
-    #[cfg(feature = "cloud")]
-    match crate::organization::is_org_in_free_trial_period(org).await {
-        Ok(true) => {}
-        Ok(false) => return false,
-        Err(e) => {
-            log::warn!("[ServiceGraph] org {org}: trial check failed, skipped this tick: {e}");
-            return false;
-        }
-    }
-    true
 }
 
 async fn claim_stream(org: &str, stream: &str) -> Option<i64> {

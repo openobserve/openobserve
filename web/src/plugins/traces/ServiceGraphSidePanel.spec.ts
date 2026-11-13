@@ -32,8 +32,10 @@ vi.mock("@/services/service_streams", () => ({
 }));
 
 vi.mock("vue-router", () => ({
+  useRoute: () => ({ query: {} }),
   useRouter: () => ({
     push: vi.fn(),
+    replace: vi.fn(),
   }),
 }));
 
@@ -412,6 +414,13 @@ describe("ServiceGraphSidePanel.vue", () => {
       expect(health.text).toBe("Warning");
     });
 
+    it("should return warning status when error_rate > 5% and <= 10%, as the catalog does", () => {
+      wrapper = createWrapper({ selectedNode: mockNodes[1] }); // 7.8%
+      const health = wrapper.vm.serviceHealth;
+      expect(health.status).toBe("warning");
+      expect(health.text).toBe("Warning");
+    });
+
     it("should return critical status when error_rate > 10%", () => {
       wrapper = createWrapper({ selectedNode: mockNodes[2] }); // 12.5%
       const health = wrapper.vm.serviceHealth;
@@ -720,16 +729,6 @@ describe("ServiceGraphSidePanel.vue", () => {
       expect(wrapper.find('[data-test="service-graph-node-panel-tab-operations"]').exists()).toBe(
         true,
       );
-    });
-
-    it.skip("should render the nodes tab", () => {
-      // nodes tab is dynamic — only rendered after the async workload-fields
-      // service resolves with k8s/aws/etc schema groups; not available in unit tests
-    });
-
-    it.skip("should render the pods tab", () => {
-      // pods tab is dynamic — only rendered after the async workload-fields
-      // service resolves with k8s/aws/etc schema groups; not available in unit tests
     });
 
     it("should default to operations tab on mount", () => {

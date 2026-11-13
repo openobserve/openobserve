@@ -136,6 +136,7 @@ import { queryClient } from "@/composables/query/queryClient";
 import { streamProbeQuery } from "@/services/stream.queries";
 import { useSampleDataSession } from "@/composables/sampleData/useSampleDataSession";
 import { firstDataStorageKey } from "@/composables/firstEvent/useFirstDataNotice";
+import { b64DecodeUnicode } from "@/utils/zincutils";
 
 // OverviewTab renders only O2 `lib` components.
 
@@ -1190,6 +1191,63 @@ describe("OverviewTab", () => {
       pending.resolve({ data: { nodes: [], edges: [] } });
       await flushPromises();
       expect(visibleSkeletons()).toEqual([]);
+    });
+
+    describe("the service card's view-traces drill", () => {
+      let push: ReturnType<typeof vi.spyOn>;
+
+      beforeEach(() => {
+        push = vi.spyOn(router, "push").mockResolvedValue(undefined as never);
+      });
+
+      afterEach(() => {
+        push.mockRestore();
+      });
+
+      const drillFilterFor = async (node: Record<string, unknown>) => {
+        vi.mocked(serviceGraphService.getCurrentTopology).mockResolvedValue({
+          data: { nodes: [{ stream_name: "default", requests: 10, ...node }], edges: [] },
+        } as never);
+        wrapper = mountOverviewTab();
+        await flushPromises();
+        const buttons = wrapper.find(SERVICES).findAll('button[title="View Traces"]');
+        expect(buttons).toHaveLength(1);
+        await buttons[0].trigger("click");
+        expect(push).toHaveBeenCalledTimes(1);
+        const query = (push.mock.calls[0][0] as { query: Record<string, string> }).query;
+        expect(query.stream).toBe("default");
+        return b64DecodeUnicode(query.query);
+      };
+
+      it("should filter an inferred node on infer_service_name", async () => {
+        const filter = await drillFilterFor({
+          id: "postgres",
+          label: "postgres",
+          service_type: "database",
+          error_rate: 0,
+        });
+        expect(filter).toBe("infer_service_name = 'postgres'");
+      });
+
+      it("should keep service_name for a gen-AI model node", async () => {
+        const filter = await drillFilterFor({
+          id: "gpt-4o-mini",
+          label: "gpt-4o-mini",
+          service_type: "model",
+          error_rate: 0,
+        });
+        expect(filter).toBe("service_name = 'gpt-4o-mini'");
+      });
+
+      it("should still append the error filter when the node is error-flagged", async () => {
+        const inferred = await drillFilterFor({
+          id: "redis",
+          label: "redis",
+          service_type: "database",
+          error_rate: 6.2,
+        });
+        expect(inferred).toBe("infer_service_name = 'redis' AND span_status = 'ERROR'");
+      });
     });
   });
   describe("load failures", () => {

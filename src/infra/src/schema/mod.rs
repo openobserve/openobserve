@@ -67,6 +67,8 @@ static STREAM_SETTINGS_ATOMIC: Lazy<ArcSwap<StreamSettingsCache>> =
     Lazy::new(|| ArcSwap::from(Arc::new(hashbrown::HashMap::new())));
 
 pub const SCHEMA_KEY: &str = "/schema/";
+/// Every metric the service-graph writer derives from trace spans starts with this.
+pub const SERVICE_GRAPH_METRICS_PREFIX: &str = "traces_service_graph_";
 
 pub async fn init() -> Result<()> {
     history::init().await?;
@@ -201,6 +203,17 @@ pub fn remove_latest(map: &mut hashbrown::HashMap<String, SchemaCache>, key: &st
 /// Whether the org has a logs, metrics, traces or profiles stream outside the internal ones; O(1).
 pub fn org_has_user_stream(org_id: &str) -> bool {
     ORG_USER_STREAMS.contains_key(org_id)
+}
+
+/// Streams whose records may name a service: user data, minus the metrics O2 derives from traces.
+pub fn is_service_source_stream(stream_type: StreamType, stream_name: &str) -> bool {
+    matches!(
+        stream_type,
+        StreamType::Logs | StreamType::Metrics | StreamType::Traces | StreamType::Profiles
+    ) && !config::meta::self_reporting::usage::INTERNAL_STREAM_NAMES.contains(&stream_name)
+        && !stream_name.starts_with("_o2_")
+        && !(stream_type == StreamType::Metrics
+            && stream_name.starts_with(SERVICE_GRAPH_METRICS_PREFIX))
 }
 
 pub async fn get_from_db(
@@ -2012,6 +2025,32 @@ mod tests {
         assert_eq!(user_data_org("acme/metrics/cpu_usage"), Some("acme"));
         assert_eq!(user_data_org("acme/metrics/up/with/slash"), Some("acme"));
         assert_eq!(user_data_org("acme/profiles/default"), Some("acme"));
+    }
+
+    #[test]
+    fn service_sources_exclude_streams_o2_writes_or_derives() {
+        for (stream_type, name) in [
+            (StreamType::Logs, "triggers"),
+            (StreamType::Logs, "usage"),
+            (StreamType::Traces, "_evaluator"),
+            (StreamType::Metrics, "_o2_service_requests_total"),
+            (StreamType::Metrics, "traces_service_graph_request_total"),
+            (
+                StreamType::Metrics,
+                "traces_service_graph_request_server_seconds_bucket",
+            ),
+        ] {
+            assert!(!is_service_source_stream(stream_type, name), "{name}");
+        }
+        for (stream_type, name) in [
+            (StreamType::Traces, "default"),
+            (StreamType::Logs, "shop_logs"),
+            (StreamType::Logs, "_rumdata"),
+            (StreamType::Logs, "traces_service_graph_audit"),
+            (StreamType::Metrics, "http_requests_total"),
+        ] {
+            assert!(is_service_source_stream(stream_type, name), "{name}");
+        }
     }
 
     #[test]

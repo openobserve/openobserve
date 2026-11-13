@@ -42,6 +42,7 @@ vi.mock("@/services/service_streams", () => ({
       },
     }),
     saveIdentityConfig: vi.fn().mockResolvedValue({ data: {} }),
+    getServicesList: vi.fn().mockResolvedValue({ data: [] }),
   },
 }));
 
@@ -71,6 +72,8 @@ import ServiceIdentitySetup from "./ServiceIdentitySetup.vue";
 import serviceStreamsService from "@/services/service_streams";
 import { serviceStreamKeys } from "@/services/service_streams.querykeys";
 import { queryClient } from "@/composables/query/queryClient";
+import { labelRows } from "@/components/shared/ServiceNameLabel.fixtures";
+import stage8 from "@/test/unit/fixtures/serviceVersions/stage8.json";
 
 // ─── Test setup ──────────────────────────────────────────────────────────────
 
@@ -453,6 +456,277 @@ describe("ServiceIdentitySetup", () => {
     });
   });
 
+  describe("service display names", () => {
+    const row = labelRows.differs;
+    const analytics = (valueDisplay?: Record<string, string>) => ({
+      data: {
+        org_id: "test-org",
+        total_dimensions: 1,
+        by_cardinality: { service: 2 },
+        recommended_priority_dimensions: [],
+        dimensions: [
+          {
+            dimension_name: "service",
+            cardinality: 2,
+            service_count: 2,
+            cardinality_class: "Low",
+            first_seen: 0,
+            last_updated: 0,
+            sample_values: {},
+            value_children: { [row.service_name]: {}, nats: {} },
+          },
+        ],
+        available_groups: [
+          { group_id: "service", display: "Service", stream_types: ["traces"], aliases: {} },
+        ],
+        service_field_sources: [],
+        generated_at: 0,
+        ...(valueDisplay ? { value_display: valueDisplay } : {}),
+      },
+    });
+    const serviceSet = {
+      data: {
+        sets: [{ id: "k8s", label: "Kubernetes", distinguish_by: ["service"] }],
+        tracked_alias_ids: [],
+      },
+    };
+
+    beforeEach(() => {
+      vi.mocked(serviceStreamsService.getIdentityConfig).mockResolvedValue(serviceSet as any);
+    });
+
+    it("labels service value pills with the display name, keyed by the value", async () => {
+      vi.mocked(serviceStreamsService.getDimensionAnalytics).mockResolvedValue(
+        analytics({ [row.service_name]: row.display_name, nats: "nats" }) as any,
+      );
+      wrapper = mountComponent();
+      await flushPromises();
+
+      const pill = wrapper.get(
+        `[data-test="service-identity-setup-value-pill-${row.service_name}"]`,
+      );
+      expect(pill.text()).toContain(row.display_name);
+      expect(pill.text()).not.toContain(row.service_name);
+      expect(pill.find('[data-test="svcver-service-name"]').exists()).toBe(true);
+      expect(wrapper.get('[data-test="service-identity-setup-value-pill-nats"]').text()).toContain(
+        "nats",
+      );
+    });
+
+    it("titles the insight drawer with the display name and the detected key under it", async () => {
+      vi.mocked(serviceStreamsService.getDimensionAnalytics).mockResolvedValue(
+        analytics({ [row.service_name]: row.display_name }) as any,
+      );
+      wrapper = mountComponent();
+      await flushPromises();
+      (wrapper.vm as any).openInsightDialog(row.service_name, "primary");
+      await flushPromises();
+
+      expect(wrapper.get('[data-test="service-identity-setup-insight-title"]').text()).toBe(
+        row.display_name,
+      );
+      expect(wrapper.get('[data-test="service-identity-setup-insight-detected"]').text()).toBe(
+        `detected as ${row.service_name}`,
+      );
+    });
+
+    it("orders the signal slices Logs, Metrics, Traces whatever order the response used", async () => {
+      const response = analytics();
+      response.data.dimensions[0].sample_values = {
+        traces: { "traces/default": [row.service_name] },
+        metrics: { "metrics/default": [row.service_name] },
+        logs: { "logs/default": [row.service_name] },
+      } as any;
+      vi.mocked(serviceStreamsService.getDimensionAnalytics).mockResolvedValue(response as any);
+      wrapper = mountComponent();
+      await flushPromises();
+      (wrapper.vm as any).openInsightDialog(row.service_name, "primary");
+      await flushPromises();
+      const slices = (wrapper.vm as any).insightChartData.options.series[0].data;
+      expect(slices.map((slice: { name: string }) => slice.name)).toEqual([
+        "Logs",
+        "Metrics",
+        "Traces",
+      ]);
+    });
+
+    it("counts the service card out of the discovered services, by display name", async () => {
+      queryClient.clear();
+      const response = analytics();
+      Object.assign(response.data.dimensions[0], {
+        service_count: 16,
+        value_counts: { [row.service_name]: 1 },
+      });
+      vi.mocked(serviceStreamsService.getDimensionAnalytics).mockResolvedValue(response as any);
+      vi.mocked(serviceStreamsService.getServicesList).mockResolvedValueOnce({
+        data: [
+          { service_name: row.service_name, display_name: row.display_name },
+          { service_name: "legacy-key", display_name: row.display_name },
+          { service_name: "nats" },
+        ],
+      } as any);
+      wrapper = mountComponent();
+      await flushPromises();
+      (wrapper.vm as any).openInsightDialog(row.service_name, "primary");
+      await flushPromises();
+      expect((wrapper.vm as any).insightData.total).toBe(2);
+      expect((wrapper.vm as any).insightData.coverage).toBe(50);
+      queryClient.clear();
+    });
+
+    describe("service card denominator while the discovered count is not in", () => {
+      const openServiceInsight = async (list: Promise<unknown>) => {
+        queryClient.clear();
+        const response = analytics();
+        Object.assign(response.data.dimensions[0], {
+          service_count: 16,
+          value_counts: { [row.service_name]: 1 },
+        });
+        vi.mocked(serviceStreamsService.getDimensionAnalytics).mockResolvedValue(response as any);
+        vi.mocked(serviceStreamsService.getServicesList).mockReturnValueOnce(list as any);
+        wrapper = mountComponent();
+        await flushPromises();
+        (wrapper.vm as any).openInsightDialog(row.service_name, "primary");
+        await flushPromises();
+      };
+      const line = () => wrapper.find('[data-test="service-identity-setup-insight-coverage"]');
+      afterEach(() => queryClient.clear());
+
+      it("says the count could not load, in red, when the read fails", async () => {
+        await openServiceInsight(Promise.reject(new Error("list failed")));
+        expect((wrapper.vm as any).insightData.total).toBeNull();
+        const failed = wrapper.find('[data-test="service-identity-setup-insight-coverage-failed"]');
+        expect(failed.exists()).toBe(true);
+        expect(failed.text()).toBe("Couldn't load the service count");
+        expect(failed.attributes("role")).toBe("alert");
+        expect(failed.classes()).toContain("text-status-error-text");
+        expect(line().exists()).toBe(false);
+        expect(wrapper.text()).not.toContain("/16");
+        expect(wrapper.text()).not.toContain("% of services");
+      });
+
+      it("counts a real zero as zero, not as a missing count", async () => {
+        await openServiceInsight(Promise.resolve({ data: [] }));
+        expect((wrapper.vm as any).insightData.total).toBe(0);
+        expect(line().text()).toContain("(0/0)");
+        expect(line().text()).not.toContain("/16");
+      });
+    });
+    it("opens the clicked Service pill's own insight when Service ranks fourth", async () => {
+      const key = row.service_name;
+      const dimension = (
+        name: string,
+        cardinality: number,
+        valueChildren: Record<string, Record<string, string[]>>,
+        valueCounts: Record<string, number>,
+      ) => ({
+        dimension_name: name,
+        cardinality,
+        service_count: 2,
+        cardinality_class: "Low",
+        first_seen: 0,
+        last_updated: 0,
+        sample_values: { logs: { default: Object.keys(valueChildren) } },
+        value_children: valueChildren,
+        value_counts: valueCounts,
+      });
+      const group = (group_id: string, display: string) => ({
+        group_id,
+        display,
+        stream_types: ["logs", "traces"],
+        aliases: {},
+      });
+      vi.mocked(serviceStreamsService.getIdentityConfig).mockResolvedValue({
+        data: {
+          sets: [
+            {
+              id: "k8s",
+              label: "Kubernetes",
+              distinguish_by: ["k8s-cluster", "k8s-namespace", "k8s-deployment", "service"],
+            },
+          ],
+          tracked_alias_ids: [],
+        },
+      } as any);
+      vi.mocked(serviceStreamsService.getDimensionAnalytics).mockResolvedValue({
+        data: {
+          org_id: "test-org",
+          total_dimensions: 4,
+          by_cardinality: {},
+          recommended_priority_dimensions: [],
+          dimensions: [
+            dimension("k8s-cluster", 1, { c1: { "k8s-namespace": ["c1"] } }, { c1: 2 }),
+            dimension(
+              "k8s-namespace",
+              1,
+              { c1: { "k8s-deployment": [key, "checkout"] } },
+              { c1: 2 },
+            ),
+            dimension(
+              "k8s-deployment",
+              2,
+              { [key]: { service: [key] }, checkout: { service: ["checkoutservice"] } },
+              { [key]: 1, checkout: 1 },
+            ),
+            dimension(
+              "service",
+              3,
+              {
+                [key]: {
+                  "k8s-deployment": [key],
+                  "k8s-namespace": ["c1"],
+                  "k8s-cluster": ["c1"],
+                },
+                checkoutservice: { "k8s-deployment": ["checkout"] },
+                nats: {},
+              },
+              { [key]: 1, checkoutservice: 1, nats: 1 },
+            ),
+          ],
+          available_groups: [
+            group("k8s-cluster", "K8s Cluster"),
+            group("k8s-namespace", "K8s Namespace"),
+            group("k8s-deployment", "K8s Deployment"),
+            group("service", "Service"),
+          ],
+          service_field_sources: [],
+          generated_at: 0,
+          value_display: stage8.analytics_value_display,
+        },
+      } as any);
+      wrapper = mountComponent();
+      await flushPromises();
+
+      await wrapper.get(`[data-test="service-identity-setup-value-pill-${key}"]`).trigger("click");
+      await flushPromises();
+
+      const header = wrapper.get('[data-test="service-identity-setup-insight-header"]').text();
+      expect(header).toContain("Service");
+      expect(header).not.toContain("K8s Deployment");
+      expect(wrapper.get('[data-test="service-identity-setup-insight-title"]').text()).toBe(
+        row.display_name,
+      );
+      expect(wrapper.get('[data-test="service-identity-setup-insight-detected"]').text()).toBe(
+        `detected as ${key}`,
+      );
+      expect(wrapper.find('[data-test="service-identity-setup-insight-sources"]').exists()).toBe(
+        true,
+      );
+      const related = wrapper.get('[data-test="service-identity-setup-insight-related"]').text();
+      expect(related).toContain("K8s Deployment");
+      expect(related).toContain(key);
+      expect(related).toContain("c1");
+      const notice = wrapper.get('[data-test="service-identity-setup-insight-notice"]');
+      expect(notice.classes()).toContain("bg-surface-panel");
+      expect(notice.classes()).not.toContain("bg-status-info-bg");
+      const donut = wrapper.findComponent({ name: "CustomChartRenderer" }).props("data");
+      expect(donut.animation).toBe(false);
+      expect(donut.series[0]).toMatchObject({ type: "pie", radius: ["50%", "78%"] });
+      const explain = wrapper.get('[data-test="service-identity-setup-insight-explain"]').text();
+      expect(explain).toMatch(new RegExp(`co-occurring with\\s+${row.display_name}\\s*\\.$`));
+    });
+  });
+
   // ─── Migrated dialog/drawer coverage ──────────────────────────────────────
 
   describe("Workload Insight ODrawer", () => {
@@ -518,6 +792,14 @@ describe("ServiceIdentitySetup", () => {
       expect(drawer.attributes("data-open")).toBe("true");
       // Default width when there are <= 2 related dimensions → 37 (percent)
       expect(drawer.attributes("data-width")).toBe("37");
+    });
+
+    it("names the drawer after its visible title for assistive tech", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+      (wrapper.vm as any).openInsightDialog("shop", "primary");
+      await flushPromises();
+      expect(wrapper.findComponent({ name: "ODrawer" }).props("title")).toBe("K8s Namespace shop");
     });
 
     it("should close the ODrawer when update:open=false is emitted (header close)", async () => {

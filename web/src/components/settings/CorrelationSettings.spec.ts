@@ -46,6 +46,17 @@ vi.mock("@/components/settings/DiscoveredServices.vue", () => ({
   },
 }));
 
+vi.mock("@/aws-exports", async (original) => ({
+  default: { ...(await original<{ default: object }>()).default, isEnterprise: "true" },
+}));
+
+vi.mock("@/components/settings/ServiceEnvVersionSettings.vue", () => ({
+  default: {
+    name: "ServiceEnvVersionSettings",
+    template: '<div data-test="env-version-settings" />',
+  },
+}));
+
 vi.mock("@/components/settings/ServiceIdentitySetup.vue", () => ({
   default: {
     name: "ServiceIdentitySetup",
@@ -146,6 +157,25 @@ describe("CorrelationSettings", () => {
       expect(wrapper.find('[data-name="discovery"]').attributes("data-suffix")).toBe("lock");
       expect(wrapper.find('[data-name="field-aliases"]').attributes("data-suffix")).toBeUndefined();
       expect(serviceStreamsService.getSemanticGroups).toHaveBeenCalled();
+    });
+
+    it("locks the env-versions tab with the correlation denial when correlation is locked", async () => {
+      wrapper = mountComponent(storeWith({ correlation: "locked" }));
+      (wrapper.vm as any).activeTab = "env-versions";
+      await flushPromises();
+
+      expect(wrapper.find('[data-name="env-versions"]').attributes("data-suffix")).toBe("lock");
+      expect(wrapper.find('[data-test="svcver-env-versions-license-denied"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="env-version-settings"]').exists()).toBe(false);
+    });
+
+    it("shows env-versions settings when correlation is enabled", async () => {
+      wrapper = mountComponent(storeWith({ correlation: "enabled" }));
+      (wrapper.vm as any).activeTab = "env-versions";
+      await flushPromises();
+
+      expect(wrapper.find('[data-name="env-versions"]').attributes("data-suffix")).toBeUndefined();
+      expect(wrapper.find('[data-test="env-version-settings"]').exists()).toBe(true);
     });
 
     it("locks field aliases and skips semantic groups when alerts is locked", async () => {

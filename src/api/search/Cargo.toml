@@ -67,3 +67,6 @@ urlencoding.workspace = true
 utoipa.workspace = true
 transform.workspace = true
 vector-enrichment.workspace = true
+
+[dev-dependencies]
+datafusion.workspace = true

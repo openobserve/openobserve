@@ -244,6 +244,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :targets="row.targets"
                   :alert-groups="row.alert_groups"
                   :folder-name="targetFolderName"
+                  :value-label="valueLabel"
                   :max-chips="2"
                   :data-test="`downtime-list-${row.id}-targets`"
                 />
@@ -666,6 +667,7 @@ import { useViewerTimezone } from "@/composables/downtimes/useViewerTimezone";
 import { DEFAULT_DOWNTIME_FOLDER } from "@/utils/downtimes/folderDefault";
 import MoveAcrossFolders from "@/components/common/sidebar/MoveAcrossFolders.vue";
 import { useListBoundaryRefetch } from "@/composables/downtimes/useListBoundaryRefetch";
+import { useDowntimeValueLabels } from "@/composables/downtimes/useDowntimeValueLabels";
 import DowntimeTargetsCell from "./DowntimeTargetsCell.vue";
 import { useEditorDraftIds } from "@/composables/useEditorDraft";
 import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
@@ -876,6 +878,13 @@ const displayedRows = computed(() => {
       : folderRows.value.filter((r) => r.status === f);
   return sortDowntimeRows(rows);
 });
+
+// One lookup for every listed service, so the Targets column names it as the detail page does.
+const valueLabel = useDowntimeValueLabels(orgId, activeFolderId, () => ({
+  type: "group",
+  op: "and",
+  items: displayedRows.value.flatMap((row) => (row.condition ? [row.condition] : [])),
+}));
 
 const isFiltered = computed(
   () => !!search.value.trim() || typeFilter.value !== "all" || statFilter.value !== null,

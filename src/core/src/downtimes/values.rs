@@ -150,7 +150,26 @@ pub async fn values(
         let queries = stream_queries(records, groups, &streams, &plan);
         search_values(org, user_id, queries, &plan).await
     };
-    Ok(answer(&prefix, known, may_search, search).await)
+    let mut response = answer(&prefix, known, may_search, search).await;
+    if req.key == "service" {
+        crate::service_identity::display_feed::ensure(org).await;
+        let keys = response.values.iter().map(|v| v.value.clone());
+        let shown = crate::service_identity::display_feed::labels(org, keys).await;
+        label_services(&mut response.values, |value| {
+            shown
+                .get(value)
+                .cloned()
+                .unwrap_or_else(|| value.to_string())
+        });
+    }
+    Ok(response)
+}
+
+/// Each suggestion keeps its key as `value` and shows the display name as `label`.
+pub fn label_services(values: &mut [ValueSuggestion], label: impl Fn(&str) -> String) {
+    for suggestion in values {
+        suggestion.label = Some(label(&suggestion.value));
+    }
 }
 
 /// Filters the known values by the prefix and searches only when allowed and still short.
@@ -512,6 +531,7 @@ pub fn merge_and_rank(found: Vec<Found>, prefix: &str) -> Vec<ValueSuggestion> {
             source: f.source.as_str().to_string(),
             items: f.items,
             last_seen: f.last_seen,
+            label: None,
         })
         .collect()
 }
@@ -829,6 +849,7 @@ mod tests {
                     stream_type: StreamType::Logs,
                     filters: HashMap::new(),
                     dropped_dimensions: vec![],
+                    filter_spellings: HashMap::new(),
                 }]),
                 ..Default::default()
             },
@@ -910,6 +931,7 @@ mod tests {
                 source: "inventory".to_string(),
                 items: 1,
                 last_seen: Some(30),
+                label: None,
             }
         );
         let order: Vec<&str> = ranked.iter().map(|v| v.value.as_str()).collect();
@@ -946,12 +968,14 @@ mod tests {
                     source: "inventory".to_string(),
                     items: 3,
                     last_seen: None,
+                    label: None,
                 },
                 ValueSuggestion {
                     value: "payments-worker".to_string(),
                     source: "inventory".to_string(),
                     items: 1,
                     last_seen: None,
+                    label: None,
                 },
             ]
         );
@@ -1284,5 +1308,29 @@ mod tests {
             ensure_prefix_len(&"a".repeat(MAX_PREFIX_CHARS + 1)),
             Err(DowntimeError::BadRequest(_))
         ));
+    }
+
+    #[test]
+    fn requests_still_send_key() {
+        let hits = vec![
+            found("checkoutservice", Source::Inventory, 2, None),
+            found("nats", Source::Inventory, 1, None),
+        ];
+        let mut ranked = merge_and_rank(hits, "");
+        label_services(&mut ranked, |key| match key {
+            "checkoutservice" => "CheckoutService".to_string(),
+            other => other.to_string(),
+        });
+        let pairs: Vec<(&str, Option<&str>)> = ranked
+            .iter()
+            .map(|v| (v.value.as_str(), v.label.as_deref()))
+            .collect();
+        assert_eq!(
+            pairs,
+            vec![
+                ("checkoutservice", Some("CheckoutService")),
+                ("nats", Some("nats")),
+            ]
+        );
     }
 }

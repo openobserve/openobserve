@@ -20,6 +20,7 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import FilterBarChip from "./FilterBarChip.vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import {
@@ -88,6 +89,12 @@ const summaryOf = (group: FilterGroup) =>
       connectorMode: props.connectorMode,
     }),
   );
+// Only a single stored value can carry one display name; an equal name would repeat the chip.
+const valueName = (node: FilterCondition | FilterRawNode) => {
+  if (node.kind !== "condition" || !node.field || node.values.length !== 1) return undefined;
+  const label = bar?.valueLabel?.(node.field, node.values[0])?.label;
+  return label && label !== node.values[0] ? label : undefined;
+};
 const hasIssue = (group: FilterGroup) =>
   Array.from(props.invalidIds ?? []).some((id) => containsNode(group, id));
 </script>
@@ -273,6 +280,12 @@ const hasIssue = (group: FilterGroup) =>
           @edit="(part, element) => emit('edit', item.id, part, element)"
           @remove="emit('remove', item.id)"
         />
+        <OTruncatedText
+          v-if="valueName(item)"
+          class="text-text-secondary min-w-0 text-xs"
+          :data-test="`${dataTest}-value-label-${pathOf(index)}`"
+          >{{ raw(valueName(item)!) }}</OTruncatedText
+        >
         <span v-if="canAdd" class="inline-flex">
           <OButton
             variant="ghost"
