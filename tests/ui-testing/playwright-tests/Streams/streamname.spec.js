@@ -11,6 +11,7 @@ test.describe("Stream name casing preservation tests", () => {
     { name: "e2e_MyUpperStream1" },
     { name: "e2e_mylowerstream1" },
   ];
+  const storedNames = new Set();
 
   test.beforeEach(async ({ page }, testInfo) => {
     testLogger.testStart(testInfo.title, testInfo.file);
@@ -21,10 +22,10 @@ test.describe("Stream name casing preservation tests", () => {
 
   test.afterEach(async ({ page }, testInfo) => {
     // Cleanup: Delete test streams
-    for (const stream of TEST_STREAMS) {
+    for (const name of new Set([...TEST_STREAMS.map((s) => s.name), ...storedNames])) {
       try {
-        await pm.streamsPage.deleteStreamViaAPI(stream.name, 'logs');
-        testLogger.info('Cleaned up stream', { streamName: stream.name });
+        await pm.streamsPage.deleteStreamViaAPI(name, 'logs');
+        testLogger.info('Cleaned up stream', { streamName: name });
       } catch (e) {
         // Stream may not exist, ignore
       }
@@ -37,32 +38,35 @@ test.describe("Stream name casing preservation tests", () => {
   test("should preserve stream name casing after ingestion and show in stream explorer", {
     tag: ['@streamName', '@casing', '@all', '@streams']
   }, async ({ page }) => {
-    // Casing preservation needs the server started with
-    // ZO_FORMAT_STREAM_NAME_TO_LOWERCASE=false (the local playwright.yml does
-    // this); shared cloud deployments run the default (true) and lowercase
-    // every ingested stream name, so the feature under test is off there.
     test.skip(isCloudEnvironment(), 'Cloud runs ZO_FORMAT_STREAM_NAME_TO_LOWERCASE=true (default) — stream names are always lowercased');
 
     testLogger.info('Testing stream name casing preservation');
 
-    // Ingest data into streams
+    // PR CI declares the server flag false, so a lowercased name there is a real regression rather than a server setting.
+    const casingDeclaredPreserved = process.env.ZO_FORMAT_STREAM_NAME_TO_LOWERCASE === 'false';
+    const streams = [];
     for (const stream of TEST_STREAMS) {
-      await pm.streamsPage.ingestTestData(stream.name);
-      testLogger.info('Ingested test data', { streamName: stream.name });
+      const storedName = await pm.streamsPage.ingestTestData(stream.name);
+      if (storedName) storedNames.add(storedName);
+      const lowercasedByServer = storedName !== stream.name && storedName?.toLowerCase() === stream.name.toLowerCase();
+      test.skip(!casingDeclaredPreserved && lowercasedByServer, 'server lowercases stream names (ZO_FORMAT_STREAM_NAME_TO_LOWERCASE)');
+      expect(storedName, 'ingest response stream name').toBe(stream.name);
+      streams.push(storedName);
+      testLogger.info('Ingested test data', { streamName: stream.name, storedName });
     }
 
     // Wait for indexing
     await page.waitForTimeout(2000);
 
     // Validate streams in Stream Explorer
-    for (const stream of TEST_STREAMS) {
+    for (const streamName of streams) {
       await pm.streamsPage.navigateToStreamExplorer();
-      await pm.streamsPage.searchStream(stream.name);
-      await pm.streamsPage.verifyStreamNameVisibility(stream.name);
+      await pm.streamsPage.searchStream(streamName);
+      await pm.streamsPage.verifyStreamNameVisibility(streamName);
       await pm.streamsPage.exploreStream();
       await pm.streamsPage.verifyStreamExploration();
       await pm.streamsPage.goBack();
-      testLogger.info('Verified stream casing', { streamName: stream.name });
+      testLogger.info('Verified stream casing', { streamName });
     }
 
     testLogger.info('Stream name casing preservation test completed');

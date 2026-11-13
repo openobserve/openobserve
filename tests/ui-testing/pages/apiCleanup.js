@@ -2908,6 +2908,12 @@ class APICleanup {
         }
     }
 
+    async deleteSavedViewByName(viewName) {
+        const view = (await this.fetchSavedViews()).find((v) => v.view_name === viewName);
+        if (!view) return { code: 404, message: 'Saved view not found' };
+        return this.deleteSavedView(view.view_id);
+    }
+
     /**
      * Clean up all saved views matching test patterns
      * Deletes saved views starting with "streamslog" or "multistream_view_"

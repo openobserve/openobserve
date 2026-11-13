@@ -107,4 +107,13 @@ mod shell_tests {
         assert!(meta.contains(r#"id="latest-down""#));
         assert!(!meta.contains(r#"id="tz-select""#));
     }
+
+    // S8: each component says when a real test last ran, in amber once it is three intervals old.
+    #[test]
+    fn shell_shows_last_checked_and_marks_it_stale() {
+        assert!(SHELL.contains("c.last_checked_at"));
+        assert!(SHELL.contains(r#""Last checked ""#));
+        assert!(SHELL.contains("c.stale_after_secs * 1000"));
+        assert!(SHELL.contains(".lastchk.stale { color:var(--warn)"));
+    }
 }

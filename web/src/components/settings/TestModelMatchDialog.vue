@@ -155,7 +155,7 @@
               <div class="text-compact font-bold">
                 {{ t("modelPricing.noMatchFound") }}
               </div>
-              <div class="mt-0.5 text-xs opacity-70">
+              <div class="text-text-secondary mt-0.5 text-xs">
                 {{
                   t("modelPricing.noMatchDesc", {
                     modelName: testModelName,
@@ -166,10 +166,10 @@
             <div
               class="rounded-default bg-surface-panel border-card-glass-border border px-3.5 py-3"
             >
-              <div class="text-2xs mb-1.5 font-semibold opacity-55">
+              <div class="text-2xs text-text-secondary mb-1.5 font-semibold">
                 {{ t("modelPricing.troubleshootingTitle") }}
               </div>
-              <ul class="m-0 ps-4 text-xs leading-[1.9] opacity-60">
+              <ul class="text-text-secondary m-0 ps-4 text-xs leading-[1.9]">
                 <li>{{ t("modelPricing.tip1") }}</li>
                 <li>{{ t("modelPricing.tip2") }}</li>
                 <li>{{ t("modelPricing.tip3") }}</li>
@@ -192,12 +192,12 @@
                     : t("modelPricing.matchFound")
                 }}
               </div>
-              <div class="mt-0.5 text-xs opacity-70">
+              <div class="text-text-secondary mt-0.5 text-xs">
                 <OCode truncate>{{ testResult.matched.name }}</OCode>
               </div>
               <div
                 v-if="isApproximateMatch"
-                class="mt-0.5 text-xs opacity-70"
+                class="text-text-secondary mt-0.5 text-xs"
                 data-test="test-match-approximate"
               >
                 {{ t("modelPricing.approximateMatchDesc", { modelName: testModelName }) }}
@@ -217,7 +217,7 @@
             <div
               class="border-card-glass-border rounded-default bg-surface-panel border px-3.5 py-3"
             >
-              <div class="text-3xs mb-2 font-semibold opacity-40">
+              <div class="text-2xs text-text-secondary mb-2 font-semibold">
                 {{ t("modelPricing.matchPriority") }}
               </div>
               <div class="flex flex-wrap items-center gap-1.5">
@@ -253,7 +253,7 @@
                   <div class="text-compact font-bold">
                     {{ testResult.tier || t("settings.testModelMatchDialog.defaultTier") }}
                   </div>
-                  <div class="text-2xs mt-0.5 opacity-50" v-if="matchedTierDef?.condition">
+                  <div class="text-2xs text-text-secondary mt-0.5" v-if="matchedTierDef?.condition">
                     {{ t("settings.testModelMatchDialog.condition") }}
                     <OCode
                       >{{ matchedTierDef.condition.usage_key }}
@@ -262,7 +262,7 @@
                     >
                   </div>
                   <div
-                    class="text-2xs mt-0.5 flex items-center gap-1 opacity-50"
+                    class="text-2xs text-text-secondary mt-0.5 flex items-center gap-1"
                     v-if="matchedTierWindows.length"
                     data-test="test-match-tier-windows"
                   >
@@ -275,13 +275,13 @@
                   <div
                     v-for="(rule, rIdx) in matchedTierRules"
                     :key="rIdx"
-                    class="text-2xs mt-0.5 opacity-50"
+                    class="text-2xs text-text-secondary mt-0.5"
                     data-test="test-match-tier-rule"
                   >
                     <OCode>{{ formatTierRule(rule, t) }}</OCode>
                   </div>
                   <div
-                    class="text-2xs mt-0.5 opacity-50"
+                    class="text-2xs text-text-secondary mt-0.5"
                     v-if="
                       !matchedTierDef?.condition &&
                       !matchedTierWindows.length &&
@@ -297,10 +297,10 @@
                 <div
                   class="border-card-glass-border bg-surface-panel grid grid-cols-[1.5fr_1fr] gap-2 border-b px-3.5 py-1.75"
                 >
-                  <span class="text-3xs font-semibold opacity-40">{{
+                  <span class="text-2xs text-text-secondary font-semibold">{{
                     t("modelPricing.usageType")
                   }}</span>
-                  <span class="text-3xs text-right font-semibold opacity-40">{{
+                  <span class="text-2xs text-text-secondary text-right font-semibold">{{
                     t("modelPricing.pricePerMTokens")
                   }}</span>
                 </div>

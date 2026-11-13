@@ -322,8 +322,14 @@ async fn mark_failure(row: &synthetics_jobs::LeasedRow, reason: Option<&str>) ->
     // The reason rides on the job's `result` so the failure explains itself.
     // Without it a dispatch that never reached the probe is indistinguishable
     // from one that ran and failed — both surface as a bare "error".
-    let result_json =
-        reason.map(|r| serde_json::json!({ "error": r, "error_source": "dispatch" }).to_string());
+    // Always written: finalization reads `error_source` to count the job as Not measured.
+    let result_json = Some(
+        serde_json::json!({
+            "error": reason.unwrap_or("dispatch failed"),
+            "error_source": crate::alerting::ERROR_SOURCE_DISPATCH,
+        })
+        .to_string(),
+    );
     let acked = match synthetics_jobs::ack_complete(
         db,
         &row.id,
@@ -350,7 +356,10 @@ async fn mark_failure(row: &synthetics_jobs::LeasedRow, reason: Option<&str>) ->
         return false;
     }
     match synthetics_runs::finalize_run(db, &row.run_id, 4, now_us).await {
-        Ok(Some(done)) => crate::job_api::publish_check_status(&done).await,
+        Ok(Some(done)) => {
+            crate::job_api::after_run_finalized(&done).await;
+            crate::job_api::alert_for_swept_run(&done).await;
+        }
         Ok(None) => {}
         Err(e) => {
             tracing::error!(synthetics_id = %row.synthetics_id, run_id = %row.run_id, job_id = %row.id, "[synthetics dispatcher] finalize_run: {e}");

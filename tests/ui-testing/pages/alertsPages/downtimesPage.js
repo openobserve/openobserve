@@ -71,6 +71,7 @@ export class DowntimesPage {
     this.detailNotFound = '[data-test="downtime-detail-not-found"]';
     this.detailMuteHour = '[data-test="downtime-detail-mute-hour"]';
     this.detailSendTest = '[data-test="downtime-detail-send-test"]';
+    this.detailSendTestConfirm = '[data-test="downtime-detail-send-test-confirm"]';
     this.detailEndNow = '[data-test="downtime-detail-end-now"]';
     this.detailExtend = '[data-test="downtime-detail-extend"]';
     this.detailExtendUntil = '[data-test="downtime-detail-extend-until"]';
@@ -697,6 +698,9 @@ export class DowntimesPage {
 
   async sendTestFromDetail() {
     await this.page.locator(this.detailSendTest).click();
+    const dialog = this.page.locator(this.detailSendTestConfirm).filter({ visible: true });
+    await dialog.locator(this.dialogPrimary).click();
+    await expect(dialog).toBeHidden();
   }
 
   async endNowFromDetail() {
