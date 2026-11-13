@@ -16411,11 +16411,12 @@
       "logoTextHelp": "Replaces the default name shown in the app. Up to 100 characters.",
       "logoTextTooLong": "Use 100 characters or fewer.",
       "logoTextSaveFailed": "Custom logo text was not saved. {reason}",
+      "logoSaveFailed": "{mode} logo was not uploaded. {reason}",
+      "brandingUpdated": "Branding updated",
       "logoLightLabel": "Custom logo (light mode)",
       "logoLightHelp": "Shown in light mode. PNG, JPG, GIF or BMP, up to 150 × 30 px.",
       "logoDarkLabel": "Custom logo (dark mode)",
-      "logoDarkHelp": "Shown in dark mode. PNG, JPG, GIF or BMP, up to 150 × 30 px.",
-      "uploadLogo": "Upload"
+      "logoDarkHelp": "Shown in dark mode. PNG, JPG, GIF or BMP, up to 150 × 30 px."
     },
     "modelPricingEditor": {
       "copySuffix": " (Copy)"
@@ -16443,7 +16444,8 @@
       "globalType": "Global {type}: {value}",
       "daysValue": "{days} days",
       "forever": "keep forever",
-      "invalid": "Use 0 or at least 3 days"
+      "invalid": "Use 0 or at least 3 days",
+      "invalidType": "Use at least 3 days, or remove this type"
     },
     "organizationSettings": {
       "fieldNameHelp": "Letters, numbers and + = , . {'@'} - _ only.",

@@ -99,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="`settings-data-retention-days-${index}`"
             :name="`types[${index}].days`"
             type="number"
-            min="0"
+            :min="MIN_RETENTION_DAYS"
             :suffix="t('settings.dataRetentionDefaults.unitDays')"
             :aria-label="daysLabel(row.type)"
           />
@@ -138,7 +138,7 @@ import {
   type RetentionKey,
   type RetentionStreamType,
 } from "@/utils/dataRetention";
-import type { DataRetentionDefaultsForm } from "./DataRetentionDefaults.schema";
+import { MIN_RETENTION_DAYS, type DataRetentionDefaultsForm } from "./DataRetentionDefaults.schema";
 import type { OrganizationSettingsForm } from "./OrganizationSettings.schema";
 
 // The rows belong to the page's form: its save bar counts, validates and saves them.

@@ -28,13 +28,19 @@ const isValidDays = (value: unknown): boolean => {
 
 export const makeDataRetentionDefaultsSchema = (t: (_key: string) => string) => {
   const invalid = { message: t("settings.dataRetentionDefaults.invalid") };
+  const invalidType = { message: t("settings.dataRetentionDefaults.invalidType") };
   return z.object({
-    // Empty inherits; a row exists to say something, so its days are required.
     default: z.any().refine((value) => isEmpty(value) || isValidDays(value), invalid),
     types: z.array(
       z.object({
         type: z.enum(RETENTION_STREAM_TYPES),
-        days: z.any().refine((value) => !isEmpty(value) && isValidDays(value), invalid),
+        // Empty or 0 would save as "no override" and drop the row; removing a type is the row's own control.
+        days: z
+          .any()
+          .refine(
+            (value) => !isEmpty(value) && isValidDays(value) && Number(value) > 0,
+            invalidType,
+          ),
       }),
     ),
   });

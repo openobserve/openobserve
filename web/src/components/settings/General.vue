@@ -252,16 +252,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OIcon name="attach-file" size="sm" />
                 </template>
               </OFile>
-              <OButton
-                v-if="filesLight"
-                data-test="settings_ent_logo_custom_light_save_btn"
-                :loading="loadingState"
-                variant="outline"
-                size="sm-action"
-                type="button"
-                @click="uploadImage(filesLight, 'light')"
-                >{{ t("settings.general.uploadLogo") }}</OButton
-              >
             </div>
           </OSettingRow>
 
@@ -321,16 +311,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OIcon name="attach-file" size="sm" />
                 </template>
               </OFile>
-              <OButton
-                v-if="filesDark"
-                data-test="settings_ent_logo_custom_dark_save_btn"
-                :loading="loadingState"
-                variant="outline"
-                size="sm-action"
-                type="button"
-                @click="uploadImage(filesDark, 'dark')"
-                >{{ t("settings.general.uploadLogo") }}</OButton
-              >
             </div>
           </OSettingRow>
         </OFormSection>
@@ -393,7 +373,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :loaded="settingsLoaded"
           data-test="general-settings-save-bar"
           save-data-test="dashboard-add-submit"
-          @discard="discardThemeColors"
+          @discard="discardOffForm"
         />
       </Teleport>
     </OForm>
@@ -520,6 +500,7 @@ import { orgSummaryQuery, updateOrgSettingsMutation } from "@/services/organizat
 import {
   computed,
   defineComponent,
+  nextTick,
   onActivated,
   onBeforeUnmount,
   onMounted,
@@ -564,6 +545,9 @@ import { makeGeneralSettingsSchema, type GeneralSettingsForm } from "./General.s
 import { SAVE_BAR_SLOT } from "./saveBarSlot";
 import { useLockedAffordance } from "@/composables/useLockedAffordance";
 import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
+
+type LogoMode = "light" | "dark";
+const LOGO_MODES: LogoMode[] = ["light", "dark"];
 
 export default defineComponent({
   name: "PageGeneralSettings",
@@ -644,9 +628,11 @@ export default defineComponent({
     const updateOrgSettings = useMutation(() =>
       updateOrgSettingsMutation(store.state?.selectedOrganization?.identifier),
     );
-    const files = ref(null);
-    const filesLight = ref(null);
-    const filesDark = ref(null);
+    // A chosen logo waits for the page's Save like any other edit.
+    const filesLight = ref<File | null>(null);
+    const filesDark = ref<File | null>(null);
+    const logoFiles = { light: filesLight, dark: filesDark };
+    const chosenLogos = computed(() => Number(!!filesLight.value) + Number(!!filesDark.value));
     const logoThemeToDelete = ref<string>("light");
 
     // Theme management state
@@ -677,6 +663,7 @@ export default defineComponent({
     const changeCount = computed(
       () =>
         formChanges.value +
+        chosenLogos.value +
         Number(customLightColor.value !== savedLightColor.value) +
         Number(customDarkColor.value !== savedDarkColor.value),
     );
@@ -950,13 +937,16 @@ export default defineComponent({
       const base = form.options.defaultValues as GeneralSettingsForm;
       const textChanged = (value.custom_logo_text ?? "") !== (base.custom_logo_text ?? "");
       const text = sanitizeInput(value.custom_logo_text ?? "");
-      // A text-only edit must not rewrite, or fail on, organization settings nobody touched.
-      const sendOrg = !textChanged || changeCount.value > 1;
+      const logos = LOGO_MODES.filter((mode) => logoFiles[mode].value);
+      // A branding-only edit must not rewrite, or fail on, organization settings nobody touched.
+      const brandingChanges = Number(textChanged) + logos.length;
+      const sendOrg = brandingChanges === 0 || changeCount.value > brandingChanges;
 
       const savedOrg = store.state?.selectedOrganization?.identifier;
-      const [orgSaved, textSaved] = await Promise.all([
+      const [orgSaved, textSaved, logosSaved] = await Promise.all([
         sendOrg && saveOrgPart(owned),
         textChanged && saveLogoText(text),
+        saveLogos(logos),
       ]);
       // The store holds only the selected organization: a save that outlives a switch has nowhere to land.
       if (store.state?.selectedOrganization?.identifier !== savedOrg) return;
@@ -966,9 +956,11 @@ export default defineComponent({
           ...store.state?.organizationData?.organizationSettings,
           ...owned,
         });
+        // The layout re-applies the stored theme when settings change; the saved color goes on after it.
+        await nextTick();
       }
       // A switch away and back replaced this page; the form and preview colors now belong to its successor.
-      if (unmounted || (!orgSaved && !textSaved)) return;
+      if (unmounted || (!orgSaved && !textSaved && logosSaved.length === 0)) return;
 
       // A failed or unsent part keeps its old baseline, so its edits stay counted as unsaved.
       const orgFields = (
@@ -1008,12 +1000,17 @@ export default defineComponent({
         store.commit("clearTempThemeColors");
       }
 
-      toast({
-        variant: "success",
-        message: orgSaved
-          ? t("settings.organizationSettingsUpdated")
-          : t("settings.logoTextUpdatedSuccessfully"),
-      });
+      toast({ variant: "success", message: savedMessage(!!orgSaved, !!textSaved, logosSaved) });
+    };
+
+    // One message per Save: a lone branding part is named, anything more is summed up.
+    const savedMessage = (orgSaved: boolean, textSaved: boolean, logos: LogoMode[]) => {
+      if (orgSaved) return t("settings.organizationSettingsUpdated");
+      if (textSaved && logos.length === 0) return t("settings.logoTextUpdatedSuccessfully");
+      if (!textSaved && logos.length === 1) {
+        return t("settings.logoUpdatedSuccessfully", { mode: logoModeLabel(logos[0]) });
+      }
+      return t("settings.general.brandingUpdated");
     };
 
     const saveOrgPart = async (owned: Record<string, unknown>): Promise<boolean> => {
@@ -1056,89 +1053,57 @@ export default defineComponent({
       }
     };
 
-    const uploadImage = (fileList: any = null, mode: string = "light") => {
-      const selectedFiles = fileList || files.value;
-      // Handle single file or file array
-      //but mostly we will support single file because we only show one image at a time right
-      let fileToUpload = null;
-      if (selectedFiles) {
-        if (Array.isArray(selectedFiles)) {
-          fileToUpload = selectedFiles[0];
-        } else {
-          fileToUpload = selectedFiles;
-        }
+    const logoModeLabel = (mode: LogoMode) =>
+      mode === "dark" ? t("settings.darkMode") : t("settings.lightMode");
+
+    // Each logo is its own request and fails on its own; a failed one keeps its file chosen.
+    const saveLogo = async (mode: LogoMode): Promise<boolean> => {
+      const file = logoFiles[mode].value;
+      if (!file) return false;
+      const formData = new FormData();
+      formData.append("image", file);
+      try {
+        const res: any = await settingsService.createLogo(brandingOrg(), formData, mode);
+        if (res?.status != 200) throw new Error(res?.message);
+        if (logoFiles[mode].value === file) logoFiles[mode].value = null;
+        return true;
+      } catch (err: any) {
+        toast({
+          variant: "error",
+          message: t("settings.general.logoSaveFailed", {
+            mode: logoModeLabel(mode),
+            reason:
+              err?.response?.data?.message || err?.message || t("settings.errorUploadingImage"),
+          }),
+        });
+        return false;
       }
+    };
 
-      if (config.isEnterprise == "true" && fileToUpload) {
-        loadingState.value = true;
-        const formData = new FormData();
-        formData.append("image", fileToUpload);
-        let orgIdentifier = "default";
-        for (let item of store.state.organizations) {
-          if (item.type == "default") {
-            orgIdentifier = item.identifier;
-          }
-        }
-        settingsService
-          .createLogo(store.state.selectedOrganization?.identifier || orgIdentifier, formData, mode)
-          .then(async (res) => {
-            if (res.status == 200) {
-              toast({
-                variant: "success",
-                message: t("settings.logoUpdatedSuccessfully", {
-                  mode: mode === "dark" ? t("settings.darkMode") : t("settings.lightMode"),
-                }),
-              });
+    const saveLogos = async (modes: LogoMode[]): Promise<LogoMode[]> => {
+      const done = await Promise.all(modes.map(saveLogo));
+      const saved = modes.filter((_, index) => done[index]);
+      if (saved.length > 0) await refreshConfig();
+      return saved;
+    };
 
-              // Forced: the logo just changed, so the cached config is the one
-              // thing that must not answer here.
-              await queryClient.invalidateQueries({
-                queryKey: configFullQuery(
-                  store.state.selectedOrganization?.identifier || orgIdentifier,
-                ).queryKey,
-                exact: true,
-                refetchType: "none",
-              });
-              store.dispatch(
-                "setConfig",
-                await queryClient.fetchQuery(
-                  configFullQuery(store.state.selectedOrganization?.identifier || orgIdentifier),
-                ),
-              );
-
-              // Clear the appropriate file ref
-              if (mode === "dark") {
-                filesDark.value = null;
-              } else {
-                filesLight.value = null;
-              }
-              files.value = null;
-            } else {
-              toast({
-                variant: "error",
-                message: t("settings.somethingWentWrong"),
-              });
-            }
-          })
-          .catch((e) => {
-            toast({
-              variant: "error",
-              message: e?.message || t("settings.errorUploadingImage"),
-            });
-          })
-          .finally(() => {
-            loadingState.value = false;
-          });
-      } else if (config.isEnterprise != "true") {
-        toast({
-          variant: "error",
-          message: t("settings.notAllowedAction"),
+    // Forced: a logo just changed, so the cached config is the one thing that must not answer here.
+    const refreshConfig = async () => {
+      const query = configFullQuery(brandingOrg());
+      try {
+        await queryClient.invalidateQueries({
+          queryKey: query.queryKey,
+          exact: true,
+          refetchType: "none",
         });
-      } else {
-        toast({
-          variant: "error",
-          message: t("settings.selectFileToUpload"),
+        const fresh: any = await queryClient.fetchQuery(query);
+        // Text saved by the same Save may land after this read started; the store's copy is the newer one.
+        store.dispatch("setConfig", {
+          ...fresh,
+          custom_logo_text: store.state.zoConfig?.custom_logo_text ?? fresh?.custom_logo_text,
         });
+      } catch {
+        // The upload itself is stored; the next load of the config shows it.
       }
     };
 
@@ -1363,9 +1328,16 @@ export default defineComponent({
       restoreSavedTheme();
     };
 
+    // The save bar resets the form's fields; colors and chosen files live outside the form.
+    const discardOffForm = () => {
+      discardThemeColors();
+      filesLight.value = null;
+      filesDark.value = null;
+    };
+
     const discardUnsaved = () => {
       discardFormChanges(form);
-      discardThemeColors();
+      discardOffForm();
     };
 
     let unmounted = false;
@@ -1391,9 +1363,8 @@ export default defineComponent({
       changeCount,
       SAVE_BAR_SLOT,
       defaultMaxSeries,
-      discardThemeColors,
+      discardOffForm,
       saveGeneralSettings,
-      files,
       filesLight,
       filesDark,
       logoThemeToDelete,
@@ -1409,7 +1380,6 @@ export default defineComponent({
           }),
         });
       },
-      uploadImage,
       deleteLogo,
       loadingState,
       confirmDeleteImage: ref(false),

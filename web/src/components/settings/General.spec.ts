@@ -92,6 +92,7 @@ import config from "@/aws-exports";
 import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import { confirmLeave } from "@/lib/forms/SaveBar/useLeaveGuard";
+import { applyThemeColors } from "@/utils/theme";
 
 const mockOrganizations = organizations as any;
 const mockSettingsService = settingsService as any;
@@ -377,6 +378,38 @@ describe("General", () => {
         variant: "success",
         message: "Organization settings updated",
       });
+    });
+
+    it("keeps the saved accent color applied after the app's settings watchers have run", async () => {
+      const accent = () => document.documentElement.style.getPropertyValue("--color-primary-500");
+      const preview = mockStore.state.tempThemeColors;
+      mockStore.commit.mockImplementation((mutation: string, payload: any) => {
+        if (mutation === "setTempThemeColor") preview[payload.mode] = payload.color;
+        if (mutation === "clearTempThemeColors") preview.light = preview.dark = null;
+      });
+      // Stands in for the layout's watcher: it re-applies the stored theme unless a preview is live.
+      mockStore.dispatch.mockImplementation((action: string) => {
+        if (action !== "setOrganizationSettings") return;
+        void Promise.resolve().then(() => {
+          if (!preview.light && !preview.dark) applyThemeColors("#3F7994", "light", true);
+        });
+      });
+      const wrapper = createWrapper();
+
+      await wrapper.find('[data-test="theme-light-chip"]').trigger("click");
+      Object.assign(wrapper.vm, { tempColor: "#aa3366" });
+      (wrapper.vm as any).updateCustomColor();
+      await wrapper.findComponent({ name: "OForm" }).vm.form.handleSubmit();
+      await flushPromises();
+
+      expect(mockOrganizations.post_organization_settings.mock.calls[0][1]).toMatchObject({
+        light_mode_theme_color: "#aa3366",
+      });
+      expect(accent()).not.toBe("");
+      expect(preview.light).toBeNull();
+      mockStore.commit.mockReset();
+      mockStore.dispatch.mockReset();
+      applyThemeColors("#3F7994", "light", true);
     });
 
     it("a save that completes late keeps later edits and never writes into another organization", async () => {
@@ -697,78 +730,112 @@ describe("General", () => {
       }
     });
 
-    it("shows the file picker when no logo exists, and Upload only once a file is chosen", async () => {
-      mockStore.state.zoConfig.meta_org = "test-org";
-      mockStore.state.zoConfig.custom_logo_img = null;
-      const wrapper = createWrapper();
-      const upload = () => wrapper.find('[data-test="settings_ent_logo_custom_light_save_btn"]');
+    describe("a chosen file is part of the page's form", () => {
+      const lightFile = new File(["light"], "light.png", { type: "image/png" });
+      const darkFile = new File(["dark"], "dark.png", { type: "image/png" });
+      const formOf = (wrapper: any) => wrapper.findComponent({ name: "OForm" }).vm.form;
+      const successToasts = () =>
+        mockToast.mock.calls.filter(([toast]: any) => toast.variant === "success");
 
-      expect(wrapper.find('[data-test="setting_ent_custom_logo_img_file_upload"]').exists()).toBe(
-        true,
-      );
-      expect(upload().exists()).toBe(false);
-
-      const file = new File(["test"], "test.png", { type: "image/png" });
-      Object.assign(wrapper.vm, { filesLight: file });
-      await nextTick();
-      await upload().trigger("click");
-
-      expect(mockSettingsService.createLogo).toHaveBeenCalledWith(
-        "test-org",
-        expect.any(FormData),
-        "light",
-      );
-    });
-
-    it("should upload image successfully with default theme", async () => {
-      const mockFile = new File(["test"], "test.png", { type: "image/png" });
-      const wrapper = createWrapper();
-
-      await wrapper.vm.uploadImage(mockFile);
-
-      expect(mockSettingsService.createLogo).toHaveBeenCalledWith(
-        "test-org",
-        expect.any(FormData),
-        "light", // default theme
-      );
-      expect(mockToast).toHaveBeenCalledWith({
-        variant: "success",
-        message: "Light Mode logo updated successfully.",
-      });
-    });
-
-    it("should upload dark mode image successfully", async () => {
-      const mockFile = new File(["test"], "test-dark.png", { type: "image/png" });
-      const wrapper = createWrapper();
-
-      await wrapper.vm.uploadImage(mockFile, "dark");
-
-      expect(mockSettingsService.createLogo).toHaveBeenCalledWith(
-        "test-org",
-        expect.any(FormData),
-        "dark",
-      );
-      expect(mockToast).toHaveBeenCalledWith({
-        variant: "success",
-        message: "Dark Mode logo updated successfully.",
-      });
-    });
-
-    it("should handle upload error", async () => {
-      const mockFile = new File(["test"], "test.png", { type: "image/png" });
-      const wrapper = createWrapper();
-
-      mockSettingsService.createLogo.mockRejectedValue({
-        message: "Upload failed",
+      beforeEach(() => {
+        mockStore.state.zoConfig.meta_org = "test-org";
+        mockStore.state.zoConfig.custom_logo_img = null;
       });
 
-      await wrapper.vm.uploadImage(mockFile);
-      // Wait for async operations to complete
-      await wrapper.vm.$nextTick();
+      it("counts each chosen file, has no button of its own, and uploads with the page's other edits in one Save", async () => {
+        const wrapper = createWrapper();
+        expect(wrapper.find('[data-test="setting_ent_custom_logo_img_file_upload"]').exists()).toBe(
+          true,
+        );
 
-      expect(mockToast).toHaveBeenCalledWith({
-        variant: "error",
-        message: "Upload failed",
+        Object.assign(wrapper.vm, { filesLight: lightFile, filesDark: darkFile });
+        formOf(wrapper).setFieldValue("scrape_interval", "45");
+        await nextTick();
+        expect(wrapper.vm.changeCount).toBe(3);
+        expect(
+          wrapper.find('[data-test="general-settings-save-bar"]').attributes("data-state"),
+        ).toBe("changed");
+        expect(wrapper.find('[data-test="settings_ent_logo_custom_light_save_btn"]').exists()).toBe(
+          false,
+        );
+
+        await formOf(wrapper).handleSubmit();
+        await flushPromises();
+
+        for (const mode of ["light", "dark"]) {
+          expect(mockSettingsService.createLogo).toHaveBeenCalledWith(
+            "test-org",
+            expect.any(FormData),
+            mode,
+          );
+        }
+        expect(mockOrganizations.post_organization_settings).toHaveBeenCalledTimes(1);
+        expect(successToasts()).toHaveLength(1);
+        expect(wrapper.vm.filesLight).toBeNull();
+        expect(wrapper.vm.changeCount).toBe(0);
+      });
+
+      it("uploads a lone file without rewriting organization settings", async () => {
+        const wrapper = createWrapper();
+
+        Object.assign(wrapper.vm, { filesDark: darkFile });
+        await nextTick();
+        await formOf(wrapper).handleSubmit();
+        await flushPromises();
+
+        expect(mockSettingsService.createLogo).toHaveBeenCalledWith(
+          "test-org",
+          expect.any(FormData),
+          "dark",
+        );
+        expect(mockOrganizations.post_organization_settings).not.toHaveBeenCalled();
+        expect(successToasts()).toEqual([
+          [{ variant: "success", message: "Dark Mode logo updated successfully." }],
+        ]);
+      });
+
+      it("names the logo whose upload failed and keeps only that file unsaved", async () => {
+        mockSettingsService.createLogo.mockImplementation(
+          (_org: string, _data: any, mode: string) =>
+            mode === "light" ? Promise.reject({ message: "Upload failed" }) : { status: 200 },
+        );
+        const wrapper = createWrapper();
+
+        Object.assign(wrapper.vm, { filesLight: lightFile, filesDark: darkFile });
+        formOf(wrapper).setFieldValue("scrape_interval", "45");
+        await nextTick();
+        await formOf(wrapper).handleSubmit();
+        await flushPromises();
+
+        expect(mockToast).toHaveBeenCalledWith({
+          variant: "error",
+          message: "Light Mode logo was not uploaded. Upload failed",
+        });
+        expect(successToasts()).toHaveLength(1);
+        expect(wrapper.vm.filesLight).toBe(lightFile);
+        expect(wrapper.vm.filesDark).toBeNull();
+        expect(wrapper.vm.changeCount).toBe(1);
+      });
+
+      it("is cleared by Discard, and asked about before leaving", async () => {
+        const wrapper = createWrapper();
+        const dialog = useConfirmDialog();
+
+        Object.assign(wrapper.vm, { filesLight: lightFile });
+        await nextTick();
+        await wrapper.find('[data-test="general-settings-save-bar-discard"]').trigger("click");
+        expect(wrapper.vm.filesLight).toBeNull();
+
+        Object.assign(wrapper.vm, { filesDark: darkFile });
+        await nextTick();
+        let left = false;
+        void confirmLeave().then((leave) => (left = leave));
+        await vi.waitFor(() => {
+          dialog.handleConfirm();
+          expect(left).toBe(true);
+        });
+        expect(wrapper.vm.filesDark).toBeNull();
+        expect(mockSettingsService.createLogo).not.toHaveBeenCalled();
       });
     });
 
@@ -1073,22 +1140,6 @@ describe("General", () => {
     });
   });
 
-  describe("Organization identifier handling", () => {
-    it("should use default organization when no selected organization", async () => {
-      // Create wrapper first, then modify store state
-      const wrapper = createWrapper();
-      mockStore.state.selectedOrganization = null;
-
-      await wrapper.vm.uploadImage(new File(["test"], "test.png"));
-
-      expect(mockSettingsService.createLogo).toHaveBeenCalledWith(
-        "default",
-        expect.any(FormData),
-        "light",
-      );
-    });
-  });
-
   describe("Accessibility", () => {
     it("should render the scrape interval as a number input", () => {
       const wrapper = createWrapper();
@@ -1110,25 +1161,6 @@ describe("General", () => {
       expect(wrapper.find('[data-test="general-settings-save-bar"]').attributes("data-state")).toBe(
         "loading",
       );
-    });
-
-    it("should handle upload when not enterprise", async () => {
-      const wrapper = createWrapper();
-      const mockFile = new File(["test"], "test.png");
-
-      // Mock the config to simulate non-enterprise mode
-      const originalIsEnterprise = wrapper.vm.config.isEnterprise;
-      wrapper.vm.config.isEnterprise = "false";
-
-      await wrapper.vm.uploadImage(mockFile);
-
-      expect(mockToast).toHaveBeenCalledWith({
-        variant: "error",
-        message: "You are not allowed to perform this action.",
-      });
-
-      // Restore original value
-      wrapper.vm.config.isEnterprise = originalIsEnterprise;
     });
   });
 });

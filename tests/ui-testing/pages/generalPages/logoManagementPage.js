@@ -15,7 +15,6 @@ export
         this.deleteLogoButton = page.locator('[data-test="setting_ent_custom_logo_img_delete_btn"]');
         this.confirmDeleteButton = page.locator('[data-test="general-delete-image-dialog"] [data-test="o-dialog-primary-btn"]');
         this.fileUploadInput = page.locator('[data-test="setting_ent_custom_logo_img_file_upload-field"]');
-        this.saveButtonLight = page.locator('[data-test="settings_ent_logo_custom_light_save_btn"]');
         this.enterpriseFeature = page.locator('#enterpriseFeature');
         this.organizationSearchInput = page.locator('[data-test="organization-search-input-field"]');
         this.organizationMenuList = page.locator('[data-test="organization-menu-list"]');
@@ -24,7 +23,6 @@ export
 
         // Dark mode logo locators
         this.fileUploadInputDark = page.locator('[data-test="setting_ent_custom_logo_dark_img_file_upload-field"]');
-        this.saveButtonDark = page.locator('[data-test="settings_ent_logo_custom_dark_save_btn"]');
         this.deleteLogoButtonDark = page.locator('[data-test="setting_ent_custom_logo_dark_img_delete_btn"]');
     }
 
@@ -133,11 +131,9 @@ export
         await this.openMetaGeneralSettings();
         await this.fileUploadInput.waitFor({ state: 'attached' });
         await this.fileUploadInput.setInputFiles(filePath);
-        // wait for Vue reactivity to process the file change before clicking save
-        await this.page.waitForTimeout(500);
-        // Click the save button after logo upload (light mode)
-        await this.saveButtonLight.waitFor({ state: 'visible' });
-        await this.saveButtonLight.click({ force: true });
+        // A chosen logo is a normal form change: the page Save uploads it.
+        await expect(this.submitButton).toBeEnabled();
+        await this.submitButton.click();
         await expect(this.page.locator('[data-test="o-toast-message"]').filter({ hasText: /Logo updated successfully/i }).first()).toBeVisible({
             timeout: 30000,
         });
@@ -163,9 +159,9 @@ export
         await this.fileUploadInputDark.waitFor({ state: 'attached' });
         await this.fileUploadInputDark.setInputFiles(filePath);
 
-        // Click the save button for dark mode logo
-        await this.saveButtonDark.waitFor({ state: 'visible' });
-        await this.saveButtonDark.click({ force: true });
+        // A chosen logo is a normal form change: the page Save uploads it.
+        await expect(this.submitButton).toBeEnabled();
+        await this.submitButton.click();
 
         // Verify success message
         await expect(this.page.locator('[data-test="o-toast-message"]').filter({ hasText: /Dark mode logo updated/i }).first()).toBeVisible({

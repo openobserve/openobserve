@@ -35,10 +35,10 @@ describe("DataRetentionDefaults schema", () => {
     }
   });
 
-  it("requires days on a row, and accepts only the configurable types", () => {
+  it("requires at least 3 days on a row, where 0 would be no override, and accepts only the configurable types", () => {
     expect(acceptsRow("metrics", 180)).toBe(true);
     expect(acceptsRow("profiles", 3)).toBe(true);
-    expect(acceptsRow("metrics", "")).toBe(false);
+    for (const days of ["", null, 0, "0"]) expect(acceptsRow("metrics", days)).toBe(false);
     for (const type of [
       "metadata",
       "index",
