@@ -8008,6 +8008,19 @@ mod tests {
             };
             let alert = plant(detection).await;
             let row = (case, detection, window, key_type);
+            // A repeat firing that converted the alert leaves its episode on the old-kind incident.
+            let mut episode = AlertState::empty(&id, ROLLUP_GROUP_KEY);
+            episode.episode_incident_id = Some(existing.id.clone());
+            let episode = StateUpdate {
+                state: Some(episode),
+                transition: None,
+            };
+            infra::table::alert_states::persist(&episode, None)
+                .await
+                .unwrap();
+            // Until a firing opens an incident of the new kind, the old one is still paging.
+            let acked = crate::alerts::ack::firing_incident(&org, &id).await;
+            assert_eq!(acked.as_deref(), Some(existing.id.as_str()), "{row:?}");
 
             let joined = if let Some(key_type) = key_type {
                 let subject = CorrelationSubject {
@@ -8052,16 +8065,6 @@ mod tests {
             assert_ne!(joined, existing.id, "{row:?}");
             let joined_row = get_rw(&org, &joined).await.unwrap().unwrap();
             assert_eq!(joined_row.security_case, detection, "{row:?}");
-            // A repeat firing that converted the alert leaves its episode on the old-kind incident.
-            let mut episode = AlertState::empty(&id, ROLLUP_GROUP_KEY);
-            episode.episode_incident_id = Some(existing.id.clone());
-            let episode = StateUpdate {
-                state: Some(episode),
-                transition: None,
-            };
-            infra::table::alert_states::persist(&episode, None)
-                .await
-                .unwrap();
             let acked = crate::alerts::ack::firing_incident(&org, &id).await;
             assert_eq!(acked.as_deref(), Some(joined.as_str()), "{row:?}");
             plant(!detection).await;
