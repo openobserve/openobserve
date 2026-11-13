@@ -324,6 +324,7 @@ import {
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
 import { useRoute, useRouter, RouterView, isNavigationFailure } from "vue-router";
+import { orgSwitchListRoute } from "@/utils/orgScopedRoutes";
 import { solutionModeForPath } from "@/utils/security/solutionMode";
 import { useSecurityAccess } from "@/composables/security/useSecurityAccess";
 import config from "../aws-exports";
@@ -390,7 +391,6 @@ import { useHomeDashboard } from "@/composables/useHomeDashboard";
 
 // Back from a drill-out (Analytics to Session Viewer, Traces to a trace or its logs) must land on the same results without rerunning them.
 const KEPT_ALIVE_VIEWS = ["AppAnalytics", "AppTraces"];
-const DASHBOARD_SCOPED_ROUTES = ["viewDashboard", "addPanel"];
 
 let mainLayoutMixin: any = null;
 if (config.isCloud == "true") {
@@ -1328,14 +1328,15 @@ export default defineComponent({
     const updateOrganization = async () => {
       const targetOrg = { ...selectedOrg.value };
       const orgIdentifier = targetOrg.identifier;
-      const onDashboardRoute = DASHBOARD_SCOPED_ROUTES.includes(
-        String(router.currentRoute.value.name),
+      const listRoute = orgSwitchListRoute(
+        router.currentRoute.value.name,
+        router.currentRoute.value.query,
       );
-      if (onDashboardRoute) {
+      if (listRoute) {
         if (orgIdentifier === store.state.selectedOrganization?.identifier) return;
-        // leave before anything resets: a dashboard id is org-scoped and would 404 in the new org
+        // leave before anything resets: the page's id is org-scoped and would fail to load in the new org
         const failure = await router.push({
-          name: "dashboards",
+          name: listRoute,
           query: { org_identifier: orgIdentifier },
         });
         if (isNavigationFailure(failure)) {
@@ -1347,7 +1348,7 @@ export default defineComponent({
       resetStreams();
       store.dispatch("logs/resetLogs");
       store.dispatch("setIsDataIngested", false);
-      if (!onDashboardRoute) {
+      if (!listRoute) {
         const queryParams =
           router.currentRoute.value.path.indexOf(".logs") > -1
             ? router.currentRoute.value.query

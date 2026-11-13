@@ -2329,6 +2329,8 @@ describe("MainLayout — org switch on a dashboard route", () => {
       routes: [
         { path, name: routeName, component: StubDiv },
         { path: "/dashboards", name: "dashboards", component: StubDiv },
+        { path: "/alerts", name: "alertList", component: StubDiv },
+        { path: "/pipelines", name: "pipelines", component: StubDiv },
       ],
     });
     if (blockLeave) router.beforeEach((to) => (to.name === "dashboards" ? false : true));
@@ -2372,11 +2374,13 @@ describe("MainLayout — org switch on a dashboard route", () => {
   };
 
   it.each([
-    ["viewDashboard", "/dashboards/view"],
-    ["addPanel", "/dashboards/add_panel"],
-  ])("sends %s to the dashboards list of the new org", async (name, path) => {
+    ["viewDashboard", "/dashboards/view", "dashboards"],
+    ["addPanel", "/dashboards/add_panel", "dashboards"],
+    ["editAlert", "/alerts/edit/a1", "alertList"],
+    ["pipelineEditor", "/pipelines/edit", "pipelines"],
+  ])("sends %s to its list of the new org", async (name, path, list) => {
     const { route } = await switchOrgAt(name, path);
-    expect(route.name).toBe("dashboards");
+    expect(route.name).toBe(list);
     expect(route.query).toEqual({ org_identifier: "other_org" });
   });
 
