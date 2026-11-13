@@ -1630,6 +1630,18 @@ pub async fn find_open_incident_containing_alert(
         .await
 }
 
+/// `named`, the open incidents with an unrecovered firing of `alert_id` begun by `at`, and any
+/// incident whose such firing was recovered at `at` (a retried recovery); each with its marker.
+pub async fn open_incidents_firing(
+    org_id: &str,
+    alert_id: &str,
+    named: &str,
+    at: i64,
+) -> Result<Vec<(String, bool)>, errors::Error> {
+    // The primary: a replica behind the alert's last firing would miss the incident it joined.
+    open_incidents_firing_with(get_orm_client_rw().await, org_id, alert_id, named, at).await
+}
+
 /// The incidents among `ids` in this org, by id, read in one query.
 pub async fn get_many(
     org_id: &str,
@@ -2278,6 +2290,42 @@ async fn find_open_incident_containing_alert_with<C: ConnectionTrait>(
     }
     query
         .one(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
+}
+
+async fn open_incidents_firing_with<C: ConnectionTrait>(
+    client: &C,
+    org_id: &str,
+    alert_id: &str,
+    named: &str,
+    at: i64,
+) -> Result<Vec<(String, bool)>, errors::Error> {
+    let firing = |recovered: SimpleExpr| {
+        alert_incident_alerts::Entity::find()
+            .select_only()
+            .column(alert_incident_alerts::Column::IncidentId)
+            .filter(alert_incident_alerts::Column::AlertId.eq(alert_id))
+            .filter(recovered)
+            .filter(alert_incident_alerts::Column::AlertFiredAt.lte(at))
+            .into_query()
+    };
+    let unrecovered = firing(alert_incident_alerts::Column::ResolvedAt.is_null());
+    let open = alert_incidents::Column::Status
+        .ne("resolved")
+        .and(alert_incidents::Column::Id.in_subquery(unrecovered));
+    // Whatever its status: the attempt that recovered it may not have finished its follow-ups.
+    let retried = firing(alert_incident_alerts::Column::ResolvedAt.eq(at));
+    let held = open.or(alert_incidents::Column::Id.in_subquery(retried));
+    alert_incidents::Entity::find()
+        .select_only()
+        .column(alert_incidents::Column::Id)
+        .column(alert_incidents::Column::SecurityCase)
+        .filter(alert_incidents::Column::OrgId.eq(org_id))
+        .filter(held.or(alert_incidents::Column::Id.eq(named)))
+        .order_by_asc(alert_incidents::Column::Id)
+        .into_tuple()
+        .all(client)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
 }
@@ -3160,6 +3208,32 @@ mod tests {
             let many = find_open_incidents_containing_alerts_with(&db, "acme", &many).await;
             assert!(want.contains(&many.unwrap()["a1"].id), "{cases:?}");
         }
+        let firing_and = async |named: &str, at: i64| {
+            let firing = open_incidents_firing_with(&db, "acme", "a1", named, at).await;
+            BTreeSet::from_iter(firing.unwrap())
+        };
+        let firing = async |at: i64| firing_and("", at).await;
+        let (case, ops) = ((ids["case"].clone(), true), (ids["ops"].clone(), false));
+        let both = [case.clone(), ops.clone()].into();
+        assert_eq!(firing(1).await, both, "both kinds");
+        assert_eq!(firing(0).await, [].into(), "a firing begun later");
+        alert_incident_alerts::Entity::update_many()
+            .col_expr(
+                alert_incident_alerts::Column::ResolvedAt,
+                Expr::value(Some(2i64)),
+            )
+            .filter(alert_incident_alerts::Column::IncidentId.eq(&ids["ops"]))
+            .exec(&db)
+            .await
+            .unwrap();
+        assert_eq!(firing(1).await, [case].into(), "a recovered firing");
+        assert_eq!(firing(2).await, both, "recovered just now");
+        update_status_with(&db, "acme", &ids["ops"], "resolved")
+            .await
+            .unwrap();
+        assert_eq!(firing(2).await, both, "settled just now");
+        let named = firing_and(&ops.0, 0).await;
+        assert_eq!(named, [ops].into(), "the named incident, firing or not");
     }
 
     #[tokio::test]

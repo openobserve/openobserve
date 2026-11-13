@@ -1795,13 +1795,7 @@ pub async fn resolve_alert_firing(
     event: &config::meta::alerts::recovery::RecoveryEvent,
     muted: bool,
 ) -> Result<(), anyhow::Error> {
-    let Some(incident_id) = event.incident_id.as_deref() else {
-        return Ok(());
-    };
-    let (org_id, alert_id, turns) = (&event.org_id, &event.alert_id, &ClusterIncidentTurns);
-    let at = event.recovered_at;
-    resolve_firing(org_id, incident_id, alert_id, at, muted, None, turns).await?;
-    Ok(())
+    recover_alert_firing(event, muted, &ClusterIncidentTurns).await
 }
 
 /// The finding's firing at `triggered_at` recovered; true only if this call resolved it.
@@ -2847,6 +2841,35 @@ enum OncallRecovery {
     Failed,
 }
 
+/// [resolve_alert_firing] behind its turns seam.
+async fn recover_alert_firing(
+    event: &config::meta::alerts::recovery::RecoveryEvent,
+    muted: bool,
+    turns: &dyn IncidentTurns,
+) -> Result<(), anyhow::Error> {
+    let Some(incident_id) = event.incident_id.as_deref() else {
+        return Ok(());
+    };
+    let (org_id, alert_id, id) = (&event.org_id, &event.alert_id, incident_id);
+    let at = event.recovered_at;
+    resolve_firing(org_id, id, alert_id, at, muted, None, turns).await?;
+    // One primary read gives the named incident's marker: a replica may not hold a new case yet.
+    let held = infra::table::alert_incidents::open_incidents_firing(org_id, alert_id, id, at);
+    let held = held.await?;
+    let Some((_, case)) = held.iter().find(|(held_id, _)| held_id == id) else {
+        return Ok(());
+    };
+    // Only a switch between SIEM and ops while firing leaves firings the episode no longer names;
+    // an alert that kept its kind keeps its other incidents, and a newer episode stays open.
+    if held.iter().all(|(_, held_case)| held_case == case) {
+        return Ok(());
+    }
+    for (left_id, _) in held.iter().filter(|(held_id, _)| held_id != id) {
+        resolve_firing(org_id, left_id, alert_id, at, muted, Some(at), turns).await?;
+    }
+    Ok(())
+}
+
 /// [resolve_alert_firing]'s rules for any firing; a finding's `onset` keeps its later firings open.
 async fn resolve_firing(
     org_id: &str,
@@ -2921,7 +2944,7 @@ async fn settle_resolution(
             AutomaticResolution::AlreadyResolved(snapshot) => {
                 let user = SYSTEM_USER_EMAIL;
                 let resent =
-                    finish_status_change(org_id, incident_id, user, false, *snapshot, fence);
+                    finish_status_change(org_id, incident_id, user, muted, *snapshot, fence);
                 IncidentAfter::AlreadyResolved(Some(resent.await?.1))
             }
             AutomaticResolution::Resolved { before, after } => {
@@ -7912,9 +7935,23 @@ mod tests {
         use config::meta::alerts::{
             alert::{Alert, SIEM_ATTRIBUTE},
             incidents::KeyType,
+            recovery::{EpisodeInput, apply_episode, recovery_event},
+            state::{AlertState, ROLLUP_GROUP_KEY, StateUpdate},
         };
-        use infra::table::alert_incidents::{CaseActivity, add_alert_to_incident, create, get_rw};
+        use infra::table::alert_incidents::{
+            CaseActivity, add_alert_to_incident, create, get_incident_alerts_rw, get_rw,
+            resolve_alert_firings, update_status,
+        };
         use svix_ksuid::{Ksuid, KsuidLike};
+
+        struct Only(String);
+        #[async_trait::async_trait]
+        impl IncidentTurns for Only {
+            async fn take(&self, org_id: &str, incident_id: &str) -> anyhow::Result<IncidentTurn> {
+                anyhow::ensure!(incident_id == self.0, "turn lost");
+                ClusterIncidentTurns.take(org_id, incident_id).await
+            }
+        }
 
         const HOUR: i64 = 3_600_000_000;
         let _db = crate::alerts::rca_runs::tests::db().await;
@@ -7943,17 +7980,20 @@ mod tests {
             } else {
                 key_type.unwrap_or(KeyType::AlertId)
             };
-            let existing = create(&org, "P2", stored.clone(), &kind.to_string(), 1, None)
-                .await
-                .unwrap();
-            if case {
-                infra::table::alert_incidents::mark_security_case(&org, &existing.id)
+            let hold = async |as_case: bool, at: i64, kind: KeyType| {
+                let held = create(&org, "P2", stored.clone(), &kind.to_string(), at, None).await;
+                let held = held.unwrap();
+                if as_case {
+                    infra::table::alert_incidents::mark_security_case(&org, &held.id)
+                        .await
+                        .unwrap();
+                }
+                add_alert_to_incident(&held.id, &id, "a1", "internal", at, "alert_id")
                     .await
                     .unwrap();
-            }
-            add_alert_to_incident(&existing.id, &id, "a1", "internal", 1, "alert_id")
-                .await
-                .unwrap();
+                held
+            };
+            let existing = hold(case, 1, kind).await;
             let key = db::alerts::alert::cache_alert_key(&org, &id);
             let plant = |detection: bool| {
                 let mut alert = alert.clone();
@@ -8012,32 +8052,82 @@ mod tests {
             assert_ne!(joined, existing.id, "{row:?}");
             let joined_row = get_rw(&org, &joined).await.unwrap().unwrap();
             assert_eq!(joined_row.security_case, detection, "{row:?}");
+            // A repeat firing that converted the alert leaves its episode on the old-kind incident.
+            let mut episode = AlertState::empty(&id, ROLLUP_GROUP_KEY);
+            episode.episode_incident_id = Some(existing.id.clone());
+            let episode = StateUpdate {
+                state: Some(episode),
+                transition: None,
+            };
+            infra::table::alert_states::persist(&episode, None)
+                .await
+                .unwrap();
             let acked = crate::alerts::ack::firing_incident(&org, &id).await;
             assert_eq!(acked.as_deref(), Some(joined.as_str()), "{row:?}");
             plant(!detection).await;
             let acked = crate::alerts::ack::firing_incident(&org, &id).await;
             assert_eq!(acked.as_deref(), Some(existing.id.as_str()), "{row:?}");
             plant(detection).await;
-            resolve_firing(
-                &org,
-                &existing.id,
-                &id,
-                3,
-                false,
-                None,
-                &ClusterIncidentTurns,
-            )
-            .await
-            .unwrap();
+            // An earlier incident of the joined kind, and two of the other kind that fire later.
+            let first = hold(detection, 1, KeyType::AlertId).await.id;
+            let late = hold(case, 4, KeyType::AlertId).await.id;
+            let peer = hold(case, 4, KeyType::AlertId).await.id;
+            // The episode follows the last delivered firing, so its recovery names only `joined`.
+            let mut state = AlertState::empty(&id, "");
+            for (at, incident_id) in [(1, &existing.id), (2, &joined)] {
+                let input = EpisodeInput {
+                    delivered: true,
+                    incident_id: Some(incident_id.clone()),
+                    ..Default::default()
+                };
+                apply_episode(&mut state, true, &input, at, || "ep".into());
+            }
+            let clear = EpisodeInput::undelivered(0);
+            let closed = apply_episode(&mut state, false, &clear, 3, || "ep".into());
+            let event = recovery_event(&org, &state, closed.unwrap(), 3);
+            // The retry finishes an attempt cut short after a link write or once `existing`
+            // settled.
+            if case {
+                let cut = recover_alert_firing(&event, false, &Only(joined.clone())).await;
+                assert!(cut.is_err(), "{row:?}");
+            } else {
+                resolve_alert_firings(&existing.id, &id, 3).await.unwrap();
+                update_status(&org, &existing.id, "resolved").await.unwrap();
+            }
+            resolve_alert_firing(&event, false).await.unwrap();
             common::infra::config::ALERTS.write().await.remove(&key);
+            let recovered = async |incident: &str| {
+                let links = get_incident_alerts_rw(incident).await.unwrap();
+                links.iter().map(|l| l.resolved_at).collect::<Vec<_>>()
+            };
+            assert_eq!(recovered(&existing.id).await, [Some(3)], "{row:?}");
+            let swept = [&first, &late, &peer].map(|held| recovered(held));
+            let swept = futures::future::join_all(swept).await;
+            assert_eq!(swept, [[Some(3)], [None], [None]], "{row:?}");
+            // A muted recovery retried after the companion resolved still pages nobody on repair.
+            let turns = &ClusterIncidentTurns;
+            let again = resolve_firing(&org, &existing.id, &id, 3, true, Some(3), turns).await;
+            let oncall = match again.unwrap().incident {
+                IncidentAfter::AlreadyResolved(Some(repairs)) => Some(repairs.oncall),
+                _ => None,
+            };
+            assert_eq!(oncall, (!case).then_some(OncallRecovery::Muted), "{row:?}");
+            // With no firing left in the other kind, a recovery keeps to the incident it names.
+            let mut next = event.clone();
+            (next.incident_id, next.recovered_at) = (Some(late.clone()), 5);
+            resolve_alert_firing(&next, false).await.unwrap();
+            let kept = (recovered(&late).await, recovered(&peer).await);
+            assert_eq!(kept, (vec![Some(5)], vec![None]), "{row:?}");
             let after = get_rw(&org, &existing.id).await.unwrap().unwrap();
+            let first = get_rw(&org, &first).await.unwrap().unwrap();
             assert_eq!(
                 (
                     after.group_values,
                     after.security_case,
-                    after.status == "resolved"
+                    after.status == "resolved",
+                    first.status == "resolved"
                 ),
-                (stored, case, !case),
+                (stored, case, !case, !detection),
                 "{row:?}"
             );
         }
