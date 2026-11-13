@@ -40,9 +40,13 @@ const AUTO_AWESOME_CALL_SITES = [
   "components/alerts/IncidentAiAnalysisCell.vue",
   "components/alerts/IncidentRCAAnalysis.vue",
   "components/alerts/TemplateList.vue",
+  // Auto-Observe call sites that are main's own, untouched by the assistant work.
+  "components/autoobserve/insight/InsightBlock.vue",
+  "components/autoobserve/live/LivePaged.vue",
   "components/alerts/rca/RcaAnalysisBar.vue",
   "components/autoobserve/v2/TopBar.vue",
   "components/login/firstSourceOptions.ts",
+  "layouts/MainLayout.vue",
   "components/rum/productAnalytics/FunnelBuilder.vue",
   "components/rum/productAnalytics/funnelParts/FunnelAddStep.vue",
   "components/settings/ServiceIdentitySetup.vue",
@@ -99,6 +103,10 @@ const ROUNDED_FULL_FILES = [
   // Home's chats rail: the pill search and view tabs, and its small row dot.
   "components/ai-assistant/history/AssistantHistoryList.vue",
   "components/ai-assistant/history/AssistantHistoryRow.vue",
+  // The round jump-to-latest button.
+  "components/ai-assistant/transcript/AssistantTranscript.vue",
+  // The floating launcher's working-dots pill.
+  "components/ai-assistant/shell/AssistantFloatingLauncher.vue",
 ];
 
 const PURE_CONSTRUCTORS = new Set(["Set", "Map"]);
@@ -251,7 +259,13 @@ describe("assistant repo guards", () => {
     ["uppercase", /\buppercase\b/],
     ['OIcon name="', /<OIcon[^>]*\sname="/],
   ])("bans %s in assistant components", (_label, pattern) => {
-    expect(offenders((f) => inAssistantUi(f.path) && pattern.test(f.text))).toEqual([]);
+    // The header AI button keeps the app-wide gradient look, so it alone may use the AI tokens.
+    const allowed = (path: string) =>
+      /gradient-ai|ai-gradient/.test(pattern.source) &&
+      path === "components/ai-assistant/shell/AssistantHeaderButton.vue";
+    expect(
+      offenders((f) => inAssistantUi(f.path) && !allowed(f.path) && pattern.test(f.text)),
+    ).toEqual([]);
   });
 
   it("allows rounded-full only in the status dot, the composer's round Send and agent pill, and Home's chats rail", () => {

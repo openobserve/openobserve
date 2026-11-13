@@ -74,14 +74,13 @@ test.describe("assistant composer and context", () => {
     assistant = new AssistantPage(page);
   });
 
-  test("CTX-01 the time chip is first and the popover tells sent from not read", { tag: ["@mock"] }, async ({ page }) => {
+  test("CTX-01 the time chip sits in the composer row and the popover tells sent from not read", { tag: ["@mock"] }, async ({ page }) => {
     await openOnLogs(page);
-    const first = assistant.tray().locator('button, [role="button"]').first();
-    await expect(first).toHaveAttribute("data-test", "assistant-context-chip-time");
+    const first = assistant.timeChip();
     await expect(first).toHaveAttribute("aria-label", /^Time range, \d\d:\d\d–\d\d:\d\d, from this page$/);
     // The page's own stream is read from the page, so it is listed in the popover, not staged as a chip.
     await expect(assistant.chips()).toHaveCount(0);
-    await assistant.sees().click();
+    await assistant.openSees();
     const popover = page.locator('[data-test="assistant-context-sees-popover"]');
     await expect(popover).toBeVisible();
     const sent = popover.locator('[data-test="assistant-context-sees-sent"]');
@@ -90,7 +89,7 @@ test.describe("assistant composer and context", () => {
     await expect(popover.locator('[data-test="assistant-context-sees-not_read"]')).toContainText("Quick mode");
     await page.keyboard.press("Escape");
     await expect(popover).toBeHidden();
-    await expect(assistant.sees()).toBeFocused();
+    await expect(assistant.thread().locator('[data-test="assistant-thread-title-button"]')).toBeFocused();
   });
 
   test("CTX-01 Tab past a chip popover's last control moves on and stays there; the time range opens by keyboard", { tag: ["@mock"] }, async ({
