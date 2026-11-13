@@ -3179,7 +3179,6 @@ fn node_routes() -> Router {
         .route("/status", get(status::cache_status))
         .route("/enable", put(status::enable_node))
         .route("/flush", put(status::flush_node))
-        .route("/release_memory", put(status::memory::release_memory))
         .route("/reload", get(status::cache_reload))
         .route("/list", get(status::list_node))
         .route("/metrics", get(status::node_metrics));
@@ -5708,18 +5707,6 @@ mod tests {
         );
         let response = node_routes().oneshot(node_request(root)).await.unwrap();
         assert_eq!(response.status(), StatusCode::OK);
-    }
-
-    #[tokio::test]
-    async fn node_memory_release_refuses_a_non_root_caller() {
-        let request = Request::builder()
-            .method("PUT")
-            .uri("/release_memory")
-            .header("user_id", "member@node-routes.test")
-            .body(Body::empty())
-            .unwrap();
-        let response = node_routes().oneshot(request).await.unwrap();
-        assert_eq!(response.status(), StatusCode::FORBIDDEN);
     }
 
     async fn refusal_parts(error: AuthError, denied: bool) -> (StatusCode, String) {
