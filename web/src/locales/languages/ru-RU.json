@@ -10,7 +10,8 @@
     "toastMessageGeneric": "Ваша лицензия не включает эту функцию. Попросите администратора обновить лицензию.",
     "bannerMessage": "Эта функция заблокирована. Для неё требуется функция {feature} в вашей лицензии.",
     "bannerMessageGeneric": "Для этой страницы нужна функция, которой нет в вашей лицензии.",
-    "headerLocked": "Заблокировано: требуется {feature}"
+    "headerLocked": "Заблокировано: требуется {feature}",
+    "availableInEnterprise": "Доступно в OpenObserve Enterprise: {feature}"
   },
   "emptyState": {
     "illustrations": {

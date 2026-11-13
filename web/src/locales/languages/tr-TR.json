@@ -10,7 +10,8 @@
     "toastMessageGeneric": "Lisansınız bu özelliği içermiyor. Lisansı güncellemesi için yöneticinize başvurun.",
     "bannerMessage": "Bu özellik kilitli. Lisansınızda {feature} özelliği gerekiyor.",
     "bannerMessageGeneric": "Bu sayfa lisansınızda bulunmayan bir özellik gerektiriyor.",
-    "headerLocked": "Kilitli: {feature} gerekiyor"
+    "headerLocked": "Kilitli: {feature} gerekiyor",
+    "availableInEnterprise": "{feature}, OpenObserve Enterprise'da kullanılabilir"
   },
   "emptyState": {
     "illustrations": {

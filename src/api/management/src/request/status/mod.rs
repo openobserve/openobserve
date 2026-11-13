@@ -682,7 +682,10 @@ pub async fn zo_config(
         .filter_map(|(key, gate)| Some((key.clone(), gate.display_name.clone()?)))
         .collect();
     #[cfg(not(feature = "enterprise"))]
-    let feature_names: HashMap<String, String> = HashMap::new();
+    let feature_names: HashMap<String, String> = featuremap
+        .keys()
+        .map(|f| (<&str>::from(*f).to_string(), f.display_name().to_string()))
+        .collect();
 
     axum::Json(ConfigResponse {
         version: config::VERSION.to_string(),
@@ -2913,6 +2916,28 @@ mod tests {
             "ingestion_quota_used",
         ] {
             assert!(json.get(k).is_none(), "{k}");
+        }
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    #[tokio::test]
+    async fn test_zo_config_names_every_locked_feature_in_oss() {
+        let json = zo_config_json().await;
+        let locked: Vec<&str> = json["features"]
+            .as_object()
+            .unwrap()
+            .iter()
+            .filter(|(_, state)| *state == "locked")
+            .map(|(key, _)| key.as_str())
+            .collect();
+        assert!(!locked.is_empty());
+        for key in locked {
+            let feature = Feature::all().find(|f| <&str>::from(*f) == key).unwrap();
+            assert_eq!(
+                json["feature_names"][key].as_str(),
+                Some(feature.display_name()),
+                "{key}"
+            );
         }
     }
 

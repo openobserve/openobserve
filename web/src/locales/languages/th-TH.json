@@ -10,7 +10,8 @@
     "toastMessageGeneric": "สิทธิ์การใช้งานของคุณไม่รวมฟีเจอร์นี้ โปรดขอให้ผู้ดูแลระบบอัปเดตสิทธิ์การใช้งาน",
     "bannerMessage": "ฟีเจอร์นี้ถูกล็อก ต้องมีฟีเจอร์ {feature} ในสิทธิ์การใช้งานของคุณ",
     "bannerMessageGeneric": "หน้านี้ต้องใช้ฟีเจอร์ที่ไม่มีในสิทธิ์การใช้งานของคุณ",
-    "headerLocked": "ล็อกอยู่: ต้องมี {feature}"
+    "headerLocked": "ล็อกอยู่: ต้องมี {feature}",
+    "availableInEnterprise": "{feature} ใช้งานได้ใน OpenObserve Enterprise"
   },
   "emptyState": {
     "illustrations": {

@@ -10,7 +10,8 @@
     "toastMessageGeneric": "您的许可证不包含此功能。请联系管理员更新许可证。",
     "bannerMessage": "此功能已锁定。您的许可证需要包含 {feature} 功能。",
     "bannerMessageGeneric": "此页面需要一项您的许可证中未包含的功能。",
-    "headerLocked": "已锁定：需要 {feature}"
+    "headerLocked": "已锁定：需要 {feature}",
+    "availableInEnterprise": "{feature} 适用于 OpenObserve 企业版"
   },
   "emptyState": {
     "illustrations": {

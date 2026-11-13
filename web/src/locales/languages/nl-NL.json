@@ -10,7 +10,8 @@
     "toastMessageGeneric": "Je licentie bevat deze functie niet. Vraag je beheerder om de licentie bij te werken.",
     "bannerMessage": "Deze functie is vergrendeld. Je licentie moet de functie {feature} bevatten.",
     "bannerMessageGeneric": "Deze pagina vereist een functie die niet in je licentie zit.",
-    "headerLocked": "Vergrendeld: vereist {feature}"
+    "headerLocked": "Vergrendeld: vereist {feature}",
+    "availableInEnterprise": "{feature} is beschikbaar in OpenObserve Enterprise"
   },
   "emptyState": {
     "illustrations": {

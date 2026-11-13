@@ -10,7 +10,8 @@
     "toastMessageGeneric": "您的授權未包含此功能。請您的管理員更新授權。",
     "bannerMessage": "此功能已鎖定。您的授權需要包含 {feature} 功能。",
     "bannerMessageGeneric": "此頁面所需的功能不在您的授權中。",
-    "headerLocked": "已鎖定：需要 {feature}"
+    "headerLocked": "已鎖定：需要 {feature}",
+    "availableInEnterprise": "{feature} 適用於 OpenObserve 企業版"
   },
   "emptyState": {
     "illustrations": {
