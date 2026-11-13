@@ -126,16 +126,43 @@ const occursOn = (s: DowntimeSchedule, ymd: string): boolean => {
   return s.repeat !== "weekly" || s.weekdays.includes(isoWeekday(ymd));
 };
 
-/** A full-day window ends at the next day's start, so DST days neither overlap nor gap. */
-const windowEnd = (s: DowntimeSchedule, day: string, start: number): number => {
-  if (s.duration_secs !== FULL_DAY_SECS || !s.start_time_local) {
-    return start + s.duration_secs * MICROS;
-  }
-  return (
-    localToUtcMicros(addDays(day, 1), s.start_time_local, s.timezone) ??
-    start + s.duration_secs * MICROS
-  );
+/** The start of the occurrence on a local day; the server skips one before `starts_at`, e.g. 09:00 on a day that starts at 13:00. */
+const occurrenceStart = (s: DowntimeSchedule, day: string): number | null => {
+  if (!s.start_time_local || !occursOn(s, day)) return null;
+  const start = localToUtcMicros(day, s.start_time_local, s.timezone);
+  return start === null || start < s.starts_at ? null : start;
 };
+
+/** The start of the first occurrence after a local day; a repeat gap is at most 7 days. */
+const nextStartAfter = (s: DowntimeSchedule, day: string): number | null => {
+  for (let ahead = 1; ahead <= 7; ahead += 1) {
+    const start = occurrenceStart(s, addDays(day, ahead));
+    if (start !== null) return start;
+  }
+  return null;
+};
+
+/** A full-day window ends at the next day's start, and no window runs past the next one's start, so DST days neither overlap nor gap. */
+const windowEnd = (s: DowntimeSchedule, day: string, start: number): number => {
+  const full =
+    s.duration_secs === FULL_DAY_SECS && s.start_time_local
+      ? localToUtcMicros(addDays(day, 1), s.start_time_local, s.timezone)
+      : null;
+  const end = full ?? start + s.duration_secs * MICROS;
+  const next = nextStartAfter(s, day);
+  return next !== null && next < end ? next : end;
+};
+
+/** Whether a recurring rule has any window, searched like the server: 8 days from its start. */
+export function producesWindow(s: DowntimeSchedule): boolean {
+  if (s.repeat === "none") return true;
+  if (!s.start_time_local || !isHhMm(s.start_time_local)) return true;
+  const first = utcMicrosToLocal(s.starts_at, s.timezone).date;
+  for (let offset = 0; offset <= 8; offset += 1) {
+    if (occurrenceStart(s, addDays(first, offset)) !== null) return true;
+  }
+  return false;
+}
 
 /** The window that is running at `nowMicros`, else the next one; recurring rows look 8 days ahead. */
 export function currentOrNextWindow(s: DowntimeSchedule, nowMicros: number): DowntimeWindow | null {
@@ -144,40 +171,48 @@ export function currentOrNextWindow(s: DowntimeSchedule, nowMicros: number): Dow
     return { start: s.starts_at, end: s.ends_at };
   }
   if (!s.start_time_local || !isHhMm(s.start_time_local)) return null;
-  const today = utcMicrosToLocal(nowMicros, s.timezone).date;
-  // A window that started up to `duration` ago is still running, so look back that many days.
-  const lookback = Math.max(1, Math.ceil(s.duration_secs / 86_400));
+  // Like the server, a series that starts later is searched from its start.
+  const today = utcMicrosToLocal(Math.max(nowMicros, s.starts_at), s.timezone).date;
+  // A window that started up to `duration` ago is still running; a late start reaches one day further.
+  const lookback = Math.ceil(s.duration_secs / 86_400) + 1;
   for (let offset = -lookback; offset <= 8; offset += 1) {
     const day = addDays(today, offset);
-    if (!occursOn(s, day)) continue;
-    const start = localToUtcMicros(day, s.start_time_local, s.timezone);
-    // The server skips an occurrence that starts before `starts_at`, e.g. 09:00 on a day that starts at 13:00.
-    if (start === null || start < s.starts_at) continue;
+    const start = occurrenceStart(s, day);
+    if (start === null) continue;
     const end = windowEnd(s, day, start);
     if (end > nowMicros) return { start, end };
   }
   return null;
 }
 
-/** The last `count` windows that ended before `nowMicros`, oldest first; looks back 60 days. */
+/** A cancel drops every later window and cuts the one that holds it, as the server's `cut_at_cancel` does. */
+const cutAtCancel = (w: DowntimeWindow, cancelledAt?: number | null): DowntimeWindow | null => {
+  if (cancelledAt === null || cancelledAt === undefined) return w;
+  if (w.start >= cancelledAt) return null;
+  return { start: w.start, end: Math.min(w.end, cancelledAt) };
+};
+
+/** The last `count` windows that ended before `nowMicros`, oldest first, cut at a cancel; looks back 60 days. */
 export function recentWindows(
   s: DowntimeSchedule,
   nowMicros: number,
   count: number,
+  cancelledAt?: number | null,
 ): DowntimeWindow[] {
   if (s.repeat === "none") {
-    return s.ends_at && s.ends_at <= nowMicros ? [{ start: s.starts_at, end: s.ends_at }] : [];
+    if (!s.ends_at) return [];
+    const w = cutAtCancel({ start: s.starts_at, end: s.ends_at }, cancelledAt);
+    return w && w.end <= nowMicros ? [w] : [];
   }
   if (!s.start_time_local || !isHhMm(s.start_time_local)) return [];
   const today = utcMicrosToLocal(nowMicros, s.timezone).date;
   const found: DowntimeWindow[] = [];
   for (let offset = 0; offset >= -60 && found.length < count; offset -= 1) {
     const day = addDays(today, offset);
-    if (!occursOn(s, day)) continue;
-    const start = localToUtcMicros(day, s.start_time_local, s.timezone);
-    if (start === null || start < s.starts_at) continue;
-    const end = windowEnd(s, day, start);
-    if (end <= nowMicros) found.push({ start, end });
+    const start = occurrenceStart(s, day);
+    if (start === null) continue;
+    const w = cutAtCancel({ start, end: windowEnd(s, day, start) }, cancelledAt);
+    if (w && w.end <= nowMicros) found.push(w);
   }
   return found.reverse();
 }

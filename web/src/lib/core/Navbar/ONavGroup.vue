@@ -50,6 +50,7 @@ import { useTheme } from "@/composables/useTheme";
 import { useRouter, type LocationQueryRaw } from "vue-router";
 import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import MenuLink from "@/components/MenuLink.vue";
 import BetaBadge from "@/components/common/BetaBadge.vue";
 import { isGateOpen, useNavGateContext } from "./useNavGateContext";
@@ -73,6 +74,7 @@ import { useFeatureNames } from "@/composables/useFeatureLock";
 import {
   checkFeatureAccess,
   buildFeatureGateContext,
+  featureGateLabelKey,
   isFeatureKey,
 } from "@/utils/enterpriseFeatures";
 
@@ -383,6 +385,17 @@ function childRowTestId(child: SubnavChild): string {
 function childLockedLabel(child: SubnavChild): I18nText {
   const feature = child.feature ? (featureName(child.feature) ?? child.feature) : "";
   return t("featureLock.headerLocked", { feature: raw(feature) });
+}
+
+function childLockTip(child: SubnavChild): I18nText | undefined {
+  if (child.locked && child.gate && isFeatureKey(child.gate)) {
+    return t("featureLock.availableInEnterprise", { feature: t(featureGateLabelKey(child.gate)) });
+  }
+  if (!child.licenseLocked) return undefined;
+  const { isEnterprise, isCloud } = buildFeatureGateContext(store.state.zoConfig);
+  if (isEnterprise || isCloud) return childLockedLabel(child);
+  const feature = child.feature ? (featureName(child.feature) ?? child.feature) : "";
+  return t("featureLock.availableInEnterprise", { feature: raw(feature) });
 }
 
 function tileElement(): HTMLElement | null {
@@ -815,7 +828,8 @@ function onChildMouseenter(event: MouseEvent) {
                 :data-test="`${childDataTest(child)}-lock`"
                 aria-hidden="true"
               />
-              <span v-if="child.licenseLocked" class="sr-only">{{ childLockedLabel(child) }}</span>
+              <span v-if="childLockTip(child)" class="sr-only">{{ childLockTip(child) }}</span>
+              <OTooltip v-if="childLockTip(child)" side="right" :content="childLockTip(child)" />
               <span
                 v-if="isChildPaywalled(child)"
                 :id="itemDescriptionId(child, 'inline-')"
@@ -869,9 +883,14 @@ function onChildMouseenter(event: MouseEvent) {
               :data-test="`${childDataTest(block.child)}-lock`"
               aria-hidden="true"
             />
-            <span v-if="block.child.licenseLocked" class="sr-only">{{
-              childLockedLabel(block.child)
+            <span v-if="childLockTip(block.child)" class="sr-only">{{
+              childLockTip(block.child)
             }}</span>
+            <OTooltip
+              v-if="childLockTip(block.child)"
+              side="right"
+              :content="childLockTip(block.child)"
+            />
             <span
               v-if="isChildPaywalled(block.child)"
               :id="itemDescriptionId(block.child, 'inline-')"
@@ -995,9 +1014,14 @@ function onChildMouseenter(event: MouseEvent) {
                       :data-test="`${childDataTest(child)}-lock`"
                       aria-hidden="true"
                     />
-                    <span v-if="child.licenseLocked" class="sr-only">{{
-                      childLockedLabel(child)
+                    <span v-if="childLockTip(child)" class="sr-only">{{
+                      childLockTip(child)
                     }}</span>
+                    <OTooltip
+                      v-if="childLockTip(child)"
+                      side="right"
+                      :content="childLockTip(child)"
+                    />
                     <span
                       v-if="isChildPaywalled(child)"
                       :id="itemDescriptionId(child)"
@@ -1060,9 +1084,14 @@ function onChildMouseenter(event: MouseEvent) {
                     :data-test="`${childDataTest(block.child)}-lock`"
                     aria-hidden="true"
                   />
-                  <span v-if="block.child.licenseLocked" class="sr-only">{{
-                    childLockedLabel(block.child)
+                  <span v-if="childLockTip(block.child)" class="sr-only">{{
+                    childLockTip(block.child)
                   }}</span>
+                  <OTooltip
+                    v-if="childLockTip(block.child)"
+                    side="right"
+                    :content="childLockTip(block.child)"
+                  />
                   <span
                     v-if="isChildPaywalled(block.child)"
                     :id="itemDescriptionId(block.child)"

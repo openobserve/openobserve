@@ -3,6 +3,8 @@
 import { describe, it, expect } from "vitest";
 import { gt } from "@/types/i18n";
 import type { Downtime } from "@/services/downtimes";
+import type { ValueLabelFn } from "./targetSummary";
+import stage8 from "@/test/unit/fixtures/serviceVersions/stage8.json";
 import {
   ALL_FOLDERS,
   applyPrefill,
@@ -13,6 +15,7 @@ import {
   defaultDowntimeValues,
   downtimeToFormValues,
   exclusiveAllFolders,
+  movePastWindow,
   nextFullHourMs,
   scheduleForRepeat,
   unnarrowedModules,
@@ -260,6 +263,37 @@ describe("buildDowntimeRequest", () => {
   });
 });
 
+describe("duplicate of a past window", () => {
+  const once = (start: string, end: string): Downtime => ({
+    ...flow1,
+    schedule: {
+      repeat: "none",
+      starts_at: Date.parse(start) * 1000,
+      ends_at: Date.parse(end) * 1000,
+      timezone: "UTC",
+      duration_secs: (Date.parse(end) - Date.parse(start)) / 1000,
+      weekdays: [],
+    },
+  });
+
+  it("moves an ended one-time window to the next full hour with the same duration", () => {
+    const values = movePastWindow(
+      downtimeToFormValues(once("2026-09-10T20:00:00Z", "2026-09-10T22:30:00Z"), "duplicate"),
+      NOW,
+    );
+    const s = buildDowntimeRequest(values).schedule;
+    expect(s.starts_at).toBe(Date.parse("2026-09-17T13:00:00Z") * 1000);
+    expect(s.ends_at).toBe(Date.parse("2026-09-17T15:30:00Z") * 1000);
+  });
+
+  it("keeps a window that is still ahead and leaves a recurring row alone", () => {
+    const ahead = downtimeToFormValues(once("2026-09-18T20:00:00Z", "2026-09-18T22:00:00Z"));
+    expect(movePastWindow(ahead, NOW)).toBe(ahead);
+    const weekly = downtimeToFormValues(flow1);
+    expect(movePastWindow(weekly, NOW)).toBe(weekly);
+  });
+});
+
 describe("prefill and the mute-all rule", () => {
   it("pre-fills one module with all folders and the row's id", () => {
     const values = applyPrefill(defaultDowntimeValues(NOW, "UTC"), {
@@ -411,5 +445,30 @@ describe("notifications in the form", () => {
     });
     expect(buildDowntimeRequest(values).notifications).toEqual(saved.notifications);
     expect(downtimeToFormValues(flow1).notifications.destinations).toEqual([]);
+  });
+});
+
+// Display names as the real values endpoint returns them for `service` (stage 8 golden).
+const goldenLabel: ValueLabelFn = (key, value) =>
+  key === "service"
+    ? stage8.downtime_values.values.find((v) => v.value === value)?.label
+    : undefined;
+
+describe("generated name with display names", () => {
+  it("titles a service condition with the service's display name, not its stored key", () => {
+    const values = defaultDowntimeValues(NOW, "UTC");
+    values.condition_open = true;
+    values.condition = {
+      type: "pair",
+      key: "service",
+      operator: "=",
+      value: "checkoutservice",
+    };
+    expect(buildDowntimeAutoName(values, gt, undefined, undefined, "en-US", goldenLabel)).toBe(
+      "service=CheckoutService · once Thu 17 Sep",
+    );
+    expect(buildDowntimeAutoName(values, gt, undefined, undefined, "en-US")).toBe(
+      "service=checkoutservice · once Thu 17 Sep",
+    );
   });
 });

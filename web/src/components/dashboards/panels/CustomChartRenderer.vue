@@ -216,6 +216,9 @@ export default defineComponent({
       chart?.resize();
     };
 
+    // A panel or drawer can change size without a window resize, so the chart follows its own box.
+    let sizeObserver: ResizeObserver | null = null;
+
     const handleMouseOver = () => {
       if (hoveredSeriesState) hoveredSeriesState.panelId = props.data.extras?.panelId;
     };
@@ -229,6 +232,12 @@ export default defineComponent({
 
       // Watch for window resize
       window.addEventListener("resize", handleResize);
+      if (typeof ResizeObserver !== "undefined" && chartRef.value) {
+        sizeObserver = new ResizeObserver(() => {
+          if (!zeroSizeReinitObserver) chart?.resize();
+        });
+        sizeObserver.observe(chartRef.value);
+      }
     });
     watch(
       () => props.data,
@@ -243,6 +252,8 @@ export default defineComponent({
     );
 
     onUnmounted(() => {
+      sizeObserver?.disconnect();
+      sizeObserver = null;
       zeroSizeReinitObserver?.disconnect();
       zeroSizeReinitObserver = null;
       chart?.dispose();

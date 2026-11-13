@@ -37,9 +37,12 @@ import i18n, {
   applyDocumentLocale,
   getLocale,
   isRtlLocale,
+  loadLazyLocaleBlocks,
   loadLocaleMessages,
   localeFileMap,
 } from "@/locales";
+import enMessages from "@/locales/languages/en-US.json";
+import entryMessages from "@/locales/languages/en-US.json?without=serviceVersions";
 
 const withNavigatorLanguage = (language: string, assertion: () => void) => {
   const descriptor = Object.getOwnPropertyDescriptor(navigator, "language");
@@ -79,6 +82,12 @@ describe("locale registry stays in sync", () => {
 
   it("formats numbers for every locale it can load", () => {
     expect(Object.keys(APP_LOCALE_TO_BCP47).sort()).toEqual(Object.keys(localeFileMap).sort());
+  });
+
+  it("restores every en-US message once the blocks left out of the entry load", async () => {
+    expect(entryMessages).not.toHaveProperty("serviceVersions");
+    await loadLazyLocaleBlocks();
+    expect(i18n.global.getLocaleMessage("en-us")).toEqual(enMessages);
   });
 });
 

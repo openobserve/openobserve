@@ -186,6 +186,13 @@ pub const COVERAGE: &[Coverage] = &[
     table("search_jobs", DB),
     table("search_queue", DB),
     table("service_streams", DB),
+    table("service_identity_rules", DB),
+    table("service_name_aliases", DB),
+    table("service_version_deploys", DB),
+    table("service_version_verdict_metrics", DB),
+    table("service_version_verdicts", DB),
+    table("service_versions", DB),
+    table("service_where_summary", DB),
     exempt(
         Kind::Table,
         "sessions",
@@ -470,7 +477,7 @@ mod tests {
     /// Steps the worker runs by name, beyond the fixed steps it enqueues.
     const ITEM_STEPS: [&str; 2] = ["delete_stream", "delete_stream_final"];
     /// Tables that name their org through a parent id or key that no `belongs_to` declares.
-    const PARENT_ID_SCOPED: [&str; 14] = [
+    const PARENT_ID_SCOPED: [&str; 15] = [
         "alert_state_transitions",
         "alert_states",
         "compactor_manual_jobs",
@@ -482,6 +489,7 @@ mod tests {
         "public_dashboard_outbox",
         "search_job_partitions",
         "search_job_results",
+        "service_version_verdict_metrics",
         "slo_backfill_jobs",
         "slo_status",
         "users",

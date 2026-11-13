@@ -18,7 +18,7 @@ const valid = (): DowntimeFormValues => ({
 });
 
 const errorsOf = (values: DowntimeFormValues, ctx = {}) => {
-  const result = makeAddDowntimeSchema(gt, ctx).safeParse(values);
+  const result = makeAddDowntimeSchema(gt, { nowMs: () => NOW, ...ctx }).safeParse(values);
   if (result.success) return {};
   return Object.fromEntries(result.error.issues.map((i) => [i.path.join("."), i.message]));
 };
@@ -26,6 +26,56 @@ const errorsOf = (values: DowntimeFormValues, ctx = {}) => {
 describe("AddDowntime schema", () => {
   it("accepts a narrowed one-time downtime", () => {
     expect(errorsOf(valid())).toEqual({});
+  });
+
+  it("refuses a one-time end at or before now unless an SLO target corrects the past", () => {
+    const v = valid();
+    const end = Date.parse("2026-09-17T14:00:00Z");
+    expect(errorsOf(v, { nowMs: () => end + 1 })["schedule.end_date"]).toBe(
+      "The end time is in the past. Pick an end time after now.",
+    );
+    expect(errorsOf(v, { nowMs: () => end })["schedule.end_date"]).toBe(
+      "The end time is in the past. Pick an end time after now.",
+    );
+    expect(errorsOf(v, { nowMs: () => end - 1 })).toEqual({});
+    v.modules = ["alerts", "slos"];
+    expect(errorsOf(v, { nowMs: () => end + 1 })).toEqual({});
+  });
+
+  it("refuses a weekly schedule with no window between its start and its until day", () => {
+    const v = valid();
+    v.schedule = {
+      ...v.schedule,
+      repeat: "weekly",
+      start_date: "2026-09-21",
+      start_time: "02:00",
+      duration: "1h",
+      weekdays: [7],
+      until_date: "2026-09-25",
+    };
+    expect(errorsOf(v)["schedule.weekdays"]).toBe("This schedule never produces a window.");
+    v.schedule.until_date = "2026-09-27";
+    expect(errorsOf(v)).toEqual({});
+  });
+
+  it("puts the no-window error of a daily schedule on its until day", () => {
+    const v = valid();
+    // Loaded with a start of Thursday 13:00, so the 09:00 window of that Thursday is not one.
+    v.schedule = {
+      ...v.schedule,
+      repeat: "daily",
+      start_date: "2026-09-17",
+      start_time: "09:00",
+      duration: "1h",
+      weekdays: [],
+      until_date: "2026-09-17",
+      starts_at: Date.parse("2026-09-17T13:00:00Z") * 1000,
+      ends_at: null,
+      starts_at_timezone: "UTC",
+    };
+    expect(errorsOf(v)["schedule.until_date"]).toBe("This schedule never produces a window.");
+    v.schedule.until_date = "2026-09-18";
+    expect(errorsOf(v)).toEqual({});
   });
 
   it("needs at least one module", () => {

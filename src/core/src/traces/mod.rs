@@ -58,6 +58,7 @@ pub mod inferred;
 pub mod otel;
 pub mod red_insights;
 pub mod service_graph;
+pub mod service_identity;
 pub mod session;
 #[cfg(test)]
 mod tests_enrich_golden;
@@ -80,7 +81,12 @@ use crate::{
         evaluate_trigger, get_thread_id, grpc::get_val, write_file,
     },
     logs::IngestJsonData,
-    traces::otel::{OtelIngestionProcessor, SpanContext, is_llm_trace},
+    traces::{
+        otel::{OtelIngestionProcessor, SpanContext, is_llm_trace},
+        service_identity::{
+            SERVICE_IDENTITY_FIELD_PREFIX, SERVICE_IDENTITY_FIELDS, ServiceIdentityCollector,
+        },
+    },
 };
 
 const SERVICE_NAME: &str = "service.name";
@@ -88,7 +94,7 @@ const SERVICE: &str = "service";
 const PARENT_SPAN_ID: &str = "reference.parent_span_id";
 const PARENT_TRACE_ID: &str = "reference.parent_trace_id";
 const REF_TYPE: &str = "reference.ref_type";
-const RESERVED_SPAN_FIELDS: [&str; 34] = [
+const RESERVED_SPAN_FIELDS: [&str; 38] = [
     "trace_id",
     "span_id",
     "flags",
@@ -126,6 +132,10 @@ const RESERVED_SPAN_FIELDS: [&str; 34] = [
     // `gen_ai_usage_cost_status`, …) on any span gets the attr_ prefix, so only the
     // processor's own value reaches the column.
     config::meta::model_pricing::COST_STATUS_COLUMN,
+    config::meta::service_identity::O2_SERVICE_WHERE,
+    config::meta::service_identity::O2_SERVICE_ENV,
+    config::meta::service_identity::O2_SERVICE_VERSION,
+    config::meta::service_identity::O2_SERVICE_IMAGE,
     "events",
     "links",
     TIMESTAMP_COL_NAME,
@@ -379,13 +389,17 @@ async fn queue_gen_ai_agent_observations(org_id: &str, mut observations: AgentOb
 /// are still on the record (the derivations are deterministic). This path does not
 /// price spans, so it never sets `gen_ai_usage_cost_status`; a value on the record is
 /// not ingest's.
-fn strip_client_supplied_derived_fields(record_val: &mut Map<String, json::Value>) {
+fn strip_client_supplied_derived_fields(
+    record_val: &mut Map<String, json::Value>,
+    keep_service_identity: bool,
+) {
     record_val.remove(config::meta::model_pricing::COST_STATUS_COLUMN);
     // one key scan instead of 20 map removals: a record almost never carries a derived key
-    if !record_val
-        .keys()
-        .any(|k| k.starts_with(DB_FIELD_PREFIX) || k.starts_with(INFER_FIELD_PREFIX))
-    {
+    if !record_val.keys().any(|k| {
+        k.starts_with(DB_FIELD_PREFIX)
+            || k.starts_with(INFER_FIELD_PREFIX)
+            || (!keep_service_identity && k.starts_with(SERVICE_IDENTITY_FIELD_PREFIX))
+    }) {
         return;
     }
     for field in crate::db_monitoring::ALL_DB_FIELDS {
@@ -393,6 +407,11 @@ fn strip_client_supplied_derived_fields(record_val: &mut Map<String, json::Value
     }
     for field in inferred::ALL_INFER_FIELDS {
         record_val.remove(field);
+    }
+    if !keep_service_identity {
+        for field in SERVICE_IDENTITY_FIELDS {
+            record_val.remove(field);
+        }
     }
 }
 
@@ -407,6 +426,7 @@ fn save_derived_fields_for_uds(
     crate::db_monitoring::ALL_DB_FIELDS
         .iter()
         .chain(inferred::ALL_INFER_FIELDS.iter())
+        .chain(SERVICE_IDENTITY_FIELDS.iter())
         .filter(|f| !fields.contains(**f))
         .filter_map(|f| record_val.get(*f).map(|v| (*f, v.clone())))
         .collect()
@@ -502,9 +522,10 @@ pub fn enrich_json_record(
     record_val: &mut Map<String, json::Value>,
     db_monitoring_enabled: bool,
     db_enrich_opts: &crate::db_monitoring::EnrichOptions,
+    keep_service_identity: bool,
 ) -> bool {
     // RESERVED_SPAN_FIELDS protects OTLP only, so client-supplied derived keys go (D1 cond. 1)
-    strip_client_supplied_derived_fields(record_val);
+    strip_client_supplied_derived_fields(record_val, keep_service_identity);
 
     let span_kind = normalize_span_kind(record_val);
 
@@ -676,6 +697,16 @@ fn resource_attribute_key(raw_key: String) -> String {
 // Clock skew can deliver end < start; saturate instead of wrapping to ~585M years.
 fn span_duration_micros(start_time_nanos: u64, end_time_nanos: u64) -> u64 {
     end_time_nanos.saturating_sub(start_time_nanos) / 1000
+}
+
+/// The first span of the resource's first scope: where a cluster name may sit.
+fn first_span_attributes(
+    scope_spans: &[opentelemetry_proto::tonic::trace::v1::ScopeSpans],
+) -> &[opentelemetry_proto::tonic::common::v1::KeyValue] {
+    scope_spans
+        .first()
+        .and_then(|scope| scope.spans.first())
+        .map_or(&[], |span| span.attributes.as_slice())
 }
 
 pub async fn otlp_proto(
@@ -896,10 +927,12 @@ pub async fn handle_otlp_request(
     let gen_ai_agent_mapping_config =
         crate::db::system_settings::get_gen_ai_agent_mapping_config(org_id).await;
     let mut agent_observations = AgentObservationBuffer::default();
+    let mut service_identity = ServiceIdentityCollector::for_org(org_id).await;
 
     for res_span in res_spans {
         service_scope.enter_resource(res_span.resource);
         let resource_keys = normalized_resource_keys(service_scope.attrs());
+        service_identity.enter_resource(first_span_attributes(&res_span.scope_spans));
         let inst_resources = res_span.scope_spans;
         for inst_span in inst_resources {
             let spans = inst_span.spans;
@@ -945,6 +978,8 @@ pub async fn handle_otlp_request(
                 let is_llm_span = is_llm_trace(&span_att_map, scope_name);
                 let (service_name, service_att_map) =
                     service_scope.for_span(is_llm_span, &span_att_map, &otel_processor);
+                let service_stamp =
+                    service_identity.stamp_for_span(&service_name, service_scope.attrs());
 
                 // special addition for https://github.com/openobserve/openobserve/issues/4851
                 // we set the status (error/non-error) properly, but skip the message
@@ -1092,6 +1127,9 @@ pub async fn handle_otlp_request(
                     json::Value::Number(timestamp.into()),
                 );
                 set_o2_ingest_ts(record);
+                if let Some(stamp) = &service_stamp {
+                    stamp.apply(record);
+                }
 
                 if !executable_pipelines.is_empty() {
                     stream_pipeline_inputs.push(value);
@@ -1104,6 +1142,7 @@ pub async fn handle_otlp_request(
                     &mut partial_success,
                     &mut json_data_by_stream,
                     &mut agent_observations,
+                    &mut service_identity,
                 ) {
                     log::error!(
                         "[TRACES:OTLP] stream did not receive a valid json object, org_id: {org_id}, trace_id: {trace_id}"
@@ -1207,6 +1246,7 @@ pub async fn handle_otlp_request(
                             }
                             restore_canonical_agent_fields(&mut record_val, canonical_agent_fields);
                             set_o2_ingest_ts(&mut record_val);
+                            service_identity.observe(&stream_params.stream_name, &record_val);
 
                             log::debug!(
                                 "[TRACES:OTLP] pipeline result for stream: {org_id}/{} got {} records",
@@ -1242,6 +1282,7 @@ pub async fn handle_otlp_request(
                     &mut partial_success,
                     &mut json_data_by_stream,
                     &mut agent_observations,
+                    &mut service_identity,
                 );
             }
         }
@@ -1352,6 +1393,8 @@ pub async fn handle_otlp_request(
 
     #[cfg(feature = "enterprise")]
     queue_gen_ai_agent_observations(org_id, agent_observations).await;
+    #[cfg(feature = "enterprise")]
+    service_identity.queue(org_id);
 
     // mark llm stream if needed
     if need_mark_llm_stream
@@ -1396,6 +1439,7 @@ fn finalize_and_buffer_trace_span(
     partial_success: &mut ExportTracePartialSuccess,
     json_data_by_stream: &mut HashMap<String, IngestJsonData>,
     agent_observations: &mut AgentObservationBuffer,
+    service_identity: &mut ServiceIdentityCollector,
 ) -> bool {
     value = match flatten::flatten(value) {
         Ok(v) => v,
@@ -1436,6 +1480,7 @@ fn finalize_and_buffer_trace_span(
     }
     restore_canonical_agent_fields(&mut record_val, canonical_agent_fields);
     set_o2_ingest_ts(&mut record_val);
+    service_identity.observe(traces_stream_name, &record_val);
     let (ts_data, _) = json_data_by_stream
         .entry(traces_stream_name.to_string())
         .or_insert((Vec::new(), None));
@@ -1518,6 +1563,7 @@ pub async fn ingest_json(
     let gen_ai_agent_mapping_config =
         crate::db::system_settings::get_gen_ai_agent_mapping_config(org_id).await;
     let mut agent_observations = AgentObservationBuffer::default();
+    let mut service_identity = ServiceIdentityCollector::for_org(org_id).await;
     for mut value in json_values {
         let timestamp = value[TIMESTAMP_COL_NAME].as_i64().unwrap_or(
             value["start_time"]
@@ -1570,9 +1616,16 @@ pub async fn ingest_json(
         };
         normalize_llm_field_types(&mut record_val);
 
-        if enrich_json_record(&mut record_val, cfg.db_monitoring.enabled, &db_enrich_opts) {
+        // the scheduled pipeline the org configured may set o2_service_* on purpose
+        if enrich_json_record(
+            &mut record_val,
+            cfg.db_monitoring.enabled,
+            &db_enrich_opts,
+            true,
+        ) {
             has_db_spans = true;
         }
+        service_identity.stamp_json_record(&mut record_val);
 
         // check if we have any LLM related attributes
         if !is_llm_stream && detect_llm_stream(|k| record_val.contains_key(k)) {
@@ -1595,6 +1648,7 @@ pub async fn ingest_json(
             &gen_ai_agent_mapping_config,
             &mut agent_observations,
         );
+        service_identity.observe(traces_stream_name, &record_val);
         let (ts_data, _) = json_data_by_stream
             .entry(traces_stream_name.to_string())
             .or_insert((Vec::new(), None));
@@ -1704,6 +1758,8 @@ pub async fn ingest_json(
 
     #[cfg(feature = "enterprise")]
     queue_gen_ai_agent_observations(org_id, agent_observations).await;
+    #[cfg(feature = "enterprise")]
+    service_identity.queue(org_id);
 
     // mark llm stream if needed
     if need_mark_llm_stream
@@ -2086,6 +2142,8 @@ fn detect_llm_stream(contains_key: impl Fn(&str) -> bool) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::{HashMap, HashSet};
+
     use config::utils::json::{self, json};
     use opentelemetry_proto::tonic::trace::v1::{Status, status::StatusCode};
 
@@ -2573,7 +2631,13 @@ mod tests {
     #[test]
     fn test_reserved_span_fields() {
         let reserved_span_fields = &super::RESERVED_SPAN_FIELDS;
-        assert_eq!(reserved_span_fields.len(), 34);
+        assert_eq!(reserved_span_fields.len(), 38);
+        for field in super::SERVICE_IDENTITY_FIELDS {
+            assert!(
+                reserved_span_fields.contains(&field),
+                "missing service identity reserved field {field}"
+            );
+        }
         // All eleven DBM identity columns are reserved (design D1 condition 1).
         for field in crate::db_monitoring::ALL_DB_FIELDS {
             assert!(
@@ -3024,7 +3088,7 @@ mod tests {
         );
         record_val.insert("gen_ai_usage_cost".to_string(), json::json!(0.25));
 
-        super::strip_client_supplied_derived_fields(&mut record_val);
+        super::strip_client_supplied_derived_fields(&mut record_val, false);
 
         assert!(!record_val.contains_key(config::meta::model_pricing::COST_STATUS_COLUMN));
         assert!(record_val.contains_key("gen_ai_usage_cost"));
@@ -3065,7 +3129,7 @@ mod tests {
         record_val.insert("infer_self_port".to_string(), json::json!(2));
         record_val.insert("infer_self_ip".to_string(), json::json!("10.0.0.2"));
 
-        super::strip_client_supplied_derived_fields(&mut record_val);
+        super::strip_client_supplied_derived_fields(&mut record_val, false);
 
         for field in crate::db_monitoring::ALL_DB_FIELDS {
             assert!(
@@ -3109,11 +3173,11 @@ mod tests {
         record_val.insert("o2_db".to_string(), json::json!("not derived"));
         record_val.insert("infer".to_string(), json::json!("not derived"));
         let before = record_val.clone();
-        super::strip_client_supplied_derived_fields(&mut record_val);
+        super::strip_client_supplied_derived_fields(&mut record_val, false);
         assert_eq!(record_val, before);
 
         record_val.insert("infer_self_ip".to_string(), json::json!("10.0.0.2"));
-        super::strip_client_supplied_derived_fields(&mut record_val);
+        super::strip_client_supplied_derived_fields(&mut record_val, false);
         assert_eq!(record_val, before);
     }
 
@@ -3190,6 +3254,7 @@ mod tests {
             &mut partial,
             &mut out,
             &mut observations,
+            &mut super::ServiceIdentityCollector::default(),
         );
         assert!(ok);
         let (ts_data, _) = out.get("default").unwrap();
@@ -3539,6 +3604,7 @@ mod tests {
             &mut partial,
             &mut out,
             &mut observations,
+            &mut super::ServiceIdentityCollector::default(),
         );
         assert!(ok);
         let (ts_data, _) = out.get("default").unwrap();
@@ -3910,6 +3976,7 @@ mod tests {
         use arrow::{array::StringArray, compute::cast, datatypes::DataType};
 
         let org_id = "test_service_name_scope_org";
+        infra::db::create_table().await.unwrap();
         let resp = super::handle_otlp_request(
             org_id,
             export_request(resources),
@@ -4215,5 +4282,587 @@ mod tests {
                 .contains(&format!("only {limit} columns accept"))
         );
         assert!(status.message.contains("ZO_COLS_PER_RECORD_LIMIT"));
+    }
+
+    type SpanAttrs = Vec<opentelemetry_proto::tonic::common::v1::KeyValue>;
+
+    /// Resources of (attributes, spans), each span (attributes, start offset in µs from now).
+    fn identity_request(
+        resources: Vec<(SpanAttrs, Vec<(SpanAttrs, u64)>)>,
+    ) -> opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest {
+        identity_request_at(
+            chrono::Utc::now().timestamp_nanos_opt().unwrap() as u64,
+            resources,
+        )
+    }
+
+    fn identity_request_at(
+        now: u64,
+        resources: Vec<(SpanAttrs, Vec<(SpanAttrs, u64)>)>,
+    ) -> opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest {
+        use opentelemetry_proto::tonic::{
+            collector::trace::v1::ExportTraceServiceRequest,
+            resource::v1::Resource,
+            trace::v1::{ResourceSpans, ScopeSpans, Span},
+        };
+        // span ids stay unique across requests, so rows read back never collide
+        static NEXT_SPAN_ID: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+        let resource_spans = resources
+            .into_iter()
+            .map(|(attributes, spans)| {
+                let spans = spans
+                    .into_iter()
+                    .map(|(attributes, offset_us)| {
+                        let span_id =
+                            NEXT_SPAN_ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                        Span {
+                            trace_id: vec![7; 16],
+                            span_id: span_id.to_be_bytes().to_vec(),
+                            name: "op".to_string(),
+                            start_time_unix_nano: now - offset_us * 1000,
+                            end_time_unix_nano: now - offset_us * 1000 + 1000,
+                            attributes,
+                            ..Default::default()
+                        }
+                    })
+                    .collect();
+                ResourceSpans {
+                    resource: Some(Resource {
+                        attributes,
+                        ..Default::default()
+                    }),
+                    scope_spans: vec![ScopeSpans {
+                        spans,
+                        ..Default::default()
+                    }],
+                    ..Default::default()
+                }
+            })
+            .collect();
+        ExportTraceServiceRequest { resource_spans }
+    }
+
+    fn kvs(pairs: &[(&str, &str)]) -> SpanAttrs {
+        pairs.iter().map(|(k, v)| string_kv(k, v)).collect()
+    }
+
+    async fn ingest_identity(
+        org_id: &str,
+        stream: &str,
+        request: opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest,
+    ) -> axum::http::StatusCode {
+        infra::db::create_table().await.unwrap();
+        super::handle_otlp_request(
+            org_id,
+            request,
+            config::meta::otlp::OtlpRequestType::HttpProtobuf,
+            Some(stream),
+            ingestion_common::IngestUser::from_user_email("a@a.com"),
+        )
+        .await
+        .unwrap()
+        .status()
+    }
+
+    /// Every memtable row of the stream by span id: each column castable to text.
+    async fn stored_rows(
+        org_id: &str,
+        stream: &str,
+    ) -> std::collections::BTreeMap<String, HashMap<String, String>> {
+        use arrow::{
+            array::{Array, StringArray},
+            compute::cast,
+            datatypes::DataType,
+        };
+
+        let (_, batches) = ingester::read_from_memtable(
+            org_id,
+            config::meta::stream::StreamType::Traces.as_str(),
+            stream,
+            None,
+            &[],
+        )
+        .await
+        .unwrap();
+        let mut rows = std::collections::BTreeMap::new();
+        for entry in batches.into_iter().flat_map(|(_, entries)| entries) {
+            let schema = entry.data.schema();
+            for row in 0..entry.data.num_rows() {
+                let mut values = HashMap::new();
+                for (i, field) in schema.fields().iter().enumerate() {
+                    let Ok(column) = cast(entry.data.column(i), &DataType::Utf8) else {
+                        continue;
+                    };
+                    let column = column.as_any().downcast_ref::<StringArray>().unwrap();
+                    if column.is_valid(row) {
+                        values.insert(field.name().clone(), column.value(row).to_string());
+                    }
+                }
+                rows.insert(values["span_id"].clone(), values);
+            }
+        }
+        rows
+    }
+
+    #[cfg(feature = "enterprise")]
+    fn expected_identity(
+        resource: &[(&str, &str)],
+        service_name: &str,
+    ) -> o2_enterprise::enterprise::service_identity::resolver::ResolvedIdentity {
+        let attrs: HashMap<String, String> = resource
+            .iter()
+            .filter(|(k, _)| *k != super::SERVICE_NAME)
+            .map(|(k, v)| (format!("service_{k}"), v.to_string()))
+            .collect();
+        o2_enterprise::enterprise::service_identity::resolver::resolve_resource(
+            |key| attrs.get(key).cloned(),
+            |_| None,
+            service_name,
+            &config::meta::service_identity::OrgIdentity::default(),
+            &o2_enterprise::enterprise::service_identity::fields::IdentityFields::from_defaults(),
+        )
+    }
+
+    #[cfg(feature = "enterprise")]
+    fn drained(org_id: &str) -> Vec<config::meta::service_identity::ServiceVersionRecord> {
+        o2_enterprise::enterprise::service_identity::registry::drain(org_id)
+    }
+
+    #[cfg(feature = "enterprise")]
+    fn assert_stamped(
+        row: &HashMap<String, String>,
+        identity: &o2_enterprise::enterprise::service_identity::resolver::ResolvedIdentity,
+    ) {
+        use config::meta::service_identity::{
+            O2_SERVICE_ENV, O2_SERVICE_VERSION, O2_SERVICE_WHERE,
+        };
+        assert_eq!(row[O2_SERVICE_WHERE], identity.where_identity.where_key);
+        assert_eq!(row[O2_SERVICE_ENV], identity.env.env);
+        let version = (!identity.version.version.is_empty()).then_some(&identity.version.version);
+        assert_eq!(row.get(O2_SERVICE_VERSION), version);
+    }
+
+    #[cfg(all(feature = "enterprise", not(feature = "cloud")))]
+    #[tokio::test]
+    async fn otlp_two_resources_stamp_their_own_identity() {
+        let (org, stream) = ("svcid_two_res_org", "svcid_two_res");
+        let request = identity_request(vec![
+            (kvs(&CHECKOUT), vec![(vec![], 0), (vec![], 1)]),
+            (kvs(&CART), vec![(vec![], 2)]),
+        ]);
+        assert_eq!(
+            ingest_identity(org, stream, request).await,
+            axum::http::StatusCode::OK
+        );
+        let rows = stored_rows(org, stream).await;
+        assert_eq!(rows.len(), 3);
+        let checkout = expected_identity(&CHECKOUT, "checkout");
+        let cart = expected_identity(&CART, "cart");
+        assert_eq!(checkout.where_identity.where_key, "k8s:prod-eu/shop");
+        assert_eq!(cart.where_identity.where_key, "env:staging");
+        for row in rows.values() {
+            match row["service_name"].as_str() {
+                "checkout" => assert_stamped(row, &checkout),
+                "cart" => assert_stamped(row, &cart),
+                other => panic!("unexpected service {other}"),
+            }
+        }
+        assert!(
+            rows.values()
+                .filter(|r| r["service_name"] == "cart")
+                .all(|r| !r.contains_key(config::meta::service_identity::O2_SERVICE_VERSION)),
+            "the first resource's version never leaks into the second"
+        );
+        drained(org);
+    }
+
+    #[cfg(all(feature = "enterprise", not(feature = "cloud")))]
+    #[tokio::test]
+    async fn otlp_image_digest_stamps_its_column_and_splits_the_registry_row() {
+        use config::meta::service_identity::{O2_SERVICE_IMAGE, version_key, version_key_for};
+        let (org, stream) = ("svcid_image_org", "svcid_image");
+        let build = |id: &'static str| {
+            [
+                ("service.name", "checkout"),
+                ("k8s.cluster.name", "prod-eu"),
+                ("k8s.namespace.name", "shop"),
+                ("service.version", "2.4.0"),
+                ("container.image.name", "ghcr.io/acme/checkout"),
+                ("container.image.tag", "2.4.0"),
+                ("container.image.id", id),
+            ]
+        };
+        let a = build("sha256:3f9c2ab14e0d7c55a1b2c3d4e5f60718293a4b5c6d7e8f9011223344556677ab");
+        let b = build("sha256:9c1e4b7f00112233445566778899aabbccddeeff00112233445566778899aabb");
+        let request = identity_request(vec![
+            (kvs(&a), vec![(vec![], 0)]),
+            (kvs(&b), vec![(vec![], 1)]),
+            (kvs(&CHECKOUT), vec![(vec![], 2)]),
+        ]);
+        assert_eq!(
+            ingest_identity(org, stream, request).await,
+            axum::http::StatusCode::OK
+        );
+        let mut images: Vec<_> = stored_rows(org, stream)
+            .await
+            .values()
+            .map(|row| row.get(O2_SERVICE_IMAGE).cloned())
+            .collect();
+        images.sort();
+        assert_eq!(
+            images,
+            [
+                None,
+                Some("3f9c2ab".to_string()),
+                Some("9c1e4b7".to_string())
+            ]
+        );
+        let mut records: Vec<_> = drained(org)
+            .into_iter()
+            .filter(|row| row.version == "2.4.0")
+            .map(|row| (row.version_key, row.image, row.image_ref))
+            .collect();
+        records.sort();
+        let place = "k8s:prod-eu/shop";
+        let mut expected = vec![
+            (
+                version_key_for(org, "checkout", place, "2.4.0", Some("3f9c2ab")),
+                Some("3f9c2ab".to_string()),
+                Some("ghcr.io/acme/checkout:2.4.0".to_string()),
+            ),
+            (
+                version_key_for(org, "checkout", place, "2.4.0", Some("9c1e4b7")),
+                Some("9c1e4b7".to_string()),
+                Some("ghcr.io/acme/checkout:2.4.0".to_string()),
+            ),
+        ];
+        expected.sort();
+        assert_eq!(records, expected);
+        assert_ne!(expected[0].0, version_key(org, "checkout", place, "2.4.0"));
+    }
+
+    #[cfg(all(feature = "enterprise", not(feature = "cloud")))]
+    #[tokio::test]
+    async fn otlp_llm_span_renamed_service_gets_its_own_identity() {
+        let (org, stream) = ("svcid_llm_org", "svcid_llm");
+        let resource = [
+            ("k8s.cluster.name", "prod-eu"),
+            ("k8s.namespace.name", "ml"),
+        ];
+        let request = identity_request(vec![(
+            kvs(&resource),
+            vec![(vec![], 0), (llm_span_attrs("llm-svc"), 1)],
+        )]);
+        assert_eq!(
+            ingest_identity(org, stream, request).await,
+            axum::http::StatusCode::OK
+        );
+        let rows = stored_rows(org, stream).await;
+        let llm = rows
+            .values()
+            .find(|r| r["service_name"] == "llm-svc")
+            .expect("the LLM span keeps its own name");
+        assert_stamped(llm, &expected_identity(&resource, "llm-svc"));
+        let plain = rows.values().find(|r| r["service_name"] == stream).unwrap();
+        assert_stamped(plain, &expected_identity(&resource, stream));
+        let mut services: Vec<String> = drained(org).into_iter().map(|r| r.service_name).collect();
+        services.sort();
+        assert_eq!(services, vec!["llm-svc".to_string(), stream.to_string()]);
+    }
+
+    const CHECKOUT: [(&str, &str); 4] = [
+        ("service.name", "checkout"),
+        ("k8s.cluster.name", "prod-eu"),
+        ("k8s.namespace.name", "shop"),
+        ("service.version", "1.4.2"),
+    ];
+    const CART: [(&str, &str); 2] = [
+        ("service.name", "cart"),
+        ("deployment.environment.name", "staging"),
+    ];
+
+    #[cfg(not(feature = "cloud"))]
+    #[tokio::test]
+    async fn otlp_span_attr_o2_service_env_is_renamed() {
+        let (org, stream) = ("svcid_rename_org", "svcid_rename");
+        let request = identity_request(vec![(
+            kvs(&CART),
+            vec![(kvs(&[("o2.service.env", "spoofed")]), 0)],
+        )]);
+        assert_eq!(
+            ingest_identity(org, stream, request).await,
+            axum::http::StatusCode::OK
+        );
+        let rows = stored_rows(org, stream).await;
+        let row = rows.values().next().unwrap();
+        assert_eq!(row["attr_o2_service_env"], "spoofed");
+        assert_ne!(
+            row.get(config::meta::service_identity::O2_SERVICE_ENV)
+                .map(String::as_str),
+            Some("spoofed")
+        );
+        #[cfg(feature = "enterprise")]
+        drained(org);
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    #[cfg(not(feature = "cloud"))]
+    #[tokio::test]
+    async fn oss_build_stamps_nothing() {
+        let (org, stream) = ("svcid_oss_org", "svcid_oss");
+        let request = identity_request(vec![
+            (kvs(&CHECKOUT), vec![(vec![], 0)]),
+            (kvs(&CART), vec![(vec![], 1)]),
+        ]);
+        assert_eq!(
+            ingest_identity(org, stream, request).await,
+            axum::http::StatusCode::OK
+        );
+        let rows = stored_rows(org, stream).await;
+        assert_eq!(rows.len(), 2);
+        for row in rows.values() {
+            assert!(
+                !row.keys().any(|k| k.starts_with("o2_service_")),
+                "OSS writes no o2_service_* column: {row:?}"
+            );
+        }
+    }
+
+    fn client_record() -> serde_json::Map<String, json::Value> {
+        json::json!({
+            "service_name": "checkout",
+            "o2_service_where": "k8s:spoofed/ns",
+            "o2_service_env": "spoofed",
+            "o2_service_version": "6.6.6",
+            "o2_service_image": "0000000",
+            "span_kind": "2",
+        })
+        .as_object()
+        .cloned()
+        .unwrap()
+    }
+
+    #[test]
+    fn json_ingest_drops_client_o2_service_keys() {
+        let opts = crate::db_monitoring::EnrichOptions::default();
+        let mut record = client_record();
+        super::enrich_json_record(&mut record, false, &opts, false);
+        assert!(!record.keys().any(|k| k.starts_with("o2_service_")));
+
+        let mut kept = client_record();
+        super::enrich_json_record(&mut kept, false, &opts, true);
+        assert_eq!(kept["o2_service_version"], "6.6.6");
+        assert_eq!(kept["o2_service_where"], "k8s:spoofed/ns");
+    }
+
+    #[test]
+    fn uds_field_list_keeps_stamped_fields() {
+        let mut record = client_record();
+        record.insert("kept_attr".to_string(), json::json!("x"));
+        record.insert("dropped_attr".to_string(), json::json!("y"));
+        let fields: HashSet<String> = ["service_name", "kept_attr"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+        let saved = super::save_derived_fields_for_uds(&record, &fields);
+        let mut record = crate::ingestion::refactor_map(record, &fields);
+        super::restore_derived_fields(&mut record, saved);
+        for field in super::SERVICE_IDENTITY_FIELDS {
+            assert!(record.contains_key(field), "{field} survives the UDS list");
+        }
+        assert!(!record.contains_key("dropped_attr"));
+    }
+
+    #[cfg(all(feature = "enterprise", not(feature = "cloud")))]
+    #[tokio::test]
+    async fn one_observation_per_service_where_version_per_request() {
+        let (org, stream) = ("svcid_one_obs_org", "svcid_one_obs");
+        let mut v2 = CHECKOUT;
+        v2[3] = ("service.version", "1.5.0");
+        let request = identity_request(vec![
+            (
+                kvs(&CHECKOUT),
+                vec![(vec![], 40), (vec![], 10), (vec![], 30)],
+            ),
+            (kvs(&CHECKOUT), vec![(vec![], 50), (vec![], 5)]),
+            (kvs(&v2), vec![(vec![], 20)]),
+        ]);
+        assert_eq!(
+            ingest_identity(org, stream, request).await,
+            axum::http::StatusCode::OK
+        );
+        let times: HashMap<String, i64> = stored_rows(org, stream)
+            .await
+            .into_values()
+            .map(|r| {
+                (
+                    r["o2_service_version"].clone(),
+                    r["_timestamp"].parse().unwrap(),
+                )
+            })
+            .fold(HashMap::new(), |mut acc, (v, ts)| {
+                acc.entry(format!("{v}/min"))
+                    .and_modify(|m: &mut i64| *m = (*m).min(ts))
+                    .or_insert(ts);
+                acc.entry(format!("{v}/max"))
+                    .and_modify(|m: &mut i64| *m = (*m).max(ts))
+                    .or_insert(ts);
+                acc
+            });
+        let mut records = drained(org);
+        records.sort_by(|a, b| a.version.cmp(&b.version));
+        assert_eq!(
+            records.len(),
+            2,
+            "one per (stream, service, where, version)"
+        );
+        for record in &records {
+            assert_eq!(
+                record.traces_first_seen,
+                Some(times[&format!("{}/min", record.version)])
+            );
+            assert_eq!(
+                record.traces_last_seen,
+                Some(times[&format!("{}/max", record.version)])
+            );
+        }
+        assert_eq!(
+            records[0].traces_last_seen.unwrap() - records[0].traces_first_seen.unwrap(),
+            45
+        );
+    }
+
+    #[cfg(all(feature = "enterprise", not(feature = "cloud")))]
+    #[tokio::test]
+    async fn rejected_write_queues_nothing() {
+        let (org, stream) = ("svcid_rejected_org", "svcid_rejected");
+        let limit = config::get_config().limit.req_cols_per_record_limit;
+        let wide: SpanAttrs = (0..=limit)
+            .map(|i| string_kv(&format!("wide_{i}"), "x"))
+            .collect();
+        let request = identity_request(vec![(kvs(&CHECKOUT), vec![(wide, 0)])]);
+        assert_eq!(
+            ingest_identity(org, stream, request).await,
+            axum::http::StatusCode::BAD_REQUEST
+        );
+        assert!(
+            !o2_enterprise::enterprise::service_identity::registry::pending_orgs()
+                .contains(&org.to_string())
+        );
+        assert!(drained(org).is_empty());
+    }
+
+    #[cfg(all(feature = "enterprise", not(feature = "cloud")))]
+    #[tokio::test]
+    async fn flush_from_real_ingest_matches_span_bounds() {
+        use config::meta::service_identity::ServiceVersionRecord;
+        use infra::table::{
+            service_versions::{
+                create_tables_for_tests, get_by_keys, sqlite_and_postgres_for_tests,
+            },
+            service_where_summary,
+        };
+
+        let mut v2 = CHECKOUT;
+        v2[3] = ("service.version", "1.5.0");
+        let now = chrono::Utc::now().timestamp_nanos_opt().unwrap() as u64;
+        let first = || {
+            identity_request_at(
+                now,
+                vec![
+                    (kvs(&CHECKOUT), vec![(vec![], 90), (vec![], 70)]),
+                    (kvs(&CART), vec![(vec![], 60)]),
+                ],
+            )
+        };
+        let second = || {
+            identity_request_at(
+                now,
+                vec![
+                    (kvs(&CHECKOUT), vec![(vec![], 80), (vec![], 20)]),
+                    (kvs(&v2), vec![(vec![], 10)]),
+                ],
+            )
+        };
+        let comparable = |mut rows: Vec<ServiceVersionRecord>| {
+            rows.sort_by(|a, b| (&a.service_name, &a.version).cmp(&(&b.service_name, &b.version)));
+            rows.into_iter()
+                .map(|r| {
+                    (
+                        r.service_name,
+                        r.where_key,
+                        r.version,
+                        r.env,
+                        r.traces_last_seen.unwrap() - r.traces_first_seen.unwrap(),
+                    )
+                })
+                .collect::<Vec<_>>()
+        };
+        for (i, db) in sqlite_and_postgres_for_tests("svcid_flush")
+            .await
+            .into_iter()
+            .enumerate()
+        {
+            create_tables_for_tests(&db).await.unwrap();
+            let mut finals = Vec::new();
+            for (order, requests) in [[first(), second()], [second(), first()]]
+                .into_iter()
+                .enumerate()
+            {
+                let org = format!("svcid_flush_{i}_{order}");
+                let stream = format!("svcid_flush_{i}_{order}");
+                for request in requests {
+                    assert_eq!(
+                        ingest_identity(&org, &stream, request).await,
+                        axum::http::StatusCode::OK
+                    );
+                    crate::db::service_versions::flush_org_with(&db, &org)
+                        .await
+                        .unwrap();
+                }
+                let spans = stored_rows(&org, &stream).await;
+                let mut keys = Vec::new();
+                for record in spans.values() {
+                    let version = record.get("o2_service_version").map_or("", String::as_str);
+                    keys.push(config::meta::service_identity::version_key(
+                        &org,
+                        &record["service_name"],
+                        &record["o2_service_where"],
+                        version,
+                    ));
+                }
+                keys.sort();
+                keys.dedup();
+                let rows = get_by_keys(&db, &org, &keys).await.unwrap();
+                assert_eq!(rows.len(), 3, "checkout 1.4.2, checkout 1.5.0, cart");
+                for row in &rows {
+                    let times: Vec<i64> = spans
+                        .values()
+                        .filter(|s| {
+                            s["service_name"] == row.service_name
+                                && s.get("o2_service_version").map_or("", String::as_str)
+                                    == row.version
+                        })
+                        .map(|s| s["_timestamp"].parse().unwrap())
+                        .collect();
+                    assert_eq!(row.traces_first_seen, times.iter().min().copied());
+                    assert_eq!(row.traces_last_seen, times.iter().max().copied());
+                    assert_eq!(row.first_seen, row.traces_first_seen.unwrap());
+                }
+                let summaries = service_where_summary::list_by_org(&db, &org).await.unwrap();
+                assert_eq!(
+                    summaries.len(),
+                    2,
+                    "one summary row per (service, where, stream)"
+                );
+                assert!(
+                    summaries
+                        .iter()
+                        .any(|s| s.service_name == "checkout" && s.newest_version == "1.5.0")
+                );
+                finals.push(comparable(rows));
+            }
+            assert_eq!(finals[0], finals[1], "flush order does not change the rows");
+        }
     }
 }

@@ -244,6 +244,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :targets="row.targets"
                   :alert-groups="row.alert_groups"
                   :folder-name="targetFolderName"
+                  :value-label="valueLabel"
                   :max-chips="2"
                   :data-test="`downtime-list-${row.id}-targets`"
                 />
@@ -553,15 +554,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ConfirmDialog
       v-model="cancelOpen"
       :title="t('alerts.downtimes.confirmCancel.title')"
-      :message="
-        pendingCancel.length > 1
-          ? t(
-              'alerts.downtimes.confirmCancel.bulkMessage',
-              { count: pendingCancel.length },
-              pendingCancel.length,
-            )
-          : t('alerts.downtimes.confirmCancel.message')
-      "
+      :message="cancelMessage"
+      ok-variant="destructive"
+      focus-cancel
       :ok-label="
         t(
           'alerts.downtimes.confirmCancel.confirm',
@@ -583,10 +578,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ConfirmDialog
       v-model="endNowOpen"
       :title="t('alerts.downtimes.confirmEndNow.title')"
-      :message="t('alerts.downtimes.confirmEndNow.message')"
-      :ok-label="t('alerts.downtimes.confirmEndNow.ok')"
+      :message="
+        endNowRepeats
+          ? t('alerts.downtimes.confirmEndNow.recurringMessage')
+          : t('alerts.downtimes.confirmEndNow.message')
+      "
+      :ok-label="
+        endNowRepeats
+          ? t('alerts.downtimes.confirmEndNow.recurringOk')
+          : t('alerts.downtimes.confirmEndNow.ok')
+      "
       :cancel-label="t('alerts.downtimes.confirmEndNow.keep')"
-      ok-color="destructive"
+      ok-variant="destructive"
+      focus-cancel
       @update:ok="confirmEndNow"
       @update:cancel="endNowOpen = false"
     />
@@ -666,6 +670,7 @@ import { useViewerTimezone } from "@/composables/downtimes/useViewerTimezone";
 import { DEFAULT_DOWNTIME_FOLDER } from "@/utils/downtimes/folderDefault";
 import MoveAcrossFolders from "@/components/common/sidebar/MoveAcrossFolders.vue";
 import { useListBoundaryRefetch } from "@/composables/downtimes/useListBoundaryRefetch";
+import { useDowntimeValueLabels } from "@/composables/downtimes/useDowntimeValueLabels";
 import DowntimeTargetsCell from "./DowntimeTargetsCell.vue";
 import { useEditorDraftIds } from "@/composables/useEditorDraft";
 import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
@@ -876,6 +881,13 @@ const displayedRows = computed(() => {
       : folderRows.value.filter((r) => r.status === f);
   return sortDowntimeRows(rows);
 });
+
+// One lookup for every listed service, so the Targets column names it as the detail page does.
+const valueLabel = useDowntimeValueLabels(orgId, activeFolderId, () => ({
+  type: "group",
+  op: "and",
+  items: displayedRows.value.flatMap((row) => (row.condition ? [row.condition] : [])),
+}));
 
 const isFiltered = computed(
   () => !!search.value.trim() || typeFilter.value !== "all" || statFilter.value !== null,
@@ -1159,6 +1171,26 @@ const cancelIds = async (ids: string[]) => {
 
 const endNowOpen = ref(false);
 const pendingEndNow = ref("");
+
+// A cancel of a recurring row stops every future window, so its dialogs say so.
+const repeatsById = (id: string) => {
+  const row = allRows.value.find((r) => r.id === id);
+  return !!row && row.schedule.repeat !== "none";
+};
+const endNowRepeats = computed(() => repeatsById(pendingEndNow.value));
+const cancelMessage = computed<I18nText>(() => {
+  const count = pendingCancel.value.length;
+  const anyRepeats = pendingCancel.value.some(repeatsById);
+  if (count > 1) {
+    const bulk = t("alerts.downtimes.confirmCancel.bulkMessage", { count }, count);
+    return anyRepeats
+      ? raw(`${bulk} ${t("alerts.downtimes.confirmCancel.bulkRecurringNote")}`)
+      : bulk;
+  }
+  return anyRepeats
+    ? t("alerts.downtimes.confirmCancel.recurringMessage")
+    : t("alerts.downtimes.confirmCancel.message");
+});
 
 const askEndNow = (row: DowntimeListItem) => {
   pendingEndNow.value = row.id;

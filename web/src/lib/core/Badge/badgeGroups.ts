@@ -111,6 +111,70 @@ function humanize(value: unknown): string {
 // NOTE: keys inside `values` MUST be normalised (lowercase, no separators).
 
 export const BADGE_GROUPS = {
+  versionVerdict: {
+    mode: "plain",
+    values: {
+      ok: { variant: "success-soft", labelKey: "serviceVersions.verdict.ok" },
+      watch: { variant: "warning-soft", labelKey: "serviceVersions.verdict.watch" },
+      regressed: { variant: "error-soft", labelKey: "serviceVersions.verdict.regressed" },
+      insufficient: { variant: "default-soft", labelKey: "serviceVersions.verdict.insufficient" },
+      firstversion: { variant: "default-soft", labelKey: "serviceVersions.verdict.firstVersion" },
+      preexisting: { variant: "default-soft", labelKey: "serviceVersions.verdict.preExisting" },
+      notserving: { variant: "error-outline", labelKey: "serviceVersions.verdict.notServing" },
+      capped: { variant: "default-soft", labelKey: "serviceVersions.verdict.capped" },
+      restricted: { variant: "default-soft", labelKey: "serviceVersions.verdict.restricted" },
+      rollbackrecovered: {
+        variant: "success-soft",
+        labelKey: "serviceVersions.verdict.rollbackRecovered",
+        icon: "undo",
+      },
+      rollbackstillworse: {
+        variant: "warning-soft",
+        labelKey: "serviceVersions.verdict.rollbackStillWorse",
+        icon: "undo",
+      },
+    },
+  },
+  serviceEnvSource: {
+    mode: "plain",
+    values: {
+      attribute: { variant: "default-soft", labelKey: "serviceVersions.env.attribute" },
+      rum: { variant: "default-soft", labelKey: "serviceVersions.env.rum" },
+      override: { variant: "default-soft", labelKey: "serviceVersions.env.override" },
+      namespace: { variant: "default-soft", labelKey: "serviceVersions.env.namespace" },
+      cluster: { variant: "default-soft", labelKey: "serviceVersions.env.cluster" },
+      workload: { variant: "default-soft", labelKey: "serviceVersions.env.workload" },
+      clustername: { variant: "default-soft", labelKey: "serviceVersions.env.clusterName" },
+      namespacename: { variant: "default-soft", labelKey: "serviceVersions.env.namespaceName" },
+      default: { variant: "default-soft", labelKey: "serviceVersions.env.default" },
+    },
+  },
+  cwvBand: {
+    mode: "plain",
+    values: {
+      good: { variant: "success-soft", labelKey: "serviceVersions.compare.cwv.good" },
+      needsimprovement: { variant: "warning-soft", labelKey: "serviceVersions.compare.cwv.ni" },
+      poor: { variant: "error-soft", labelKey: "serviceVersions.compare.cwv.poor" },
+    },
+  },
+  aliasConfidence: {
+    mode: "plain",
+    shape: "rounded",
+    values: {
+      high: { variant: "success-soft", labelKey: "serviceVersions.nameReview.confidence.high" },
+      medium: { variant: "warning-soft", labelKey: "serviceVersions.nameReview.confidence.medium" },
+      low: { variant: "default-soft", labelKey: "serviceVersions.nameReview.confidence.low" },
+    },
+  },
+  aliasStatus: {
+    mode: "plain",
+    values: {
+      proposed: { variant: "blue-soft", labelKey: "serviceVersions.nameReview.status.proposed" },
+      active: { variant: "success-soft", labelKey: "serviceVersions.nameReview.status.active" },
+      rejected: { variant: "default-soft", labelKey: "serviceVersions.nameReview.status.rejected" },
+    },
+  },
+
   // Alerts: scheduled vs real-time vs anomaly — distinct colour + icon.
   alertType: {
     mode: "icon",
@@ -1263,6 +1327,8 @@ export const BADGE_GROUPS = {
       container: { variant: "error-soft" },
       application: { variant: "amber-soft" },
       app: { variant: "amber-soft" },
+      where: { variant: "default-soft" },
+      version: { variant: "indigo-soft" },
     },
   },
 

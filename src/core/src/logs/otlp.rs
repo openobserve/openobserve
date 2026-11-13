@@ -1934,7 +1934,12 @@ mod tests {
     #[tokio::test]
     async fn otlp_refuses_feature_writer_streams_for_every_caller() {
         use config::meta::self_reporting::usage::is_feature_writer_stream;
-        for stream in ["_o2_alert_calibration_digests", "_o2_autoobserve_health"] {
+        for stream in [
+            "_o2_alert_calibration_digests",
+            "_o2_autoobserve_health",
+            "_o2_service_verdicts",
+            "_o2_service_requests_total",
+        ] {
             let err = handle_request(
                 0,
                 "demo-org",

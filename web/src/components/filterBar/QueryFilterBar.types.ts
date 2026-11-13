@@ -34,6 +34,13 @@ import type {
 
 export type FilterBarExtraRow = Omit<ChipInputSuggestion, "section" | "selected">;
 
+/** A stored value's display name; the value itself is still what is saved and shown in the chip. */
+export interface FilterValueLabel {
+  label: string;
+  /** Secondary text on the value row's end edge. */
+  detail?: I18nText;
+}
+
 /** Rows from the host, not filters; each picks through `extra-select` with its own key. */
 export interface FilterBarExtraSection {
   title: I18nText;
@@ -63,6 +70,8 @@ export interface QueryFilterBarProps {
   issues?: FilterIssue[];
   /** A soft warning for a chip's value, e.g. one not seen in recent data. */
   valueHint?: (field: string, values: string[]) => I18nText | undefined;
+  /** A display name for a stored value: its value row reads as the label, and a vertical row shows it beside the chip. */
+  valueLabel?: (field: string, value: string) => FilterValueLabel | undefined;
   fieldsLoading?: boolean;
   placeholder?: I18nText;
   disabled?: boolean;
@@ -154,6 +163,7 @@ export interface FilterBarCaretSlotProps {
 export interface FilterBarChipContext {
   fieldLabel: (field: string) => string | undefined;
   valueHint: (field: string, values: string[]) => I18nText | undefined;
+  valueLabel?: (field: string, value: string) => FilterValueLabel | undefined;
   issueMessage: (nodeId: string) => I18nText | undefined;
   operatorName: (id: FilterOperatorId) => I18nText;
 }

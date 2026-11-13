@@ -149,6 +149,7 @@ import { useRoute } from "vue-router";
 import RenderDashboardCharts from "@/views/Dashboards/RenderDashboardCharts.vue";
 import overviewDashboard from "@/utils/rum/overview.json";
 import useRumPerformanceTab, { rangeFromPage } from "@/composables/rum/useRumPerformanceTab";
+import { useDeployMarkerClicks } from "@/composables/dashboard/deployMarkerScope";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -232,6 +233,7 @@ export default defineComponent({
     watch(nextDashboard, (next) => {
       if (!isEqual(next, renderedDashboard.value)) renderedDashboard.value = next;
     });
+    useDeployMarkerClicks(() => renderedDashboard.value);
     const overviewDateTime = pageRange;
     const overviewPicker = computed(() => props.selectedDate);
     const retrySchema = () => {

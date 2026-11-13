@@ -117,7 +117,14 @@
       "traces-15477-open-trace-new-tab.spec.js",
       "traces-ent3126-dag-controls-dark.spec.js",
       "traces-1578-apply-search-same-field.spec.js",
-      "traces-3126-catalog-health-badge.spec.js"
+      "traces-3126-catalog-health-badge.spec.js",
+      "traces-14760-auto-run-off.spec.js",
+      "traces-2693-span-kind-display.spec.js",
+      "traces-15973-trace-graph-views.spec.js",
+      "traces-11145-row-date.spec.js",
+      "traces-12213-cross-linking-tab.spec.js",
+      "traces-ent1272-share-link-stream.spec.js",
+      "traces-ent1740-dag-label-overflow.spec.js"
     ],
     "disabled": []
   },
@@ -198,11 +205,14 @@
   },
   {
     "testfolder": "SLO-Regression",
+    "_comment": "Pinned to 3 workers like the SLO shard: at 5 the concurrent SLO/folder writes trip SQLite's 'database is locked' on the single-node meta store.",
     "actual_folder": "RegressionSet/SLO",
     "browser": "chrome",
+    "workers": 3,
     "run_files": [
       "slo-error-messages.spec.js",
-      "slo-14273-form-overlay-exclusivity.spec.js"
+      "slo-14273-form-overlay-exclusivity.spec.js",
+      "slo-16546-import.spec.js"
     ],
     "disabled": []
   },

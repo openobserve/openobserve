@@ -6,6 +6,7 @@ import { createRouter, createMemoryHistory } from "vue-router";
 import { createStore } from "vuex";
 import { createI18n } from "vue-i18n";
 import ONavGroup from "./ONavGroup.vue";
+import buildConfig from "@/aws-exports";
 import type { SubnavChild } from "./ONavbar.types";
 import { NAV_GROUPS } from "./navGroups";
 import { AIM_IDLE, aim } from "./hoverIntent";
@@ -85,6 +86,12 @@ const i18n = createI18n({
         pipeline: "Pipelines",
         trialFlyoutNote: "Your trial has ended. Pages with a lock need a plan.",
         trialPageNeedsPlan: "{page} needs a plan",
+        serviceGraph: "Service Graph",
+        onCall: "On-Call",
+        pages: "Pages",
+      },
+      featureLock: {
+        availableInEnterprise: "{feature} is available in OpenObserve Enterprise",
       },
     },
   },
@@ -1351,6 +1358,7 @@ describe("ONavGroup", () => {
         tab: "service-graph",
         gate: "enterprise",
       },
+      { titleKey: "menu.pages", icon: "bell", name: "traces", tab: "pages", gate: "oncall" },
     ];
 
     async function mountLocked(path: string) {
@@ -1392,6 +1400,39 @@ describe("ONavGroup", () => {
       const el = w.get('[data-test="nav-group-item-traces-service-graph-locked"]');
       expect(el.element.tagName).toBe("DIV");
       expect(el.attributes("href")).toBeUndefined();
+      wrapper = w;
+    });
+
+    it("explains the edition lock with a tooltip on the locked child", async () => {
+      const { wrapper: w } = await mountLocked("/traces");
+      const row = w.get('[data-test="nav-group-item-traces-service-graph-locked"]');
+      const tooltip = row.findComponent({ name: "OTooltip" });
+      expect(tooltip.exists()).toBe(true);
+      expect(String(tooltip.props("content"))).toBe(
+        "Service Graph is available in OpenObserve Enterprise",
+      );
+      wrapper = w;
+    });
+
+    it("names the feature, not the row title, in the tooltip and the accessible name", async () => {
+      const { wrapper: w } = await mountLocked("/traces");
+      const row = w.get('[data-test="nav-group-item-traces-pages-locked"]');
+      expect(String(row.findComponent({ name: "OTooltip" }).props("content"))).toBe(
+        "On-Call is available in OpenObserve Enterprise",
+      );
+      expect(row.text()).toContain("On-Call is available in OpenObserve Enterprise");
+      wrapper = w;
+    });
+
+    it("shows the same tooltip on the inline rows in the mobile menu", async () => {
+      mobile.set(true);
+      const { wrapper: w } = await mountLocked("/traces");
+      await w.get('[data-test="tile"]').trigger("click");
+      await flushPromises();
+      const row = w.get('[data-test="nav-group-item-traces-service-graph-locked"]');
+      expect(String(row.findComponent({ name: "OTooltip" }).props("content"))).toBe(
+        "Service Graph is available in OpenObserve Enterprise",
+      );
       wrapper = w;
     });
 
@@ -1594,6 +1635,13 @@ describe("ONavGroup", () => {
   });
 
   describe("license feature state of a child", () => {
+    beforeEach(() => {
+      buildConfig.isEnterprise = "true";
+    });
+    afterEach(() => {
+      buildConfig.isEnterprise = "false";
+    });
+
     const workflowsChild: SubnavChild = {
       titleKey: "menu.workflows",
       icon: "schema",
@@ -1642,6 +1690,16 @@ describe("ONavGroup", () => {
       await hoverOpen();
       return router;
     }
+
+    it("on an OSS build names the missing edition, not a licence, in the tooltip and screen-reader text", async () => {
+      buildConfig.isEnterprise = "false";
+      await mountWithFeature("locked");
+      const item = flyout().get('[data-test="nav-group-item-workflows-license-lock"]');
+      expect(item.find(".sr-only").text()).toBe("workflows is available in OpenObserve Enterprise");
+      expect(String(item.findComponent({ name: "OTooltip" }).props("content"))).toBe(
+        "workflows is available in OpenObserve Enterprise",
+      );
+    });
 
     it("shows a locked child as a real link with a gold lock and screen-reader text", async () => {
       const router = await mountWithFeature("locked");

@@ -16,7 +16,10 @@
 use arrow_schema::Schema;
 use config::{
     TIMESTAMP_COL_NAME, get_config,
-    meta::search::{Query, Request, SearchEventType},
+    meta::{
+        search::{Query, Request, SearchEventType},
+        service_identity::O2_SERVICE_VERSION,
+    },
     utils::time::now_micros,
 };
 use hashbrown::HashMap;
@@ -28,6 +31,8 @@ use super::{
     response::TraceResponseItem,
 };
 use crate::{common::utils::http::get_use_cache_from_request, traces::schema_compat};
+
+const ROOT_SPAN: &str = "(reference_parent_span_id IS NULL OR reference_parent_span_id = '')";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TraceListMode {
@@ -299,6 +304,7 @@ impl TraceSort {
 pub struct TraceColumns {
     has_ref_parent_id: bool,
     pub has_inferred_service: bool,
+    has_service_version: bool,
 }
 
 impl TraceColumns {
@@ -310,6 +316,8 @@ impl TraceColumns {
                 s.field_with_name(openobserve_core::traces::inferred::INFER_SERVICE_NAME)
                     .is_ok()
             }),
+            has_service_version: schema
+                .is_some_and(|s| s.field_with_name(O2_SERVICE_VERSION).is_ok()),
         }
     }
 
@@ -339,7 +347,25 @@ impl TraceColumns {
              {root_service} AS root_service_name, \
              {root_operation} AS root_operation_name, \
              first_value(service_name ORDER BY {TIMESTAMP_COL_NAME} ASC, end_time DESC) AS first_service_name, \
-             first_value(operation_name ORDER BY {TIMESTAMP_COL_NAME} ASC, end_time DESC) AS first_operation_name"
+             first_value(operation_name ORDER BY {TIMESTAMP_COL_NAME} ASC, end_time DESC) AS first_operation_name{}",
+            self.version_selects()
+        )
+    }
+
+    // A stream without the stamped column selects nothing extra, so the query never fails on it.
+    fn version_selects(&self) -> String {
+        if !self.has_service_version {
+            return String::new();
+        }
+        let root = if self.has_ref_parent_id {
+            format!(
+                ", first_value(CASE WHEN {ROOT_SPAN} THEN {O2_SERVICE_VERSION} END ORDER BY CASE WHEN {ROOT_SPAN} THEN 0 ELSE 1 END ASC, service_name DESC, {O2_SERVICE_VERSION} DESC NULLS LAST) AS root_service_version"
+            )
+        } else {
+            String::new()
+        };
+        format!(
+            "{root}, first_value({O2_SERVICE_VERSION} ORDER BY {TIMESTAMP_COL_NAME} ASC, end_time DESC) AS first_service_version"
         )
     }
 }
@@ -647,5 +673,95 @@ mod tests {
             };
             assert!(plan.sql("traces").contains(expected));
         }
+    }
+
+    #[test]
+    fn service_version_is_selected_only_when_the_stream_has_it() {
+        let stamped = Schema::new(vec![
+            Field::new("reference_parent_span_id", DataType::Utf8, true),
+            Field::new(O2_SERVICE_VERSION, DataType::Utf8, true),
+        ]);
+        let plan = |schema: Option<&Schema>| TraceListPlan {
+            options: TraceListOptions::parse(&query(), TraceListMode::Complete).unwrap(),
+            sort: TraceSort::parse(&query()).unwrap(),
+            columns: TraceColumns::from_schema(schema),
+            llm_schema: None,
+            mode: TraceListMode::Complete,
+        };
+        let sql = plan(Some(&stamped)).sql("traces");
+        assert!(sql.contains("THEN o2_service_version END ORDER BY"));
+        assert!(sql.contains("AS root_service_version"));
+        assert!(sql.contains("first_value(o2_service_version ORDER BY"));
+        let bare = Schema::new(vec![Field::new(
+            "reference_parent_span_id",
+            DataType::Utf8,
+            true,
+        )]);
+        for schema in [Some(&bare), None] {
+            assert!(!plan(schema).sql("traces").contains(O2_SERVICE_VERSION));
+        }
+    }
+
+    #[tokio::test]
+    async fn root_version_comes_from_the_span_that_names_the_root_service() {
+        use std::sync::Arc;
+
+        use datafusion::{
+            arrow::{
+                array::{ArrayRef, Int64Array, StringArray},
+                record_batch::RecordBatch,
+                util::display::array_value_to_string,
+            },
+            datasource::MemTable,
+            prelude::SessionContext,
+        };
+
+        let text = |name: &str| Field::new(name, DataType::Utf8, true);
+        let number = |name: &str| Field::new(name, DataType::Int64, true);
+        let schema = Arc::new(Schema::new(vec![
+            text("trace_id"),
+            text("service_name"),
+            text("operation_name"),
+            text("reference_parent_span_id"),
+            text(O2_SERVICE_VERSION),
+            text("span_status"),
+            number(TIMESTAMP_COL_NAME),
+            number("end_time"),
+            number("duration"),
+        ]));
+        let strings =
+            |values: [Option<&str>; 3]| Arc::new(StringArray::from(values.to_vec())) as ArrayRef;
+        let numbers = |values: [i64; 3]| Arc::new(Int64Array::from(values.to_vec())) as ArrayRef;
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                strings([Some("t1"); 3]),
+                strings([Some("Api"), Some("Worker"), Some("Db")]),
+                strings([Some("GET"), Some("run"), Some("query")]),
+                strings([None, Some(""), Some("p1")]),
+                strings([Some("v9"), Some("v1"), Some("v5")]),
+                strings([Some("OK"); 3]),
+                numbers([1, 2, 3]),
+                numbers([4, 5, 6]),
+                numbers([7, 8, 9]),
+            ],
+        )
+        .unwrap();
+        let ctx = SessionContext::new();
+        let table = MemTable::try_new(schema.clone(), vec![vec![batch]]).unwrap();
+        ctx.register_table("traces", Arc::new(table)).unwrap();
+        let columns = TraceColumns::from_schema(Some(schema.as_ref()));
+        let sql = format!(
+            "SELECT {} FROM traces GROUP BY trace_id",
+            columns.aggregate_selects()
+        );
+        let batches = ctx.sql(&sql).await.unwrap().collect().await.unwrap();
+        let pick = |name: &str| {
+            array_value_to_string(batches[0].column_by_name(name).unwrap(), 0).unwrap()
+        };
+        assert_eq!(
+            (pick("root_service_name"), pick("root_service_version")),
+            ("Worker".to_string(), "v1".to_string())
+        );
     }
 }

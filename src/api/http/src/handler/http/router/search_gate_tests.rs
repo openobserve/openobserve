@@ -22,7 +22,7 @@ use super::*;
 
 /// Every route `search_routes_with` registers, as (method, template, handler).
 #[rustfmt::skip]
-const GATED: [(&str, &str, &str); 49] = [
+const GATED: [(&str, &str, &str); 50] = [
     ("POST", "/{org_id}/_search_multi", "search::multi_streams::search_multi"),
     ("POST", "/{org_id}/_search_multi_stream", "search::multi_streams::search_multi_stream"),
     ("POST", "/{org_id}/_search_partition_multi", "search::multi_streams::_search_partition_multi"),
@@ -50,6 +50,7 @@ const GATED: [(&str, &str, &str); 49] = [
     ("GET", "/{org_id}/db_monitoring/instances", "db_monitoring::handler::get_dbm_instances"),
     ("GET", "/{org_id}/db_monitoring/instance_metrics", "db_monitoring::handler::get_dbm_instance_metrics"),
     ("GET", "/{org_id}/db_monitoring/badges", "db_monitoring::handler::get_dbm_badges"),
+    ("POST", "/{org_id}/service_versions/compare", "service_versions::compare"),
     ("POST", "/{org_id}/anomaly_detection/{config_id}/train", "anomaly_detection::train_model"),
     ("POST", "/{org_id}/anomaly_detection/{config_id}/detect", "anomaly_detection::detect_anomalies"),
     ("POST", "/{org_id}/search_jobs", "search::search_job::submit_job"),
@@ -269,14 +270,14 @@ const BACKGROUND_SEARCH_FNS: [(&str, Option<&str>); 10] = [
     ),
 ];
 
-const SEARCH_ENTRY: &str = r"\b(?:\w+::)*(?:search|search_service|SearchService|core_promql|promql_service)::(?:(?:cache|search)::)?(?:search|search_multi|search_partition|search_partition_multi)\(|\bgrpc_search(?:_partition)?\(|process_search_stream_request(?:_multi)?\(|eval_jobs::search::execute|execute_training_query\(";
+const SEARCH_ENTRY: &str = r"\b(?:\w+::)*(?:search|search_service|SearchService|core_promql|promql_service)::(?:(?:cache|search)::)?(?:search|search_request|search_multi|search_partition|search_partition_multi)\(|\bgrpc_search(?:_partition)?\(|process_search_stream_request(?:_multi)?\(|eval_jobs::search::execute|execute_training_query\(";
 
 /// A `use` that brings a search entry fn into scope, so calls name it bare.
-const SEARCH_IMPORT: &str = r"\buse [^;]*\b(?:search|search_service|SearchService|promql_service::search)::(search|search_multi|search_partition|search_partition_multi)(?:\s+as\s+(\w+))?\b[^;]*;";
+const SEARCH_IMPORT: &str = r"\buse [^;]*\b(?:search|search_service|SearchService|promql_service::search)::(search|search_request|search_multi|search_partition|search_partition_multi)(?:\s+as\s+(\w+))?\b[^;]*;";
 
 /// Every production fn that calls a search entry point, as (file, fn), and how it is licence-gated.
 #[rustfmt::skip]
-const SEARCH_CALLERS: [(&str, &str, Caller); 75] = [
+const SEARCH_CALLERS: [(&str, &str, Caller); 78] = [
     ("api/management/src/request/alert_calibration/digests.rs", "search_at", Caller::Operational),
     ("api/management/src/request/alerts/history.rs", "get_alert_history", Caller::Exempt("the org's own alert and anomaly run history; its routes stay open")),
     ("api/management/src/request/alerts/history.rs", "get_all_anomaly_history", Caller::Exempt("the org's own alert and anomaly run history; its routes stay open")),
@@ -342,6 +343,9 @@ const SEARCH_CALLERS: [(&str, &str, Caller); 75] = [
     ("core/src/public_dashboards/mod.rs", "publish_estimate", Caller::Helper("public dashboard builds; request/public_dashboards/public.rs checks the licence before any read")),
     ("core/src/public_dashboards/mod.rs", "sql", Caller::Helper("public dashboard builds; request/public_dashboards/public.rs checks the licence before any read")),
     ("core/src/self_reporting/search.rs", "get_usage", Caller::Exempt("licence usage from the meta org")),
+    ("core/src/service_identity/signals/metrics.rs", "range", Caller::Helper("version compare arms and RUM vitals; service_versions::compare is in the gated group, deploy detection and verdict ticks call it in the background")),
+    ("core/src/service_identity/signals/processor.rs", "query", Caller::Background("service version deploy detection and verdict ticks")),
+    ("core/src/service_identity/signals/rum_drill.rs", "hits", Caller::Routed("service_versions::compare")),
     ("core/src/slo/job.rs", "prom_search", Caller::Background("SLO job")),
     ("core/src/slo/job.rs", "search", Caller::Background("SLO job")),
     ("core/src/slo/reconcile.rs", "search_slices_page", Caller::Background("SLO reconcile")),

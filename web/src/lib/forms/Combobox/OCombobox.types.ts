@@ -5,6 +5,9 @@ import type { I18nText } from "@/types/i18n";
 export interface ComboboxOption {
   label: I18nText;
   value: string;
+  description?: I18nText;
+  /** Extra text the filter matches besides the label, e.g. the stored key behind a display name. */
+  searchText?: string;
 }
 
 export interface ComboboxProps {

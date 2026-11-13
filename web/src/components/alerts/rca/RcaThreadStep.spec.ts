@@ -13,8 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it } from "vitest";
-import { mount } from "@vue/test-utils";
+import { describe, expect, it, vi } from "vitest";
+import { flushPromises, mount } from "@vue/test-utils";
 import i18n from "@/locales";
 import RcaThreadStep from "./RcaThreadStep.vue";
 import { rcaStep, rcaToolCall } from "@/test/unit/fixtures/rcaThread";
@@ -24,15 +24,22 @@ const mountStep = (
   step: RcaStep,
   runLive = false,
   evidenceNumbers: Map<string, number> | null = null,
+  extra: Record<string, unknown> = {},
 ) =>
   mount(RcaThreadStep, {
-    props: { step, runLive, evidenceNumbers },
+    props: { step, runLive, evidenceNumbers, ...extra },
     global: { plugins: [i18n] },
   });
 
+/** Opens the step's note, the way a reader does. */
+const openNote = async (wrapper: ReturnType<typeof mountStep>) => {
+  await wrapper.get('[data-test="rca-thread-step-note-toggle"]').trigger("click");
+  return wrapper;
+};
+
 describe("RcaThreadStep (02 TH38)", () => {
-  it("shows title, UTC time, the note with citation chips, and the calls line", () => {
-    const wrapper = mountStep(rcaStep());
+  it("shows title, UTC time, the note with citation chips, and the calls line", async () => {
+    const wrapper = await openNote(mountStep(rcaStep()));
 
     expect(wrapper.find('[data-test="rca-thread-step-title"]').text()).toBe(
       "Load incident context",
@@ -118,24 +125,116 @@ describe("RcaThreadStep (02 TH38)", () => {
     expect(wrapper.find('[data-test="rca-thread-step-calls-toggle"]').exists()).toBe(false);
   });
 
+  it("folds a finished step's note behind Note, and Hide note folds it again", async () => {
+    const wrapper = mountStep(rcaStep());
+    const toggle = wrapper.get('[data-test="rca-thread-step-note-toggle"]');
+
+    expect(wrapper.find('[data-test="rca-thread-step-note"]').exists()).toBe(false);
+    expect(toggle.text()).toBe("Note");
+    await toggle.trigger("click");
+    expect(wrapper.find('[data-test="rca-thread-step-note"]').exists()).toBe(true);
+    expect(toggle.text()).toBe("Hide note");
+    expect(toggle.attributes("aria-expanded")).toBe("true");
+  });
+
+  it.each([
+    ["folds when the step completes", 0, false],
+    ["stays open when the reader opened it", 2, true],
+  ])("a running step's note %s", async (_case, clicks, open) => {
+    const wrapper = mountStep(rcaStep({ ended_at: null }), true);
+    for (let i = 0; i < clicks; i++) await openNote(wrapper);
+    expect(wrapper.find('[data-test="rca-thread-step-note"]').exists()).toBe(true);
+    await wrapper.setProps({ step: rcaStep() });
+    expect(wrapper.find('[data-test="rca-thread-step-note"]').exists()).toBe(open);
+  });
+
+  it.each([
+    ["mounted as", true],
+    ["that becomes", false],
+  ])(
+    "a step %s the conclusion shows under its label, cut at three lines with Show more as its width changes",
+    async (_case, atMount) => {
+      const observers: ResizeObserverCallback[] = [];
+      vi.stubGlobal(
+        "ResizeObserver",
+        class {
+          constructor(callback: ResizeObserverCallback) {
+            observers.push(callback);
+          }
+          observe() {}
+          disconnect() {}
+        },
+      );
+      let height = 90;
+      Object.defineProperty(HTMLElement.prototype, "scrollHeight", {
+        configurable: true,
+        get: () => height,
+      });
+      Object.defineProperty(HTMLElement.prototype, "clientHeight", {
+        configurable: true,
+        get: () => 60,
+      });
+      const resize = async (to: number) => {
+        height = to;
+        observers.forEach((callback) => callback([], {} as ResizeObserver));
+        await flushPromises();
+      };
+      const wrapper = mountStep(rcaStep(), false, null, { conclusion: atMount });
+      await flushPromises();
+      await wrapper.setProps({ conclusion: true });
+      await flushPromises();
+      const toggle = () => wrapper.find('[data-test="rca-thread-conclusion-toggle"]');
+
+      expect(wrapper.find('[data-test="rca-thread-step-note-toggle"]').exists()).toBe(false);
+      expect(wrapper.get('[data-test="rca-thread-conclusion"]').text()).toContain("Conclusion");
+      await resize(60);
+      expect(toggle().exists()).toBe(false);
+      await resize(90);
+      expect(toggle().attributes("aria-expanded")).toBe("false");
+      await toggle().trigger("click");
+      expect(toggle().attributes("aria-expanded")).toBe("true");
+      wrapper.unmount();
+      vi.unstubAllGlobals();
+      Reflect.deleteProperty(HTMLElement.prototype, "scrollHeight");
+      Reflect.deleteProperty(HTMLElement.prototype, "clientHeight");
+    },
+  );
+
+  it("a conclusion step lists its tool calls under the title, above the conclusion", () => {
+    const wrapper = mountStep(rcaStep(), false, null, { conclusion: true });
+    const html = wrapper.html();
+    expect(html.indexOf('data-test="rca-thread-step-calls-toggle"')).toBeGreaterThan(-1);
+    expect(html.indexOf('data-test="rca-thread-step-calls-toggle"')).toBeLessThan(
+      html.indexOf('data-test="rca-thread-conclusion"'),
+    );
+  });
+
+  it("markdown headings in a note render as bold lines, never as raw hashes", async () => {
+    const wrapper = await openNote(
+      mountStep(rcaStep({ note: "## Summary of findings\nAll blocked.", citations: [] })),
+    );
+    const note = wrapper.get('[data-test="rca-thread-step-note"]');
+
+    expect(note.text()).not.toContain("#");
+    expect(note.find("strong").text()).toBe("Summary of findings");
+  });
+
   describe("evidence numbers (03 VE24, VE30; F9)", () => {
-    it("a verified id shows its entry number and opens it; an unknown id shows 'e7 · not verified'", async () => {
-      const wrapper = mountStep(rcaStep(), false, new Map([["e3", 4]]));
+    it("a verified id shows its entry number and opens it; an unknown id shows 'not verified'", async () => {
+      const wrapper = await openNote(mountStep(rcaStep(), false, new Map([["e3", 4]])));
 
       const chips = wrapper.findAll('[data-test="rca-citation-chip"]');
       expect(chips.map((chip) => chip.text())).toEqual(["4"]);
       expect(chips[0].element.tagName).toBe("BUTTON");
       expect(chips[0].attributes("aria-label")).toBe("Open evidence 4");
-      expect(wrapper.find('[data-test="rca-citation-unverified"]').text()).toBe(
-        "e7 · not verified",
-      );
+      expect(wrapper.find('[data-test="rca-citation-unverified"]').text()).toBe("not verified");
 
       await chips[0].trigger("click");
       expect(wrapper.emitted("open-evidence")).toEqual([[4]]);
     });
 
-    it("with no summary the chips show the raw ids and are not buttons", () => {
-      const wrapper = mountStep(rcaStep());
+    it("with no summary the chips show the raw ids and are not buttons", async () => {
+      const wrapper = await openNote(mountStep(rcaStep()));
 
       const chips = wrapper.findAll('[data-test="rca-citation-chip"]');
       expect(chips.map((chip) => chip.element.tagName)).toEqual(["SPAN", "SPAN"]);
@@ -143,12 +242,14 @@ describe("RcaThreadStep (02 TH38)", () => {
     });
   });
 
-  it("inline markdown in a note renders as marks; HTML and links stay text (no injection)", () => {
-    const wrapper = mountStep(
-      rcaStep({
-        note: '**Pool full** <img src=x onerror="alert(1)"> see [logs](https://evil.example) `n=100`',
-        citations: [],
-      }),
+  it("inline markdown in a note renders as marks; HTML and links stay text (no injection)", async () => {
+    const wrapper = await openNote(
+      mountStep(
+        rcaStep({
+          note: '**Pool full** <img src=x onerror="alert(1)"> see [logs](https://evil.example) `n=100`',
+          citations: [],
+        }),
+      ),
     );
     const note = wrapper.find('[data-test="rca-thread-step-note"]');
 

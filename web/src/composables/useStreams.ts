@@ -305,10 +305,9 @@ const useStreams = (t: TranslateFn) => {
                 const _stream: any = await (prefetched ??
                   StreamService.schema(org, streamName, streamType));
                 const fetched = removeSchemaFields(_stream.data);
-                if (store.state.selectedOrganization.identifier !== org) return resolve(fetched);
-                const streamList = deepCopy(streamsCache[streamType].value || {});
-                streamList.list[streamIndex] = fetched;
-                updateStreamsInStore(streamType, streamList);
+                if (!storeFetchedSchema(org, streamType, streamName, fetched)) {
+                  return resolve(fetched);
+                }
               } catch (err: any) {
                 return reject(
                   withResponse(
@@ -322,7 +321,8 @@ const useStreams = (t: TranslateFn) => {
                 );
               }
             }
-            return resolve(streamsCache[streamType].value?.list[streamIndex] || {});
+            const currentIndex = store.state.streams.streamsIndexMapping[streamType]?.[streamName];
+            return resolve(streamsCache[streamType].value?.list[currentIndex] || {});
           } else {
             // Stream not found in cache - reject with proper Error object
             // await StreamService.schema(
@@ -408,15 +408,10 @@ const useStreams = (t: TranslateFn) => {
 
             // If schema is requested but not present, fetch and update it.
             if (schema && !hasSchema) {
-              const fetchedStream = await StreamService.schema(
-                store.state.selectedOrganization.identifier,
-                streamName,
-                streamType,
-              );
-
-              const streamList = deepCopy(streamsCache[streamType].value || {});
-              streamList.list[streamIndex] = removeSchemaFields(fetchedStream.data);
-              updateStreamsInStore(streamType, streamList);
+              const org = store.state.selectedOrganization.identifier;
+              const fetchedStream = await StreamService.schema(org, streamName, streamType);
+              const fetched = removeSchemaFields(fetchedStream.data);
+              if (!storeFetchedSchema(org, streamType, streamName, fetched)) return fetched;
             }
           }
 
@@ -441,6 +436,18 @@ const useStreams = (t: TranslateFn) => {
       streamData.schema = streamData.schema.filter((field: any) => !isRemoved(field));
     }
     return streamData;
+  }
+
+  // The list can be replaced while a schema read is in flight (org switch or refetch), so the write re-checks the org and re-reads the index.
+  function storeFetchedSchema(org: string, streamType: string, streamName: string, data: any) {
+    const index = store.state.streams.streamsIndexMapping[streamType]?.[streamName];
+    const list = streamsCache[streamType].value;
+    if (store.state.selectedOrganization.identifier !== org || index === undefined || !list?.list)
+      return false;
+    const streamList = deepCopy(list);
+    streamList.list[index] = data;
+    updateStreamsInStore(streamType, streamList);
+    return true;
   }
 
   const isStreamFetched = (streamType: string) => {

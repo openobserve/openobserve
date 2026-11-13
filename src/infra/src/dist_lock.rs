@@ -22,6 +22,12 @@ enum LockerStore {
 }
 
 impl Locker {
+    pub async fn owned_revision(&self) -> Result<u64> {
+        match &self.0 {
+            LockerStore::Nats(locker) => locker.owned_revision().await,
+        }
+    }
+
     pub fn key(&self) -> String {
         match self.0 {
             LockerStore::Nats(ref locker) => locker.key.clone(),
