@@ -13,6 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { ref } from "vue";
+import type { RouteRecordNameGeneric } from "vue-router";
+
+/** True while an org switch is leaving an org-scoped page, so editor guards treat the leave as forced. */
+export const orgSwitchPending = ref(false);
+
 /** Detail and edit routes whose id belongs to one org, mapped to the list route to land on after an org switch. */
 const ORG_SCOPED_DETAIL_ROUTES: Record<string, string> = {
   viewDashboard: "dashboards",
@@ -29,7 +35,8 @@ const ORG_SCOPED_DETAIL_ROUTES: Record<string, string> = {
   editGroup: "groups",
   editRole: "roles",
   incidentDetail: "incidentList",
-  workflowEditor: "workflows",
+  onCallResponseDetail: "onCallResponses",
+  onCallTeamDetail: "onCallTeams",
   workflowRuns: "workflows",
   traceDetails: "traces",
   "synthetics-edit": "synthetics",
@@ -42,7 +49,7 @@ const ORG_SCOPED_DETAIL_ROUTES: Record<string, string> = {
 
 /** The list route to leave for on an org switch, or null when the current page is not tied to an org-scoped id. */
 export const orgSwitchListRoute = (
-  routeName: unknown,
+  routeName: RouteRecordNameGeneric,
   query: Record<string, unknown> = {},
 ): string | null => {
   const name = String(routeName ?? "");

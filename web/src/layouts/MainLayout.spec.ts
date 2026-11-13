@@ -2316,7 +2316,7 @@ describe("license search banner mount", () => {
   });
 });
 
-describe("MainLayout — org switch on a dashboard route", () => {
+describe("MainLayout — org switch on an org-scoped page", () => {
   const StubDiv = defineComponent({ name: "StubDiv", setup: () => () => h("div") });
   const switchOrgAt = async (
     routeName: string,

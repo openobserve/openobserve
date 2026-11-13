@@ -324,7 +324,7 @@ import {
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
 import { useRoute, useRouter, RouterView, isNavigationFailure } from "vue-router";
-import { orgSwitchListRoute } from "@/utils/orgScopedRoutes";
+import { orgSwitchListRoute, orgSwitchPending } from "@/utils/orgScopedRoutes";
 import { solutionModeForPath } from "@/utils/security/solutionMode";
 import { useSecurityAccess } from "@/composables/security/useSecurityAccess";
 import config from "../aws-exports";
@@ -1335,10 +1335,12 @@ export default defineComponent({
       if (listRoute) {
         if (orgIdentifier === store.state.selectedOrganization?.identifier) return;
         // leave before anything resets: the page's id is org-scoped and would fail to load in the new org
-        const failure = await router.push({
-          name: listRoute,
-          query: { org_identifier: orgIdentifier },
-        });
+        orgSwitchPending.value = true;
+        const failure = await router
+          .replace({ name: listRoute, query: { org_identifier: orgIdentifier } })
+          .finally(() => {
+            orgSwitchPending.value = false;
+          });
         if (isNavigationFailure(failure)) {
           // the leave was blocked (e.g. the unsaved-changes prompt was declined), so the user stays in the current org
           selectedOrg.value = { ...store.state.selectedOrganization };
