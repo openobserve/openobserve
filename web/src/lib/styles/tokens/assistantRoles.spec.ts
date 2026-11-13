@@ -22,7 +22,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { PREDEFINED_THEMES } from "@/constants/themes";
 import { ASSISTANT_ROLE_TOKENS, applyThemeColors } from "@/utils/theme";
 
-import { composite, contrastRatio, resolveColor, resolveTokens } from "./colorMath";
+import { composite, contrastRatio, parseColor, resolveColor, resolveTokens } from "./colorMath";
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -135,6 +135,21 @@ describe("assistant colour roles", () => {
   it.each(["light", "dark"] as const)("reads at AA from the shipped sheets alone in %s", (mode) => {
     expect(failures(THEMES[mode])).toEqual([]);
   });
+
+  it.each(["light", "dark"] as const)(
+    "keeps every stop of Home's focus ribbon and its resting edge at 3:1 in %s",
+    (mode) => {
+      const scope = THEMES[mode];
+      const page = resolveColor("--color-surface-base", scope)!;
+      const stops = scope.get("--color-gradient-brand-ribbon-focus")?.match(/#[0-9a-f]{6}/gi) ?? [];
+      expect(stops).toHaveLength(3);
+      for (const stop of stops)
+        expect(contrastRatio(parseColor(stop)!, page)).toBeGreaterThanOrEqual(NON_TEXT_MIN);
+      expect(ratio(scope, "--color-input-border", "--color-surface-base")).toBeGreaterThanOrEqual(
+        NON_TEXT_MIN,
+      );
+    },
+  );
 
   it("drops the inline roles when the default theme takes over", () => {
     applyThemeColors("#3f7994", "light", false);

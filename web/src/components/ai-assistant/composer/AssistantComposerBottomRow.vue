@@ -18,14 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     :class="[
       'flex min-w-0 flex-wrap items-center gap-x-1 gap-y-1',
-      divided
-        ? [
-            'relative -mx-2 mt-1 min-h-10 px-2 pt-1.5',
-            plain
-              ? 'border-border-default border-t'
-              : 'before:bg-gradient-brand-ribbon before:absolute before:inset-x-0 before:top-0 before:h-px before:opacity-50 before:content-[\'\']',
-          ]
-        : 'min-h-8',
+      divided ? 'border-border-default relative -mx-2 mt-1 min-h-10 border-t px-2 pt-2' : 'min-h-8',
     ]"
     data-test="assistant-composer-bar"
   >
@@ -44,18 +37,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 // Send, Stop and the dictation Stop are the kit's one round shape; repoGuards allows it only here.
 export const ROUND_ACTION_CLASS = "rounded-full";
+
+// An idle Send reads as neutral, not as a half-lit primary; the arrow keeps 3:1 on the fill in both themes.
+export const SEND_ACTION_CLASS = `${ROUND_ACTION_CLASS} aria-disabled:bg-surface-subtle! aria-disabled:text-text-secondary!`;
 </script>
 
 <script setup lang="ts">
-withDefaults(
-  defineProps<{
-    /** A thin line above the controls. */
-    divided?: boolean;
-    /** The line is a solid border instead of Home's gradient. */
-    plain?: boolean;
-  }>(),
-  { divided: false, plain: false },
-);
+withDefaults(defineProps<{ /** A thin line above the controls. */ divided?: boolean }>(), {
+  divided: false,
+});
 
 defineSlots<{ agent?: () => unknown; default?: () => unknown }>();
 </script>

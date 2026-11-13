@@ -362,41 +362,36 @@ html.theme-switching *::after {
     }
   }
 }
-@keyframes assistant-border-flow {
-  from {
-    background-position: 0% 50%;
-  }
-  to {
-    background-position: 100% 50%;
-  }
-}
-/* A gradient border that drifts slowly side to side while its field has focus; still under reduced motion. */
-@utility assistant-border-flow {
+/* Home's Ask box: nothing at rest; on focus the ribbon fills the gap round the box and a soft glow fades in once. */
+@utility assistant-focus-glow {
   position: relative;
   isolation: isolate;
-  /* The same gradient, blurred, blooms out from behind the box. */
-  &::before {
+  &::before,
+  &::after {
     content: "";
     position: absolute;
     inset: 0;
     z-index: -1;
     border-radius: inherit;
-    background: inherit;
-    filter: blur(1.25rem);
+    background: var(--color-gradient-brand-ribbon-focus);
     opacity: 0;
-    transition: opacity 0.3s ease-out;
+    transition: opacity 0.2s ease-out;
     pointer-events: none;
   }
-  &:focus-within::before {
-    opacity: 0.5;
+  /* The glow sits under the crisp ring. */
+  &::before {
+    filter: blur(1rem);
   }
-  &:focus-within {
-    background-size: 200% 100%;
-    animation: assistant-border-flow 3.5s ease-in-out infinite alternate;
+  &:focus-within::before {
+    opacity: 0.35;
+  }
+  &:focus-within::after {
+    opacity: 1;
   }
   @media (prefers-reduced-motion: reduce) {
-    &:focus-within {
-      animation: none;
+    &::before,
+    &::after {
+      transition: none;
     }
   }
 }

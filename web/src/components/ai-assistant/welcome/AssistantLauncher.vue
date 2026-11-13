@@ -84,6 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :state="state ?? undefined"
           :disabled="fieldLoading"
           :placeholder="placeholder"
+          placeholder-tone="strong"
           :input-attrs="{
             'aria-label': t('assistant.welcome.launcher.inputName', { product }),
             maxlength: MAX_LAUNCHER_CHARS,
@@ -155,6 +156,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="text"
                 :label="t('assistant.welcome.launcher.clear')"
                 :icon="assistantGlyph.close"
+                size="md"
                 data-test="assistant-launcher-clear"
                 @click="clear"
               />
@@ -172,7 +174,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :label="t('assistant.welcome.launcher.ask')"
                 :icon="assistantGlyph.send"
                 :disabled="!canSend"
-                :class="[ROUND_ACTION_CLASS, layout === 'overview' && canSend && SEND_GLOW_CLASS]"
+                :disabled-reason="fieldLoading ? undefined : t('assistant.composer.sendEmpty')"
+                :class="SEND_ACTION_CLASS"
                 data-test="assistant-launcher-ask"
                 @click="ask(false)"
               />
@@ -329,9 +332,6 @@ export const MAX_LAUNCHER_CHARS = 4_000;
 /** Rows of each column (`70` §2.1). */
 export const LAUNCHER_ROWS = 3;
 
-// Home's Send lights up once there is a line to send.
-const SEND_GLOW_CLASS = "bg-gradient-ai enabled:hover:shadow-md enabled:hover:shadow-ai-accent/40";
-
 /** In-progress chats can sit below the latest ones, so Your chats looks this far down the list. */
 const RECENT_LOOKUP = 20;
 
@@ -420,7 +420,7 @@ import { formatRelativeCompact } from "@/utils/formatters";
 import { getUUIDv7 } from "@/utils/uuid";
 
 import AssistantComposerBottomRow, {
-  ROUND_ACTION_CLASS,
+  SEND_ACTION_CLASS,
 } from "@/components/ai-assistant/composer/AssistantComposerBottomRow.vue";
 import AssistantComposerFrame from "@/components/ai-assistant/composer/AssistantComposerFrame.vue";
 import AssistantComposerPlusMenu, {

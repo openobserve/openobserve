@@ -53,9 +53,9 @@ export interface AssistantComposerFrameProps {
   opening?: boolean;
   /** Attributes for the textarea itself; `class` adds to the frame's own. */
   inputAttrs?: Record<string, string | number | boolean | undefined>;
-  /** Home's Ask box: a gradient border, a larger radius and a soft glow instead of the plain frame. */
+  /** Home's Ask box: a plain edge at rest; on focus a brand ribbon rings the box and a soft glow fades in. */
   glow?: boolean;
-  /** Both composers start three lines tall. */
+  /** Both composers start two lines tall. */
   tall?: boolean;
 }
 
@@ -72,11 +72,11 @@ const FRAME_CLASS = [
   "[&>div]:ring-offset-0 [&>div]:motion-reduce:transition-none [&>div]:focus-within:border-input-border-focus [&>div]:focus-within:ring-1 [&>div]:focus-within:ring-focus-ring-accent",
 ].join(" ");
 
-// A gradient has no border-color form, so the glow frame paints it on the wrapper and its box drops its own border; on focus the gradient drifts and blooms instead of a ring.
+// The box keeps OTextarea's own 3:1 border and takes the focus-ring colour on focus, so the ribbon is never the only focus cue.
 const GLOW_FRAME_CLASS = [
-  "rounded-3xl bg-gradient-brand-ribbon assistant-border-flow p-0.5 transition-shadow duration-200",
-  "focus-within:shadow-ai-focus",
-  "[&>div]:rounded-3xl [&>div]:border-0 [&>div]:gap-0.5 [&>div]:px-2 [&>div]:pt-1.5 [&>div]:pb-2",
+  "rounded-surface assistant-focus-glow p-0.5",
+  "[&>div]:rounded-surface [&>div]:gap-0.5 [&>div]:px-2 [&>div]:pt-1.5 [&>div]:pb-2 [&>div]:motion-reduce:transition-none",
+  "[&>div]:focus-within:border-focus-ring-accent",
 ].join(" ");
 
 const INERT_CLASS = "[&>div]:bg-surface-subtle";
@@ -118,7 +118,7 @@ const textbox = ref<InstanceType<typeof OTextarea> | null>(null);
 
 const fieldAttrs = computed(() => ({
   ...props.inputAttrs,
-  class: [FIELD_CLASS, props.tall ? "min-h-20" : "min-h-6", props.inputAttrs.class ?? ""].join(" "),
+  class: [FIELD_CLASS, props.tall ? "min-h-12" : "min-h-6", props.inputAttrs.class ?? ""].join(" "),
 }));
 
 defineExpose({

@@ -13,11 +13,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+
 import { flushPromises, mount } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { computed } from "vue";
 
 import { contextRegistry } from "@/composables/contextProviders/registry";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OFile from "@/lib/forms/File/OFile.vue";
 import { requestOverviewFocus } from "@/composables/goto/goToRequests";
 
@@ -417,7 +421,11 @@ describe("AssistantLauncher", () => {
     const field = wrapper.get('[data-test="assistant-composer-frame"]');
     expect(field.find('[data-test="assistant-composer-strip"]').exists()).toBe(false);
     const left = field.get('[data-test="assistant-composer-bar-left"]');
-    expect(left.find('[data-test="assistant-context-chip-time"]').exists()).toBe(true);
+    const time = left.get('[data-test="assistant-context-chip-time"]');
+    expect(time.classes()).toContain("h-7");
+    expect(time.findAllComponents(OIcon).map((icon) => icon.props("name"))).toContain(
+      "expand-more",
+    );
     expect(left.find('[data-test="assistant-agent-pill"]').exists()).toBe(false);
     expect(left.findAll("button")[0].attributes("data-test")).toBe("assistant-composer-plus");
     expect(wrapper.findComponent(AssistantComposerPlusMenu).props("actions")).toEqual([
@@ -426,36 +434,72 @@ describe("AssistantLauncher", () => {
     ]);
     expect(wrapper.find('[data-test="assistant-launcher-chip-row"]').exists()).toBe(false);
     const right = field.get('[data-test="assistant-composer-bar-right"]');
-    expect(right.find('[data-test="assistant-launcher-ask"]').classes()).toContain("rounded-full");
+    const ask = right.get('[data-test="assistant-launcher-ask"]');
+    expect(ask.classes()).toEqual(
+      expect.arrayContaining([
+        "rounded-full",
+        "aria-disabled:bg-surface-subtle!",
+        "aria-disabled:text-text-secondary!",
+      ]),
+    );
+    // + and Send share one 2 rem box and one 0.5 rem inset, so they sit on one centre line.
+    expect(left.get('[data-test="assistant-composer-plus"]').attributes("data-size")).toBe("md");
+    expect(ask.attributes("data-size")).toBe("md");
+    expect(field.get('[data-test="assistant-composer-bar"]').classes()).toEqual(
+      expect.arrayContaining(["px-2", "pt-2", "min-h-10"]),
+    );
     expect(wrapper.find('[data-test="assistant-launcher-narrow-tools"]').exists()).toBe(false);
   });
 
-  it("gives Home's field the glow frame and a gradient Send once there is text", async () => {
+  it("rings Home's field with the ribbon only on focus, over a solid edge, and keeps the card plain", async () => {
     const { wrapper } = setupOn({ layout: "overview" });
-    const box = wrapper.get('[data-test="assistant-composer-frame"] > div');
-    expect(box.classes()).toEqual(
-      expect.arrayContaining(["bg-gradient-brand-ribbon", "rounded-3xl", "assistant-border-flow"]),
+    const frame = wrapper.get('[data-test="assistant-composer-frame"] > div');
+    expect(frame.classes()).toEqual(
+      expect.arrayContaining([
+        "assistant-focus-glow",
+        "rounded-surface",
+        "[&>div]:rounded-surface",
+        "[&>div]:focus-within:border-focus-ring-accent",
+      ]),
     );
+    // Nothing paints a gradient at rest; the ribbon lives only in the utility's focus-within layers.
+    expect(frame.classes().some((c) => /gradient|rounded-3xl|border-0/.test(c))).toBe(false);
+    expect(frame.get(":scope > div").classes()).toContain("border-input-border");
+    const card = setup().wrapper.get('[data-test="assistant-composer-frame"] > div');
+    expect(card.classes()).not.toContain("assistant-focus-glow");
+    expect(card.classes()).toContain("[&>div]:focus-within:ring-1");
+    expect(wrapper.get('[data-test="assistant-composer-bar"]').classes()).toContain("border-t");
+    expect(input(wrapper).classes()).toContain("placeholder:text-text-secondary");
     const ask = () => wrapper.get('[data-test="assistant-launcher-ask"]');
-    expect(ask().classes()).not.toContain("bg-gradient-ai");
     await input(wrapper).setValue("why?");
-    expect(ask().classes()).toContain("bg-gradient-ai");
-    const card = setup().wrapper;
-    expect(card.get('[data-test="assistant-composer-frame"] > div').classes()).not.toContain(
-      "bg-gradient-brand-ribbon",
-    );
-    await input(card).setValue("why?");
-    expect(card.get('[data-test="assistant-launcher-ask"]').classes()).not.toContain(
-      "bg-gradient-ai",
-    );
+    expect(
+      ask()
+        .classes()
+        .some((c) => c.includes("gradient")),
+    ).toBe(false);
   });
 
-  it("turns Ask on only with text", async () => {
+  it("fades the focus glow in once, never loops it, and holds it still under reduced motion", () => {
+    const css = readFileSync(resolve(__dirname, "../../../styles/tailwind.css"), "utf8");
+    const start = css.indexOf("@utility assistant-focus-glow {");
+    const rule = css.slice(start, css.indexOf("\n}\n", start));
+    expect(start).toBeGreaterThan(-1);
+    expect(rule).toContain("background: var(--color-gradient-brand-ribbon-focus)");
+    expect(rule).toMatch(/opacity: 0;\s*transition: opacity 0\.2s/);
+    expect(rule).toMatch(/&:focus-within::after \{\s*opacity: 1;/);
+    expect(rule).not.toMatch(/animation|infinite/);
+    expect(rule).toMatch(/prefers-reduced-motion: reduce\)[\s\S]*transition: none/);
+  });
+
+  it("turns Ask on only with text, and says why it is off while it stays reachable", async () => {
     const { wrapper } = setup();
     const ask = () => wrapper.get('[data-test="assistant-launcher-ask"]');
-    expect(ask().attributes("disabled")).toBeDefined();
-    await input(wrapper).setValue("why?");
     expect(ask().attributes("disabled")).toBeUndefined();
+    expect(ask().attributes("aria-disabled")).toBe("true");
+    const reason = wrapper.get(`[id="${ask().attributes("aria-describedby")}"]`);
+    expect(reason.text()).toBe("Type a message or add context to send");
+    await input(wrapper).setValue("why?");
+    expect(ask().attributes("aria-disabled")).toBeUndefined();
   });
 
   it("states a failed list with the same words as the title menu, and retries", async () => {
@@ -567,7 +611,7 @@ describe("AssistantLauncher", () => {
       pick(wrapper, [png("d.png")]);
       await vi.waitFor(() => expect(thumbs(wrapper)).toHaveLength(1));
       expect(
-        wrapper.get('[data-test="assistant-launcher-ask"]').attributes("disabled"),
+        wrapper.get('[data-test="assistant-launcher-ask"]').attributes("aria-disabled"),
       ).toBeUndefined();
       await input(wrapper).trigger("keydown", { key: "Enter" });
       expect(open.mock.calls[2][0].payload).toMatchObject({
