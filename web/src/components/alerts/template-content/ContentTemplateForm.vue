@@ -662,6 +662,7 @@ const ALERT_VARIABLES = [
   "alert_type",
   "alert_status",
   "episode_id",
+  "recovery_reason",
 ];
 const allVariables = computed(() => (props.variables?.length ? props.variables : ALERT_VARIABLES));
 const mostUsedVariables = computed(() => allVariables.value.slice(0, 5));
