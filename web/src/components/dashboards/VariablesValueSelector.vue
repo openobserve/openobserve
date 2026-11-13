@@ -157,7 +157,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import ODate from "@/lib/forms/Date/ODate.vue";
 import { isInvalidDate } from "@/utils/date";
-import { addLabelsToSQlQuery } from "@/utils/query/sqlUtils";
+import { addLabelGroupToSQlQuery, addLabelsToSQlQuery } from "@/utils/query/sqlUtils";
 import { b64EncodeUnicode, escapeSingleQuotes, generateTraceContext } from "@/utils/zincutils";
 import { buildVariablesDependencyGraph } from "@/utils/dashboard/variables/variablesDependencyUtils";
 import {
@@ -166,7 +166,6 @@ import {
   formatDateVariable,
 } from "@/utils/dashboard/variables/variablesUtils";
 import {
-  buildFilterGroupSql,
   expandMultiValueFilter,
   getQueryVariableLanguage,
   getQueryVariableMaxRecords,
@@ -176,6 +175,7 @@ import {
   reconcileQueryVariableValue,
   resolveQueryVariableValue,
   substituteQueryVariables,
+  toSqlLabelGroup,
   usesQueryVariableLoader,
   type QueryVariableOption,
 } from "@/utils/dashboard/variables/queryVariableUtils";
@@ -2225,12 +2225,10 @@ export default defineComponent({
           ? await addLabelsToSQlQuery(dummyQuery, constructedFilter)
           : dummyQuery;
       } else {
-        const where = buildFilterGroupSql(filterGroup, expandFilter);
-        queryContext = !where
-          ? dummyQuery
-          : searchText
-            ? `${dummyQuery} AND (${where})`
-            : `${dummyQuery} WHERE ${where}`;
+        queryContext = await addLabelGroupToSQlQuery(
+          dummyQuery,
+          toSqlLabelGroup(filterGroup, expandFilter),
+        );
       }
 
       // Normalize spaces inside variable syntax before replacement

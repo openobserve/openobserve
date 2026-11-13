@@ -13,10 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { escapeRegExp } from "lodash-es";
 import { CUSTOM_VALUE, SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import { escapeSingleQuotes, splitQuotedString } from "@/utils/zincutils";
 import type { DashboardFilterGroup } from "@/components/filterBar/codecs/dashboardFilterCodec";
-import { joinConditions } from "@/utils/dashboard/dashboardAutoQueryBuilder";
+import type { SqlLabel, SqlLabelGroup } from "@/utils/query/sqlUtils";
 import {
   normalizeVariableSyntax,
   replaceVariablePlaceholders,
@@ -60,7 +61,7 @@ export const PROMQL_FILTER_OPERATORS: readonly string[] = [
 export interface VariableFilterRow {
   name?: string;
   operator?: string;
-  value?: string;
+  value?: string | string[];
 }
 
 export interface QueryVariableData {
@@ -71,7 +72,6 @@ export interface QueryVariableData {
   filter?: VariableFilterRow[] | null;
   filter_group?: DashboardFilterGroup | null;
   query_type?: string;
-  custom_query?: boolean;
   query?: string;
   value_field?: string | null;
   label_field?: string | null;
@@ -118,9 +118,13 @@ const PROM_FUNCTION_REGEX = /^([a-z_]+)\s*\(([\s\S]*)\)$/;
 const OPENING = "([{";
 const CLOSING = ")]}";
 
+/** A saved non-empty `query` is what makes a variable custom; there is no separate flag. */
+export const hasCustomQuery = (queryData?: { query?: string } | null): boolean =>
+  !!queryData?.query?.trim();
+
 /** A query_values variable whose options come from its hand-written query. */
 export const isCustomQueryVariable = (variable?: VariableLike | null): boolean =>
-  variable?.type === "query_values" && variable.query_data?.custom_query === true;
+  variable?.type === "query_values" && hasCustomQuery(variable.query_data);
 
 /** True when options load through the SQL/PromQL query loader rather than the field values stream. */
 export const usesQueryVariableLoader = (variable?: VariableLike | null): boolean =>
@@ -138,36 +142,51 @@ export const getQueryVariableMaxRecords = (variable?: {
   return Number.isFinite(size) && size > 0 ? Math.floor(size) : DEFAULT_QUERY_VARIABLE_MAX_RECORDS;
 };
 
-const promString = (value: string): string =>
-  `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+const escapePromString = (value: string): string =>
+  value.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 
-const promAlternatives = (value: string): string =>
-  (splitQuotedString(value) ?? [])
-    .map((item: string) => item.replace(/^['"]|['"]$/g, ""))
+const promString = (value: string): string => `"${escapePromString(value)}"`;
+
+const PROM_PLACEHOLDER = /(\$\{[^}]*\}|\{\{[^}]*\}\}|\$[a-zA-Z0-9_-]+)/;
+
+// Placeholders stay as written: substitution regex-escapes the values it puts in their place.
+const promRegexLiteral = (value: string): string =>
+  value
+    .split(PROM_PLACEHOLDER)
+    .map((part, index) => (index % 2 ? part : escapeRegExp(part)))
+    .join("");
+
+const promAlternatives = (value: string | string[]): string =>
+  (Array.isArray(value) ? value : (splitQuotedString(value) ?? []))
+    .map((item: string) => promRegexLiteral(item.replace(/^['"]|['"]$/g, "")))
     .join("|");
 
-const promMatcher = (filter: { name?: string; operator?: string; value?: string }): string => {
+const promMatcher = (filter: VariableFilterRow): string => {
   const name = (filter.name ?? "").trim();
   const value = String(filter.value ?? "");
   // A $variable may expand to several values joined by "|", which only a regex matcher accepts.
   const hasVariable = /\$|\{\{/.test(value);
   switch (filter.operator) {
     case "!=":
-      return `${name}${hasVariable ? "!~" : "!="}${promString(value)}`;
+      return hasVariable
+        ? `${name}!~${promString(promRegexLiteral(value))}`
+        : `${name}!=${promString(value)}`;
     case "re_match":
       return `${name}=~${promString(value)}`;
     case "re_not_match":
       return `${name}!~${promString(value)}`;
     case "IN":
-      return `${name}=~${promString(promAlternatives(value))}`;
+      return `${name}=~${promString(promAlternatives(filter.value ?? ""))}`;
     case "NOT IN":
-      return `${name}!~${promString(promAlternatives(value))}`;
+      return `${name}!~${promString(promAlternatives(filter.value ?? ""))}`;
     case "Is Null":
       return `${name}=""`;
     case "Is Not Null":
       return `${name}!=""`;
     default:
-      return `${name}${hasVariable ? "=~" : "="}${promString(value)}`;
+      return hasVariable
+        ? `${name}=~${promString(promRegexLiteral(value))}`
+        : `${name}=${promString(value)}`;
   }
 };
 
@@ -199,9 +218,19 @@ export const getVariableFilterValues = (queryData?: QueryVariableData | null): s
   ...(queryData?.filter_group ? groupLeafValues(queryData.filter_group) : []),
 ];
 
+// An imported filter_group that only ANDs leaves holds the same rows; OR and nesting have no matcher form.
+const promqlFilterRows = (queryData?: QueryVariableData | null): VariableFilterRow[] => {
+  if (!queryData?.filter_group) return queryData?.filter ?? [];
+  const { conditions } = toSqlLabelGroup(queryData.filter_group);
+  const flatAnd = conditions.every(
+    (item, index) => !("conditions" in item) && (index === 0 || item.logicalOperator !== "OR"),
+  );
+  return flatAnd ? (conditions as VariableFilterRow[]) : (queryData.filter ?? []);
+};
+
 /** The `label_values(metric{matchers}, label)` query an auto PromQL variable runs; a PromQL variable saves only AND rows. */
 export const buildAutoPromqlQuery = (queryData?: QueryVariableData | null): string => {
-  const matchers = (queryData?.filter ?? [])
+  const matchers = promqlFilterRows(queryData)
     .filter(
       (filter) =>
         (filter?.name ?? "").trim() && PROMQL_FILTER_OPERATORS.includes(filter.operator ?? ""),
@@ -229,7 +258,7 @@ const SQL_FILTER_FUNCTIONS: Record<string, string> = {
 const SQL_COMPARISONS = ["=", "!=", "<>", "<", ">", "<=", ">="];
 
 // Mirrors addLabelToSQlQuery's operator handling, without waiting for the lazily loaded SQL parser.
-const sqlCondition = (filter: { name?: string; operator?: string; value?: string }): string => {
+const sqlCondition = (filter: VariableFilterRow): string => {
   const column = `"${(filter.name ?? "").trim()}"`;
   const operator = filter.operator ?? "";
   const value = filter.value ?? "";
@@ -249,7 +278,8 @@ const sqlCondition = (filter: { name?: string; operator?: string; value?: string
       return `${column} IS NOT NULL`;
     case "IN":
     case "NOT IN": {
-      const items = (splitQuotedString(value) ?? []).map(sqlString).join(", ");
+      const list = Array.isArray(value) ? value : (splitQuotedString(value) ?? []);
+      const items = list.map(sqlString).join(", ");
       return `${column} ${operator} (${items})`;
     }
     default:
@@ -271,25 +301,48 @@ export const buildFilterRowsSql = (
     .filter(Boolean)
     .join(" AND ");
 
-// The panel builder only reads joins and stream schemas from it; a variable has neither.
-const VARIABLE_PANEL_CONTEXT = {
-  data: { queries: [{ fields: {}, joins: [] }] },
-  layout: { currentQueryIndex: 0 },
-  meta: {},
+// A panel-shaped leaf as the flat row it would be saved as; a list leaf keeps its values as an array.
+const leafToRow = (leaf: any): SqlLabel | null => {
+  const name = typeof leaf?.column === "string" ? leaf.column : (leaf?.column?.field ?? "");
+  const logicalOperator = leaf?.logicalOperator;
+  if (leaf?.type === "list") {
+    const values = (leaf.values ?? []).map(String);
+    return values.length ? { name, operator: "IN", value: values, logicalOperator } : null;
+  }
+  if (leaf?.operator == null) return null;
+  return { name, operator: leaf.operator, value: leaf.value ?? "", logicalOperator };
 };
 
-const mapGroupLeaves = (group: any, mapLeaf: (leaf: any) => any): any => ({
-  ...group,
-  conditions: (group?.conditions ?? []).map((node: any) =>
-    node?.filterType === "group" ? mapGroupLeaves(node, mapLeaf) : mapLeaf(node),
-  ),
+/** A `filter_group` as flat rows in their AND/OR tree; `mapRow` rewrites each row first, e.g. `= $var` to IN. */
+export const toSqlLabelGroup = (
+  group: DashboardFilterGroup,
+  mapRow: (row: SqlLabel) => SqlLabel = (row) => row,
+): SqlLabelGroup => ({
+  logicalOperator: group?.logicalOperator,
+  conditions: (group?.conditions ?? []).flatMap((node: any): (SqlLabel | SqlLabelGroup)[] => {
+    if (node?.filterType === "group") return [toSqlLabelGroup(node, mapRow)];
+    const row = leafToRow(node);
+    return row ? [mapRow(row)] : [];
+  }),
 });
 
-/** The WHERE expression the panel builder writes for a `filter_group`; `mapLeaf` rewrites each leaf first. */
-export const buildFilterGroupSql = (
-  group: DashboardFilterGroup,
-  mapLeaf: (leaf: any) => any = (leaf) => leaf,
-): string => joinConditions(mapGroupLeaves(group, mapLeaf).conditions, VARIABLE_PANEL_CONTEXT);
+const joinSqlLabelGroup = (group: SqlLabelGroup): string =>
+  group.conditions
+    .map((item) => {
+      if (!("conditions" in item))
+        return { item, sql: usableSqlFilter(item) ? sqlCondition(item) : "" };
+      const inner = joinSqlLabelGroup(item);
+      return { item, sql: inner ? `(${inner})` : "" };
+    })
+    .filter(({ sql }) => sql)
+    .map(({ item, sql }, index) =>
+      index ? `${item.logicalOperator === "OR" ? "OR" : "AND"} ${sql}` : sql,
+    )
+    .join(" ");
+
+/** The WHERE text of a `filter_group`, each leaf written as `buildFilterRowsSql` writes its row. */
+export const buildFilterGroupSql = (group: DashboardFilterGroup): string =>
+  joinSqlLabelGroup(toSqlLabelGroup(group));
 
 /** The SQL an auto variable stands for, used to prefill the custom editor. */
 export const buildAutoSqlQuery = (queryData?: QueryVariableData | null): string => {
@@ -439,9 +492,30 @@ const formatSqlValues = (
   }
 };
 
-const formatPromValues = (values: string[], format: VariableFormat | undefined): string => {
+type PromValueContext = "regex" | "string" | "bare";
+
+// A placeholder inside a "…" string after =~ or !~ is a regex; inside any other "…" string, a literal.
+const promContextAt = (text: string, offset: number): PromValueContext => {
+  let open = -1;
+  for (let i = 0; i < offset; i++) {
+    if (text[i] === "\\" && open >= 0) i++;
+    else if (text[i] === '"') open = open >= 0 ? -1 : i;
+  }
+  if (open < 0) return "bare";
+  return /[=!]~\s*$/.test(text.slice(0, open)) ? "regex" : "string";
+};
+
+const formatPromValues = (
+  values: string[],
+  format: VariableFormat | undefined,
+  context: PromValueContext,
+): string => {
   // A regex matcher is the only place an "all" selection can be honoured in PromQL.
-  const resolved = values.map((value) => (value === SELECT_ALL_VALUE ? ".*" : value));
+  const resolved = values.map((value) => {
+    if (value === SELECT_ALL_VALUE) return ".*";
+    const literal = context === "regex" ? escapeRegExp(value) : value;
+    return context === "bare" ? literal : escapePromString(literal);
+  });
   switch (format) {
     case "csv":
       return resolved.join(",");
@@ -473,24 +547,21 @@ export const substituteQueryVariables = (
     }
   }
 
-  return replaceVariablePlaceholders(
-    normalizeVariableSyntax(query),
-    byName.keys(),
-    ({ name, format, quoted }) => {
-      const variable = byName.get(name);
-      if (!variable || variable.isVariablePartialLoaded === false) return undefined;
-      const resolved = resolveQueryVariableValue(variable);
-      const isArray = Array.isArray(resolved);
-      const rawValues: unknown[] = isArray ? resolved : [resolved];
-      const values = rawValues
-        .filter((value) => value !== null && value !== undefined)
-        .map(stripCustomSuffix);
-      if (!values.length) return undefined;
-      return language === "promql"
-        ? formatPromValues(values, format)
-        : formatSqlValues(values, isArray, quoted, format);
-    },
-  );
+  const text = normalizeVariableSyntax(query);
+  return replaceVariablePlaceholders(text, byName.keys(), ({ name, format, quoted, offset }) => {
+    const variable = byName.get(name);
+    if (!variable || variable.isVariablePartialLoaded === false) return undefined;
+    const resolved = resolveQueryVariableValue(variable);
+    const isArray = Array.isArray(resolved);
+    const rawValues: unknown[] = isArray ? resolved : [resolved];
+    const values = rawValues
+      .filter((value) => value !== null && value !== undefined)
+      .map(stripCustomSuffix);
+    if (!values.length) return undefined;
+    return language === "promql"
+      ? formatPromValues(values, format, promContextAt(text, offset))
+      : formatSqlValues(values, isArray, quoted, format);
+  });
 };
 
 const toOptionText = (value: unknown): string | null => {

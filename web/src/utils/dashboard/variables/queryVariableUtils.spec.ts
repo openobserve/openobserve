@@ -19,6 +19,7 @@ import {
   buildAutoPromqlQuery,
   buildAutoSqlQuery,
   buildFilterGroupSql,
+  buildFilterRowsSql,
   expandMultiValueFilter,
   formatPromSeries,
   getQueryVariableLanguage,
@@ -38,19 +39,21 @@ import {
   reconcileQueryVariableValue,
   resolveQueryVariableValue,
   substituteQueryVariables,
+  toSqlLabelGroup,
   usesQueryVariableLoader,
 } from "./queryVariableUtils";
 
 describe("query_values modes", () => {
-  const custom = { type: "query_values", query_data: { custom_query: true } };
+  const custom = { type: "query_values", query_data: { query: "SELECT 1" } };
   const autoSql = { type: "query_values", query_data: { stream: "default", field: "host" } };
   const autoPromql = { type: "query_values", query_data: { query_type: "promql" } };
 
-  it("treats only a query_values variable with custom_query as custom", () => {
+  it("treats only a query_values variable with a non-empty query as custom", () => {
     expect(isCustomQueryVariable(custom)).toBe(true);
+    expect(isCustomQueryVariable({ type: "query_values", query_data: { query: " " } })).toBe(false);
     expect(isCustomQueryVariable(autoSql)).toBe(false);
     expect(isCustomQueryVariable(autoPromql)).toBe(false);
-    expect(isCustomQueryVariable({ type: "custom", query_data: { custom_query: true } })).toBe(
+    expect(isCustomQueryVariable({ type: "custom", query_data: { query: "SELECT 1" } })).toBe(
       false,
     );
     expect(isCustomQueryVariable(undefined)).toBe(false);
@@ -69,7 +72,7 @@ describe("query_values modes", () => {
     expect(
       getQueryVariableQuery({
         type: "query_values",
-        query_data: { custom_query: true, query: "label_names()" },
+        query_data: { query: "label_names()" },
       }),
     ).toBe("label_names()");
     expect(
@@ -128,6 +131,46 @@ describe("buildAutoPromqlQuery", () => {
         ],
       }),
     ).toBe('label_values(up{msg="say \\"hi\\""}, job)');
+  });
+
+  it("regex-escapes literal values it turns into a regex matcher, keeping $variables", () => {
+    expect(
+      buildAutoPromqlQuery({
+        stream: "up",
+        field: "pod",
+        filter: [
+          { name: "host", operator: "IN", value: "c.d, $host" },
+          { name: "zone", operator: "=", value: "eu.$zone" },
+          { name: "path", operator: "re_match", value: "/api/.*" },
+        ],
+      }),
+    ).toBe('label_values(up{host=~"c\\\\.d|$host",zone=~"eu\\\\.$zone",path=~"/api/.*"}, pod)');
+  });
+
+  it("uses the rows of an AND-only filter_group, and only those", () => {
+    const leaf = (field: string, value: string, logicalOperator = "AND") => ({
+      type: "condition" as const,
+      column: { field },
+      filterType: "condition" as const,
+      operator: "=",
+      value,
+      logicalOperator: logicalOperator as "AND" | "OR",
+      values: [],
+    });
+    const grouped = (conditions: any[]) => ({
+      stream: "up",
+      field: "pod",
+      filter_group: { filterType: "group" as const, logicalOperator: "AND" as const, conditions },
+    });
+    expect(buildAutoPromqlQuery(grouped([leaf("env", "prod"), leaf("job", "$job")]))).toBe(
+      'label_values(up{env="prod",job=~"$job"}, pod)',
+    );
+    expect(
+      buildAutoPromqlQuery(grouped([{ ...leaf("env", ""), type: "list", values: ["a", "b.c"] }])),
+    ).toBe('label_values(up{env=~"a|b\\\\.c"}, pod)');
+    expect(buildAutoPromqlQuery(grouped([leaf("env", "prod"), leaf("env", "dev", "OR")]))).toBe(
+      "label_values(up, pod)",
+    );
   });
 
   it("parses back into a label_values lookup scoped by the selector", () => {
@@ -253,21 +296,64 @@ describe("filter_group SQL", () => {
     ],
   };
 
-  it("renders AND/OR and nesting with the panel builder", () => {
-    expect(buildFilterGroupSql(group)).toBe(`env = '$env' AND (svc <> '$svc' OR level = 'error')`);
+  it("renders AND/OR and nesting, each leaf as its flat row", () => {
+    expect(buildFilterGroupSql(group)).toBe(
+      `"env" = '$env' AND ("svc" <> '$svc' OR "level" = 'error')`,
+    );
   });
 
-  it("turns a multi-value $variable leaf into IN / NOT IN before rendering", () => {
+  it("writes an AND group exactly as the same flat rows", () => {
+    const rows = [
+      { name: "k8s-ns", operator: "=", value: "07" },
+      { name: "Level", operator: "IN", value: "$env" },
+      { name: "a.b", operator: "NOT IN", value: "'x', 'y'" },
+      { name: "c", operator: "Contains", value: "it's" },
+      { name: "d", operator: "Is Null", value: "" },
+    ];
+    const anded = {
+      filterType: "group" as const,
+      logicalOperator: "AND" as const,
+      conditions: rows.map((row) => leaf(row.name, row.operator, row.value)),
+    };
+    expect(buildFilterGroupSql(anded)).toBe(buildFilterRowsSql(rows));
+    const ored = {
+      ...anded,
+      conditions: rows.map((row) => leaf(row.name, row.operator, row.value, "OR")),
+    };
+    expect(buildFilterGroupSql(ored)).toBe(buildFilterRowsSql(rows).replaceAll(" AND ", " OR "));
+  });
+
+  it("writes a list leaf as IN over its values", () => {
+    const list = {
+      filterType: "group" as const,
+      logicalOperator: "AND" as const,
+      conditions: [{ ...leaf("env", "IN", ""), type: "list" as const, values: ["a", "it's"] }],
+    };
+    expect(buildFilterGroupSql(list)).toBe(`"env" IN ('a', 'it''s')`);
+  });
+
+  it("maps every leaf to its flat row, rewritten by mapRow", () => {
     const values: Record<string, unknown> = { env: "prod", svc: ["a", "b"] };
-    const sql = buildFilterGroupSql(group, (leafNode) =>
-      expandMultiValueFilter(leafNode, (name) => values[name]),
-    );
-    expect(sql).toBe(`env = '$env' AND (svc NOT IN ($svc) OR level = 'error')`);
+    expect(
+      toSqlLabelGroup(group, (row) => expandMultiValueFilter(row, (name) => values[name])),
+    ).toEqual({
+      logicalOperator: "AND",
+      conditions: [
+        { name: "env", operator: "=", value: "$env", logicalOperator: "AND" },
+        {
+          logicalOperator: "AND",
+          conditions: [
+            { name: "svc", operator: "NOT IN", value: "$svc", logicalOperator: "AND" },
+            { name: "level", operator: "=", value: "error", logicalOperator: "OR" },
+          ],
+        },
+      ],
+    });
   });
 
   it("prefills the custom SQL with the same WHERE", () => {
     expect(buildAutoSqlQuery({ stream: "s", field: "f", filter_group: group })).toBe(
-      `SELECT DISTINCT "f" FROM "s" WHERE env = '$env' AND (svc <> '$svc' OR level = 'error')`,
+      `SELECT DISTINCT "f" FROM "s" WHERE "env" = '$env' AND ("svc" <> '$svc' OR "level" = 'error')`,
     );
   });
 
@@ -478,6 +564,25 @@ describe("substituteQueryVariables", () => {
     expect(substituteQueryVariables("'${regions:csv}'", variables, "sql")).toBe("'eu,us'");
   });
 
+  it("escapes PromQL values for the string and the regex they land in", () => {
+    const vars = [
+      { name: "inst", value: ['a"b', "c.d", "e\\f"], isVariablePartialLoaded: true },
+      { name: "one", value: 'x"y.z', isVariablePartialLoaded: true },
+    ];
+    expect(substituteQueryVariables('up{instance=~"$inst"}', vars, "promql")).toBe(
+      'up{instance=~"a\\"b|c\\\\.d|e\\\\\\\\f"}',
+    );
+    expect(substituteQueryVariables('up{a="x", instance!~ "$one"}', vars, "promql")).toBe(
+      'up{a="x", instance!~ "x\\"y\\\\.z"}',
+    );
+    expect(substituteQueryVariables('up{instance="$one"}', vars, "promql")).toBe(
+      'up{instance="x\\"y.z"}',
+    );
+    expect(substituteQueryVariables("label_values($one, job)", vars, "promql")).toBe(
+      'label_values(x"y.z, job)',
+    );
+  });
+
   it("joins a PromQL multi-select with | and turns all into .*", () => {
     expect(
       substituteQueryVariables('label_values(up{region=~"$regions"}, job)', variables, "promql"),
@@ -503,7 +608,7 @@ describe("query variable 'All'", () => {
   ];
   const svc = {
     type: "query_values",
-    query_data: { custom_query: true },
+    query_data: { query: "SELECT 1" },
     multiSelect: true,
     value: [SELECT_ALL_VALUE],
     options,

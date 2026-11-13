@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { mount, VueWrapper } from "@vue/test-utils";
+import { flushPromises, mount, VueWrapper } from "@vue/test-utils";
 import { nextTick, reactive } from "vue";
 import VariablesValueSelector from "./VariablesValueSelector.vue";
 import ODate from "@/lib/forms/Date/ODate.vue";
@@ -81,8 +81,10 @@ vi.mock("@/utils/date", () => ({
   isInvalidDate: vi.fn((date: any) => !date || isNaN(date.getTime())),
 }));
 
-vi.mock("@/utils/query/sqlUtils", () => ({
+vi.mock("@/utils/query/sqlUtils", async (importOriginal) => ({
   addLabelsToSQlQuery: vi.fn((query: string) => Promise.resolve(query)),
+  addLabelGroupToSQlQuery: (await importOriginal<typeof import("@/utils/query/sqlUtils")>())
+    .addLabelGroupToSQlQuery,
 }));
 
 vi.mock("@/utils/zincutils", async (importOriginal) => ({
@@ -2882,7 +2884,10 @@ describe("VariablesValueSelector", () => {
     });
 
     it("runs an OR filter_group as a parenthesised WHERE with multi-value IN", async () => {
-      const { addLabelsToSQlQuery } = await import("@/utils/query/sqlUtils");
+      const { addLabelsToSQlQuery, addLabelGroupToSQlQuery } =
+        await import("@/utils/query/sqlUtils");
+      // Loads the SQL parser first, so the mount-time load settles before the one under test.
+      await addLabelGroupToSQlQuery("SELECT a FROM b", { conditions: [] });
       const condition = (field: string, value: string, logicalOperator = "AND") => ({
         filterType: "condition",
         type: "condition",
@@ -2925,7 +2930,7 @@ describe("VariablesValueSelector", () => {
         },
         initialVariableValues: { value: {} },
       });
-      await nextTick();
+      await flushPromises();
 
       const vm = wrapper.vm as any;
       const byName = (name: string) => vm.variablesData.values.find((v: any) => v.name === name);
@@ -2951,7 +2956,7 @@ describe("VariablesValueSelector", () => {
 
       expect(addLabelsToSQlQuery).not.toHaveBeenCalled();
       expect(capturedSql).toContain(
-        `WHERE env = 'prod' AND (svc IN ('api', '_o2_all_') OR svc = 'web')`,
+        `WHERE "env" = 'prod' AND ("svc" IN ('api', '_o2_all_') OR "svc" = 'web')`,
       );
     });
   });

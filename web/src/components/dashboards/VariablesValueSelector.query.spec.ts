@@ -66,8 +66,6 @@ const sqlServiceVariable = {
   type: "query_values",
   multiSelect: false,
   query_data: {
-    custom_query: true,
-    query_type: "sql",
     stream_type: "logs",
     query: "SELECT svc, display FROM logs WHERE region = '$region'",
     value_field: "svc",
@@ -181,7 +179,6 @@ describe("VariablesValueSelector — custom and PromQL query_values variables", 
       scope: "global",
       multiSelect: false,
       query_data: {
-        custom_query: true,
         stream_type: "metrics",
         query_type: "promql",
         query: 'label_values(kube_pod_info{region="$region"}, namespace)',
@@ -485,6 +482,70 @@ describe("VariablesValueSelector — custom and PromQL query_values variables", 
       const sql = valuesSql()[0];
       expect(sql).toContain("\"cluster\" IN ('prod-eu', 'prod-us')");
       expect(sql).toContain("\"region\" NOT IN ('prod-eu', 'prod-us')");
+      wrapper.unmount();
+    });
+
+    it("writes each filter_group leaf exactly as the flat filter rows write it", async () => {
+      const env = {
+        name: "env",
+        type: "custom",
+        scope: "global",
+        multiSelect: false,
+        options: [{ label: "prod", value: "prod", selected: true }],
+      };
+      const every = { ...multiCluster, name: "every", selectAllValueForMultiSelect: "all" };
+      const rows = [
+        { name: "k8s-ns", operator: "=", value: "07" },
+        { name: "Level", operator: "IN", value: "$env" },
+        { name: "a.b", operator: "IN", value: "$cluster" },
+        { name: "zone", operator: "=", value: "$cluster" },
+        { name: "tier", operator: "=", value: "$every" },
+      ];
+      const leaves = (connector: string) =>
+        rows.map((row) => ({
+          type: "condition",
+          column: { field: row.name },
+          filterType: "condition",
+          operator: row.operator,
+          value: row.value,
+          logicalOperator: connector,
+          values: [],
+        }));
+      const auto = (field: string, extra: Record<string, unknown>) => ({
+        name: field,
+        type: "query_values",
+        scope: "global",
+        multiSelect: false,
+        query_data: { stream_type: "logs", stream: "default", field, ...extra },
+      });
+      const group = (connector: string) => ({
+        filterType: "group",
+        logicalOperator: "AND",
+        conditions: leaves(connector),
+      });
+      const { wrapper } = await mountWith([
+        env,
+        multiCluster,
+        every,
+        auto("flat", { filter: rows }),
+        auto("anded", { filter_group: group("AND") }),
+        auto("ored", { filter_group: group("OR") }),
+      ]);
+      const sqlFor = (field: string) =>
+        streamMock.mock.calls
+          .filter(([payload]: any) => payload.queryReq?.fields?.[0] === field)
+          .map(([payload]: any) => b64DecodeUnicode(payload.queryReq.sql))[0];
+      await vi.waitFor(() => expect(sqlFor("ored")).toBeDefined(), { timeout: 5000 });
+
+      const flat = sqlFor("flat");
+      // The flat rows keep main's SQL; only `= $multi` becomes IN.
+      expect(flat).toBe(
+        `SELECT _timestamp FROM "default" WHERE "k8s-ns" = '07' AND "Level" IN ('prod') AND ` +
+          `"a.b" IN ('prod-eu', 'prod-us') AND "zone" IN ('prod-eu', 'prod-us') AND ` +
+          `"tier" IN ('prod-eu', 'prod-us')`,
+      );
+      expect(sqlFor("anded")).toBe(flat);
+      expect(sqlFor("ored")).toBe(flat.replaceAll(" AND ", " OR "));
       wrapper.unmount();
     });
 
