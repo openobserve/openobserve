@@ -81,6 +81,20 @@ describe("OSnapScroll", () => {
     expect(scrollTo).toHaveBeenLastCalledWith({ top: 200, behavior: "smooth" });
   });
 
+  it("tries the next stop when snapping pulls the page back to where it was", () => {
+    wrapper = mountScroll();
+    const { root, scrollTo } = layOut(wrapper);
+    Object.defineProperty(root.querySelector("#one"), "offsetHeight", {
+      configurable: true,
+      value: 700,
+    });
+    wheel(root, 40, 1000);
+    expect(scrollTo).toHaveBeenLastCalledWith({ top: 200, behavior: "smooth" });
+
+    root.dispatchEvent(new Event("scrollend"));
+    expect(scrollTo).toHaveBeenLastCalledWith({ top: 400, behavior: "smooth" });
+  });
+
   it("spends no wheel gesture on a stop right at the section start", () => {
     wrapper = mount(OSnapScroll, {
       attachTo: document.body,

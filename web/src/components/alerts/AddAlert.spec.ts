@@ -1593,10 +1593,12 @@ describe("AddAlert (OForm owner)", () => {
         ]);
       });
 
-      it("Discard brings the saved measure back", async () => {
+      it("Discard brings the saved measure back and drops the autosaved draft", async () => {
         await mountWithQuery();
         await pickEventCount();
+        const discardDraft = vi.spyOn(wrapper.vm.alertDraft, "discard");
         await wrapper.vm.discardChanges();
+        expect(discardDraft).toHaveBeenCalledOnce();
         await flushPromises();
         expect(wrapper.vm.isAggregationEnabled).toBe(true);
         expect(wrapper.vm.getAlertPayload().query_condition.aggregation).toMatchObject(

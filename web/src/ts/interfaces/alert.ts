@@ -506,4 +506,6 @@ export interface TriggerAlertResponseBody {
   message?: string;
   claim_lost?: boolean;
   ineligible?: boolean;
+  /** The alert ran but a delivery failed; the reason to show. */
+  warning?: string;
 }
