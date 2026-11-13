@@ -1328,9 +1328,7 @@ export default defineComponent({
 
         if (!dashboard || typeof dashboard !== "object" || !Object.keys(dashboard).length) {
           if (playlistReporters.missing("notFound")) return;
-          // No id in the URL is not a deleted dashboard, so go to the list of
-          // the current org without the error toast. Replace, not back: the
-          // previous history entry can belong to another org.
+          // No id is not a deleted dashboard: replace with this org's list, no toast.
           if (!route.query.dashboard) {
             router.replace({
               path: "/dashboards",

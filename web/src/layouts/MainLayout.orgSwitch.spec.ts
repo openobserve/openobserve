@@ -16,7 +16,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import { defineComponent, h } from "vue";
-import { createMemoryHistory, createRouter, useRoute, type Router } from "vue-router";
+import {
+  createMemoryHistory,
+  createRouter,
+  useRoute,
+  type RouteComponent,
+  type Router,
+} from "vue-router";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
 import { queryClient } from "@/composables/query/queryClient";
@@ -30,7 +36,7 @@ vi.mock("@openobserve/browser-rum", () => ({
   openobserveRum: { setUser: vi.fn(), startView: vi.fn() },
 }));
 vi.mock("@/services/organizations", async (importOriginal) => {
-  const actual: any = await importOriginal();
+  const actual = await importOriginal<typeof import("@/services/organizations")>();
   return {
     default: {
       ...actual.default,
@@ -89,19 +95,24 @@ const ViewDashboardPage = defineComponent({
   setup: () => () => h(ViewDashboardBody, { key: store.state.selectedOrganization?.identifier }),
 });
 
-const makeRouter = (dashboardsPage: any = recordingPage("list")) =>
+const makeRouter = (
+  dashboardsPage: RouteComponent | (() => Promise<RouteComponent>) = recordingPage("list"),
+) =>
   createRouter({
     history: createMemoryHistory(),
     routes: [
       { path: "/", component: StubDiv },
-      { path: "/dashboards", component: dashboardsPage },
-      { path: "/dashboards/view", component: ViewDashboardPage },
-      { path: "/dashboards/add_panel", component: StubDiv },
+      { path: "/dashboards", name: "dashboards", component: dashboardsPage },
+      { path: "/dashboards/view", name: "viewDashboard", component: ViewDashboardPage },
+      { path: "/dashboards/add_panel", name: "addPanel", component: StubDiv },
       { path: "/alerts", component: StubDiv },
     ],
   });
 
-type LayoutVm = { selectedOrg: any; updateOrganization: () => Promise<void> };
+type LayoutVm = {
+  selectedOrg: Record<string, unknown>;
+  updateOrganization: () => Promise<void>;
+};
 
 describe("MainLayout — org switch", () => {
   let wrapper: VueWrapper | undefined;
@@ -167,6 +178,14 @@ describe("MainLayout — org switch", () => {
   it("treats a trailing slash on the dashboard path the same way", async () => {
     const router = makeRouter();
     await switchOrg(router, "/dashboards/view/?dashboard=d1&folder=default");
+
+    expect(router.currentRoute.value.path).toBe("/dashboards");
+    expect(store.state.selectedOrganization.identifier).toBe("_meta");
+  });
+
+  it("matches the dashboard route by name, whatever the path case", async () => {
+    const router = makeRouter();
+    await switchOrg(router, "/Dashboards/View?dashboard=d1&folder=default");
 
     expect(router.currentRoute.value.path).toBe("/dashboards");
     expect(store.state.selectedOrganization.identifier).toBe("_meta");

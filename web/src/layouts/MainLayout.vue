@@ -289,7 +289,7 @@ import { useRouteEnterFade } from "@/layouts/useRouteEnterFade";
 import { PAGE_ENTRANCE_KEY } from "@/lib/core/PageLayout/pageEntrance";
 import type { NavItem } from "@/lib/core/Navbar/ONavbar.types";
 import { securityNavLinks as buildSecurityNavLinks } from "@/utils/security/nav";
-import { getOrgSwitchRoute, isDashboardItemPath } from "@/utils/orgSwitchRoute";
+import { getOrgSwitchRoute, isDashboardItemRoute } from "@/utils/orgSwitchRoute";
 import { featureState, menuState, streamTypeFeature, type FeatureState } from "@/utils/featureGate";
 import { checkFeatureAccess, buildFeatureGateContext } from "@/utils/enterpriseFeatures";
 import AppHeader from "../components/Header.vue";
@@ -324,7 +324,13 @@ import {
 } from "vue";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
-import { useRoute, useRouter, RouterView } from "vue-router";
+import {
+  useRoute,
+  useRouter,
+  RouterView,
+  type NavigationFailure,
+  type RouteLocationNormalized,
+} from "vue-router";
 import { solutionModeForPath } from "@/utils/security/solutionMode";
 import { useSecurityAccess } from "@/composables/security/useSecurityAccess";
 import config from "../aws-exports";
@@ -1330,10 +1336,11 @@ export default defineComponent({
     const updateOrganization = async () => {
       const switchId = ++orgSwitchSeq;
       const nextOrg = { ...selectedOrg.value };
-      const currentPath = router.currentRoute.value.path;
+      const currentRoute = router.currentRoute.value;
       const target = getOrgSwitchRoute(
-        currentPath,
-        router.currentRoute.value.query,
+        currentRoute.path,
+        currentRoute.name,
+        currentRoute.query,
         nextOrg.identifier,
       );
       const commitOrg = () => {
@@ -1343,26 +1350,24 @@ export default defineComponent({
         useLocalOrganization(nextOrg);
         store.dispatch("setSelectedOrganization", { ...nextOrg });
       };
-      if (isDashboardItemPath(currentPath)) {
-        // The org changes only when the move off the dashboard page lands.
-        // Before that, the page would remount in the new org with the old
-        // dashboard id. In afterEach, the new route and the new org render in
-        // one pass, so the list page never mounts with the old org. Replace,
-        // so Back does not open the old org's dashboard in the new org. A leave
-        // guard (unsaved edits) or a failed page load cancels the move, and
-        // then the old org stays.
+      if (isDashboardItemRoute(currentRoute.name)) {
+        // Commit the org only when the move lands, so no page shows the old id in the new org.
         let landed = false;
         const targetPath = router.resolve(target).fullPath;
-        const stopHook = router.afterEach((to: any, _from: unknown, failure: unknown) => {
-          // Wait for the landing on this target. A cancelled navigation (also an
-          // older switch to the same org) reports a failure here, so skip it.
-          // The finally block removes the hook when this navigation fails.
-          if (failure || to.fullPath !== targetPath) return;
-          stopHook();
-          if (switchId !== orgSwitchSeq) return;
-          landed = true;
-          commitOrg();
-        });
+        const stopHook = router.afterEach(
+          (
+            to: RouteLocationNormalized,
+            _from: RouteLocationNormalized,
+            failure?: NavigationFailure | void,
+          ) => {
+            // A cancelled navigation, also an older switch to the same org, reports a failure.
+            if (failure || to.fullPath !== targetPath) return;
+            stopHook();
+            if (switchId !== orgSwitchSeq) return;
+            landed = true;
+            commitOrg();
+          },
+        );
         try {
           await router.replace(target);
         } catch {

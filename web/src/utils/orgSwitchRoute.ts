@@ -1,28 +1,38 @@
-import type { LocationQuery, RouteLocationRaw } from "vue-router";
+//  Copyright 2026 OpenObserve Inc.
 
-// Pages that show one dashboard (or one playlist of dashboards). Their ids
-// belong to a single org, so they make no sense after an org switch.
-const DASHBOARD_ITEM_PATHS = new Set([
-  "/dashboards/view",
-  "/dashboards/add_panel",
-  "/dashboards/tv",
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+import type { LocationQuery, RouteLocationRaw, RouteRecordNameGeneric } from "vue-router";
+
+// Their dashboard and playlist ids belong to one org.
+const DASHBOARD_ITEM_ROUTES = new Set<RouteRecordNameGeneric>([
+  "viewDashboard",
+  "addPanel",
+  "dashboardTvPlaylist",
 ]);
 
-// The router also matches a trailing slash, for example "/dashboards/view/".
-export const isDashboardItemPath = (path: string): boolean =>
-  DASHBOARD_ITEM_PATHS.has(path.length > 1 ? path.replace(/\/+$/, "") : path);
+export const isDashboardItemRoute = (name: RouteRecordNameGeneric): boolean =>
+  DASHBOARD_ITEM_ROUTES.has(name);
 
-/**
- * Builds the route to open after the user picks another org in the header.
- * Logs pages keep their query. Dashboard item pages go to the dashboard list
- * of the new org. Every other page keeps its path with only the new org.
- */
+/** Route to open after an org switch: dashboard item pages go to the new org's list. */
 export const getOrgSwitchRoute = (
   path: string,
+  name: RouteRecordNameGeneric,
   query: LocationQuery,
   orgIdentifier: string,
 ): RouteLocationRaw => {
-  if (isDashboardItemPath(path)) {
+  if (isDashboardItemRoute(name)) {
     return { path: "/dashboards", query: { org_identifier: orgIdentifier } };
   }
   const queryParams = path.indexOf(".logs") > -1 ? query : {};
