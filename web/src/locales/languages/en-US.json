@@ -10492,59 +10492,6 @@
       },
       "admins": "Admins: {names}",
       "flapping": "Flapping · {count}×",
-      "problems": {
-        "title": "Problems with no alert",
-        "note": "Matched by service name in your alert queries",
-        "noAlert": "No alert matches this service",
-        "createAlert": "Create alert",
-        "askEditor": "Ask an editor"
-      },
-      "attention": {
-        "title": "Needs Attention",
-        "viewAll": "View All",
-        "open": "Open",
-        "openName": "Open {row}",
-        "retry": "Retry",
-        "sendData": "Send Data",
-        "investigate": "Investigate",
-        "addToChat": "Add to Chat",
-        "addToChatName": "Add {row} to Chat",
-        "removeFromChat": "Remove From Chat",
-        "removeFromChatName": "Remove {row} From Chat",
-        "kind": {
-          "service": "Service",
-          "alert": "Alert",
-          "incident": "Incident",
-          "anomaly": "Anomaly"
-        },
-        "openTo": {
-          "service": "View Traces",
-          "alert": "View Alert History",
-          "incident": "Open Incident",
-          "anomaly": "View Anomaly History"
-        },
-        "since": "since {time}",
-        "p99": "p99 {value}",
-        "fired": "Fired {count} time | Fired {count} times",
-        "lastAgo": "last {age} ago",
-        "recoveredAgo": "recovered {age} ago",
-        "alerts": "{count} alert | {count} alerts",
-        "openedAgo": "opened {age} ago",
-        "empty": {
-          "clear": {
-            "title": "All Clear",
-            "body": "No open incidents, firing alerts or degraded services right now."
-          },
-          "no-data": {
-            "title": "No Data Yet",
-            "body": "Nothing is being monitored. Send traces or create an alert and problems will show up here."
-          },
-          "failed": {
-            "title": "Couldn't Load Everything",
-            "body": "Some data did not load, so this list may be incomplete."
-          }
-        }
-      },
       "openIncident": "Open incident",
       "openService": "Open service",
       "openAlert": "Open alert",

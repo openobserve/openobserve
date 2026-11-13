@@ -849,15 +849,5 @@ function openBilling(): void {
 defineExpose({
   /** Focus on arrival; skipped when the field is gated or the user is elsewhere. */
   focusAsk: () => focusWhenReady(() => input.value?.textarea),
-  /** Home's Needs Attention puts a row here as a chip, as an @ pick would; a chip already held is kept once. */
-  addContext(chip: ContextChip): void {
-    if (!mentionChips.value.some((held) => held.id === chip.id))
-      mentionChips.value = [...mentionChips.value, chip];
-    void focusWhenReady(() => input.value?.textarea);
-  },
-  removeContext(id: string): void {
-    mentionChips.value = mentionChips.value.filter((held) => held.id !== id);
-  },
-  hasContext: (id: string): boolean => mentionChips.value.some((held) => held.id === id),
 });
 </script>
