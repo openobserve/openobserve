@@ -540,8 +540,8 @@ saturated colour spent only on the one signal each screen exists to surface.
 Which signal that is changes by page type (**monitoring** = state/severity;
 **catalog** = category/recency/ownership; **access** = role; **forms** =
 progress/validity), and you colour it with the shared toolkit — `OStatStrip` /
-`OStatCard` summary tiles (optionally filter tiles, via `OTable`'s `#subheader`
-slot), `OTag` chips from `badgeGroups.ts`, a row state rail + light
+`OStatCard` summary tiles (multi-select filter chips in `OTable`'s `#toolbar`
+after the search; see calm-signal § Summary-strip conventions), `OTag` chips from `badgeGroups.ts`, a row state rail + light
 exception-only highlight, recency-aware `OTimeCell`, `OUserCell` avatars. Keep
 everything else quiet: highlight exceptions not the norm, muted `0`/`—`,
 border-not-fill selection, one primary action, no layout shift. Full playbook +
