@@ -1354,10 +1354,12 @@ export default defineComponent({
         let landed = false;
         const targetPath = router.resolve(target).fullPath;
         const stopHook = router.afterEach((to: any, _from: unknown, failure: unknown) => {
-          // A cancelled older switch also reports here, for its own target.
-          if (to.fullPath !== targetPath) return;
+          // Wait for the landing on this target. A cancelled navigation (also an
+          // older switch to the same org) reports a failure here, so skip it.
+          // The finally block removes the hook when this navigation fails.
+          if (failure || to.fullPath !== targetPath) return;
           stopHook();
-          if (failure || switchId !== orgSwitchSeq) return;
+          if (switchId !== orgSwitchSeq) return;
           landed = true;
           commitOrg();
         });

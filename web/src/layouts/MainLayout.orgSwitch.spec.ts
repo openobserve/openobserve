@@ -201,6 +201,34 @@ describe("MainLayout — org switch", () => {
     expect(vm.selectedOrg.identifier).toBe("org_c");
   });
 
+  it("commits the org when the same org is picked twice while the first move is pending", async () => {
+    const router = makeRouter();
+    wrapper = await mountLayout("/dashboards/view?dashboard=d1&folder=default", router);
+    await flushPromises();
+    store.state.selectedOrganization = { ...oldOrg };
+    const vm = wrapper.vm as unknown as LayoutVm;
+    // The first move waits (a slow page load); the second move cancels it.
+    let releaseFirst: (allow: boolean) => void = () => {};
+    let calls = 0;
+    router.beforeEach(() => {
+      calls += 1;
+      if (calls === 1) return new Promise<boolean>((resolve) => (releaseFirst = resolve));
+      return true;
+    });
+
+    vm.selectedOrg = { ...newOrg };
+    const first = vm.updateOrganization();
+    await flushPromises();
+    vm.selectedOrg = { ...newOrg };
+    const second = vm.updateOrganization();
+    releaseFirst(true);
+    await Promise.all([first, second]);
+    await flushPromises();
+
+    expect(router.currentRoute.value.query).toEqual({ org_identifier: "_meta" });
+    expect(store.state.selectedOrganization.identifier).toBe("_meta");
+  });
+
   it("keeps the old org when a leave guard cancels the move off the panel editor", async () => {
     const router = makeRouter();
     await router.push("/dashboards/add_panel?dashboard=d1");
