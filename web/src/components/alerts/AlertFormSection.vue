@@ -30,6 +30,8 @@ const props = defineProps<{
   title: I18nText;
   /** One sentence under the title. */
   help: I18nText;
+  /** False while another section is in view: its step buttons hide so only one pair shows. */
+  current?: boolean;
 }>();
 
 const emit = defineEmits<{ go: [id: AlertSectionId] }>();
@@ -83,6 +85,7 @@ provide(SETTING_ROW_BARE_KEY, true);
       <OButton
         v-if="previous"
         class="shrink-0 max-md:hidden"
+        :class="current === false && 'invisible'"
         variant="primary"
         size="icon-circle-lg"
         icon-left="arrow-upward"
@@ -98,6 +101,7 @@ provide(SETTING_ROW_BARE_KEY, true);
       <div
         v-if="next"
         class="mt-auto flex justify-end pt-4 max-md:hidden xl:sticky xl:bottom-4 xl:-me-11"
+        :class="current === false && 'invisible'"
       >
         <OButton
           variant="primary"
