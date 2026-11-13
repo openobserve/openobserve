@@ -1262,7 +1262,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       ref="editorContainerRef"
       class="query-editor-container relative flex w-full overflow-visible"
-      :class="{ 'bg-theme-body-bg-primary! overflow-hidden!': isFocused }"
+      :class="{ 'bg-surface-base! overflow-hidden!': isFocused }"
       :data-fullscreen="isFocused ? 'true' : 'false'"
       :style="editorFullscreenStyle"
     >
@@ -1322,6 +1322,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="showFilterBuilder"
                 class="h-full overflow-y-auto py-0.75 ps-1.5"
                 :class="aiButtonShown ? 'pe-26.5' : 'pe-18'"
+                @pointerdown.self.prevent="activateFilterBuilder"
               >
                 <SqlFilterBuilder
                   ref="filterBuilderRef"
@@ -1330,6 +1331,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :load-values="loadFilterBuilderValues"
                   :fields-loading="searchObj.loadingStream"
                   :extra-suggestions="recentFilterSection"
+                  :max-rows="isFocused ? 0 : 3"
                   data-test="logs-search-bar-filter-builder"
                   @update:query="onFilterBuilderQuery"
                   @submit="handleRunQueryFn()"
@@ -2340,6 +2342,9 @@ export default defineComponent({
     const filterBuilderRef = ref(null);
     // The query pane grows with the builder's lines (it caps itself at three), so nothing in it is cut.
     const filterBuilderGrowth = useFilterBarGrowth(filterBuilderRef);
+    // The pane is taller than the bar, so a press on its blank part must still start a filter.
+    const activateFilterBuilder = () =>
+      (filterBuilderRef.value as { activate?: () => void } | null)?.activate?.();
     watch(filterBuilderGrowth, (growth) => emit("filterBuilderGrowth", growth), {
       immediate: true,
     });
@@ -5373,6 +5378,7 @@ export default defineComponent({
       filterBuilderToggleRight,
       filterBuilderFields,
       filterBuilderRef,
+      activateFilterBuilder,
       loadFilterBuilderValues,
       onFilterBuilderQuery,
       onRefreshIntervalUpdate,
