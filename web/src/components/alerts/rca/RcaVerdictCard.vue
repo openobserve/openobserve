@@ -19,7 +19,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="rca-verdict-card"
     class="border-border-default flex flex-col gap-3 border-b pb-5"
   >
-    <div class="flex flex-wrap items-center gap-2.5">
+    <RcaVerdictSummary
+      v-if="graded && summary"
+      :summary="summary"
+      :headline="headline"
+      :verdict-details="verdictDetails"
+      :report-text="reportText"
+      :firing-scope="firingScope"
+      :alerts-now="alertsNow"
+      :timezone="timezone"
+      @open-hypothesis="$emit('open-hypothesis', $event)"
+      @show-unverified="$emit('show-unverified')"
+      @show-blind-spots="$emit('show-blind-spots')"
+    />
+
+    <div v-if="!graded" class="flex flex-wrap items-center gap-2.5">
       <RcaPill
         data-test="rca-verdict-state"
         :tone="pill.tone"
@@ -36,6 +50,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ qualifier }}
       </span>
     </div>
+    <span
+      v-else-if="qualifier"
+      data-test="rca-verdict-qualifier"
+      class="text-text-secondary text-compact -mt-1 font-semibold"
+    >
+      {{ qualifier }}
+    </span>
 
     <!-- A completed run that a responder's answer unblocked. -->
     <p
@@ -47,8 +68,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </p>
 
     <h2
+      v-if="!graded"
       data-test="rca-verdict-headline"
-      class="text-text-heading m-0 max-w-215 text-2xl leading-tight font-bold [text-wrap:pretty]"
+      class="text-text-heading m-0 max-w-215 text-base leading-normal font-bold [text-wrap:pretty]"
     >
       <RcaInlineText :text="headline" />
     </h2>
@@ -78,9 +100,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </li>
     </ol>
 
-    <!-- Confidence line: graded and partial runs only, never while live. -->
+    <!-- Confidence line of a partial record; a graded run shows it as a chip. -->
     <div
-      v-if="showConfidence"
+      v-if="partial"
       data-test="rca-verdict-confidence"
       class="flex max-w-225 flex-wrap items-center gap-2 text-sm"
     >
@@ -137,67 +159,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </button>
     </div>
 
-    <!-- What the agent claimed, what the evidence allows and why, and any cap. -->
-    <dl
-      v-if="breakdown"
-      data-test="rca-verdict-confidence-why"
-      class="text-compact m-0 -mt-1 grid max-w-225 grid-cols-[max-content_minmax(0,1fr)] gap-x-4 gap-y-0.5"
-    >
-      <dt class="text-text-secondary">{{ t("alerts.incidents.rcaSummary.confidenceClaimed") }}</dt>
-      <dd data-test="rca-confidence-claimed" class="text-text-heading m-0 font-semibold">
-        {{ bandWord(breakdown.claimed) }}
-      </dd>
-      <dt class="text-text-secondary">{{ t("alerts.incidents.rcaSummary.confidenceEvidence") }}</dt>
-      <dd data-test="rca-confidence-evidence" class="text-text-secondary m-0">
-        <span class="text-text-heading font-semibold">{{ bandWord(breakdown.evidence) }}</span>
-        · {{ evidenceText }}
-      </dd>
-      <template v-if="breakdown.caps.length > 0">
-        <dt class="text-text-secondary">
-          {{ t("alerts.incidents.rcaSummary.confidenceCapped", { band: bandWord("medium") }) }}
-        </dt>
-        <dd data-test="rca-confidence-caps" class="text-text-secondary m-0">
-          {{ breakdown.caps.join(", ") }}
-        </dd>
-      </template>
-    </dl>
-
     <RcaStageStepper
       v-if="cardState === 'investigating'"
       :stage-index="stageIndex"
       :stage="stage"
     />
 
-    <dl
-      v-if="graded"
-      data-test="rca-verdict-facts"
-      class="m-0 mt-0.5 flex min-w-0 flex-wrap items-start gap-8"
-    >
-      <div v-if="suspectText" class="max-w-105 min-w-0">
-        <dt class="text-text-secondary text-xs">
-          {{ t("alerts.incidents.rcaSummary.suspectChange") }}
-        </dt>
-        <dd data-test="rca-verdict-suspect" class="text-text-heading m-0 text-sm font-semibold">
-          {{ suspectText }}
-        </dd>
-      </div>
-      <div class="max-w-95 min-w-0">
-        <dt class="text-text-secondary text-xs">{{ t("alerts.incidents.rcaSummary.impact") }}</dt>
-        <dd data-test="rca-verdict-impact" class="text-text-heading m-0 text-sm font-semibold">
-          <RcaInlineText :text="impactText" />
-        </dd>
-      </div>
-      <div v-if="impactedServices.length" class="max-w-105 min-w-0">
-        <dt class="text-text-secondary text-xs">
-          {{ t("alerts.incidents.rcaSummary.impactedServices") }}
-        </dt>
-        <dd
-          data-test="rca-verdict-services"
-          class="text-text-heading m-0 text-sm font-semibold break-words"
-        >
-          {{ impactedServices.join(", ") }}
-        </dd>
-      </div>
+    <dl v-if="graded && suspectText" class="m-0 min-w-0">
+      <dt class="text-text-secondary text-xs">
+        {{ t("alerts.incidents.rcaSummary.suspectChange") }}
+      </dt>
+      <dd data-test="rca-verdict-suspect" class="text-text-heading m-0 text-sm font-semibold">
+        {{ suspectText }}
+      </dd>
     </dl>
 
     <!-- The server refused to start a run (AI credits, paid usage declined); no run records it. -->
@@ -470,20 +444,18 @@ import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import type {
-  RcaBand,
   RcaChangeKind,
   RcaRunError,
   RcaRunMode,
   RcaRunSummary,
   RcaSummaryCause,
-  RcaVerdictDetails,
 } from "@/services/incidents";
 import {
   RCA_OUTCOME_PILL,
   rcaBandLabel,
   rcaBandLevel,
-  rcaUtcRange,
   type RcaPillTone,
+  type RcaVerdictView,
 } from "@/utils/incidents/rcaSummary";
 import { formatTimestampInTimezone } from "@/utils/date";
 import { rcaBlindSpotRoute } from "@/utils/incidents/rcaEvidenceLinks";
@@ -495,6 +467,8 @@ import RcaBlockedBanner from "./RcaBlockedBanner.vue";
 import RcaInlineText from "./RcaInlineText.vue";
 import RcaPill from "./RcaPill.vue";
 import RcaStageStepper from "./RcaStageStepper.vue";
+import RcaVerdictSummary from "./RcaVerdictSummary.vue";
+import type { RcaAlertsNow, RcaFiringScope } from "./rcaLight";
 
 const props = withDefaults(
   defineProps<{
@@ -541,8 +515,14 @@ const props = withDefaults(
     refusal?: RcaRefusal | null;
     /** AI credits a re-analysis uses; unset outside cloud. */
     reanalyzeCreditCost?: number | null;
-    /** Impacted services of the shown completed run's verdict. */
-    verdictDetails?: RcaVerdictDetails | null;
+    /** Services, actions and paging advice of the shown completed run's verdict. */
+    verdictDetails?: RcaVerdictView | null;
+    /** The shown run's report, for its Customer Impact row. */
+    reportText?: string;
+    firingScope?: RcaFiringScope | null;
+    alertsNow?: RcaAlertsNow | null;
+    /** The app's time zone. */
+    timezone?: string;
     /** Why no new run can start: Retry stays visible, disabled, with this reason. */
     startLockedReason?: I18nText;
   }>(),
@@ -572,6 +552,10 @@ const props = withDefaults(
     refusal: null,
     reanalyzeCreditCost: null,
     verdictDetails: null,
+    reportText: "",
+    firingScope: null,
+    alertsNow: null,
+    timezone: "UTC",
     startLockedReason: undefined,
   },
 );
@@ -588,6 +572,8 @@ defineEmits<{
   "tell-agent": [];
   /** "Resume run" on a failed or cancelled run. */
   resume: [];
+  /** The open-finding chip: open that hypothesis. */
+  "open-hypothesis": [hypothesisId: string];
 }>();
 
 const { t } = useI18nTyped();
@@ -632,11 +618,6 @@ const partial = computed(
   () => (props.cardState === "failed" || props.cardState === "cancelled") && !!props.summary,
 );
 const graded = computed(() => outcome.value !== null);
-
-/** A graded run's stored impacted services. */
-const impactedServices = computed(() =>
-  graded.value ? (props.verdictDetails?.impactedServices ?? []) : [],
-);
 
 const pill = computed<{
   tone: RcaPillTone;
@@ -753,8 +734,6 @@ const belowHeadline = computed<I18nText | null>(() => {
   return null;
 });
 
-const showConfidence = computed(() => graded.value || partial.value);
-
 /** The root causes of a run with several; empty otherwise. */
 const causes = computed(() =>
   outcome.value === "multiple_root_causes" ? (card.value?.causes ?? []) : [],
@@ -772,26 +751,11 @@ const causeMeta = (cause: RcaSummaryCause): I18nText => {
   parts.push(rcaBandLabel(cause.band));
   return raw(parts.join(" · "));
 };
-const breakdown = computed(() => (graded.value ? (card.value?.confidence ?? null) : null));
-const BAND_WORD: Record<RcaBand, I18nText> = {
-  high: t("alerts.incidents.aiAnalysis.band.high"),
-  medium: t("alerts.incidents.aiAnalysis.band.medium"),
-  low: t("alerts.incidents.aiAnalysis.band.low"),
-};
-const bandWord = (band: RcaBand) => BAND_WORD[band];
-/** "1 decisive source (logs) · High needs a second decisive source …" */
-const evidenceText = computed(() => {
-  const value = breakdown.value;
-  if (!value) return "";
-  return value.next_level
-    ? `${value.evidence_reason} · ${value.next_level}`
-    : value.evidence_reason;
-});
 const unverifiedCount = computed(() =>
-  showConfidence.value ? (props.summary?.unverified.length ?? 0) : 0,
+  partial.value ? (props.summary?.unverified.length ?? 0) : 0,
 );
 const blindSpotCount = computed(() =>
-  showConfidence.value ? (props.summary?.blind_spots.length ?? 0) : 0,
+  partial.value ? (props.summary?.blind_spots.length ?? 0) : 0,
 );
 
 const CHANGE_KIND: Record<RcaChangeKind, I18nText> = {
@@ -818,16 +782,6 @@ const suspectText = computed<I18nText | null>(() => {
     parts.push(t("alerts.incidents.rcaSummary.fromAuthor", { author: change.lead_author }));
   }
   return raw(parts.join(" "));
-});
-
-/** "3 services · peak 4.1% 5xx · 14:04–14:31 UTC" */
-const impactText = computed<I18nText>(() => {
-  const impact = card.value?.impact;
-  if (!impact) return t("alerts.incidents.rcaSummary.noImpact");
-  const parts: string[] = [impact.summary];
-  if (impact.peak) parts.push(t("alerts.incidents.rcaSummary.peak", { peak: impact.peak }));
-  if (impact.window) parts.push(rcaUtcRange(impact.window.start, impact.window.end));
-  return raw(parts.join(" · "));
 });
 
 // Details stay collapsed for every new failure.

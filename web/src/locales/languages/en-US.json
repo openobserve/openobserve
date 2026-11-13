@@ -10,7 +10,8 @@
     "toastMessageGeneric": "Your license does not include this feature. Ask your administrator to update the license.",
     "bannerMessage": "This feature is locked. It needs the {feature} feature in your license.",
     "bannerMessageGeneric": "This page needs a feature that is not in your license.",
-    "headerLocked": "Locked: needs {feature}"
+    "headerLocked": "Locked: needs {feature}",
+    "availableInEnterprise": "{feature} is available in OpenObserve Enterprise"
   },
   "emptyState": {
     "illustrations": {
@@ -12250,23 +12251,6 @@
     "isOptionalNote": "is optional",
     "noTriggersLoaded": "No triggers loaded",
     "externalDestinationTitle": "External Destination",
-    "serviceGraphLegendTitle": "Graph Legend",
-    "serviceGraphRootCause": "Red = Potential Root Cause",
-    "serviceGraphHighFrequency": "Orange = High Frequency",
-    "serviceGraphNormal": "Blue = Normal",
-    "serviceGraphTemporalFlow": "Purple arrows show temporal flow",
-    "serviceGraphUnavailable": "Service Graph Unavailable",
-    "serviceGraphNoTopologyData": "No topology data available for this incident.",
-    "serviceGraphTooltipService": "Service: {name}",
-    "serviceGraphTooltipAlertCount": "Alert Count: {count}",
-    "serviceGraphTooltipFirstFired": "First Fired: {time}",
-    "serviceGraphTooltipLastFired": "Last Fired: {time}",
-    "serviceGraphTooltipRootCause": "⚠ First Alert (Potential Root Cause)",
-    "serviceGraphTooltipTimeDifference": "⏱ Time difference: {duration}",
-    "serviceGraphTooltipFrom": "From: {time}",
-    "serviceGraphTooltipTo": "To: {time}",
-    "serviceGraphTooltipTemporalCorrelation": "Temporal correlation",
-    "serviceGraphTooltipServiceDependency": "Service dependency",
     "suppressed": "suppressed /",
     "historyTimeline": {
       "firing": "Firing",
@@ -12594,6 +12578,67 @@
       "openPage": "Open page",
       "activityTab": "Activity",
       "alertGraph": "Alert Graph",
+      "reportTab": "Report",
+      "unfold": {
+        "legendAlert": "Alert",
+        "legendDependency": "Service dependency",
+        "summary": "{firings} from {alerts} over {span}",
+        "summaryNoSpan": "{firings} from {alerts}",
+        "firings": "{count} firing | {count} firings",
+        "alerts": "{count} alert | {count} alerts",
+        "duration": {
+          "seconds": "{count} s",
+          "minutes": "{count} min",
+          "hours": "{hours} h",
+          "hoursMinutes": "{hours} h {minutes} min",
+          "days": "{days} d",
+          "daysHours": "{days} d {hours} h"
+        },
+        "firedOnce": "Fired once",
+        "streamLane": "{stream} · stream",
+        "noService": "No service",
+        "acknowledged": "Acknowledged",
+        "by": "by {user}",
+        "notAcknowledged": "Not acknowledged yet",
+        "openSince": "Open since {time}",
+        "now": "Now",
+        "nowAt": "now ({time})",
+        "moreAlerts": "+{count} more alert | +{count} more alerts",
+        "moreServices": "+{count} more service | +{count} more services",
+        "showEveryService": "Show every service",
+        "andMore": "{count} more",
+        "histogramCaption": "Firings per {bucket}, {from} to {to}",
+        "bucket": {
+          "minutes15": "15 minutes",
+          "minutes30": "30 minutes",
+          "hour": "hour",
+          "hours3": "3 hours",
+          "hours6": "6 hours",
+          "day": "day"
+        },
+        "emptyTitle": "No alerts yet",
+        "emptyText": "Alerts that fire into this incident show here, one card per alert.",
+        "firstToFire": "First to fire",
+        "open": "Still open",
+        "noUser": "No user recorded",
+        "firingNow": "Firing now",
+        "grouped": {
+          "sameAlert": "Same alert",
+          "sameService": "Same service",
+          "sameLabels": "Matching labels",
+          "relatedLabels": "Related labels"
+        },
+        "hintZone": "One lane per service or stream, then your team. Select an alert for its details. Times in {zone}.",
+        "quietNow": "Quiet now",
+        "liveRule": "Firing now means its latest check fired. With no check result recorded, it means it fired within its last 2 checks, or in the silence after a firing.",
+        "cantRun": "Can't run",
+        "cantRunLong": "Can't run · last check errored",
+        "cantRunWhy": "Its last check errored, so it can't fire until a check runs again.",
+        "disabled": "Disabled",
+        "disabledWhy": "This alert is turned off, so it doesn't check or fire.",
+        "legendFiredLater": "Fired later",
+        "legendFiredLaterWhy": "Time order only: a later alert isn't necessarily caused by the one before it."
+      },
       "totalAlerts": "Total Alerts",
       "affectedServices": "Affected Services",
       "activeDuration": "Active Duration",
@@ -12700,7 +12745,6 @@
       "filterActive": "Active",
       "alertCount": "Alerts",
       "alertCountAxis": "Alert Count",
-      "correlatedAlertsCount": "Alerts: {count} correlated alert | Alerts: {count} correlated alerts",
       "noCorrelatedLogs": "No correlated logs found",
       "noCorrelatedMetrics": "No correlated metrics found",
       "noCorrelatedTraces": "No correlated traces found",
@@ -12869,8 +12913,12 @@
         "cancelledByChecks": "Cancelled by {user} at {time} UTC after {duration}. {done} of {total} checks finished; the partial results below are not a verdict.",
         "cancelledAtChecks": "Cancelled at {time} UTC after {duration}. {done} of {total} checks finished; the partial results below are not a verdict.",
         "loadingReport": "Loading report…",
-        "fullReport": "Full report",
-        "reportLoadFailed": "Failed to load the analysis report",
+        "readFullReport": "Read the full report on the Report tab",
+        "reportLoadFailedTitle": "Couldn't load the report",
+        "reportAfterRunText": "The agent is still checking. Its steps appear in the Investigation thread on the Incident Analysis tab as they happen.",
+        "noReportTitle": "No report for this run",
+        "noReportText": "This run ended without a report. What it checked is on the Incident Analysis tab.",
+        "openAnalysisTab": "Open Incident Analysis",
         "reportAfterRun": "The report shows after the run.",
         "noAnalysisTitle": "No analysis yet",
         "noAnalysisText": "The AI SRE Agent checks this incident's alerts, topology, recent changes, traces, logs and metrics, then writes a report. You can follow its work in the Investigation thread while it runs.",
@@ -13065,6 +13113,84 @@
         "hourAgo": "{count} hour ago | {count} hours ago",
         "dayAgo": "{count} day ago | {count} days ago"
       },
+      "rcaLight": {
+        "showMore": "Show more",
+        "showLess": "Show less",
+        "openFindings": "{count} open finding · {status} | {count} open findings · {status}",
+        "openFindingsHint": "Show it in Hypotheses",
+        "bandConfidence": "{band} confidence",
+        "whyConfidence": "Why this confidence",
+        "whyBand": "Why {band}",
+        "nextLevel": "Next level",
+        "agentSuggests": "Agent suggests",
+        "pageAction": {
+          "page": "Page",
+          "downgrade": "Downgrade",
+          "suppress": "Suppress"
+        },
+        "whySuggestion": "Why this suggestion",
+        "whySuggestionTitle": "Why “{action}”",
+        "impactDetails": "Impact details",
+        "customerImpact": "Customer impact: {text}",
+        "customerImpactLabel": "Customer impact",
+        "noServiceImpact": "No service impact recorded",
+        "peak": "Peak {peak}",
+        "peakLabel": "Peak",
+        "noPeak": "No peak recorded",
+        "windowLabel": "Window",
+        "servicesLabel": "Services",
+        "inThisIncident": "In this incident",
+        "firedOnce": "Fired once",
+        "span": "{start} to {end} {zone}",
+        "spanOne": "{time} {zone}",
+        "alertsNow": "Alerts now",
+        "firstAction": "First action",
+        "andMoreBelow": "and {count} more below",
+        "suggestionOnly": "Suggestion only",
+        "blindSpots": "Blind spots",
+        "dayZone": "{day} · {zone}",
+        "noEvidence": "No evidence",
+        "fromIncident": "From the incident",
+        "evidenceCount": "{count} evidence | {count} evidence",
+        "showAgentInput": "Show agent input",
+        "hideAgentInput": "Hide agent input",
+        "note": "Note",
+        "hideNote": "Hide note",
+        "conclusion": "Conclusion",
+        "timesIn": "times in {zone}",
+        "failedTitle": "Analysis failed {count} time · last {time} | Analysis failed {count} times · last {time}",
+        "failedText": "{reason}. No report was written; the incident's alerts and graph are unaffected.",
+        "whatWentWrong": "What went wrong",
+        "hideWhatWentWrong": "Hide what went wrong",
+        "reasonCount": "once | {count} times",
+        "retryAnalysis": "Retry analysis",
+        "failReason": {
+          "noResponse": "The analysis service didn't respond",
+          "reanalysisNoStart": "Re-analysis couldn't start",
+          "noStart": "Analysis couldn't start",
+          "other": "The analysis stopped with an error"
+        },
+        "noReportFailed": "No report: the analysis failed {count} time | No report: the analysis failed {count} times",
+        "lastTry": "Last try {time}. Retry it on the Incident Analysis tab.",
+        "goToAnalysis": "Go to Incident Analysis",
+        "onThisReport": "On this report",
+        "reportSections": "Report sections",
+        "openThread": "Open thread",
+        "copiedTitle": "Copied to clipboard",
+        "copiedHint": "Preview of the copied Markdown · Download as Markdown saves the same text",
+        "closePreview": "Close preview",
+        "notVerifiedCite": "not verified",
+        "copyHeading": "{title} · incident analysis",
+        "copyLink": "Link: {url}",
+        "copyConfidence": "{band} confidence · {reason}",
+        "copySuggests": "Agent suggests: {action}",
+        "copyBlindSpots": "Blind spots: {list}",
+        "runAt": "Run {number} · {time}",
+        "servicesMore": "{list} and {count} more",
+        "copyOpenFinding": "Open finding ({status}): {statement}",
+        "copyTimes": "Times in {zone}",
+        "copyEvidence": "Evidence"
+      },
       "rcaSummary": {
         "loading": "Loading the analysis…",
         "leading": "Leading: {statement}",
@@ -13112,6 +13238,7 @@
         },
         "whatHappened": "What happened",
         "linkCount": "{count} link | {count} links",
+        "eventCount": "{count} event | {count} events",
         "timelineComesWithReport": "The causal timeline comes with the report.",
         "timelineEmpty": "The report has no timeline.",
         "marker": {
@@ -13121,7 +13248,7 @@
           "refuted": "Refuted"
         },
         "openEvidence": "Open evidence {number}",
-        "notVerifiedId": "{id} · not verified",
+        "notVerifiedId": "not verified",
         "hypotheses": "Hypotheses",
         "noHypotheses": "No hypotheses recorded yet.",
         "noEvidenceYet": "No evidence yet",
@@ -13197,7 +13324,87 @@
           "unclassified": "Other"
         }
       },
-      "alertCountChip": "{count} alert | {count} alerts"
+      "firingsAlerts": "{firings} · {alerts}",
+      "liveFiring": "{firing} of {total} alert firing now | {firing} of {total} alerts firing now",
+      "liveQuiet": "Quiet now",
+      "liveLastFired": "Last firing in this incident {duration} ago",
+      "panel": {
+        "schedule": {
+          "every": "Checked every {interval}",
+          "everySilenced": "Checked every {interval} · silenced {silence} after firing",
+          "cron": "Checked on a custom schedule, about every {interval}",
+          "realTime": "Checked as events arrive",
+          "cronPlain": "Checked on a custom schedule"
+        },
+        "kind": {
+          "logs": "Logs",
+          "metrics": "Metrics",
+          "traces": "Traces"
+        },
+        "timesIn": "Times in {zone}",
+        "notListed": "This alert is not in the alert list.",
+        "stateError": "Couldn't load state",
+        "whyFired": "Why it fired",
+        "valueAt": "at {time}",
+        "definitionError": "Couldn't load the alert",
+        "valueError": "Couldn't load the firing evaluation",
+        "lastWeek": "Last 7 days",
+        "weekNone": "None in 7 days",
+        "weekIncomplete": "History is incomplete",
+        "weekDayUnknown": "{day}: unknown",
+        "weekError": "Couldn't load the last 7 days",
+        "openAlert": "Open alert",
+        "stateUnknown": "State unknown",
+        "every": "every ~{interval}",
+        "tipGrouped": "Grouped by {how}",
+        "tipTimes": "Fired at {times}",
+        "tipFirst": "First fired {time}",
+        "tipLast": "Last fired {time}",
+        "tipGap": "Longest gap {gap}",
+        "firedAgain": "Fired again {time} in another incident",
+        "rowCap": "The check stops counting at {value} rows, so there may have been more.",
+        "atLeast": "{value}+",
+        "rowsAtLeast": "{value}+ rows",
+        "rowCount": "{value} row | {value} rows",
+        "needs": "alert needs {condition}",
+        "currentCondition": "alert now needs {condition}",
+        "currentConditionOver": "alert now needs {condition} over {period}",
+        "openSource": "Open at source",
+        "needsOver": "alert needs {condition} over {period}",
+        "needsLead": "Needs {condition}",
+        "needsOverLead": "Needs {condition} over {period}",
+        "query": {
+          "sql": "SQL",
+          "promql": "PromQL",
+          "custom": "Custom"
+        },
+        "copyQuery": "Copy query",
+        "tryAgain": "Try again",
+        "weekBusy": "Couldn't load: search is busy",
+        "today": "Today",
+        "daysOf": "{count}/{total} days",
+        "weekSilenced": "{count} of {total} firing was silenced: it came in the quiet time after a firing, so it notified no one. | {count} of {total} firings were silenced: they came in the quiet time after a firing, so they notified no one.",
+        "weekDays": "Days run midnight to midnight in {zone}; today is still in progress.",
+        "weekDay": "{day}: no firings | {day}: {count} firing | {day}: {count} firings",
+        "notifiesNone": "Notifies no one",
+        "notifiesOne": "Notifies {name}",
+        "notifiesMore": "Notifies {name}, +{count}",
+        "tipDestinations": "Notifies {names}",
+        "tipOwner": "Owner: {owner}",
+        "tipRecovery": "Also notifies on recovery",
+        "viewLogs": "View logs",
+        "logsRange": "Logs from {from} to {to} ({zone})",
+        "aggregate": {
+          "avg": "average {field}",
+          "min": "lowest {field}",
+          "max": "highest {field}",
+          "sum": "total {field}",
+          "count": "count of {field}",
+          "median": "median {field}",
+          "percentile": "{percentile} of {field}"
+        }
+      },
+      "liveQuietSome": "{quiet} of {total} alert quiet now | {quiet} of {total} alerts quiet now"
     },
     "alertDetails": {
       "sql": "SQL",
@@ -14176,6 +14383,9 @@
         "onceFor": "Once, {duration}"
       },
       "validation": {
+        "endInPast": "The end time is in the past. Pick an end time after now.",
+        "pastSloOnly": "This window is in the past. It only corrects SLO data.",
+        "neverProducesWindow": "This schedule never produces a window.",
         "conditionRequired": "Add a condition, or remove the condition block.",
         "pairKey": "Choose a dimension for every row.",
         "pairOperator": "Use = or != in a downtime condition.",
@@ -14249,7 +14459,9 @@
       "confirmEndNow": {
         "title": "End this downtime now?",
         "message": "Notifications resume at once. The downtime stays in the list as ended early.",
+        "recurringMessage": "This downtime repeats. Ending it now also stops every future window and its extensions. Other downtimes that cover the same items keep muting. To mute future windows again, duplicate it.",
         "ok": "End now",
+        "recurringOk": "End now and stop future windows",
         "keep": "Keep running"
       },
       "extend": {
@@ -14282,6 +14494,8 @@
       "confirmCancel": {
         "title": "Cancel downtime",
         "message": "Notifications resume at once. The downtime stays in the list for history.",
+        "recurringMessage": "This downtime repeats. Cancelling it stops every future window.",
+        "bulkRecurringNote": "At least one selected downtime repeats. Cancelling it stops every future window.",
         "bulkMessage": "Cancel {count} downtime? Notifications resume at once. | Cancel {count} downtimes? Notifications resume at once.",
         "confirm": "Cancel downtime | Cancel downtimes",
         "keep": "Keep downtime | Keep downtimes"
@@ -14481,6 +14695,12 @@
         "bannerOn": "Shown to the org while active",
         "bannerOff": "No banner",
         "occurrences": "Occurrences",
+        "plannedSchedule": "Planned schedule",
+        "endedEarlyAt": "Ended early at",
+        "cancelledAt": "Cancelled at",
+        "endedEarlyAtTime": "Ended early at {time}",
+        "cancelledAtTime": "Cancelled at {time}",
+        "stoppedTime": "{time} ({zone})",
         "nextWindow": "Next window: {window}. Your time: {local}.",
         "sectionCount": "{name} · {count}",
         "matchedByHeader": "Matched by",
@@ -14750,8 +14970,7 @@
       "sourcePlatformResolve": "platform resolve",
       "sourceLegacy": "legacy payload",
       "sourceLegacyPayload": "the kind's own JSON payload (generic webhook)"
-    },
-    "serviceGraphTooltipServiceDetected": "Service: {name} (detected as {detected})"
+    }
   },
   "alert_dependencies": {
     "actionOpen": "Open",
@@ -30399,6 +30618,7 @@
       "sameMinute": "same minute",
       "plusMinutes": "+{count} min",
       "plusHours": "+{hours} h {minutes} min",
+      "plusDays": "+{days} d {hours} h",
       "firstFired": "First fired",
       "lastFired": "Last fired",
       "firings": "Firings",
@@ -30408,6 +30628,9 @@
       "firedAt": "Fired at",
       "when": "When",
       "chartNote": "The problem's main chart, as in Evidence",
+      "foldedAlerts": "Alerts in this card",
+      "expandLane": "Show every alert in this lane",
+      "later": "Later →",
       "outcome": {
         "paged": "Paged on-call",
         "asked": "Asked for an OK",
@@ -30417,7 +30640,8 @@
         "fixed": "Fixed",
         "resolved": "Resolved",
         "open": "Still open"
-      }
+      },
+      "legendMore": "+{count}"
     },
     "coverage": {
       "showing": "Showing {shown} of {total} services",
@@ -32563,7 +32787,11 @@
     "fieldMissing": "Stream {stream} has no field {field} yet. Budgets can only be scoped to fields that exist in the stream.",
     "limit": "Limit (USD)",
     "period": "Period",
-    "periods": { "day": "Day", "month": "Month", "hour": "Hour" },
+    "periods": {
+      "day": "Day",
+      "month": "Month",
+      "hour": "Hour"
+    },
     "scopes": {
       "agent": "Agent",
       "feature": "Feature",
@@ -32647,13 +32875,22 @@
         "title": "Repeated failing tool calls",
         "when": "Same tool fails 3+ times in one trace"
       },
-      "toolLoop": { "title": "tool_loop", "when": "Same input 3+ times in the last 5 tool calls" },
-      "retryStorm": { "title": "retry_storm", "when": "One call retried 4+ times" },
+      "toolLoop": {
+        "title": "tool_loop",
+        "when": "Same input 3+ times in the last 5 tool calls"
+      },
+      "retryStorm": {
+        "title": "retry_storm",
+        "when": "One call retried 4+ times"
+      },
       "falseIdempotent": {
         "title": "false_idempotent",
         "when": "Same input, different outputs, no side effect"
       },
-      "dspmUnbound": { "title": "dspm_unbound", "when": "A run has no data_security binding" },
+      "dspmUnbound": {
+        "title": "dspm_unbound",
+        "when": "A run has no data_security binding"
+      },
       "policyAbsent": {
         "title": "policy_absent",
         "when": "A run has no sandbox or content_safety binding"
@@ -32662,7 +32899,10 @@
         "title": "Error rate",
         "when": "Over 5% of traces have an errored span, 50+ traces, per agent (last 30 min)"
       },
-      "cost": { "title": "Hourly cost", "when": "A model's spend over the last hour is above $5" },
+      "cost": {
+        "title": "Hourly cost",
+        "when": "A model's spend over the last hour is above $5"
+      },
       "scoreDrop": {
         "title": "Score drop",
         "when": "A score config's healthy rate falls below its target"

@@ -442,6 +442,30 @@ export function downtimeToFormValues(d: Downtime): DowntimeFormValues {
   };
 }
 
+/** A Duplicate of a one-time window that already ended moves it to the next full hour with the same duration (D5). */
+export function movePastWindow(values: DowntimeFormValues, nowMs: number): DowntimeFormValues {
+  const s = values.schedule;
+  if (s.repeat !== "none") return values;
+  const built = buildSchedule(s);
+  const endsAt = built.ends_at;
+  if (endsAt == null || endsAt > nowMs * 1000) return values;
+  const startMs = nextFullHourMs(nowMs, s.timezone);
+  const span = Math.max(0, endsAt - built.starts_at);
+  const start = utcMicrosToLocal(startMs * 1000, s.timezone);
+  const end = utcMicrosToLocal(startMs * 1000 + span, s.timezone);
+  return {
+    ...values,
+    schedule: {
+      ...s,
+      ...LOADED_NONE,
+      start_date: start.date,
+      start_time: start.time,
+      end_date: end.date,
+      end_time: end.time,
+    },
+  };
+}
+
 /** Resolves a picked item's display name. */
 export type ItemNameFn = (module: TargetModule, id: string) => string | undefined;
 
