@@ -67,4 +67,41 @@ describe("ODimensionChip", () => {
     await remove.trigger("click");
     expect(wrapper.emitted("remove")).toHaveLength(1);
   });
+
+  it("colours the where and version facets the same on every surface", () => {
+    const variant = (dimKey: string) =>
+      mount(ODimensionChip, { props: { dimKey, value: "x" } })
+        .findComponent(OTag)
+        .props("variant");
+    expect(variant("where")).toBe("default-soft");
+    expect(variant("version")).toBe("indigo-soft");
+  });
+  it("renders a qualifier as a third segment inside the chip, after the value", () => {
+    const wrapper = mount(ODimensionChip, {
+      props: { dimKey: "env", value: "prod", qualifier: "inferred", qualifierDataTest: "q" },
+    });
+    const qualifier = wrapper.get('[data-test="q"]');
+    expect(qualifier.text()).toBe("inferred");
+    expect(wrapper.findComponent(OTag).text()).toBe("envprodinferred");
+  });
+
+  it("drops the key segment when the surrounding column already names the dimension", () => {
+    const wrapper = mount(ODimensionChip, {
+      props: { dimKey: "env", value: "prod", qualifier: "inferred", hideKey: true },
+    });
+    expect(wrapper.findComponent(OTag).text()).toBe("prodinferred");
+  });
+
+  it("renders no qualifier segment when the prop is absent", () => {
+    const wrapper = mount(ODimensionChip, { props: { dimKey: "env", value: "prod" } });
+    expect(wrapper.findComponent(OTag).text()).toBe("envprod");
+  });
+
+  it("keeps the dismiss affordance on a removable chip that also gets a qualifier", () => {
+    const wrapper = mount(ODimensionChip, {
+      props: { dimKey: "env", value: "prod", qualifier: "inferred", removable: true },
+    });
+    expect(wrapper.find("button").exists()).toBe(true);
+    expect(wrapper.text()).not.toContain("inferred");
+  });
 });

@@ -17,6 +17,7 @@ import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
 import IncidentServiceGraph from "./IncidentServiceGraph.vue";
 import { nextTick } from "vue";
+import { labelRows } from "@/components/shared/ServiceNameLabel.fixtures";
 
 // Mock ChartRenderer component
 vi.mock("@/components/dashboards/panels/ChartRenderer.vue", () => ({
@@ -763,6 +764,56 @@ describe("IncidentServiceGraph.vue", () => {
       const tooltip = normalNode.tooltip.formatter();
 
       expect(tooltip).not.toContain("First Alert (Potential Root Cause)");
+    });
+  });
+
+  describe("Service display names", () => {
+    const row = labelRows.differs;
+    const node = (overrides: Record<string, unknown>) => ({
+      alert_id: "alert_ingest",
+      alert_name: "Ingest lag",
+      service_name: row.service_name,
+      alert_count: 1,
+      first_fired_at: 1000000,
+      last_fired_at: 1000000,
+      ...overrides,
+    });
+    const topology = (nodes: any[]) => ({
+      nodes,
+      edges: [],
+      stats: { total_services: 1, total_alerts: nodes.length, services_with_alerts: 1 },
+    });
+    const tooltipOf = (w: VueWrapper<any>) =>
+      w.vm.chartData.options.series[0].data[0].tooltip.formatter() as string;
+
+    it("names the trace service and the detected key when they differ", async () => {
+      wrapper = mountComponent({
+        topologyContext: topology([node({ display_name: row.display_name })]),
+      });
+      await flushPromises();
+
+      const html = tooltipOf(wrapper);
+      expect(html).toContain('data-test="incident-graph-tooltip-service"');
+      expect(html).toContain(
+        `Service: <strong>${row.display_name}</strong> (detected as ${row.service_name})`,
+      );
+    });
+
+    it("counts bucket services by key and escapes the display name", async () => {
+      // More firings than the detail-mode cap, so they collapse into one time bucket.
+      const firings = Array.from({ length: 16 }, (_, i) =>
+        node({ first_fired_at: 1000000 + i, last_fired_at: 1000000 + i }),
+      );
+      firings[0] = { ...firings[0], display_name: "<b>ingester</b>" };
+      wrapper = mountComponent({ topologyContext: topology(firings) });
+      await flushPromises();
+
+      const data = wrapper.vm.chartData.options.series[0].data;
+      expect(data).toHaveLength(1);
+      const html = data[0].tooltip.formatter() as string;
+      expect(html).toContain("&lt;b&gt;ingester&lt;/b&gt;");
+      expect(html).not.toContain("<b>ingester</b>");
+      expect(html).toContain(`detected as ${row.service_name}`);
     });
   });
 

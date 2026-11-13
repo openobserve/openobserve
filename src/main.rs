@@ -267,15 +267,14 @@ async fn run() -> Result<(), anyhow::Error> {
 
             job_init_tx.send(true).ok();
             job_shutdown_rx.await.ok();
+            #[cfg(feature = "enterprise")]
+            db::service_versions::wait_for_active_flushes().await;
             job_stopped_tx.send(()).ok();
 
             // flush WAL cache to disk
             _ = ingester::flush_all().await;
             // flush compact offset cache to disk disk
             _ = db::compact::files::sync_cache_to_db().await;
-            // flush db
-            let db = infra::db::get_db().await;
-            _ = db.close().await;
         });
     });
 
@@ -314,6 +313,8 @@ async fn run() -> Result<(), anyhow::Error> {
                 log::error!("gRPC server init failed: {e}");
                 std::process::exit(1);
             }
+            #[cfg(feature = "enterprise")]
+            db::service_versions::wait_for_active_flushes().await;
         });
     });
 
@@ -412,6 +413,23 @@ async fn run() -> Result<(), anyhow::Error> {
     }
     log::info!("HTTP server stopped");
 
+    #[cfg(feature = "enterprise")]
+    db::service_versions::begin_shutdown();
+
+    // stop gRPC server
+    grpc_shutudown_tx.send(()).ok();
+    grpc_stopped_rx.await.ok();
+    #[cfg(feature = "enterprise")]
+    db::service_versions::wait_for_active_flushes().await;
+    grpc_rt_handle.join().ok();
+    log::info!("gRPC server stopped");
+
+    // stop backend jobs
+    job_shutudown_tx.send(()).ok();
+    job_stopped_rx.await.ok();
+    job_rt_handle.join().ok();
+    log::info!("backend job stopped");
+
     // stop tracing
     if let Some(tracer_provider) = tracer_provider {
         let result = tracer_provider.shutdown();
@@ -437,23 +455,19 @@ async fn run() -> Result<(), anyhow::Error> {
         {
             log::error!("Failed to flush Gen-AI agent registry: {}", e);
         }
+
+        log::info!("Flushing service version registry...");
+        if let Err(e) = db::service_versions::shutdown().await {
+            log::error!("Failed to flush service version registry: {}", e);
+        }
     }
+
+    let db = infra::db::get_db().await;
+    _ = db.close().await;
 
     // leave the cluster
     _ = cluster::leave().await;
     log::info!("Node left cluster");
-
-    // stop gRPC server
-    grpc_shutudown_tx.send(()).ok();
-    grpc_stopped_rx.await.ok();
-    grpc_rt_handle.join().ok();
-    log::info!("gRPC server stopped");
-
-    // stop backend jobs
-    job_shutudown_tx.send(()).ok();
-    job_stopped_rx.await.ok();
-    job_rt_handle.join().ok();
-    log::info!("backend job stopped");
 
     // stop telemetry
     if cfg.common.telemetry_enabled {

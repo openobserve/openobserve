@@ -283,6 +283,9 @@ pub struct AlertNode {
     pub first_fired_at: i64,
     /// Timestamp of last occurrence (microseconds)
     pub last_fired_at: i64,
+    /// Display name of `service_name`, set on response copies only and never stored.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub display_name: Option<String>,
 }
 
 /// Edge in the alert flow graph
@@ -355,6 +358,9 @@ pub struct Incident {
     /// Why automatic analysis runs never start for this incident (`l0_off`).
     #[serde(default)]
     pub rca_off_reason: Option<String>,
+    /// `{"service": display}` for `group_values`, set on response copies only and never stored.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub group_values_display: Option<std::collections::HashMap<String, String>>,
 
     /// Every alert that fired into the incident and how often, most-fired first; list only.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -421,10 +427,26 @@ pub struct IncidentWithAlerts {
     pub composite_alerts: Vec<CompositeAlertSummary>,
 }
 
-/// Outcome of correlating an alert to an incident.
-///
-/// Used by the scheduler to decide whether and how to send a notification
-/// when an alert with `creates_incident=true` fires.
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+pub struct ManualIncidentRequest {
+    pub title: String,
+    pub severity: String,
+    pub service: String,
+    pub where_key: String,
+    #[serde(default)]
+    pub env: String,
+    #[serde(default)]
+    pub version: String,
+    #[serde(default)]
+    pub baseline_version: String,
+    #[serde(default)]
+    pub verdict_key: String,
+    #[serde(default)]
+    pub summary: String,
+    #[serde(default)]
+    pub link: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum IncidentCorrelationOutcome {
     /// A brand new incident was created for this alert firing.
@@ -1771,6 +1793,7 @@ mod tests {
             alert_count: 2,
             first_fired_at: 1000,
             last_fired_at: 2000,
+            display_name: None,
         };
 
         let node2 = AlertNode {
@@ -1780,6 +1803,7 @@ mod tests {
             alert_count: 1,
             first_fired_at: 1500,
             last_fired_at: 1500,
+            display_name: None,
         };
 
         let edge = AlertEdge {
@@ -2188,6 +2212,7 @@ mod tests {
             rca_off_reason: None,
             alert_groups: None,
             historical: false,
+            group_values_display: None,
         }
     }
 
@@ -2643,5 +2668,34 @@ mod tests {
                 ..
             }
         ));
+    }
+
+    #[test]
+    fn display_fields_serde_round_trip_and_old_json() {
+        let mut incident = make_incident(None, None, None, None);
+        let plain = serde_json::to_string(&incident).unwrap();
+        assert!(!plain.contains("group_values_display"));
+        incident.group_values_display = Some(std::collections::HashMap::from([(
+            "service".to_string(),
+            "CheckoutService".to_string(),
+        )]));
+        let back: Incident =
+            serde_json::from_str(&serde_json::to_string(&incident).unwrap()).unwrap();
+        assert_eq!(
+            back.group_values_display.unwrap()["service"],
+            "CheckoutService"
+        );
+        let old: Incident = serde_json::from_str(&plain).unwrap();
+        assert!(old.group_values_display.is_none());
+
+        let node: AlertNode = serde_json::from_str(
+            r#"{"alert_id":"a","alert_name":"n","service_name":"checkoutservice","alert_count":1,"first_fired_at":1,"last_fired_at":2}"#,
+        )
+        .unwrap();
+        assert!(node.display_name.is_none());
+        assert_eq!(
+            serde_json::to_string(&node).unwrap(),
+            r#"{"alert_id":"a","alert_name":"n","service_name":"checkoutservice","alert_count":1,"first_fired_at":1,"last_fired_at":2}"#
+        );
     }
 }

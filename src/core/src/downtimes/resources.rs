@@ -41,7 +41,7 @@ pub async fn resources(
     if values::is_priority(org, &req.refine_by).await? {
         let readable = values::searchable_records(org, user_id, &records).await;
         let found = values::registry_values(&readable, &req.refine_by, &pairs);
-        return Ok(respond(&req.refine_by, found, "registry"));
+        return Ok(labelled(org, respond(&req.refine_by, found, "registry")).await);
     }
     let plan = SearchPlan {
         key: &req.refine_by,
@@ -60,7 +60,7 @@ pub async fn resources(
             req.refine_by
         );
     }
-    Ok(respond(&req.refine_by, found, "search"))
+    Ok(labelled(org, respond(&req.refine_by, found, "search")).await)
 }
 
 /// The `=` pairs of the And spine, values normalized as stored; none is a 400.
@@ -85,6 +85,7 @@ pub fn respond(dimension: &str, found: Vec<Found>, source: &str) -> ResourcesRes
             value: f.value,
             last_seen: f.last_seen.unwrap_or(0),
             streams: f.streams,
+            label: None,
         })
         .collect();
     values.sort_by(|a, b| b.last_seen.cmp(&a.last_seen).then(a.value.cmp(&b.value)));
@@ -96,6 +97,31 @@ pub fn respond(dimension: &str, found: Vec<Found>, source: &str) -> ResourcesRes
         total,
         source: source.to_string(),
     }
+}
+
+/// `service` rows keep the key as `value` and carry the display name as `label`.
+pub fn label_resources(response: &mut ResourcesResponse, label: impl Fn(&str) -> String) {
+    if response.dimension != "service" {
+        return;
+    }
+    for row in &mut response.values {
+        row.label = Some(label(&row.value));
+    }
+}
+
+async fn labelled(org: &str, mut response: ResourcesResponse) -> ResourcesResponse {
+    if response.dimension == "service" {
+        crate::service_identity::display_feed::ensure(org).await;
+        let keys = response.values.iter().map(|v| v.value.clone());
+        let shown = crate::service_identity::display_feed::labels(org, keys).await;
+        label_resources(&mut response, |value| {
+            shown
+                .get(value)
+                .cloned()
+                .unwrap_or_else(|| value.to_string())
+        });
+    }
+    response
 }
 
 #[cfg(test)]
@@ -128,6 +154,7 @@ mod tests {
                     stream_type: StreamType::Logs,
                     filters: HashMap::new(),
                     dropped_dimensions: vec![],
+                    filter_spellings: HashMap::new(),
                 }]),
                 ..Default::default()
             },
@@ -264,5 +291,35 @@ mod tests {
         assert_eq!(resp.total, 600);
         assert_eq!(resp.values.len(), MAX_RESOURCES);
         assert_eq!(resp.values[0].value, "h599");
+    }
+
+    #[test]
+    fn service_resource_rows_keep_the_key_and_carry_the_label() {
+        let row = |value: &str| ResourceValue {
+            value: value.into(),
+            last_seen: 1,
+            streams: vec![],
+            label: None,
+        };
+        let response = |dimension: &str, values| ResourcesResponse {
+            dimension: dimension.into(),
+            values,
+            total: 2,
+            source: "registry".into(),
+        };
+        let shown = HashMap::from([("payments-api".to_string(), "PaymentService".to_string())]);
+        let label = |v: &str| shown.get(v).cloned().unwrap_or_else(|| v.to_string());
+        let mut service = response("service", vec![row("payments-api"), row("nats")]);
+        label_resources(&mut service, label);
+        let body = serde_json::to_value(&service).unwrap();
+        assert_eq!(
+            body["values"][0],
+            serde_json::json!({"value": "payments-api", "last_seen": 1, "streams": [], "label": "PaymentService"})
+        );
+        assert_eq!(body["values"][1]["label"], "nats");
+        let mut host = response("host", vec![row("web-1")]);
+        label_resources(&mut host, label);
+        let body = serde_json::to_value(&host).unwrap();
+        assert!(body["values"][0].get("label").is_none());
     }
 }

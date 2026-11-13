@@ -404,7 +404,8 @@
     },
     "noServicesCatalog": {
       "title": "No services found",
-      "description": "No services were detected in the selected time range. Try a wider range or a different stream."
+      "description": "No services were detected in the selected time range. Try a wider range or a different stream.",
+      "noTraceStream": "No services were detected in the selected time range."
     },
     "noSearchHistory": {
       "title": "No search history yet",
@@ -12658,7 +12659,7 @@
       "filterActive": "Active",
       "alertCount": "Alerts",
       "alertCountAxis": "Alert Count",
-      "correlatedAlertsCount": "Alerts: {count} correlated alerts",
+      "correlatedAlertsCount": "Alerts: {count} correlated alert | Alerts: {count} correlated alerts",
       "noCorrelatedLogs": "No correlated logs found",
       "noCorrelatedMetrics": "No correlated metrics found",
       "noCorrelatedTraces": "No correlated traces found",
@@ -13154,7 +13155,8 @@
           "context": "Context",
           "unclassified": "Other"
         }
-      }
+      },
+      "alertCountChip": "{count} alert | {count} alerts"
     },
     "alertDetails": {
       "sql": "SQL",
@@ -14707,7 +14709,8 @@
       "sourcePlatformResolve": "platform resolve",
       "sourceLegacy": "legacy payload",
       "sourceLegacyPayload": "the kind's own JSON payload (generic webhook)"
-    }
+    },
+    "serviceGraphTooltipServiceDetected": "Service: {name} (detected as {detected})"
   },
   "alert_dependencies": {
     "actionOpen": "Open",
@@ -15396,7 +15399,8 @@
           "noLogsStream": "No logs stream for service {service}",
           "noTracesStream": "No traces stream for service {service}",
           "noServiceField": "No service field in this stream",
-          "notApplied": "Not applied: {labels} (no matching field in this stream)"
+          "notApplied": "Not applied: {labels} (no matching field in this stream)",
+          "service": "Service"
         },
         "forecast": {
           "label": "Forecast",
@@ -16339,7 +16343,10 @@
       "reasonCardinality": "{level} cardinality",
       "reasonCoverage": "{coverage}% coverage",
       "reasonAcrossStreamTypes": "across {types}",
-      "reasonIdealForDisambiguation": "{details} — ideal for service disambiguation"
+      "reasonIdealForDisambiguation": "{details} — ideal for service disambiguation",
+      "trackedK8sWorkload": "K8s Workload",
+      "trackedK8sPod": "K8s Pod",
+      "serviceCountFailed": "Couldn't load the service count"
     },
     "testModelMatchDialog": {
       "modelNamePlaceholder": "e.g. {example}",
@@ -34859,6 +34866,780 @@
       "invalid": "Enter a number above 0.",
       "invalidErrors": "Enter 0 or more.",
       "anyErrorNote": "AutoObserve found no errors for {service} in the last 7 days, so this alert fires on any error. Raise the threshold if some errors are normal."
+    }
+  },
+  "serviceVersions": {
+    "image": {
+      "short": "img {image}",
+      "alsoLive": "Also live: {versions}",
+      "moreImages": "and {count} more image of {version} · type to search | and {count} more images of {version} · type to search",
+      "moreImagesRow": "and {count} more image of {version} | and {count} more images of {version}",
+      "showThem": "show it | show them"
+    },
+    "where": {
+      "outside": "Outside Kubernetes",
+      "outsideReason": "Outside Kubernetes · all instances of this service together"
+    },
+    "versionSource": {
+      "image": "from the container image",
+      "imageNote": "The service sends no service.version, so the image tag names its versions.",
+      "noSpanVersion": "Compare is off: spans carry no version yet"
+    },
+    "verdict": {
+      "ok": "OK",
+      "watch": "Possible regression",
+      "regressed": "Regressed",
+      "insufficient": "Not enough data",
+      "firstVersion": "First version",
+      "preExisting": "Pre-existing",
+      "notServing": "Not serving",
+      "capped": "Not evaluated (limit)",
+      "restricted": "Restricted",
+      "rollbackRecovered": "Rolled back · recovered",
+      "rollbackStillWorse": "Rolled back · still worse"
+    },
+    "env": {
+      "attribute": "Resource attribute",
+      "rum": "RUM SDK",
+      "override": "Override",
+      "namespace": "Namespace",
+      "cluster": "Cluster",
+      "workload": "Workload",
+      "clusterName": "Cluster name",
+      "namespaceName": "Namespace name",
+      "default": "No env",
+      "noCluster": "Add k8s.cluster.name in your collector to separate clusters",
+      "alsoSeenIn": "Also seen in: {envs}",
+      "moreEnvs": "{count} more",
+      "inferred": "inferred",
+      "noEnv": "No env"
+    },
+    "actions": {
+      "share": "Share",
+      "copyLink": "Copy link",
+      "pin": "Pin",
+      "unpin": "Unpin",
+      "openIncident": "Open incident",
+      "openService": "Open service",
+      "backToService": "Back to {service}",
+      "retry": "Retry",
+      "shorterWindow": "Use a shorter window",
+      "showThem": "Show it | Show them",
+      "compare": "Compare",
+      "copySnippet": "Copy snippet",
+      "close": "Close",
+      "resize": "Resize comparison",
+      "shareWaiting": "Share is available once the compare loads.",
+      "incidentNoVerdict": "Only a deploy's own verdict can open an incident. This compare has none.",
+      "incidentRestricted": "You can't open an incident from a restricted result."
+    },
+    "catalog": {
+      "env": "Env",
+      "where": "Where",
+      "deployVerdict": "Deploy verdict",
+      "noVersion": "No version",
+      "unavailable": "Verdicts unavailable: filter disabled",
+      "cellUnavailable": "unavailable",
+      "empty": "No services in the version registry",
+      "severityCount": "{count} {verdict}",
+      "deployedLabel": "Deployed",
+      "health": "Health",
+      "version": "Version",
+      "any": "Any",
+      "allEnvs": "All envs",
+      "disabled": "Disabled",
+      "noVersionBand": "{count} sends no version, so it gets no deploy verdict. | {count} send no version, so they get no deploy verdict.",
+      "noVersionBandCount": "{count} service | {count} services",
+      "noVersionHint": "{count} {scope} service sends no version, so it gets no deploy verdict and no deploy markers. Set {attribute} at build or deploy time. | {count} {scope} services send no version, so they get no deploy verdict and no deploy markers. Set {attribute} at build or deploy time.",
+      "noVersionHintCount": "{count} of {total}",
+      "howToAddVersion": "How to add a version",
+      "versionsUnavailable": "{title}: version tracking did not respond. Trace metrics below are current. The Env and Deploy verdict filters are disabled until it recovers.",
+      "versionsUnavailableTitle": "Versions and deploy verdicts are unavailable",
+      "verdictsUnavailable": "{title}: trace metrics below are current. The Deploy verdict filter is disabled until it recovers.",
+      "verdictsUnavailableTitle": "Deploy verdicts are unavailable",
+      "vsBaseline": "vs {version}",
+      "vsBaselineIn": "vs {version} in {where}",
+      "vsBaselineOutside": "vs {version} outside Kubernetes",
+      "vsServingBefore": "vs {version}, serving before",
+      "liveCount": "+{count} live",
+      "rolledBackFrom": "rolled back from {version}",
+      "noVersionCell": "no version",
+      "noVersionTip": "Set service.version at build or deploy time to get deploy verdicts.",
+      "noCluster": "(no cluster)",
+      "sortedByVerdict": "Sorted by deploy verdict: {verdicts}",
+      "secondsAgo": "{count}s ago",
+      "minutesAgo": "{count}m ago",
+      "hoursAgo": "{count}h ago",
+      "daysAgo": "{count}d ago",
+      "warmingUp": "Deploy tracking is warming up. Deploy verdicts start with your next deploy after {time}.",
+      "healthNoTraffic": "No traffic in the window",
+      "moreChips": "+{count} more | +{count} more",
+      "warmingUpNoEpoch": "Deploy tracking is warming up. Deploy verdicts start with your next deploy.",
+      "noDeployRecorded": "No deploy recorded"
+    },
+    "panel": {
+      "versions": "Versions",
+      "deployCount": "{count} deploys",
+      "purged": "{count} older versions without traffic were removed",
+      "selectTwo": "Select two versions to compare",
+      "version": "Version",
+      "asName": "as {name}",
+      "columns": {
+        "firstSeen": "First seen",
+        "lastSeen": "Last seen",
+        "signals": "Signals seen"
+      },
+      "live": "Live",
+      "stopped": "stopped {ago}",
+      "current": "current",
+      "baselineSource": {
+        "picked": "baseline · picked",
+        "automatic": "baseline · automatic",
+        "last_good": "baseline · last good"
+      },
+      "compareTo": "Compare {from} → {to}",
+      "showStopped": "Show stopped versions",
+      "showStoppedHint": "from the service registry, all time",
+      "transitionsIn": "Deploy transitions in {where}",
+      "transitionsOutside": "Deploy transitions outside Kubernetes",
+      "transition": {
+        "deploy": "deploy",
+        "redeploy": "redeploy",
+        "rollbackFrom": "rollback from {version}"
+      },
+      "vsBaseline": "vs {version}",
+      "health": "Health",
+      "clickToCompare": "click to compare",
+      "newError": "New",
+      "errorCounts": "{b} → {a}",
+      "seeWhatChanged": "See what changed",
+      "durationP95": "Duration p95",
+      "whereUnscoped": "Charts and tables are not scoped to {where}: the stream schema could not be read.",
+      "whereUnscopedOutside": "Charts and tables are not scoped to the instances outside Kubernetes: the stream schema could not be read.",
+      "byVersion": "By version",
+      "onlyOneVersion": "Only one version so far"
+    },
+    "compare": {
+      "baseline": "Compare with",
+      "previous": "Previous version",
+      "canary": "Canary",
+      "auto": "Automatic baseline",
+      "pickVersion": "Pick version",
+      "searchVersions": "Search versions",
+      "traces": "Traces",
+      "rum": "RUM",
+      "whatChanged": "What changed",
+      "allEndpoints": "All endpoints",
+      "tooEarly": "Too early to judge",
+      "changed": "Changed since release verdict",
+      "restricted": "Verdict hidden: needs read access to its source streams",
+      "empty": "No comparison data",
+      "error": "Comparison unavailable",
+      "denied": "You do not have access to this comparison",
+      "ambiguous": "Choose versions to resolve this link",
+      "cwv": {
+        "good": "Good",
+        "ni": "Needs improvement",
+        "poor": "Poor"
+      },
+      "baselineSwitched": "Baseline switched at {at}",
+      "overlay": "Metric by version in five-minute buckets",
+      "before": "before {version}",
+      "after": "after {version}",
+      "legend": "· Red or green = real change (its 90% range excludes zero) · grey = noise · ranges are 90%",
+      "window": "{start}–{end}",
+      "tile": {
+        "requests": "Requests / min",
+        "error_rate": "Error rate",
+        "p95": "Latency p95",
+        "p99": "Latency p99",
+        "error_view_rate": "Error-view rate",
+        "lcp_p75": "LCP p75",
+        "inp_p75": "INP p75",
+        "cls_p75": "CLS p75",
+        "noise": "noise",
+        "range": "range {lo} to {hi}",
+        "waiting": "Not enough data to judge",
+        "progress": "{have} of {need} requests"
+      },
+      "unit": {
+        "ms": "{value} ms",
+        "s": "{value} s",
+        "percent": "{value}%",
+        "points": "{value} points"
+      },
+      "inline": {
+        "requests": "requests",
+        "error_rate": "error rate",
+        "p50": "p50",
+        "p95": "p95",
+        "p99": "p99",
+        "error_view_rate": "error-view rate",
+        "lcp_p75": "LCP",
+        "inp_p75": "INP",
+        "cls_p75": "CLS"
+      },
+      "why": {
+        "rose": "Why {verdict}: {metric} rose by a real {delta}.",
+        "new_error_types": "Why {verdict}: {version} shows error types the baseline never had.",
+        "below_min_effect": "Why {verdict}: the change is real, but below the regression threshold.",
+        "seen_in_k8s_no_requests": "{baseline} still takes all traffic.",
+        "traffic_drop": "Requests fell sharply after {version} started; no verdict on latency or errors while it serves nothing.",
+        "recovered": "Why recovered: back on {version}, {metric} fell by a real {delta} against {baseline}, the version serving before the rollback, and is back to its level before {baseline}.",
+        "stillWorse": "Why still worse: back on {version}, {metric} is still worse than it was before {baseline}.",
+        "improved": "Why {verdict}: {metrics} improved, and nothing got worse.",
+        "noise": "Why {verdict}: every change is within noise.",
+        "rebuilt": "{version} was rebuilt: same service.version, new image."
+      },
+      "windowLine": "Before: {before} {beforeWindow} · after: {after} {afterWindow} ({mode}) · {requests} · 90% ranges",
+      "armIn": "{version} in {where}",
+      "armOutside": "{version} outside Kubernetes",
+      "modeSequential": "equal windows",
+      "modeConcurrent": "running concurrently, same wall clock",
+      "requestsPair": "{b} and {a} requests",
+      "viewsPair": "{b} and {a} views",
+      "progressLine": "{have} of {need} requests",
+      "region": "{cluster}: {verdict}",
+      "canaryFallback": "If {baseline} drains before it reaches {need} requests, the baseline switches to {baseline} {window} (the {span} before the rollout began) and the verdict is computed then. You will not be left waiting.",
+      "rolledBackFrom": "Rolled back from {version}",
+      "rollbackSuffix": "· rollback",
+      "redeploySuffix": "· redeploy",
+      "baselineFromChip": "baseline from",
+      "whereChip": "where",
+      "envChip": "env",
+      "detectedAs": "detected as {name}",
+      "baselineFromTip": "No earlier version in {where}; compared with the same env ({env}) in {baselineWhere}.",
+      "baselineFromTipOutside": "No earlier version outside Kubernetes; compared with the same env ({env}) in {baselineWhere}.",
+      "baselineFromTipBaselineOutside": "No earlier version in {where}; compared with the same env ({env}) outside Kubernetes.",
+      "baselineRule": {
+        "previous": "serving before this deploy",
+        "canary": "running concurrently",
+        "env_fallback": "same env, first version in {where}",
+        "env_fallback_outside": "same env, first version outside Kubernetes",
+        "manual": "picked by you",
+        "rollback": "serving before the rollback",
+        "none": "first version",
+        "previous_by_first_seen": "previous by first seen (no deploy history)",
+        "pre_existing": "running before deploy tracking started",
+        "warming_up": "deploy tracking is warming up"
+      },
+      "notServingRequests": "Requests, {window}",
+      "notServingNote": "Nothing to compare until {version} serves traffic.",
+      "chartHint": "click a tile to switch the metric",
+      "chartHintEarly": "no red or green until each version has enough requests",
+      "errorTypes": "Error types",
+      "errorTypesLegend": "New = not seen in {before} · Gone = not seen in {after} · Shared = seen in both",
+      "allErrorsOn": "All errors on {version}",
+      "endpointsTitle": "Endpoints by worst regression",
+      "tooEarlyCount": "Too early to judge · {n} requests so far",
+      "newErrorsEarly": "New error types: seen in {version}, not in the baseline yet.",
+      "column": {
+        "change": "Change",
+        "errorType": "Error type",
+        "source": "Source",
+        "endpoint": "Endpoint",
+        "p95Change": "p95 change",
+        "errorChange": "Error change",
+        "callsOn": "Calls on {version}"
+      },
+      "changeKind": {
+        "introduced": "New",
+        "fixed": "Gone",
+        "shared": "Shared"
+      },
+      "pointsShort": "{value} pts",
+      "baselineAuto": "Baseline: {version} · {rule}",
+      "baselineAutoShare": "Baseline: {version} · {rule} · {share}% of traffic",
+      "baselineAutoFrom": "Baseline: {version} from {where} · {rule}",
+      "baselineAutoFromOutside": "Baseline: {version} from outside Kubernetes · {rule}",
+      "requestsOf": "{count} req ({version})",
+      "requestsByVersion": "Requests / min by version",
+      "lastGood": "Last good:",
+      "lastGoodRan": "({verdict}, ran {duration})",
+      "lastGoodVerdict": "({verdict})",
+      "canaryFallbackRule": "If {baseline} drains before it reaches {need} requests, the baseline switches to the window before the rollout began and the verdict is computed then. You will not be left waiting.",
+      "armHourly": "Older than a day, so this side is read in whole hours.",
+      "notCompared": "not compared",
+      "pods": {
+        "title": "Pods in {where}",
+        "titleOutside": "Pods outside Kubernetes",
+        "events": "Pod events",
+        "logs": "Pod logs",
+        "column": {
+          "pod": "Pod",
+          "version": "Version",
+          "started": "Started",
+          "status": "Status",
+          "ready": "Ready",
+          "requests": "Requests ({window})"
+        },
+        "more": "+{count} more",
+        "eventsNoStream": "No readable k8s_events stream carries pod events.",
+        "logsNoStream": "No log stream carries this pod's name and namespace fields.",
+        "logsNoClusterField": "This log stream has no cluster field; logs from same-named pods in other clusters may be included",
+        "linkFailed": "The pod link could not be opened. Try again.",
+        "status": {
+          "running": "Running"
+        },
+        "ready": {
+          "yes": "Yes",
+          "no": "No"
+        }
+      },
+      "drill": {
+        "inp": {
+          "title": "Slowest interactions in {version} (INP)",
+          "target": "Interaction · page",
+          "p75": "p75 on {version}",
+          "pageCount": "{page} · {count} interaction | {page} · {count} interactions",
+          "replay": "Replay"
+        },
+        "breakdown": {
+          "title": "Breakdown",
+          "column": "Breakdown",
+          "change": "{metric} change",
+          "dims": {
+            "browser": "Browser",
+            "device": "Device",
+            "country": "Country"
+          },
+          "dimReason": "{dim}: {reason}"
+        },
+        "pages": {
+          "tab": "All pages",
+          "title": "Pages by worst regression",
+          "page": "Page",
+          "vitalChange": "Vital change",
+          "newErrors": "New errors",
+          "views": "Views on {version}",
+          "newCount": "{count} new",
+          "worst": "{metric} {change}",
+          "sessions": "Sessions / replays"
+        },
+        "reasons": {
+          "sdkNoInpTarget": "Update the RUM SDK so it reports which element each interaction hit",
+          "rawAgedOut": "Raw RUM aged out for this window",
+          "fieldAbsent": "Not collected for this app",
+          "timeout": "Timed out",
+          "error": "Could not be loaded"
+        },
+        "noise": "noise",
+        "truncated": "Showing the top rows only",
+        "bandCrossed": "Core Web Vitals band changed",
+        "metric": {
+          "lcp_p75": "LCP",
+          "inp_p75": "INP",
+          "cls_p75": "CLS"
+        },
+        "inpGoodLimit": "(≤200 ms)",
+        "bandNiShort": "Needs impr.",
+        "tile": {
+          "js_errors": "JS errors / 1k sessions",
+          "sessions": "Sessions"
+        },
+        "sentence": {
+          "headline": "{verdict}: {metric} {change} ({base} → {new}).",
+          "headlineWithImproved": "{verdict}: {metric} {change} ({base} → {new}); {improved}."
+        },
+        "chart": {
+          "belowFloor": "{version} has {have} of {need} samples, too few to plot",
+          "noData": "{version} has no samples in this window",
+          "noDataBoth": "No samples in either window"
+        },
+        "why": {
+          "withinGood": "Why {verdict}: the {metric} change is real, but {metric} is still Good ({limit}) and below the regression threshold.",
+          "belowEffect": "Why {verdict}: the {metric} change is real, but below the regression threshold."
+        },
+        "goodLimit": {
+          "lcp_p75": "≤2.5 s",
+          "inp_p75": "≤200 ms",
+          "cls_p75": "≤0.1"
+        },
+        "windowLine": "Before: {before} {beforeWindow} · after: {after} {afterWindow} · {sessions} · 90% ranges",
+        "sessionsPair": "{b} and {a} sessions"
+      },
+      "baselineAutoNone": "No baseline: {rule}",
+      "notes": {
+        "baselineUnavailable": "Baseline unavailable: its data could not be read. Retry, or pick a baseline.",
+        "transitionMissing": "Requested deploy transition is no longer available; comparing the version with an automatic baseline."
+      },
+      "endpointNew": "new · {rate}",
+      "windowLineFirst": "{version} {window} · {requests}",
+      "windowLineFirstBare": "{version} {window}",
+      "windowLineUnequal": "Before: {before} {beforeWindow} · after: {after} {afterWindow} · {requests} · 90% ranges",
+      "requestsCount": "{count} requests",
+      "chartHintFirst": "No earlier version to compare with.",
+      "endpointsIn": "Endpoints in {version}",
+      "storedFrom": "Stored verdict from {time}.",
+      "storedWindows": "Before: {before} {beforeWindow} · after: {after} {afterWindow}",
+      "detailsFailed": "Couldn't load the details for {window}.",
+      "detailGap": "{subject} detail doesn't cover {span}, so New and Gone aren't marked",
+      "detailGapSubject": {
+        "endpoint": "Endpoint",
+        "page": "Page",
+        "error": "Error"
+      },
+      "detailGapSpan": {
+        "this": "this window",
+        "both": "both windows"
+      },
+      "notServingSuffix": "· not serving",
+      "detailsFailedBare": "Couldn't load the details of this compare.",
+      "windowLineBare": "Before: {before} {beforeWindow} · after: {after} {afterWindow} ({mode}) · 90% ranges",
+      "windowLineUnequalBare": "Before: {before} {beforeWindow} · after: {after} {afterWindow} · 90% ranges"
+    },
+    "sentence": {
+      "ok": "OK: no real change · {n} requests",
+      "watch": "Possible regression: {metric} {base} → {new}.",
+      "regressed": "Regressed: {metric} {base} → {new}.",
+      "insufficient": "Not enough data yet. No verdict until each version has {need} requests ({metric}).",
+      "firstVersion": "First version",
+      "preExisting": "Running before deploy tracking started; verdicts start with the next deploy",
+      "notServing": "Not serving: {version} serves no requests.",
+      "capped": "Not evaluated: the org’s limit of 200 running evaluations was reached",
+      "rollbackRecovered": "Rolled back · recovered: {metric} {base} → {new}.",
+      "rollbackStillWorse": "Rolled back · still worse: {metric} {base} → {new}.",
+      "watchBare": "Possible regression in {version}.",
+      "regressedBare": "Regressed: {version} is worse than the baseline.",
+      "insufficientBare": "Not enough data yet. No verdict until each version has {need} requests.",
+      "notServingPods": "Not serving: {version} runs on pods with no requests.",
+      "notServingDrop": "Not serving: requests dropped sharply since {version}.",
+      "rollbackRecoveredBare": "Rolled back to {version} from {from} · recovered.",
+      "rollbackStillWorseBare": "Rolled back to {version} from {from} · still worse.",
+      "preExistingSince": "Running before deploy tracking started ({epoch}); verdicts start with the next deploy",
+      "okImproved": "OK · {n} requests"
+    },
+    "evidence": {
+      "traces": "Traces",
+      "sessions": "Sessions",
+      "slowTraces": "Slow traces",
+      "errorDetails": "Error details"
+    },
+    "setup": {
+      "title": "This service sends no version",
+      "titleFor": "No versions reported for {service}",
+      "intro": "Versions appear once telemetry carries one. Inject it at build or deploy time and every rollout shows up here, with a deploy verdict.",
+      "otelTitle": "OpenTelemetry resource (deploy time)",
+      "sdkTitle": "RUM SDK init (build time)",
+      "hint": "Use the release tag. No tag? {sha} works, but versions then read as hashes.",
+      "guide": "View setup guide",
+      "dialogTitle": "How to add a version"
+    },
+    "incident": {
+      "created": "Incident created",
+      "attached": "Attached to existing incident",
+      "failed": "Could not open incident"
+    },
+    "rum": {
+      "strip": {
+        "label": "RUM version status",
+        "switchApp": "Switch RUM app",
+        "moreApps": "· {count} more apps",
+        "moreApp": "· 1 more app",
+        "deployed": "deployed {time}",
+        "rolledBackFrom": "rolled back from {version}",
+        "headline": "{metric} {change} ({base} → {new})",
+        "improved": "{metrics} improved",
+        "unavailable": "Version status unavailable",
+        "headlineWithImproved": "{headline}, {improved}"
+      },
+      "noVersion": {
+        "hint": "No {version} seen for {app} in {range}. Set {version} in {init} to get deploy markers and version comparisons.",
+        "rangeRelative": "the last {period}",
+        "rangeAbsolute": "the selected time range",
+        "setupGuide": "Setup guide",
+        "dismiss": "Dismiss",
+        "copied": "Snippet copied"
+      },
+      "markers": {
+        "unavailable": "verdict unavailable · retry",
+        "compareWithPrevious": "Compare with previous"
+      },
+      "compareVersions": "Compare versions"
+    },
+    "envEdit": {
+      "clickToChange": "click to change",
+      "clickToSet": "click to set one",
+      "title": "Change env",
+      "now": "Now",
+      "appliesTo": "Applies to",
+      "scope": {
+        "where": "namespace {namespace} in cluster {cluster}",
+        "whereNoCluster": "namespace {namespace} (no cluster)",
+        "whereFlat": "all services in {where}",
+        "whereNone": "all services outside Kubernetes",
+        "service": "only {service} here",
+        "cluster": "all namespaces in cluster {cluster}"
+      },
+      "hint": {
+        "both": "Widen to the whole cluster {cluster}, or narrow to only {service} here.",
+        "widen": "Widen to the whole cluster {cluster}.",
+        "narrow": "Narrow to only {service} here."
+      },
+      "impactServices": "{n} service | {n} services",
+      "impactVersions": "{n} version | {n} versions",
+      "impactTail": "in this scope get the new label.",
+      "impactNote": "Applies at once, to past versions and verdicts too. Compares keep their baselines: they group by where, not env.",
+      "setTo": "Set env to",
+      "current": "current · {n} service org-wide · no change | current · {n} services org-wide · no change",
+      "detected": "detected",
+      "new": "New…",
+      "newHint": "type a label, Enter applies",
+      "newPlaceholder": "New env label",
+      "invalid": "Use 1 to 128 letters, digits, dots, dashes or underscores.",
+      "footer": "Clicking an env saves it, with Undo. Listed in Environments & versions.",
+      "readonly": "Ask an admin to change this",
+      "loadError": "Couldn't load envs.",
+      "saved": "Env set to {env} for {n} service in {scope} | Env set to {env} for {n} services in {scope}",
+      "savedOutside": "Env set to {env} for {n} service outside Kubernetes | Env set to {env} for {n} services outside Kubernetes",
+      "undo": "Undo",
+      "viewOverrides": "View overrides",
+      "toastScope": {
+        "where": "{namespace} ({cluster})",
+        "whereNoCluster": "{namespace}",
+        "whereFlat": "{where}",
+        "whereNone": "all services outside Kubernetes",
+        "service": "{service} in {where}",
+        "serviceOutside": "{service} outside Kubernetes",
+        "cluster": "cluster {cluster}"
+      },
+      "errors": {
+        "invalidValue": "That env label isn't valid. Use letters, digits, dots, dashes or underscores.",
+        "scope": "This scope can't take an override here. Pick another Applies to option.",
+        "notFound": "Nothing in this scope was seen in the last 7 days. Refresh and try again.",
+        "limit": "The org has reached its override limit. Remove one in Environments & versions.",
+        "unavailable": "The service registry is unavailable. Try again in a few seconds.",
+        "generic": "Couldn't change the env. Try again."
+      },
+      "source": {
+        "attribute": "from your {attribute} attribute ({value})",
+        "namespace": "inferred from namespace {value}",
+        "cluster": "inferred from cluster {value}",
+        "workload": "inferred from workload {value}",
+        "cluster_name": "inferred from cluster name {value} (no env word found)",
+        "namespace_name": "inferred from namespace name {value} (no cluster attribute, no env word found)",
+        "default": "this service sends no deployment.environment and runs outside Kubernetes",
+        "defaultInPlace": "this service sends no deployment.environment",
+        "rum": "from RUM {value}",
+        "override": "set by {who}, {date}",
+        "overrideUnknown": "override"
+      },
+      "kind": {
+        "attribute": "deployment.environment",
+        "namespace": "namespace",
+        "cluster": "cluster",
+        "workload": "workload",
+        "cluster_name": "cluster name",
+        "namespace_name": "namespace name",
+        "default": "no env",
+        "rum": "RUM env",
+        "override": "override"
+      },
+      "detectedLine": "detected: {env} · {kind}",
+      "where": {
+        "k8s": "cluster {cluster} · namespace {namespace}",
+        "noCluster": "namespace {namespace} · no cluster attribute",
+        "flat": "{where}",
+        "none": "Where: outside Kubernetes, all its instances together"
+      },
+      "shadow": {
+        "replaces": "Also removes the override for {scope} ({env}), so this label follows.",
+        "broader": "{scope} also has an override ({env}). Pick that scope in Applies to, then the detected label."
+      },
+      "partlyChanged": "Couldn't undo the change. The env may be partly changed; the chip shows the server's state.",
+      "savedService": "Env set to {env} for {service} in {where}",
+      "savedServiceOutside": "Env set to {env} for {service} outside Kubernetes",
+      "orgServices": "{n} service org-wide | {n} services org-wide"
+    },
+    "settings": {
+      "tab": "Environments & versions",
+      "intro": "Envs and versions are detected automatically. Overrides made from an env chip are listed here.",
+      "howDetection": "How detection works",
+      "title": "Env overrides",
+      "subtitle": "{n} · they win over detection for what they match",
+      "cols": {
+        "matches": "Matches",
+        "inferredSetTo": "Inferred → Set to",
+        "who": "Who",
+        "when": "When"
+      },
+      "remove": "Remove",
+      "match": {
+        "where": "namespace {namespace} in cluster {cluster}",
+        "whereNoCluster": "namespace {namespace} (no cluster)",
+        "whereFlat": "{where}",
+        "cluster": "cluster {cluster}",
+        "allNamespaces": "(all namespaces)",
+        "service": "{service} in {where}",
+        "serviceOutside": "{service} outside Kubernetes"
+      },
+      "from": "from {kind}",
+      "today": "Today {time}",
+      "footer": "Add one with Change env on any env chip: Discovered Services, catalog, service panel, compare and correlation drawers.",
+      "emptyTitle": "No overrides",
+      "emptyBody": "Every env comes from {attribute}, a prod, staging, dev… word in the namespace, cluster or workload name, or the cluster name. If one is wrong, click its env chip anywhere (Discovered Services, the catalog, a panel or drawer) and pick {changeEnv}.",
+      "versionsTitle": "Versions",
+      "versionsNote": "Trailing git-hash segments are stripped automatically: {raw} → {clean}. Nothing to configure.",
+      "removed": "Override removed",
+      "undo": "Undo",
+      "removeFailed": "Couldn't remove the override. Try again.",
+      "undoFailed": "Couldn't restore the override. Set it again from its env chip.",
+      "loadError": "Couldn't load env overrides.",
+      "unavailable": "Env overrides are unavailable right now. Try again in a few seconds.",
+      "denied": "You don't have access to env overrides."
+    },
+    "names": {
+      "detectedAs": "detected as {name}",
+      "traceNameDetectedAs": "trace name · detected as {name}",
+      "qualifier": "· {qualifier}",
+      "ambiguity": "covers {count} trace service | covers {count} trace services",
+      "candidatesTitle": "{name} covers {count} trace service | {name} covers {count} trace services",
+      "source": {
+        "trace": "from traces",
+        "k8sWorkload": "via k8s workload alias",
+        "rename": "via rename alias",
+        "rumService": "via RUM service alias",
+        "detection": "detected (no trace name)"
+      },
+      "serviceChip": "service",
+      "detectedFrom": "detected from {field}",
+      "candidatesNote": "Correlation keeps matching on {name}.",
+      "reviewNames": "Review names",
+      "qualifierWhy": "{qualifier} added: another service is also named {name}",
+      "placeholder": "Placeholder name sent by the SDK",
+      "placeholderHint": "Set {attribute} in the SDK to name it",
+      "noServiceName": "No service name was sent"
+    },
+    "correlation": {
+      "openService": "Open service",
+      "versionChip": "version",
+      "versionFilter": "version:",
+      "allVersions": "All versions",
+      "versionsLine": "{count} version of {service} sent spans in this window: | {count} versions of {service} sent spans in this window:",
+      "versionOnPods": "{version} on {count} pod | {version} on {count} pods",
+      "podRunsVersion": "{pod} runs {version}",
+      "versionColumn": "Version",
+      "deployVerdict": "Deploy verdict {from} → {to}",
+      "deployVerdictFirst": "Deploy verdict {to}",
+      "byPod": "picked from this log's pod",
+      "byPodSpans": "Pod {pod} sent its spans from cluster {cluster}, namespace {namespace}.",
+      "byPodLogCluster": "This log's own cluster field reads {cluster}."
+    },
+    "discovered": {
+      "banner": "Service = name from traces. \"detected as\" = the name correlation matches on (kept, shown muted). Kubernetes workload = the deployment or statefulset the pods belong to.",
+      "tiles": {
+        "discovered": "Discovered (all signals)",
+        "discoveredSub": "{n} of these send traces",
+        "envs": "Envs detected",
+        "overrides": "Env overrides",
+        "view": "View →",
+        "names": "Names to review",
+        "review": "Review →",
+        "versions": "Versions",
+        "versionsStripped": "{count} git hash stripped | {count} git hashes stripped"
+      },
+      "view": {
+        "label": "Discovered Services view",
+        "services": "Services",
+        "nameReview": "Name review"
+      },
+      "cols": {
+        "service": "Service",
+        "workload": "Kubernetes workload",
+        "identity": "Instance identity",
+        "telemetry": "Telemetry coverage",
+        "env": "Env",
+        "version": "Version",
+        "lastSeen": "Last seen"
+      },
+      "noVersion": "no version",
+      "noWorkload": "No Kubernetes workload",
+      "search": "Search service or detected name",
+      "proposedWorkload": "proposed: {workloads}"
+    },
+    "nameReview": {
+      "banner": "Accepting changes only the display: every screen shows the trace name, with the detected name as a muted label. Correlation matching does not change.",
+      "filters": {
+        "label": "Name review filter",
+        "pending": "Pending",
+        "accepted": "Accepted",
+        "rejected": "Rejected"
+      },
+      "acceptHigh": "Accept {n} high-confidence",
+      "acceptHighDone": "Accept {n} high-confidence · done",
+      "cols": {
+        "display": "Display name (from traces)",
+        "detected": "Detected as (Kubernetes workload)",
+        "evidence": "Evidence",
+        "env": "Env",
+        "confidence": "Confidence"
+      },
+      "accept": "Accept",
+      "reject": "Reject",
+      "edit": "Edit display name",
+      "revert": "Revert",
+      "evidence": {
+        "podsShared": "{n} of {total} pods shared",
+        "podsSplit": "{n} pods across {k} services",
+        "renamed": "renamed from {from}"
+      },
+      "envStays": "Env stays per workload: {envs} stay separate",
+      "editor": {
+        "label": "Display as",
+        "hint": "Type a name or pick a trace service. Changes the display only; correlation keeps matching on the detected name.",
+        "save": "Save",
+        "cancel": "Cancel"
+      },
+      "collision": {
+        "message": "{name} is already shown for {existing} ({where}). Two different components would both read \"{plain}\".",
+        "messageNoWhere": "{name} is already shown for {existing}. Two different components would both read \"{plain}\".",
+        "useQualified": "Use {name} ({qualifier})",
+        "keep": "Keep detected name",
+        "skipped": "{n} not accepted: the display name is already shown for another service. Choose for each row below. | {n} not accepted: the display name is already shown for another service. Choose for each row below.",
+        "messageNoExisting": "{name} is already shown for another service. Two different components would both read \"{plain}\"."
+      },
+      "unresolved": {
+        "title": "Unresolved",
+        "sub": "Detected names with no trace service to display them as",
+        "cols": {
+          "name": "Detected name",
+          "seenIn": "Seen in",
+          "why": "Why it has no trace name"
+        },
+        "ambiguous": "One detected name covers pods of {n} trace services ({names})",
+        "noTrace": "No trace service runs on these pods; the detected name is shown as is",
+        "displayAs": "Display as…"
+      },
+      "snack": {
+        "accepted": "Accepted {n} display names: {names} | Accepted {n} display name: {names} | Accepted {n} display names: {names}",
+        "acceptedCount": "Accepted {n} display names | Accepted {n} display name | Accepted {n} display names",
+        "undo": "Undo",
+        "restored": "Restored {n} names | Restored {n} name | Restored {n} names",
+        "undoExpired": "Nothing to undo: the batch is older than 24 hours or was changed since.",
+        "undoFailed": "Couldn't undo. Revert the rows from Accepted."
+      },
+      "states": {
+        "loadError": "Couldn't load the name review list.",
+        "unavailable": "Name review is unavailable right now. Try again in a minute.",
+        "denied": "You don't have permission to view name review.",
+        "readOnly": "You can view display names but not change them.",
+        "emptyPending": "No names to review",
+        "emptyAccepted": "No accepted display names",
+        "emptyRejected": "No rejected suggestions",
+        "emptyBody": "Suggestions appear when a Kubernetes workload sends more than one trace service name or a service is renamed.",
+        "writeFailed": "Couldn't save the change. Try again."
+      },
+      "confidence": {
+        "high": "High",
+        "medium": "Medium",
+        "low": "Low"
+      },
+      "status": {
+        "proposed": "Proposed",
+        "active": "Active",
+        "rejected": "Rejected"
+      },
+      "noHighConfidence": "No high-confidence names"
     }
   }
 }

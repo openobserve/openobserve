@@ -98,6 +98,9 @@ vi.mock("@/composables/useStreamingSearch", () => ({
 vi.mock("@/utils/zincutils", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/utils/zincutils")>()),
   useLocalWrapContent: vi.fn(() => null),
+  useLocalTimezone: vi.fn(() => null),
+  useLocalOrganization: vi.fn(() => null),
+  useLocalCurrentUser: vi.fn(() => null),
 }));
 vi.mock("@/utils/query/sqlUtils", () => ({}));
 vi.mock("@/utils/query/search", () => ({}));

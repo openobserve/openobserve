@@ -87,7 +87,11 @@ const filteredOptions = computed<ComboboxOption[]>(() => {
   }
 
   const lower = needle.toLowerCase();
-  return (props.items ?? []).filter((opt) => opt.label.toLowerCase().includes(lower));
+  return (props.items ?? []).filter(
+    (opt) =>
+      opt.label.toLowerCase().includes(lower) ||
+      (opt.searchText !== undefined && opt.searchText.toLowerCase().includes(lower)),
+  );
 });
 
 // ── Imperative reset ────────────────────────────────────────────────────────
@@ -306,7 +310,15 @@ const hasInsideLabel = computed(
               ]"
               :data-test="parentDataTest ? `${parentDataTest}-option` : undefined"
             >
-              <span class="min-w-0 flex-1 wrap-break-word whitespace-normal">{{
+              <span v-if="option.description" class="flex min-w-0 flex-1 flex-col">
+                <span class="wrap-break-word whitespace-normal">{{ option.label }}</span>
+                <span
+                  class="text-text-secondary text-xs wrap-break-word whitespace-normal"
+                  :data-test="parentDataTest ? `${parentDataTest}-option-description` : undefined"
+                  >{{ option.description }}</span
+                >
+              </span>
+              <span v-else class="min-w-0 flex-1 wrap-break-word whitespace-normal">{{
                 option.label
               }}</span>
               <ComboboxItemIndicator
