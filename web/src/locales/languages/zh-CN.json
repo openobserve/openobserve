@@ -10,7 +10,8 @@
     "toastMessageGeneric": "您的许可证不包含此功能。请联系管理员更新许可证。",
     "bannerMessage": "此功能已锁定。您的许可证需要包含 {feature} 功能。",
     "bannerMessageGeneric": "此页面需要一项您的许可证中未包含的功能。",
-    "headerLocked": "已锁定：需要 {feature}"
+    "headerLocked": "已锁定：需要 {feature}",
+    "availableInEnterprise": "{feature} 适用于 OpenObserve 企业版"
   },
   "emptyState": {
     "illustrations": {
@@ -10368,6 +10369,23 @@
     "services": "服务",
     "recentEvents": "最近事件",
     "investigate": "调查 →",
+    "askAi": {
+      "label": "询问 AI",
+      "hint": "就此询问 AI",
+      "labelFor": "就{item}询问 AI",
+      "chip": {
+        "firing": "触发中的告警",
+        "failing": "失败的规则",
+        "incidents": "未解决的事件",
+        "pipelines": "流水线错误",
+        "delivery": "投递失败",
+        "quiet": "静默的数据流",
+        "critical": "严重告警",
+        "warning": "警告告警",
+        "alert": "告警 · {name}",
+        "incident": "事件 · {name}"
+      }
+    },
     "viewAll": "查看全部",
     "showingOf": "显示 {shown}/{total}",
     "colErrorRate": "错误率",
@@ -12017,6 +12035,12 @@
     "summaryPaused": "已暂停",
     "summaryFailed": "失败",
     "summaryFiring": "触发中",
+    "summaryEvalError": "评估错误",
+    "summaryDeliveryFailed": "投递失败",
+    "levelFilter": "{level} 级别触发中",
+    "levelFilterRemove": "移除筛选：{label}",
+    "levelCritical": "严重",
+    "levelWarning": "警告",
     "summaryRecent": "触发 < 15分钟",
     "summaryTotal": "总计",
     "webhook": "Web Hook",

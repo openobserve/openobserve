@@ -52,6 +52,7 @@ vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }))
 vi.mock("@/views/OverviewTab.vue", () => ({
   default: {
     name: "OverviewTab",
+    emits: ["sendToAiChat"],
     template: '<div data-test="overview-tab-stub"><slot name="top" /></div>',
   },
 }));
@@ -112,6 +113,7 @@ vi.mock("@/composables/useHomeDashboard", async (importOriginal) => {
   };
 });
 const homeReads = vi.hoisted(() => ({ count: 0 }));
+const assistantDoor = vi.hoisted(() => ({ open: vi.fn() }));
 vi.mock("@/composables/assistant", async () => {
   const { computed, reactive } = await import("vue");
   const prefs = await import("@/composables/assistant/prefs");
@@ -125,13 +127,19 @@ vi.mock("@/composables/assistant", async () => {
       return prefs.migrateHome(key);
     },
     writeHome: prefs.writeHome,
+    openAssistant: assistantDoor.open,
+    legacyRelayArgs: (value: unknown) => ({ entryKind: "legacy_relay", relayed: value }),
   };
 });
 vi.mock("@/views/UsageTab.vue", () => ({
   default: { name: "UsageTab", template: '<div data-test="usage-tab-stub" />' },
 }));
 vi.mock("@/components/O2AIChat.vue", () => ({
-  default: { name: "O2AIChat", template: '<div data-test="ai-chat-stub" />' },
+  default: {
+    name: "O2AIChat",
+    props: { aiChatPayload: { type: Object, default: null } },
+    template: '<div data-test="ai-chat-stub" />',
+  },
 }));
 vi.mock("@/views/HomeChatHistory.vue", () => ({
   default: { name: "HomeChatHistory", template: "<div />" },
@@ -329,6 +337,79 @@ describe("HomeView", () => {
 
       expect(has("home-tab-lock-ai")).toBe(false);
       expect(has("ai-chat-stub")).toBe(true);
+    });
+  });
+
+  describe("an Ask AI hand-off from the Overview tab", () => {
+    const handoff = {
+      query: "Why are 3 alerts firing and what should I check first?",
+      chipName: raw("Firing alerts"),
+      newChat: true,
+      autoSend: false,
+      context: { currentPage: "Alerts", org_id: "default" },
+    };
+    const sendFromOverview = async () => {
+      setFlag(false);
+      store.commit("setConfig", {
+        ...store.state.zoConfig,
+        ai_enabled: true,
+        features: { ai_assistant: "enabled" },
+      });
+      openTab("overview");
+      wrapper = mountHome();
+      await flushPromises();
+      wrapper.findComponent({ name: "OverviewTab" }).vm.$emit("sendToAiChat", handoff);
+      await flushPromises();
+    };
+    const tab = () => (wrapper.vm as unknown as { activeHomeTab: string }).activeHomeTab;
+    const chat = () => wrapper.findComponent({ name: "O2AIChat" });
+
+    it("switches to the AI tab and passes the chip payload with a unique id", async () => {
+      await sendFromOverview();
+
+      expect(tab()).toBe("ai");
+      expect(chat().exists()).toBe(true);
+      expect(chat().props("aiChatPayload")).toMatchObject({
+        text: handoff.query,
+        chipName: "Firing alerts",
+        newChat: true,
+        autoSend: false,
+        context: handoff.context,
+      });
+      expect(typeof chat().props("aiChatPayload").id).toBe("number");
+    });
+
+    it("ignores a hand-off while the AI tab is locked", async () => {
+      setFlag(false);
+      store.commit("setConfig", {
+        ...store.state.zoConfig,
+        ai_enabled: false,
+        features: { ai_assistant: "locked" },
+      });
+      openTab("overview");
+      wrapper = mountHome();
+      await flushPromises();
+      wrapper.findComponent({ name: "OverviewTab" }).vm.$emit("sendToAiChat", handoff);
+      await flushPromises();
+
+      expect(tab()).toBe("overview");
+      expect((wrapper.vm as unknown as { aiChatPayload: unknown }).aiChatPayload).toBeNull();
+    });
+
+    it("gives a second hand-off a fresh id so the chat watcher fires again", async () => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      try {
+        await sendFromOverview();
+        const first = chat().props("aiChatPayload").id;
+        vi.setSystemTime(Date.now() + 5);
+        (wrapper.vm as unknown as { activeHomeTab: string }).activeHomeTab = "overview";
+        await flushPromises();
+        wrapper.findComponent({ name: "OverviewTab" }).vm.$emit("sendToAiChat", handoff);
+        await flushPromises();
+        expect(chat().props("aiChatPayload").id).toBeGreaterThan(first);
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 
@@ -640,6 +721,25 @@ describe("HomeView", () => {
       expect(has("assistant-home-tab-stub")).toBe(true);
       expect(has("ai-chat-stub")).toBe(false);
       expect(has("overview-tab-stub")).toBe(false);
+    });
+
+    it("hands an Overview Ask AI to the assistant's door with the flag on, staying on Overview", async () => {
+      flagged(true);
+      assistant.userOrgKey = "k1";
+      assistantDoor.open.mockClear();
+      wrapper = mountHome();
+      await settleAsync();
+      (wrapper.vm as unknown as { activeHomeTab: string }).activeHomeTab = "overview";
+      await settleAsync();
+      const handoff = { query: "Why is checkout slow?", chipName: "Checkout", newChat: true };
+      wrapper.findComponent({ name: "OverviewTab" }).vm.$emit("sendToAiChat", handoff);
+      await settleAsync();
+      expect(assistantDoor.open).toHaveBeenCalledWith({
+        entryKind: "legacy_relay",
+        relayed: handoff,
+      });
+      expect((wrapper.vm as unknown as { activeHomeTab: string }).activeHomeTab).toBe("overview");
+      expect((wrapper.vm as unknown as { aiChatPayload: unknown }).aiChatPayload).toBeNull();
     });
 
     it("hides the AI tab and opens on Overview when AI is off for the org", async () => {

@@ -90,6 +90,10 @@ export function isErrorOutcome(status: unknown): boolean {
   return ERROR.has(normalize(status));
 }
 
+export function isNotifyFailedOutcome(status: unknown): boolean {
+  return normalize(status) === "notifyfailed";
+}
+
 export function isPendingOutcome(status: unknown): boolean {
   return PENDING.has(normalize(status));
 }

@@ -2158,6 +2158,152 @@ describe("AlertList - row actions keep the view", () => {
   });
 });
 
+describe("AlertList - filters from the Overview links", () => {
+  const withQuery = async (query: Record<string, string>) => {
+    router.currentRoute.value.query = query as any;
+    const wrapper: any = await mountAlertList();
+    await flushPromises();
+    return wrapper;
+  };
+
+  it.each([
+    "active",
+    "paused",
+    "failed",
+    "firing",
+    "acknowledged",
+    "recent",
+    "error",
+    "notify_failed",
+  ])("reads ?state=%s into the state filter", async (state) => {
+    const wrapper = await withQuery({ state });
+    expect(wrapper.vm.stateFilter).toBe(state);
+  });
+
+  it("lets ?state win over the saved state and ignores an invalid value", async () => {
+    Object.assign(useListViewState("alerts", {}), { stateFilter: "paused" });
+    expect((await withQuery({ state: "firing" })).vm.stateFilter).toBe("firing");
+    expect((await withQuery({ state: "bogus" })).vm.stateFilter).toBe("paused");
+  });
+
+  it("starts without the saved search when the link carries a state or level", async () => {
+    Object.assign(useListViewState("alerts", {}), { searchQuery: "saved", filterQuery: "f=1" });
+    const linked = await withQuery({ state: "firing" });
+    expect(linked.vm.searchQuery).toBe("");
+    expect(linked.vm.filterQuery).toBe("");
+    expect((await withQuery({ level: "critical" })).vm.searchQuery).toBe("");
+    expect((await withQuery({ state: "bogus" })).vm.searchQuery).toBe("saved");
+  });
+
+  it("clears the level filter with the Total tile", async () => {
+    const wrapper = await withQuery({ state: "firing", level: "critical" });
+    wrapper.vm.onStatSelect("total");
+    expect(wrapper.vm.stateFilter).toBeNull();
+    expect(wrapper.vm.levelFilter).toBeNull();
+  });
+
+  it("clears the level filter when any state tile is selected or deselected", async () => {
+    const wrapper = await withQuery({ state: "firing", level: "critical" });
+    wrapper.vm.onStatSelect("error");
+    expect(wrapper.vm.levelFilter).toBeNull();
+    const again = await withQuery({ state: "firing", level: "critical" });
+    again.vm.onStatSelect("firing");
+    expect(again.vm.stateFilter).toBeNull();
+    expect(again.vm.levelFilter).toBeNull();
+  });
+
+  it("reads ?level and ignores values other than critical and warning", async () => {
+    expect((await withQuery({ level: "critical" })).vm.levelFilter).toBe("critical");
+    expect((await withQuery({ level: "ok" })).vm.levelFilter).toBeNull();
+  });
+
+  it("shows exactly the firing rows at the linked level", async () => {
+    const wrapper = await withQuery({ state: "firing", level: "critical" });
+    wrapper.vm.filteredResults = [
+      { enabled: true, name: "crit", last_outcome: "firing", level: "critical" },
+      { enabled: true, name: "crit-undelivered", last_outcome: "notify_failed", level: "critical" },
+      { enabled: true, name: "warn", last_outcome: "firing", level: "warning" },
+      { enabled: true, name: "crit-ok", last_outcome: "normal", level: "critical" },
+    ];
+    await wrapper.vm.$nextTick();
+    expect(wrapper.vm.displayedAlerts.map((r: any) => r.name)).toEqual([
+      "crit",
+      "crit-undelivered",
+    ]);
+
+    wrapper.vm.clearLevelFilter();
+    await wrapper.vm.$nextTick();
+    expect(wrapper.vm.displayedAlerts.map((r: any) => r.name)).toEqual([
+      "crit",
+      "crit-undelivered",
+      "warn",
+    ]);
+  });
+
+  it("filters rules whose last evaluation errored and alerts whose delivery failed", async () => {
+    const wrapper = await withQuery({});
+    wrapper.vm.filteredResults = [
+      { enabled: true, name: "errored", last_outcome: "error" },
+      { enabled: true, name: "undelivered", last_outcome: "notify_failed" },
+      { enabled: true, name: "firing", last_outcome: "firing" },
+      // A paused rule freezes its last outcome, so it is never counted as failing.
+      { enabled: false, name: "paused-errored", last_outcome: "error" },
+    ];
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.vm.stateCounts).toMatchObject({ error: 1, notify_failed: 1 });
+    wrapper.vm.onStatSelect("error");
+    expect(wrapper.vm.displayedAlerts.map((r: any) => r.name)).toEqual(["errored"]);
+    wrapper.vm.onStatSelect("notify_failed");
+    expect(wrapper.vm.displayedAlerts.map((r: any) => r.name)).toEqual(["undelivered"]);
+  });
+
+  it("strips state and level from the URL after reading them, keeping other keys", async () => {
+    const replace = vi.spyOn(router, "replace").mockResolvedValue(undefined as any);
+    await withQuery({ state: "firing", level: "warning", org_identifier: "acme" });
+    expect(replace).toHaveBeenCalledWith({ query: { org_identifier: "acme" } });
+    replace.mockRestore();
+  });
+
+  it("does not write the URL when the tile or level chip changes later", async () => {
+    const wrapper = await withQuery({ state: "firing", level: "warning" });
+    const replace = vi.spyOn(router, "replace").mockResolvedValue(undefined as any);
+    wrapper.vm.onStatSelect("paused");
+    wrapper.vm.clearLevelFilter();
+    await flushPromises();
+    expect(replace).not.toHaveBeenCalled();
+    replace.mockRestore();
+  });
+
+  it("restores the saved search on a later mount without the param", async () => {
+    Object.assign(useListViewState("alerts", {}), { searchQuery: "saved", filterQuery: "f=1" });
+    await withQuery({ state: "firing" });
+    const again = await withQuery({});
+    expect(again.vm.searchQuery).toBe("saved");
+    expect(again.vm.filterQuery).toBe("f=1");
+  });
+
+  it("starts a linked filter inside the current folder, not across folders", async () => {
+    Object.assign(useListViewState("alerts", {}), { searchAcrossFolders: true });
+    expect((await withQuery({ state: "firing" })).vm.searchAcrossFolders).toBe(false);
+    expect((await withQuery({})).vm.searchAcrossFolders).toBe(true);
+  });
+
+  it("says what pressing the level chip does", async () => {
+    const wrapper = await withQuery({ state: "firing", level: "critical" });
+    expect(
+      wrapper.get('[data-test="alert-list-level-filter-clear"]').attributes("aria-label"),
+    ).toBe("Remove filter: Firing at critical level");
+  });
+
+  it("offers a way to remove the level filter", async () => {
+    const wrapper = await withQuery({ state: "firing", level: "critical" });
+    expect(wrapper.find('[data-test="alert-list-level-filter"]').text()).toContain("critical");
+    await wrapper.get('[data-test="alert-list-level-filter-clear"]').trigger("click");
+    expect(wrapper.find('[data-test="alert-list-level-filter"]').exists()).toBe(false);
+  });
+});
+
 describe("AlertList - view state restoration", () => {
   it("restores the stat-tile chip, sort and page size saved before navigating away", async () => {
     Object.assign(useListViewState("alerts", {}), {
@@ -4077,7 +4223,7 @@ describe("AlertList - first run and the alert library", () => {
     expect(wrapper.find('[data-test="alert-list-empty-new-alert"]').exists()).toBe(true);
   });
 
-  it("renders the summary strip compact, so its six tiles share one row", async () => {
+  it("passes the compact flag to the summary strip", async () => {
     const wrapper: any = await mountList();
     expect(wrapper.findComponent({ name: "OStatStrip" }).props("compact")).toBe(true);
   });

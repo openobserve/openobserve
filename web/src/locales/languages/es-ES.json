@@ -10,7 +10,8 @@
     "toastMessageGeneric": "Tu licencia no incluye esta función. Pide a tu administrador que actualice la licencia.",
     "bannerMessage": "Esta función está bloqueada. Necesita la función {feature} en tu licencia.",
     "bannerMessageGeneric": "Esta página necesita una función que no está en tu licencia.",
-    "headerLocked": "Bloqueada: necesita {feature}"
+    "headerLocked": "Bloqueada: necesita {feature}",
+    "availableInEnterprise": "Disponible en OpenObserve Enterprise: {feature}"
   },
   "emptyState": {
     "illustrations": {
@@ -10368,6 +10369,23 @@
     "services": "Servicios",
     "recentEvents": "Eventos recientes",
     "investigate": "Investiga →",
+    "askAi": {
+      "label": "Preguntar a la IA",
+      "hint": "Preguntar a la IA sobre esto",
+      "labelFor": "Preguntar a la IA sobre {item}",
+      "chip": {
+        "firing": "Alertas disparadas",
+        "failing": "Reglas fallidas",
+        "incidents": "Incidentes abiertos",
+        "pipelines": "Errores de pipelines",
+        "delivery": "Fallos de entrega",
+        "quiet": "Streams inactivos",
+        "critical": "Alertas críticas",
+        "warning": "Alertas de advertencia",
+        "alert": "Alerta · {name}",
+        "incident": "Incidente · {name}"
+      }
+    },
     "viewAll": "Ver todos",
     "showingOf": "Mostrando {shown} de {total}",
     "colErrorRate": "Tasa de error",
@@ -12017,6 +12035,12 @@
     "summaryPaused": "Pausado",
     "summaryFailed": "Fallido",
     "summaryFiring": "Disparada",
+    "summaryEvalError": "Errores de evaluación",
+    "summaryDeliveryFailed": "Entrega fallida",
+    "levelFilter": "Disparada en nivel {level}",
+    "levelFilterRemove": "Quitar filtro: {label}",
+    "levelCritical": "Crítica",
+    "levelWarning": "Advertencia",
     "summaryRecent": "Disparado < 15m",
     "summaryTotal": "Total",
     "webhook": "Web Hook",

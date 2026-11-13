@@ -313,7 +313,8 @@ import {
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
 import { pageCardClasses } from "@/layouts/pageCard";
-import { useRoute, useRouter, RouterView } from "vue-router";
+import { useRoute, useRouter, RouterView, isNavigationFailure } from "vue-router";
+import { orgSwitchListRoute, orgSwitchPending } from "@/utils/orgScopedRoutes";
 import { solutionModeForPath } from "@/utils/security/solutionMode";
 import { useSecurityAccess } from "@/composables/security/useSecurityAccess";
 import config from "../aws-exports";
@@ -1356,21 +1357,45 @@ export default defineComponent({
         selectedOrg.value = store.state.selectedOrganization;
         return;
       }
+      const targetOrg = { ...selectedOrg.value };
+      const orgIdentifier = targetOrg.identifier;
+      const listRoute = orgSwitchListRoute(
+        router.currentRoute.value.name,
+        router.currentRoute.value.query,
+      );
+      if (listRoute) {
+        if (orgIdentifier === store.state.selectedOrganization?.identifier) return;
+        // leave before anything resets: the page's id is org-scoped and would fail to load in the new org
+        orgSwitchPending.value = true;
+        const failure = await router
+          .replace({ name: listRoute, query: { org_identifier: orgIdentifier } })
+          .finally(() => {
+            orgSwitchPending.value = false;
+          });
+        if (isNavigationFailure(failure)) {
+          // the leave was blocked (e.g. the unsaved-changes prompt was declined), so the user stays in the current org
+          selectedOrg.value = { ...store.state.selectedOrganization };
+          return;
+        }
+      }
       resetStreams();
       store.dispatch("logs/resetLogs");
       store.dispatch("setIsDataIngested", false);
-      const orgIdentifier = selectedOrg.value.identifier;
-      const queryParams =
-        router.currentRoute.value.path.indexOf(".logs") > -1 ? router.currentRoute.value.query : {};
-      router.push({
-        path: router.currentRoute.value.path,
-        query: {
-          ...queryParams,
-          org_identifier: orgIdentifier,
-        },
-      });
-      useLocalOrganization(selectedOrg.value);
-      store.dispatch("setSelectedOrganization", { ...selectedOrg.value });
+      if (!listRoute) {
+        const queryParams =
+          router.currentRoute.value.path.indexOf(".logs") > -1
+            ? router.currentRoute.value.query
+            : {};
+        router.push({
+          path: router.currentRoute.value.path,
+          query: {
+            ...queryParams,
+            org_identifier: orgIdentifier,
+          },
+        });
+      }
+      useLocalOrganization(targetOrg);
+      store.dispatch("setSelectedOrganization", targetOrg);
       // setSelectedOrganization();
       // if (
       //   config.isCloud &&
@@ -1399,7 +1424,7 @@ export default defineComponent({
         store.state.zoConfig.restricted_routes_on_empty_data == true &&
         store.state.organizationData.isDataIngested == false
       ) {
-        await verifyStreamExist(selectedOrg.value);
+        await verifyStreamExist(targetOrg);
       }
     };
 

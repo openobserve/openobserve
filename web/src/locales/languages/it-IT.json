@@ -10,7 +10,8 @@
     "toastMessageGeneric": "La tua licenza non include questa funzionalità. Chiedi al tuo amministratore di aggiornare la licenza.",
     "bannerMessage": "Questa funzionalità è bloccata. Richiede la funzionalità {feature} nella tua licenza.",
     "bannerMessageGeneric": "Questa pagina richiede una funzionalità non inclusa nella tua licenza.",
-    "headerLocked": "Bloccata: richiede {feature}"
+    "headerLocked": "Bloccata: richiede {feature}",
+    "availableInEnterprise": "Disponibile in OpenObserve Enterprise: {feature}"
   },
   "emptyState": {
     "illustrations": {
@@ -10368,6 +10369,23 @@
     "services": "Servizi",
     "recentEvents": "Eventi recenti",
     "investigate": "Indaga →",
+    "askAi": {
+      "label": "Chiedi all'IA",
+      "hint": "Chiedi all'IA di questo",
+      "labelFor": "Chiedi all'IA di {item}",
+      "chip": {
+        "firing": "Alert in allarme",
+        "failing": "Regole non riuscite",
+        "incidents": "Incidenti aperti",
+        "pipelines": "Errori delle pipeline",
+        "delivery": "Consegne non riuscite",
+        "quiet": "Stream silenziosi",
+        "critical": "Alert critici",
+        "warning": "Alert di avviso",
+        "alert": "Alert · {name}",
+        "incident": "Incidente · {name}"
+      }
+    },
     "viewAll": "Visualizza tutto",
     "showingOf": "Mostrando {shown} di {total}",
     "colErrorRate": "Tasso di errore",
@@ -12017,6 +12035,12 @@
     "summaryPaused": "In pausa",
     "summaryFailed": "Fallito",
     "summaryFiring": "In allarme",
+    "summaryEvalError": "Errori di valutazione",
+    "summaryDeliveryFailed": "Consegna non riuscita",
+    "levelFilter": "In allarme a livello {level}",
+    "levelFilterRemove": "Rimuovi filtro: {label}",
+    "levelCritical": "Critico",
+    "levelWarning": "Avviso",
     "summaryRecent": "Attivati < 15m",
     "summaryTotal": "Totale",
     "webhook": "Webhook",

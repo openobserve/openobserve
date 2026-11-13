@@ -10,7 +10,8 @@
     "toastMessageGeneric": "Giấy phép của bạn không bao gồm tính năng này. Hãy yêu cầu quản trị viên cập nhật giấy phép.",
     "bannerMessage": "Tính năng này bị khóa. Cần có tính năng {feature} trong giấy phép của bạn.",
     "bannerMessageGeneric": "Trang này cần một tính năng không có trong giấy phép của bạn.",
-    "headerLocked": "Đã khóa: cần {feature}"
+    "headerLocked": "Đã khóa: cần {feature}",
+    "availableInEnterprise": "{feature} có trong OpenObserve Enterprise"
   },
   "emptyState": {
     "illustrations": {
@@ -10368,6 +10369,23 @@
     "services": "Dịch vụ",
     "recentEvents": "Sự kiện gần đây",
     "investigate": "Điều tra →",
+    "askAi": {
+      "label": "Hỏi AI",
+      "hint": "Hỏi AI về nội dung này",
+      "labelFor": "Hỏi AI về {item}",
+      "chip": {
+        "firing": "Cảnh báo đang kích hoạt",
+        "failing": "Quy tắc thất bại",
+        "incidents": "Sự cố đang mở",
+        "pipelines": "Lỗi pipeline",
+        "delivery": "Gửi thất bại",
+        "quiet": "Stream im lặng",
+        "critical": "Cảnh báo nghiêm trọng",
+        "warning": "Cảnh báo mức cảnh cáo",
+        "alert": "Cảnh báo · {name}",
+        "incident": "Sự cố · {name}"
+      }
+    },
     "viewAll": "Xem tất cả",
     "showingOf": "Hiển thị {shown} trên {total}",
     "colErrorRate": "Tỷ lệ lỗi",
@@ -12017,6 +12035,12 @@
     "summaryPaused": "Tạm dừng",
     "summaryFailed": "Thất bại",
     "summaryFiring": "Đang kích hoạt",
+    "summaryEvalError": "Lỗi đánh giá",
+    "summaryDeliveryFailed": "Gửi thất bại",
+    "levelFilter": "Đang kích hoạt ở mức {level}",
+    "levelFilterRemove": "Xóa bộ lọc: {label}",
+    "levelCritical": "Nghiêm trọng",
+    "levelWarning": "Cảnh cáo",
     "summaryRecent": "Đã kích hoạt < 15m",
     "summaryTotal": "Tổng",
     "webhook": "Web Hook",
