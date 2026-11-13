@@ -263,9 +263,9 @@ describe("OTab", () => {
     expect(classes).not.toContain("focus-visible:outline-offset-2");
   });
 
-  it("uses a positive focus outline offset on a vertical tab", () => {
+  it("keeps the focus outline inside the rail inset on a vertical tab", () => {
     const classes = mountTab({ isVertical: true }).find('[role="tab"]').classes();
-    expect(classes).toContain("focus-visible:outline-offset-2");
+    expect(classes).toContain("focus-visible:outline-offset-0");
     expect(classes).not.toContain("focus-visible:-outline-offset-2");
   });
 

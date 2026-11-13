@@ -1,5 +1,6 @@
 import { expect } from '@playwright/test';
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
+const { getAuthHeaders, getOrgIdentifier } = require('../../playwright-tests/utils/cloud-auth.js');
 
 export class CrossLinkPage {
     constructor(page) {
@@ -534,6 +535,16 @@ export class CrossLinkPage {
         await this.page.locator(this.orgSettingsSaveBtn).click();
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
+    }
+
+    // ZO_ENABLE_CROSS_LINKING is a server env flag; the unauthenticated /config does not carry it, the org config does.
+    async isCrossLinkingEnabledOnServer() {
+        const res = await this.page.request.get(
+            `${process.env.ZO_BASE_URL}/api/${getOrgIdentifier()}/config`,
+            { headers: getAuthHeaders() },
+        );
+        if (!res.ok()) throw new Error(`GET /api/${getOrgIdentifier()}/config answered HTTP ${res.status()}`);
+        return (await res.json())?.enable_cross_linking === true;
     }
 
     // ============================================================

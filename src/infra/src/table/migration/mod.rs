@@ -269,6 +269,10 @@ mod m20261030_000002_create_org_domain_ownership_req_table;
 mod m20261101_000001_create_oncall_slack;
 mod m20261102_000001_add_workflow_run_data_run_id_index;
 mod m20261103_000001_add_status_streaks_to_synthetics;
+mod m20261103_000002_add_run_class_to_synthetics;
+mod m20261103_000003_add_gap_state_to_synthetics;
+mod m20261103_000003_status_page_notice_false_alarm;
+mod m20261111_000001_add_false_alarm_recovery_stamp;
 mod m20261120_000001_add_template_applies_to;
 mod m20261120_000002_rename_reserved_template_collisions;
 mod m20261120_000003_add_anomaly_template;
@@ -876,6 +880,10 @@ impl MigratorTrait for Migrator {
             Box::new(m20261218_000001_add_security_case_to_alert_incidents::Migration),
             Box::new(m20261219_000001_add_historical_to_alert_incidents::Migration),
             Box::new(m20261029_000001_add_budget_to_online_eval_jobs::Migration),
+            Box::new(m20261103_000002_add_run_class_to_synthetics::Migration),
+            Box::new(m20261103_000003_status_page_notice_false_alarm::Migration),
+            Box::new(m20261103_000003_add_gap_state_to_synthetics::Migration),
+            Box::new(m20261111_000001_add_false_alarm_recovery_stamp::Migration),
             Box::new(m20261030_000001_add_agent_to_ai_chat_turns::Migration),
             Box::new(m20261016_000001_add_first_event_at_to_ai_chat_turns::Migration),
             Box::new(m20261020_000001_add_health_to_org_ai_toolsets::Migration),
@@ -1016,14 +1024,18 @@ mod tests {
         (148, "m20261218_000001_add_security_case_to_alert_incidents"),
         (149, "m20261219_000001_add_historical_to_alert_incidents"),
         (150, "m20261029_000001_add_budget_to_online_eval_jobs"),
-        (151, "m20261016_000001_add_first_event_at_to_ai_chat_turns"),
-        (152, "m20261020_000005_create_ai_turn_marks"),
-        (153, "m20261021_000005_create_ai_chat_imports"),
-        (154, "m20261021_000006_create_paid_overage_attribution"),
-        (155, "m20261021_000007_create_ai_approvals"),
-        (156, "m20261030_000001_add_agent_to_ai_chat_turns"),
-        (157, "m20261218_000001_ai_chat_sessions_branched_from"),
-        (158, "m20261219_000001_add_approval_scope_to_ai_actions"),
+        (151, "m20261103_000002_add_run_class_to_synthetics"),
+        (152, "m20261103_000003_status_page_notice_false_alarm"),
+        (153, "m20261103_000003_add_gap_state_to_synthetics"),
+        (154, "m20261111_000001_add_false_alarm_recovery_stamp"),
+        (155, "m20261016_000001_add_first_event_at_to_ai_chat_turns"),
+        (156, "m20261020_000005_create_ai_turn_marks"),
+        (157, "m20261021_000005_create_ai_chat_imports"),
+        (158, "m20261021_000006_create_paid_overage_attribution"),
+        (159, "m20261021_000007_create_ai_approvals"),
+        (160, "m20261030_000001_add_agent_to_ai_chat_turns"),
+        (161, "m20261218_000001_ai_chat_sessions_branched_from"),
+        (162, "m20261219_000001_add_approval_scope_to_ai_actions"),
     ];
 
     // Two branches that each claim the next version merge cleanly, so a reused number must fail

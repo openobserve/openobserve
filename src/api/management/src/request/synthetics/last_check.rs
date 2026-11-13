@@ -196,6 +196,8 @@ mod tests {
             updated_at: 0,
             last_triggered_at: 0,
             status: SyntheticStatus::Unknown,
+            last_run_class: 0,
+            last_run_class_at: 0,
             last_check_at: Some(111),
             last_response_ms: Some(1.0),
             steps: None,

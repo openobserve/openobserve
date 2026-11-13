@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Field panel toggle — same style as add-panel config sidebar -->
         <OButton
           variant="outline"
-          size="icon-xs-sq"
+          size="icon-chip"
           class="ms-1.5 shrink-0"
           data-test="logs-search-field-list-collapse-btn"
           @click="isMobile ? $emit('open-mobile-fields') : toggleFieldList()"
@@ -78,14 +78,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTag
                 type="logsResultChip"
                 value="neutral"
-                class="min-w-[26ch] tabular-nums"
+                class="tabular-nums"
                 data-test="logs-result-records-chip"
                 >{{ recordsChips.records }}</OTag
               >
               <OTag
                 type="logsResultChip"
                 value="info"
-                class="min-w-[10ch] tabular-nums max-md:hidden"
+                class="tabular-nums max-md:hidden"
                 data-test="logs-result-time-chip"
                 >{{ recordsChips.time }}</OTag
               >
@@ -457,7 +457,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @keydown.esc="closePinnedTooltip"
             tabindex="-1"
           >
-            <div class="oo-pin-tooltip__time">
+            <div class="oo-pin-tooltip__time text-text-secondary">
               {{ pinnedTooltip.timestamp }}
             </div>
             <div v-for="row in pinnedTooltip.rows" :key="row.rawValue" class="oo-pin-tooltip__row">
@@ -3655,7 +3655,6 @@ export default defineComponent({
 .oo-pin-tooltip__time {
   font-size: var(--text-2xs);
   font-weight: 500;
-  opacity: 0.65;
   padding: 0 0.625rem 0.25rem;
   margin-bottom: 0;
   /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom */

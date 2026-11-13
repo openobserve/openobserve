@@ -3664,7 +3664,7 @@
     "agplFullName": "GNU Affero General Public License (AGPL)",
     "github": "GitHub",
     "website": "Website",
-    "licenseAndUsage": "License & Usage",
+    "licenseAndUsage": "License & usage",
     "copyLicenseId": "Copy license ID",
     "editionLbl": "Edition",
     "gbPerDay": "GB / day",
@@ -15079,6 +15079,7 @@
     "template": "Template Override",
     "additionalVariables": "Additional Variables",
     "testSuccessMessage": "Test successful! Your destination is configured correctly.",
+    "testSuccessGenericSample": "Connection checked. The test sent a generic sample, not your template.",
     "testFailedMessage": "Test failed. Please check your configuration and try again.",
     "testFailedWithReason": "Test failed: {reason}",
     "testInProgress": "Testing destination...",
@@ -17299,7 +17300,11 @@
         "test": {
           "send": "Send test",
           "sent": "Test sent to {count} destination | Test sent to {count} destinations",
-          "failed": "The test did not reach {names}."
+          "failed": "The test did not reach {names}.",
+          "skipped": "skipped, a live downtime does not notify this platform",
+          "noMember": "skipped, no recipient is a member of this organization",
+          "confirmTitle": "Send a test message?",
+          "confirmMessage": "A real message marked [TEST] goes to {names} now."
         }
       },
       "untilClear": {
@@ -17874,7 +17879,7 @@
     "payloadFormatAuto": "Automatic",
     "payloadFormatLegacy": "Legacy JSON",
     "payloadFormatRendered": "Rendered template",
-    "payloadFormatHelp": "Automatic sends the old JSON body for anomaly, synthetics and on-call messages until a template is attached. Stored as the metadata key payload_format.",
+    "payloadFormatHelp": "Automatic sends the old JSON body for anomaly, synthetics, on-call and downtime messages until a template is attached.",
     "output_format": "Output Format",
     "readonly": "Read-only",
     "additional_settings": "Additional Settings",
@@ -17897,6 +17902,7 @@
     "headers": "Headers",
     "previewError": "Failed to generate preview",
     "webhookPreviewNote": "Your URL receives this body as is, not a formatted card. The values are sample alert data.",
+    "previewGenericSampleNote": "This is a generic sample with sample alert data, not your template.",
     "slackOAuth": {
       "setupMethodLabel": "How do you want to connect Slack?",
       "oauthMethodTitle": "Connect Slack",
@@ -24594,6 +24600,9 @@
       "durationMid": "5-15s",
       "durationSlow": "> 15s",
       "failed": "Failed",
+      "misconfigured": "Misconfigured",
+      "notMeasured": "Not measured",
+      "partial": "Partial",
       "passed": "Passed",
       "warning": "Warning"
     },
@@ -25461,6 +25470,7 @@
       "tabOverview": "Overview",
       "tabSteps": "Steps",
       "timelineAllFailed": "All {count} failed",
+      "timelineNotMeasured": "Not measured",
       "timelineAllPassed": "All {count} passed",
       "timelineAllWarning": "All {count} warning",
       "timelineMixed": "{passed} passed, {failed} failed of {total}",
@@ -25594,6 +25604,7 @@
       "scheduledAt": "Scheduled At",
       "status": "Status",
       "statusDegraded": "⚠ Degraded",
+      "notMeasuredSince": "Not measured since {time}",
       "statusDown": "✗ Down",
       "statusUp": "✓ Up",
       "steps": "Steps",
@@ -25629,7 +25640,14 @@
       "scrollLeft": "Scroll timeline left",
       "scrollRight": "Scroll timeline right",
       "title": "Status Timeline",
+      "confirmFailed": "failed",
+      "confirmFrom": "Confirm from {location}: {result}",
+      "confirmNotMeasured": "not measured",
+      "confirmPassed": "passed",
+      "notMeasured": "Not measured",
+      "notMeasuredNote": "Not measured. OpenObserve could not reach the probe. Your site was not tested.",
       "tooltipFailed": "{count} failed",
+      "tooltipNotMeasured": "{count} not measured",
       "tooltipPassed": "{count} passed",
       "tooltipWarning": "{count} warning",
       "warning": "Warning"
@@ -25895,6 +25913,19 @@
       "affects": "Affects",
       "allComponents": "All components",
       "componentsUnavailable": "Components no longer on this page",
+      "falseAlarm": {
+        "action": "Mark as false alarm",
+        "badge": "False alarm",
+        "confirm": "Mark as false alarm",
+        "help": "The incident resolves now, leaves the public page and stops counting as downtime. You can undo this.",
+        "markFailed": "Failed to mark the incident as a false alarm",
+        "marked": "Marked as a false alarm",
+        "markedBy": "Marked by {by}: {reason}",
+        "reason": "Reason",
+        "restored": "False alarm mark removed",
+        "undo": "Undo false alarm",
+        "undoFailed": "Failed to remove the false alarm mark"
+      },
       "state": {
         "scheduled": "Scheduled",
         "active": "Active",
@@ -26700,7 +26731,10 @@
         "critical": "Critical",
         "offline": "Offline",
         "failed": "Failed",
-        "down": "Down"
+        "down": "Down",
+        "partial": "Failing in some locations",
+        "notMeasured": "Not measured",
+        "misconfigured": "Misconfigured"
       },
       "severity": {
         "critical": "Critical",

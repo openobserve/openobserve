@@ -251,12 +251,17 @@ class SchemaPage {
     // Apply query button action
     async applyQuery() {
         testLogger.debug('Applying query with search response wait');
-        // OButton returns early in handleClick when loading=true, so wait for enabled first.
-        await this.logsSearchBarRefreshBtn.waitFor({ state: 'visible', timeout: 15000 });
-        await expect(this.logsSearchBarRefreshBtn).toBeEnabled({ timeout: 15000 });
-        const search = this.page.waitForResponse(logData.applyQuery);
-        await this.logsSearchBarRefreshBtn.click();
-        await expect.poll(async () => (await search).status(), { timeout: 30000 }).toBe(200);
+        // While an auto-run is in flight this test id is the Cancel button, so a click there sends no search; retry once the run settles.
+        let response;
+        await expect(async () => {
+            await expect(this.logsSearchBarRefreshBtn).not.toHaveText(/cancel/i, { timeout: 15000 });
+            await expect(this.logsSearchBarRefreshBtn).toBeEnabled({ timeout: 15000 });
+            [response] = await Promise.all([
+                this.page.waitForResponse(logData.applyQuery, { timeout: 15000 }),
+                this.logsSearchBarRefreshBtn.click(),
+            ]);
+        }).toPass({ timeout: 90000 });
+        expect(response.status()).toBe(200);
     }
 
     // Navigate to streams page

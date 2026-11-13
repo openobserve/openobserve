@@ -66,6 +66,9 @@ pub struct JobMetadata {
     /// can carry `type` without a check lookup.
     #[serde(default)]
     pub synthetic_type: String,
+    /// The failed job this one re-tests before the failure counts. Set on confirm jobs only.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub confirm_of: Option<String>,
 }
 
 #[derive(Debug, Serialize)]

@@ -53,6 +53,22 @@ pub struct CheckStateRow {
     /// Consecutive Up run verdicts.
     pub up_runs: i32,
     pub last_triggered_at: i64,
+    /// `scheduled_ts` of the newest finalized run.
+    pub status_run_ts: i64,
+    /// `RunClass` DB integer of the newest finalized run.
+    pub last_run_class: i32,
+    /// `scheduled_ts` of the first run in the current `last_run_class`.
+    pub last_run_class_at: i64,
+    /// `scheduled_ts` of the newest finalized run that tested the site. 0 = none.
+    pub last_tested_at: i64,
+    /// Finish time of the run that started the current Up streak. A false alarm hold matches it.
+    pub recovered_at: i64,
+    /// A writer of this build wrote the streaks. When false, no false alarm hold may apply,
+    /// because an older build can have missed a recovery. See `StatusStreaks::signed`.
+    pub signed: bool,
+    /// Seconds between scheduled runs; 0 for cron.
+    pub interval_secs: i64,
+    pub created_at: i64,
 }
 
 pub async fn get_page_by_slug<C: ConnectionTrait>(
@@ -130,32 +146,73 @@ pub async fn get_check_states<C: ConnectionTrait>(
         .column(synthetics_checks::Column::StatusUpRuns)
         .column(synthetics_checks::Column::LastTriggeredAt)
         .column(synthetics_checks::Column::UpdatedAt)
+        .column(synthetics_checks::Column::StatusRunTs)
+        .column(synthetics_checks::Column::LastRunClass)
+        .column(synthetics_checks::Column::LastRunClassAt)
+        .column(synthetics_checks::Column::LastTestedAt)
+        .column(synthetics_checks::Column::StatusRecoveredAt)
+        .column(synthetics_checks::Column::StatusStreakSig)
+        .column(synthetics_checks::Column::Frequency)
+        .column(synthetics_checks::Column::CreatedAt)
         .filter(synthetics_checks::Column::Id.is_in(check_ids.iter().cloned()));
     if let Some(watermark) = since {
         q = q.filter(synthetics_checks::Column::UpdatedAt.gt(watermark));
     }
-    let rows = q
-        .into_tuple::<(String, String, i32, i32, i32, i64, i64)>()
-        .all(conn)
-        .await?;
+    // Thirteen columns: more than a tuple read takes.
+    #[derive(sea_orm::FromQueryResult)]
+    struct Row {
+        id: String,
+        org_id: String,
+        last_check_status: i32,
+        status_down_runs: i32,
+        status_up_runs: i32,
+        last_triggered_at: i64,
+        updated_at: i64,
+        status_run_ts: i64,
+        last_run_class: i32,
+        last_run_class_at: i64,
+        last_tested_at: i64,
+        status_recovered_at: i64,
+        status_streak_sig: i64,
+        frequency: serde_json::Value,
+        created_at: i64,
+    }
+    let rows = q.into_model::<Row>().all(conn).await?;
     let mut max_updated = since.unwrap_or(0);
     let out = rows
         .into_iter()
-        .map(
-            |(id, org_id, last_check_status, down_runs, up_runs, last_triggered_at, updated_at)| {
-                if updated_at > max_updated {
-                    max_updated = updated_at;
-                }
-                CheckStateRow {
-                    id,
-                    org_id,
-                    last_check_status,
-                    down_runs,
-                    up_runs,
-                    last_triggered_at,
-                }
-            },
-        )
+        .map(|r| {
+            if r.updated_at > max_updated {
+                max_updated = r.updated_at;
+            }
+            let interval_secs =
+                serde_json::from_value::<config::meta::synthetics::SyntheticFrequency>(r.frequency)
+                    .map(|f| f.interval_secs())
+                    .unwrap_or(0);
+            CheckStateRow {
+                id: r.id,
+                org_id: r.org_id,
+                last_check_status: r.last_check_status,
+                down_runs: r.status_down_runs,
+                up_runs: r.status_up_runs,
+                last_triggered_at: r.last_triggered_at,
+                status_run_ts: r.status_run_ts,
+                last_run_class: r.last_run_class,
+                last_run_class_at: r.last_run_class_at,
+                last_tested_at: r.last_tested_at,
+                recovered_at: r.status_recovered_at,
+                signed: r.status_streak_sig
+                    == super::synthetics_checks::streak_sig(
+                        r.status_down_runs,
+                        r.status_up_runs,
+                        r.status_run_ts,
+                        r.last_run_class,
+                        r.status_recovered_at,
+                    ),
+                interval_secs,
+                created_at: r.created_at,
+            }
+        })
         .collect();
     Ok((out, max_updated))
 }
@@ -248,6 +305,20 @@ pub async fn get_notice_by_id(
     id: &str,
 ) -> Result<Option<status_page_notices::Model>, errors::Error> {
     let conn = get_orm_client_ro().await;
+    Ok(status_page_notices::Entity::find_by_id(id)
+        .filter(status_page_notices::Column::OrgId.eq(org_id))
+        .filter(status_page_notices::Column::DeletedAt.is_null())
+        .one(conn)
+        .await?)
+}
+
+/// [`get_notice_by_id`] from the primary. A read right after a write must not see a replica
+/// that lags behind it.
+pub async fn get_notice_by_id_primary(
+    org_id: &str,
+    id: &str,
+) -> Result<Option<status_page_notices::Model>, errors::Error> {
+    let conn = get_orm_client_rw().await;
     Ok(status_page_notices::Entity::find_by_id(id)
         .filter(status_page_notices::Column::OrgId.eq(org_id))
         .filter(status_page_notices::Column::DeletedAt.is_null())
@@ -360,6 +431,17 @@ pub async fn upsert_check_snooze(
     Ok(())
 }
 
+/// Ends a check's org-wide snooze, so an undone false alarm can reopen at once.
+pub async fn delete_check_snooze(org_id: &str, synthetics_id: &str) -> Result<(), errors::Error> {
+    let conn = get_orm_client_rw().await;
+    status_page_check_snoozes::Entity::delete_many()
+        .filter(status_page_check_snoozes::Column::OrgId.eq(org_id))
+        .filter(status_page_check_snoozes::Column::SyntheticsId.eq(synthetics_id))
+        .exec(conn)
+        .await?;
+    Ok(())
+}
+
 /// The one notice writer the rebuilder uses for open/re-open/recover/resolve:
 /// state, resolved_at, segments, and the recovery streak move together.
 pub async fn update_notice_runtime<C: ConnectionTrait>(
@@ -384,6 +466,78 @@ pub async fn update_notice_runtime<C: ConnectionTrait>(
         )
         .col_expr(status_page_notices::Column::UpdatedAt, Expr::value(now))
         .filter(status_page_notices::Column::Id.eq(id))
+        // A tick that read the notice before a false alarm mark must not write its old open
+        // state over the mark.
+        .filter(status_page_notices::Column::FalseAlarmAt.is_null())
+        .exec(conn)
+        .await?;
+    Ok(())
+}
+
+/// Writes a false alarm mark only if the notice still holds the `state`, `resolved_at` and empty
+/// mark that the caller read, and only the columns the mark owns. Returns false when another
+/// write came first, so the caller can read again.
+pub async fn mark_notice_false_alarm(
+    before: &status_page_notices::Model,
+    after: &status_page_notices::Model,
+) -> Result<bool, errors::Error> {
+    let conn = get_orm_client_rw().await;
+    let resolved_was = match before.resolved_at {
+        Some(at) => status_page_notices::Column::ResolvedAt.eq(at),
+        None => status_page_notices::Column::ResolvedAt.is_null(),
+    };
+    let res = status_page_notices::Entity::update_many()
+        .col_expr(status_page_notices::Column::State, Expr::value(after.state))
+        .col_expr(
+            status_page_notices::Column::ResolvedAt,
+            Expr::value(after.resolved_at),
+        )
+        .col_expr(
+            status_page_notices::Column::Segments,
+            Expr::value(after.segments.clone()),
+        )
+        .col_expr(
+            status_page_notices::Column::ExcludedFromUptime,
+            Expr::value(after.excluded_from_uptime),
+        )
+        .col_expr(
+            status_page_notices::Column::FalseAlarmBy,
+            Expr::value(after.false_alarm_by.clone()),
+        )
+        .col_expr(
+            status_page_notices::Column::FalseAlarmAt,
+            Expr::value(after.false_alarm_at),
+        )
+        .col_expr(
+            status_page_notices::Column::FalseAlarmReason,
+            Expr::value(after.false_alarm_reason.clone()),
+        )
+        .col_expr(
+            status_page_notices::Column::FalseAlarmRecoveredAt,
+            Expr::value(after.false_alarm_recovered_at),
+        )
+        .col_expr(
+            status_page_notices::Column::UpdatedAt,
+            Expr::value(after.updated_at),
+        )
+        .filter(status_page_notices::Column::Id.eq(before.id.as_str()))
+        .filter(status_page_notices::Column::OrgId.eq(before.org_id.as_str()))
+        .filter(status_page_notices::Column::FalseAlarmAt.is_null())
+        .filter(status_page_notices::Column::State.eq(before.state))
+        .filter(resolved_was)
+        .exec(conn)
+        .await?;
+    Ok(res.rows_affected > 0)
+}
+
+/// Disarms every false alarm hold. Part of [`super::synthetics_checks::reset_false_alarm_holds`].
+pub async fn disarm_false_alarm_holds<C: ConnectionTrait>(conn: &C) -> Result<(), errors::Error> {
+    status_page_notices::Entity::update_many()
+        .col_expr(
+            status_page_notices::Column::FalseAlarmRecoveredAt,
+            Expr::value(Option::<i64>::None),
+        )
+        .filter(status_page_notices::Column::FalseAlarmRecoveredAt.is_not_null())
         .exec(conn)
         .await?;
     Ok(())
@@ -799,6 +953,7 @@ fn action_code(action: &str) -> i32 {
         "create_domain" => 10,
         "delete_domain" => 11,
         "verify_domain" => 12,
+        "undo_false_positive" => 13,
         _ => 99,
     }
 }

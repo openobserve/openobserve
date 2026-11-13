@@ -66,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :dot="true"
         size="sm"
       >
-        {{ resolveBadgeLabel("serviceStatus", (row as any).status) }}
+        {{ statusLabel(row as any) }}
       </OBadge>
     </template>
 
@@ -287,7 +287,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           v-else
           :variant="(row as any).enabled ? 'ghost-destructive' : 'ghost'"
-          size="icon-sm"
+          size="icon-xs-sq"
           :icon-left="(row as any).enabled ? 'pause' : 'play-arrow'"
           class="max-md:hidden"
           :data-test="`${dataTest}-${(row as any).enabled ? 'pause' : 'enable'}-btn`"
@@ -304,7 +304,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Edit -->
         <OButton
           variant="ghost"
-          size="icon-sm"
+          size="icon-xs-sq"
           icon-left="edit"
           class="max-md:hidden"
           :data-test="`${dataTest}-edit-btn`"
@@ -316,7 +316,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Duplicate -->
         <OButton
           variant="ghost"
-          size="icon-sm"
+          size="icon-xs-sq"
           icon-left="content-copy"
           class="max-md:hidden"
           :data-test="`${dataTest}-duplicate-btn`"
@@ -327,7 +327,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <OButton
           variant="ghost"
-          size="icon-sm"
+          size="icon-xs-sq"
           icon-left="drive-file-move"
           class="max-md:hidden"
           :data-test="`${dataTest}-move-btn`"
@@ -351,7 +351,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               v-else
               variant="ghost"
-              size="icon-sm"
+              size="icon-xs-sq"
               icon-left="more-vert"
               :data-test="`${dataTest}-more-btn`"
               @click.stop
@@ -622,6 +622,7 @@ import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { resolveBadge, resolveBadgeLabel } from "@/lib/core/Badge/badgeGroups";
+import { utcClock } from "@/utils/synthetics/runClass";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import type { ForbiddenState } from "@/utils/featureGate";
 import MutedChip from "@/components/alerts/downtimes/MutedChip.vue";
@@ -649,22 +650,31 @@ type Mode = "all" | "browser";
 // A DEGRADED monitor keeps a clean row and reads from the amber rail: it is worth
 // noticing, not worth acting on this second, and washing it too would put most of
 // a wobbly estate in colour.
+/** The badge text; Not measured says since when, so a long gap reads as one. */
+const statusLabel = (row: any): I18nText => {
+  if (row?.status === "not_measured" && row?.statusSince) {
+    return t("synthetics.table.notMeasuredSince", { time: utcClock(row.statusSince) });
+  }
+  return resolveBadgeLabel("serviceStatus", row?.status);
+};
+
+const FAILING_STATUSES = new Set(["failed", "error", "misconfigured"]);
+
 const monitorRowClass = (row: any): string => {
   const st = String(row?.status ?? "").toLowerCase();
-  if (st === "failed" || st === "error") return "!bg-status-error-bg";
+  if (FAILING_STATUSES.has(st)) return "!bg-status-error-bg";
   return row?.enabled === false ? "!bg-surface-panel" : "";
 };
 
 const monitorRowStyle = (row: any): Record<string, string> => {
   const status = String(row?.status ?? "").toLowerCase();
-  const color =
-    status === "failed" || status === "error"
-      ? "var(--color-error-500)"
-      : status === "warning"
-        ? "var(--color-warning-500)"
-        : status === "passed"
-          ? "var(--color-success-500)"
-          : "var(--color-grey-400)";
+  const color = FAILING_STATUSES.has(status)
+    ? "var(--color-error-500)"
+    : status === "warning" || status === "partial"
+      ? "var(--color-warning-500)"
+      : status === "passed"
+        ? "var(--color-success-500)"
+        : "var(--color-grey-400)";
   return { boxShadow: `var(--shadow-rail-geom) ${color}` };
 };
 

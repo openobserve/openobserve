@@ -147,7 +147,8 @@ test.describe('First event bar on a keyword card', () => {
         };
         try {
             const nowUs = Date.now() * 1000;
-            await metric('system_cpu_time', nowUs);
+            // the bar's start time is rounded down to whole seconds, so a record from this same second would count as new
+            await metric('system_cpu_time', nowUs - 10 * 1000 * 1000);
             await metric('system_disk_io', nowUs - HOUR_US);
             await metric('system_memory_usage', nowUs - 2 * HOUR_US);
             // the watcher anchors on the match with the newest doc_time_max (list order on a tie); feed only another one

@@ -63,7 +63,7 @@ test.describe("IAM Group form validation", { tag: '@enterprise' }, () => {
         await pm.iamFormValidation.submitGroupForm(); // reveal the error
         await expect(pm.iamFormValidation.getGroupNameErrorLocator()).toBeVisible();
         await expect(pm.iamFormValidation.getGroupNameErrorLocator()).toContainText(
-            "Use alphanumeric and '_' characters only, without spaces."
+            "Use letters, numbers and underscores only, without spaces."
         );
 
         testLogger.info('Group invalid name error correctly shown');
@@ -149,7 +149,7 @@ test.describe("IAM Role form validation", { tag: '@enterprise' }, () => {
         await pm.iamFormValidation.submitRoleForm(); // reveal the error
         await expect(pm.iamFormValidation.getRoleNameErrorLocator()).toBeVisible();
         await expect(pm.iamFormValidation.getRoleNameErrorLocator()).toContainText(
-            "Use alphanumeric and '_' characters only, without spaces."
+            "Use letters, numbers and underscores only, without spaces."
         );
 
         testLogger.info('Role invalid name error correctly shown');
@@ -164,7 +164,7 @@ test.describe("IAM Role form validation", { tag: '@enterprise' }, () => {
         await pm.iamFormValidation.fillRoleName('bad role name!');
         await pm.iamFormValidation.submitRoleForm(); // reveal the error (submit-then-change)
         await expect(pm.iamFormValidation.getRoleNameErrorLocator()).toBeVisible();
-        await expect(pm.iamFormValidation.getRoleNameErrorLocator()).toContainText("Use alphanumeric and '_' characters only, without spaces.");
+        await expect(pm.iamFormValidation.getRoleNameErrorLocator()).toContainText("Use letters, numbers and underscores only, without spaces.");
 
         // After the first submit, errors revalidate live on change → fixing clears it.
         await pm.iamFormValidation.fillRoleName('valid_role_name');

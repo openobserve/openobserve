@@ -10,7 +10,7 @@
           <OButton
             :aria-label="t('common.close')"
             variant="ghost"
-            size="icon-sm"
+            size="icon-xs-sq"
             data-test="queryList-cancel"
             @click="$emit('close')"
             icon-left="close"

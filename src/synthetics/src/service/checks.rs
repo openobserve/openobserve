@@ -44,6 +44,9 @@ pub async fn create_synthetic(
             body.folder_id = pk;
         }
     }
+    // A new check alerts on down only unless it asks for any location (spec S7, Q3).
+    body.alert_on
+        .get_or_insert(config::meta::synthetics::AlertOn::Down);
     // Normalise locations — ensure aws- prefix (UI may send "us-east-1" instead of "aws-us-east-1")
     body.locations = body.locations.into_iter().map(normalize_location).collect();
 
@@ -395,6 +398,8 @@ pub async fn list_synthetics(
             updated_at: m.updated_at,
             last_triggered_at: m.last_triggered_at,
             status: m.last_check_status,
+            last_run_class: m.last_run_class,
+            last_run_class_at: m.last_run_class_at,
             last_check_at: (m.last_triggered_at > 0).then_some(m.last_triggered_at),
             last_response_ms: None,
             steps,
@@ -649,14 +654,27 @@ async fn keep_stored_type(
     id: &str,
     body: &mut Synthetic,
 ) -> anyhow::Result<Option<SyntheticType>> {
-    let stored = synthetics_checks::get(conn, org_id, id)
+    let Some(stored) = synthetics_checks::get(conn, org_id, id)
         .await
         .map_err(|e| anyhow::anyhow!(e.to_string()))?
-        .map(|c| c.check_type);
-    if let Some(check_type) = &stored {
-        body.check_type = check_type.clone();
+    else {
+        return Ok(None);
+    };
+    body.check_type = stored.check_type.clone();
+    keep_stored_settings(body, &stored);
+    Ok(Some(stored.check_type))
+}
+
+/// A client that does not send a setting keeps the stored one, so an edit from an older UI never
+/// turns "any location" into "down only", and an editor without the confirm setting never turns
+/// it back on.
+fn keep_stored_settings(body: &mut Synthetic, stored: &Synthetic) {
+    if body.alert_on.is_none() {
+        body.alert_on = stored.alert_on;
     }
-    Ok(stored)
+    if body.confirm_failures.is_none() {
+        body.confirm_failures = stored.confirm_failures;
+    }
 }
 
 async fn holds_browser_check(
@@ -853,8 +871,8 @@ mod tests {
 
     use super::{
         composition_fields, create_synthetic_under_lock, delete_synthetic_under_lock,
-        delete_synthetics_bulk_under_lock, holds_browser_check, keep_stored_type,
-        needs_composition_lock, run_composition_mutation,
+        delete_synthetics_bulk_under_lock, holds_browser_check, keep_stored_settings,
+        keep_stored_type, needs_composition_lock, run_composition_mutation,
     };
     use crate::service::{
         composition::{CompositionError, tests::db_with_synthetics_defaults, validate_for_save},
@@ -1090,6 +1108,20 @@ mod tests {
             parents_before
         );
         assert_eq!(refs_before["parent"], ["child"]);
+    }
+
+    #[test]
+    fn an_update_that_omits_the_confirm_setting_keeps_the_stored_one() {
+        let mut stored = check("c", SyntheticType::Http);
+        stored.confirm_failures = Some(false);
+        let mut body = check("c", SyntheticType::Http);
+        body.confirm_failures = None;
+        keep_stored_settings(&mut body, &stored);
+        assert_eq!(body.confirm_failures, Some(false));
+        // A client that sends it wins.
+        body.confirm_failures = Some(true);
+        keep_stored_settings(&mut body, &stored);
+        assert_eq!(body.confirm_failures, Some(true));
     }
 
     #[tokio::test]

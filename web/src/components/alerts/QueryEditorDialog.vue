@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="rounded-default border-info/28 bg-info/10 inline-flex flex-row items-center gap-1.25 border px-2.5 py-0.75 max-md:hidden"
           >
             <span class="text-2xs text-text-label font-semibold">{{ t("alerts.streamType") }}</span>
-            <span class="text-2xs text-text-label opacity-30">:</span>
+            <span class="text-2xs text-text-label">:</span>
             <span class="text-text-link text-xs font-bold">{{ streamType }}</span>
           </div>
           <span v-if="streamType && streamName" class="opacity-20 select-none max-md:hidden"
@@ -59,11 +59,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="text-2xs text-text-label font-semibold max-md:hidden">{{
               t("alerts.stream_name")
             }}</span>
-            <span class="text-2xs text-text-label opacity-30 max-md:hidden">:</span>
+            <span class="text-2xs text-text-label max-md:hidden">:</span>
             <span v-if="streamName" class="text-sql-accent min-w-0 truncate text-xs font-bold">{{
               streamName
             }}</span>
-            <span v-else class="text-sql-accent text-xs font-bold italic opacity-40">{{
+            <span v-else class="text-text-muted text-xs font-bold italic">{{
               t("alerts.queryEditor.noStream")
             }}</span>
           </div>
@@ -435,7 +435,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="flex h-full flex-col items-center justify-center gap-2"
                   >
                     <OSpinner size="md" />
-                    <span class="text-sm opacity-60">{{ t("search.fetchingResults") }}</span>
+                    <span class="text-text-secondary text-sm">{{
+                      t("search.fetchingResults")
+                    }}</span>
                   </div>
                   <!-- Results -->
                   <QueryEditor
@@ -512,7 +514,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="flex h-full flex-col items-center justify-center gap-2"
                   >
                     <OSpinner size="md" />
-                    <span class="text-sm opacity-60">{{ t("search.fetchingResults") }}</span>
+                    <span class="text-text-secondary text-sm">{{
+                      t("search.fetchingResults")
+                    }}</span>
                   </div>
                   <!-- Results -->
                   <QueryEditor
