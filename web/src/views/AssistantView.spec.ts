@@ -447,7 +447,7 @@ describe("AssistantView", () => {
       .filter(Boolean);
     expect(ids).toEqual([
       "assistant-thread-new",
-      "assistant-open-as-button",
+      "assistant-shell-place-sidebar",
       "assistant-context-sees",
       "assistant-thread-more",
     ]);

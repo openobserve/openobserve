@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <section
     :aria-labelledby="headingId"
-    class="mx-auto flex w-full max-w-3xl min-w-0 flex-col gap-2"
+    class="mx-auto flex min-h-48 w-full max-w-3xl min-w-0 flex-1 flex-col gap-2"
     data-test="home-attention"
   >
     <div class="flex min-h-8 min-w-0 items-center gap-3 ps-1">
@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="home-attention-empty-icon"
           />
         </div>
-        <div class="flex min-w-0 max-w-[60ch] flex-col gap-0.5">
+        <div class="flex max-w-[60ch] min-w-0 flex-col gap-0.5">
           <span class="text-text-heading text-sm font-medium">{{
             t(`home.agent.attention.empty.${empty}.title`)
           }}</span>
@@ -99,7 +99,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <!-- The row is a mouse shortcut for its Open button, which keyboard and screen reader users reach -->
-    <ul v-if="snapshot.rows.length" class="flex min-w-0 flex-col gap-2" data-test="home-attention-rows">
+    <ul
+      v-if="snapshot.rows.length"
+      class="flex min-h-0 min-w-0 flex-col gap-2 overflow-y-auto"
+      data-test="home-attention-rows"
+    >
       <li
         v-for="row in snapshot.rows"
         :key="row.key"

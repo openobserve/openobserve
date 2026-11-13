@@ -132,7 +132,7 @@ describe("HomeChatsRail", () => {
     expect(wrapper.find('[data-test="assistant-history-search"]').exists()).toBe(true);
     const groups = wrapper.findAll('[data-test="assistant-history-group"]');
     expect(groups.map((group) => group.attributes("data-group"))).toEqual([
-      "running",
+      "needs_you",
       "today",
       "yesterday",
     ]);
@@ -153,11 +153,13 @@ describe("HomeChatsRail", () => {
     expect(tools).not.toEqual(expect.arrayContaining(["border-b"]));
     expect(tools).not.toContain("border-border-default");
     expect(wrapper.get('[data-test="assistant-history-search"]').classes()).toEqual(
-      expect.arrayContaining(["[&>div]:h-7", "[&>div]:rounded-full"]),
+      expect.arrayContaining(["[&>div]:h-8", "[&>div]:rounded-full"]),
     );
-    expect(wrapper.get('[data-test="assistant-history-view-all"]').classes()).toEqual(
-      expect.arrayContaining(["h-6!", "rounded-full!"]),
+    expect(tools).toEqual(expect.arrayContaining(["gap-2"]));
+    expect(wrapper.get('[data-test="home-chats-rail-header"]').classes()).toEqual(
+      expect.arrayContaining(["px-2", "justify-between"].filter((c) => c !== "justify-between")),
     );
+    expect(wrapper.find('[data-test="assistant-history-views"]').exists()).toBe(false);
   });
 
   it("lays every row out as status dot, one-line title and the time at the row's end, with the menu over the time", async () => {
@@ -176,9 +178,10 @@ describe("HomeChatsRail", () => {
       expect(row.get('[data-test="o-truncated-text"]').classes()).toContain("truncate");
     }
     const time = wrapper.get('[data-test="assistant-history-row-time"]').classes();
-    expect(time).toContain("min-w-7");
-    expect(time).not.toContain("w-12");
-    expect(wrapper.get('[data-test="assistant-history-row-state"]').classes()).toContain("min-w-7");
+    expect(time).toContain("w-12");
+    const state = wrapper.get('[data-test="assistant-history-row-state"]');
+    expect(state.classes()).toEqual(["sr-only"]);
+    expect(state.text()).toBe("Needs you");
     expect(wrapper.get('[data-test="assistant-history-row-menu"]').classes()).toContain(
       "absolute!",
     );

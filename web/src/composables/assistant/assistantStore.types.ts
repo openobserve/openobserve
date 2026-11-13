@@ -335,7 +335,9 @@ export type OpenAssistantResult =
   | { ok: true; sid: Sid; container: Container; staged: number; sent: boolean; queued: boolean }
   | {
       ok: false;
-      reason: GateCode | "turn_running_no_autosend" | "approval_pending" | "org_changed";
+      /** `home_ask`: Home's Ask box took the door, focused, and nothing opened. */
+      reason:
+        GateCode | "turn_running_no_autosend" | "approval_pending" | "org_changed" | "home_ask";
     };
 
 export type ApprovalKind =

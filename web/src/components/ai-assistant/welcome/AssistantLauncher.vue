@@ -102,6 +102,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:model-value="onInput"
           @keydown="onKeydown"
         >
+          <template v-if="trayChips.length > 0" #strip>
+            <div
+              class="flex h-7 min-h-7 min-w-0 items-center overflow-hidden px-0.5"
+              data-test="assistant-launcher-chip-row"
+            >
+              <AssistantChipTray
+                v-model:expanded="chipsExpanded"
+                :items="shownTrayChips"
+                :hidden-count="hiddenTrayChips"
+                :hidden-labels="hiddenTrayLabels"
+                data-test="assistant-launcher-chips"
+              >
+                <template #chip="{ item }">
+                  <AssistantContextChip
+                    :chip="item.chip"
+                    compact
+                    :short-label="item.chip.short"
+                    :image-src="item.src"
+                    :popup="false"
+                    :data-test="
+                      item.src ? 'assistant-launcher-image-chip' : 'assistant-launcher-mention-chip'
+                    "
+                    @remove="removeTrayChip(item.chip)"
+                  />
+                </template>
+              </AssistantChipTray>
+            </div>
+          </template>
           <template #bar>
             <AssistantComposerBottomRow divided>
               <template #agent>
@@ -111,42 +139,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :disabled="fieldLoading"
                   @select="onPlus"
                 />
-                <AssistantChipTray
-                  v-model:expanded="chipsExpanded"
-                  :items="shownTrayChips"
-                  :hidden-count="hiddenTrayChips"
-                  :hidden-labels="hiddenTrayLabels"
-                  data-test="assistant-launcher-chips"
-                >
-                  <template #leading>
-                    <span class="flex shrink-0 items-center gap-2">
-                      <AssistantTimePrefix
-                        v-model:open="timeOpen"
-                        :window="window"
-                        :disabled="fieldLoading"
-                        fixed
-                        align="start"
-                        @change="timeOverride = $event"
-                      />
-                      <AssistantLauncherAgent v-model="agent" :disabled="fieldLoading" />
-                    </span>
-                  </template>
-                  <template #chip="{ item }">
-                    <AssistantContextChip
-                      :chip="item.chip"
-                      compact
-                      :short-label="item.chip.short"
-                      :image-src="item.src"
-                      :popup="false"
-                      :data-test="
-                        item.src
-                          ? 'assistant-launcher-image-chip'
-                          : 'assistant-launcher-mention-chip'
-                      "
-                      @remove="removeTrayChip(item.chip)"
-                    />
-                  </template>
-                </AssistantChipTray>
+                <span class="flex shrink-0 items-center gap-2">
+                  <AssistantTimePrefix
+                    v-model:open="timeOpen"
+                    :window="window"
+                    :disabled="fieldLoading"
+                    fixed
+                    align="start"
+                    @change="timeOverride = $event"
+                  />
+                  <AssistantLauncherAgent v-model="agent" :disabled="fieldLoading" />
+                </span>
               </template>
               <AssistantIconButton
                 v-if="text"
@@ -841,4 +844,12 @@ function openChat(sid: string): void {
 function openBilling(): void {
   void router.push({ name: "plans", query: { org_identifier: org.value } }).catch(() => undefined);
 }
+
+// Home's capabilities page stages its sample question here.
+defineExpose({
+  fill(line: string): void {
+    text.value = line;
+    input.value?.focus();
+  },
+});
 </script>

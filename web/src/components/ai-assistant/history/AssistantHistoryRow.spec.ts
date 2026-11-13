@@ -123,6 +123,12 @@ describe("AssistantHistoryRow", () => {
     const answering = setup({ activeTurn: true });
     expect(answering.get('[data-test="assistant-history-row-state"]').text()).toBe("Answering");
     expect(answering.find('[data-test="assistant-history-row-time"]').exists()).toBe(false);
+    expect(
+      answering.get('[data-test="assistant-history-row-working"]').findAll("span"),
+    ).toHaveLength(3);
+    expect(answering.get('[data-test="assistant-history-row-state"] .sr-only').text()).toBe(
+      "Answering",
+    );
     expect(answering.find('[data-test="assistant-status-dot"]').attributes("data-state")).toBe(
       "working",
     );

@@ -658,6 +658,61 @@ describe("container resolution (10 §3.3)", () => {
   });
 });
 
+describe("Home's Ask box takes the sidebar's doors", () => {
+  const onHome = (options: Setup = {}) => {
+    const ctx = setup(options);
+    const focusHomeAsk = vi.fn();
+    ctx.env.homeAsk = () => true;
+    ctx.env.focusHomeAsk = focusHomeAsk;
+    return { ...ctx, focusHomeAsk };
+  };
+
+  it("focuses the Ask box for a bare open and opens nothing", async () => {
+    const { open, store, pushRoute, focusHomeAsk } = onHome();
+    expect(await open(headerOpen)).toEqual({ ok: false, reason: "home_ask" });
+    expect(await open({ ...headerOpen, thread: "new", container: "sidebar" })).toEqual({
+      ok: false,
+      reason: "home_ask",
+    });
+    expect(focusHomeAsk).toHaveBeenCalledTimes(2);
+    expect(store.state.shell.placement.kind).toBe("hidden");
+    expect(Object.keys(store.state.sessions)).toEqual([]);
+    expect(pushRoute).not.toHaveBeenCalled();
+  });
+
+  it("shows a door's prompt as a chat on Home, as the Ask box's own send does", async () => {
+    const { open, store, pushRoute, send, focusHomeAsk } = onHome();
+    const result = ok(await open(explain({ thread: "new", container: "sidebar" })));
+    expect(result.container).toBe("full_view");
+    expect(result.sent).toBe(true);
+    expect(send).toHaveBeenCalledOnce();
+    expect(store.state.shell.placement).toEqual({ kind: "full" });
+    expect(pushRoute).toHaveBeenCalledWith({ name: "assistant", params: { chatId: result.sid } });
+    expect(focusHomeAsk).not.toHaveBeenCalled();
+  });
+
+  it("shows a bare open's chat on Home when it needs the user", async () => {
+    const { open, store, pushRoute } = onHome();
+    const sid = store.createSession({
+      origin: { entryKind: "thread_new", objectKind: "none", container: "sidebar" },
+    });
+    store.state.sessions[sid].unread = true;
+    const result = ok(await open({ ...headerOpen, thread: "current" }));
+    expect(result.sid).toBe(sid);
+    expect(pushRoute).toHaveBeenCalledWith({ name: "assistant", params: { chatId: sid } });
+  });
+
+  it("leaves an open sidebar and every other page as they were", async () => {
+    const home = onHome();
+    home.store.open({ kind: "sidebar" }, { focus: "none" });
+    expect(ok(await home.open(explain({ thread: "new" }))).container).toBe("sidebar");
+    expect(home.focusHomeAsk).not.toHaveBeenCalled();
+    const { open, env } = setup();
+    env.homeAsk = () => false;
+    expect(ok(await open(headerOpen)).container).toBe("sidebar");
+  });
+});
+
 describe("org safety and ordering", () => {
   it("refuses a payload built under another user+org and creates nothing", async () => {
     const { open, store, notify } = setup();

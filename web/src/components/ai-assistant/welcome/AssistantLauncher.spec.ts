@@ -424,6 +424,7 @@ describe("AssistantLauncher", () => {
       "attach",
       "context",
     ]);
+    expect(wrapper.find('[data-test="assistant-launcher-chip-row"]').exists()).toBe(false);
     const right = field.get('[data-test="assistant-composer-bar-right"]');
     expect(right.find('[data-test="assistant-launcher-ask"]').classes()).toContain("rounded-full");
     expect(wrapper.find('[data-test="assistant-launcher-narrow-tools"]').exists()).toBe(false);
@@ -505,7 +506,7 @@ describe("AssistantLauncher", () => {
 
     beforeEach(() => toastCall.mockReset());
 
-    it("opens the picker from + and shows the pick as a removable thumbnail chip in the bottom row", async () => {
+    it("opens the picker from + and shows the pick as a removable thumbnail chip in a row above the field", async () => {
       const click = vi
         .spyOn(HTMLInputElement.prototype, "click")
         .mockImplementation(() => undefined);
@@ -517,7 +518,12 @@ describe("AssistantLauncher", () => {
       pick(wrapper, [png("shot.png")]);
       await vi.waitFor(() => expect(thumbs(wrapper)).toHaveLength(1));
       const left = wrapper.get('[data-test="assistant-composer-bar-left"]');
-      const chip = left.get('[data-test="assistant-launcher-image-chip"]');
+      const row = wrapper.get('[data-test="assistant-launcher-chip-row"]');
+      expect(left.find('[data-test="assistant-launcher-chips"]').exists()).toBe(false);
+      expect(row.element.compareDocumentPosition(wrapper.get("textarea").element)).toBe(
+        Node.DOCUMENT_POSITION_FOLLOWING,
+      );
+      const chip = row.get('[data-test="assistant-launcher-image-chip"]');
       expect(chip.text()).toBe("shot.png");
       expect(chip.get('[data-test="assistant-context-chip-thumb"]').attributes("src")).toBe(
         "data:image/png;base64,AAAAAAAAAAAAAA==",
@@ -621,7 +627,7 @@ describe("AssistantLauncher", () => {
         fake.current.capability.value = { ...fake.current.capability.value, agents: ROSTER };
         await flushPromises();
         const chips = wrapper
-          .get('[data-test="assistant-context-tray-scroller"]')
+          .get('[data-test="assistant-composer-bar-left"]')
           .findAll('[data-test^="assistant-"]')
           .map((el) => el.attributes("data-test"));
         expect(chips.indexOf("assistant-launcher-agent")).toBe(

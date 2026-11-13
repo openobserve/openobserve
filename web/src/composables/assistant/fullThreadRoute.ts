@@ -15,6 +15,8 @@
 
 import type { LocationQuery, LocationQueryRaw, RouteLocationRaw } from "vue-router";
 
+import { overviewFocusListening } from "@/composables/goto/goToRequests";
+
 /** Home shows a thread at Full density while this query key is present; an empty value is the active or a new chat. */
 export const THREAD_QUERY_KEY = "thread";
 
@@ -41,6 +43,13 @@ export function threadParam(
 /** True on the Full density view, which is Home's AI tab with `?thread=`. */
 export function isFullThreadRoute(route: RouteLike | null | undefined): boolean {
   return route?.name === "home" && threadParam(route.query) !== null;
+}
+
+/** True while Home's Ask box is on screen; Home keeps its tab in state, not always in `?tab=`, so the mounted box is the signal. */
+export function isHomeAskShown(route: RouteLike | null | undefined): boolean {
+  return (
+    route?.name === "home" && threadParam(route.query) === null && overviewFocusListening.value
+  );
 }
 
 /** Home's AI tab at Full density on `sid`, keeping the other query keys. */

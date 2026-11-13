@@ -24,14 +24,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <HomeChatsRail v-if="railReady" />
     </aside>
+    <AssistantCapabilities
+      v-if="view === 'capabilities'"
+      class="min-w-0 flex-1"
+      @back="view = 'home'"
+      @try="tryPrompt"
+    />
     <div
-      class="h-full min-h-0 min-w-0 flex-1 overflow-y-auto px-4 py-4"
+      v-else
+      class="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-y-auto px-4 py-4"
       data-test="assistant-home-tab"
       :data-state="state"
     >
       <!-- A fixed top offset, not centring, so rows arriving below never move the Ask box -->
       <div
-        class="relative mx-auto flex max-w-5xl min-w-0 flex-col gap-4 pt-[12vh] max-md:pt-0"
+        class="relative mx-auto flex min-h-0 w-full max-w-5xl min-w-0 flex-1 flex-col gap-4 pt-[12vh] max-md:pt-0"
         data-test="assistant-home-main"
       >
         <AgentHomeGreeting :class="entering && RISE.greeting" />
@@ -43,10 +50,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <AssistantLauncher
           v-else
+          ref="launcher"
           layout="overview"
           :page-range="pageRange"
           class="mx-auto max-w-3xl"
         />
+        <OButton
+          v-if="!offReason"
+          variant="ghost-primary"
+          size="sm"
+          class="mx-auto"
+          data-test="assistant-home-capabilities"
+          @click="view = 'capabilities'"
+        >
+          {{ t("home.agent.capabilities.open") }}
+        </OButton>
         <HomeNeedsAttention
           class="mt-4"
           :snapshot="attentionSnapshot"
@@ -73,10 +91,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, defineAsyncComponent, onDeactivated, onMounted, ref } from "vue";
+import { computed, defineAsyncComponent, nextTick, onDeactivated, onMounted, ref } from "vue";
 import { useRoute, useRouter, type RouteLocationRaw } from "vue-router";
 
 import AssistantLauncher from "@/components/ai-assistant/welcome/AssistantLauncher.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import type { ComposerState } from "@/composables/assistant";
 import { HOME_TAB_QUERY_KEY } from "@/composables/assistant/pure";
 import type { OverviewNowRow, OverviewNowSnapshot } from "@/composables/contextProviders/types";
@@ -88,6 +107,7 @@ import { sqlEquals } from "@/utils/query/sqlFilterBuilder";
 
 import AgentHomeAskNote from "./AgentHomeAskNote.vue";
 import AgentHomeGreeting from "./AgentHomeGreeting.vue";
+import AssistantCapabilities from "./AssistantCapabilities.vue";
 import HomeNeedsAttention, { type EmptyState } from "./HomeNeedsAttention.vue";
 import type { NowRowMeta } from "./HomeNowRow.vue";
 import { healthState } from "./homeHealth";
@@ -107,7 +127,7 @@ const AlertHistoryDrawer = defineAsyncComponent(
 const DEFAULT_TRACES_STREAM = "default";
 
 /** Needs Attention shows this many rows; View All opens the Overview with the rest. */
-const ATTENTION_ROWS = 3;
+const ATTENTION_ROWS = 20;
 
 // A 0.5s fade-up, none under reduced motion; a literal string so Tailwind emits it.
 const RISE = {
@@ -197,6 +217,15 @@ const attentionEmpty = computed<EmptyState | null>(() => {
 // The entrance plays once per mount; a kept-alive return re-inserts the nodes, which would replay it.
 const entering = ref(true);
 onDeactivated(() => (entering.value = false));
+
+const view = ref<"home" | "capabilities">("home");
+const launcher = ref<InstanceType<typeof AssistantLauncher> | null>(null);
+
+// Back on Home the field is mounted again, so the sample question is staged after the swap.
+function tryPrompt(prompt: string): void {
+  view.value = "home";
+  void nextTick(() => launcher.value?.fill?.(prompt));
+}
 
 const historyAlert = ref<{ details: unknown; id: string; type: string } | null>(null);
 

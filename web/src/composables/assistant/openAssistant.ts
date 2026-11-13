@@ -138,6 +138,9 @@ export interface OpenAssistantEnv {
   historyRows?(): HistoryRow[];
   /** Stores a door's seeded chat on the server; `createSeededChat` when absent. */
   seedChat?(org: string, body: SeededChatRequest): Promise<unknown>;
+  /** True while Home's Ask box is on screen, which takes the doors that would open the sidebar. */
+  homeAsk?(): boolean;
+  focusHomeAsk?(): void;
 }
 
 type DoorTarget = Placement | { kind: "window"; sid: Sid };
@@ -192,7 +195,14 @@ function runDoor(env: OpenAssistantEnv, args: OpenAssistantCall): OpenAssistantR
   }
   // A host that cannot give the dock its minimum beside the editor opens the sidebar instead.
   const narrow = !!args.dockHost && args.container !== "sidebar" && !dockFits(env, args.dockHost);
-  const plan = planDoor(env, narrow ? { ...args, container: "sidebar" } : args);
+  const routed: OpenAssistantCall = narrow ? { ...args, container: "sidebar" } : args;
+  const home = homeDoor(env, routed);
+  if (home === "focus") {
+    trackAssistant("ai_entry_clicked", entryProps(args, null, gate));
+    env.focusHomeAsk?.();
+    return { ok: false, reason: "home_ask" };
+  }
+  const plan = planDoor(env, home === "full" ? { ...routed, container: "full" } : routed);
   trackAssistant("ai_entry_clicked", entryProps(args, plan, gate));
   const container = containerOfDoor(plan.target, env.lgUp());
   // A door names only a thread it starts; staging into a chat already in use keeps that chat's title.
@@ -291,6 +301,22 @@ function resolveContainer(env: OpenAssistantEnv, args: OpenAssistantCall): DoorT
     if (window) return { kind: "window", sid: window };
   }
   return { kind: "sidebar" };
+}
+
+// Home's Ask box is the assistant there: a door bound for a closed sidebar shows its chat on Home, or focuses the box.
+function homeDoor(env: OpenAssistantEnv, args: OpenAssistantCall): "full" | "focus" | null {
+  if (!env.homeAsk?.() || env.store.state.shell.placement.kind === "sidebar") return null;
+  const target = resolveContainer(env, args);
+  if (target.kind !== "sidebar") return null;
+  if (args.intent !== "open" || args.payload || args.seed?.length) return "full";
+  const session = resolveThread(env, args, target);
+  const live =
+    !!session &&
+    (isRunning(session.turn) ||
+      session.unread ||
+      !!session.pendingApproval ||
+      !!session.pendingConsent);
+  return live ? "full" : "focus";
 }
 
 // The most recently focused visible container, unless that window hides the door's source (X-14).

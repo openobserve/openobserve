@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       v-if="toolsShown"
       :class="[
-        'flex min-w-0 shrink-0 items-center gap-1',
+        'flex min-w-0 shrink-0 items-center gap-2',
         mode === 'rail' && !bare && 'border-border-default -mx-2 h-10 border-b px-2',
       ]"
       data-test="assistant-history-tools"
@@ -50,13 +50,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @update:model-value="(q) => history.setFilter({ q })"
         @keydown="onSearchKey"
       />
-      <ODropdown align="end">
+      <ODropdown align="end" @update:open="onMenuOpen">
         <template #trigger>
           <AssistantIconButton
             :label="t('assistant.history.listMenu')"
+            :no-tooltip="menuTipOff"
             :icon="assistantGlyph.more"
+            class="h-8!"
             data-test="assistant-history-list-menu"
           />
+        </template>
+        <template v-if="menuViews.length">
+          <OText variant="meta" as="p" class="px-2 py-1">{{
+            t("assistant.history.filter.show")
+          }}</OText>
+          <ODropdownItem
+            v-for="item in menuViews"
+            :key="item.id"
+            :icon-left="item.icon"
+            role="menuitemradio"
+            :aria-checked="view === item.id"
+            :data-test="`assistant-history-view-menu-${item.id}`"
+            @select="setView(item.id)"
+          >
+            {{ item.label }}
+            <template v-if="view === item.id" #icon-right>
+              <OIcon :name="assistantGlyph.copied" size="xs" />
+            </template>
+          </ODropdownItem>
+          <ODropdownSeparator />
         </template>
         <ODropdownItem
           v-if="sharesOffered"
@@ -78,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="narrow && $slots['menu-layout']"
           :text-value="t('assistant.shell.openAs')"
         >
-          <template #icon-left><OIcon :name="assistantGlyph.openFull" size="sm" /></template>
+          <template #icon-left><OIcon :name="assistantGlyph.fullPage" size="sm" /></template>
           <template #trigger>{{ t("assistant.shell.openAs") }}</template>
           <slot name="menu-layout" />
         </ODropdownSub>
@@ -96,28 +118,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </ODropdown>
     </div>
     <div
-      v-if="toolsShown && views.length > 1"
-      class="-mx-1 flex min-w-0 shrink-0 overflow-x-auto px-1"
+      v-if="toolsShown && activeMenuView"
+      class="flex min-w-0 shrink-0 flex-wrap items-center gap-1"
       data-test="assistant-history-views"
     >
-      <OToggleGroup
-        :model-value="view"
-        :aria-label="t('assistant.history.filter.show')"
-        mobile-dropdown
-        :class="bare && BARE_VIEWS_CLASS"
-        @update:model-value="(value) => setView(value as HistoryView)"
+      <OButton
+        v-if="activeMenuView"
+        variant="outline"
+        size="xs"
+        icon-right="close"
+        class="h-6! rounded-full!"
+        :aria-label="
+          t('assistant.history.filter.remove', { filter: raw(String(activeMenuView.label)) })
+        "
+        data-test="assistant-history-filter-active"
+        @click="setView('all')"
       >
-        <OToggleGroupItem
-          v-for="item in views"
-          :key="item.id"
-          :value="item.id"
-          size="xs"
-          :class="bare && BARE_VIEW_CLASS"
-          :data-test="`assistant-history-view-${item.id}`"
-        >
-          {{ item.label }}
-        </OToggleGroupItem>
-      </OToggleGroup>
+        {{ activeMenuView.label }}
+      </OButton>
     </div>
 
     <div ref="scroller" class="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto">
@@ -286,7 +304,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :data-group="item.id"
                 data-test="assistant-history-group"
               >
-                <h3 :class="GROUP_HEADING_CLASS">{{ groupLabel(item.id) }}</h3>
+                <h3 :class="GROUP_HEADING_CLASS">
+                  {{ groupLabel(item.id) }}
+                  <OBadge
+                    v-if="COUNTED_GROUPS.has(item.id)"
+                    size="sm"
+                    :data-test="`assistant-history-${item.id}-count`"
+                    >{{ groupCount(item.id) }}</OBadge
+                  >
+                </h3>
               </div>
               <AssistantHistoryRow
                 v-else
@@ -324,6 +350,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <h3 :id="`${listId}-${group.id}`" :class="GROUP_HEADING_CLASS">
                 {{ groupLabel(group.id) }}
+                <OBadge
+                  v-if="COUNTED_GROUPS.has(group.id)"
+                  size="sm"
+                  :data-test="`assistant-history-${group.id}-count`"
+                  >{{ group.rows.length }}</OBadge
+                >
               </h3>
               <ul class="flex flex-col">
                 <AssistantHistoryRow
@@ -366,13 +398,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :clear-on-sign-out="clearOnSignOut"
         :description-id="modeLineId"
         :compact="bare"
-        class="px-2"
+        class="px-0"
         @update:clear-on-sign-out="setClearOnSignOut"
       />
       <p
         v-else-if="endScope"
         :id="modeLineId"
-        class="text-text-secondary px-2 text-xs"
+        class="text-text-secondary text-xs"
         data-test="assistant-history-end-scope"
       >
         {{ t("assistant.history.titlesOnly") }} ·
@@ -390,7 +422,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :id="modeLineId"
         variant="meta"
         as="p"
-        class="px-2"
         data-test="assistant-history-retention"
       >
         {{ retentionLine }}
@@ -455,6 +486,7 @@ export const SEARCH_DEBOUNCE_MS = 300;
 export const VIRTUAL_FROM = 150;
 
 const GROUP_ORDER = [
+  "needs_you",
   "running",
   "pinned",
   "today",
@@ -472,12 +504,11 @@ const REM_PX = 16;
 
 const COUNTDOWN_TICK_MS = 1_000;
 
-const GROUP_HEADING_CLASS = "text-text-secondary px-2 pb-1 text-xs font-medium";
+const GROUP_HEADING_CLASS =
+  "text-text-secondary flex items-center justify-between gap-1.5 pb-1 text-xs font-medium";
 
 // A bare list's search and filters take the Ask box's pill chips: the field's box is its first child.
-const BARE_SEARCH_CLASS = "[&>div]:h-7 [&>div]:rounded-full [&_input]:text-xs";
-const BARE_VIEWS_CLASS = "gap-1 border-0! bg-transparent! p-0! [&>[aria-hidden=true]]:rounded-full";
-const BARE_VIEW_CLASS = "h-6! rounded-full! px-2.5! font-normal!";
+const BARE_SEARCH_CLASS = "[&>div]:h-8 [&>div]:rounded-full [&_input]:text-xs";
 
 type GroupId = (typeof GROUP_ORDER)[number];
 
@@ -516,12 +547,11 @@ import {
 } from "@/composables/assistant";
 import { rosterOffersChoice } from "@/composables/assistant/pure";
 import useBreakpoint from "@/composables/useBreakpoint";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.types";
-import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
-import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OVirtualScroll from "@/lib/core/VirtualScroll/OVirtualScroll.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
@@ -628,28 +658,24 @@ const sharesOffered = computed(
 const offersAgents = computed(() => rosterOffersChoice(capability.value.agents));
 const triedTime = computed(() => (triedAt.value ? formatOrgTime(triedAt.value) : ""));
 
-// Investigations and Auto-runs need the agent roster and the server; Shared needs the server's links.
-const views = computed(() => {
+// Less-used filters live in the list menu; the active one shows as a chip.
+const menuViews = computed(() => {
   const server = history.mode.value === "server";
   const f = "assistant.history.filter";
-  const list: { id: HistoryView; label: I18nText }[] = [
-    { id: "all", label: t(`${f}.all`) },
-    {
-      id: "needs_you",
-      label: needsYouCount.value
-        ? t(`${f}.needsYouCount`, { count: needsYouCount.value })
-        : t(`${f}.needsYou`),
-    },
-  ];
-  if (offersAgents.value) list.push({ id: "investigations", label: t(`${f}.investigations`) });
-  if (server) list.push({ id: "auto_runs", label: t(`${f}.autoRuns`) });
-  if (server) list.push({ id: "shared", label: t(`${f}.shared`) });
+  const list: { id: HistoryView; label: I18nText; icon: IconName }[] = [];
+  if (offersAgents.value)
+    list.push({
+      id: "investigations",
+      label: t(`${f}.investigations`),
+      icon: assistantGlyph.agentInvestigator,
+    });
+  if (server)
+    list.push({ id: "auto_runs", label: t(`${f}.autoRuns`), icon: assistantGlyph.history });
+  if (server) list.push({ id: "shared", label: t(`${f}.shared`), icon: assistantGlyph.shared });
   return list;
 });
-const needsYouCount = computed(
-  () => runs.rows.value.filter((row) => row.group === "needs_you" && !row.otherOrg).length,
-);
-const localView = ref<"all" | "needs_you" | "auto_runs">("all");
+const activeMenuView = computed(() => menuViews.value.find((item) => item.id === view.value));
+const localView = ref<"all" | "auto_runs">("all");
 // Shared and Investigations live in the stored filter, so a reload keeps them; the rest are this list's own.
 const view = computed<HistoryView>(() => {
   const { kind, agent } = history.filter.value;
@@ -692,10 +718,6 @@ const liveRows = computed<HistoryRow[]>(() => {
   return runs.rows.value.filter((row) => !listed.has(row.sid) && isCounted(row)).map(rowOfRun);
 });
 const shownRows = computed<HistoryRow[]>(() => {
-  if (view.value === "needs_you")
-    return [...liveRows.value, ...history.visible.value].filter(
-      (row) => statusOf(row) === "needs_you",
-    );
   if (query.value || narrowed.value) return history.visible.value;
   const seen = new Set(history.visible.value.map((row) => row.sid));
   const drafts = history.drafts.value.filter((row) => !seen.has(row.sid));
@@ -715,9 +737,13 @@ const groups = computed(() => {
   const buckets = new Map<GroupId, HistoryRow[]>();
   for (const row of drawn.value) {
     // A chat that answers or waits leaves its date group until it settles (D5 decision 2).
-    const id = isInProgress(statusOf(row))
-      ? "running"
-      : groupOf(row, now.value, (ts, at) => orgDayDistance(ts, at, zone), server);
+    const status = statusOf(row);
+    const id =
+      status === "needs_you"
+        ? "needs_you"
+        : isInProgress(status)
+          ? "running"
+          : groupOf(row, now.value, (ts, at) => orgDayDistance(ts, at, zone), server);
     const bucket = buckets.get(id);
     if (bucket) bucket.push(row);
     else buckets.set(id, [row]);
@@ -786,6 +812,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
   root.value?.removeEventListener("keydown", onRootKey);
   if (clock) clearInterval(clock);
+  if (menuTipTimer) clearTimeout(menuTipTimer);
   if (countdown) clearInterval(countdown);
   sizes?.disconnect();
   unregisterHistory?.();
@@ -820,6 +847,7 @@ function rowProps(row: HistoryRow) {
     serverPins: history.serverPins.value,
     timezone: timezone.value,
     compact: props.bare,
+    quietStatus: statusOf(row) === "needs_you",
   };
 }
 
@@ -876,9 +904,14 @@ function statusOf(row: HistoryRow): ChatStatus | null {
 }
 
 function groupLabel(id: GroupId): string {
-  if (id !== "running") return t(`assistant.history.group.${id}`);
-  const count = groups.value.find((group) => group.id === "running")?.rows.length ?? 0;
-  return t("assistant.history.group.running", { count, cap: runs.cap.value });
+  return id === "needs_you"
+    ? t("assistant.history.group.needsYou")
+    : t(`assistant.history.group.${id}`);
+}
+
+const COUNTED_GROUPS = new Set<GroupId>(["needs_you", "running"]);
+function groupCount(id: GroupId): number {
+  return groups.value.find((group) => group.id === id)?.rows.length ?? 0;
 }
 
 // Escape that nothing inside used (search clearing, a menu) returns the panel to its chat.
@@ -939,8 +972,17 @@ function clearFilters(): void {
   focusSearch();
 }
 
+// The menu's close leaves the pointer and focus on its button, so its tooltip stays unmounted until the menu has settled.
+const menuTipOff = ref(false);
+let menuTipTimer: ReturnType<typeof setTimeout> | null = null;
+function onMenuOpen(open: boolean): void {
+  if (menuTipTimer) clearTimeout(menuTipTimer);
+  if (open) menuTipOff.value = true;
+  else menuTipTimer = setTimeout(() => (menuTipOff.value = false), 600);
+}
+
 function setView(next: HistoryView): void {
-  localView.value = next === "needs_you" || next === "auto_runs" ? next : "all";
+  localView.value = next === "auto_runs" ? next : "all";
   const kind = next === "shared" ? "shared" : "all";
   const agent = next === "investigations" ? "investigator" : null;
   history.setFilter({ kind, agent, started: null });

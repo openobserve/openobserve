@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <!-- The rail's top padding is the main column's, so Chats sits on the greeting's top line -->
   <div class="flex h-full min-h-0 min-w-0 flex-col gap-2 pt-4" data-test="home-chats-rail">
-    <div class="flex h-8 shrink-0 items-center gap-1 ps-4 pe-2" data-test="home-chats-rail-header">
+    <div class="flex h-8 shrink-0 items-center gap-1 px-2" data-test="home-chats-rail-header">
       <!-- The list names itself with a hidden heading, so the visible title is not read twice -->
       <span aria-hidden="true" class="text-text-heading min-w-0 flex-1 text-sm font-medium">
         {{ t("assistant.history.title") }}
