@@ -17,7 +17,6 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { defineComponent, nextTick, reactive } from "vue";
 
-import { alertCreationDialog } from "@/composables/alerts/useAlertCreation";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
@@ -52,13 +51,12 @@ vi.mock("./useAgentHomeState", async () => {
     }),
   };
 });
-vi.mock("./useHomeNowData", async (importOriginal) => {
+vi.mock("./useHomeNowData", async () => {
   const { computed, reactive: live, ref } = await import("vue");
   const rows = live(mocks.rows);
   const committed = live(mocks.committed);
   const failed = live(mocks.failed);
   const alerts = live(mocks.alerts);
-  const actual = await importOriginal<typeof import("./useHomeNowData")>();
   return {
     useHomeNowData: () => {
       const selectedKey = ref<string | null>(null);
@@ -390,7 +388,7 @@ describe("AssistantHomeTab", () => {
     const keys = (w: ReturnType<typeof mountTab>) =>
       w.findAll('[data-test^="home-attention-row-"]').map((row) => row.attributes("data-test"));
 
-    it("sits under the Ask box, with the three most urgent rows of every kind", async () => {
+    it("sits under the Ask box and with every row that needs attention, most urgent first", async () => {
       set(mocks.rows, [
         serviceRow("checkout", { coverage: "none" }),
         incidentRow("inc-1"),
@@ -409,7 +407,11 @@ describe("AssistantHomeTab", () => {
         "home-attention-row-service:checkout",
         "home-attention-row-incident:inc-1",
         "home-attention-row-alert:hot",
+        "home-attention-row-anomaly:spike",
       ]);
+      expect(wrapper.get('[data-test="home-attention-rows"]').classes()).toContain(
+        "overflow-y-auto",
+      );
       expect(wrapper.get('[data-test="home-attention"]').classes()).toContain("mt-4");
     });
 
@@ -525,6 +527,16 @@ describe("AssistantHomeTab", () => {
           anomaly.get('[data-test="assistant-home-alert-history"]').attributes("data-type"),
         ).toBe("anomaly_detection"),
       );
+    });
+
+    it("swaps the tab body to the capabilities page and back", async () => {
+      const wrapper = mountTab();
+      await flushPromises();
+      await wrapper.get('[data-test="assistant-home-capabilities"]').trigger("click");
+      expect(wrapper.find('[data-test="assistant-capabilities"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="assistant-home-tab"]').exists()).toBe(false);
+      await wrapper.get('[data-test="assistant-capabilities-back"]').trigger("click");
+      expect(wrapper.find('[data-test="assistant-home-tab"]').exists()).toBe(true);
     });
 
     it("takes View All to the Overview tab through the URL", async () => {

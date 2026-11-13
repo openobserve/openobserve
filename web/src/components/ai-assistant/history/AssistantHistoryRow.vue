@@ -21,6 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :class="[
       'group/row rounded-default hover:bg-surface-subtle relative flex min-w-0 items-center gap-1',
       current && 'bg-surface-subtle',
+      compact && '-mx-2 px-2',
     ]"
     :aria-busy="pending ? 'true' : undefined"
     :data-sid="row.sid"
@@ -53,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :tabindex="tabbable ? 0 : -1"
           :aria-current="current ? 'true' : undefined"
           :class="[
-            'h-auto! min-w-0 flex-1 justify-start! py-1.5 text-start max-md:min-h-11 pointer-coarse:min-h-11',
+            'h-auto! min-w-0 flex-1 justify-start! px-0! py-1.5 text-start max-md:min-h-11 pointer-coarse:min-h-11',
             compact ? 'min-h-9' : 'min-h-8',
           ]"
           data-test="assistant-history-row"
@@ -66,7 +67,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span class="flex min-w-0 flex-1 items-center gap-2">
             <!-- A fixed slot keeps every title on one edge whether or not its row has a light -->
             <span
-              :class="['inline-flex shrink-0 justify-center', compact ? 'w-3' : 'w-4']"
+              :class="[
+                'inline-flex shrink-0',
+                compact ? 'w-3 justify-start' : 'w-4 justify-center',
+              ]"
               data-test="assistant-history-row-light"
               :data-signal="signal ?? (compact ? 'ready' : undefined)"
             >
@@ -78,14 +82,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="bg-border-default size-1.5 rounded-full"
               />
             </span>
-            <OIcon
-              v-if="agentIcon"
-              :name="agentIcon"
-              size="xs"
-              class="text-text-secondary shrink-0"
-              aria-hidden="true"
-              data-test="assistant-history-row-agent"
-            />
             <span class="flex min-w-0 flex-1 flex-col">
               <!-- A chosen row moves as the list re-sorts, so its bubble would be left over the nav (X1) -->
               <!-- The row is a button, whose nowrap would stop the 2-line clamp from wrapping or showing its ellipsis -->
@@ -102,6 +98,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ org }}
               </OText>
             </span>
+            <OIcon
+              v-if="agentIcon"
+              :name="agentIcon"
+              size="xs"
+              class="text-text-secondary shrink-0"
+              aria-hidden="true"
+              data-test="assistant-history-row-agent"
+            />
             <template v-if="visibility">
               <OIcon
                 :name="visibility === 'public' ? assistantGlyph.shared : 'corporate-fare'"
@@ -128,6 +132,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 pendingText
               }}</OText>
             </template>
+            <span
+              v-else-if="status === 'answering'"
+              :class="[
+                'flex shrink-0 items-center justify-end',
+                compact ? COMPACT_TRAIL_CLASS : 'w-12',
+              ]"
+              data-status="answering"
+              data-test="assistant-history-row-state"
+            >
+              <span class="sr-only" aria-live="polite">{{
+                chatStatusWord(status, expiresAt, now ?? Date.now(), t)
+              }}</span>
+              <span
+                aria-hidden="true"
+                class="flex items-center gap-0.5"
+                data-test="assistant-history-row-working"
+              >
+                <span class="bg-text-secondary size-1 rounded-full motion-safe:animate-pulse" />
+                <span
+                  class="bg-text-secondary size-1 rounded-full motion-safe:animate-pulse motion-safe:[animation-delay:200ms]"
+                />
+                <span
+                  class="bg-text-secondary size-1 rounded-full motion-safe:animate-pulse motion-safe:[animation-delay:400ms]"
+                />
+              </span>
+            </span>
+            <span
+              v-else-if="status === 'needs_you' && quietStatus"
+              class="sr-only"
+              data-status="needs_you"
+              data-test="assistant-history-row-state"
+              >{{ chatStatusWord(status, expiresAt, now ?? Date.now(), t) }}</span
+            >
             <span
               v-else-if="status"
               :class="[
@@ -250,6 +287,8 @@ export interface AssistantHistoryRowProps {
   tag?: "li" | "div";
   /** One-line row for a narrow rail: every row marks its status, and the menu covers the time while shown. */
   compact?: boolean;
+  /** The row sits under a section that names its status, so only screen readers get the word. */
+  quietStatus?: boolean;
 }
 
 type RowAction =
@@ -265,10 +304,10 @@ const KEBAB_CLASS = [
 ];
 // The compact kebab sits over the time, so the time reaches the row's end; a touch screen keeps it in line.
 const COMPACT_KEBAB_CLASS =
-  "absolute! end-1 group-focus-within/row:opacity-100 pointer-coarse:static!";
+  "absolute! end-2 group-focus-within/row:opacity-100 pointer-coarse:static!";
 // The time steps aside wherever the kebab shows over it, and is never narrower than the kebab.
 const COMPACT_TRAIL_CLASS = [
-  "min-w-7",
+  "w-12 text-end",
   "pointer-fine:group-hover/row:invisible pointer-fine:group-focus-within/row:invisible",
   "pointer-fine:group-data-[current]/row:invisible pointer-fine:group-has-[[data-state=open]]/row:invisible",
 ];
@@ -318,6 +357,7 @@ const props = withDefaults(defineProps<AssistantHistoryRowProps>(), {
   timezone: undefined,
   tag: "li",
   compact: false,
+  quietStatus: false,
 });
 
 const emit = defineEmits<{

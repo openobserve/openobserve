@@ -91,6 +91,7 @@ function refusalOutcome(
 ): InvestigateOutcome {
   switch (reason) {
     case "org_changed":
+    case "home_ask":
       return { kind: "none" };
     case "loading":
     case "approval_pending":

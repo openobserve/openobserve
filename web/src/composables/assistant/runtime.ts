@@ -35,6 +35,7 @@ import type { Router } from "vue-router";
 import config from "@/aws-exports";
 import { requestAlertCreation } from "@/composables/alerts/useAlertCreation";
 import { contextRegistry } from "@/composables/contextProviders/registry";
+import { requestOverviewFocus } from "@/composables/goto/goToRequests";
 import { queryClient } from "@/composables/query/queryClient";
 import { useAiDashboardEvents } from "@/composables/useAiDashboardEvents";
 import useBreakpoint from "@/composables/useBreakpoint";
@@ -86,7 +87,7 @@ import { cancelConsentOnClose, createConsentRuntime, type ConsentRuntime } from 
 import { serialize } from "./context/serialize";
 import { createHintChannel, type AssistantHintChannel } from "./hints";
 import { isAssistantV2 } from "./flags";
-import { isFullThreadRoute } from "./fullThreadRoute";
+import { isFullThreadRoute, isHomeAskShown } from "./fullThreadRoute";
 import { createIndexedDbHistory } from "./historyDb";
 import { assistantClientId } from "./historyElsewhere";
 import { serverCardOf } from "./historyRecords";
@@ -354,6 +355,8 @@ function buildRuntime(): AssistantRuntime {
           .querySelector(`[data-assistant-window="${CSS.escape(sid)}"]`)
           ?.getBoundingClientRect() ?? null,
       historyRows: () => history.rows.value,
+      homeAsk: () => isHomeAskShown(context.value?.router?.currentRoute.value),
+      focusHomeAsk: () => void requestOverviewFocus(),
     });
     return {
       store,
