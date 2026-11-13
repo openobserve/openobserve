@@ -15,7 +15,7 @@
 
 import { flushPromises, mount } from "@vue/test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { computed, nextTick, ref, shallowRef } from "vue";
+import { computed, ref, shallowRef } from "vue";
 
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -23,17 +23,22 @@ import store from "@/test/unit/helpers/store";
 import TurnOnAlertsDrawer from "./TurnOnAlertsDrawer.vue";
 import { fakeFlow, PACK } from "./starterPackTestFlow";
 
-const fake = vi.hoisted(() => ({ turn: null as any, push: vi.fn(async () => {}) }));
+const fake = vi.hoisted(() => ({
+  turn: null as any,
+  push: vi.fn(async () => {}),
+  resolve: vi.fn(() => ({ href: "/alert-destinations?action=add" })),
+  destinations: [{ name: "pager" }] as Array<{ name: string }>,
+}));
 
 vi.mock("@/composables/starterPacks/useTurnOnAlerts", () => ({
   useTurnOnAlerts: () => fake.turn,
 }));
 vi.mock("@/composables/query/readQuery", () => ({
-  readQuery: vi.fn(async ({ queryKey }: { queryKey: unknown[] }) =>
-    JSON.stringify(queryKey).includes("template") ? [{ name: "tpl" }] : [{ name: "pager" }],
-  ),
+  readQuery: vi.fn(async () => fake.destinations),
 }));
-vi.mock("vue-router", () => ({ useRouter: () => ({ push: fake.push }) }));
+vi.mock("vue-router", () => ({
+  useRouter: () => ({ push: fake.push, resolve: fake.resolve }),
+}));
 
 const row = (id: string, severity: string, result: Record<string, unknown> | null) => ({
   id,
@@ -88,11 +93,6 @@ const render = async (flow = fakeFlow()) => {
       plugins: [i18n, store],
       stubs: {
         ODrawer: { template: "<div><slot /><slot name='footer' /></div>" },
-        AddDestination: {
-          props: ["templates"],
-          template:
-            "<div data-test='add-destination'>{{ templates.map((row) => row.name).join() }}</div>",
-        },
         OIcon: true,
       },
     },
@@ -105,6 +105,7 @@ const text = (wrapper: any, id: string) => wrapper.get(`[data-test="${id}"]`).te
 describe("TurnOnAlertsDrawer", () => {
   beforeEach(() => {
     fake.turn = turnFor([row("a", "critical", result(1))]);
+    fake.destinations = [{ name: "pager" }];
   });
 
   it("shows hours checked, marks short history, and never says a day", async () => {
@@ -160,18 +161,100 @@ describe("TurnOnAlertsDrawer", () => {
     expect(fake.turn.retryRow).toHaveBeenCalledWith("a");
   });
 
-  it("opens New destination inside the drawer", async () => {
+  it("opens Alert Destinations in a new tab and selects the one added there", async () => {
+    const opened = vi.spyOn(window, "open").mockReturnValue(null);
     const wrapper = await render();
     await wrapper.get('[data-test="turn-on-alerts-new-destination-btn"]').trigger("click");
-    await nextTick();
-    expect(wrapper.find('[data-test="add-destination"]').exists()).toBe(true);
+    expect(fake.resolve).toHaveBeenCalledWith({
+      name: "alertDestinations",
+      query: { action: "add", org_identifier: expect.anything() },
+    });
+    expect(opened).toHaveBeenCalledWith("/alert-destinations?action=add", "_blank");
+    fake.destinations = [{ name: "pager" }, { name: "platform-alerts" }];
+    window.dispatchEvent(new Event("focus"));
+    await flushPromises();
+    expect(text(wrapper, "turn-on-alerts-critical-destination")).toContain("platform-alerts");
+    expect(text(wrapper, "turn-on-alerts-warning-destination")).toContain("platform-alerts");
+    opened.mockRestore();
   });
 
-  it("gives New destination the org's templates", async () => {
+  it("leaves the lists alone on focus when no destination was being added", async () => {
     const wrapper = await render();
-    await wrapper.get('[data-test="turn-on-alerts-new-destination-btn"]').trigger("click");
+    fake.destinations = [{ name: "pager" }, { name: "platform-alerts" }];
+    window.dispatchEvent(new Event("focus"));
     await flushPromises();
-    expect(text(wrapper, "add-destination")).toBe("tpl");
+    expect(text(wrapper, "turn-on-alerts-critical-destination")).not.toContain("platform-alerts");
+  });
+
+  it("labels the table columns and splits the run count from the history checked", async () => {
+    fake.turn = turnFor([
+      row("a", "critical", { incidents: 0, runs: 24, checkedSeconds: 7200, noData: false }),
+      row("b", "warning", { incidents: 0, runs: 288, checkedSeconds: 86400, noData: false }),
+    ]);
+    const wrapper = await render();
+    expect(text(wrapper, "turn-on-alerts-table-header")).toBe(
+      "AlertWould have firedHistory checked",
+    );
+    const first = wrapper.get('[data-test="turn-on-alerts-row-a"]');
+    expect(first.get('[data-test="turn-on-alerts-fired"]').text()).toBe("0 incidents · 24 runs");
+    expect(first.get('[data-test="turn-on-alerts-history"]').text()).toContain("2 h of 24 h");
+    expect(first.find('[data-test="turn-on-alerts-partial-tag"]').exists()).toBe(true);
+    const second = wrapper.get('[data-test="turn-on-alerts-row-b"]');
+    expect(second.get('[data-test="turn-on-alerts-history"]').text()).toBe("24 h");
+  });
+
+  it("names each row by its library title, like Pack details", async () => {
+    fake.turn = turnFor([row("a", "critical", result(0))]);
+    const wrapper = await render(fakeFlow({ alertTitle: (id: string) => `Title ${id}` }));
+    expect(text(wrapper, "turn-on-alerts-title-a")).toBe("Title a");
+    expect(wrapper.find('[aria-label="Title a"]').exists()).toBe(true);
+  });
+
+  it("puts No data in the History checked column with nothing fired", async () => {
+    fake.turn = turnFor([
+      row("a", "critical", { ...result(0, 0), noData: true }),
+      row("b", "warning", result(1)),
+    ]);
+    const wrapper = await render();
+    const first = wrapper.get('[data-test="turn-on-alerts-row-a"]');
+    expect(first.find('[data-test="turn-on-alerts-no-data-tag"]').exists()).toBe(true);
+    expect(first.find('[data-test="turn-on-alerts-fired"]').exists()).toBe(false);
+  });
+
+  it("shows the notes, scope and cost without a More details toggle", async () => {
+    const wrapper = await render();
+    for (const id of ["history-note", "noise-rule", "scope", "cost"]) {
+      expect(wrapper.find(`[data-test="turn-on-alerts-${id}"]`).isVisible()).toBe(true);
+    }
+    expect(wrapper.find('[data-test="turn-on-alerts-more-details"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="turn-on-alerts-limit-clusters-btn"]').exists()).toBe(true);
+  });
+
+  it("ticks only the preselected alerts once the rows load", async () => {
+    fake.turn = turnFor([row("a", "critical", result(0)), row("b", "warning", result(0))]);
+    fake.turn.loadState.value = "loading";
+    const wrapper = mount(TurnOnAlertsDrawer, {
+      props: { flow: fakeFlow(), clusters: [], open: true, preselectIds: ["b"] },
+      global: {
+        plugins: [i18n, store],
+        stubs: { ODrawer: { template: "<div><slot /><slot name='footer' /></div>" }, OIcon: true },
+      },
+    });
+    fake.turn.loadState.value = "ready";
+    await flushPromises();
+    expect(fake.turn.choose).toHaveBeenCalledWith("a", false);
+    expect(fake.turn.choose).toHaveBeenCalledWith("b", true);
+    wrapper.unmount();
+  });
+
+  it("names the alerts that did not turn on in the footer, with Retry", async () => {
+    fake.turn = turnFor([row("a", "critical", result(0)), row("b", "warning", result(0))]);
+    fake.turn.failedIds.value = ["b"];
+    const wrapper = await render();
+    expect(text(wrapper, "turn-on-alerts-failed")).toContain("b didn't turn on.");
+    await wrapper.get('[data-test="turn-on-alerts-retry-btn"]').trigger("click");
+    await flushPromises();
+    expect(fake.turn.turnOn).toHaveBeenCalledWith(expect.anything(), ["b"]);
   });
 
   it("offers the on-call preview to nobody on OSS", async () => {
@@ -183,5 +266,57 @@ describe("TurnOnAlertsDrawer", () => {
     fake.turn.forbidden.value = true;
     const wrapper = await render();
     expect(wrapper.find('[data-test="turn-on-alerts-copy-link-btn"]').exists()).toBe(true);
+  });
+  const editThreshold = async (wrapper: any, value: string) => {
+    await wrapper.get('[data-test="turn-on-alerts-row-expand"]').trigger("click");
+    await wrapper.get('[data-test="turn-on-alerts-edit-threshold-btn"]').trigger("click");
+    await wrapper.get('[data-test="turn-on-alerts-threshold-input"] input').setValue(value);
+    await wrapper.get('[data-test="turn-on-alerts-threshold-save-btn"]').trigger("click");
+    await flushPromises();
+  };
+  const thresholdError = (wrapper: any) =>
+    wrapper.find('[data-test="turn-on-alerts-threshold-input-error"]');
+
+  it("says a threshold must be a number instead of saving nothing", async () => {
+    const wrapper = await render();
+    await editThreshold(wrapper, "");
+    expect(fake.turn.setThreshold).not.toHaveBeenCalled();
+    expect(thresholdError(wrapper).attributes("data-test-error-text")).toBe(
+      i18n.global.t("starterPacks.turnOn.thresholdInvalid"),
+    );
+  });
+
+  it("keeps the edit open and says so when the threshold save fails", async () => {
+    fake.turn.setThreshold = vi.fn(async () => false);
+    const wrapper = await render();
+    await editThreshold(wrapper, "7");
+    expect(fake.turn.setThreshold).toHaveBeenCalledWith("a", 7);
+    expect(thresholdError(wrapper).attributes("data-test-error-text")).toBe(
+      i18n.global.t("starterPacks.turnOn.thresholdFailed"),
+    );
+  });
+
+  it("drops a half-done threshold edit when the drawer reopens", async () => {
+    const wrapper = await render();
+    await wrapper.get('[data-test="turn-on-alerts-row-expand"]').trigger("click");
+    await wrapper.get('[data-test="turn-on-alerts-edit-threshold-btn"]').trigger("click");
+    await wrapper.setProps({ open: false });
+    await wrapper.setProps({ open: true });
+    await flushPromises();
+    expect(wrapper.find('[data-test="turn-on-alerts-threshold-input"]').exists()).toBe(false);
+  });
+
+  it("stops looking for a new destination once the drawer closes", async () => {
+    const opened = vi.spyOn(window, "open").mockReturnValue(null);
+    const wrapper = await render();
+    await wrapper.get('[data-test="turn-on-alerts-new-destination-btn"]').trigger("click");
+    await wrapper.setProps({ open: false });
+    await wrapper.setProps({ open: true });
+    await flushPromises();
+    fake.destinations = [{ name: "pager" }, { name: "platform-alerts" }];
+    window.dispatchEvent(new Event("focus"));
+    await flushPromises();
+    expect(text(wrapper, "turn-on-alerts-critical-destination")).not.toContain("platform-alerts");
+    opened.mockRestore();
   });
 });

@@ -51,4 +51,15 @@ describe("StarterPackRepairChip", () => {
     expect(chip).toContain("2 alerts have no data");
     expect(chip).not.toContain("panel");
   });
+
+  it("reports opening its drawer so the page can close another one", async () => {
+    fake.issue = { record: {}, from: "a", to: "b", lastUs: 1, startedUs: 2, panels: 0, alerts: 2 };
+    const wrapper = mount(StarterPackRepairChip, {
+      props: { org: "org", scope: {} },
+      global: { plugins: [i18n, store], stubs: { ODrawer: true } },
+    });
+    await flushPromises();
+    await wrapper.get('[data-test="starter-pack-repair-chip"]').trigger("click");
+    expect(wrapper.emitted("opened")).toHaveLength(1);
+  });
 });

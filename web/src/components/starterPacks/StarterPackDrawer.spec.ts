@@ -1,5 +1,5 @@
 import { flushPromises, mount } from "@vue/test-utils";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { nextTick, ref, shallowRef } from "vue";
 
 import i18n from "@/locales";
@@ -380,6 +380,90 @@ describe("StarterPackDrawer", () => {
     expect(flow.land).toHaveBeenCalled();
   });
 
+  it("confirms Remove in place in the footer, never in a second dialog", async () => {
+    const items = [{ kind: "alert", itemId: "a1", status: "created", id: "al1" }];
+    const flow = fakeFlow({
+      installed: ref(true),
+      canUndo: ref(false),
+      items: ref(items),
+      made: ref(items),
+      toCreate: ref(items),
+      alertsOn: ref(1),
+    });
+    const wrapper = render(flow);
+    await wrapper.get('[data-test="starter-pack-page-remove-btn"]').trigger("click");
+    expect(has(wrapper, "starter-pack-undo-dialog")).toBe(false);
+    const confirm = wrapper.get('[data-test="starter-pack-drawer-confirm"]');
+    expect(confirm.text()).toContain("Remove pack?");
+    expect(confirm.text()).toContain("Removes 1 item · 1 live alert loses cover");
+    expect(has(wrapper, "starter-pack-drawer-open-btn")).toBe(false);
+    await wrapper.get('[data-test="starter-pack-drawer-confirm-cancel-btn"]').trigger("click");
+    expect(has(wrapper, "starter-pack-drawer-confirm")).toBe(false);
+    await wrapper.get('[data-test="starter-pack-page-remove-btn"]').trigger("click");
+    await wrapper.get('[data-test="starter-pack-remove-confirm-btn"]').trigger("click");
+    await flushPromises();
+    expect(flow.remove).toHaveBeenCalled();
+    expect(wrapper.emitted("update:open")?.at(-1)).toEqual([false]);
+  });
+
+  it("confirms Undo setup in place with the time left", async () => {
+    const flow = fakeFlow({ installed: ref(true), canUndo: ref(true) });
+    const wrapper = render(flow);
+    await wrapper.get('[data-test="starter-pack-progress-undo-btn"]').trigger("click");
+    const confirm = wrapper.get('[data-test="starter-pack-drawer-confirm"]');
+    expect(confirm.text()).toContain("Undo setup?");
+    expect(confirm.text()).toContain("5 h left to undo");
+    await wrapper.get('[data-test="starter-pack-undo-confirm-btn"]').trigger("click");
+    await flushPromises();
+    expect(flow.undo).toHaveBeenCalled();
+  });
+
+  it("keeps the confirm open with the failure when Undo setup fails", async () => {
+    const flow = fakeFlow({
+      installed: ref(true),
+      canUndo: ref(true),
+      undo: vi.fn(async () => false),
+    });
+    const wrapper = render(flow);
+    await wrapper.get('[data-test="starter-pack-progress-undo-btn"]').trigger("click");
+    await wrapper.get('[data-test="starter-pack-undo-confirm-btn"]').trigger("click");
+    await flushPromises();
+    expect(flow.undo).toHaveBeenCalledTimes(1);
+    expect(has(wrapper, "starter-pack-confirm-failed")).toBe(true);
+    expect(has(wrapper, "starter-pack-drawer-confirm")).toBe(true);
+    expect(wrapper.emitted("update:open")).toBeUndefined();
+  });
+
+  it("runs Remove once and locks the confirm while it works", async () => {
+    const flow = fakeFlow({ installed: ref(true), canUndo: ref(false), busy: ref(false) });
+    const wrapper = render(flow);
+    await wrapper.get('[data-test="starter-pack-page-remove-btn"]').trigger("click");
+    flow.busy.value = true;
+    await nextTick();
+    expect(
+      wrapper.get('[data-test="starter-pack-drawer-confirm-cancel-btn"]').attributes("disabled"),
+    ).toBeDefined();
+    await wrapper.get('[data-test="starter-pack-remove-confirm-btn"]').trigger("click");
+    expect(flow.remove).not.toHaveBeenCalled();
+  });
+
+  it("confirms Undo setup inside the install dialog, never in a dialog on top", async () => {
+    const made = [{ kind: "alert", itemId: "a1", status: "created" }];
+    const flow = fakeFlow({ interrupted: ref(true), toCreate: ref(made), made: ref(made) });
+    const wrapper = render(flow);
+    await wrapper.get('[data-test="starter-pack-progress-undo-btn"]').trigger("click");
+    expect(has(wrapper, "starter-pack-undo-dialog")).toBe(false);
+    expect(wrapper.get('[data-test="starter-pack-progress-confirm"]').text()).toContain(
+      "5 h left to undo",
+    );
+    expect(has(wrapper, "starter-pack-progress-open-btn")).toBe(false);
+    await wrapper.get('[data-test="starter-pack-undo-confirm-btn"]').trigger("click");
+    await flushPromises();
+    expect(flow.undo).toHaveBeenCalledTimes(1);
+    expect(wrapper.emitted("update:open")?.at(-1)).toEqual([false]);
+    expect(wrapper.emitted("done")).toHaveLength(1);
+  });
+
   it("offers Finish or Undo on an interrupted install", () => {
     const wrapper = render(
       fakeFlow({
@@ -446,6 +530,52 @@ describe("StarterPackDrawer", () => {
     const wrapper = render(fakeFlow({ preview: shallowRef(preview) }));
     expect(has(wrapper, "starter-pack-drawer-open-btn")).toBe(true);
     expect(has(wrapper, "starter-pack-drawer-submit-btn")).toBe(false);
+  });
+
+  it("offers Open pack from the install dialog when no dashboard was made", () => {
+    const made = [{ kind: "alert", itemId: "a1", status: "created" }];
+    const wrapper = render(
+      fakeFlow({ interrupted: ref(true), toCreate: ref(made), made: ref(made) }),
+    );
+    expect(wrapper.get('[data-test="starter-pack-progress-open-btn"]').text()).toBe("Open pack");
+  });
+
+  it("offers Open pack on a set-up pack without a dashboard and Open dashboard with one", () => {
+    const plain = render(fakeFlow({ installed: ref(true) }));
+    expect(plain.get('[data-test="starter-pack-drawer-open-btn"]').text()).toBe("Open pack");
+    const withDashboard = render(
+      fakeFlow({
+        installed: ref(true),
+        dashboardItem: shallowRef({ kind: "dashboard", itemId: "overview", id: "d1" }),
+      }),
+    );
+    expect(withDashboard.get('[data-test="starter-pack-drawer-open-btn"]').text()).toBe(
+      "Open dashboard",
+    );
+  });
+
+  it("counts only the ticked alerts in the Alerts card", async () => {
+    const wrapper = render(ready());
+    await rowChecks(wrapper, "alert")[0].trigger("click");
+    expect(
+      group(wrapper, "alert").get('[data-test="starter-pack-drawer-group-meta"]').text(),
+    ).toContain("1 · silent until you turn them on");
+    expect(submit(wrapper).text()).toBe("Set up Kubernetes monitoring (3)");
+  });
+
+  it("reports done after an inline Remove or Undo succeeds, and not when it fails", async () => {
+    const removed = render(fakeFlow({ installed: ref(true), canUndo: ref(false) }));
+    await removed.get('[data-test="starter-pack-page-remove-btn"]').trigger("click");
+    await removed.get('[data-test="starter-pack-remove-confirm-btn"]').trigger("click");
+    await flushPromises();
+    expect(removed.emitted("done")).toHaveLength(1);
+    const failed = render(
+      fakeFlow({ installed: ref(true), canUndo: ref(true), undo: vi.fn(async () => false) }),
+    );
+    await failed.get('[data-test="starter-pack-progress-undo-btn"]').trigger("click");
+    await failed.get('[data-test="starter-pack-undo-confirm-btn"]').trigger("click");
+    await flushPromises();
+    expect(failed.emitted("done")).toBeUndefined();
   });
 
   it("names the built-in pack calmly when the Library is out of reach", () => {

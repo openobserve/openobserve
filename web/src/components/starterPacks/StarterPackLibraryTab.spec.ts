@@ -20,21 +20,33 @@ import i18n from "@/locales";
 
 const fake = vi.hoisted(() => ({
   ready: true,
-  dashboard: true,
   fail: false,
   records: [] as Array<Record<string, unknown>>,
   rawLogs: [] as Array<{ stream: string; column: string }>,
   rawLogsFor: [] as string[][],
   push: vi.fn(async () => {}),
-  state: { zoConfig: {}, userInfo: { role: "member", email: "a@example.com" } } as Record<
+  copy: vi.fn(),
+  update: { available: { value: false }, check: vi.fn(async () => true) },
+  state: { zoConfig: {}, userInfo: { role: "admin", email: "a@example.com" } } as Record<
     string,
     any
   >,
   repairs: [] as Array<Record<string, any>>,
   undo: vi.fn(async () => {}),
+  pack: {
+    id: "kubernetes",
+    titleKey: "starterPacks.kubernetes.title",
+    descriptionKey: "starterPacks.kubernetes.description",
+    dashboards: [{ id: "overview", title: "Kubernetes Overview" }],
+    collectorRoute: "ingestFromKubernetes",
+  } as Record<string, unknown>,
 }));
 
 vi.mock("vuex", () => ({ useStore: () => ({ state: fake.state }) }));
+vi.mock("./StarterPackDrawer.vue", () => ({
+  default: { name: "StarterPackDrawer", template: "<div />" },
+}));
+vi.mock("@/utils/clipboard", () => ({ copyToClipboard: fake.copy }));
 vi.mock("@/composables/starterPacks/useNginxParse", () => ({
   useNginxParse: () => ({
     active: async () => fake.repairs,
@@ -43,6 +55,9 @@ vi.mock("@/composables/starterPacks/useNginxParse", () => ({
     confirm: vi.fn(),
     undo: fake.undo,
   }),
+}));
+vi.mock("@/composables/starterPacks/usePackUpdates", () => ({
+  usePackUpdates: () => fake.update,
 }));
 
 vi.mock("vue-router", async (importOriginal) => ({
@@ -53,14 +68,7 @@ vi.mock("@/composables/alerts/useAlertLibrary", () => ({
   useAlertLibrary: () => ({ loadManifest: vi.fn(), loadAlertFile: vi.fn() }),
 }));
 vi.mock("@/composables/starterPacks/kubernetesPack", () => ({
-  STARTER_PACKS: [
-    {
-      id: "kubernetes",
-      titleKey: "starterPacks.kubernetes.title",
-      descriptionKey: "starterPacks.kubernetes.description",
-      dashboards: [{ id: "overview", title: "Kubernetes Overview" }],
-    },
-  ],
+  STARTER_PACKS: [fake.pack],
 }));
 vi.mock("@/composables/starterPacks/packMatchData", () => ({
   readOrgStreams: async () => {
@@ -69,7 +77,11 @@ vi.mock("@/composables/starterPacks/packMatchData", () => ({
   },
   matchPack: async () => ({
     ready: fake.ready,
-    dashboards: new Map([["overview", fake.dashboard]]),
+    alerts: new Map([
+      ["a1", fake.ready],
+      ["a2", false],
+    ]),
+    dashboards: new Map([["overview", fake.ready]]),
   }),
 }));
 vi.mock("@/composables/starterPacks/useStarterPackFlow", async (importOriginal) => {
@@ -93,15 +105,25 @@ vi.mock("@/composables/starterPacks/useInstallRecords", () => ({
   useInstallRecords: () => ({ list: async () => fake.records }),
 }));
 
+import { useStarterPackFlow } from "@/composables/starterPacks/useStarterPackFlow";
 import StarterPackLibraryTab from "./StarterPackLibraryTab.vue";
 
-const render = async (view: "packs" | "dashboards" = "packs") => {
+const flow = useStarterPackFlow("org", {} as never);
+
+const render = async () => {
   const wrapper = mount(StarterPackLibraryTab, {
-    props: { org: "org", view },
-    global: { plugins: [i18n], stubs: { StarterPackDrawer: true } },
+    props: { org: "org" },
+    global: { plugins: [i18n], stubs: { StarterPackDrawer: true, StarterPackUndoDialog: true } },
   });
   await flushPromises();
   return wrapper;
+};
+type Wrapper = Awaited<ReturnType<typeof render>>;
+const text = (wrapper: Wrapper, id: string) => wrapper.get(`[data-test="${id}"]`).text();
+const has = (wrapper: Wrapper, id: string) => wrapper.find(`[data-test="${id}"]`).exists();
+const pick = async (wrapper: Wrapper, tile: string) => {
+  await wrapper.get(`[data-test="library-tab-stat-${tile}"]`).trigger("click");
+  await flushPromises();
 };
 const record = (over: Record<string, unknown>) => ({
   packId: "kubernetes",
@@ -112,51 +134,78 @@ const record = (over: Record<string, unknown>) => ({
   installedAt: 1_700_000_000_000_000,
   ...over,
 });
+const shortDate = new Date(1_700_000_000_000).toLocaleDateString(undefined, {
+  day: "numeric",
+  month: "short",
+});
 
 describe("StarterPackLibraryTab", () => {
   beforeEach(() => {
     fake.ready = true;
-    fake.dashboard = true;
     fake.fail = false;
     fake.records = [];
     fake.push.mockClear();
+    fake.copy.mockClear();
+    fake.update.available.value = false;
+    fake.state.userInfo.role = "admin";
+    flow.record.value = null;
+    flow.running.value = false;
+    flow.alertsOff.value = 0;
+    flow.installed.value = false;
+    flow.licensed.value = true;
+    delete fake.pack.nativeView;
+    vi.mocked(flow.install).mockClear();
+    vi.mocked(flow.undo).mockClear();
   });
 
-  it("puts a pack that fits under Fits your data with its counts in the chips", async () => {
+  it("counts packs in the stat strip and offers Set up on a pack that fits", async () => {
     const wrapper = await render();
-    expect(wrapper.find('[data-test="library-tab-section-fits"]').exists()).toBe(true);
-    expect(wrapper.get('[data-test="library-tab-chip-ready"]').text()).toBe("Fits your data · 1");
-    expect(wrapper.get('[data-test="library-tab-chip-all"]').text()).toBe("All · 1");
-    expect(wrapper.get('[data-test="library-tab-install-kubernetes"]').text()).toBe(
-      "Set up Kubernetes monitoring",
+    expect(text(wrapper, "library-tab-stat-ready")).toContain("1");
+    expect(text(wrapper, "library-tab-stat-all")).toContain("1");
+    expect(text(wrapper, "library-tab-state-kubernetes")).toBe("Ready to use");
+    expect(text(wrapper, "library-tab-counts-kubernetes")).toBe(
+      "1 dashboard · 2 alerts · 1 saved view",
     );
-    expect(wrapper.find('[data-test="library-tab-see-kubernetes"]').exists()).toBe(true);
+    expect(text(wrapper, "library-tab-meta-kubernetes")).toBe("2 of 3 items fit your data");
+    expect(text(wrapper, "library-tab-install-kubernetes")).toBe("Set up Kubernetes monitoring");
+    expect(has(wrapper, "library-tab-see-kubernetes")).toBe(true);
   });
 
   it("loads the install preview so its count matches Home and the drawer", async () => {
-    const { useStarterPackFlow } = await import("@/composables/starterPacks/useStarterPackFlow");
-    const flow = useStarterPackFlow("org", {} as never);
     vi.mocked(flow.loadPreview).mockClear();
     await render();
     expect(flow.loadPreview).toHaveBeenCalledTimes(1);
   });
 
-  it("puts a pack without data under Nothing matching yet and filters it out", async () => {
+  it("offers Open pack and Ingestion guide, never Set up, for a pack without data", async () => {
     fake.ready = false;
     const wrapper = await render();
-    expect(wrapper.find('[data-test="library-tab-section-missing"]').exists()).toBe(true);
-    await wrapper.get('[data-test="library-tab-chip-ready"]').trigger("click");
-    expect(wrapper.find('[data-test="library-tab-empty"]').exists()).toBe(true);
+    expect(text(wrapper, "library-tab-state-kubernetes")).toBe("Not ingested");
+    expect(text(wrapper, "library-tab-meta-kubernetes")).toBe("Needs Kubernetes data");
+    expect(has(wrapper, "library-tab-install-kubernetes")).toBe(false);
+    await wrapper.get('[data-test="library-tab-guide-kubernetes"]').trigger("click");
+    expect(fake.push).toHaveBeenCalledWith({
+      name: "ingestFromKubernetes",
+      query: { org_identifier: "org" },
+    });
+    await pick(wrapper, "ready");
+    expect(has(wrapper, "library-tab-empty")).toBe(true);
+    await pick(wrapper, "missing");
+    expect(has(wrapper, "library-tab-row-kubernetes")).toBe(true);
   });
 
-  it("searches by name", async () => {
-    const wrapper = await render();
-    await wrapper.get('[data-test="library-tab-search"] input').setValue("nothing-like-this");
+  it("hides the stat strip while loading", async () => {
+    const wrapper = mount(StarterPackLibraryTab, {
+      props: { org: "org" },
+      global: { plugins: [i18n], stubs: { StarterPackDrawer: true } },
+    });
+    expect(has(wrapper, "library-tab-loading")).toBe(true);
+    expect(has(wrapper, "library-tab-strip")).toBe(false);
     await flushPromises();
-    expect(wrapper.find('[data-test="library-tab-empty"]').exists()).toBe(true);
+    expect(has(wrapper, "library-tab-strip")).toBe(true);
   });
 
-  it("shows how many items an installed pack has and offers Manage", async () => {
+  it("marks a pack with a failed item Incomplete and offers Retry", async () => {
     fake.records = [
       record({
         items: [
@@ -166,11 +215,29 @@ describe("StarterPackLibraryTab", () => {
       }),
     ];
     const wrapper = await render();
-    const items = wrapper.get('[data-test="library-tab-items-one"]').text();
-    expect(items).toContain("1 of 2 items installed");
-    expect(items).toContain("1 item could not be created");
-    expect(wrapper.get('[data-test="library-tab-state-one"]').text()).toBe("1 failed");
-    expect(wrapper.find('[data-test="library-tab-open-dashboard-one"]').exists()).toBe(true);
+    expect(text(wrapper, "library-tab-meta-one")).toBe(
+      `Installed by a@example.com on ${shortDate} · Incomplete`,
+    );
+    const retry = wrapper.get('[data-test="library-tab-retry-one"]');
+    expect(retry.text()).toBe("Retry 1 item");
+    await retry.trigger("click");
+    expect(flow.install).toHaveBeenCalledTimes(1);
+  });
+
+  it("counts what setup made on an installed card, not what the pack holds", async () => {
+    fake.records = [
+      record({
+        items: [
+          { kind: "folder", itemId: "f", status: "created" },
+          { kind: "dashboard", itemId: "overview", status: "existing" },
+          { kind: "alert", itemId: "a", status: "created" },
+          { kind: "alert", itemId: "b", status: "failed" },
+          { kind: "alert", itemId: "c", status: "skipped" },
+        ],
+      }),
+    ];
+    const wrapper = await render();
+    expect(text(wrapper, "library-tab-counts-one")).toBe("1 dashboard · 1 alert");
   });
 
   it("lists every install with its installer and date under Installed", async () => {
@@ -180,44 +247,122 @@ describe("StarterPackLibraryTab", () => {
       record({ installId: "gone", status: "removed" }),
     ];
     const wrapper = await render();
-    await wrapper.get('[data-test="library-tab-chip-installed"]').trigger("click");
-    const one = wrapper.get('[data-test="library-tab-installed-one"]').text();
-    expect(one).toContain("a@example.com");
-    expect(one).toContain(new Date(1_700_000_000_000).toLocaleString());
-    expect(wrapper.get('[data-test="library-tab-installed-two"]').text()).toContain("Incomplete");
-    expect(wrapper.find('[data-test="library-tab-installed-gone"]').exists()).toBe(false);
+    await pick(wrapper, "installed");
+    expect(text(wrapper, "library-tab-meta-one")).toBe(
+      `Installed by a@example.com on ${shortDate}`,
+    );
+    expect(text(wrapper, "library-tab-meta-two")).toContain("Incomplete");
+    expect(has(wrapper, "library-tab-row-gone")).toBe(false);
   });
 
   it("explains an empty Installed filter", async () => {
     const wrapper = await render();
-    await wrapper.get('[data-test="library-tab-chip-installed"]').trigger("click");
-    expect(wrapper.get('[data-test="library-tab-empty"]').text()).toContain(
-      "No pack has been installed",
-    );
+    await pick(wrapper, "installed");
+    expect(text(wrapper, "library-tab-empty")).toContain("No pack has been installed");
   });
 
-  it("lists pack dashboards with their own verdict", async () => {
-    fake.dashboard = false;
-    fake.records = [record({})];
-    const wrapper = await render("dashboards");
-    const id = "kubernetes/overview/one";
-    expect(wrapper.find('[data-test="library-tab-section-missing"]').exists()).toBe(true);
-    expect(wrapper.get(`[data-test="library-tab-installed-${id}"]`).text()).toContain(
-      "a@example.com",
-    );
+  it("offers Turn on N alerts, which opens the pack page with the Turn on drawer", async () => {
+    const installed = record({});
+    fake.records = [installed];
+    flow.record.value = installed as never;
+    flow.alertsOff.value = 2;
+    const wrapper = await render();
+    expect(text(wrapper, "library-tab-meta-one")).toContain("2 alerts off");
+    await wrapper.get('[data-test="library-tab-turn-on-one"]').trigger("click");
+    expect(fake.push).toHaveBeenCalledWith({
+      name: "starterPack",
+      params: { pack: "kubernetes" },
+      query: { org_identifier: "org", turnOn: "1" },
+    });
   });
 
-  it("lists every install of a dashboard", async () => {
-    fake.records = [record({}), record({ installId: "two", installedBy: "b@example.com" })];
-    const wrapper = await render("dashboards");
-    const line = '[data-test="library-tab-installed-kubernetes/overview/two"]';
-    expect(wrapper.get(line).text()).toContain("b@example.com");
-    expect(
-      wrapper.find('[data-test="library-tab-installed-kubernetes/overview/one"]').exists(),
-    ).toBe(true);
+  it("offers Review update when the installed pack has an update", async () => {
+    const installed = record({});
+    fake.records = [installed];
+    flow.record.value = installed as never;
+    flow.installed.value = true;
+    fake.update.available.value = true;
+    const wrapper = await render();
+    expect(fake.update.check).toHaveBeenCalled();
+    expect(text(wrapper, "library-tab-meta-one")).toBe("An update to this pack is available");
+    expect(has(wrapper, "library-tab-review-update-one")).toBe(true);
   });
 
-  it("opens the pack page from Manage", async () => {
+  it("shows a pack being set up as busy, then an interrupted one with only Open pack", async () => {
+    const installing = record({
+      status: "installing",
+      items: [
+        { kind: "dashboard", itemId: "overview", status: "created" },
+        { kind: "alert", itemId: "a", status: "pending" },
+      ],
+    });
+    fake.records = [installing];
+    flow.record.value = installing as never;
+    flow.running.value = true;
+    flow.alertsOff.value = 2;
+    const wrapper = await render();
+    expect(text(wrapper, "library-tab-meta-one")).toBe("Setting up · 1 of 2 created");
+    expect(has(wrapper, "library-tab-open-one")).toBe(false);
+    flow.running.value = false;
+    await flushPromises();
+    expect(text(wrapper, "library-tab-meta-one")).toContain("Incomplete");
+    expect(has(wrapper, "library-tab-open-one")).toBe(true);
+    expect(has(wrapper, "library-tab-turn-on-one")).toBe(false);
+    expect(has(wrapper, "library-tab-undo-one")).toBe(false);
+  });
+
+  it("never offers Undo setup while the setup is still running", async () => {
+    const installing = record({ status: "installing" });
+    fake.records = [installing];
+    flow.record.value = installing as never;
+    flow.running.value = true;
+    expect(has(await render(), "library-tab-undo-one")).toBe(false);
+  });
+
+  it("asks before Undo setup removes what the pack created", async () => {
+    const installed = record({});
+    fake.records = [installed];
+    flow.record.value = installed as never;
+    flow.alertsOff.value = 0;
+    const wrapper = await render();
+    await wrapper.get('[data-test="library-tab-undo-one"]').trigger("click");
+    const dialog = wrapper.findComponent({ name: "StarterPackUndoDialog" });
+    expect(dialog.props("open")).toBe(true);
+    expect(dialog.props("mode")).toBe("undo");
+    expect(flow.undo).not.toHaveBeenCalled();
+  });
+
+  it("offers Open pack and What gets created, not Set up, when the pack's view needs a license", async () => {
+    fake.pack.nativeView = { feature: "kubernetes_monitoring", route: "infraKubernetes" };
+    flow.licensed.value = false;
+    const wrapper = await render();
+    expect(has(wrapper, "library-tab-install-kubernetes")).toBe(false);
+    expect(has(wrapper, "library-tab-open-kubernetes")).toBe(true);
+    expect(has(wrapper, "library-tab-see-kubernetes")).toBe(true);
+  });
+
+  it("refreshes in place, keeping the cards and the chosen filter", async () => {
+    const wrapper = await render();
+    await pick(wrapper, "ready");
+    const done = (wrapper.vm as unknown as { refresh: () => Promise<void> }).refresh();
+    await wrapper.vm.$nextTick();
+    expect(has(wrapper, "library-tab-loading")).toBe(false);
+    await done;
+    await flushPromises();
+    expect(has(wrapper, "library-tab-install-kubernetes")).toBe(true);
+    expect(wrapper.findComponent({ name: "OStatStrip" }).props("selectedKey")).toBe("ready");
+  });
+
+  it("gives a non-admin Copy link for an admin instead of Set up", async () => {
+    fake.state.userInfo.role = "member";
+    const wrapper = await render();
+    expect(text(wrapper, "library-tab-meta-kubernetes")).toContain("only admins can set up packs");
+    expect(has(wrapper, "library-tab-install-kubernetes")).toBe(false);
+    await wrapper.get('[data-test="library-tab-copy-link-kubernetes"]').trigger("click");
+    expect(fake.copy).toHaveBeenCalledWith(flow.packLink(), expect.anything());
+  });
+
+  it("opens the pack page from Open pack", async () => {
     fake.records = [record({ installId: "kubernetes" })];
     const wrapper = await render();
     await wrapper.get('[data-test="library-tab-open-kubernetes"]').trigger("click");
@@ -226,14 +371,15 @@ describe("StarterPackLibraryTab", () => {
     );
   });
 
-  it("shows an error with retry", async () => {
+  it("shows an error with retry and no stat strip", async () => {
     fake.fail = true;
     const wrapper = await render();
+    expect(has(wrapper, "library-tab-strip")).toBe(false);
     const error = wrapper.get('[data-test="library-tab-error"]');
     fake.fail = false;
     await error.get("button").trigger("click");
     await flushPromises();
-    expect(wrapper.find('[data-test="library-tab-row-kubernetes"]').exists()).toBe(true);
+    expect(has(wrapper, "library-tab-row-kubernetes")).toBe(true);
   });
 
   describe("raw logs", () => {
@@ -243,11 +389,11 @@ describe("StarterPackLibraryTab", () => {
       fake.undo.mockClear();
     });
 
-    it("names plain-text Nginx logs without an action for a non-admin", async () => {
+    it("names plain-text Nginx logs on a card without an action for a non-admin", async () => {
       fake.rawLogs = [{ stream: "edge", column: "message" }];
       const wrapper = await render();
       const notice = wrapper.find('[data-test="library-tab-raw-log-edge"]');
-      expect(notice.text()).toBe("Looks like Nginx logs in edge, stored as plain text");
+      expect(notice.text()).toContain("Looks like Nginx logs in edge, stored as plain text");
       expect(notice.find("button").exists()).toBe(false);
       expect(fake.rawLogsFor).toEqual([["edge"]]);
     });
@@ -296,16 +442,14 @@ describe("StarterPackLibraryTab", () => {
         },
       ];
       const wrapper = await render();
-      const banner = wrapper.get('[data-test="library-tab-parsing-edge"]');
-      expect(banner.text()).toContain("not fully set up");
-      expect(banner.find("button").exists()).toBe(false);
+      const card = wrapper.get('[data-test="library-tab-parsing-edge"]');
+      expect(card.text()).toContain("not fully set up");
+      expect(card.find("button").exists()).toBe(false);
     });
 
-    it("shows nothing when no stream reads as raw Nginx, and never checks on Dashboards", async () => {
-      const packs = await render();
-      expect(packs.find('[data-test^="library-tab-raw-log-"]').exists()).toBe(false);
-      await render("dashboards");
-      expect(fake.rawLogsFor).toHaveLength(1);
+    it("shows nothing when no stream reads as raw Nginx", async () => {
+      const wrapper = await render();
+      expect(wrapper.find('[data-test^="library-tab-raw-log-"]').exists()).toBe(false);
     });
   });
 });

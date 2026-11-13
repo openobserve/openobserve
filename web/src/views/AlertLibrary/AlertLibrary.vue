@@ -50,11 +50,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </template>
       <template #actions-overflow>
-        <StarterPackFindMore
-          v-if="packsEnabled"
-          :org="store.state.selectedOrganization?.identifier"
-          daily-toggle
-        />
         <OButton
           variant="outline"
           size="sm"
@@ -66,32 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </template>
 
-      <template v-if="packsEnabled" #subnav>
-        <OTabs
-          :model-value="libraryTab"
-          align="left"
-          class="px-page-edge"
-          data-test="alert-library-tabs"
-          @change="onLibraryTabChange"
-        >
-          <OTab
-            v-for="tab in LIBRARY_TABS"
-            :key="tab"
-            :name="tab"
-            :data-test="`alert-library-tab-${tab}`"
-          >
-            {{ t(`starterPacks.libraryTabs.${tab}`) }}
-          </OTab>
-        </OTabs>
-      </template>
-
-      <StarterPackLibraryTab
-        v-if="libraryTab !== 'alerts'"
-        :key="libraryTab"
-        :org="store.state.selectedOrganization?.identifier"
-        :view="libraryTab"
-      />
-      <div v-else class="flex min-h-0 flex-1">
+      <div class="flex min-h-0 flex-1">
         <div class="w-rail border-border-default h-full shrink-0 border-e max-md:hidden">
           <LibraryRail
             :categories="categoryFacets"
@@ -431,14 +401,10 @@ import useStreams from "@/composables/useStreams";
 import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
 import { useLicenseLock } from "@/composables/useFeatureLock";
 import OButton from "@/lib/core/Button/OButton.vue";
-import StarterPackFindMore from "@/components/starterPacks/StarterPackFindMore.vue";
-import StarterPackLibraryTab from "@/components/starterPacks/StarterPackLibraryTab.vue";
 import { STARTER_PACKS } from "@/composables/starterPacks/kubernetesPack";
 import { ingestTimes, matchAlerts } from "@/composables/starterPacks/packMatchData";
 import { STARTER_PACKS_ENABLED } from "@/constants/starterPacks";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
-import OTab from "@/lib/navigation/Tabs/OTab.vue";
-import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
@@ -457,16 +423,11 @@ import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 
 /** Where the alerts are authored. Not the serving URL — that is a constant. */
 const CONTRIBUTE_URL = "https://github.com/openobserve/o2-alerts-library";
-const LIBRARY_TABS = ["alerts", "packs", "dashboards"] as const;
 
 const { t } = useI18nTyped();
 const store = useStore();
 const router = useRouter();
 const packsEnabled = STARTER_PACKS_ENABLED;
-const libraryTab = ref<(typeof LIBRARY_TABS)[number]>("alerts");
-const onLibraryTabChange = (tab: string | number) => {
-  libraryTab.value = tab as (typeof LIBRARY_TABS)[number];
-};
 
 const { manifest, isLoading, error, loadManifest, loadAlertFile, isReady } = useAlertLibrary();
 const packVerdicts = shallowRef<Map<string, boolean> | null>(null);

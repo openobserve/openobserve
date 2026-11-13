@@ -179,7 +179,7 @@ export function useHomePacks(org: string, packs: StarterPack[] = STARTER_PACKS) 
   );
   const silent = computed(() => setUp.value.filter((item) => item.flow.remindAlerts.value));
   const library = () =>
-    router.push({ name: "alertLibrary", query: { org_identifier: org } }).catch(() => {});
+    router.push({ name: "starterPacks", query: { org_identifier: org } }).catch(() => {});
 
   return {
     items,

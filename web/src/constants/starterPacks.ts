@@ -13,5 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-/** Kill switch for the Starter Packs UI; every UI surface checks this. */
-export const STARTER_PACKS_ENABLED: boolean = true;
+import config from "@/aws-exports";
+
+const KILL_SWITCH = true;
+
+/** Starter Packs ship in Enterprise and Cloud only; without it the routes are not registered, so the menu hides too. */
+export const STARTER_PACKS_ENABLED: boolean =
+  KILL_SWITCH && (config.isEnterprise == "true" || config.isCloud == "true");
