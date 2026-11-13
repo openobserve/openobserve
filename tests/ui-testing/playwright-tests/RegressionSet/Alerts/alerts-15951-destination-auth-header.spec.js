@@ -3,7 +3,10 @@
 const { test, expect, navigateToBase } = require('../../utils/enhanced-baseFixtures.js');
 const testLogger = require('../../utils/test-logger.js');
 const PageManager = require('../../../pages/page-manager.js');
-const { api, baseUrl, orgId, uniqueName } = require('../../utils/oncall-seed.js');
+const { uniqueName } = require('../../utils/oncall-seed.js');
+const {
+  createHttpTemplate, createHttpDestination, getDestination, deleteDestination, deleteTemplate, isDestinationUpdate,
+} = require('../../utils/regression-alert-fixtures.js');
 
 // A ServiceNow-shaped URL is what made the edit form open as prebuilt and drop the header.
 const SERVICENOW_URL = 'https://ovn-a.service-now.com/api/now/table/incident';
@@ -13,7 +16,6 @@ test.describe('Custom webhook destination keeps its Authorization header on edit
   tag: ['@alerts', '@destinations', '@regression', '@all'],
 }, () => {
   test.describe.configure({ mode: 'serial' });
-  const v1 = () => `${baseUrl()}/api/${orgId()}`;
   let templateName;
   let destName;
 
@@ -22,18 +24,15 @@ test.describe('Custom webhook destination keeps its Authorization header on edit
     await navigateToBase(page);
     templateName = uniqueName('ovn_a_15951_tmpl');
     destName = uniqueName('ovn_a_15951_dest');
-    const tmpl = await api(page, 'post', `${v1()}/alerts/templates`, { name: templateName, type: 'http', title: '', body: '{"text":"{alert_name}"}' });
+    const tmpl = await createHttpTemplate(page, templateName, '{"text":"{alert_name}"}');
     expect(tmpl.ok(), await tmpl.text()).toBe(true);
-    const dest = await api(page, 'post', `${v1()}/alerts/destinations`, {
-      name: destName, url: SERVICENOW_URL, method: 'post', type: 'http', skip_tls_verify: false,
-      template: templateName, headers: HEADERS,
-    });
+    const dest = await createHttpDestination(page, { name: destName, url: SERVICENOW_URL, template: templateName, headers: HEADERS });
     expect(dest.ok(), await dest.text()).toBe(true);
   });
 
   test.afterEach(async ({ page }) => {
-    await api(page, 'delete', `${v1()}/alerts/destinations/${destName}`);
-    await api(page, 'delete', `${v1()}/alerts/templates/${templateName}`);
+    await deleteDestination(page, destName);
+    await deleteTemplate(page, templateName);
   });
 
   test('the edit form shows both header rows and saving keeps Authorization', { tag: ['@bug-15951', '@P0'] }, async ({ page }) => {
@@ -45,11 +44,11 @@ test.describe('Custom webhook destination keeps its Authorization header on edit
     await pm.alertDestinationsPage.expectHeaderRow('Authorization', HEADERS.Authorization);
     await pm.alertDestinationsPage.expectHeaderRow('X-Other', HEADERS['X-Other']);
 
-    const saved = page.waitForResponse((r) => r.request().method() === 'PUT' && r.url().includes(`/alerts/destinations/${destName}`));
+    const saved = page.waitForResponse((r) => isDestinationUpdate(r, destName));
     await pm.alertDestinationsPage.clickSave();
     expect((await saved).status()).toBe(200);
 
-    const stored = await (await api(page, 'get', `${v1()}/alerts/destinations/${destName}`)).json();
+    const stored = await getDestination(page, destName);
     expect(stored.headers).toMatchObject(HEADERS);
     expect(stored.type).toBe('http');
   });

@@ -3,32 +3,11 @@
 const { test, expect, navigateToBase } = require('../../utils/enhanced-baseFixtures.js');
 const testLogger = require('../../utils/test-logger.js');
 const PageManager = require('../../../pages/page-manager.js');
-const { api, baseUrl, ingestUrl, orgId, uniqueName } = require('../../utils/oncall-seed.js');
-
-const v2 = () => `${baseUrl()}/api/v2/${orgId()}`;
-
-function incidentAlert(name, stream) {
-  return {
-    name, stream_type: 'logs', stream_name: stream, is_real_time: false,
-    query_condition: {
-      type: 'sql', conditions: null, promql: '', promql_condition: null,
-      sql: `SELECT service_name, count(*) AS cnt FROM "${stream}" WHERE level = 'error' GROUP BY service_name`,
-      search_event_type: 'ui', vrl_function: null, multi_time_range: [],
-    },
-    trigger_condition: {
-      period: 30, operator: '>=', threshold: 1, frequency: 1, cron: '', silence: 0,
-      frequency_type: 'minutes', timezone: 'UTC', tolerance_in_secs: 0,
-    },
-    destinations: [], enabled: true, description: 'ENT#3181 detail confirm',
-    creates_incident: true, context_attributes: {}, row_template: '',
-  };
-}
-
-async function incidentStatus(page, id) {
-  const res = await api(page, 'get', `${v2()}/alerts/incidents/${id}`);
-  const body = await res.json();
-  return (body.incident || body).status;
-}
+const { uniqueName } = require('../../utils/oncall-seed.js');
+const {
+  incidentAlert, readOrgConfig, ingestLogs, deleteLogStream, createAlertInDefaultFolder, deleteAlertInDefaultFolder,
+  findIncidentIdForAlert, incidentStatus, resolveIncident, isIncidentStatusUpdate,
+} = require('../../utils/regression-alert-fixtures.js');
 
 test.describe('Incident detail: Resolve and Reopen confirm before they act (ENT#3181)', {
   tag: ['@incidents', '@enterprise', '@regression', '@incidentsRegression'],
@@ -39,19 +18,17 @@ test.describe('Incident detail: Resolve and Reopen confirm before they act (ENT#
   test.beforeAll(async ({ browser }) => {
     const page = await browser.newPage();
     try {
-      const config = await (await api(page, 'get', `${baseUrl()}/api/${orgId()}/config`)).json();
+      const config = await readOrgConfig(page);
       if (config.incidents_enabled !== true) return;
       created.stream = uniqueName('ovn_inc3181_s');
       const rows = [{ _timestamp: Date.now() * 1000, level: 'error', service_name: uniqueName('svc3181'), msg: 'seed' }];
-      const ing = await api(page, 'post', `${ingestUrl()}/api/${orgId()}/${created.stream}/_json`, rows);
+      const ing = await ingestLogs(page, created.stream, rows);
       expect(ing.ok(), await ing.text()).toBe(true);
-      const res = await api(page, 'post', `${v2()}/alerts?folder=default`, incidentAlert(uniqueName('ovn_inc3181'), created.stream));
+      const res = await createAlertInDefaultFolder(page, incidentAlert(uniqueName('ovn_inc3181'), created.stream));
       expect(res.ok(), await res.text()).toBe(true);
       created.alertId = (await res.json()).id;
       await expect.poll(async () => {
-        const list = await (await api(page, 'get', `${v2()}/alerts/incidents?limit=1000`)).json();
-        const hit = (list.incidents || []).find((i) => (i.alert_groups || []).some((g) => g.alert_id === created.alertId));
-        created.incidentId = hit ? hit.id : null;
+        created.incidentId = await findIncidentIdForAlert(page, created.alertId);
         return created.incidentId;
       }, { timeout: 240000, intervals: [5000], message: 'the alert must open an incident' }).not.toBeNull();
     } finally {
@@ -62,9 +39,9 @@ test.describe('Incident detail: Resolve and Reopen confirm before they act (ENT#
   test.afterAll(async ({ browser }) => {
     const page = await browser.newPage();
     try {
-      if (created.alertId) await api(page, 'delete', `${v2()}/alerts/${created.alertId}?folder=default`);
-      if (created.incidentId) await api(page, 'patch', `${v2()}/alerts/incidents/${created.incidentId}/update`, { status: 'resolved' });
-      if (created.stream) await api(page, 'delete', `${baseUrl()}/api/${orgId()}/streams/${created.stream}?type=logs`);
+      if (created.alertId) await deleteAlertInDefaultFolder(page, created.alertId);
+      if (created.incidentId) await resolveIncident(page, created.incidentId);
+      if (created.stream) await deleteLogStream(page, created.stream);
     } finally {
       await page.close();
     }
@@ -77,7 +54,7 @@ test.describe('Incident detail: Resolve and Reopen confirm before they act (ENT#
     const pm = new PageManager(page);
     const patches = [];
     page.on('request', (req) => {
-      if (req.method() === 'PATCH' && req.url().includes(`/alerts/incidents/${created.incidentId}/update`)) patches.push(req.postData());
+      if (isIncidentStatusUpdate(req, created.incidentId)) patches.push(req.postData());
     });
 
     await pm.incidentsPage.gotoDetail(created.incidentId);
@@ -90,7 +67,7 @@ test.describe('Incident detail: Resolve and Reopen confirm before they act (ENT#
     expect(patches, 'cancelling the Resolve confirm must not send a status change').toHaveLength(0);
     expect(await incidentStatus(page, created.incidentId)).not.toBe('resolved');
 
-    const resolved = page.waitForResponse((r) => r.request().method() === 'PATCH' && r.url().includes(`/alerts/incidents/${created.incidentId}/update`));
+    const resolved = page.waitForResponse((r) => isIncidentStatusUpdate(r.request(), created.incidentId));
     await pm.incidentsPage.statusAction('Resolve').click();
     await pm.incidentsPage.acceptConfirmDialog();
     expect((await resolved).status()).toBe(200);
@@ -105,7 +82,7 @@ test.describe('Incident detail: Resolve and Reopen confirm before they act (ENT#
     expect(patches).toHaveLength(1);
     expect(await incidentStatus(page, created.incidentId)).toBe('resolved');
 
-    const reopened = page.waitForResponse((r) => r.request().method() === 'PATCH' && r.url().includes(`/alerts/incidents/${created.incidentId}/update`));
+    const reopened = page.waitForResponse((r) => isIncidentStatusUpdate(r.request(), created.incidentId));
     await pm.incidentsPage.statusAction('Reopen').click();
     await pm.incidentsPage.acceptConfirmDialog();
     expect((await reopened).status()).toBe(200);
