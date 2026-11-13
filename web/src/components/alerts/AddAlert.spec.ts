@@ -1499,6 +1499,9 @@ describe("AddAlert (OForm owner)", () => {
       await input.setValue("checkout#errors");
       await flushPromises();
       expect(wrapper.find('[data-test="add-alert-details-name-error"]').exists()).toBe(true);
+      await input.setValue("checkout/errors");
+      await flushPromises();
+      expect(wrapper.find('[data-test="add-alert-details-name-error"]').exists()).toBe(true);
       wrapper.vm.form.setFieldMeta("name", (meta: object) => ({
         ...meta,
         errorMap: { onSubmit: "invalid" },
