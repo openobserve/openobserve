@@ -68,6 +68,7 @@ export class HomePage {
         this.iamPageIndicator = page.locator('[data-test="iam-users-tab"]').first();
         this.pipelinesPageIndicator = page.locator('[data-test="function-list-add-function-btn"]').first();
         this.homePageIndicator = page.locator('[data-test="home-page"]').first();
+        this.homeRefreshButton = page.locator('[data-test="home-page"] [data-test="refresh-button"]');
 
         // ===== FAVICON SELECTOR (Bug #9217) =====
         this.faviconLink = page.locator('link#favicon');
@@ -904,5 +905,14 @@ export class HomePage {
         }
 
         return result;
+    }
+
+    async clickHomeRefresh() {
+        await this.homeRefreshButton.click();
+    }
+
+    async openPinnedDashboardTab(title) {
+        await this.homePageMenu.click();
+        await this.page.getByRole('tab', { name: title }).click();
     }
 }

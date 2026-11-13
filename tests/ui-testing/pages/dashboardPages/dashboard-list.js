@@ -74,6 +74,41 @@ export default class DashboardListPage {
     await this.page.locator('[data-test="dashboard-folder-move"]').click();
   }
 
+  dashboardRow(title) {
+    return this.page.locator("tr", {
+      has: this.page.locator(`[data-test="dashboard-name-cell-${title}"]`),
+    });
+  }
+
+  homeIndicator(title) {
+    return this.page.locator(`[data-test="dashboard-home-indicator-${title}"]`);
+  }
+
+  async setHomeFromRowMenu(title, org) {
+    const saved = this.page.waitForResponse(
+      (r) => r.url().includes(`/api/${org}/settings/v2`) && r.request().method() === "POST",
+      { timeout: 15000 },
+    );
+    await this.dashboardRow(title).locator('[data-test="dashboard-row-more-actions"]').click();
+    await this.page.locator('[data-test="dashboard-list-set-home-btn"]').click();
+    return saved;
+  }
+
+  async moveRowToFolder(title, folderId) {
+    await this.dashboardRow(title).locator('[data-test="dashboard-move-to-another-folder"]').click();
+    await this.page.locator('[data-test="index-dropdown-stream_type"]').click();
+    await this.page
+      .locator(`[data-test="index-dropdown-stream_type-option"][data-test-value="${folderId}"]`)
+      .first()
+      .click();
+    const moved = this.page.waitForResponse(
+      (r) => /\/dashboards\/move/.test(r.url()) && r.request().method() !== "GET",
+      { timeout: 15000 },
+    );
+    await this.page.getByRole("dialog").locator('[data-test="o-dialog-primary-btn"]').click();
+    return moved;
+  }
+
   // Menu Items — menu-link data-test contains a literal "/" (route prefix);
   // CSS attribute selectors accept "/" verbatim, no escape needed.
   async menuItem(item) {

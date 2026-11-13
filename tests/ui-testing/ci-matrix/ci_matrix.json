@@ -81,6 +81,7 @@
       "dashboard-config-line-style.spec.js",
       "dashboard-config-panel-time.spec.js",
       "dashboard-config-table.spec.js",
+      "dashboard-table-timezone.spec.js",
       "dashboard-config-trellis.spec.js",
       "dashboard-config-promql.spec.js",
       "dashboard-config-markline.spec.js",
@@ -282,6 +283,8 @@
       "ai-toolsets-form-validation.spec.js",
       "annotationQueueInputPreview.spec.js",
       "login-form-validation.spec.js",
+      "stale-build-toast.spec.js",
+      "oselect-search-scroll-reset.spec.js",
       "runningQueriesCancel.spec.js",
       "navRailHeaderKeyboard.spec.js"
     ],
@@ -629,7 +632,8 @@
       "diagnosis.spec.js",
       "first-event.spec.js",
       "legacy-pages.spec.js",
-      "token-picker.spec.js"
+      "token-picker.spec.js",
+      "home-first-data.spec.js"
     ],
     "disabled": []
   },

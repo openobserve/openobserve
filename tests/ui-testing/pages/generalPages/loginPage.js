@@ -17,6 +17,8 @@ export class LoginPage {
     // used to confirm a saved/warm session actually loaded.
     this.homeMenuItem = page.locator('[data-test="menu-link-\\/-item"]');
     this.mainNav = page.locator('[data-test="navbar-main-nav"]');
+    this.appLogo = page.locator('img.appLogo').first();
+    this.appLogoLink = page.locator('a:has(img.appLogo)').first();
   }
 
   // A form login lands in the user's default org; reload with ORGNAME so menu navigation stays in the test org.
@@ -37,6 +39,14 @@ export class LoginPage {
       testLogger.error('Blocked write to the default org', { method: route.request().method(), url: route.request().url() });
       return route.abort('blockedbyclient');
     });
+  }
+
+  async clickLogoAndWaitForNewTab() {
+    const [popup] = await Promise.all([
+      this.page.context().waitForEvent('page'),
+      this.appLogo.click(),
+    ]);
+    return popup;
   }
 
   // Assert the authenticated Home menu item is visible — proves the SPA loaded
