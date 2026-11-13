@@ -129,6 +129,47 @@ describe("MainLayout — org switch", () => {
     // The last navigation (the org switch) finished while the old org was still selected,
     // so the dashboard page never remounts with the new org and the old dashboard id.
     expect(orgAtNavigation.at(-1)).toBe(oldOrg.identifier);
+    // Replace, not push: Back must not reopen the old org's dashboard in the new org.
+    router.back();
+    await flushPromises();
+    expect(router.currentRoute.value.path).not.toBe("/dashboards/view");
+  });
+
+  it("treats a trailing slash on the dashboard path the same way", async () => {
+    const router = makeRouter();
+    await switchOrg(router, "/dashboards/view/?dashboard=d1&folder=default");
+
+    expect(router.currentRoute.value.path).toBe("/dashboards");
+    expect(store.state.selectedOrganization.identifier).toBe("_meta");
+  });
+
+  it("does not let a cancelled older switch undo a newer one", async () => {
+    const router = makeRouter();
+    wrapper = await mountLayout("/dashboards/add_panel?dashboard=d1", router);
+    await flushPromises();
+    store.state.selectedOrganization = { ...oldOrg };
+    const vm = wrapper.vm as unknown as LayoutVm;
+    // The first move waits on a guard (an unsaved-edits dialog) and is then cancelled.
+    let releaseFirst: (allow: boolean) => void = () => {};
+    let calls = 0;
+    router.beforeEach(() => {
+      calls += 1;
+      if (calls === 1) return new Promise<boolean>((resolve) => (releaseFirst = resolve));
+      return true;
+    });
+
+    vm.selectedOrg = { ...newOrg, identifier: "org_b", label: "org_b" };
+    const first = vm.updateOrganization();
+    await flushPromises();
+    vm.selectedOrg = { ...newOrg, identifier: "org_c", label: "org_c" };
+    const second = vm.updateOrganization();
+    releaseFirst(false);
+    await Promise.all([first, second]);
+    await flushPromises();
+
+    expect(router.currentRoute.value.query).toEqual({ org_identifier: "org_c" });
+    expect(store.state.selectedOrganization.identifier).toBe("org_c");
+    expect(vm.selectedOrg.identifier).toBe("org_c");
   });
 
   it("keeps the old org when a leave guard cancels the move off the panel editor", async () => {

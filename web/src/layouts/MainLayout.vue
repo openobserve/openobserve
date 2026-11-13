@@ -1325,18 +1325,24 @@ export default defineComponent({
       }
     }
 
+    // Counts org switches, so a slow switch that finishes late cannot undo a newer one.
+    let orgSwitchSeq = 0;
     const updateOrganization = async () => {
+      const switchId = ++orgSwitchSeq;
+      const nextOrg = { ...selectedOrg.value };
       const currentPath = router.currentRoute.value.path;
       const target = getOrgSwitchRoute(
         currentPath,
         router.currentRoute.value.query,
-        selectedOrg.value.identifier,
+        nextOrg.identifier,
       );
       if (isDashboardItemPath(currentPath)) {
         // Leave the dashboard page before the org changes. Otherwise the page
-        // remounts in the new org with the old dashboard id. A leave guard
+        // remounts in the new org with the old dashboard id. Replace, so Back
+        // does not open the old org's dashboard in the new org. A leave guard
         // (unsaved edits) can cancel the move, and then the org stays.
-        const failure = await router.push(target);
+        const failure = await router.replace(target);
+        if (switchId !== orgSwitchSeq) return;
         if (failure) {
           selectedOrg.value = store.state.selectedOrganization;
           return;
@@ -1347,8 +1353,8 @@ export default defineComponent({
       resetStreams();
       store.dispatch("logs/resetLogs");
       store.dispatch("setIsDataIngested", false);
-      useLocalOrganization(selectedOrg.value);
-      store.dispatch("setSelectedOrganization", { ...selectedOrg.value });
+      useLocalOrganization(nextOrg);
+      store.dispatch("setSelectedOrganization", { ...nextOrg });
       // setSelectedOrganization();
       // if (
       //   config.isCloud &&
@@ -1377,7 +1383,7 @@ export default defineComponent({
         store.state.zoConfig.restricted_routes_on_empty_data == true &&
         store.state.organizationData.isDataIngested == false
       ) {
-        await verifyStreamExist(selectedOrg.value);
+        await verifyStreamExist(nextOrg);
       }
     };
 

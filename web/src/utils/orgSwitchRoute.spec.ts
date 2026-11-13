@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getOrgSwitchRoute } from "./orgSwitchRoute";
+import { getOrgSwitchRoute, isDashboardItemPath } from "./orgSwitchRoute";
 
 describe("getOrgSwitchRoute", () => {
   const dashboardQuery = {
@@ -35,4 +35,16 @@ describe("getOrgSwitchRoute", () => {
       );
     },
   );
+
+  it.each([
+    ["/dashboards/view", true],
+    ["/dashboards/view/", true],
+    ["/dashboards/add_panel/", true],
+    ["/dashboards", false],
+    ["/dashboards/", false],
+    ["/dashboards/import", false],
+    ["/", false],
+  ])("isDashboardItemPath(%s) is %s", (path, expected) => {
+    expect(isDashboardItemPath(path)).toBe(expected);
+  });
 });

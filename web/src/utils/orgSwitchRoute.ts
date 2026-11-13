@@ -8,7 +8,9 @@ const DASHBOARD_ITEM_PATHS = new Set([
   "/dashboards/tv",
 ]);
 
-export const isDashboardItemPath = (path: string): boolean => DASHBOARD_ITEM_PATHS.has(path);
+// The router also matches a trailing slash, for example "/dashboards/view/".
+export const isDashboardItemPath = (path: string): boolean =>
+  DASHBOARD_ITEM_PATHS.has(path.length > 1 ? path.replace(/\/+$/, "") : path);
 
 /**
  * Builds the route to open after the user picks another org in the header.
