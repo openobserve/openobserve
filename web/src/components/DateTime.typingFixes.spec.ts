@@ -102,7 +102,8 @@ describe("DateTime typed text", () => {
     expect(el("date-time-resolved-name")?.textContent).toBe("Q4 2026");
 
     await pressInBar("Enter");
-    expect(wrapper!.vm.triggerLabel).toBe("Q4 2026 · Oct 1 – Nov 12, 21:24");
+    expect(lastEmit()).toMatchObject({ relativeTimePeriod: "calendar:quarter:0" });
+    expect(wrapper!.vm.triggerLabel).toBe("Q4 2026");
   });
 
   it("greys a typed range over the limit and offers the longest allowed before it (V9)", async () => {

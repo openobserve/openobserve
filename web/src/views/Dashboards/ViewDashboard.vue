@@ -943,7 +943,10 @@ export default defineComponent({
     }
     const kioskMode = computed(() => store.state.kioskMode === true);
     const dashboardTitleEl = ref<HTMLElement | null>(null);
-    const { crowded: titleCrowded } = useHeaderTitleRoom(dashboardTitleEl);
+    const dateTimePicker = ref(null); // holds a reference to the date time picker
+    const { crowded: titleCrowded } = useHeaderTitleRoom(dashboardTitleEl, {
+      movedEl: computed(() => (dateTimePicker.value as { $el?: HTMLElement } | null)?.$el ?? null),
+    });
     const hasTimeRow = computed(
       () =>
         (isMobile.value || titleCrowded.value) &&
@@ -1065,8 +1068,6 @@ export default defineComponent({
         };
       }
     };
-
-    const dateTimePicker = ref(null); // holds a reference to the date time picker
 
     // The applied range: what panels, the URL and the Share link use. The picker's own value is `timeGate.picked`.
     const selectedDate = ref(null);

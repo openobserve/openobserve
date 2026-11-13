@@ -15,7 +15,7 @@
 
 import { describe, expect, it } from "vitest";
 import type { TranslateFn } from "@/types/i18n";
-import { parseTimeInput, type TimeInputOptions } from "./dateTimeRangeParse";
+import { parseTimeInput, suggestTimeInput, type TimeInputOptions } from "./dateTimeRangeParse";
 import { formatReadingNote, readingNote } from "./timeRangeNotes";
 
 const NOW = new Date(Date.UTC(2026, 10, 11, 12, 41, 53));
@@ -56,6 +56,11 @@ describe("readingNote", () => {
     expect(noteOf("Nov 4 - 6")).toBeNull();
   });
 
+  it("names the day/month order of a flipped reading [P10]", () => {
+    const [, flipped] = suggestTimeInput("12/11/2026", OPTS);
+    expect(readingNote(flipped, "UTC")).toEqual({ kind: "dayOrder", order: "dayMonth" });
+  });
+
   it("marks a future zone reading", () => {
     expect(readingNote({ type: "timestamp", startMicros: 0, endMicros: 1, future: true })).toEqual({
       kind: "future",
@@ -71,6 +76,9 @@ describe("formatReadingNote", () => {
     [{ kind: "fiscal", startMonth: 1 } as const, 'dateTime.fiscalYearStarts {"month":"Jan"}'],
     [{ kind: "cut" } as const, "dateTime.cutToTenYears {}"],
     [{ kind: "future" } as const, "dateTime.inTheFuture {}"],
+    [{ kind: "dayOrder", order: "dayMonth" } as const, "dateTime.readAsDayMonth {}"],
+    [{ kind: "dayOrder", order: "monthDay" } as const, "dateTime.readAsMonthDay {}"],
+    [{ kind: "cutToNow" } as const, "dateTime.cutToNow {}"],
   ])("words %j", (note, expected) => {
     expect(formatReadingNote(note, echo)).toBe(expected);
   });

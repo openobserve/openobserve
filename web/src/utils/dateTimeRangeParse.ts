@@ -37,6 +37,8 @@ export interface AbsoluteRangeResult {
   name?: string;
   /** Start month (1 = January) of a fiscal-year reading. */
   fiscalStartMonth?: number;
+  /** The day/month order of a reading offered against the locale's own order. */
+  readAs?: "monthDay" | "dayMonth";
 }
 
 export interface TimestampRangeResult {
@@ -96,6 +98,8 @@ export interface TimeInputOptions {
   locale?: string;
   timeZone?: string;
   weekStart?: WeekDay;
+  /** Latest instant (ms) the picker accepts; past now, a yearless date may read as the coming one. */
+  ceilingMs?: number;
 }
 
 // `implied` marks the UTC frame a pasted instant is read in, which the text never wrote as a zone.
@@ -105,6 +109,8 @@ type Zone = { kind: "offset"; minutes: number; implied?: boolean } | { kind: "ia
 interface ParseContext {
   now: Date;
   nowCivil: number;
+  ceilingMs: number;
+  ceilingCivil: number;
   timeZone?: string;
   dayFirst: boolean;
   flipDayMonth: boolean;
@@ -362,7 +368,8 @@ const CLOCK_HEAD_RE = new RegExp(String.raw`^(${CLOCK_TEXT})\s+(?:on\s+)?(.+)$`,
 const CLOCK_RE = /^(\d{1,2})(?::(\d{2})(?::(\d{2})(?:\.(\d{1,9}))?)?)?\s*([ap]m)?$/i;
 const NUMERIC_DATE_RE =
   /^(\d{1,2})([/.])(\d{1,2})(?:\2(\d{2}|\d{4}))?$|^(\d{1,2})-(\d{1,2})-(\d{2}|\d{4})$/;
-const ENDS_WITH_CLOCK_RE = /\d{1,2}:\d{2}(?::\d{2}(?:\.\d+)?)?$/;
+// A date with its year, or a numeric date, then a clock: only such a stamp may carry a `-HH:MM` offset.
+const STAMP_CLOCK_END_RE = /(?:\d{4}|\d[-/.]\d{1,2})[T\s]+\d{1,2}:\d{2}(?::\d{2}(?:\.\d+)?)?$/i;
 const NL_RANGE_SEPARATORS = [
   /\s+(?:to|until|till|through|thru)\s+/i,
   /\s*[–—]\s*/,
@@ -456,7 +463,11 @@ export function suggestTimeInput(raw: string, opts?: TimeInputOptions): ParsedTi
   if (asked.length) return asked;
   const { dayMonth, meridiem } = ctx.seen;
   const readings = [preferred];
-  if (dayMonth) readings.push(...readFlipped(raw, opts, { flipDayMonth: true }));
+  if (dayMonth) {
+    const order = ctx.dayFirst ? "monthDay" : "dayMonth";
+    const flipped = readFlipped(raw, opts, { flipDayMonth: true });
+    readings.push(...flipped.map((reading) => withDayOrder(reading, order)));
+  }
   if (meridiem) readings.push(...readFlipped(raw, opts, { flipMeridiem: true }));
   const unique = uniqueReadings(readings);
   return unique.length > 1 ? unique.slice(0, 4) : [];
@@ -550,11 +561,15 @@ function readRangeStamp(raw: string, seen?: ParseContext["seen"]): ParsedDateRan
     const parts = s.split(separator);
     if (parts.length !== 2) continue;
     const dashed = separator === SPACED_DASH || separator === BARE_DASH;
-    if (dashed && OFFSET_LIKE_END_RE.test(parts[1].trim())) continue;
+    if (dashed && isOffsetLikeEnd(parts[0].trim(), parts[1].trim())) continue;
     const range = combineRangePoints(parsePoint(parts[0]), parsePoint(parts[1]), seen);
     if (range) return range;
   }
   return null;
+}
+
+function isOffsetLikeEnd(left: string, right: string): boolean {
+  return STAMP_CLOCK_END_RE.test(left) && OFFSET_LIKE_END_RE.test(right);
 }
 
 function readSingleStamp(raw: string): StampedSingle | null {
@@ -958,9 +973,15 @@ function toMicros(digits: string): number {
 function createContext(opts?: TimeInputOptions, flips: Partial<ParseContext> = {}): ParseContext {
   const now = opts?.now ?? new Date();
   const locale = opts?.locale ?? browserLanguage();
+  const nowCivil = wallClockOf(now, opts?.timeZone);
+  const ceilingMs = Math.max(opts?.ceilingMs ?? now.getTime(), now.getTime());
   return {
     now,
-    nowCivil: wallClockOf(now, opts?.timeZone),
+    nowCivil,
+    ceilingMs,
+    ceilingCivil: Number.isFinite(ceilingMs)
+      ? Math.max(nowCivil, wallClockOf(new Date(ceilingMs), opts?.timeZone))
+      : Number.POSITIVE_INFINITY,
     timeZone: opts?.timeZone,
     dayFirst: isDayFirstLocale(locale),
     flipDayMonth: false,
@@ -1018,10 +1039,17 @@ function zoneReadings(
   return uniqueReadings(readings).slice(0, 4);
 }
 
+function withDayOrder(
+  reading: ParsedTimeInput,
+  readAs: AbsoluteRangeResult["readAs"],
+): ParsedTimeInput {
+  return reading.type === "absolute" ? { ...reading, readAs } : reading;
+}
+
 function uniqueReadings(readings: ParsedTimeInput[]): ParsedTimeInput[] {
   const keys = new Set<string>();
   return readings.filter((reading) => {
-    const key = JSON.stringify(reading);
+    const key = JSON.stringify({ ...reading, readAs: undefined });
     if (keys.has(key)) return false;
     keys.add(key);
     return true;
@@ -1382,8 +1410,8 @@ function readLogPrefix(text: string): ParsedTimeInput | null {
 
 function isWhollyFuture(reading: ParsedTimeInput, ctx: ParseContext): boolean {
   if (reading.type === "relative") return false;
-  if (reading.type === "timestamp") return reading.startMicros > ctx.now.getTime() * 1000;
-  return civilOf(reading.startDate, reading.startTime) > ctx.nowCivil;
+  if (reading.type === "timestamp") return reading.startMicros > ctx.ceilingMs * 1000;
+  return civilOf(reading.startDate, reading.startTime) > ctx.ceilingCivil;
 }
 
 function civilOf(date: string, time: string): number {
@@ -1621,7 +1649,7 @@ function readSplitRange(text: string, ctx: ParseContext): CivilRange | null {
     if (parts.length !== 2) continue;
     const dashed = separator === SPACED_DASH || separator === BARE_DASH;
     const [left, right] = parts.map((part) => part.trim());
-    if (dashed && ENDS_WITH_CLOCK_RE.test(left) && OFFSET_LIKE_END_RE.test(right)) continue;
+    if (dashed && isOffsetLikeEnd(left, right)) continue;
     const range = resolveRange(left, right, ctx);
     if (range) return range;
   }
@@ -1766,7 +1794,8 @@ function daySpanAt(start: number): { start: number; end: number } {
   return { start, end: start + DAY_MS };
 }
 
-// A missing year is the most recent past one; a range's end only rolls into the next year from an earlier month.
+// A missing year is the latest started one, or the coming one where the ceiling allows the future;
+// a range's end only rolls into the next year from an earlier month.
 function resolveDate(
   day: Extract<DaySpec, { kind: "date" }>,
   ctx: ParseContext,
@@ -1783,6 +1812,11 @@ function resolveDate(
     return null;
   }
   const year = new Date(ctx.nowCivil).getUTCFullYear();
+  // Where the picker allows the future, the nearest span not yet over: this year's, else next year's.
+  for (const candidate of [year, year + 1]) {
+    const span = spanIn(candidate);
+    if (span && span.end > ctx.nowCivil && span.start < ctx.ceilingCivil) return span;
+  }
   // A yearless Feb 29 falls back to the latest leap year; leap years are at most eight apart.
   for (let candidate = year; candidate > year - 9; candidate--) {
     const span = spanIn(candidate);

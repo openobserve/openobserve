@@ -30,9 +30,11 @@ export type ReadingNote =
   | { kind: "fiscal"; startMonth: number }
   | { kind: "dstGap"; typed: string; used: string; dateUs: number }
   | { kind: "cut" }
+  | { kind: "cutToNow" }
+  | { kind: "dayOrder"; order: "monthDay" | "dayMonth" }
   | { kind: "future" };
 
-/** The note a reading carries by itself: future, epoch unit, typed zone, fiscal year, or a DST-skipped time in `timezone`. */
+/** The note a reading carries by itself: future, epoch unit, typed zone, day/month order, fiscal year, or a DST-skipped time in `timezone`. */
 export const readingNote = (
   reading: ParsedTimeInput,
   timezone?: string | null,
@@ -44,6 +46,7 @@ export const readingNote = (
     if (reading.utcStamp) return { kind: "utc" };
     return reading.sourceZone ? { kind: "typedZone", zone: reading.sourceZone } : null;
   }
+  if (reading.readAs) return { kind: "dayOrder", order: reading.readAs };
   if (reading.fiscalStartMonth) return { kind: "fiscal", startMonth: reading.fiscalStartMonth };
   if (reading.exact) return null;
   return dstGapNote(reading, safeTimezone(timezone));
@@ -60,6 +63,10 @@ export const formatReadingNote = (
   if (note.kind === "utc") return t("dateTime.readAsUtc");
   if (note.kind === "typedZone") return t("dateTime.typedInZone", { zone: note.zone });
   if (note.kind === "cut") return t("dateTime.cutToTenYears");
+  if (note.kind === "cutToNow") return t("dateTime.cutToNow");
+  if (note.kind === "dayOrder") {
+    return t(note.order === "monthDay" ? "dateTime.readAsMonthDay" : "dateTime.readAsDayMonth");
+  }
   if (note.kind === "future") return t("dateTime.inTheFuture");
   if (note.kind === "fiscal") {
     const month = new Intl.DateTimeFormat(locale, { month: "short", timeZone: "UTC" }).format(

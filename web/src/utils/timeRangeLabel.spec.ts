@@ -21,7 +21,6 @@ import {
   formatRangeLabel,
   formatRangeStamps,
   formatZoneOffset,
-  namedFixedPeriod,
 } from "./timeRangeLabel";
 import { parseTimeInput } from "./dateTimeRangeParse";
 import { formatKnownPeriod } from "./timeRangeRail";
@@ -155,27 +154,34 @@ describe("formatRangeLabel", () => {
     );
   });
 
-  it("keeps the name of an exact quarter, half, month or year [#35]", () => {
+  it("shows a fixed quarter, half, month or year as its dates only, never a name [P4]", () => {
     const q3 = { startUs: ist("2026-07-01T00:00:00"), endUs: ist("2026-10-01T00:00:00") };
     const h1 = { startUs: ist("2026-01-01T00:00:00"), endUs: ist("2026-07-01T00:00:00") };
     const sep = { startUs: ist("2026-09-01T00:00:00"), endUs: ist("2026-10-01T00:00:00") };
     const year = { startUs: ist("2025-01-01T00:00:00"), endUs: ist("2026-01-01T00:00:00") };
-    expect(formatRangeLabel(q3, OPTS)).toBe("Q3 2026 · Jul 1 – Sep 30");
-    expect(formatRangeLabel(h1, OPTS)).toBe("H1 2026 · Jan 1 – Jun 30");
-    expect(formatRangeLabel(sep, OPTS)).toBe("Sep 2026");
-    expect(formatRangeLabel(year, OPTS)).toBe("2025");
-    expect(namedFixedPeriod(q3.startUs, q3.endUs, { timezone: "UTC" })).toBeNull();
+    expect(formatRangeLabel(q3, OPTS)).toBe("Jul 1 – Sep 30");
+    expect(formatRangeLabel(h1, OPTS)).toBe("Jan 1 – Jun 30");
+    expect(formatRangeLabel(sep, OPTS)).toBe("Sep 1 – 30");
+    expect(formatRangeLabel(year, OPTS)).toBe("Jan 1 – Dec 31, 2025");
   });
 
-  it("names a started period that runs to now, with its end to the minute [V6]", () => {
-    const now = ist("2026-11-12T21:24:10.512");
+  it("shows a fixed range from a period's start to a past instant as dates, never a name or now [C9]", () => {
+    const now = ist("2026-11-12T21:24:00");
     const q4 = { startUs: ist("2026-10-01T00:00:00"), endUs: now };
     const year = { startUs: ist("2026-01-01T00:00:00"), endUs: now };
-    const h2 = { startUs: ist("2026-07-01T00:00:00"), endUs: now };
-    expect(formatRangeLabel(q4, OPTS)).toBe("Q4 2026 · Oct 1 – Nov 12, 21:24");
-    expect(formatRangeLabel(year, OPTS)).toBe("2026 · Jan 1 – Nov 12, 21:24");
-    expect(formatRangeLabel(h2, OPTS)).toBe("H2 2026 · Jul 1 – Nov 12, 21:24");
-    expect(namedFixedPeriod(q4.startUs, q4.endUs, OPTS)).toBe("Q4 2026");
+    expect(formatRangeLabel(q4, OPTS)).toBe("Oct 1, 00:00 – Nov 12, 21:24");
+    expect(formatRangeLabel(year, OPTS)).toBe("Jan 1, 00:00 – Nov 12, 21:24");
+  });
+
+  it("names a live period by the name it was given [C9]", () => {
+    const q4 = {
+      startUs: ist("2026-10-01T00:00:00"),
+      endUs: ist("2026-11-12T21:24:00"),
+      name: "Q4 2026",
+      live: true,
+      calendar: true,
+    };
+    expect(formatRangeLabel(q4, OPTS)).toBe("Q4 2026");
   });
 
   it("names no period for a range that ends inside an earlier, smaller one [V6]", () => {
@@ -313,10 +319,10 @@ describe("copy text and labels read back [review pass 1]", () => {
     });
   });
 
-  it("reads a fixed-period label back as that period [#5]", () => {
+  it("reads a fixed quarter's label back as that quarter [#5]", () => {
     const range = { startUs: ist("2026-07-01T00:00:00"), endUs: ist("2026-10-01T00:00:00") };
     const label = formatRangeLabel(range, OPTS);
-    expect(label).toBe("Q3 2026 · Jul 1 – Sep 30");
+    expect(label).toBe("Jul 1 – Sep 30");
     expect(read(label, IST)).toMatchObject({ startDate: "2026/07/01", endDate: "2026/10/01" });
   });
 
@@ -327,5 +333,37 @@ describe("copy text and labels read back [review pass 1]", () => {
     const reading = read(text, IST) as { startMicros: number; endMicros: number };
     expect(reading.startMicros).toBeLessThanOrEqual(startUs);
     expect(reading.endMicros).toBeGreaterThanOrEqual(endUs);
+  });
+});
+
+describe("labels far from now never throw [S1]", () => {
+  it.each([
+    ["year 10000", Date.UTC(10000, 0, 1) * 1000, 10000],
+    ["year 9999 near its end", Date.UTC(9999, 11, 31, 23) * 1000, 10000],
+    ["year 0", Date.UTC(0, 5, 1) * 1000 - 3155760000000000, -100],
+  ])("formats a range in %s", (_name, startUs) => {
+    const range = { startUs, endUs: startUs + 3_600_000_000 };
+    expect(() => formatRangeLabel(range, OPTS)).not.toThrow();
+    expect(() => formatRangeStamps(range, OPTS)).not.toThrow();
+    expect(() => formatRangeCopyText(range, OPTS)).not.toThrow();
+  });
+
+  it("reads the year past 9999 in full", () => {
+    const startUs = Date.UTC(10000, 0, 1) * 1000;
+    const range = { startUs, endUs: startUs + 86_400_000_000 };
+    expect(formatRangeLabel(range, { ...OPTS, timezone: "UTC" })).toBe("Jan 1, 10000");
+  });
+
+  it("keeps a year before year 1 apart from this one", () => {
+    const start = new Date(0);
+    start.setUTCFullYear(-5, 0, 1);
+    const startUs = start.getTime() * 1000;
+    const range = { startUs, endUs: startUs + 86_400_000_000 };
+    expect(formatRangeLabel(range, { ...OPTS, timezone: "UTC" })).toMatch(/^Jan 1, /);
+  });
+
+  it("does not throw at the very edge of the Date range", () => {
+    const range = { startUs: 8.64e18 - 3_600_000_000, endUs: 8.64e18 };
+    expect(() => formatRangeLabel(range, OPTS)).not.toThrow();
   });
 });

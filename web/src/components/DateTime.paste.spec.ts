@@ -1208,17 +1208,19 @@ describe("DateTime paste", () => {
         });
       });
 
-      it("applies the as-UTC reading of the highlighted row the preview shows", async () => {
+      it("applies the as-UTC reading of a slash instant the preview shows [P10]", async () => {
         store.state.timezone = "Asia/Calcutta";
         createWrapper();
         await openMenu();
         await typeInto("04/05/2026 10:00");
-        expect(rows().length).toBeGreaterThan(1);
+        expect(inMenu("date-time-list-anchor-5m")).not.toBeNull();
 
         tick();
         inMenu("date-time-as-utc-toggle")!.click();
         await flushPromises();
-        expect(inMenu("date-time-resolved-name")?.textContent).toBe("Apr 5, 15:25 – 15:35");
+        expect(inMenu("date-time-resolved-name")?.textContent).toBe(
+          "± 5 min around Apr 5, 15:30:00",
+        );
         await press("Enter");
 
         expect(lastEmit()).toMatchObject({
@@ -1622,7 +1624,7 @@ describe("DateTime paste", () => {
         expect(line).toContain("1d");
         expect(line).not.toMatch(/\d{2}:\d{2}/);
         expect(line).not.toContain("GMT");
-        expect(wrapper!.vm.triggerLabel).toBe("2026/11/09 - 2026/11/09");
+        expect(wrapper!.vm.triggerLabel).toBe("Nov 9");
       });
 
       it("shows a typed range as its days, with no as-UTC chip", async () => {
@@ -2265,33 +2267,23 @@ describe("DateTime paste", () => {
       expect(lastEmit()).toMatchObject({ relativeTimePeriod: "2M" });
     });
 
-    it("applies the token's range as absolute dates when calendar presets are off", async () => {
+    it("applies the token's rolling length when calendar presets are off", async () => {
       createWrapper({ calendarPresets: false });
       await openMenu();
 
       await typeAndEnter("last month");
 
-      expect(lastEmit()).toMatchObject({
-        valueType: "absolute",
-        relativeTimePeriod: null,
-        startTime: micros("2026-10-01T00:00:00Z"),
-        endTime: micros("2026-11-01T00:00:00Z"),
-      });
-      expect(wrapper!.vm.selectedDate).toEqual({ from: "2026/10/01", to: "2026/10/31" });
-      expect(wrapper!.vm.selectedTime).toEqual({ startTime: "00:00:00", endTime: "23:59:59" });
+      expect(lastEmit()).toMatchObject({ relativeTimePeriod: "30d" });
+      expect(lastEmit().valueType).not.toBe("absolute");
     });
 
-    it("ends today at now when calendar presets are off", async () => {
+    it("applies today as the last day when calendar presets are off", async () => {
       createWrapper({ calendarPresets: false });
       await openMenu();
 
       await typeAndEnter("today");
 
-      expect(lastEmit()).toMatchObject({
-        valueType: "absolute",
-        startTime: micros("2026-11-09T00:00:00Z"),
-      });
-      expect(lastEmit().endTime as number).toBeGreaterThanOrEqual(micros("2026-11-09T03:33:00Z"));
+      expect(lastEmit()).toMatchObject({ relativeTimePeriod: "1d" });
     });
   });
 });

@@ -543,7 +543,10 @@ describe("ShareButton", () => {
               props: ["dataTest", "disabled"],
               emits: ["click"],
             },
-            OTooltip: { template: "<span />" },
+            OTooltip: {
+              props: ["content"],
+              template: "<span data-test='tip'>{{ content }}</span>",
+            },
             ODropdown: { template: "<div><slot name='trigger' /><slot /></div>" },
             ODropdownSeparator: { template: "<hr />" },
             ODropdownItem: {
@@ -629,6 +632,33 @@ describe("ShareButton", () => {
       expect(lastCopy()[0]).toBe(
         "https://short.url/abc123\nLogs · default · Nov 11, 06:57 – 07:12 UTC · fixed",
       );
+    });
+
+    it("names the live period, its dates and offset in the live range copy", async () => {
+      const wrapper = mountKinds({
+        liveUrl: LIVE,
+        defaultKind: "live",
+        rangeContext: "Logs · default",
+        fixedCopyLabel: "Nov 11, 06:57 – 07:12 UTC",
+      });
+      await wrapper.get('[data-test="share-button-copy-with-range"]').trigger("click");
+      await flushPromises();
+      expect(shortURLService.create).toHaveBeenCalledWith("test-org", LIVE);
+      expect(lastCopy()[0]).toBe(
+        "https://short.url/abc123\nLogs · default · Last 15 minutes · Nov 11, 06:57 – 07:12 UTC · live",
+      );
+    });
+
+    it("says why Share is greyed instead of naming the copy kind", () => {
+      const wrapper = mountKinds({ liveUrl: LIVE, disabled: true, tooltip: "Run the query first" });
+      const tip = wrapper.get('[data-test="share-link-btn"] [data-test="tip"]');
+      expect(tip.text()).toBe("Run the query first");
+    });
+
+    it("names the copy kind on the main button when Share is available", () => {
+      const wrapper = mountKinds({ liveUrl: LIVE });
+      const tip = wrapper.get('[data-test="share-link-btn"] [data-test="tip"]');
+      expect(tip.text()).toBe("Copy fixed link");
     });
 
     it("offers the fixed link and the range copy for a fixed range", async () => {

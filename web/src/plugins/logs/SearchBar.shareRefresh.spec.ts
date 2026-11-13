@@ -91,6 +91,19 @@ describe("SearchBar share kinds and auto-refresh pause", () => {
     expect(wrapper!.vm.shareFixedCopyLabel).toMatch(/12:27 – 12:42 UTC$/);
   });
 
+  it.each([true, false])(
+    "asks the page to redraw rows in the new zone (query_on_stream_selection %s)",
+    async (queryOnSelection) => {
+      const before = store.state.zoConfig.query_on_stream_selection;
+      store.state.zoConfig.query_on_stream_selection = queryOnSelection;
+      const picker = wrapper!.findComponent({ name: "DateTime" });
+      picker.vm.$emit("on:timezone-change", "Asia/Tokyo");
+      await wrapper!.vm.$nextTick();
+      store.state.zoConfig.query_on_stream_selection = before;
+      expect(wrapper!.emitted("onChangeTimezone")).toHaveLength(1);
+    },
+  );
+
   it("hands the picker the window a SQL timestamp filter keeps", () => {
     setRange("absolute");
     wrapper!.vm.searchObj.meta.sqlMode = false;

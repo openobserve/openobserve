@@ -36,6 +36,9 @@ export const MAX_CUSTOM_RELATIVE_VALUE: Record<string, number> = {
   M: 120,
 };
 
+// Dec 30, 9999 UTC, so the year stays 9999 or less in every zone.
+export const LATEST_INSTANT_US = Date.UTC(9999, 11, 30) * 1000;
+
 export interface TimeRangeLimitProps {
   disableRelative: boolean;
   minDate: string;
@@ -94,12 +97,12 @@ export default function useTimeRangeLimits(props: TimeRangeLimitProps, clock: Ti
     return { start: startUs, end: Math.min(endUs, selectionCeilingMicros()) };
   };
 
-  // A parent's range is trusted as given, ahead of the browser clock too; only an explicit maxDate bounds it.
+  // A parent's range is trusted ahead of the browser clock and before the calendar, but only within years 1970-9999 that every zone can show.
   const trustedRange = (startUs: number, endUs: number): { start: number; end: number } | null => {
     if (!Number.isFinite(startUs) || !Number.isFinite(endUs) || endUs <= startUs) return null;
-    if (!props.maxDate) return { start: startUs, end: endUs };
-    const ceiling = forwardCeilingMicros();
-    return startUs < ceiling ? { start: startUs, end: Math.min(endUs, ceiling) } : null;
+    const ceiling = props.maxDate ? forwardCeilingMicros() : LATEST_INSTANT_US;
+    if (startUs < 0 || startUs >= ceiling) return null;
+    return { start: startUs, end: Math.min(endUs, ceiling) };
   };
 
   const restrictionMessage = (): I18nText =>

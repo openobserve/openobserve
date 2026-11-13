@@ -563,7 +563,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div
         ref="toolbarRightRef"
-        class="flex flex-shrink-0 items-center gap-2 max-md:w-full max-md:justify-end"
+        class="flex flex-shrink-0 items-center gap-2 max-md:w-full max-md:justify-end max-[24rem]:flex-wrap max-[24rem]:gap-y-1"
       >
         <OPageHeaderStatus />
         <template v-if="searchObj.meta.showTransformEditor && !shouldMoveShareToMenu">
@@ -881,7 +881,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTooltip :content="t('search.functionEditorLabel')" />
         </OButton>
 
-        <div class="order-1 min-w-0 max-md:me-auto">
+        <div class="order-1 min-w-0 max-md:me-auto max-[24rem]:shrink-0">
           <DateTime
             ref="dateTimeRef"
             auto-apply
@@ -3382,11 +3382,8 @@ export default defineComponent({
       }
     };
 
-    const updateTimezone = () => {
-      if (store.state.zoConfig.query_on_stream_selection == false) {
-        emit("onChangeTimezone");
-      }
-    };
+    // A zone change keeps the instants, so nothing re-runs and the page must redraw its rows.
+    const updateTimezone = () => emit("onChangeTimezone");
 
     const updateQuery = () => {
       if (queryEditorRef.value?.setValue) queryEditorRef.value.setValue(searchObj.data.query);

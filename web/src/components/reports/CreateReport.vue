@@ -183,6 +183,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         required
                         :description="t('reports.timeRangeDescription')"
                         auto-apply
+                        :calendar-presets="false"
                         data-test="add-report-timerange-dropdown"
                         menu-align="start"
                       />

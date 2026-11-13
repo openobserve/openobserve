@@ -50,7 +50,7 @@
           data-test="dashboard-viewpanel-date-time-picker"
           :disable="disable"
           calendar-presets
-          @update:model-value="timeGate.onPick"
+          @update:model-value="timeGate.onApply"
           @show="timeGate.onShow"
           @hide="onTimePickerHide"
           @timezone-change="timeGate.flush"

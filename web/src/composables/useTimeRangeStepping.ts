@@ -33,7 +33,8 @@ import { convertToUtcTimestamp } from "@/utils/zincutils";
 import { exceedsRangeRestriction } from "@/utils/timeRangeRail";
 import { formatRangeDuration, formatRangeLabel } from "@/utils/timeRangeLabel";
 import { popUndoStep, pushUndoStep, type TimeRangeUndoStep } from "@/utils/timeRangeUndo";
-import { useShortcuts } from "@/lib/vue-shortcut-manager/composables";
+import { registerShortcuts } from "@/lib/vue-shortcut-manager/composables";
+import { getManager } from "@/lib/vue-shortcut-manager/manager";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { raw, useI18nTyped } from "@/types/i18n";
 import {
@@ -46,8 +47,10 @@ import {
 import { MAX_CUSTOM_RELATIVE_VALUE, type TimeRangeLimits } from "@/composables/useTimeRangeLimits";
 import type { TimeRangeFields } from "@/composables/useTimeRangeFields";
 
-// Toolbar pickers on screen, oldest first; the oldest holds the key bindings and the newest acts on them.
-const shortcutPickers = ref<{ token: symbol; act: Record<string, () => void> }[]>([]);
+// Toolbar pickers on screen, oldest first; the newest acts on the keys.
+let shortcutPickers: { token: symbol; act: Record<string, () => void> }[] = [];
+// The ids are bound once for the app while any picker is on screen, so no picker's exit can drop another's keys.
+let boundShortcuts: { manager: unknown; release: () => void } | null = null;
 
 export interface TimeRangeSteppingProps {
   autoApply: boolean;
@@ -142,9 +145,12 @@ export default function useTimeRangeStepping(
   const { selectedDate, selectedTime } = fields;
 
   const undoStack = ref<TimeRangeUndoStep[]>([]);
+  // The live range the chain last left, kept apart from the stack, whose oldest steps drop past its limit.
+  let liveOrigin: TimeRangeUndoStep | null = null;
 
   const clearUndo = () => {
     undoStack.value = [];
+    liveOrigin = null;
   };
 
   // A range the page sets replaces the one undo leads back from, unless it echoes or answers this picker's own emit.
@@ -168,7 +174,7 @@ export default function useTimeRangeStepping(
     if (!props.undoable || props.hideRangeShift) return;
     const { startTime, endTime } = getConsumableDateTime();
     const applied = deps.appliedSelection();
-    undoStack.value = pushUndoStep(undoStack.value, {
+    const step = {
       label: String(deps.triggerLabel.value),
       selectedType: applied.selectedType,
       calendarToken: applied.calendarToken,
@@ -176,7 +182,10 @@ export default function useTimeRangeStepping(
       relativeValue: applied.relativeValue,
       startUs: startTime,
       endUs: endTime,
-    });
+    };
+    if (undoStack.value.length === 0) liveOrigin = null;
+    if (step.selectedType === "relative" && step.calendarToken === null) liveOrigin = step;
+    undoStack.value = pushUndoStep(undoStack.value, step);
   };
 
   const undoRange = () => {
@@ -184,6 +193,7 @@ export default function useTimeRangeStepping(
     if (!popped) return;
     const { step } = popped;
     undoStack.value = popped.rest;
+    if (popped.rest.length === 0) liveOrigin = null;
     selectedType.value = step.selectedType;
     calendarToken.value = step.calendarToken;
     relativePeriod.value = step.relativePeriod;
@@ -241,7 +251,7 @@ export default function useTimeRangeStepping(
 
   // A chain of steps that began on a rolling range goes back to it once `]` reaches where it began, or now.
   const returnToLiveOrigin = (endUs: number): boolean => {
-    const origin = undoStack.value[0];
+    const origin = liveOrigin;
     if (props.maxDate || !origin || origin.selectedType !== "relative") return false;
     const reach = Math.min(origin.endUs, Date.now() * 1000) - MICROS_PER_SECOND;
     if (origin.calendarToken !== null || endUs < reach) return false;
@@ -445,7 +455,6 @@ export default function useTimeRangeStepping(
     };
   });
 
-  // One binding per key app-wide: two pickers registering the same ids would unregister each other.
   const shortcutToken = Symbol("date-time");
   const takesShortcuts = computed(
     () => props.shortcuts && !props.hideRangeShift && !props.disableRelative,
@@ -467,36 +476,20 @@ export default function useTimeRangeStepping(
   };
   const joinShortcuts = () => {
     if (!takesShortcuts.value) return;
-    if (shortcutPickers.value.some((item) => item.token === shortcutToken)) return;
-    shortcutPickers.value = [
-      ...shortcutPickers.value,
-      { token: shortcutToken, act: shortcutActions },
-    ];
+    if (shortcutPickers.some((item) => item.token === shortcutToken)) return;
+    shortcutPickers = [...shortcutPickers, { token: shortcutToken, act: shortcutActions }];
+    syncShortcutBindings();
   };
   const leaveShortcuts = () => {
-    shortcutPickers.value = shortcutPickers.value.filter((item) => item.token !== shortcutToken);
+    shortcutPickers = shortcutPickers.filter((item) => item.token !== shortcutToken);
+    syncShortcutBindings();
   };
-  const holdsShortcuts = computed(() => shortcutPickers.value[0]?.token === shortcutToken);
-  const onNewestPicker = (action: string) => () =>
-    shortcutPickers.value[shortcutPickers.value.length - 1]?.act[action]?.();
   onMounted(joinShortcuts);
   onActivated(joinShortcuts);
   // Print and kiosk modes turn the page's keys off while the picker stays mounted.
   watch(takesShortcuts, (takes) => (takes ? joinShortcuts() : leaveShortcuts()));
   onDeactivated(leaveShortcuts);
   onBeforeUnmount(leaveShortcuts);
-
-  useShortcuts(
-    [
-      { id: "timeRangeOpen", handler: onNewestPicker("open") },
-      { id: "timeRangePrevious", handler: onNewestPicker("prev") },
-      { id: "timeRangeNext", handler: onNewestPicker("next") },
-      { id: "timeRangeZoomOut", handler: onNewestPicker("zoomOut") },
-      { id: "timeRangeUndo", handler: onNewestPicker("undo") },
-    ],
-    undefined,
-    { active: holdsShortcuts },
-  );
 
   return {
     clearUndo,
@@ -513,4 +506,23 @@ export default function useTimeRangeStepping(
     liveDurationLabel,
     stepTooltip,
   };
+}
+
+const onNewestPicker = (action: string) => () => shortcutPickers.at(-1)?.act[action]?.();
+
+function syncShortcutBindings() {
+  const manager = getManager();
+  if (boundShortcuts && (shortcutPickers.length === 0 || boundShortcuts.manager !== manager)) {
+    boundShortcuts.release();
+    boundShortcuts = null;
+  }
+  if (boundShortcuts || shortcutPickers.length === 0) return;
+  const release = registerShortcuts([
+    { id: "timeRangeOpen", handler: onNewestPicker("open") },
+    { id: "timeRangePrevious", handler: onNewestPicker("prev") },
+    { id: "timeRangeNext", handler: onNewestPicker("next") },
+    { id: "timeRangeZoomOut", handler: onNewestPicker("zoomOut") },
+    { id: "timeRangeUndo", handler: onNewestPicker("undo") },
+  ]);
+  if (release) boundShortcuts = { manager, release };
 }

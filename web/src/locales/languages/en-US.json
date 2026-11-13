@@ -23654,7 +23654,11 @@
     "goLiveResumeTooltipNoDuration": "Follow now and resume refresh",
     "refreshPausedAria": "Auto refresh, paused: range ended",
     "groupPinned": "Pinned",
-    "groupSuggestions": "Suggestions"
+    "groupSuggestions": "Suggestions",
+    "readAsMonthDay": "read as month/day",
+    "readAsDayMonth": "read as day/month",
+    "cutToNow": "cut to now",
+    "rollingHere": "no calendar periods here"
   },
   "shortcuts": {
     "then": "then",
