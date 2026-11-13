@@ -24,16 +24,12 @@ const content = ref<HTMLElement | null>(null);
 
 // Sub-pixel layout makes an exact offset comparison flap between two stops.
 const EDGE = 2;
-// Trackpad momentum keeps firing wheel events; a pause this long starts a new gesture.
-const GESTURE_GAP_MS = 200;
 // The section whose start has crossed this share of the viewport is the current one.
 const SPY_BAND = 0.3;
-// A wheel stop nearer the section's start than this share of the view would spend a gesture on almost no movement.
+// A stop nearer the section's start than this share of the view would spend a key press on almost no movement.
 const MIN_STOP = 0.1;
 // A reveal hands focus to the element at once; a dropdown opened during a smooth glide closes on its next scroll event.
 const REVEAL_BEHAVIOR: ScrollBehavior = "instant";
-const MAX_SNAP_RETRIES = 3;
-const SETTLE_FALLBACK_MS = 800;
 
 const BUTTON_LIKE =
   'button, summary, [role="button"], [role="switch"], [role="checkbox"], [role="radio"], [role="tab"]';
@@ -64,7 +60,7 @@ const markStops = (): void => {
   }
 };
 
-// Past this offset a tall section no longer fills the view and the browser snaps on to the next one, skipping what is left.
+// A tall section also stops where its end meets the bottom of the view, so paging shows all of it.
 const sectionEnds = (): number[] => {
   const viewport = root.value?.clientHeight ?? 0;
   return sections()
@@ -93,7 +89,7 @@ const stopOffsets = (sectionsOnly: boolean): number[] => {
   return [...blocks, ...sectionEnds()].sort((a, b) => a - b);
 };
 
-const targetFor = (direction: 1 | -1, sectionsOnly: boolean, skip = 0): number | null => {
+const targetFor = (direction: 1 | -1, sectionsOnly: boolean): number | null => {
   const scroller = root.value;
   if (!scroller) return null;
   const top = scroller.scrollTop;
@@ -101,38 +97,19 @@ const targetFor = (direction: 1 | -1, sectionsOnly: boolean, skip = 0): number |
   const viewport = scroller.clientHeight;
   const stops = stopOffsets(sectionsOnly);
   if (direction === 1) {
-    const next = stops.filter((s) => s > top + EDGE)[skip] ?? max;
+    const next = stops.find((s) => s > top + EDGE) ?? max;
     // Never skip content: a block taller than the view pages by at most one view.
     return Math.min(next, sectionsOnly ? next : top + viewport, max);
   }
-  const prev = [...stops].reverse().filter((s) => s < top - EDGE)[skip] ?? 0;
+  const prev = [...stops].reverse().find((s) => s < top - EDGE) ?? 0;
   return Math.max(prev, sectionsOnly ? prev : top - viewport, 0);
 };
 
-const afterScroll = (scroller: HTMLElement, run: () => void): void => {
-  let done = false;
-  const finish = (): void => {
-    if (done) return;
-    done = true;
-    scroller.removeEventListener("scrollend", finish);
-    run();
-  };
-  scroller.addEventListener("scrollend", finish, { once: true });
-  setTimeout(finish, SETTLE_FALLBACK_MS);
-};
-
-const go = (direction: 1 | -1, sectionsOnly: boolean, skip = 0): void => {
+const go = (direction: 1 | -1, sectionsOnly: boolean): void => {
   markStops();
-  const scroller = root.value;
-  const target = targetFor(direction, sectionsOnly, skip);
-  if (target === null || !scroller) return;
-  const from = scroller.scrollTop;
-  scroller.scrollTo({ top: target, behavior: "smooth" });
-  if (skip >= MAX_SNAP_RETRIES || Math.abs(target - from) <= EDGE) return;
-  // Snapping can pull a stop that is not a snap point back to where the page was; then try the next one.
-  afterScroll(scroller, () => {
-    if (Math.abs(scroller.scrollTop - from) <= EDGE) go(direction, sectionsOnly, skip + 1);
-  });
+  const target = targetFor(direction, sectionsOnly);
+  if (target === null || !root.value) return;
+  root.value.scrollTo({ top: target, behavior: "smooth" });
 };
 
 const pageStop = (direction: 1 | -1): void => go(direction, false);
@@ -205,34 +182,6 @@ const onAnyScroll = (): void => {
   });
 };
 
-const innerScrolls = (target: EventTarget | null, direction: 1 | -1): boolean => {
-  let el = target instanceof Element ? target : null;
-  while (el && el !== root.value) {
-    if (el instanceof HTMLElement && el.scrollHeight > el.clientHeight + 1) {
-      const overflow = getComputedStyle(el).overflowY;
-      if (overflow === "auto" || overflow === "scroll") {
-        const canMove =
-          direction === 1 ? el.scrollTop + el.clientHeight < el.scrollHeight - 1 : el.scrollTop > 0;
-        if (canMove) return true;
-      }
-    }
-    el = el.parentElement;
-  }
-  return false;
-};
-
-let lastWheelAt = -Infinity;
-const onWheel = (e: WheelEvent): void => {
-  if (!props.snap || e.ctrlKey || Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
-  const direction = e.deltaY > 0 ? 1 : -1;
-  if (innerScrolls(e.target, direction)) return;
-  e.preventDefault();
-  const now = e.timeStamp;
-  const fresh = now - lastWheelAt > GESTURE_GAP_MS;
-  lastWheelAt = now;
-  if (fresh) pageStop(direction);
-};
-
 const onPageKey = (e: KeyboardEvent | undefined, run: () => void): void => {
   const focused = document.activeElement;
   // The shortcut swallowed Space, so a focused button still has to be pressed.
@@ -295,10 +244,9 @@ defineExpose<OSnapScrollExpose>({ scrollToSection, revealElement, pageStop, page
     :class="[
       'min-h-0',
       snap
-        ? '[container-type:size] snap-y snap-mandatory overflow-y-auto overscroll-contain [&_[data-snap-on]]:snap-start [&_[data-snap-section]]:min-h-[100cqh] [&_[data-snap-section]]:snap-start'
+        ? '[container-type:size] overflow-y-auto overscroll-contain [&_[data-snap-section]]:min-h-[100cqh]'
         : '',
     ]"
-    @wheel="onWheel"
   >
     <div ref="content">
       <slot />

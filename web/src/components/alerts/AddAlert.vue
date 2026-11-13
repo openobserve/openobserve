@@ -273,6 +273,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <AlertFormSection
             id="watch"
+            :current="activeSection === 'watch'"
             :index="1"
             :title="t('alerts.sections.watch.title')"
             :help="t('alerts.sections.watch.help')"
@@ -337,6 +338,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <AlertFormSection
             id="condition"
+            :current="activeSection === 'condition'"
             :index="2"
             :title="t('alerts.sections.condition.title')"
             :help="t('alerts.sections.condition.help')"
@@ -492,6 +494,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <AlertFormSection
             id="notify"
+            :current="activeSection === 'notify'"
             :index="3"
             :title="t('alerts.sections.notify.title')"
             :help="t('alerts.sections.notify.help')"
@@ -554,6 +557,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <AlertFormSection
             id="schedule"
+            :current="activeSection === 'schedule'"
             :index="4"
             :title="t('alerts.sections.schedule.title')"
             :help="t('alerts.sections.schedule.help')"
@@ -588,6 +592,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <AlertFormSection
             id="details"
+            :current="activeSection === 'details'"
             :index="5"
             :title="t('alerts.sections.details.title')"
             :help="t('alerts.sections.details.help')"
