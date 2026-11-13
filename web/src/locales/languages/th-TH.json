@@ -1965,6 +1965,7 @@
     "slos": "SLOs",
     "reliability": "ความเสถียร (Reliability)",
     "onCall": "เวรประจำการ (On-Call)",
+    "response": "การตอบสนอง",
     "toggleNavigation": "สลับการแสดงแถบนำทาง",
     "ingestionText": "การนำเข้าข้อมูล",
     "navigationLink": "ลิงก์นำทาง",

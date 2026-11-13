@@ -298,6 +298,16 @@ impl HttpResponse {
             .into_response()
     }
 
+    /// A TooManyRequests response with a `Retry-After` header of at least one second.
+    pub fn too_many_requests_retry_after(error: impl ToString, retry_after_secs: i64) -> Response {
+        let mut resp = Self::too_many_requests(error);
+        resp.headers_mut().insert(
+            axum::http::header::RETRY_AFTER,
+            HeaderValue::from(retry_after_secs.max(1)),
+        );
+        resp
+    }
+
     /// Send an error response in json format that also reports the message through
     /// [`ERROR_HEADER`] for the audit log.
     pub fn error_with_header(code: StatusCode, error: impl ToString) -> Response {

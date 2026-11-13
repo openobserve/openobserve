@@ -15,14 +15,15 @@
 
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
-const { trackSearches, ingestRows } = require('../utils/auto-run-helpers.js');
-const { getAuthHeaders } = require('../utils/cloud-auth.js');
+const { trackSearches, ingestRows, waitForSearchable } = require('../utils/auto-run-helpers.js');
+const { getAuthHeaders, getOrgIdentifier } = require('../utils/cloud-auth.js');
 const PageManager = require('../../pages/page-manager.js');
 
-const ORG = `freetext${Date.now()}`;
-const FTS = 'fts_a';
-const NOFTS = 'nofts_b';
-const NOTEXT = 'nofts_c';
+const ORG = getOrgIdentifier() || 'default';
+const RUN_ID = Math.random().toString(36).slice(2, 7);
+const FTS = `e2e_freetext_fts_${RUN_ID}`;
+const NOFTS = `e2e_freetext_nofts_${RUN_ID}`;
+const NOTEXT = `e2e_freetext_notext_${RUN_ID}`;
 
 const editor = '[data-test="logs-search-bar-query-editor"] .monaco-editor';
 const runBtn = '[data-test="logs-search-bar-refresh-btn"]';
@@ -132,6 +133,8 @@ test.describe('Logs bare-word search (item 1)', () => {
     await expect
       .poll(() => apiTotal(request, `SELECT * FROM "${FTS}"`), { timeout: 120000 })
       .toBe(40);
+    await waitForSearchable(request, ORG, NOFTS, 10);
+    await waitForSearchable(request, ORG, NOTEXT, 10);
   });
 
   test('a bare word runs as match_all, highlights and the editor then shows what ran (AC1.1-AC1.5, Reinstated)', {

@@ -38,7 +38,7 @@
 
   /* Button — outline */
   --color-button-outline-text: var(--color-text-heading);
-  --color-button-outline-border: var(--color-border-default);
+  --color-button-outline-border: var(--color-border-control);
   --color-button-outline-hover-bg: var(--color-interactive-hover-bg);
   --color-button-outline-hover-border: var(--color-primary-300);
   --color-button-outline-active-bg: var(--color-surface-accent-active);
@@ -141,12 +141,13 @@
   /* ToggleGroup */
   --color-toggle-track-bg: var(--color-surface-subtle);
   --color-toggle-item-bg: transparent;
-  --color-toggle-item-text: var(--color-text-heading);
-  --color-toggle-item-hover-bg: var(--color-primary-50);
+  --color-toggle-item-text: var(--color-text-body);
+  --color-toggle-item-hover-bg: var(--color-grey-150);
   --color-toggle-item-active-bg: var(--color-surface-accent-active);
   --color-toggle-item-active-text: var(--color-primary-700);
+  --color-toggle-item-active-border: var(--color-primary-600);
   --color-toggle-item-disabled: var(--color-text-disabled);
-  --color-toggle-border: var(--color-border-default);
+  --color-toggle-border: var(--color-border-subtle);
   --color-toggle-focus-ring: var(--color-focus-ring-accent);
   /* Insertion line shown while dragging to reorder (reorderable groups) */
   --color-toggle-drop-indicator: var(--color-primary-600);
@@ -195,11 +196,12 @@
 
   /* Tabs */
   --color-tabs-indicator: var(--color-primary-600);
-  --color-tabs-active-text: var(--color-primary-600);
+  --color-tabs-active-text: var(--color-primary-700);
   --color-tabs-active-bg: var(--color-surface-accent-active);
   --color-tabs-inactive-text: var(--color-text-heading);
   --color-tabs-hover-text: var(--color-text-heading);
   --color-tabs-hover-bg: color-mix(in srgb, var(--color-primary-100) 50%, var(--color-primary-50));
+  --color-tabs-rail-hover-bg: var(--color-grey-150);
   --color-tabs-disabled-text: var(--color-text-disabled);
   --color-tabs-bar-border: var(--color-border-default);
   --spacing-tabs-height: var(--spacing-10);
@@ -1482,6 +1484,7 @@
   --color-toggle-item-hover-bg: var(--color-toggle-item-hover-bg);
   --color-toggle-item-active-bg: var(--color-toggle-item-active-bg);
   --color-toggle-item-active-text: var(--color-toggle-item-active-text);
+  --color-toggle-item-active-border: var(--color-toggle-item-active-border);
   --color-toggle-item-disabled: var(--color-toggle-item-disabled);
   --color-toggle-border: var(--color-toggle-border);
   --color-toggle-focus-ring: var(--color-toggle-focus-ring);
@@ -1528,6 +1531,7 @@
   --color-tabs-inactive-text: var(--color-tabs-inactive-text);
   --color-tabs-hover-text: var(--color-tabs-hover-text);
   --color-tabs-hover-bg: var(--color-tabs-hover-bg);
+  --color-tabs-rail-hover-bg: var(--color-tabs-rail-hover-bg);
   --color-tabs-disabled-text: var(--color-tabs-disabled-text);
   --color-tabs-bar-border: var(--color-tabs-bar-border);
   --spacing-tabs-height: var(--spacing-tabs-height);

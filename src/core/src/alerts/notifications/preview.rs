@@ -79,6 +79,11 @@ pub struct PreviewModel {
     pub severity: Option<String>,
     pub footer: String,
     pub chart_placeholder: bool,
+    /// The sample's result rows, column-ordered, as the real message lists them.
+    pub rows: Vec<Vec<PreviewKv>>,
+    /// Set when the template formats each row; the real message then shows these lines instead
+    /// of `rows`.
+    pub row_lines: Option<Vec<String>>,
 }
 
 #[derive(Debug, Clone, Serialize, ToSchema)]
@@ -290,6 +295,19 @@ pub fn preview(req: &PreviewRequest) -> Result<PreviewResponse, PreviewError> {
         severity: req.severity.clone(),
         footer,
         chart_placeholder: req.definition.chart.enabled,
+        rows: content
+            .rows
+            .iter()
+            .map(|row| {
+                row.iter()
+                    .map(|(label, value)| PreviewKv {
+                        label: label.clone(),
+                        value: value.clone(),
+                    })
+                    .collect()
+            })
+            .collect(),
+        row_lines: content.row_lines.clone(),
     };
 
     Ok(PreviewResponse {
@@ -700,6 +718,69 @@ mod tests {
             at(NotificationKind::Synthetics, Some(AlertLevel::Warning)),
             (Some(AlertLevel::Warning), notice)
         );
+    }
+
+    fn rows_request(format: Option<&str>) -> PreviewRequest {
+        let mut spec = sample_spec();
+        spec.rows = config::meta::alerts::content_spec::RowsSpec {
+            enabled: true,
+            max: 5,
+            columns: Some(vec!["host".into()]),
+            format: format.map(str::to_string),
+        };
+        PreviewRequest {
+            definition: spec,
+            channel: "slack".into(),
+            severity: Some("critical".into()),
+            sample: None,
+            kind: Default::default(),
+        }
+    }
+
+    #[test]
+    fn the_preview_model_lists_the_rows_the_real_message_lists() {
+        let model = preview(&rows_request(None)).unwrap().preview_model;
+        assert_eq!(model.row_lines, None);
+        let rows: Vec<Vec<(String, String)>> = model
+            .rows
+            .iter()
+            .map(|r| {
+                r.iter()
+                    .map(|kv| (kv.label.clone(), kv.value.clone()))
+                    .collect()
+            })
+            .collect();
+        assert_eq!(
+            rows,
+            vec![
+                vec![("host".to_string(), "web-1".to_string())],
+                vec![("host".to_string(), "web-2".to_string())],
+            ]
+        );
+    }
+
+    #[test]
+    fn a_row_format_gives_the_preview_its_lines_not_the_columns() {
+        let model = preview(&rows_request(Some("{host} at {cpu}")))
+            .unwrap()
+            .preview_model;
+        // The format reads `cpu`, which the selected columns leave out: the lines win, as in email.
+        assert_eq!(
+            model.row_lines,
+            Some(vec![
+                "web-1 at 92.5".to_string(),
+                "web-2 at 88.1".to_string()
+            ])
+        );
+    }
+
+    #[test]
+    fn rows_switched_off_leave_the_preview_without_rows() {
+        let mut req = rows_request(Some("{host}"));
+        req.definition.rows.enabled = false;
+        let model = preview(&req).unwrap().preview_model;
+        assert!(model.rows.is_empty());
+        assert_eq!(model.row_lines, None);
     }
 
     #[test]

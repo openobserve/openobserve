@@ -134,6 +134,54 @@ describe("ExtendDowntimeDialog", () => {
   });
 });
 
+describe("ExtendDowntimeDialog with a row's own submit", () => {
+  const press = async () => {
+    dialog()!.querySelector<HTMLButtonElement>('[data-test="o-dialog-primary-btn"]')!.click();
+    await flushPromises();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await flushPromises();
+  };
+  const mountWith = async (submit: (until: number) => Promise<string>) => {
+    const wrapper = mount(ExtendDowntimeDialog, {
+      props: { open: false, downtime: row("none"), submit },
+      global: { plugins: [store] },
+      attachTo: document.body,
+    });
+    await wrapper.setProps({ open: true });
+    await flushPromises();
+    return wrapper;
+  };
+
+  beforeEach(() => vi.mocked(downtimes.extend).mockReset());
+
+  it("closes and refreshes its screen on ok, without the generic extend", async () => {
+    const submit = vi.fn().mockResolvedValue("ok");
+    const wrapper = await mountWith(submit);
+    await press();
+    expect(submit).toHaveBeenCalledWith(START + 3 * HOUR);
+    expect(downtimes.extend).not.toHaveBeenCalled();
+    expect(wrapper.emitted("settled")).toHaveLength(1);
+    expect(wrapper.emitted("update:open")?.at(-1)).toEqual([false]);
+    wrapper.unmount();
+  });
+
+  it("closes and refreshes its screen when the server refused", async () => {
+    const wrapper = await mountWith(vi.fn().mockResolvedValue("conflict"));
+    await press();
+    expect(wrapper.emitted("settled")).toHaveLength(1);
+    expect(wrapper.emitted("update:open")?.at(-1)).toEqual([false]);
+    wrapper.unmount();
+  });
+
+  it("stays open with no refresh when no answer came", async () => {
+    const wrapper = await mountWith(vi.fn().mockResolvedValue("failed"));
+    await press();
+    expect(wrapper.emitted("settled")).toBeUndefined();
+    expect(wrapper.emitted("update:open")).toBeUndefined();
+    wrapper.unmount();
+  });
+});
+
 describe("extend form", () => {
   const bounds = { currentEnd: START + 2 * HOUR, start: START };
   const schema = makeExtendSchema(gt, "UTC", () => bounds);

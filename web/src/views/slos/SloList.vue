@@ -280,7 +280,7 @@
         <div class="flex items-center gap-1" @click.stop>
           <OButton
             variant="ghost"
-            size="icon-sm"
+            size="icon-xs-sq"
             icon-left="edit"
             class="max-md:hidden"
             :title="t('slos.edit')"
@@ -289,7 +289,7 @@
           />
           <OButton
             variant="ghost"
-            size="icon-sm"
+            size="icon-xs-sq"
             icon-left="drive-file-move"
             class="max-md:hidden"
             :title="t('slos.move')"
@@ -298,7 +298,7 @@
           />
           <OButton
             variant="ghost"
-            size="icon-sm"
+            size="icon-xs-sq"
             :icon-left="row.enabled ? 'pause' : 'play-arrow'"
             class="max-md:hidden"
             :title="row.enabled ? t('slos.pause') : t('slos.resume')"
@@ -307,7 +307,7 @@
           />
           <OButton
             variant="ghost"
-            size="icon-sm"
+            size="icon-xs-sq"
             icon-left="download"
             class="max-md:hidden"
             :title="t('common.export')"
@@ -317,7 +317,7 @@
           <OButton
             v-if="downtimesEnabled"
             variant="ghost"
-            size="icon-sm"
+            size="icon-xs-sq"
             icon-left="notifications-paused"
             class="max-md:hidden"
             :title="t('alerts.downtimes.mute.exclude')"
@@ -326,7 +326,7 @@
           />
           <OButton
             variant="ghost"
-            size="icon-sm"
+            size="icon-xs-sq"
             icon-left="delete"
             class="max-md:hidden"
             :title="t('slos.delete')"
@@ -993,7 +993,7 @@ const visibleRows = computed(() => {
 });
 
 function onStatSelect(key: string | null) {
-  healthFilter.value = key === "total" ? null : key;
+  healthFilter.value = key === "total" || healthFilter.value === key ? null : key;
 }
 
 // The first real load lands after mount and races TanStack's own auto-reset-on-data-change, which resolves through its own deferred microtask queue — setTimeout(0) runs strictly after that queue drains, so the restored page reliably wins.

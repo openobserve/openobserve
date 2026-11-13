@@ -67,6 +67,7 @@ import { findContentFocusTarget } from "./railFocus";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 import { featureState } from "@/utils/featureGate";
 import useBreakpoint from "@/composables/useBreakpoint";
+import { flyoutTop, needsColumns } from "./flyoutLayout";
 import { useTrialPaywall } from "@/composables/useTrialPaywall";
 import { useFeatureNames } from "@/composables/useFeatureLock";
 import {
@@ -215,6 +216,21 @@ const flyoutBlocks = computed<Block[]>(() => {
     open = null;
   }
   return blocks;
+});
+
+const useColumns = ref(false);
+
+const sectionCount = computed(() => flyoutBlocks.value.filter((b) => b.kind === "group").length);
+
+// One column per section; a stray item rides along with the section before it.
+const flyoutColumns = computed<Block[][]>(() => {
+  if (!useColumns.value) return [flyoutBlocks.value];
+  const columns: Block[][] = [];
+  for (const block of flyoutBlocks.value) {
+    if (block.kind === "group" || columns.length === 0) columns.push([block]);
+    else columns[columns.length - 1].push(block);
+  }
+  return columns;
 });
 
 // Hover open/close are debounced so brushing past the tile or crossing the
@@ -389,19 +405,38 @@ async function positionFlyout() {
     ? { right: `${document.documentElement.clientWidth - rect.left + GAP}px` }
     : { left: `${rect.right + GAP}px` };
   const maxHeight = window.innerHeight - VIEWPORT_MARGIN * 2;
-  flyoutStyle.value = {
-    position: "fixed",
-    ...horizontalPosition,
-    top: `${rect.top}px`,
-    maxHeight: `${maxHeight}px`,
-    zIndex: "6000",
-  };
+  // Measured uncapped: a max-height would hide how tall the content really is.
+  const base = { position: "fixed", ...horizontalPosition, top: `${rect.top}px`, zIndex: "6000" };
+  useColumns.value = false;
+  flyoutStyle.value = base;
   await nextTick();
-  const flyoutH = flyoutRef.value?.offsetHeight ?? 0;
-  const maxTop = window.innerHeight - flyoutH - VIEWPORT_MARGIN;
+  let flyoutH = flyoutRef.value?.offsetHeight ?? 0;
+  const box = {
+    tileTop: rect.top,
+    height: flyoutH,
+    viewportHeight: window.innerHeight,
+    margin: VIEWPORT_MARGIN,
+  };
+  if (needsColumns(box, sectionCount.value)) {
+    useColumns.value = true;
+    await nextTick();
+    const columnsH = flyoutRef.value?.offsetHeight ?? 0;
+    const columnsW = flyoutRef.value?.offsetWidth ?? 0;
+    const viewportW = document.documentElement.clientWidth;
+    const availableW = isRtl
+      ? rect.left - GAP - VIEWPORT_MARGIN
+      : viewportW - rect.right - GAP - VIEWPORT_MARGIN;
+    if (columnsH <= maxHeight && columnsW <= availableW) {
+      flyoutH = columnsH;
+    } else {
+      useColumns.value = false;
+      await nextTick();
+    }
+  }
   flyoutStyle.value = {
-    ...flyoutStyle.value,
-    top: `${Math.max(VIEWPORT_MARGIN, Math.min(rect.top, maxTop))}px`,
+    ...base,
+    maxHeight: `${maxHeight}px`,
+    top: `${flyoutTop({ ...box, height: flyoutH })}px`,
   };
   flyoutRef.value?.querySelector("[aria-current]")?.scrollIntoView?.({ block: "nearest" });
 }
@@ -858,6 +893,7 @@ function onChildMouseenter(event: MouseEvent) {
         role="menu"
         :aria-label="title"
         :aria-describedby="showTrialNote ? trialNoteId : undefined"
+        :data-layout="useColumns ? 'columns' : 'single'"
         class="nav-group-flyout rounded-default bg-dropdown-bg shadow-overlay min-w-52 overflow-y-auto overscroll-contain border border-transparent p-1"
         :style="flyoutStyle"
         @mouseenter="clearTimers"
@@ -885,141 +921,159 @@ function onChildMouseenter(event: MouseEvent) {
         >
           {{ t("menu.trialFlyoutNote") }}
         </div>
-        <template v-for="(block, blockIndex) in flyoutBlocks" :key="block.key">
-          <!-- A labelled group: the heading names it via aria-labelledby and is
+        <div role="none" :class="useColumns ? 'flex items-start gap-1' : ''">
+          <div
+            v-for="(column, columnIndex) in flyoutColumns"
+            :key="`col-${columnIndex}`"
+            role="none"
+            data-test="nav-group-column"
+            :class="useColumns ? 'min-w-48 shrink-0' : ''"
+          >
+            <template v-for="(block, blockIndex) in column" :key="block.key">
+              <!-- A labelled group: the heading names it via aria-labelledby and is
                itself presentational, because a bare <div> is not a valid child
                of role="menu" and AT drops it. -->
-          <div
-            v-if="block.kind === 'group'"
-            role="group"
-            :aria-labelledby="block.labelId"
-            :data-test="`nav-group-section-${block.key}`"
-          >
-            <div
-              :id="block.labelId"
-              role="presentation"
-              :data-test="`nav-group-section-label-${block.key}`"
-              class="text-text-secondary px-3 pb-1 text-xs font-semibold"
-              :class="blockIndex === 0 ? 'pt-2' : 'pt-4'"
-            >
-              {{ t(block.labelKey) }}
-            </div>
-            <template v-for="(child, childIndex) in block.children" :key="childKey(child)">
-              <!-- `div` when locked, never `router-link` — see the comment on
+              <div
+                v-if="block.kind === 'group'"
+                role="group"
+                :aria-labelledby="block.labelId"
+                :data-test="`nav-group-section-${block.key}`"
+              >
+                <div
+                  :id="block.labelId"
+                  role="presentation"
+                  :data-test="`nav-group-section-label-${block.key}`"
+                  class="text-text-secondary px-3 pb-1 text-xs font-semibold"
+                  :class="blockIndex === 0 ? 'pt-2' : 'pt-4'"
+                >
+                  {{ t(block.labelKey) }}
+                </div>
+                <template v-for="(child, childIndex) in block.children" :key="childKey(child)">
+                  <!-- `div` when locked, never `router-link` — see the comment on
                    the mobile block above (RouterLink's own click handler runs
                    before onChildClick's preventDefault). -->
-              <component
-                :is="child.locked ? 'div' : 'router-link'"
-                :data-test="childRowTestId(child)"
-                role="menuitem"
-                :to="child.locked ? undefined : childTo(child)"
-                :tabindex="child.locked ? 0 : undefined"
-                class="nav-group-item rounded-default focus-visible:ring-accent flex cursor-pointer items-center gap-2.5 px-3 py-1.5 text-sm transition-colors duration-150 outline-none select-none [text-decoration:none]! focus-visible:ring-2 focus-visible:ring-inset"
-                :class="[
-                  flyoutTextClass,
-                  childIndex > 0 ? 'mt-0.5' : '',
-                  isChildActive(child)
-                    ? 'bg-select-item-selected-bg font-medium'
-                    : 'hover:bg-dropdown-item-hover-bg',
-                ]"
-                :aria-current="isChildActive(child) ? 'page' : undefined"
-                :data-paywalled="isChildPaywalled(child) ? 'true' : undefined"
-                :aria-describedby="isChildPaywalled(child) ? itemDescriptionId(child) : undefined"
-                @click="onChildClick($event, child)"
-                @mouseenter="onChildMouseenter"
-              >
-                <!-- Icon color is locked to the text color so it never picks up a
+                  <component
+                    :is="child.locked ? 'div' : 'router-link'"
+                    :data-test="childRowTestId(child)"
+                    role="menuitem"
+                    :to="child.locked ? undefined : childTo(child)"
+                    :tabindex="child.locked ? 0 : undefined"
+                    class="nav-group-item rounded-default focus-visible:ring-accent flex cursor-pointer items-center gap-2.5 px-3 py-1.5 text-sm transition-colors duration-150 outline-none select-none [text-decoration:none]! focus-visible:ring-2 focus-visible:ring-inset"
+                    :class="[
+                      flyoutTextClass,
+                      childIndex > 0 ? 'mt-0.5' : '',
+                      isChildActive(child)
+                        ? 'bg-select-item-selected-bg font-medium'
+                        : 'hover:bg-dropdown-item-hover-bg',
+                    ]"
+                    :aria-current="isChildActive(child) ? 'page' : undefined"
+                    :data-paywalled="isChildPaywalled(child) ? 'true' : undefined"
+                    :aria-describedby="
+                      isChildPaywalled(child) ? itemDescriptionId(child) : undefined
+                    "
+                    @click="onChildClick($event, child)"
+                    @mouseenter="onChildMouseenter"
+                  >
+                    <!-- Icon color is locked to the text color so it never picks up a
                      primary tint via currentColor inheritance. -->
-                <OIcon
-                  :name="child.icon"
-                  size="sm"
-                  class="shrink-0"
-                  :class="isChildPaywalled(child) ? 'text-text-secondary!' : flyoutIconClass"
-                />
-                <span class="leading-none">{{ childLabel(child) }}</span>
-                <BetaBadge v-if="child.beta" size="xs" />
-                <OIcon
-                  v-if="isChildPaywalled(child) || child.locked || child.licenseLocked"
-                  name="lock"
-                  size="xs"
-                  class="ms-auto shrink-0"
-                  :class="child.locked || child.licenseLocked ? 'lock-chip' : 'text-text-secondary'"
-                  :data-test="`${childDataTest(child)}-lock`"
-                  aria-hidden="true"
-                />
-                <span v-if="child.licenseLocked" class="sr-only">{{
-                  childLockedLabel(child)
-                }}</span>
-                <span
-                  v-if="isChildPaywalled(child)"
-                  :id="itemDescriptionId(child)"
-                  class="sr-only"
-                  >{{ t("menu.trialPageNeedsPlan", { page: childLabel(child) }) }}</span
+                    <OIcon
+                      :name="child.icon"
+                      size="sm"
+                      class="shrink-0"
+                      :class="isChildPaywalled(child) ? 'text-text-secondary!' : flyoutIconClass"
+                    />
+                    <span class="leading-none">{{ childLabel(child) }}</span>
+                    <BetaBadge v-if="child.beta" size="xs" />
+                    <OIcon
+                      v-if="isChildPaywalled(child) || child.locked || child.licenseLocked"
+                      name="lock"
+                      size="xs"
+                      class="ms-auto shrink-0"
+                      :class="
+                        child.locked || child.licenseLocked ? 'lock-chip' : 'text-text-secondary'
+                      "
+                      :data-test="`${childDataTest(child)}-lock`"
+                      aria-hidden="true"
+                    />
+                    <span v-if="child.licenseLocked" class="sr-only">{{
+                      childLockedLabel(child)
+                    }}</span>
+                    <span
+                      v-if="isChildPaywalled(child)"
+                      :id="itemDescriptionId(child)"
+                      class="sr-only"
+                      >{{ t("menu.trialPageNeedsPlan", { page: childLabel(child) }) }}</span
+                    >
+                  </component>
+                </template>
+              </div>
+
+              <template v-else>
+                <component
+                  :is="block.child.locked ? 'div' : 'router-link'"
+                  :data-test="childRowTestId(block.child)"
+                  role="menuitem"
+                  :to="block.child.locked ? undefined : childTo(block.child)"
+                  :tabindex="block.child.locked ? 0 : undefined"
+                  class="nav-group-item rounded-default focus-visible:ring-accent flex cursor-pointer items-center gap-2.5 px-3 py-1.5 text-sm transition-colors duration-150 outline-none select-none [text-decoration:none]! focus-visible:ring-2 focus-visible:ring-inset"
+                  :class="[
+                    flyoutTextClass,
+                    // Matches the pt-4 a header gets, so leaving a run and starting
+                    // one look like the same size of break.
+                    block.spaced ? 'mt-3' : '',
+                    isChildActive(block.child)
+                      ? 'bg-select-item-selected-bg font-medium'
+                      : 'hover:bg-dropdown-item-hover-bg',
+                  ]"
+                  :aria-current="isChildActive(block.child) ? 'page' : undefined"
+                  :data-paywalled="isChildPaywalled(block.child) ? 'true' : undefined"
+                  :aria-describedby="
+                    isChildPaywalled(block.child) ? itemDescriptionId(block.child) : undefined
+                  "
+                  @click="onChildClick($event, block.child)"
+                  @mouseenter="onChildMouseenter"
                 >
-              </component>
+                  <OIcon
+                    :name="block.child.icon"
+                    size="sm"
+                    class="shrink-0"
+                    :class="
+                      isChildPaywalled(block.child) ? 'text-text-secondary!' : flyoutIconClass
+                    "
+                  />
+                  <span class="leading-none">{{ childLabel(block.child) }}</span>
+                  <BetaBadge v-if="block.child.beta" size="xs" />
+                  <OIcon
+                    v-if="
+                      isChildPaywalled(block.child) ||
+                      block.child.locked ||
+                      block.child.licenseLocked
+                    "
+                    name="lock"
+                    size="xs"
+                    class="ms-auto shrink-0"
+                    :class="
+                      block.child.locked || block.child.licenseLocked
+                        ? 'lock-chip'
+                        : 'text-text-secondary'
+                    "
+                    :data-test="`${childDataTest(block.child)}-lock`"
+                    aria-hidden="true"
+                  />
+                  <span v-if="block.child.licenseLocked" class="sr-only">{{
+                    childLockedLabel(block.child)
+                  }}</span>
+                  <span
+                    v-if="isChildPaywalled(block.child)"
+                    :id="itemDescriptionId(block.child)"
+                    class="sr-only"
+                    >{{ t("menu.trialPageNeedsPlan", { page: childLabel(block.child) }) }}</span
+                  >
+                </component>
+              </template>
             </template>
           </div>
-
-          <template v-else>
-            <component
-              :is="block.child.locked ? 'div' : 'router-link'"
-              :data-test="childRowTestId(block.child)"
-              role="menuitem"
-              :to="block.child.locked ? undefined : childTo(block.child)"
-              :tabindex="block.child.locked ? 0 : undefined"
-              class="nav-group-item rounded-default focus-visible:ring-accent flex cursor-pointer items-center gap-2.5 px-3 py-1.5 text-sm transition-colors duration-150 outline-none select-none [text-decoration:none]! focus-visible:ring-2 focus-visible:ring-inset"
-              :class="[
-                flyoutTextClass,
-                // Matches the pt-4 a header gets, so leaving a run and starting
-                // one look like the same size of break.
-                block.spaced ? 'mt-3' : '',
-                isChildActive(block.child)
-                  ? 'bg-select-item-selected-bg font-medium'
-                  : 'hover:bg-dropdown-item-hover-bg',
-              ]"
-              :aria-current="isChildActive(block.child) ? 'page' : undefined"
-              :data-paywalled="isChildPaywalled(block.child) ? 'true' : undefined"
-              :aria-describedby="
-                isChildPaywalled(block.child) ? itemDescriptionId(block.child) : undefined
-              "
-              @click="onChildClick($event, block.child)"
-              @mouseenter="onChildMouseenter"
-            >
-              <OIcon
-                :name="block.child.icon"
-                size="sm"
-                class="shrink-0"
-                :class="isChildPaywalled(block.child) ? 'text-text-secondary!' : flyoutIconClass"
-              />
-              <span class="leading-none">{{ childLabel(block.child) }}</span>
-              <BetaBadge v-if="block.child.beta" size="xs" />
-              <OIcon
-                v-if="
-                  isChildPaywalled(block.child) || block.child.locked || block.child.licenseLocked
-                "
-                name="lock"
-                size="xs"
-                class="ms-auto shrink-0"
-                :class="
-                  block.child.locked || block.child.licenseLocked
-                    ? 'lock-chip'
-                    : 'text-text-secondary'
-                "
-                :data-test="`${childDataTest(block.child)}-lock`"
-                aria-hidden="true"
-              />
-              <span v-if="block.child.licenseLocked" class="sr-only">{{
-                childLockedLabel(block.child)
-              }}</span>
-              <span
-                v-if="isChildPaywalled(block.child)"
-                :id="itemDescriptionId(block.child)"
-                class="sr-only"
-                >{{ t("menu.trialPageNeedsPlan", { page: childLabel(block.child) }) }}</span
-              >
-            </component>
-          </template>
-        </template>
+        </div>
       </div>
     </Teleport>
   </div>

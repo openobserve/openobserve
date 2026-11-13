@@ -90,6 +90,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OStatStrip
                     :items="summaryStats"
                     :loading="loading"
+                    compact
+                    stacked
                     selectable
                     :selected-key="statFilter"
                     default-key="total"
@@ -338,7 +340,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OButton
                       v-if="row.status === 'scheduled'"
                       variant="ghost-destructive"
-                      size="icon-sm"
+                      size="icon-xs-sq"
                       icon-left="cancel"
                       :data-test="`downtime-list-${row.id}-cancel`"
                       @click.stop="askCancel([row.id])"
@@ -348,7 +350,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OButton
                       v-else
                       variant="ghost-destructive"
-                      size="icon-sm"
+                      size="icon-xs-sq"
                       icon-left="stop-circle"
                       :disabled="row.status !== 'active'"
                       :aria-label="t('alerts.downtimes.actions.endNow')"
@@ -366,7 +368,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OButton
                       v-if="isEditable(row)"
                       variant="ghost"
-                      size="icon-sm"
+                      size="icon-xs-sq"
                       icon-left="edit"
                       :data-test="`downtime-list-${row.id}-edit`"
                       @click.stop="editDowntime(row)"
@@ -377,7 +379,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span class="inline-flex size-8 max-md:hidden">
                     <OButton
                       variant="ghost"
-                      size="icon-sm"
+                      size="icon-xs-sq"
                       icon-left="content-copy"
                       :data-test="`downtime-list-${row.id}-duplicate`"
                       :aria-label="
@@ -412,7 +414,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <template #trigger>
                       <OButton
                         variant="ghost"
-                        size="icon-sm"
+                        size="icon-xs-sq"
                         icon-left="more-vert"
                         :aria-label="moreActionsLabel(row)"
                         :data-test="`downtime-list-${row.id}-more`"

@@ -125,7 +125,7 @@ vi.mock("vue-router", () => ({
   }),
   // Most of this suite exercises the stream-mode paths, driven through the URL
   // (`?type=stream`) the way the component reads it; scope tests override it.
-  useRoute: () => ({ query: mockRouteQuery }),
+  useRoute: () => ({ name: "aiLLMInsights", query: mockRouteQuery }),
 }));
 
 vi.mock("@/services/gen-ai-agent-mapping.service", () => ({

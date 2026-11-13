@@ -28,7 +28,7 @@ use openobserve_core::auth::check_permissions;
 use openobserve_core::{
     alerts::{
         destinations,
-        notifications::{TestSendError, check_rate_limit, jira, test_send as core_test_send},
+        notifications::{TestSendError, jira, test_send as core_test_send},
     },
     auth::UserEmail,
     http::destination_error_response,
@@ -813,7 +813,8 @@ pub struct TestSendResponse {
     description = "Renders a content-template definition (draft, via `definition`, or saved, via `template_name`) \
                    against a deterministic synthetic sample and DISPATCHES it to the named destination's real \
                    channel, with every title/subject prefixed `[TEST] `. Requires destination write permission. \
-                   Rate-capped per user (`ZO_ALERT_TEST_SEND_PER_MINUTE`, default 6/min) — returns 429 when exceeded.",
+                   Rate-capped per user (`ZO_ALERT_TEST_SEND_PER_MINUTE`, default 6/min); only a request that reaches dispatch counts, \
+                   and an exceeded cap returns 429 with a `Retry-After` header.",
     security(
         ("Authorization"= [])
     ),
@@ -861,11 +862,6 @@ pub async fn test_send(
         return MetaHttpResponse::forbidden("Unauthorized Access");
     }
 
-    // Rate cap: per-user, config `ZO_ALERT_TEST_SEND_PER_MINUTE` (default 6).
-    if let Err(e @ TestSendError::RateLimited { .. }) = check_rate_limit(user_id) {
-        return MetaHttpResponse::too_many_requests(e.to_string());
-    }
-
     // Exactly one of definition / template_name.
     let spec = match (&req.definition, &req.template_name) {
         (Some(_), Some(_)) => {
@@ -888,6 +884,12 @@ pub async fn test_send(
                     ));
                 }
             };
+            // A Custom body would parse as an all-default spec and send a blank card.
+            if template.kind != config::meta::destinations::TemplateKind::Content {
+                return MetaHttpResponse::bad_request(format!(
+                    "Template {template_name} is not a valid content template"
+                ));
+            }
             match db::alerts::templates::get_parsed_content(&template) {
                 Ok(spec) => (*spec).clone(),
                 Err(e) => {
@@ -910,12 +912,24 @@ pub async fn test_send(
         return MetaHttpResponse::bad_request("Test-send is only supported for alert destinations");
     };
 
-    match core_test_send(&org_id, destination_type, &spec, req.kind).await {
+    // Rate cap: per-user, config `ZO_ALERT_TEST_SEND_PER_MINUTE` (default 6), charged in core
+    // just before dispatch.
+    match core_test_send(&org_id, user_id, destination_type, &spec, req.kind).await {
         Ok(message) => MetaHttpResponse::json(TestSendResponse {
             success: true,
             message,
         }),
-        Err(e) => MetaHttpResponse::bad_request(e.to_string()),
+        Err(e) => test_send_error_response(e),
+    }
+}
+
+/// A rate-limited test-send is a 429 that says when to retry; every other failure is a 400.
+fn test_send_error_response(e: TestSendError) -> Response {
+    match e {
+        TestSendError::RateLimited { retry_after_secs } => {
+            MetaHttpResponse::too_many_requests_retry_after(e.to_string(), retry_after_secs)
+        }
+        e => MetaHttpResponse::bad_request(e.to_string()),
     }
 }
 
@@ -1327,5 +1341,21 @@ mod tests {
             let updated = refusal(update_destination(named(), query, user, dest).await).await;
             assert_eq!(updated, expected, "update module={module}");
         }
+    }
+
+    #[test]
+    fn a_rate_limited_test_send_is_a_429_with_retry_after_and_others_a_400() {
+        use openobserve_core::alerts::notifications::TestSendError;
+
+        let limited = super::test_send_error_response(TestSendError::RateLimited {
+            retry_after_secs: 42,
+        });
+        assert_eq!(limited.status(), StatusCode::TOO_MANY_REQUESTS);
+        assert_eq!(limited.headers()[axum::http::header::RETRY_AFTER], "42");
+
+        let skipped = super::test_send_error_response(TestSendError::PlatformSkipped(
+            config::meta::alerts::notification_kind::NotificationKind::Downtime,
+        ));
+        assert_eq!(skipped.status(), StatusCode::BAD_REQUEST);
     }
 }

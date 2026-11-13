@@ -4,6 +4,10 @@ const SUB_TABS = ['overview', 'funnels', 'paths', 'retention', 'events'];
 // Only the Trends panel's renderer streams; every other analytics query uses _search.
 const TRENDS_STREAM = /\/api\/[^/]+\/_search_stream(\?|$)/;
 const SEARCH = /\/api\/[^/]+\/_search(\?|$)/;
+const SEARCH_OR_STREAM = /\/api\/[^/]+\/_search(_stream)?(\?|$)/;
+const TRENDS_QUERY = /\/_search_stream\?.*panel_id=rum-analytics-trends/;
+// The shell's "which apps exist" query; the Trends panel must wait for its answer (ENT#3262).
+const APP_PROBE_SQL = /AS app, COUNT/;
 // The env/version filter options: the scope resolves identity only after these answer.
 const FACET_SQL = /AS value, COUNT\(DISTINCT session_id\) AS sessions/;
 // PathsFlow.vue's sankey series box: the canvas holds no DOM per box or band, so they are found by these offsets.
@@ -893,6 +897,28 @@ export class RumProductAnalyticsPage {
         };
     }
 
+    /** Lists the SQL of every Trends chart query the page sends; start it before the first goto. */
+    watchTrendsQueries() {
+        const sql = [];
+        this.page.on('request', (r) => {
+            if (TRENDS_QUERY.test(r.url())) sql.push(sqlOf(r));
+        });
+        return sql;
+    }
+
+    /** Delays every app probe by `ms`, so a panel that does not wait for it has time to send its query; `held()` counts them. */
+    async holdAppProbe(ms) {
+        let held = 0;
+        await this.page.route(SEARCH_OR_STREAM, async (route) => {
+            if (APP_PROBE_SQL.test(sqlOf(route.request()))) {
+                held += 1;
+                await new Promise((resolve) => setTimeout(resolve, ms));
+            }
+            await route.fallback();
+        });
+        return { held: () => held };
+    }
+
     /** The OTooltip `target` shows on hover; reka's role="tooltip" node is visually hidden, so match the content. */
     async tooltipOf(target) {
         await target.hover();
@@ -931,6 +957,14 @@ export class RumProductAnalyticsPage {
         // The value and its label share one text node run ("3Sessions"), so the value is the leading number.
         const text = await this.page.locator(`[data-test="rum-analytics-kpi-${key}"]`).textContent({ timeout: 5000 }).catch(() => '');
         return (text || '').match(/^\s*([\d.,]+%?)/)?.[1] ?? null;
+    }
+
+    /** Asserts a KPI card shows `label` as visible text and returns the card's and the label's boxes; a tooltip-only label fails. */
+    async expectKpiLabelVisible(key, label) {
+        const card = this.page.locator(`[data-test="rum-analytics-kpi-${key}"]`);
+        const labelText = card.getByText(label, { exact: true });
+        await expect(labelText).toBeVisible();
+        return { cardBox: await card.boundingBox(), labelBox: await labelText.boundingBox() };
     }
 
     /** Text of the whole page; regression checks assert a raw server error never reaches it. */

@@ -94,11 +94,14 @@ pub async fn run(stop: crate::StopToken) {
                         synthetics_id = %run.synthetics_id,
                         "[synthetics reaper] finalized a run whose finalization never committed"
                     );
-                    crate::job_api::publish_check_status(run).await;
+                    crate::job_api::after_run_finalized(run).await;
+                    crate::job_api::alert_for_swept_run(run).await;
                 }
             }
             Err(e) => tracing::error!("[synthetics reaper] finalize_stuck_runs: {e}"),
         }
+
+        crate::job_api::send_due_gap_notices(now_us).await;
 
         match synthetics_jobs::prune_stale(db, now_us).await {
             // Warn, not info: `dead_letter_expired` above should have claimed and
@@ -163,7 +166,10 @@ async fn handle_dead_letter(
     // Run accounting first: the ingest-token lookup below can return early, and an unfinalized
     // run never completes. 4 = Error on the SyntheticStatus scale, as the dispatcher reports.
     match synthetics_runs::finalize_run(db, &row.run_id, 4, now_us).await {
-        Ok(Some(done)) => crate::job_api::publish_check_status(&done).await,
+        Ok(Some(done)) => {
+            crate::job_api::after_run_finalized(&done).await;
+            crate::job_api::alert_for_swept_run(&done).await;
+        }
         Ok(None) => {}
         Err(e) => {
             tracing::error!(

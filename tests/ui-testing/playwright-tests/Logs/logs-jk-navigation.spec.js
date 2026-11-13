@@ -19,11 +19,11 @@ const {
   navigateToBase,
 } = require("../utils/enhanced-baseFixtures.js");
 const { trackSearches, ingestRows } = require("../utils/auto-run-helpers.js");
-const { getAuthHeaders } = require("../utils/cloud-auth.js");
+const { getAuthHeaders, getOrgIdentifier } = require("../utils/cloud-auth.js");
 const PageManager = require("../../pages/page-manager.js");
 
-const ORG = `jknav${Date.now()}`;
-const STREAM = "jk_logs";
+const ORG = getOrgIdentifier() || "default";
+const STREAM = `e2e_jk_logs_${Math.random().toString(36).slice(2, 7)}`;
 const TOTAL = 130;
 
 const editor = '[data-test="logs-search-bar-query-editor"] .monaco-editor';
@@ -109,6 +109,7 @@ async function openResults(page) {
   });
   // Stale rows stay on screen during the re-run and the app ignores J/K until the hits settle.
   expect(await logs.getResultHitsCount()).toBe(50);
+  await logs.expectResultPageCountAtLeast(2);
   await page.evaluate(
     () =>
       document.activeElement instanceof HTMLElement &&

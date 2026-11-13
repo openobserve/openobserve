@@ -27,6 +27,7 @@ import {
   type QuickMuteSelection,
 } from "@/utils/downtimes/quickMute";
 import { useViewerTimezone } from "@/composables/downtimes/useViewerTimezone";
+import { downtimeLink } from "@/utils/downtimes/link";
 
 /** Creates a quick mute and confirms it with a toast that links to the new downtime. */
 export function useQuickMute() {
@@ -44,6 +45,8 @@ export function useQuickMute() {
     reason?: string,
     folder?: string,
   ): Promise<string | null> => {
+    // The toast's link names the org of the mute, even if the user switches org before the click.
+    const org = orgId.value;
     const folderId = folder || (await defaultFolder.resolve());
     if (!folderId) {
       toast({ variant: "error", message: t("alerts.downtimes.noFolder") });
@@ -67,11 +70,7 @@ export function useQuickMute() {
         action: {
           label: t("toastMessages.downtimes.viewDowntime"),
           handler: () => {
-            void router.push({
-              name: "downtimeDetail",
-              params: { id: created.id },
-              query: { org_identifier: orgId.value },
-            });
+            void router.push(downtimeLink({ id: created.id, folder_id: folderId }, org));
           },
         },
       });

@@ -67,7 +67,7 @@ impl IndexPlan {
     }
 }
 
-pub(super) fn optimizer_physical_plan(
+pub(super) fn apply_index_rules(
     plan: Arc<dyn ExecutionPlan>,
     ctx: &SessionContext,
     schema: &Schema,
@@ -185,7 +185,7 @@ mod tests {
     };
 
     #[tokio::test]
-    async fn test_optimizer_physical_plan_detects_histogram_with_index_filter() {
+    async fn test_apply_index_rules_detects_histogram_with_index_filter() {
         let schema = Arc::new(Schema::new(vec![
             Field::new("_timestamp", DataType::Int64, false),
             Field::new("kubernetes_namespace_name", DataType::Utf8, false),
@@ -220,7 +220,7 @@ mod tests {
             .create_physical_plan(&logical_plan)
             .await
             .unwrap();
-        let (_plan, index) = optimizer_physical_plan(
+        let (_plan, index) = apply_index_rules(
             physical_plan,
             &ctx,
             &schema,
@@ -290,7 +290,7 @@ mod tests {
             .create_physical_plan(&logical_plan)
             .await
             .unwrap();
-        optimizer_physical_plan(
+        apply_index_rules(
             physical_plan,
             &ctx,
             &schema,
@@ -328,7 +328,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_optimizer_physical_plan_like_on_fts_field_keeps_filter() {
+    async fn test_apply_index_rules_like_on_fts_field_keeps_filter() {
         let (plan, index) = plan_with_index(
             "SELECT count(*) FROM default WHERE message LIKE '%timeout%'",
             true,
@@ -349,7 +349,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_optimizer_physical_plan_like_needs_fts_field_older_than_query() {
+    async fn test_apply_index_rules_like_needs_fts_field_older_than_query() {
         let sql = "SELECT count(*) FROM default WHERE message LIKE '%timeout%'";
         let start = BASE_TIME.timestamp_micros() + 100;
         for (field_added_at, index_updated_at, uses_index) in [
@@ -375,7 +375,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_optimizer_physical_plan_like_skips_fts_field_that_is_also_index_field() {
+    async fn test_apply_index_rules_like_skips_fts_field_that_is_also_index_field() {
         let settings = StreamSearchSettings {
             index_fields: vec!["service".to_string()],
             fts_fields: vec!["service".to_string(), "message".to_string()],
@@ -390,7 +390,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_optimizer_physical_plan_late_fts_field_keeps_other_conditions() {
+    async fn test_apply_index_rules_late_fts_field_keeps_other_conditions() {
         let sql = "SELECT * FROM default WHERE service = 'auth' AND message LIKE '%timeout%'";
         let start = BASE_TIME.timestamp_micros() + 100;
         let settings = settings_with_fts_added_at(Some(start + 1), 0);
@@ -406,7 +406,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_optimizer_physical_plan_skips_index_when_disabled() {
+    async fn test_apply_index_rules_skips_index_when_disabled() {
         let sql = "SELECT count(*) FROM default WHERE service = 'auth'";
         let (_plan, index) = plan_with_index(sql, true).await;
         assert!(index.use_inverted_index());
@@ -441,7 +441,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_optimizer_physical_plan_disables_detected_metrics_simple_select() {
+    async fn test_apply_index_rules_disables_detected_metrics_simple_select() {
         let schema = Arc::new(Schema::new(vec![
             Field::new("_timestamp", DataType::Int64, false),
             Field::new("name", DataType::Utf8, false),
@@ -475,7 +475,7 @@ mod tests {
         ] {
             let is_metrics = stream_type == StreamType::Metrics;
 
-            let (_plan, index) = optimizer_physical_plan(
+            let (_plan, index) = apply_index_rules(
                 physical_plan.clone(),
                 &ctx,
                 &schema,
