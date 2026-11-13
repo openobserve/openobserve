@@ -48,6 +48,33 @@ import { isFlowChart, isRowTimeline } from "@/utils/dashboard/chartTypeGroups";
 import { boxplotDrilldownSeries, boxplotDrilldownTime } from "@/utils/dashboard/convertBoxplotData";
 import { barGaugeDrilldownSeries } from "@/utils/dashboard/convertBarGaugeData";
 import { hostmapDrilldownSeries, hostmapEntityColumn } from "@/utils/dashboard/convertHostmapData";
+import {
+  filtersSummary,
+  filtersWhere,
+  correlationConfigured,
+  isHorizontalBarChart,
+  isPathChart,
+  isTimeXField,
+  logsAvailability,
+  pointFamily,
+  pointGroupFilters,
+  sliceBounds,
+  tracesAvailability,
+  tracesPageQuery,
+  treeOpensPointMenu,
+  type ExploreBlock,
+  type PointClick,
+  type PointExplore,
+  type PointExploreItem,
+  type PointFamily,
+  type PointTarget,
+} from "@/utils/dashboard/chartPointExplore";
+import type {
+  CorrelationResult,
+  TelemetryContext,
+  TelemetryType,
+} from "@/utils/telemetryCorrelation";
+import config from "@/aws-exports";
 
 // A click on these lands on a named item (slice, bar, tile), not on a named series.
 const NAMED_ITEM_TYPES = ["pie", "donut", "bar-gauge", "treemap", "sunburst", "funnel"];
@@ -77,6 +104,8 @@ export function usePanelDrilldown({
   t,
   onExemplarClick,
   hideChartTooltip,
+  findRelatedTelemetry,
+  allowPointExplore,
 }: {
   panelSchema: any;
   variablesData: any;
@@ -103,6 +132,13 @@ export function usePanelDrilldown({
   t: TranslateFn;
   onExemplarClick?: (params: any) => void | Promise<void>;
   hideChartTooltip?: () => void;
+  findRelatedTelemetry?: (
+    context: TelemetryContext,
+    sourceType: TelemetryType,
+    timeWindowMinutes: number,
+    currentStream: string,
+  ) => Promise<CorrelationResult | null>;
+  allowPointExplore?: { value: boolean };
 }) {
   // Cross-linking: store cross-links from result_schema response
   const { getStream } = useStreams(t);
@@ -346,6 +382,36 @@ export function usePanelDrilldown({
     };
   };
 
+  // The span a click covers: its segment, heatmap column or histogram bucket, else the panel range.
+  const clickedTimeRange = async (params: any) => {
+    const type = panelSchema.value.type;
+    if (isRowTimeline(type)) {
+      const segment = stateTimelineDrilldownSeries(params);
+      return { startTime: segment.__start * 1000, endTime: segment.__end * 1000 };
+    }
+    const columnRange = type === "heatmap" ? heatmapColumnRange(params) : null;
+    if (columnRange) return columnRange;
+    // A host map cell spans the whole panel range; its value[0] is a cell index, not a time.
+    const hoveredTime =
+      type === "heatmap" || type === "hostmap"
+        ? null
+        : type === "boxplot"
+          ? boxplotDrilldownTime(panelSchema.value, panelData?.value?.options, params)
+          : params?.value?.[0];
+    const hoveredTimestamp = hoveredTime
+      ? getUTCTimestampFromZonedTimestamp(hoveredTime, store.state.timezone)
+      : null;
+    return calculateTimeRange(hoveredTimestamp, intervalMicro.value);
+  };
+
+  // A breakdown series keeps its raw breakdown value apart from the name it is drawn with.
+  const clickedSeriesName = (params: any) => {
+    const seriesIndex = params?.seriesIndex;
+    const series =
+      seriesIndex !== undefined ? panelData.value?.options?.series?.[seriesIndex] : undefined;
+    return series ? series.originalSeriesName : params?.seriesName;
+  };
+
   const parseQuery = async (originalQuery: string, parser: any) => {
     try {
       return parser.astify(originalQuery);
@@ -386,6 +452,20 @@ export function usePanelDrilldown({
     Array.isArray(ast?.columns) &&
     ast.columns.some((col: any) => col?.expr?.column === "*" || col?.expr?.type === "star");
 
+  // The SELECT of an executed query, or null when it is not one; its WHERE is never read.
+  const parseSelectColumns = (executedQuery: string): any => {
+    // astify() is exponential in WHERE nesting; only SELECT/FROM are read.
+    const parseTarget = stripWherePredicate(executedQuery);
+    if (maxParenDepth(parseTarget) > SQL_PARSE_MAX_DEPTH) return null;
+    try {
+      const parsed = parser.astify(parseTarget);
+      const ast = Array.isArray(parsed) ? parsed[0] : parsed;
+      return ast?.type === "select" ? ast : null;
+    } catch {
+      return null;
+    }
+  };
+
   const computeCellDrilldownFields = async () => {
     const map = new Map<string, any>();
     const byQuery = new Map<number, Map<string, any>>();
@@ -408,18 +488,8 @@ export function usePanelDrilldown({
       const streamType = query?.fields?.stream_type;
       if (!executedQuery || !streamName) return;
 
-      // astify() is exponential in WHERE nesting; only SELECT/FROM are read below.
-      const parseTarget = stripWherePredicate(executedQuery);
-      if (maxParenDepth(parseTarget) > SQL_PARSE_MAX_DEPTH) return;
-
-      let parsed: any;
-      try {
-        parsed = parser.astify(parseTarget);
-      } catch {
-        return;
-      }
-      const ast = Array.isArray(parsed) ? parsed[0] : parsed;
-      if (!ast || ast.type !== "select") return;
+      const ast = parseSelectColumns(executedQuery);
+      if (!ast) return;
 
       const isJoin = (ast.from?.length ?? 0) > 1;
 
@@ -632,6 +702,320 @@ export function usePanelDrilldown({
     return cell ? { __name: cell._metricName ?? "", __value: cell._metricRaw ?? "" } : {};
   };
 
+  // The point menu's View logs / View traces section; null while the menu shows none.
+  const pointExplore = ref<PointExplore | null>(null);
+  // Each click supersedes the correlation lookup of the one before.
+  let pointRequest = 0;
+
+  const pointSeries = (params: any) =>
+    params?.seriesIndex !== undefined
+      ? panelData.value?.options?.series?.[params.seriesIndex]
+      : undefined;
+
+  const pointQueryIndex = (params: any): number => {
+    const queries = panelSchema.value?.queries ?? [];
+    // A tile carries no query of its own; treeOpensPointMenu admits only one visible query.
+    if (isPathChart(panelSchema.value?.type)) {
+      return Math.max(
+        0,
+        queries.findIndex((q: any) => !q?.config?.hide),
+      );
+    }
+    const index = pointSeries(params)?._panelQueryIndex;
+    return typeof index === "number" && queries[index] ? index : 0;
+  };
+
+  // A multi-field category chart draws one axis per x and breakdown field, row-aligned by dataIndex.
+  const axisFieldValues = (params: any, query: any): Map<string, unknown> | undefined => {
+    const fields = [...(query?.fields?.x ?? []), ...(query?.fields?.breakdown ?? [])];
+    const options = panelData.value?.options;
+    const axes = isHorizontalBarChart(panelSchema.value?.type) ? options?.yAxis : options?.xAxis;
+    const index = params?.dataIndex;
+    if (fields.length < 2 || !Array.isArray(axes) || axes.length !== fields.length)
+      return undefined;
+    if (typeof index !== "number") return undefined;
+    const values: [string, unknown][] = fields.map((field: any, i: number) => [
+      field.alias,
+      axes[i]?.data?.[index],
+    ]);
+    // Only trust the axes when they agree with what the click itself names.
+    const seriesValue = clickedSeriesName(params);
+    const breakdownAt = query?.fields?.x?.length ?? 0;
+    const agrees =
+      String(values[0][1]) === String(params?.name) &&
+      (seriesValue === undefined ||
+        !query?.fields?.breakdown?.length ||
+        String(values[breakdownAt]?.[1]) === String(seriesValue));
+    return agrees ? new Map(values) : undefined;
+  };
+
+  // An h-bar draws time on a category axis, so only its x field tells whether it is a time chart.
+  const pointTimeAxis = (): boolean => {
+    const schema = panelSchema.value;
+    if (schema?.queryType === "promql") return true;
+    if (isHorizontalBarChart(schema?.type)) {
+      const timestamp = store.state.zoConfig?.timestamp_column ?? "_timestamp";
+      return (schema.queries?.[0]?.fields?.x ?? []).some((f: any) => isTimeXField(f, timestamp));
+    }
+    return panelData.value?.extras?.isTimeSeries === true;
+  };
+
+  const pointClick = (params: any, family: PointFamily, query: any): PointClick => {
+    if (family !== "heatmap") {
+      return {
+        name: params?.name,
+        seriesValue: clickedSeriesName(params),
+        path: params?.data?.path,
+        fieldValues: family === "category" ? axisFieldValues(params, query) : undefined,
+      };
+    }
+    const { column, row } = heatmapCellValues(params);
+    return { heatmapRow: row, heatmapColumn: heatmapColumnRange(params) ? undefined : column };
+  };
+
+  // Keyed by the executed SQL, so a repeat click on an unchanged query skips the costly astify.
+  const customColumnsCache = new Map<string, Map<string, string>>();
+
+  // A custom SQL field is named by its result alias; only the query says which column it reads.
+  const customQueryColumns = async (queryIndex: number): Promise<Map<string, string>> => {
+    const sql =
+      metadata?.value?.queries?.[queryIndex]?.query ??
+      panelSchema.value?.queries?.[queryIndex]?.query;
+    if (!sql) return new Map();
+    const cached = customColumnsCache.get(sql);
+    if (cached) return cached;
+    if (!parser) await importSqlParser();
+    const columns = new Map<string, string>();
+    const ast = parseSelectColumns(sql);
+    if (ast) {
+      extractFields(ast, "_timestamp", parser).forEach((field: any) => {
+        if (!field.aggregationFunction && field.column) columns.set(field.alias, field.column);
+      });
+    }
+    customColumnsCache.set(sql, columns);
+    return columns;
+  };
+
+  // An h-bar time label is the raw histogram key in UTC, without a zone suffix.
+  const labelTimestamp = (label: unknown): number | null => {
+    if (typeof label === "number") return label > 1e14 ? label : label * 1000;
+    const text = String(label ?? "");
+    const ms = Date.parse(/[zZ]|[+-]\d{2}:?\d{2}$/.test(text) ? text : `${text}Z`);
+    return Number.isFinite(ms) ? ms * 1000 : null;
+  };
+
+  // The range the clicked series' own query ran over; a time-shifted query ran over an earlier one.
+  const pointQueryRange = (params: any) => {
+    const meta = metadata?.value?.queries?.[pointSeries(params)?._queryIndex ?? 0];
+    const startTime = Number(meta?.startTime ?? 0);
+    const endTime = Number(meta?.endTime ?? 0);
+    return {
+      range: startTime && endTime ? { startTime, endTime } : null,
+      // timeRangeGap.seconds holds milliseconds.
+      shiftUs: Number(meta?.timeRangeGap?.seconds ?? 0) * 1000,
+    };
+  };
+
+  const pointTimeRange = async (params: any, family: PointFamily) => {
+    const { range, shiftUs } = pointQueryRange(params);
+    if (family === "category") return range ?? calculateTimeRange(null, intervalMicro.value);
+    // An h-bar label is the raw histogram key, which no shift has moved.
+    if (isHorizontalBarChart(panelSchema.value.type)) {
+      return calculateTimeRange(labelTimestamp(params?.name), intervalMicro.value);
+    }
+    const clicked = await clickedTimeRange(params);
+    if (family !== "time") return clicked;
+    // A shifted series is drawn moved forward by its shift, so the clicked bucket moves back.
+    return { startTime: clicked.startTime - shiftUs, endTime: clicked.endTime - shiftUs };
+  };
+
+  const sliceText = (target: PointTarget): I18nText => {
+    const bounds = sliceBounds(target.startTime, target.endTime, store.state.timezone);
+    return target.timeSlice === "bucket"
+      ? t("panel.pointExplore.slice", bounds)
+      : t("panel.pointExplore.wholeRange", bounds);
+  };
+
+  const pointDetail = (target: PointTarget): I18nText =>
+    target.filters.length
+      ? t("panel.pointExplore.detail", {
+          slice: sliceText(target),
+          filters: filtersSummary(target.filters),
+        })
+      : sliceText(target);
+
+  const blockedItem = (reason: ExploreBlock): PointExploreItem => ({
+    state: "disabled",
+    detail: t(`panel.pointExplore.${reason}`),
+  });
+
+  const lockedItem = (feature: string): PointExploreItem => ({
+    state: "disabled",
+    detail: licenseLocks.lockedReason(feature),
+    locked: true,
+  });
+
+  const logsItem = (target: PointTarget): PointExploreItem => {
+    const availability = logsAvailability({
+      queryType: panelSchema.value?.queryType,
+      streamType: target.streamType,
+      isLocked: licenseLocks.isLocked,
+    });
+    if (availability.kind === "locked") return lockedItem(availability.feature);
+    if (availability.kind === "blocked") return blockedItem(availability.reason);
+    return { state: "enabled", detail: pointDetail(target) };
+  };
+
+  const correlationEnabled = () =>
+    !!findRelatedTelemetry && correlationConfigured(config.isEnterprise, store.state.zoConfig);
+
+  const tracesItem = (target: PointTarget): PointExploreItem => {
+    const availability = tracesAvailability({
+      queryType: panelSchema.value?.queryType,
+      streamType: target.streamType,
+      hasGroupValues: target.filters.length > 0,
+      correlationEnabled: correlationEnabled(),
+      isLocked: licenseLocks.isLocked,
+    });
+    if (availability.kind === "locked") return lockedItem(availability.feature);
+    if (availability.kind === "blocked") return blockedItem(availability.reason);
+    if (availability.kind === "correlate") {
+      return { state: "pending", detail: t("panel.pointExplore.findingService") };
+    }
+    return { state: "enabled", detail: pointDetail(target) };
+  };
+
+  // Correlation is a server lookup, so the traces item settles after the menu has opened.
+  const correlatePointTraces = async (request: number, target: PointTarget) => {
+    const fields = Object.fromEntries(target.filters.map((f) => [f.field, f.value ?? ""]));
+    let result: CorrelationResult | null = null;
+    try {
+      result = await findRelatedTelemetry!(
+        { timestamp: target.startTime, fields },
+        target.streamType === "metrics" ? "metrics" : "logs",
+        5,
+        target.stream,
+      );
+    } catch {
+      result = null;
+    }
+    if (request !== pointRequest || !pointExplore.value) return;
+    const data = result?.correlationData;
+    const traceStream = data?.related_streams?.traces?.[0];
+    if (!data || !traceStream?.stream_name) {
+      pointExplore.value = { ...pointExplore.value, traces: blockedItem("noTraceCorrelation") };
+      return;
+    }
+    const streamFilters = Object.entries(traceStream.filters ?? {}).map(([field, value]) => ({
+      field,
+      value,
+    }));
+    pointExplore.value = {
+      ...pointExplore.value,
+      tracesTarget: {
+        stream: traceStream.stream_name,
+        filter: filtersWhere(
+          "",
+          streamFilters.length
+            ? streamFilters
+            : [{ field: "service_name", value: data.service_name }],
+        ),
+      },
+      traces: {
+        state: "enabled",
+        detail: t("panel.pointExplore.tracesForService", {
+          service: data.service_name,
+          slice: sliceText(target),
+        }),
+      },
+    };
+  };
+
+  // Fills the point section for a click on a supported chart; false where the chart has none.
+  const preparePointExplore = async (params: any): Promise<boolean> => {
+    pointRequest += 1;
+    const request = pointRequest;
+    const schema = panelSchema.value;
+    // A treemap or sunburst keeps its zoom unless the menu can open something.
+    const treeBlocked =
+      isPathChart(schema?.type) &&
+      !treeOpensPointMenu(schema, {
+        correlationEnabled: correlationEnabled(),
+        isLocked: licenseLocks.isLocked,
+      });
+    const family =
+      allowPointExplore?.value && !treeBlocked ? pointFamily(schema?.type, pointTimeAxis()) : null;
+    if (!family) {
+      pointExplore.value = null;
+      return false;
+    }
+    const queryIndex = pointQueryIndex(params);
+    const query = schema.queries?.[queryIndex];
+    const customColumns =
+      schema.queryType !== "promql" && query?.customQuery
+        ? await customQueryColumns(queryIndex)
+        : undefined;
+    const rows = data.value?.[pointSeries(params)?._queryIndex ?? 0];
+    const filters =
+      schema.queryType === "promql"
+        ? []
+        : pointGroupFilters(
+            query,
+            schema,
+            family,
+            pointClick(params, family, query),
+            Array.isArray(rows) ? rows : undefined,
+            customColumns,
+          );
+    const range = await pointTimeRange(params, family);
+    const sameAs = (other: { startTime?: number; endTime?: number } | null) =>
+      !!other && range.startTime === other.startTime && range.endTime === other.endTime;
+    const wholeRange =
+      sameAs(pointQueryRange(params).range) ||
+      sameAs({
+        startTime: selectedTimeObj.value?.start_time?.getTime?.(),
+        endTime: selectedTimeObj.value?.end_time?.getTime?.(),
+      });
+    const target: PointTarget = {
+      queryIndex,
+      stream: query?.fields?.stream ?? "",
+      streamType: query?.fields?.stream_type || "logs",
+      startTime: range.startTime,
+      endTime: range.endTime,
+      timeSlice: family === "category" || wholeRange ? "panelRange" : "bucket",
+      filters,
+    };
+    if (request !== pointRequest) return false;
+    const traces = tracesItem(target);
+    pointExplore.value = {
+      target,
+      logs: logsItem(target),
+      traces,
+      tracesTarget:
+        traces.state === "enabled"
+          ? { stream: target.stream, filter: filtersWhere("", filters) }
+          : null,
+    };
+    if (traces.state === "pending") correlatePointTraces(request, target);
+    return true;
+  };
+
+  // Opens the clicked slice on the Traces page in a new tab.
+  const openPointTraces = () => {
+    const explore = pointExplore.value;
+    hidePopupsAndOverlays();
+    if (!explore?.tracesTarget || explore.traces.state !== "enabled") return;
+    const query = tracesPageQuery({
+      org: store.state.selectedOrganization.identifier,
+      stream: explore.tracesTarget.stream,
+      startTime: explore.target.startTime,
+      endTime: explore.target.endTime,
+      filter: explore.tracesTarget.filter,
+    });
+    const href = router.resolve({ name: "traces", query }).href;
+    window.open(href, "_blank", "noopener,noreferrer");
+  };
+
   const onChartClick = async (params: any, ...args: any) => {
     // An exemplar marker opens its trace, never the drilldown menu or an annotation.
     if (isExemplarSeriesId(params?.seriesId)) {
@@ -679,7 +1063,12 @@ export function usePanelDrilldown({
     const crossLinkItems = getCrossLinkDrilldownItems();
     // A state timeline's drilldown reads a segment, so an annotation click only opens the annotation.
     const annotationOnly = hasAnnotation && isRowTimeline(panelSchema.value.type);
-    const shouldShowDrilldown = !annotationOnly && (hasDrilldown || crossLinkItems.length > 0);
+    // Only a series item is a data point; an annotation marker keeps its own popup.
+    const isDataPoint = (params?.componentType ?? "series") === "series";
+    const hasPointExplore = isDataPoint && (await preparePointExplore(params));
+    if (!isDataPoint) pointExplore.value = null;
+    const shouldShowDrilldown =
+      !annotationOnly && (hasDrilldown || crossLinkItems.length > 0 || hasPointExplore);
 
     if (shouldShowDrilldown) {
       drilldownParams = [params, args];
@@ -914,27 +1303,13 @@ export function usePanelDrilldown({
           getOriginalQueryAndStream(queryDetails, metadata) || {};
         if (!originalQuery || !streamName) return;
 
-        const isHeatmap = panelSchema.value.type === "heatmap";
-        // A host map cell spans the whole panel range; its value[0] is a cell index, not a time.
-        const hoveredTime =
-          isHeatmap || queryDetails.type === "hostmap"
-            ? null
-            : queryDetails.type === "boxplot"
-              ? boxplotDrilldownTime(queryDetails, panelData?.value?.options, drilldownParams[0])
-              : drilldownParams[0]?.value?.[0];
-        const hoveredTimestamp = hoveredTime
-          ? getUTCTimestampFromZonedTimestamp(hoveredTime, store.state.timezone)
-          : null;
         const breakdown = queryDetails.queries[0].fields?.breakdown || [];
 
         const isStateTimeline = isRowTimeline(queryDetails.type);
         const cell =
           queryDetails.type === "hostmap" ? hostmapDrilldownSeries(drilldownParams[0]) : null;
         const segment = isStateTimeline ? stateTimelineDrilldownSeries(drilldownParams[0]) : null;
-        const calculatedTimeRange = segment
-          ? { startTime: segment.__start * 1000, endTime: segment.__end * 1000 }
-          : ((isHeatmap ? heatmapColumnRange(drilldownParams[0]) : null) ??
-            (await calculateTimeRange(hoveredTimestamp, intervalMicro.value)));
+        const calculatedTimeRange = await clickedTimeRange(drilldownParams[0]);
 
         let modifiedQuery = originalQuery;
 
@@ -962,17 +1337,11 @@ export function usePanelDrilldown({
               ? stateTimelineBreakdownColumn(breakdown[0])
               : breakdown[0]?.column;
 
-          const seriesIndex = drilldownParams[0]?.seriesIndex;
-          const breakdownSeriesName =
-            seriesIndex !== undefined ? panelData.value.options.series[seriesIndex] : undefined;
-          const uniqueSeriesName = cell
+          const breakdownValue = cell
             ? cell.__name
             : segment
               ? segment.__name
-              : breakdownSeriesName
-                ? breakdownSeriesName.originalSeriesName
-                : drilldownParams[0]?.seriesName;
-          const breakdownValue = uniqueSeriesName;
+              : clickedSeriesName(drilldownParams[0]);
 
           const whereClause = buildWhereClause(ast, breakdownColumn, breakdownValue);
 
@@ -1403,6 +1772,8 @@ export function usePanelDrilldown({
   return {
     drilldownArray,
     crossLinksData,
+    pointExplore,
+    openPointTraces,
     onChartClick,
     openDrilldown,
     drilldownLockedReason,

@@ -2558,6 +2558,15 @@ describe("PanelContainer", () => {
       expect(body.attributes("data-curated-stale")).toBe("true");
     });
 
+    it("offers the point menu on a dashboard panel, never on an injected result", () => {
+      const pointExplore = () =>
+        wrapper.findComponent({ name: "PanelSchemaRenderer" }).vm.$attrs.allowPointExplore;
+      wrapper = createWrapper({ viewOnly: true });
+      expect(pointExplore()).toBe(true);
+      wrapper = createWrapper({ viewOnly: true, injectedPanelData: { data: [] } });
+      expect(pointExplore()).toBe(false);
+    });
+
     it("shows an injected result's own note and dims it only when it asks to be", () => {
       wrapper = createWrapper({
         viewOnly: true,

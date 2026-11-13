@@ -613,6 +613,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         ref="PanleSchemaRendererRef"
         :allowAnnotationsAdd="!props.injectedPanelData"
         :allowDrilldown="!props.injectedPanelData"
+        :allowPointExplore="!props.injectedPanelData"
         :allowAlertCreation="allowAlertCreation"
         @show-legends="showLegendsDialog = true"
         :showLegendsButton="props.showLegendsButton"

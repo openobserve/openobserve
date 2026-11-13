@@ -111,7 +111,7 @@ export const contrastLabels = (nodes: TreemapNode[]) => {
 };
 
 /** Converts SQL rows into a treemap: the x field names the outer tiles, the breakdown splits them. */
-export const convertTreemapData = (panelSchema: any, data: any, store: any) => {
+export const convertTreemapData = (panelSchema: any, data: any, store: any, pointMenu = false) => {
   const config = panelSchema?.config ?? {};
   const nodes = buildTreemapNodes(panelSchema, Array.isArray(data) ? data : []);
   if (!nodes.length) return { options: { series: [] }, extras: { panelId: panelSchema?.id } };
@@ -121,7 +121,7 @@ export const convertTreemapData = (panelSchema: any, data: any, store: any) => {
   const format = (value: unknown) =>
     formatUnitValue(getUnitValue(value, config.unit, config.unit_custom, config.decimals));
   const nested = nodes.some((node) => node.children?.length);
-  const hasDrilldown = (config.drilldown?.length ?? 0) > 0;
+  const clickOpensMenu = pointMenu || (config.drilldown?.length ?? 0) > 0;
   const surface = chartColor("--color-surface-base");
 
   const options = {
@@ -150,10 +150,10 @@ export const convertTreemapData = (panelSchema: any, data: any, store: any) => {
         right: 8,
         bottom: config.treemap_show_breadcrumb === false ? 8 : 32,
         roam: false,
-        // Without a leaf depth the breadcrumb names whatever tile sits under the panel centre; a drilldown blocks zooming, so then every level is drawn.
-        leafDepth: !nested ? 1 : hasDrilldown ? undefined : 2,
-        // A click opens the drilldown menu, so it must not also zoom the tile away under it.
-        nodeClick: hasDrilldown ? false : "zoomToNode",
+        // Without a leaf depth the breadcrumb names whatever tile sits under the panel centre; a click menu blocks zooming, so then every level is drawn.
+        leafDepth: !nested ? 1 : clickOpensMenu ? undefined : 2,
+        // A click opens a menu, so it must not also zoom the tile away under it.
+        nodeClick: clickOpensMenu ? false : "zoomToNode",
         breadcrumb: {
           show: config.treemap_show_breadcrumb !== false,
           bottom: 4,

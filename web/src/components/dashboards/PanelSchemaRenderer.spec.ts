@@ -816,6 +816,149 @@ describe("PanelSchemaRenderer", () => {
     });
   });
 
+  describe("Point menu: View logs / View traces", () => {
+    const breakdownPanel = (extra: Record<string, unknown> = {}) => ({
+      ...defaultProps.panelSchema,
+      queries: [
+        {
+          ...defaultProps.panelSchema.queries[0],
+          fields: {
+            ...defaultProps.panelSchema.queries[0].fields,
+            breakdown: [
+              { alias: "breakdown_1", args: [{ type: "field", value: { field: "svc" } }] },
+            ],
+          },
+        },
+      ],
+      ...extra,
+    });
+    const pointClick = {
+      componentType: "series",
+      seriesIndex: 0,
+      value: [Date.UTC(2024, 0, 1, 10, 5), 3],
+      event: { offsetX: 1, offsetY: 1 },
+    };
+    const clickPoint = async (props: Record<string, unknown> = {}) => {
+      wrapper = createWrapper({ panelSchema: breakdownPanel(), allowPointExplore: true, ...props });
+      await flushPromises();
+      wrapper.vm.panelData = {
+        options: { series: [{ originalSeriesName: "cart" }] },
+        extras: { isTimeSeries: true },
+      };
+      await wrapper.vm.onPanelClick(pointClick);
+      await flushPromises();
+    };
+    const item = (id: string) => wrapper.find(`[data-test="drilldown-menu-item-${id}"]`);
+
+    it("a line point with no drilldowns opens the menu with only View logs and View traces", async () => {
+      await clickPoint();
+      expect(item("view-logs").exists()).toBe(true);
+      expect(item("view-logs").text()).toContain("View logs at this time");
+      expect(wrapper.find('[data-test="drilldown-menu-item-view-logs-detail"]').text()).toContain(
+        "svc=cart",
+      );
+      expect(item("view-traces").exists()).toBe(true);
+      expect(
+        wrapper.find('[data-test="drilldown-menu-item-view-traces-unavailable"]').exists(),
+      ).toBe(true);
+      expect(wrapper.find('[data-test="drilldown-menu-item-view-traces-lock"]').exists()).toBe(
+        false,
+      );
+      expect(wrapper.vm.drilldownArray).toEqual([]);
+    });
+
+    it("shows the lock icon only when the item is license-locked", async () => {
+      const zoConfig = store.state.zoConfig as any;
+      const previous = zoConfig.features;
+      zoConfig.features = { traces: "locked" };
+      try {
+        await clickPoint();
+        expect(wrapper.find('[data-test="drilldown-menu-item-view-traces-lock"]').exists()).toBe(
+          true,
+        );
+        expect(
+          wrapper.find('[data-test="drilldown-menu-item-view-traces-unavailable"]').exists(),
+        ).toBe(false);
+      } finally {
+        zoConfig.features = previous;
+      }
+    });
+
+    it("wraps a long detail line to at most two lines and shows the full text in a tooltip", async () => {
+      await clickPoint();
+      const detail = wrapper.findComponent<any>(
+        '[data-test="drilldown-menu-item-view-logs-detail"]',
+      );
+      expect(detail.classes()).toEqual(
+        expect.arrayContaining(["line-clamp-2", "whitespace-normal", "max-w-80"]),
+      );
+      expect(detail.classes()).not.toContain("truncate");
+      expect(detail.findComponent({ name: "OTooltip" }).props("overflowOnly")).toBe(true);
+    });
+
+    it("lists the panel's drilldowns after the point section, in their own order", async () => {
+      const drilldown = [
+        { name: "First", type: "byUrl", data: { url: "https://a.example" } },
+        { name: "Second", type: "byUrl", data: { url: "https://b.example" } },
+      ];
+      await clickPoint({ panelSchema: breakdownPanel({ config: { drilldown } }) });
+      const ids = wrapper
+        .findAll('[data-test="drilldown-menu"] [data-test^="drilldown-menu-item-"]')
+        .map((el) => el.attributes("data-test"))
+        .filter((id) => !/-(detail|reason|lock|unavailable)$/.test(id!));
+      expect(ids).toEqual([
+        "drilldown-menu-item-view-logs",
+        "drilldown-menu-item-view-traces",
+        "drilldown-menu-item-First",
+        "drilldown-menu-item-Second",
+      ]);
+    });
+
+    // The mocked loader reports no histogram interval, so the slice is the panel range.
+    it("View logs opens the Logs Explorer drawer with the panel WHERE and every filter", async () => {
+      const resultSchema = vi.spyOn(searchService, "result_schema").mockResolvedValue({
+        data: { where_clause: "level = 'error'", cross_links: { stream_links: [], org_links: [] } },
+      } as any);
+      onTestFinished(() => resultSchema.mockRestore());
+      await clickPoint();
+      await item("view-logs").trigger("click");
+      await flushPromises();
+
+      expect(wrapper.vm.cellDrawer).toMatchObject({
+        open: true,
+        stream: "logs",
+        streamType: "logs",
+        baseWhere: "level = 'error'",
+        filters: [{ field: "svc", value: "cart" }],
+        timeSlice: "panelRange",
+      });
+      const drawer = () => wrapper.findComponent({ name: "DashboardLogDrawer" });
+      await vi.waitFor(() => expect(drawer().exists()).toBe(true), { timeout: 5000 });
+      expect(drawer().props("filters")).toEqual([{ field: "svc", value: "cart" }]);
+    });
+
+    it("kiosk mode opens no point menu", async () => {
+      store.state.kioskMode = true;
+      onTestFinished(() => {
+        store.state.kioskMode = false;
+      });
+      await clickPoint();
+      expect(wrapper.vm.pointExplore).toBeNull();
+      expect(item("view-logs").exists()).toBe(false);
+    });
+
+    it("off by default: a renderer outside a dashboard panel opens no point menu", async () => {
+      await clickPoint({ allowPointExplore: undefined });
+      expect(wrapper.vm.pointExplore).toBeNull();
+      expect(item("view-logs").exists()).toBe(false);
+    });
+
+    it("a metric panel opens no point menu", async () => {
+      await clickPoint({ panelSchema: breakdownPanel({ type: "metric" }) });
+      expect(item("view-logs").exists()).toBe(false);
+    });
+  });
+
   describe("Drilldowns", () => {
     const withDrilldown = (allowDrilldown?: boolean) =>
       createWrapper({
@@ -1214,6 +1357,59 @@ describe("PanelSchemaRenderer", () => {
         expect(convertPanelData).toHaveBeenCalled();
         expect(vi.mocked(convertPanelData).mock.calls.at(-1)?.[11]).toBeUndefined();
       });
+
+      const field = (alias: string, functionName: string | null = null) => ({
+        alias,
+        label: alias,
+        functionName,
+        args: [{ type: "field", value: { field: "svc" } }],
+      });
+      const panelOf = (type: string, streamType: string, queries = 1) => ({
+        ...defaultProps.panelSchema,
+        type,
+        queries: Array.from({ length: queries }, () => ({
+          query: "SELECT 1",
+          fields: {
+            stream: "s",
+            stream_type: streamType,
+            x: [field("x_axis_1")],
+            y: [field("y_axis_1", "count")],
+          },
+          config: {},
+        })),
+      });
+      const treemap = (streamType: string, queries = 1) => panelOf("treemap", streamType, queries);
+      it.each([
+        ["a single-query logs treemap with the menu allowed", true, treemap("logs"), true],
+        ["the same treemap outside a dashboard panel", undefined, treemap("logs"), false],
+        ["a single-query traces treemap", true, treemap("traces"), true],
+        ["a metrics treemap with service correlation off", true, treemap("metrics"), false],
+        ["a two-query logs treemap, whose tiles name no query", true, treemap("logs", 2), false],
+        ["a line chart, which has no zoom to lose", true, panelOf("line", "logs"), false],
+      ])(
+        "%s: tells the converters whether a click opens the menu",
+        async (_name, allowPointExplore, panelSchema, expected) => {
+          const zoConfig = store.state.zoConfig as any;
+          const serviceStreams = zoConfig.service_streams_enabled;
+          zoConfig.service_streams_enabled = false;
+          onTestFinished(() => {
+            zoConfig.service_streams_enabled = serviceStreams;
+          });
+          const isFirstLoadSettled = ref(false);
+          const data = ref<any[]>([]);
+          vi.mocked(usePanelDataLoader).mockReturnValueOnce(
+            loaderWith({ isFirstLoadSettled, data }) as any,
+          );
+          wrapper = createWrapper({ allowPointExplore, panelSchema });
+          await flushPromises();
+          data.value = [[{ a: 1 }], [{ a: 1 }]];
+          isFirstLoadSettled.value = true;
+          await flushPromises();
+
+          expect(convertPanelData).toHaveBeenCalled();
+          expect(vi.mocked(convertPanelData).mock.calls.at(-1)?.[12]).toBe(expected);
+        },
+      );
 
       it("re-runs custom chart code when a variable the query does not use changes", async () => {
         const isFirstLoadSettled = ref(false);

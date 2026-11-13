@@ -272,6 +272,66 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         ref="drilldownPopUpRef"
         @mouseleave="hidePopupsAndOverlays"
       >
+        <template v-if="pointExplore">
+          <template v-for="item in pointExploreItems" :key="item.id">
+            <div
+              v-if="item.state !== 'enabled'"
+              class="text-dropdown-item-disabled flex cursor-not-allowed items-center px-4 py-2 text-sm"
+              aria-disabled="true"
+              tabindex="0"
+              :aria-busy="item.state === 'pending' ? 'true' : undefined"
+              :data-test="`drilldown-menu-item-${item.id}`"
+            >
+              <OIcon
+                v-if="item.locked"
+                size="xs"
+                class="text-icon-locked me-2"
+                name="lock"
+                :data-test="`drilldown-menu-item-${item.id}-lock`"
+              />
+              <OIcon
+                v-else
+                size="xs"
+                class="me-2"
+                :name="item.state === 'pending' ? 'hourglass-empty' : 'info-outline'"
+                :data-test="`drilldown-menu-item-${item.id}-unavailable`"
+              />
+              <span class="flex min-w-0 flex-col">
+                <span class="select-none">{{ item.label }}</span>
+                <OTruncatedText
+                  :lines="2"
+                  class="text-text-secondary w-max max-w-80 text-xs break-words whitespace-normal select-none"
+                  :data-test="`drilldown-menu-item-${item.id}-reason`"
+                  >{{ item.detail }}</OTruncatedText
+                >
+              </span>
+            </div>
+            <div
+              v-else
+              class="text-dropdown-item-text hover:bg-dropdown-item-hover-bg active:bg-dropdown-item-active-bg flex cursor-pointer items-center px-4 py-2 text-sm transition-colors duration-200"
+              :data-test="`drilldown-menu-item-${item.id}`"
+              @click="item.open"
+            >
+              <OIcon size="xs" class="me-2" :name="item.icon" />
+              <span class="flex min-w-0 flex-col">
+                <span class="select-none">{{ item.label }}</span>
+                <OTruncatedText
+                  :lines="2"
+                  class="text-text-secondary w-max max-w-80 text-xs break-words whitespace-normal select-none"
+                  :data-test="`drilldown-menu-item-${item.id}-detail`"
+                  >{{ item.detail }}</OTruncatedText
+                >
+              </span>
+              <OIcon
+                v-if="item.id === 'view-traces'"
+                size="xs"
+                class="text-text-secondary ms-2"
+                name="open-in-new"
+              />
+            </div>
+          </template>
+          <OSeparator v-if="drilldownArray.length" />
+        </template>
         <template v-for="(drilldown, index) in drilldownArray" :key="JSON.stringify(drilldown)">
           <OSeparator
             v-if="
@@ -366,6 +426,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :start-time="cellDrawer.startTime"
         :end-time="cellDrawer.endTime"
         :base-where="cellDrawer.baseWhere"
+        :filters="cellDrawer.filters"
+        :time-slice="cellDrawer.timeSlice"
         @send-to-ai-chat="onCellSendToAiChat"
       />
     </ODrawer>
@@ -389,7 +451,8 @@ import {
 } from "vue";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
-import { useLicenseLock } from "@/composables/useFeatureLock";
+import { useLicenseLock, useLicenseLocks } from "@/composables/useFeatureLock";
+import config from "@/aws-exports";
 import { chartColor } from "@/utils/chartTheme";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { usePanelTitle } from "@/composables/dashboard/usePanelTitle";
@@ -423,6 +486,13 @@ import {
   usePanelDownload,
 } from "@/composables/dashboard/usePanelActions";
 import { usePanelDrilldown } from "@/composables/dashboard/usePanelDrilldown";
+import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
+import {
+  correlationConfigured,
+  treeOpensPointMenu,
+  type FieldFilter,
+  type TimeSlice,
+} from "@/utils/dashboard/chartPointExplore";
 import { alertableQueryIndexes } from "@/utils/alerts/prefill/fromPanel";
 import { overlayNewDataOnOldOptions, isOverlayEligible } from "@/utils/dashboard/streaming";
 import { usePanelExemplars } from "@/composables/dashboard/usePanelExemplars";
@@ -517,6 +587,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { copyToClipboard } from "@/utils/clipboard";
 import { calculateWidthText } from "@/utils/dashboard/chartDimensionUtils";
 import { resolveNoDataText } from "@/utils/dashboard/noDataText";
@@ -526,6 +597,7 @@ export default defineComponent({
   name: "PanelSchemaRenderer",
   components: {
     OSeparator,
+    OTruncatedText,
     QueryAnnotationTooltip,
     ChartRenderer,
     AlertContextMenu,
@@ -601,6 +673,12 @@ export default defineComponent({
     // Off where the viewer can't follow a drilldown, such as the anonymous public page.
     allowDrilldown: {
       default: true,
+      required: false,
+      type: Boolean,
+    },
+    // Off by default: only a dashboard panel offers View logs / View traces on a point click.
+    allowPointExplore: {
+      default: false,
       required: false,
       type: Boolean,
     },
@@ -905,6 +983,7 @@ export default defineComponent({
       allowAnnotationsAPI,
       allowAlertCreation,
       allowDrilldown,
+      allowPointExplore,
       alertSource,
       runId,
       tabId,
@@ -1553,6 +1632,19 @@ export default defineComponent({
     // Conversions can resolve out of order; only the most recently started may land.
     let conversionGeneration = 0;
     let customChartRunSkipped = false;
+    const licenseLocks = useLicenseLocks();
+    // A treemap or sunburst gives up click-zoom only where its click opens the point menu.
+    const treePointMenu = computed(
+      () =>
+        allowPointExplore.value &&
+        allowDrilldown.value &&
+        !store.state.kioskMode &&
+        treeOpensPointMenu(panelSchema.value, {
+          correlationEnabled: correlationConfigured(config.isEnterprise, store.state.zoConfig),
+          isLocked: licenseLocks.isLocked,
+        }),
+    );
+
     const convertPanelDataCommon = async (applyOverlay = false) => {
       // Converting the empty pre-load buffer would publish an empty result to the header and curated tiles.
       if (isAwaitingFirstLoad.value) return;
@@ -1590,6 +1682,7 @@ export default defineComponent({
             loading.value,
             filteredSparklineData.value,
             panelSchema.value?.type === "custom_chart" ? buildCustomChartContext() : undefined,
+            treePointMenu.value,
           );
           // Superseded while awaiting: its data is older than what is coming.
           if (superseded()) return;
@@ -2401,8 +2494,11 @@ export default defineComponent({
       return [...new Set(aliases.filter(Boolean))];
     });
 
+    const { findRelatedTelemetry } = useServiceCorrelation();
     const {
       drilldownArray,
+      pointExplore,
+      openPointTraces,
       onChartClick,
       openDrilldown,
       drilldownLockedReason,
@@ -2439,6 +2535,29 @@ export default defineComponent({
       t,
       onExemplarClick: exemplarInteraction.onExemplarClick,
       hideChartTooltip: () => chartRendererRef.value?.chart?.dispatchAction?.({ type: "hideTip" }),
+      findRelatedTelemetry,
+      allowPointExplore,
+    });
+
+    const pointExploreItems = computed(() => {
+      const explore = pointExplore.value;
+      if (!explore) return [];
+      return [
+        {
+          id: "view-logs",
+          icon: "description" as const,
+          label: t("panel.pointExplore.viewLogs"),
+          ...explore.logs,
+          open: openPointLogs,
+        },
+        {
+          id: "view-traces",
+          icon: "account-tree" as const,
+          label: t("panel.pointExplore.viewTraces"),
+          ...explore.traces,
+          open: openPointTraces,
+        },
+      ];
     });
 
     // A click opens the drilldown menu, so it does nothing where drilldowns are off.
@@ -2546,6 +2665,8 @@ export default defineComponent({
       startTime: number;
       endTime: number;
       baseWhere: string;
+      filters?: FieldFilter[];
+      timeSlice?: TimeSlice;
     }>({
       open: false,
       field: "",
@@ -2727,6 +2848,27 @@ export default defineComponent({
       });
     }
 
+    // Not synced to the URL: the cell_* params can only describe a single table cell.
+    async function openPointLogs() {
+      const explore = pointExplore.value;
+      hidePopupsAndOverlays();
+      if (!explore || explore.logs.state !== "enabled") return;
+      const { target } = explore;
+      await ensureDrilldownSchema(target.queryIndex, true);
+      cellDrawer.value = {
+        open: true,
+        field: "",
+        value: "",
+        stream: target.stream,
+        streamType: target.streamType,
+        startTime: target.startTime,
+        endTime: target.endTime,
+        baseWhere: panelBaseWhere.value,
+        filters: target.filters,
+        timeSlice: target.timeSlice,
+      };
+    }
+
     return {
       hoveredQueryAnnotation,
       onChartMouseOver,
@@ -2763,6 +2905,10 @@ export default defineComponent({
       tableRowKeyFields,
       drilldownAllColumns,
       drilldownArray,
+      pointExplore,
+      pointExploreItems,
+      openPointLogs,
+      openPointTraces,
       selectedAnnotationData,
       openDrilldown,
       alertsLocked,
