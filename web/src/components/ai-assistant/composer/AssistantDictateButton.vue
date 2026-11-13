@@ -18,6 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <AssistantIconButton
     :label="t('assistant.voice.dictate')"
     :icon="glyph"
+    size="md"
     :on="pressed"
     :pressed="pressed"
     :disabled="mic === 'crossed'"

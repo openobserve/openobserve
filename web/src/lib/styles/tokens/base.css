@@ -513,6 +513,8 @@
     rgba(236, 72, 153, 0.05) 100%
   );
   --color-gradient-brand-ribbon: linear-gradient(90deg, #f59e0b, #ec4899, #7b61ff);
+  /* The ribbon as a focus edge: amber-600 is the lightest stop that keeps 3:1 on white (dark in dark.css). */
+  --color-gradient-brand-ribbon-focus: linear-gradient(90deg, #d97706, #ec4899, #7b61ff);
   --color-gradient-notification: linear-gradient(135deg, #ef4444 0%, #ec4899 100%);
   --color-gradient-danger: linear-gradient(135deg, #f56565 0%, #e53e3e 100%);
   --color-gradient-danger-hover: linear-gradient(135deg, #e53e3e 0%, #c53030 100%);

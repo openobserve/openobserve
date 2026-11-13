@@ -81,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </AssistantComposerStrip>
         </template>
         <template #bar>
-          <AssistantComposerBottomRow divided plain>
+          <AssistantComposerBottomRow divided>
             <template #agent>
               <AssistantComposerPlusMenu
                 :actions="plusActions"
@@ -120,7 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :icon="assistantGlyph.send"
               :disabled="!canSend"
               :disabled-reason="sendBlockedReason"
-              :class="ROUND_ACTION_CLASS"
+              :class="SEND_ACTION_CLASS"
               data-test="assistant-send"
               @click="trySend"
             />
@@ -253,7 +253,10 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import { formatBytes } from "@/utils/formatters";
 import { getUUIDv7 } from "@/utils/uuid";
 
-import AssistantComposerBottomRow, { ROUND_ACTION_CLASS } from "./AssistantComposerBottomRow.vue";
+import AssistantComposerBottomRow, {
+  ROUND_ACTION_CLASS,
+  SEND_ACTION_CLASS,
+} from "./AssistantComposerBottomRow.vue";
 import { attachImageFiles, imageTooBigLine, type ImageCap } from "./composerImages";
 import AssistantComposerFrame from "./AssistantComposerFrame.vue";
 import AssistantComposerPlusMenu, {

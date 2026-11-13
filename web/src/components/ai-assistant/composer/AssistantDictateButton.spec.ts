@@ -41,6 +41,7 @@ describe("AssistantDictateButton", () => {
     expect(render().get(mic).attributes()).toMatchObject({
       "aria-label": "Dictate",
       "aria-pressed": "false",
+      "data-size": "md",
     });
     expect(render({ pressed: true }).get(mic).attributes()).toMatchObject({
       "aria-label": "Dictate",

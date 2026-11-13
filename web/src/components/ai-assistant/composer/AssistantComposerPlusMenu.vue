@@ -26,6 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <AssistantIconButton
         :label="t('assistant.composer.plus')"
         :icon="assistantGlyph.addContext"
+        size="md"
         :disabled="disabled"
         data-test="assistant-composer-plus"
       />

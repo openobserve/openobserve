@@ -51,11 +51,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :aria-label="name"
           aria-haspopup="dialog"
           :aria-expanded="open"
-          :class="['shrink-0 motion-safe:transition-colors', CHIP_HIT_AREA_CLASS]"
+          :class="['h-7 shrink-0 motion-safe:transition-colors', CHIP_HIT_AREA_CLASS]"
           data-test="assistant-context-chip-time"
           @click="setOpen(!open)"
           @remove="pick(null)"
-        />
+        >
+          {{ text }}<OIcon :name="assistantGlyph.expand" size="xs" />
+        </OTag>
       </OTooltip>
     </template>
     <div class="flex flex-col gap-0.5" data-test="assistant-context-time-picker">
@@ -166,6 +168,7 @@ import {
 } from "@/components/ai-assistant/composer/composerUi";
 import { periodMs, timeRangeShortText } from "@/composables/assistant";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import ODateTimeRange from "@/lib/forms/DateTimeRange/ODateTimeRange.vue";

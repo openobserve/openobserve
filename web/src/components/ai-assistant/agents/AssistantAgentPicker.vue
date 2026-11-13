@@ -32,10 +32,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         clickable
         :disabled="disabled"
         :data-pending="pending ? '' : undefined"
-        :class="['shrink-0 motion-safe:transition-colors', CHIP_HIT_AREA_CLASS]"
+        :class="['h-7 shrink-0 motion-safe:transition-colors', CHIP_HIT_AREA_CLASS]"
         data-test="assistant-agent-picker"
         @keydown.up.prevent="menuOpen = true"
-      />
+      >
+        {{ agentName(shownAgent, t) }}<OIcon :name="assistantGlyph.expand" size="xs" />
+      </OTag>
     </template>
     <ODropdownGroup :label="t('assistant.agent.picker.heading')">
       <template v-if="sharedPolicy" #label-action>

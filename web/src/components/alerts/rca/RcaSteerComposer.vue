@@ -116,7 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :icon="assistantGlyph.send"
             :disabled="!canSend"
             :loading="sending"
-            :class="ROUND_ACTION_CLASS"
+            :class="SEND_ACTION_CLASS"
             data-test="rca-steer-send-btn"
             @click="submit"
           />
@@ -136,7 +136,7 @@ import AssistantAgentPill, {
   AGENT_PICKER_CLASS,
 } from "@/components/ai-assistant/composer/AssistantAgentPill.vue";
 import AssistantComposerBottomRow, {
-  ROUND_ACTION_CLASS,
+  SEND_ACTION_CLASS,
 } from "@/components/ai-assistant/composer/AssistantComposerBottomRow.vue";
 import AssistantComposerFrame from "@/components/ai-assistant/composer/AssistantComposerFrame.vue";
 import AssistantComposerStrip from "@/components/ai-assistant/composer/AssistantComposerStrip.vue";
