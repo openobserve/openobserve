@@ -726,6 +726,9 @@ export function decisionCopy(t: TranslateFn, locale: string) {
         return { variant: "error", text: t("insight.decisions.undoError.gone") };
       case 409:
         return { variant: "warning", text: t("insight.decisions.undoError.changed") };
+      // A deleted alert is a final state, so it is said plainly and never retried.
+      case 410:
+        return { variant: "warning", text: t("insight.decisions.undoError.alertDeleted") };
       default:
         return { variant: "error", text: t("insight.decisions.undoError.failed") };
     }
@@ -747,6 +750,7 @@ export function decisionCopy(t: TranslateFn, locale: string) {
     const refusal = refusalOf(error);
     if (refusal) return refusalText(refusal);
     if (statusOf(error) === 409) return t("insight.decisions.undoPartial.changed", {}, n);
+    if (statusOf(error) === 410) return t("insight.decisions.undoPartial.alertDeleted", {}, n);
     if (statusOf(error) === 404) return t("insight.decisions.undoPartial.gone", {}, n);
     return null;
   };

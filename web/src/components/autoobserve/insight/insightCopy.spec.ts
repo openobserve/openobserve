@@ -18,7 +18,7 @@ import "@/locales";
 import config from "@/aws-exports";
 import { gt } from "@/types/i18n";
 import type { AutoObserveSuggestion } from "@/services/autoobserve";
-import { say } from "../v2/fixtures";
+import { say } from "../v2/requestTypes";
 import { insightOf, toRequests } from "../live/liveAdapter";
 
 const ID = "f49d3499f38e5e8a374debbca25af38c40c34d9b6c9e96ba68746e17883073f9";

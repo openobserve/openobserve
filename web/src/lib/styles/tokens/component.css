@@ -547,11 +547,13 @@
   /* Timeline (OTimeline, OTimelineItem) */
   --color-timeline-line: var(--color-border-default);
   --color-timeline-dot-primary: var(--color-primary-600);
-  --color-timeline-dot-success: var(--color-success-500);
+  --color-timeline-dot-success: var(--color-success-700);
   --color-timeline-dot-destructive: var(--color-error-600);
-  --color-timeline-dot-info: var(--color-primary-500);
+  --color-timeline-dot-info: var(--color-primary-600);
   --color-timeline-dot-muted: var(--color-grey-400);
   --color-timeline-dot-fg: var(--color-white);
+  /* A brand colour repaints the primary and info dots, so their text is re-picked with it. */
+  --color-timeline-dot-primary-fg: var(--color-timeline-dot-fg);
 
   /* Trace tool-call "show calls" link. Its own step, not --color-text-link:
      that one is 600/400 per theme, this one is 500 in both. */

@@ -29556,18 +29556,11 @@
   "autoobserve": {
     "title": "AutoObserve",
     "subtitle": "Envie os seus dados. O OpenObserve encontra os problemas e avisa-o, com a sua melhor leitura da causa. Quando está tudo calmo, mostra o que verificou e o que não consegue ver.",
-    "phase2": "Fase 2",
     "tabs": {
       "issues": "Problemas",
       "coverage": "Cobertura",
       "activity": "Atividade",
       "policy": "Política"
-    },
-    "loops": {
-      "coverage": "Cobertura",
-      "calibration": "Calibração",
-      "investigation": "Investigação",
-      "action": "Ação"
     },
     "signals": {
       "requests": "Pedidos",
@@ -29577,72 +29570,25 @@
       "logPatterns": "Padrões de log",
       "dependencies": "Dependências"
     },
-    "ledgerStatus": {
-      "autoApplied": "Aplicado automaticamente",
-      "awaiting": "A aguardar aprovação",
-      "approved": "Aprovado",
-      "rejected": "Rejeitado",
-      "rolledBack": "Revertido",
-      "kept": "Mantido — verificações aprovadas"
-    },
     "issues": {
-      "subtitle": "Incidentes agrupados e investigados pelo agente de SRE. Uma notificação por problema; a causa é anexada ou segue no mesmo thread se a triagem expirar ou falhar.",
-      "open": "Abertos",
       "recent": "Resolvidos",
       "all": "Todos",
-      "heldForDigest": "Retido para o resumo de sexta-feira",
-      "colId": "Incidente",
-      "colTitle": "Problema",
-      "colSeverity": "Severidade",
-      "colServices": "Serviços afetados",
-      "colStarted": "Iniciado",
-      "colStatus": "Estado",
-      "colCause": "Causa",
       "emptyTitle": "Nada aqui",
       "emptyDescription": "Nenhum problema corresponde a este filtro.",
-      "subsetNote": "{shown} exibidos. Esta demonstração mostra uma seleção dos {total} incidentes desta semana.",
       "searchLabel": "Procurar problemas",
-      "searchPlaceholder": "Procurar problemas, serviços, causas ou INC-…",
       "noMatch": "Nenhum problema corresponde a “{query}”",
       "clearSearch": "Limpar pesquisa",
       "matchCount": "Nenhum problema corresponde | 1 problema corresponde | {count} problemas correspondem",
-      "colSignal": "Sinal",
       "span": "{start} → {end}",
-      "spanOpen": "{start} → agora",
-      "minutes": "{count} min",
-      "grouped": "{count} alerta → 1 incidente | {count} alertas → 1 incidente",
-      "confidence": "Confiança {level}",
-      "proposed": "Proposto",
-      "reversible": "reversível",
-      "proposalFor": "Correção proposta para {title}"
+      "spanOpen": "{start} → agora"
     },
     "drawer": {
       "rca": "Causa raiz",
-      "rcaSummary": "Resumo",
       "likelyCause": "Causa provável",
-      "confidence": "Confiança",
-      "confidenceValue": "Confiança: {value} (ainda sem pontuação calibrada)",
-      "nextStep": "Próxima etapa sugerida",
-      "evidence": "Evidências",
       "blastRadius": "Raio de impacto",
-      "upstream": "Chamadores upstream",
-      "affected": "Afetados",
-      "downstream": "Dependências downstream",
-      "none": "Nenhum",
       "timeline": "Cronologia",
       "notification": "Notificação enviada",
-      "notSent": "Sem acionamento: este problema de baixa gravidade foi retido para o resumo de sexta-feira. Registado na caixa de entrada do produto.",
-      "sender": "AutoObserve",
-      "threadReply": "respondeu no thread",
-      "p1Note": "O P1 aciona imediatamente, antes de a investigação ser concluída. A causa segue no mesmo thread.",
-      "gateNote": "As notificações P2 e P3 aguardam até 2 minutos pela investigação, por isso a primeira mensagem normalmente traz a causa. Se a triagem expirar ou falhar, a mensagem informa que a investigação ainda está em curso ou falhou, e a causa segue no mesmo thread. Os problemas P4 não notificam ninguém; vão para o resumo de sexta-feira.",
-      "caughtEarlier": "O que teria detetado isto mais cedo",
-      "analyzedAt": "Investigação concluída às {time}.",
-      "triggersSample": "A mostrar {shown} de {total} disparos",
-      "waitingForOk": "A aguardar o seu OK",
-      "proposedFix": "Correção proposta",
-      "unfoldTab": "Como se desenrolou",
-      "seeEvidence": "Ver tudo"
+      "unfoldTab": "Como se desenrolou"
     },
     "unfold": {
       "hint": "Leia da esquerda para a direita: o que mudou, os sinais que isto acionou e depois o que chegou à sua equipa. Selecione um cartão para ver os seus disparos.",
@@ -29655,7 +29601,6 @@
         "change": "Mudança"
       },
       "likelyCause": "Causa provável",
-      "linesUpWith": "Alinha-se com",
       "times": "×{count}",
       "sameMinute": "mesmo minuto",
       "plusMinutes": "+{count} min",
@@ -29668,28 +29613,14 @@
       "detector": "Detetor",
       "firedAt": "Disparado em",
       "when": "Quando",
-      "chartNote": "O gráfico principal do problema, como em Evidência",
       "outcome": {
         "paged": "Piquete acionado",
-        "asked": "Pediu um OK",
-        "notified": "Mensagem enviada, sem acionamento",
-        "held": "Retido para o resumo de sexta-feira",
-        "fixFailed": "A correção não ajudou",
-        "fixed": "Corrigido",
-        "resolved": "Resolvido",
         "open": "Ainda aberto"
       }
     },
     "coverage": {
       "showing": "A mostrar {shown} de {total} serviços",
-      "watched": "Monitorizado",
-      "learning": "A aprender",
-      "gap": "Lacuna",
-      "na": "Não aplicável",
-      "anomaly": "Anomalia",
-      "threshold": "Limite",
       "service": "Serviço",
-      "lastScanned": "Última verificação",
       "detector": "Detetor",
       "methodAnomaly": "Detetor de anomalia, linha de base aprendida",
       "methodThreshold": "Limite estático da biblioteca",
@@ -29701,34 +29632,15 @@
       "history": "{days} de {total} dias de histórico",
       "notScanned": "Primeira verificação em curso — desconhecido, não coberto até terminar",
       "guardrails": "Limites de proteção ativos durante a aprendizagem: teto de taxa de erro · verificação de atualidade (dispara se o stream parar)",
-      "alsoWatchedBy": "Também monitorizado por",
       "searchLabel": "Pesquisar serviços",
-      "searchPlaceholder": "Pesquisar serviço ou stream",
       "matchCount": "Nenhum serviço corresponde | 1 serviço corresponde | {count} serviços correspondem",
-      "noMatch": "Nenhum serviço ou stream corresponde a “{query}”",
       "clearSearch": "Limpar pesquisa",
       "filterLabel": "Filtrar serviços por cobertura",
       "all": "Todos",
-      "gaps": "Lacunas",
-      "cantWatch": "Não é possível monitorizar",
       "detectorCount": "1 detetor | {count} detetores",
-      "stream": "Stream",
-      "coverage": "Cobertura",
-      "coverageCount": "{watched}/{total}",
-      "coverageLabel": "{watched} de {total} sinais aplicáveis monitorizados",
       "legendLabel": "Legenda",
-      "gapChip": "LACUNA",
-      "daysShort": "{days}/{total}d",
-      "tipAnomaly": "{signal}: detetor de anomalia, linha de base aprendida",
-      "tipThreshold": "{signal}: limite estático da biblioteca",
-      "tipLearning": "{signal}: a aprender, {days} de {total} dias de histórico",
-      "tipGap": "{signal}: lacuna, ainda não pode ser monitorizado",
-      "tipNa": "{signal}: não aplicável",
       "config": "Configuração do detetor",
       "lastFired": "Último disparo",
-      "never": "Nunca",
-      "hoursAgo": "há 1 hora | há {count} horas",
-      "daysAgo": "há 1 dia | há {count} dias",
       "fixNoLink": "Adicionar etiqueta service.name",
       "fixStopped": "Verificar o coletor",
       "fixQueued": "Apenas simulação: “{action}” para {service} não foi enviado para lado nenhum",
@@ -29737,26 +29649,14 @@
       "viewTable": "Tabela",
       "fillBy": "Preencher por",
       "fillState": "Estado da cobertura",
-      "fillLearning": "Progresso da aprendizagem",
       "fillDetectors": "Contagem de detetores",
       "fillScanned": "Tempo desde a última verificação",
-      "summaryWatched": "{watched} de {total} totalmente monitorizados · {pct}%",
       "addedThisWeek": "1 novo serviço esta semana | {count} novos serviços esta semana",
-      "splitLabel": "{watched} totalmente monitorizados, {learning} em aprendizagem, {gaps} ainda não podem ser monitorizados",
       "stateWatched": "Totalmente monitorizado",
-      "stateLearning": "Aprendizagem · {days} de {total} dias",
       "stateGap": "Ainda não pode ser monitorizado",
       "hexName": "{service}, {state}, {stream}, {detectors}",
       "legendOf": "Legenda de {fill}, selecione para destacar",
       "mapLabel": "Mapa de cobertura, 1 serviço preenchido por {fill} | Mapa de cobertura, {count} serviços preenchidos por {fill}",
-      "bucketLearned": "Aprendido",
-      "bucketDays67": "6–7 dias",
-      "bucketDays35": "3–5 dias",
-      "bucketDays02": "0–2 dias",
-      "bucketNoData": "Sem dados",
-      "bucketSix": "6 detetores",
-      "bucketFive": "5 detetores",
-      "bucketFewer": "1–4 detetores",
       "bucketNone": "Nenhum",
       "bucketFresh": "Menos de 5 min",
       "bucketRecent": "5–15 min",
@@ -29777,7 +29677,6 @@
       "openTraces": "Traces",
       "openCatalog": "Catálogo de serviços",
       "rangeLabel": "Intervalo de tempo",
-      "logPatternsValue": "{known} conhecidos · {fresh} novos hoje",
       "drawerSubtitle": "{stream} · {detectors} · {library}",
       "badgeNotWatched": "Não monitorizado",
       "signalsWatched": "Sinais monitorizados",
@@ -29789,7 +29688,6 @@
       "badgeAnomaly": "Anomalia · aprendida",
       "badgeThreshold": "Limite > {threshold}",
       "now": "Agora",
-      "bandLearning": "A aprender a linha de base · {days} de {total} dias · intervalo normal pronto {day}",
       "metric": {
         "requests": "Pedidos",
         "errors": "Erros",
@@ -29810,149 +29708,9 @@
       }
     },
     "activity": {
-      "allLoops": "Todos os loops",
-      "allStatuses": "Todos os estados",
-      "ledgerHint": "Todas as alterações que o AutoObserve propõe ou faz são registadas aqui.",
-      "userBuilt": "Alerta criado pelo utilizador",
-      "confidence": "Confiança: {value}",
-      "evidence": "Evidência:",
       "before": "Antes",
       "after": "Depois",
-      "neverAutoRetire": "Desativar um alerta nunca é automático.",
-      "neverSilent": "Alertas criados pelo utilizador nunca são alterados silenciosamente.",
-      "undo": "Desfazer",
-      "approve": "Aprovar",
-      "edit": "Editar",
-      "reject": "Rejeitar",
-      "saveApprove": "Guardar e aprovar",
-      "undoneNote": "Desfeito por si — estado anterior restaurado a partir do snapshot",
-      "undoneToast": "Desfeito. Marcado como revertido no registo desta demonstração.",
-      "approvedToast": "Aprovado. Marcado como aprovado no registo desta demonstração.",
-      "rejectedNote": "Rejeitado por si",
-      "rejectedToast": "Rejeitado. Registado para esta classe de ação.",
-      "emptyTitle": "Nenhuma entrada",
-      "emptyDescription": "Nada no registo corresponde a estes filtros.",
-      "reviewWindow": "Em revisão durante {window} — mantido automaticamente se as verificações passarem, revertido se falharem. A configuração anterior continua a ser avaliada silenciosamente, por isso tudo o que esta alteração teria ocultado continua a aparecer. Desfazer restaura o estado anterior agora.",
-      "approvedNote": "Aprovado por si em {time}.",
-      "applyingNote": "Aprovado por si em {time}; a aplicar agora.",
-      "appliedNote": "Aprovado por si em {time} e aplicado.",
-      "declinedNote": "Recusado por si.",
-      "needsApproval": "Precisa da sua aprovação",
-      "awaiting": "A aguardar",
-      "auto": "Automático",
-      "outcomeFilter": "Filtrar por resultado",
-      "loopFilter": "Filtrar por loop",
-      "columns": {
-        "time": "Quando",
-        "loop": "Loop",
-        "action": "Ação",
-        "target": "Alvo",
-        "change": "Alteração",
-        "confidence": "Confiança",
-        "decision": "Decisão",
-        "outcome": "Resultado",
-        "actions": "Ações"
-      },
-      "showDetails": "Mostrar detalhes de {action} em {target}",
-      "hideDetails": "Ocultar detalhes de {action} em {target}",
-      "approveFor": "Aprovar {action} em {target}",
-      "rejectFor": "Rejeitar {action} em {target}",
-      "editFor": "Editar {action} em {target}",
-      "undoFor": "Desfazer {action} em {target}",
-      "openIncident": "Abrir incidente {id}",
-      "confidenceHint": "{value} — ainda sem pontuação calibrada",
-      "diff": "Alteração proposta, linhas removidas e adicionadas",
-      "daysLeft": "{count} dia restante | {count} dias restantes",
-      "reviewProgress": "Janela de revisão decorrida",
-      "entryId": "Entrada",
-      "logged": "Registado"
-    },
-    "policy": {
-      "gateHint": "Entre alterações a alertas existentes, apenas a ativação da supressão de repetições é aplicada automaticamente, com um snapshot do estado anterior e uma janela de revisão: mantido se as verificações passarem, revertido se falharem. Tudo o resto aguarda aprovação com um clique.",
-      "off": "Desativado",
-      "suggest": "Sugerir",
-      "auto": "Automático",
-      "phase2Title": "Ação — remediação",
-      "phase2Hint": "Correções em produção. Cada classe conquista o seu nível a partir do histórico medido e nunca age acima dele.",
-      "investigation": "Investigação",
-      "outcomesTitle": "Resultados",
-      "outcomesBody": "O AutoObserve mede o que cada ação fez: se a taxa de erro recuperou, se o acionamento parou, se foi desfeita. Uma classe que continua a acertar ganha mais autonomia, uma classe de cada vez; um erro conta contra ela, e uma correção que continua a ser necessária é reportada como bug em vez de automatizada.",
-      "outcomesExample": "ScaleQueueWorkers passou para Automático depois de 7 expansões aprovadas terem funcionado. O seu único erro, a 2 de outubro, acrescentou uma verificação prévia, e um segundo erro devolve-o a Sugerir. AbortRollout aguarda o seu OK; RollbackDeploy permanece Desativado até ter um histórico.",
-      "triage": {
-        "parallel": "Paralelo",
-        "gate": "Portão",
-        "p2p4": "P2–P3",
-        "p1Short": "P1",
-        "p1Desc": "Aciona imediatamente e investiga em paralelo; a causa segue na mesma thread. O Gate não é permitido para P1.",
-        "gateDesc": "Retém o acionamento até a investigação ser concluída, durante até 2 minutos. Falha aberta: se a triagem expirar ou falhar, aciona mesmo assim, informa que a investigação ainda está em curso ou falhou, e a causa segue na thread."
-      },
-      "classes": {
-        "EnableDeduplication": "Ativar a supressão de repetições para um alerta que notifica a cada avaliação.",
-        "CreateDetector": "Criar um detetor de anomalias para pedidos, erros ou latência de um serviço.",
-        "RaiseThreshold": "Elevar um limite que dispara em dias saudáveis.",
-        "LengthenEvaluationWindow": "Aumentar a janela de um alerta que oscila.",
-        "FixAlertQuery": "Corrigir uma consulta de alerta que mede a coisa errada ou que nunca corresponde a nada.",
-        "AttachDestination": "Anexar um destino a um detetor que dispara para o vazio.",
-        "AddLibraryAlert": "Adicionar um alerta agendado da biblioteca onde o predicado corresponder.",
-        "MoveToIncidentDelivery": "Entregar um alerta criado pelo utilizador através do seu incidente em vez da sua própria rota.",
-        "ReviewForDeletion": "Propor descontinuar um alerta que ninguém trata.",
-        "RollbackDeploy": "Reverter a implementação que causou um problema.",
-        "ScaleService": "Escalar horizontalmente um serviço saturado.",
-        "RestartPod": "Reiniciar um pod que parou de atender enquanto as suas réplicas estão saudáveis; uma repetição abre um bug em vez disso.",
-        "ToggleFeatureFlag": "Desativar a feature flag por trás de um problema.",
-        "RunRunbookStep": "Executar uma etapa do runbook do serviço.",
-        "LowerThreshold": "Baixar um limite que disparou tarde demais para avisar antes de um incidente.",
-        "RevertConfigChange": "Reverter uma alteração de definição recente com a qual um problema começou, quando as réplicas sem ela estão saudáveis.",
-        "EvictLeakedConnections": "Fechar ligações que um serviço retirou e nunca devolveu (encontradas pela deteção de fugas), sem mexer nas consultas em curso. Cada uma é associada ao bug da fuga.",
-        "AbortRollout": "Enviar o tráfego de volta para a versão anterior quando apenas os pods da nova versão falham no meio da implementação. Retomável com um clique.",
-        "ScaleQueueWorkers": "Adicionar workers a uma fila acumulada, até um limite; reduz automaticamente se a taxa de escoamento não melhorar."
-      },
-      "triageHint": "Triagem L0 por severidade. Fixo na fase 1.",
-      "channels": "Canais",
-      "channelInbox": "Caixa de entrada no produto",
-      "channelEmailAdmins": "E-mail para administradores da organização",
-      "channelDefault": "Padrão para todas as organizações. Sempre ativo.",
-      "alwaysOn": "Sempre ativo",
-      "channelSlack": "Slack {channel}",
-      "channelConnectedDesc": "Ligado. Opcional; a caixa de entrada e o e-mail funcionam sem isto.",
-      "connected": "Ligado",
-      "defaultsNote": "A Fase 1 entrega padrões fixos do produto. As substituições por organização vêm depois.",
-      "groupCoverage": "Cobertura — cria detetores automaticamente",
-      "groupCoverageHint": "Cada novo serviço recebe detetores de anomalias e os alertas correspondentes da biblioteca assim que aparece, com verificações básicas de segurança enquanto aprende. Cada criação é registada, pode ser desfeita e passa por uma janela de revisão.",
-      "groupCalibration": "Calibração — alterações em alertas existentes",
-      "channelEmail": "E-mail {address}",
-      "paging": "Acionamento",
-      "pagingHint": "A severidade decide como um problema chega às pessoas.",
-      "routing": {
-        "p1p2": "P1 e P2",
-        "p1p2Desc": "Prejudica os clientes. Aciona o piquete a qualquer hora.",
-        "page": "Acionamento",
-        "p3": "P3",
-        "p3Desc": "Uma mensagem no Slack enviada assim que fica pronta. Nunca aciona ninguém.",
-        "message": "Mensagem",
-        "p4": "P4",
-        "p4Desc": "Entra no resumo de sexta-feira.",
-        "summary": "Resumo de sexta-feira"
-      },
-      "nav": {
-        "coverage": "Cobertura",
-        "alerts": "Alterações de alertas",
-        "fixes": "Correções",
-        "investigation": "Investigação e acionamento",
-        "channels": "Canais"
-      },
-      "summary": {
-        "count": "{count} {mode}",
-        "row": "{label} {mode}",
-        "channels": "{count} ligados"
-      }
-    },
-    "notInDemo": "Não disponível nesta demonstração",
-    "confidence": {
-      "high": "Alta",
-      "medium": "Média",
-      "low": "Baixa",
-      "uncalibrated": "ainda sem pontuação calibrada"
+      "outcomeFilter": "Filtrar por resultado"
     },
     "analysis": {
       "verdict": "Veredito",
@@ -29979,15 +29737,6 @@
     }
   },
   "autoobserve2": {
-    "demoTag": "Demonstração",
-    "scenarioLabel": "Cenário de demonstração",
-    "scenarios": {
-      "demo": "Semana de demonstração",
-      "allClear": "Tudo normal",
-      "incident": "Incidente ativo",
-      "cantSee": "Sem visibilidade",
-      "noBaseline": "Sem linha de base"
-    },
     "nav": {
       "history": "Histórico",
       "settings": "Definições",
@@ -30012,295 +29761,29 @@
         "weeksAgo": "há {count} semanas"
       },
       "all": "Todos",
-      "none": "Nenhum problema {priority} {within}.",
       "allIssues": "Todos os problemas",
-      "priorityLabel": "Prioridade",
-      "showing": "{count} problema exibido | {count} problemas exibidos"
+      "priorityLabel": "Prioridade"
     },
-    "noProblems": "Nenhum problema {within}. Verifiquei {count} serviço sem parar. | Nenhum problema {within}. Verifiquei {count} serviços sem parar.",
-    "entryLabel": "{when} · {service}",
-    "when": "{day}, {time}",
     "showMore": "Mostrar mais {count}",
     "showFewer": "Mostrar menos",
-    "days": {
-      "today": "Hoje",
-      "monday": "Segunda-feira",
-      "tuesday": "Terça-feira",
-      "wednesday": "Quarta-feira",
-      "thursday": "Quinta-feira",
-      "friday": "Sexta-feira",
-      "jul18": "18 de julho",
-      "jul30": "30 de julho",
-      "aug13": "13 de agosto",
-      "aug26": "26 de agosto",
-      "sep4": "4 de setembro",
-      "sep12": "12 de setembro",
-      "sep24": "24 de setembro",
-      "sep30": "30 de setembro",
-      "oct1": "1 de outubro",
-      "oct2": "2 de outubro",
-      "sep23": "23 de setembro"
-    },
-    "problems": {
-      "ordersDisk": {
-        "title": "orders-db ficará sem espaço em disco em cerca de 3 dias",
-        "summary": "O disco está a encher cerca de 18 GB por dia desde que a versão de quinta-feira do orders ativou o log de auditoria, por isso ficará cheio por volta de quarta-feira de manhã. Quando isso acontecer, checkout, pedidos e reembolsos começarão a falhar. Ainda nada está avariado, por isso enviei um aviso à sua equipa em vez de acionar o piquete.",
-        "notify1": "orders-db ficará sem espaço em disco em cerca de 3 dias, por volta de quarta-feira às 11:00.",
-        "notify2": "Causa: desde que o orders 3.8.0 foi lançado na quinta-feira, o log de auditoria grava cerca de 18 GB por dia. Antes disso, o disco crescia cerca de 6 GB por dia.",
-        "notify3": "Reduza o log de auditoria novamente ou adicione espaço em disco antes de quarta-feira. Quando o disco encher, checkout, pedidos e reembolsos falharão. Ainda nada está avariado, por isso isto é um aviso, não um acionamento de piquete.",
-        "chartCaption": "disco · cheio ~qua 11:00",
-        "chartLabel": "O uso de disco cresceu de 334 para 445 GB de 500 ao longo de 14 dias, mais rápido desde quinta-feira, e a previsão é de que esteja cheio por volta de quarta-feira às 11:00"
-      },
-      "search": {
-        "title": "A pesquisa está lenta e o search-2 continua a falhar",
-        "titleFixed": "A pesquisa estava lenta enquanto o search-2 continuava a falhar",
-        "summary": "Cerca de 1 em cada 5 pesquisas leva mais de 3 segundos, desde as 10:27. Uma definição alterada no search-2 às 10:16 faz com que fique sem memória. Acionei o piquete, e isto continua a acontecer.",
-        "notify1": "A pesquisa está lenta: cerca de 1 em cada 5 pesquisas leva mais de 3 segundos, desde as 10:27.",
-        "notify2": "Causa: uma definição alterada no search-2 às 10:16 esgota a sua memória. Falhou cerca de 10 vezes desde as 10:20. Os outros 4 nós não têm a alteração e estão bem.",
-        "notify3": "Restaurar a definição antiga deve corrigir isto, e eu posso desfazer a alteração. Responda \"revert\" e eu faço-o. Quem fez a alteração deve verificar o motivo.",
-        "summaryFixed": "Começou às 10:27, porque uma definição alterada no search-2 esgotou a sua memória. Aprovou a restauração da definição antiga, por isso fi-lo, e as pesquisas voltaram ao normal.",
-        "summaryFixing": "Começou às 10:27, porque uma definição alterada no search-2 esgota a sua memória. Aprovou a restauração da definição antiga, por isso estou a fazê-lo agora.",
-        "chartCaption": "latência p95 · pico de 3,4 s",
-        "chartLabel": "A latência p95 subiu de 0,38 s para 3,4 s às 10:27 e continua alta",
-        "chartLabelFixed": "A latência p95 subiu de 0,38 s para 3,4 s às 10:27 e voltou ao normal assim que a definição foi restaurada"
-      },
-      "checkout": {
-        "title": "1 em cada 12 pagamentos falhou após um deploy",
-        "summary": "O payments-api 2.3.1 pediu à base de dados de pagamentos mais ligações do que esta permite. O rollback corrigiu o problema 18 minutos após o início das falhas.",
-        "notify1": "O checkout está a falhar em cerca de 1 em cada 12 pagamentos, desde as 14:02.",
-        "notify2": "Causa provável: o payments-api 2.3.1 foi lançado às 14:01 e aumentou o seu pool de ligações de 20 para 50 por servidor. 6 servidores × 50 é mais do que os 200 que a base de dados de pagamentos permite.",
-        "notify3": "Reverter para 2.3.0 é a correção mais rápida.",
-        "chartCaption": "pagamentos com falha · pico de 1 em 12",
-        "chartLabel": "Os pagamentos com falha saltaram de 0,1% para 1 em 12 às 14:02 e voltaram ao normal 18 minutos depois, após o rollback"
-      },
-      "pool": {
-        "title": "O checkout ficou sem ligações de base de dados",
-        "summary": "As ligações com fuga consumiram todas as livres, e os pagamentos começaram a expirar. Aprovou a sua limpeza, por isso fi-lo. Os pagamentos recuperaram 2 minutos depois.",
-        "notify1": "O checkout ficou sem ligações de base de dados, e cerca de 1 em 9 pagamentos está a expirar, desde as 11:18.",
-        "notify2": "Causa: 48 de 50 ligações estão retidas por exportações de reembolso que nunca as devolveram. É a fuga CHK-482, terceira vez em duas semanas.",
-        "notify3": "Fechar apenas as ligações com fuga deve resolver; os pagamentos em curso não são afetados. Responda \"sim\" e eu faço-o.",
-        "chartCaption": "timeouts · pico de 1 em 9",
-        "chartLabel": "Os timeouts de pagamento subiram para cerca de 1 em 9 às 11:18 e recuperaram 2 minutos após a correção, às 11:21"
-      },
-      "email": {
-        "title": "Os e-mails de pedido atrasaram até 9 minutos",
-        "summary": "Todos os workers de e-mail foram substituídos de uma vez durante a noite, e a fila recuperou sozinha em cerca de 20 minutos. Foi algo menor, por isso entrou no resumo de sexta-feira.",
-        "chartCaption": "atraso de e-mail · pico de 9 min",
-        "chartLabel": "O atraso de e-mail subiu para 9 minutos a partir das 03:15 e recuperou sozinho até às 03:36"
-      },
-      "recs": {
-        "title": "As recomendações ficaram mais lentas durante 15 minutos",
-        "summary": "Passaram de um quarto de segundo para quase um segundo. A reconstrução noturna do cache tinha sido iniciada manualmente durante a tarde e terminou sozinha. Retive-o para o resumo de sexta-feira.",
-        "chartCaption": "latência p95 · pico de 0,94 s",
-        "chartLabel": "A latência p95 subiu de 0,26 s para 0,94 s às 16:40 e recuperou sozinha 15 minutos depois"
-      },
-      "login": {
-        "title": "O início de sessão esteve lento durante cerca de 25 minutos",
-        "summary": "1 em 8 pessoas esperou mais de 5 segundos. O cache de sessão ficou sem espaço após um pico de tráfego e terminou a sessão de algumas pessoas. A sua equipa adicionou espaço e recuperou.",
-        "notify1": "O início de sessão está lento: cerca de 1 em 8 pessoas espera mais de 5 segundos, desde as 10:12.",
-        "notify2": "Causa: o cache de sessão está cheio depois de o tráfego duplicar às 10:05.",
-        "notify3": "Adicionar espaço ao cache deve resolver.",
-        "chartCaption": "início de sessão p95 · pico de 5,8 s",
-        "chartLabel": "O tempo de início de sessão p95 subiu de 0,6 s para 5,8 s às 10:12 e recuperou após a adição de espaço no cache às 10:31"
-      },
-      "queue": {
-        "title": "Pedidos acumulados na fila",
-        "summary": "Cerca de 4.000 estavam à espera no pior momento. Adicionei workers como permitiu, mas não ajudou, por isso reverti-os e acionei o piquete. A causa real era um índice de base de dados que uma migração deixou danificado; a sua equipa corrigiu-o 40 minutos após o início.",
-        "notify1": "Os pedidos estão a acumular-se: cerca de 4.000 à espera, desde as 21:30.",
-        "notify2": "Adicionei workers às 21:33, como permitiu, mas não ajudou, por isso reverti-os.",
-        "notify3": "As consultas de pedidos estão cerca de 40 vezes mais lentas desde a migração da base de dados às 21:20. Verifique primeiro o índice orders_by_status.",
-        "chartCaption": "acumulação · pico de 4.120",
-        "chartLabel": "Os pedidos em espera subiram para 4.120 a partir das 21:30, continuaram a subir após a adição de workers e escoaram quando o índice foi reconstruído às 21:52"
-      },
-      "uploads": {
-        "title": "Os carregamentos de imagens falharam para 1 em 40 pessoas",
-        "summary": "Durou 10 minutos, porque um certificado expirou antes de um servidor ter carregado o seu substituto. Resolveu-se sozinho, por isso retive-o para o resumo de sexta-feira.",
-        "chartCaption": "carregamentos com falha · pico de 1 em 40",
-        "chartLabel": "Os carregamentos com falha subiram para cerca de 1 em 40 às 07:05 e recuperaram sozinhos 10 minutos depois"
-      },
-      "push": {
-        "title": "As notificações push chegaram com 2 minutos de atraso",
-        "summary": "Durou meia hora, enquanto o fornecedor que as entrega estava lento. Menor, por isso aguardou o resumo de sexta-feira.",
-        "chartCaption": "atraso na entrega · pico de 2 min",
-        "chartLabel": "O atraso na entrega subiu de 4 s para cerca de 2 minutos às 13:50 e recuperou sozinho 30 minutos depois"
-      },
-      "checkoutNow": {
-        "title": "O checkout está a falhar 1 em 6 pagamentos",
-        "titleFixed": "O checkout falhou 1 em 6 pagamentos",
-        "summary": "Começou às 10:43, e ainda estou a investigar o porquê. Até agora, coincide com o lançamento da versão 2.4.0 às 10:41, e acionei o piquete.",
-        "notify1": "O checkout está a falhar cerca de 1 em 6 pagamentos, desde as 10:43.",
-        "notify2": "Ainda estou a investigar o porquê. Até agora, coincide com o lançamento do checkout 2.4.0 às 10:41.",
-        "notify3": "Apenas os servidores na 2.4.0 estão a falhar. Responda \"stop\" e eu envio o tráfego de volta para a versão antiga; os servidores antigos têm capacidade para isso. Não consigo ver o payments-db diretamente, por isso não o descartei.",
-        "summaryFixing": "Começou às 10:43, logo após o lançamento da versão 2.4.0. Aprovou a interrupção do rollout, por isso estou a enviar o tráfego de volta para a versão antiga agora.",
-        "summaryFixed": "Começou às 10:43, após o lançamento da versão 2.4.0. Aprovou a interrupção do rollout, e as falhas pararam quando o tráfego voltou para a versão antiga. Porque é que a 2.4.0 falha ainda cabe à sua equipa descobrir.",
-        "chartCaption": "pagamentos com falha · pico de 1 em 6",
-        "chartLabel": "Os pagamentos com falha saltaram de 0,1% para cerca de 1 em 6 às 10:43 e continuam a falhar",
-        "chartLabelFixed": "Os pagamentos com falha saltaram de 0,1% para cerca de 1 em 6 às 10:43 e voltaram ao normal assim que o rollout foi interrompido"
-      },
-      "gateway": {
-        "title": "A API rejeitou 1 em 30 pedidos",
-        "summary": "Começou após uma alteração de configuração. A sua equipa reverteu a alteração, e tudo voltou ao normal 13 minutos depois de começar.",
-        "notify1": "A API está a rejeitar cerca de 1 em cada 30 pedidos, desde as 15:22.",
-        "notify2": "Causa provável: uma mudança de configuração às 15:20 reduziu a duração dos tokens de início de sessão.",
-        "notify3": "Reverter esta mudança deve resolver o problema.",
-        "chartCaption": "rejeitadas · pico de 1 em 30",
-        "chartLabel": "Os pedidos rejeitados subiram para 1 em 30 às 15:22 e voltaram ao normal quando a mudança de configuração foi revertida às 15:34"
-      },
-      "poolSep": {
-        "title": "O checkout ficou sem ligações de base de dados",
-        "summary": "As ligações com fuga consumiram todas as ligações livres, e os pagamentos começaram a expirar. Rastreei a fuga até às exportações de reembolso, e aprovou a limpeza das ligações com fuga. Os pagamentos recuperaram 2 minutos depois.",
-        "notify1": "O checkout ficou sem ligações de base de dados, e cerca de 1 em cada 9 pagamentos está a expirar, desde as 15:42.",
-        "notify2": "Causa: 47 das 50 ligações estão retidas por exportações de reembolso que nunca as devolveram. Parece uma fuga no código de exportação de reembolsos.",
-        "notify3": "Fechar apenas as ligações com fuga deve resolver; os pagamentos em curso não são afetados. Responda \"sim\" e eu faço-o.",
-        "chartCaption": "expirações · pico de 1 em 9",
-        "chartLabel": "As expirações de pagamento subiram para cerca de 1 em 9 às 15:42 e recuperaram 2 minutos após a correção às 15:45"
-      },
-      "poolOct": {
-        "title": "O checkout ficou sem ligações de base de dados novamente",
-        "summary": "Foi a mesma fuga da exportação de reembolsos (CHK-482). Aprovou a limpeza das ligações com fuga, e os pagamentos recuperaram 2 minutos depois.",
-        "notify1": "O checkout ficou sem ligações de base de dados, e cerca de 1 em cada 9 pagamentos está a expirar, desde as 10:05.",
-        "notify2": "Causa: 46 das 50 ligações estão retidas por exportações de reembolso. É a fuga CHK-482 de novo, a segunda vez em 8 dias.",
-        "notify3": "Fechar apenas as ligações com fuga deve resolver; os pagamentos em curso não são afetados. Responda \"sim\" e eu faço-o.",
-        "chartCaption": "expirações · pico de 1 em 9",
-        "chartLabel": "As expirações de pagamento subiram para cerca de 1 em 9 às 10:05 e recuperaram 2 minutos após a correção às 10:08"
-      },
-      "lagSep": {
-        "title": "Novos produtos levaram até 40 minutos a aparecer na pesquisa",
-        "summary": "O search-indexer ficou para trás nas atualizações de catálogo depois de a versão 1.12.0 ter reduzido o tempo permitido por lote. A sua equipa fez o rollback e o atraso foi recuperado 40 minutos depois de começar.",
-        "notify1": "Produtos novos e alterados estão a faltar na pesquisa: o search-indexer está cerca de 48.000 atualizações de catálogo atrasado, desde as 14:06.",
-        "notify2": "Causa: o search-indexer 1.12.0 foi lançado às 13:58 e reduziu o intervalo de polling do Kafka para 30 s. Lotes grandes levam cerca de 45 s, por isso o consumidor é removido do seu grupo repetidamente.",
-        "notify3": "Fazer o rollback para 1.11.4 deve permitir que recupere o atraso. A pesquisa em si continua a funcionar; apenas mostra produtos mais antigos.",
-        "chartCaption": "atraso do consumidor · pico de 48.000",
-        "chartLabel": "O atraso do consumidor subiu de cerca de 200 para 48.000 mensagens a partir das 14:06 e escoou após o rollback às 14:39"
-      },
-      "poolAug": {
-        "title": "O checkout ficou sem ligações de base de dados durante a exportação de reembolsos",
-        "summary": "A exportação noturna de reembolsos reteve quase todas as ligações de base de dados do checkout, e cerca de 1 em cada 12 pagamentos expirou. Tudo se resolveu quando a exportação terminou, 13 minutos depois de começar.",
-        "notify1": "O checkout ficou sem ligações de base de dados, e cerca de 1 em cada 12 pagamentos está a expirar, desde as 02:04.",
-        "notify2": "Causa: 44 das 50 ligações estão retidas pela exportação noturna de reembolsos, que está cerca de 3 vezes maior que o normal após a liquidação de fim de mês.",
-        "notify3": "Deve resolver-se quando a exportação terminar. Caso contrário, parar a exportação vai libertar as ligações.",
-        "chartCaption": "expirações · pico de 1 em 12",
-        "chartLabel": "As expirações de pagamento subiram para cerca de 1 em 12 às 02:04 e recuperaram sozinhas quando a exportação terminou às 02:17"
-      },
-      "throttleAug": {
-        "title": "As verificações de fraude ficaram lentas durante 35 minutos",
-        "summary": "Um job em lote caiu nos mesmos servidores e consumiu a CPU livre deles, por isso as verificações de fraude levaram até 1,4 segundos. O checkout continuou a funcionar, apenas mais lento, e recuperou quando o job terminou, por isso deixei isto para o resumo de sexta-feira.",
-        "chartCaption": "verificação de fraude p95 · pico de 1,4 s",
-        "chartLabel": "O tempo de verificação de fraude p95 subiu de 0,18 s para 1,4 s às 11:20 e recuperou sozinho quando o job em lote terminou às 11:55"
-      },
-      "tlsJul": {
-        "title": "As faturas deixaram de ser enviadas durante 43 minutos",
-        "summary": "O certificado do invoice-service para o billing-api expirou, por isso o envio de todas as faturas falhou. A sua equipa renovou-o, e as faturas na fila foram todas enviadas.",
-        "notify1": "Nenhuma fatura está a ser enviada: todos os envios do invoice-service estão a falhar, desde as 09:01.",
-        "notify2": "Causa: o certificado de cliente do invoice-service para o billing-api expirou às 09:00, e o billing-api rejeita todas as ligações dele.",
-        "notify3": "Renovar o certificado deve resolver. As faturas estão na fila, não foram perdidas.",
-        "chartCaption": "envios com falha · todos",
-        "chartLabel": "Os envios de faturas com falha saltaram de 0,2% para 100% às 09:01 e voltaram ao normal depois de o certificado ser renovado às 09:41"
-      },
-      "dnsJul": {
-        "title": "Os preços do carrinho desapareceram para 1 em cada 4 pessoas",
-        "summary": "Uma alteração de DNS fez com que metade dos servidores DNS do cluster deixasse de responder a nomes internos, por isso o carrinho não conseguia aceder ao currency. A sua equipa reverteu-a 31 minutos depois de começar.",
-        "notify1": "Cerca de 1 em cada 4 carregamentos do carrinho não mostra preços, desde as 16:22.",
-        "notify2": "Causa: uma mudança de configuração de DNS às 16:20 removeu a zona interna de 2 dos 4 servidores DNS do cluster, por isso o carrinho não encontra currency.internal nessas consultas.",
-        "notify3": "Reverter a mudança de DNS deve resolver. Os pedidos ainda são concluídos no checkout.",
-        "chartCaption": "preços ausentes · 1 em 4 no pico",
-        "chartLabel": "Carregamentos de carrinho sem preços subiram de 0,1% para cerca de 1 em 4 às 16:22 e voltaram ao normal quando a alteração de DNS foi revertida às 16:51"
-      }
-    },
-    "drawer": {
-      "worked": "Funcionou",
-      "didntHelp": "Não ajudou",
-      "now": "Agora"
-    },
     "needs": {
-      "more": "Mais",
-      "less": "Menos",
-      "canUndo": "Pode desfazer",
-      "undo": "Desfazer",
-      "undone": "Desfeito. Isto está a aguardar a sua resposta novamente.",
-      "shiftTo": "para",
-      "retune": {
-        "body": "O alerta \"{alert}\" em {host} disparou {fired} vezes este mês, e ninguém precisou de agir. O disco sobe para cerca de 85% durante a limpeza noturna e volta a cerca de 70% pela manhã. Mesmo no seu dia mais movimentado, levaria mais de 3 dias a encher a partir de 90%. Gostaria de aumentá-lo para {to}%. Continuarei a avisá-lo se o disco estiver em vias de encher dentro de um dia.",
-        "yes": "Sim, altere",
-        "no": "Deixe como está",
-        "doneYes": "Feito. Aumentei para {to}%. O aviso de disco cheio continua ativo.",
-        "doneNo": "Certo, vou deixá-lo em {from}%.",
-        "headline": "Aumentar o alerta 'disco 80%' no ingest-3 para 90%?",
-        "why": "Disparou 41 vezes este mês e ninguém precisou de agir.",
-        "cost": "O aviso de disco cheio continua ativo"
-      },
-      "fixNow": {
-        "search": {
-          "body": "A pesquisa está lenta porque uma definição alterada no nó search-2 às 10:16 consome toda a sua memória, por isso continua a falhar. Os outros 4 nós ainda têm a definição antiga e estão bem. Posso revertê-la? Posso desfazer isto.",
-          "yes": "Reverter",
-          "no": "Eu trato disso",
-          "doneYes": "Feito. A reverter agora.",
-          "doneNo": "Certo, é consigo. Vou continuar a observar.",
-          "doneSettled": "Feito. O search-2 voltou e as pesquisas estão normais.",
-          "headline": "Reverter a definição de cache do search-2 para 10%?",
-          "why": "Uma alteração às 10:16 consome toda a sua memória, por isso continua a falhar.",
-          "cost": "Um reinício do search-2"
-        },
-        "checkoutNow": {
-          "body": "O checkout está a falhar em cerca de 1 em cada 6 pagamentos, e apenas os servidores na 2.4.0 estão a falhar. Os 6 servidores na versão antiga têm capacidade para todo o tráfego. Posso interromper o rollout e enviar o tráfego de volta para eles? A 2.4.0 permanece implementada para a sua equipa analisar.",
-          "yes": "Parar o rollout",
-          "no": "Eu trato disso",
-          "doneYes": "Feito. A parar o rollout agora.",
-          "doneNo": "Certo, é consigo. Vou continuar a observar.",
-          "doneSettled": "Feito. Os pagamentos voltaram ao normal.",
-          "headline": "Parar o rollout da 2.4.0 do checkout?",
-          "why": "Cerca de 1 em 6 pagamentos falha, todos na 2.4.0. A versão antiga pode absorver todo o tráfego.",
-          "cost": "A 2.4.0 permanece implementada"
-        }
-      },
-      "fromNowOn": {
-        "body": "Já são {done} vezes: uma nova versão fez apenas os seus próprios servidores falharem enquanto estava em rollout. De cada vez pedi para enviar o tráfego de volta à versão antiga, e as falhas pararam no espaço de 2 minutos. Posso fazer isto por conta própria durante um rollout a partir de agora? Vou deixar a nova versão no lugar para a sua equipa e avisá-la imediatamente.",
-        "yes": "Sim, por conta própria",
-        "no": "Continue a perguntar-me",
-        "doneYes": "Feito. Vou parar rollouts problemáticos por conta própria e avisá-lo de cada vez.",
-        "doneNo": "Certo, vou continuar a perguntar-lhe primeiro.",
-        "headline": "Parar rollouts problemáticos por conta própria a partir de agora?",
-        "why": "Nas 6 vezes em que disse sim, as falhas pararam no espaço de 2 minutos.",
-        "cost": "Apenas durante um rollout"
-      },
-      "labels": {
-        "fixNow": "Corrigir agora",
-        "fromNowOn": "Deixe-me tratar disto",
-        "retune": "Alerta mais silencioso"
-      },
-      "needsOk": "Precisa da sua aprovação"
+      "shiftTo": "para"
     },
     "footer": {
-      "text": "Eu também me verifico: se eu parar de funcionar, ficará a saber.",
       "seeAll": "Veja tudo o que eu monitorizo",
       "seeChanges": "Veja tudo o que eu alterei"
     },
     "coverageDrawer": {
-      "ago": {
-        "minutes": "há 1 minuto | há {count} minutos",
-        "stale": "Sem novos dados há 1 minuto (desde {since}) | Sem novos dados há {count} minutos (desde {since})"
-      },
-      "summaryWatching": "Estou a monitorizar {watched} dos seus {total} serviços.",
-      "summaryAll": "Estou a monitorizar todos os seus {total} serviços.",
-      "summaryWithClauses": "{head} {clauses}.",
-      "clauseLearning": "{count} ainda está a aprender | {count} ainda estão a aprender",
-      "clauseUnseen": "há um que não consigo ver | há {count} que não consigo ver",
       "legend": {
-        "watching": "Totalmente monitorizado",
-        "learning": "A aprender",
-        "unseen": "Não consigo ver"
-      },
-      "legendAria": "{label}: {count}",
-      "summaryAllLearning": "Estou a monitorizar todos os seus {total} serviços e ainda estou a aprender como é o normal de cada um deles."
+        "learning": "A aprender"
+      }
     },
     "coveragePage": {
-      "title": "Tudo o que eu monitorizo",
-      "back": "Voltar"
+      "title": "Tudo o que eu monitorizo"
     },
     "issuesPage": {
       "title": "Todos os problemas",
       "sentence": "Cada problema que eu abri {within}. Escolha um para ver o que aconteceu e o que fiz em relação a isso.",
-      "back": "Voltar",
       "ranges": {
         "week": "Últimos 7 dias",
         "month": "Últimos 30 dias",
@@ -30315,25 +29798,13 @@
     "activityPage": {
       "title": "O que eu alterei",
       "stats": {
-        "window": "Últimos 7 dias",
         "made": "Alteração | Alterações",
-        "worked": "Funcionou",
-        "review": "Em revisão",
         "undone": "Desfeito"
       },
       "filters": {
-        "all": "Todos",
-        "fixes": "Correções",
-        "watching": "A monitorizar",
-        "tuning": "Ajuste de alertas"
+        "all": "Todos"
       },
       "status": {
-        "applying": "A aplicar agora",
-        "worked": "Funcionou",
-        "done": "Concluído",
-        "review": "Em revisão",
-        "reviewDays": "Em revisão · {count} dia restante | Em revisão · {count} dias restantes",
-        "didntHelp": "Não ajudou",
         "undone": "Desfeito"
       },
       "actions": {
@@ -30343,246 +29814,18 @@
       },
       "details": {
         "name": "Alteração",
-        "target": "Em",
-        "confidence": "Confiança",
-        "saw": "O que eu vi",
-        "recurring": "Esta correção continua a ser necessária para a mesma fuga ({bug}), por isso vou perguntar sempre antes até que seja corrigida.",
-        "undoDecided": "Desfazer reverte isto, e vou perguntar de novo."
-      },
-      "toast": {
-        "undone": "Desfeito. Voltou ao que era antes.",
-        "undoDecided": "Desfeito. Vou perguntar de novo."
+        "target": "Em"
       },
       "empty": {
-        "filter": "Nada aqui no momento.",
-        "scenario": "Ainda não alterei nada. Quando fizer uma alteração, poderá vê-la aqui."
-      },
-      "entries": {
-        "L-313": {
-          "done": "Interrompi o rollout da 2.4.0 do checkout",
-          "why": "Apenas os 6 servidores na 2.4.0 estão a falhar; os 6 na versão antiga podem assumir todo o tráfego.",
-          "from": "6 de 12 pods",
-          "to": "sem tráfego",
-          "on": "checkout 2.4.0"
-        },
-        "L-308": {
-          "done": "Restaurei a definição de cache do search-2 para 10%",
-          "why": "Subiu para 60% às 10:16, e o search-2 tem ficado sem memória desde então.",
-          "from": "60%",
-          "to": "10%",
-          "on": "tamanho do cache · search-2"
-        },
-        "L-309": {
-          "done": "Aumentei o alerta 'disco 80%' no ingest-3 para 90%",
-          "why": "Disparou 41 vezes este mês e ninguém precisou de agir. O aviso de preenchimento continua ativo.",
-          "from": "80%",
-          "to": "90%",
-          "on": "alerta de disco · ingest-3"
-        },
-        "L-310": {
-          "done": "Comecei a monitorizar returns, exchanges e gift-cards",
-          "why": "Encontrei-os esta manhã. A aprender o que é normal para eles ao longo de 7 dias.",
-          "from": "não monitorizado",
-          "to": "monitorizado",
-          "on": "3 serviços"
-        },
-        "L-314": {
-          "done": "Comecei a monitorizar 6 serviços que encontrei esta manhã",
-          "why": "Apareceram nos seus traces hoje. A aprender o que é normal para eles ao longo de 7 dias.",
-          "from": "não monitorizado",
-          "to": "monitorizado",
-          "on": "6 serviços"
-        },
-        "L-311": {
-          "done": "Recebi o seu OK para interromper rollouts problemáticos por conta própria",
-          "why": "Interrompi 6 com a sua aprovação em 60 dias; os erros voltaram ao normal no espaço de 2 minutos de cada vez.",
-          "from": "perguntar antes",
-          "to": "por conta própria",
-          "on": "interromper rollouts"
-        },
-        "L-304": {
-          "done": "Limpei as 48 ligações de base de dados com fuga do checkout",
-          "why": "Os pagamentos estavam a expirar. Voltaram ao normal 2 minutos depois.",
-          "from": "50 de 50 em uso",
-          "to": "2 em uso",
-          "on": "pool do checkout"
-        },
-        "L-299": {
-          "done": "Limpei as 46 ligações de base de dados com fuga do checkout",
-          "why": "A mesma fuga de 23 de setembro. Os pagamentos voltaram ao normal 2 minutos depois.",
-          "from": "50 de 50 em uso",
-          "to": "4 em uso",
-          "on": "pool do checkout"
-        },
-        "L-296": {
-          "done": "Limpei as 47 ligações de base de dados com fuga do checkout",
-          "why": "Uma nova fuga, por isso registei-a depois junto da equipa do checkout como CHK-482.",
-          "from": "50 de 50 em uso",
-          "to": "3 em uso",
-          "on": "pool do checkout"
-        },
-        "L-301": {
-          "done": "Comecei a monitorizar billing-api, billing-worker e invoice-service",
-          "why": "Encontrei-os nos seus traces. Ainda estou a aprender o que é normal para eles.",
-          "from": "não monitorizado",
-          "to": "monitorizado",
-          "on": "3 serviços"
-        },
-        "L-307": {
-          "done": "Corrigi o alerta de ligação do payments-api para contar todos os servidores",
-          "why": "Verificava cada servidor individualmente, por isso nunca disparou durante a indisponibilidade de terça-feira.",
-          "from": "cada pod acima de 95%",
-          "to": "todos os pods acima de 85%",
-          "on": "alerta de ligação"
-        },
-        "L-302": {
-          "done": "Ativou a supressão de repetições nos 3 alertas de latência de checkout",
-          "why": "Notificavam a cada avaliação enquanto permaneciam disparados, por isso uma única lentidão acionou-o 120 vezes.",
-          "from": "Em cada avaliação",
-          "to": "Uma vez por alteração",
-          "on": "latência do checkout"
-        },
-        "L-303": {
-          "done": "Aumentei o alerta 'disco 80%' do ingest-1 para 90%",
-          "why": "Disparou 29 vezes em 30 dias e ninguém precisou de agir. O aviso de preenchimento continua ativo.",
-          "from": "80%",
-          "to": "90%",
-          "on": "alerta de disco · ingest-1"
-        },
-        "L-305": {
-          "done": "Adicionei 4 workers do orders-consumer para limpar um backlog",
-          "why": "Não ajudou, por isso reduzi para 4 e acionei o piquete 3 minutos depois.",
-          "from": "4 workers",
-          "to": "8 workers",
-          "on": "orders-consumer"
-        },
-        "L-306": {
-          "done": "Recebi o seu OK para adicionar workers de fila por conta própria",
-          "why": "Aprovou 7 vezes durante picos de tráfego, e o backlog foi limpo todas as vezes.",
-          "from": "pedir primeiro",
-          "to": "por conta própria",
-          "on": "adicionar workers de fila"
-        },
-        "L-312": {
-          "done": "Comecei a monitorizar os 18 serviços que encontrei quando se ligou",
-          "why": "A aprender o que é normal para cada um. Os alertas deles começam quando isso estiver pronto.",
-          "from": "não monitorizado",
-          "to": "monitorizado",
-          "on": "18 serviços"
-        }
+        "filter": "Nada aqui no momento."
       }
     },
     "historyDrawer": {
-      "title": "Histórico",
-      "seeChange": "Ver a mudança",
-      "filters": {
-        "all": "Todos",
-        "problems": "Problemas",
-        "changes": "Mudanças",
-        "fixes": "Correções",
-        "decisions": "As suas decisões"
-      },
-      "empty": "Ainda não há nada aqui.",
-      "entries": {
-        "checkoutNowPaged": "Acionei o piquete porque o checkout estava a falhar nos pagamentos.",
-        "searchPaged": "Acionei o piquete porque a pesquisa estava lenta.",
-        "searchAsked": "Perguntei se poderia restaurar a definição de cache do search-2.",
-        "euStopped": "Nada chegou do cluster {cluster} desde esta hora. Avisei-o aqui e no Slack.",
-        "fridaySummary": "Enviei o resumo de sexta-feira com {count} problema menor. | Enviei o resumo de sexta-feira com {count} problemas menores.",
-        "emailHeld": "Retive um problema menor com e-mails de pedidos para o resumo de sexta-feira.",
-        "poolFixed": "Fechei as ligações de base de dados com fuga do checkout. Os pagamentos recuperaram 2 minutos depois.",
-        "poolApproved": "Aprovou fechar as ligações de base de dados com fuga do checkout.",
-        "billingWatch": "Comecei a monitorizar billing-api, billing-worker e invoice-service.",
-        "checkoutPaged": "Acionei o piquete porque o checkout estava a falhar nos pagamentos.",
-        "recsHeld": "Retive um problema menor com recommendations para o resumo de sexta-feira.",
-        "diskApproved": "Aprovou aumentar o alerta de disco em ingest-1 para {to}%.",
-        "latencyGrouped": "Ativei a supressão de repetições nos três alertas de lentidão do checkout, para que uma única lentidão acione apenas uma vez.",
-        "queueFixed": "Adicionei workers à fila do orders, mas a fila continuou a crescer, por isso reverti-os e acionei o piquete.",
-        "loginPaged": "Acionei o piquete devido ao início de sessão lento.",
-        "queuePermission": "Permitiu-me adicionar workers de fila por conta própria, até 8.",
-        "gatewayPaged": "Acionei o piquete porque a API estava a rejeitar pedidos.",
-        "found18": "Encontrei {count} serviços e comecei a aprender como é o normal deles.",
-        "connected": "Ligou-me aos seus dados.",
-        "thresholdApproved": "Aprovou fazer o alerta de ligações do payments-api contar todos os servidores em relação ao limite de 200 da base de dados.",
-        "decision": {
-          "fixNow": {
-            "search": {
-              "yes": "Aprovou reverter a definição do search-2.",
-              "no": "Disse que trataria do search-2 por conta própria.",
-              "undoYes": "Desfez a reversão da definição do search-2. Reapliquei 60%, por isso o search-2 vai voltar a ficar sem memória; avisei o piquete.",
-              "cancel": "Cancelou a reversão da definição do search-2 antes de eu a aplicar. O search-2 continua a ficar sem memória; avisei o piquete.",
-              "undoNo": "Voltou atrás quanto a tratar do search-2 por conta própria."
-            },
-            "checkoutNow": {
-              "yes": "Aprovou interromper o rollout do checkout 2.4.0.",
-              "no": "Disse que trataria do rollout do checkout por conta própria.",
-              "undoYes": "Desfez a interrupção do rollout da 2.4.0. O tráfego está a ir novamente para a 2.4.0, por isso os pagamentos podem voltar a falhar; avisei o piquete e estou a monitorizar.",
-              "cancel": "Cancelou a interrupção do rollout da 2.4.0 antes de eu a fazer. Os pagamentos ainda estão a falhar; avisei o piquete.",
-              "undoNo": "Voltou atrás quanto a tratar do rollout do checkout por conta própria."
-            }
-          },
-          "retune": {
-            "yes": "Aprovou aumentar o alerta de disco em ingest-3 para 90%.",
-            "no": "Disse que não era o momento de aumentar o alerta de disco em ingest-3.",
-            "undoYes": "Desfez o aumento do alerta de disco em ingest-3. Voltou para 80%, por isso vai voltar a disparar em noites saudáveis.",
-            "undoNo": "Voltou atrás no seu 'não agora' sobre o alerta de disco em ingest-3."
-          },
-          "fromNowOn": {
-            "yes": "Aprovou deixar-me interromper rollouts problemáticos por conta própria.",
-            "no": "Disse que não era o momento de me deixar interromper rollouts problemáticos por conta própria.",
-            "undoYes": "Voltou atrás quanto a deixar-me interromper rollouts problemáticos por conta própria.",
-            "undoNo": "Voltou atrás no seu 'não agora' sobre deixar-me interromper rollouts problemáticos por conta própria."
-          }
-        },
-        "fixedNow": {
-          "search": "Reverti a definição do search-2. As pesquisas voltaram ao normal.",
-          "checkoutNow": "Devolvi o tráfego à versão antiga, e as falhas pararam. Descobrir porque é que a 2.4.0 falha ainda é tarefa da sua equipa; mantive-a implementada para ela."
-        },
-        "checkoutNowAsked": "Perguntei se posso interromper o rollout do checkout 2.4.0.",
-        "newWatch": "Encontrei {count} novos serviços esta manhã (returns, exchanges e gift-cards) e comecei a monitorizá-los imediatamente.",
-        "foundWatch": "Encontrei {count} novos serviços esta manhã e comecei a monitorizá-los imediatamente."
-      }
+      "title": "Histórico"
     },
     "settingsDrawer": {
       "title": "Definições",
-      "reach": "Onde devo entrar em contacto consigo?",
-      "destSlack": "Slack: {channel}",
-      "destEmail": "E-mail: {address}",
-      "autonomy": "Quanto devo fazer por conta própria?",
-      "tell": "Apenas me diga",
-      "ask": "Pergunte-me primeiro",
-      "fix": "Corrija e depois avise-me",
-      "tellHint": "Vou dizer-lhe o que faria e deixo a execução consigo.",
-      "askHint": "Vou perguntar antes de cada correção e fazer quando disser sim.",
-      "fixHint": "Para tipos de correção com histórico comprovado, vou em frente dentro dos limites que definiu e aviso-o logo a seguir.",
-      "advanced": "Avançado",
-      "perKind": "Cada tipo de correção",
-      "digestDay": "Dia do resumo",
-      "excluded": "Serviços que devo ignorar",
-      "excludedNone": "Nenhum",
-      "kinds": {
-        "pool": "Fechar ligações de base de dados com fuga",
-        "queueWorker": "Adicionar workers de fila durante uma acumulação",
-        "retune": "Aumentar o limite de um alerta ruidoso",
-        "rollback": "Reverter uma implementação",
-        "record": "Feito {done} vezes, funcionou {worked} vezes.",
-        "keptRecord": "Feito {done} vezes, mantido {worked} vezes.",
-        "noRecord": "Ainda nunca foi feito, por isso não o farei por conta própria até ter um histórico.",
-        "revertConfig": "Desfazer uma alteração recente de definição",
-        "abortRollout": "Interromper um rollout problemático",
-        "recurringRecord": "Feito {done} vezes, todas pela mesma fuga ({bug}). Continuarei a perguntar até que seja corrigida."
-      },
-      "weekdays": {
-        "monday": "Segunda-feira",
-        "tuesday": "Terça-feira",
-        "wednesday": "Quarta-feira",
-        "thursday": "Quinta-feira",
-        "friday": "Sexta-feira"
-      },
-      "saved": "Guardado",
-      "noDestination": "Não conseguirei falar com ninguém.",
-      "routing": "Quando o aciono",
-      "routingNote": "Eu aciono por qualquer coisa que prejudique os clientes. Coisas menores geram uma mensagem que não acorda ninguém, e as menores ainda vão para o resumo de sexta-feira."
+      "reach": "Onde devo entrar em contacto consigo?"
     },
     "howItWorks": {
       "title": "Como funciona",
@@ -30599,10 +29842,6 @@
       "s5Title": "Corrijo o que permitiu",
       "s5": "Só corrijo coisas que disse que eu posso. Uma correção que funciona rende um pouco de confiança, e uma que não ajuda conta contra mim. Se eu continuar a precisar da mesma correção, isso é um bug que eu reporto à sua equipa, não um hábito que automatizo."
     },
-    "topbar": {
-      "brand": "AutoObserve",
-      "checked": "Verificado há 1 minuto | Verificado há {count} minutos"
-    },
     "outcome": {
       "active": "A acontecer agora",
       "fixed": "Corrigido pelo AutoObserve",
@@ -30618,9 +29857,6 @@
       "standardTooltip": "A vista Padrão dá a leitura resumida: o que precisa de si e o que aconteceu nos últimos 7 dias",
       "nerdTooltip": "A vista Nerd mostra todos os detetores, loops e definições por completo",
       "label": "Vista"
-    },
-    "rail": {
-      "more": "Mais abaixo"
     },
     "suggestions": {
       "title": "Sugestões",

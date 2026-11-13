@@ -18,6 +18,7 @@ import config from "@/aws-exports";
 import { raw } from "@/types/i18n";
 import type { AlertPrefill } from "@/ts/interfaces/alertPrefill";
 import commonService from "@/services/common";
+import autoobserveFolders from "@/services/autoobserveFolders";
 import { baselineSql, errorFieldOf } from "@/utils/alerts/prefill/fromAutoObserve";
 import { measureBaseline, type BaselineRequest } from "../targets/baseline";
 import { draftThreshold, measuredThreshold, usableThreshold } from "../targets/thresholds";
@@ -151,7 +152,7 @@ export interface ReviewGroup {
   usesDefault: boolean;
 }
 
-/** Folder write rights per folder id, or null while the server does not serve them. */
+/** Folder write rights per folder id, or null when the server did not answer them. */
 export type FolderRights = Record<string, boolean> | null;
 type RightsSource = (org: string) => Promise<FolderRights>;
 
@@ -179,7 +180,14 @@ const state = reactive({
   opener: null as HTMLElement | null,
 });
 
-let rightsSource: RightsSource = async () => null;
+// An older server has no such route: the rights stay unknown and the create itself refuses.
+const servedRights: RightsSource = (org) =>
+  autoobserveFolders.writable(org).then(
+    (res) => res.data?.folders ?? null,
+    () => null,
+  );
+
+let rightsSource: RightsSource = servedRights;
 // Each context load supersedes the previous one, whose late answers are then dropped.
 let contextLoad = 0;
 let measuring: AbortController | null = null;
@@ -833,9 +841,9 @@ const applySchemas = ({ schemas, types }: { schemas: StreamSchemas; types: Strea
   }
 };
 
-/** Where folder write rights come from; nothing serves them yet, so the default answers null. */
+/** Where folder write rights come from; null goes back to the server's answer. */
 export const setFolderRightsSource = (source: RightsSource | null): void => {
-  rightsSource = source ?? (async () => null);
+  rightsSource = source ?? servedRights;
 };
 
 export const setGroupBy = (by: GroupBy): void => {
