@@ -322,17 +322,14 @@ impl StreamStatsPort for StreamStatsAdapter {
     }
 
     async fn history(&self, org: &str) -> anyhow::Result<Vec<StreamHistory>> {
-        let default_days = config::get_config().compact.data_retention_days;
         let mut out = Vec::new();
         for s in self.streams(org).await? {
             let stream_type = stream_type_of(&s.stream_type)?;
             let stats = infra::cache::stats::get_stream_stats(org, &s.name, stream_type);
             let settings = infra::schema::get_settings(org, &s.name, stream_type).await;
-            let days = settings
-                .as_ref()
-                .map(|x| x.data_retention)
-                .filter(|d| *d > 0)
-                .unwrap_or(default_days);
+            let own = settings.as_ref().map_or(0, |x| x.data_retention);
+            let days =
+                db::organization::stream_retention_days(org, stream_type, &s.name, own).await?;
             out.push(StreamHistory {
                 doc_time_min: (stats.doc_time_min > 0).then_some(stats.doc_time_min),
                 retention_days: (days > 0).then_some(days),
@@ -857,6 +854,41 @@ mod tests {
             "every org from one visit per key"
         );
         assert_eq!(index.len(), 3);
+    }
+
+    /// A stream with no retention of its own keeps data as long as its org's default says.
+    #[tokio::test]
+    async fn a_streams_history_ends_at_the_retention_its_org_resolves() {
+        infra::db_init().await.unwrap();
+        let org = format!("ao_keep_{}", config::utils::time::now_micros());
+        let key = format!("{org}/metrics/cpu");
+        infra::schema::STREAM_SCHEMAS_LATEST
+            .write()
+            .await
+            .insert(key.clone(), SchemaCache::new(Schema::empty()));
+        let setting = common::meta::organization::OrganizationSetting {
+            data_retention: config::meta::stream::DataRetentionDefaults {
+                metrics: 7,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let setting_key = format!("{}/{org}", db::organization::ORG_SETTINGS_KEY_PREFIX);
+        common::infra::config::ORGANIZATION_SETTING
+            .write()
+            .await
+            .insert(setting_key.clone(), setting);
+        let history = StreamStatsAdapter::default().history(&org).await.unwrap();
+        infra::schema::STREAM_SCHEMAS_LATEST
+            .write()
+            .await
+            .remove(&key);
+        common::infra::config::ORGANIZATION_SETTING
+            .write()
+            .await
+            .remove(&setting_key);
+        let days: Vec<Option<i64>> = history.iter().map(|h| h.retention_days).collect();
+        assert_eq!(days, [Some(7)]);
     }
 
     #[test]
