@@ -267,7 +267,7 @@ export class AlertsPage {
             tracesTab: '[data-test="incident-traces-tab"]',
 
             // Incident detail — Service Graph content
-            serviceGraphContainer: '.incident-service-graph',
+            serviceGraphContainer: '[data-test="incident-unfold-graph"], [data-test="incident-unfold-empty"]',
 
             // Telemetry tab state selectors
             loadingSpinner: '[data-test="incident-telemetry-loading-indicator"]',
@@ -2748,6 +2748,7 @@ export class AlertsPage {
         overview:         'incident-overview-tab',
         activity:         'incident-activity-tab',
         incidentAnalysis: 'incident-analysis-tab',
+        report:           'incident-report-tab',
         serviceGraph:     'incident-alert-graph-tab',
         alertTriggers:    'incident-alert-triggers-tab',
         logs:             'incident-logs-tab',
@@ -2757,7 +2758,7 @@ export class AlertsPage {
 
     /**
      * Click a tab on the incident detail page by its data-test attribute.
-     * @param {string} tabName - One of: overview, activity, incidentAnalysis, serviceGraph, alertTriggers, logs, metrics, traces
+     * @param {string} tabName - One of: overview, activity, incidentAnalysis, report, serviceGraph, alertTriggers, logs, metrics, traces
      */
     async clickIncidentDetailTab(tabName) {
         testLogger.info(`Clicking incident detail tab: ${tabName}`);
@@ -2775,8 +2776,8 @@ export class AlertsPage {
     /**
      * Verify the service graph tab content rendered.
      * Tabs are v-if gated (no tab-panel wrapper). The serviceGraph tab
-     * renders IncidentServiceGraph inside an absolute-positioned div.
-     * Checks for the .incident-service-graph container OR the detail page
+     * renders IncidentUnfoldGraph inside an absolute-positioned div.
+     * Checks for the unfold graph or its empty state OR the detail page
      * still being visible (confirming no crash).
      */
     async expectServiceGraphTabContentVisible() {

@@ -16,8 +16,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <aside
+    ref="columnEl"
     data-test="rca-thread-column"
-    class="border-border-default bg-surface-panel flex min-h-0 flex-none flex-col border-t max-lg:h-144 lg:h-full lg:border-s lg:border-t-0"
+    tabindex="-1"
+    class="border-border-default bg-surface-panel flex min-h-0 flex-none flex-col border-t outline-none max-lg:h-144 lg:h-full lg:border-s lg:border-t-0"
     :aria-label="t('alerts.incidents.rcaThread.title')"
   >
     <header
@@ -60,12 +62,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           }}
         </span>
       </div>
-      <p
-        v-if="statsLine"
-        data-test="rca-thread-stats"
-        class="text-text-secondary text-2xs m-0 font-mono"
-      >
-        {{ statsLine }}
+      <p v-if="statsLine" class="text-text-secondary text-2xs m-0 font-mono">
+        <span data-test="rca-thread-stats">{{ statsLine }}</span>
+        <span aria-hidden="true">{{ " · " }}</span>
+        <span data-test="rca-thread-zone">{{ zoneLine }}</span>
       </p>
     </header>
 
@@ -143,29 +143,49 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </span>
               <span v-else class="flex-1" />
               <span class="text-text-secondary text-2xs shrink-0 font-mono">
-                {{ formatRcaClock(thread.started.at) }}
+                {{ clock(thread.started.at) }}
               </span>
             </div>
-            <p
-              v-if="thread.started.prompt"
-              data-test="rca-thread-start-prompt"
-              class="text-text-body text-compact m-0 line-clamp-3 break-words"
-            >
-              {{ thread.started.prompt }}
-            </p>
+            <template v-if="thread.started.prompt">
+              <OButton
+                data-test="rca-thread-start-prompt-toggle"
+                variant="ghost-muted"
+                size="xs"
+                class="self-start"
+                :icon-right="promptOpen ? 'expand-less' : 'expand-more'"
+                :aria-expanded="promptOpen"
+                :aria-controls="promptId"
+                @click="promptOpen = !promptOpen"
+              >
+                {{
+                  promptOpen
+                    ? t("alerts.incidents.rcaLight.hideAgentInput")
+                    : t("alerts.incidents.rcaLight.showAgentInput")
+                }}
+              </OButton>
+              <p
+                v-if="promptOpen"
+                :id="promptId"
+                data-test="rca-thread-start-prompt"
+                class="rounded-default bg-surface-subtle text-text-body m-0 px-2.5 py-2 font-mono text-xs break-words whitespace-pre-wrap"
+              >
+                {{ thread.started.prompt }}
+              </p>
+            </template>
 
             <template v-if="contextSummary">
-              <button
-                type="button"
+              <OButton
                 data-test="rca-thread-context-toggle"
-                class="text-text-body flex cursor-pointer items-center gap-1 self-start border-none bg-transparent p-0 text-xs font-semibold"
+                variant="ghost-neutral"
+                size="xs"
+                class="self-start"
+                :icon-left="contextOpen ? 'expand-less' : 'expand-more'"
                 :aria-expanded="contextOpen"
                 :aria-controls="contextPanelId"
                 @click="contextOpen = !contextOpen"
               >
-                <OIcon :name="contextOpen ? 'expand-less' : 'expand-more'" size="sm" />
                 {{ contextSummary }}
-              </button>
+              </OButton>
               <div
                 v-if="contextOpen"
                 :id="contextPanelId"
@@ -196,6 +216,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :run-waiting="runWaiting"
             :finished="!unfinishedSteps.has(entry.step)"
             :evidence-numbers="evidenceNumbers"
+            :timezone="timezone"
+            :conclusion="entry.step === conclusionStep"
             @open-evidence="$emit('open-evidence', $event)"
           />
 
@@ -219,7 +241,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-if="entry.question.at !== null"
                   class="text-text-secondary text-2xs shrink-0 font-mono"
                 >
-                  {{ formatRcaClock(entry.question.at) }}
+                  {{ clock(entry.question.at) }}
                 </span>
               </div>
               <p class="text-text-body text-compact m-0 break-words whitespace-pre-wrap">
@@ -263,7 +285,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ userLocalPart(entry.item.author_email) }}
               </span>
               <span class="text-text-secondary text-2xs shrink-0 font-mono">
-                {{ formatRcaClock(entry.item.created_at) }}
+                {{ clock(entry.item.created_at) }}
               </span>
               <span
                 class="bg-surface-tint-accent text-accent text-3xs inline-flex size-5 shrink-0 items-center justify-center rounded-full font-bold uppercase"
@@ -419,8 +441,9 @@ import type {
 } from "@/services/incidents";
 import type { RcaReadStatus } from "@/composables/useIncidentRca";
 import type { RcaSteerSendResult } from "@/composables/useRcaSteering";
+import { formatTimestampInTimezone } from "@/utils/date";
+import { timezoneAbbr } from "@/utils/formatters";
 import {
-  formatRcaClock,
   formatRcaDuration,
   isFinishedStep,
   rcaThreadEntries,
@@ -470,6 +493,8 @@ const props = withDefaults(
     sending?: boolean;
     /** Sends one message to the run. */
     send?: ((text: string) => Promise<RcaSteerSendResult>) | null;
+    /** The app's time zone; the header names it once. */
+    timezone?: string;
   }>(),
   {
     canResume: false,
@@ -485,6 +510,7 @@ const props = withDefaults(
     authorEmail: "",
     sending: false,
     send: null,
+    timezone: "UTC",
   },
 );
 
@@ -498,13 +524,44 @@ const emit = defineEmits<{
 const { t } = useI18nTyped();
 
 const scrollArea = ref<HTMLElement | null>(null);
+const columnEl = ref<HTMLElement | null>(null);
+
+/** Moves focus to the thread, as "Open thread" on the Report tab asks. */
+const focusThread = () => {
+  columnEl.value?.focus({ preventScroll: true });
+  columnEl.value?.scrollIntoView?.({ block: "nearest", behavior: "smooth" });
+};
 const contextOpen = ref(false);
 const contextPanelId = useId();
 
+const promptOpen = ref(false);
+const promptId = useId();
+
 watch(
   () => props.thread?.run_id,
-  () => (contextOpen.value = false),
+  () => {
+    contextOpen.value = false;
+    promptOpen.value = false;
+  },
 );
+
+const clock = (us: number | null) =>
+  us === null ? "" : formatTimestampInTimezone(us, "HH:mm:ss", props.timezone);
+const zoneLine = computed(() =>
+  t("alerts.incidents.rcaLight.timesIn", {
+    zone: timezoneAbbr(
+      props.timezone,
+      new Date((props.thread?.started?.at ?? entries.value[0]?.at ?? Date.now() * 1000) / 1000),
+    ),
+  }),
+);
+
+/** A submitted run's last step: its note reads as the conclusion. */
+const conclusionStep = computed<RcaStep | null>(() => {
+  const thread = props.thread;
+  if (!thread || props.runLive || !thread.report_submitted) return null;
+  return thread.steps.at(-1) ?? null;
+});
 
 const emptyMessage = computed<I18nText | null>(() => {
   if (props.noTranscript) return t("alerts.incidents.rcaThread.noTranscript");
@@ -708,5 +765,5 @@ const reanalyzeRefused = () => {
   refusal.value = null;
 };
 
-defineExpose({ scrollToLatest, focusComposer });
+defineExpose({ scrollToLatest, focusComposer, focusThread });
 </script>
