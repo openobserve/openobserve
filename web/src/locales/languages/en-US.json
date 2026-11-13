@@ -2032,7 +2032,6 @@
   "menu": {
     "alertCalibration": "Alert Calibration",
     "autoobserve": "AutoObserve",
-    "llmObservability": "LLM observability",
     "upgradeToProPlan": "Upgrade to PRO Plan",
     "home": "Home",
     "about": "About",
@@ -10482,6 +10481,46 @@
     "resources": "Resources",
     "explore": "Explore",
     "agent": {
+      "capabilities": {
+        "open": "What Can O2 Assistant Do?",
+        "back": "Back",
+        "progressLabel": "Progress",
+        "problem": "Problem: checkout-api started failing after a deploy",
+        "try": "Try It On My Data",
+        "tryPrompt": "Why is checkout-api failing?",
+        "slides": {
+          "investigate": {
+            "title": "Find Out Why It Broke",
+            "text": "Ask in plain words. The Investigator reads your logs, traces and alerts, then tells you the likely cause with proof.",
+            "alt": "The Investigator finding why checkout-api fails"
+          },
+          "chart": {
+            "title": "See It Over Time",
+            "text": "Ask a follow-up and get a real chart of the numbers, with a button to open it in Traces or Logs.",
+            "alt": "A chart of checkout-api errors over time"
+          },
+          "query": {
+            "title": "Get The Query, Ready To Run",
+            "text": "Need the SQL? The Query Builder writes it against your real fields. Accept it, or accept and run it.",
+            "alt": "The Query Builder proposing a SQL query in the editor"
+          },
+          "dashboard": {
+            "title": "Turn It Into A Dashboard",
+            "text": "Describe what you want to watch. It drafts the panels and waits for your approval, then opens a real dashboard with your data.",
+            "alt": "A dashboard drafted, approved and opened with data"
+          },
+          "alert": {
+            "title": "Get Alerted Next Time",
+            "text": "It drafts an alert from what it learned and picks a destination. Approve it, and the alert is live and ready to edit.",
+            "alt": "An alert drafted, approved and opened"
+          },
+          "share": {
+            "title": "Share What You Found",
+            "text": "Send a link to a teammate. They open the same thread read-only, and the link expires when you choose.",
+            "alt": "Sharing a thread with a link and opening it logged out"
+          }
+        }
+      },
       "askOff": {
         "budget": "AI credits for this month are used up, so {product} cannot answer",
         "oss": "{product}, the AI assistant, is part of OpenObserve Enterprise. This Open Source build has no assistant and no incidents.",
@@ -12341,7 +12380,6 @@
         "alertOrIncident": "Alert or incident",
         "button": "Filter",
         "clear": "Clear filters",
-        "count": "{count} chat | {count} chats",
         "pinned": "Pinned",
         "queryEditor": "Query or function editor",
         "remove": "Remove filter {filter}",
@@ -12350,16 +12388,15 @@
         "started": "Started from",
         "investigations": "Investigations",
         "autoRuns": "Auto-runs",
-        "all": "All",
-        "needsYou": "Needs you",
-        "needsYouCount": "Needs you · {count}"
+        "all": "All"
       },
       "filterEmpty": "No chats match these filters",
       "group": {
         "browser": "In this browser",
+        "needsYou": "Needs You",
         "older": "Older",
         "pinned": "Pinned",
-        "running": "In progress · {count} of {cap}",
+        "running": "In Progress",
         "today": "Today",
         "week": "Previous 7 days",
         "yesterday": "Yesterday"
@@ -12538,9 +12575,6 @@
       "you": "You",
       "metaHandoff": "{meta} · to {agent}",
       "copyChatId": "Copy chat id",
-      "readAloud": "Read aloud",
-      "pauseReading": "Pause",
-      "readingAloud": "Reading aloud",
       "shareAnswer": "Share link",
       "linkCopied": "Link copied",
       "branch": "Branch in new chat",
@@ -12555,10 +12589,6 @@
     },
     "notice": {
       "decision": "Needs you",
-      "decisionMany": "{n} chats need you",
-      "hide": "Hide",
-      "region": "{product} notice",
-      "inOrg": "in {org}",
       "delete": "Delete {entity}"
     },
     "outcome": {
@@ -12620,6 +12650,7 @@
       "showFewerLines": "Show fewer lines",
       "newTab": "Open in new tab",
       "open": "Open in {explorer}",
+      "openShort": "Logs",
       "run": "Run",
       "running": "Running… · {n} s",
       "stop": "Stop",
@@ -13031,22 +13062,20 @@
       "widthWider": "Wider",
       "loadFailedAgain": "Still couldn't load this chat · tried {time}",
       "openAs": "Open as",
-      "sidePanel": "Side panel",
-      "fullPage": "Full page",
+      "sidePanel": "Side Panel",
+      "fullPage": "Full Page",
       "newChatFullPage": "New chat in full page",
-      "popOut": "Floating window"
+      "popOut": "Floating Window"
     },
     "tray": {
-      "close": "Close {title}",
-      "label": "Minimised chats",
-      "more": "+{count}",
-      "restore": "Restore {title}, {agent}, {status}",
-      "status": {
-        "failed": "Failed",
-        "idle": "Idle",
-        "needsYou": "Needs you",
-        "working": "Answering"
-      }
+      "more": "+{count}"
+    },
+    "launcher": {
+      "iconWorking": "Threads, {count} chat answering | Threads, {count} chats answering",
+      "more": "{count} more chats",
+      "previews": "Recent chats",
+      "restore": "Open {title}",
+      "working": "{count} chat answering | {count} chats answering"
     },
     "window": {
       "dropSidebar": "Pin as sidebar",
@@ -13569,9 +13598,6 @@
       "label": "Threads",
       "title": "Threads",
       "incidents": "Incidents with a live RCA run · {count}",
-      "noIncidents": "No incident has a live RCA run",
-      "incidentsLoading": "Checking open incidents…",
-      "incidentsFailed": "Could not load open incidents",
       "moreIncidents": "{count} more, newest first",
       "pageFull": "{count}+ open",
       "openIncidents": "Open incidents",

@@ -28,7 +28,10 @@ export class AssistantPage {
     this.sidebar = page.locator('[data-test="assistant-shell-sidebar"]').filter({ visible: true });
     this.full = page.locator('[data-test="assistant-shell-full"]');
     this.sheet = page.locator('[data-test="assistant-shell-sheet"]');
-    this.welcome = page.locator('[data-test="assistant-welcome"]').filter({ visible: true });
+    // The empty chat: Home's welcome with starters, or a panel's logo.
+    this.welcome = page
+      .locator('[data-test="assistant-welcome"], [data-test="assistant-shell-empty"]')
+      .filter({ visible: true });
   }
 
   /** The visible container root, whichever placement it is. */
@@ -59,11 +62,10 @@ export class AssistantPage {
     await this.container().first().waitFor({ state: "visible" });
   }
 
-  /** Moves the visible chat through its Open as menu: `sidebar`, `full`, `window` or `dock`. */
+  /** Moves the visible chat with its header button for another mode: `sidebar`, `full`, `window` or `dock`. */
   async placeAs(id) {
     await this.page.mouse.move(0, 0);
-    await this.container().locator('[data-test="assistant-open-as-button"]').filter({ visible: true }).first().click();
-    await this.page.locator(`[role="menu"] [data-test="assistant-shell-place-${id}"]`).click();
+    await this.container().locator(`[data-test="assistant-shell-place-${id}"]`).filter({ visible: true }).first().click();
   }
 
   async close() {
@@ -213,13 +215,13 @@ export class AssistantPage {
     return this.container().locator('[data-test="assistant-composer"]');
   }
 
-  /** The staged chips; the time chip leads the tray but is not one of them. */
+  /** The staged chips; the time chip sits in the composer's bottom row, not in the tray. */
   chips() {
     return this.tray().locator("[data-assistant-chip]");
   }
 
   timeChip() {
-    return this.tray().locator('[data-test="assistant-context-chip-time"]');
+    return this.container().locator('[data-test="assistant-context-chip-time"]');
   }
 
   /** Opens the tray's `+N`, which folds every chip past the first at sidebar width. */
@@ -233,9 +235,17 @@ export class AssistantPage {
     return this.tray().locator('[data-test="assistant-context-chip-image"]');
   }
 
-  /** The ⓘ that opens what the assistant sees: in the composer strip beside chips, else in the header. */
+  /** The ⓘ that opens what the assistant sees, in the composer strip beside chips (or Home's toolbar). */
   sees() {
     return this.container().locator('[data-test="assistant-context-sees"]').filter({ visible: true });
+  }
+
+  /** Opens what the assistant sees: the strip's ⓘ when it shows, else the panel's title menu item. */
+  async openSees() {
+    if (await this.sees().count()) return this.sees().click();
+    await this.page.mouse.move(0, 0);
+    await this.thread().locator('[data-test="assistant-thread-title-button"]').click();
+    await this.page.locator('[data-test="assistant-thread-menu-sees"]').filter({ visible: true }).click();
   }
 
   /** A host's docked chat; `hostId` is the dock's `data-host`. */

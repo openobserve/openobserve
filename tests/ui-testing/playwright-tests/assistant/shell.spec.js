@@ -115,18 +115,16 @@ test.describe("assistant shell", () => {
     await expect(assistant.headerButton).toHaveAttribute("data-state", "idle");
   });
 
-  test("the empty sidebar shows the welcome with grounded starters and the chrome", { tag: ["@mock"] }, async ({
+  test("the empty sidebar shows the logo and the product name under the chrome", { tag: ["@mock"] }, async ({
     page,
   }) => {
     await gotoLogs(page);
     await assistant.open("header");
-    await expect(assistant.welcome).toBeVisible();
+    await expect(assistant.welcome).toHaveAttribute("data-test", "assistant-shell-empty");
+    await expect(assistant.welcome).toHaveText("O2 Assistant");
     await expect(
-      assistant.welcome.locator('[data-test="assistant-welcome-heading"]'),
-    ).toContainText(/Good|Working/);
-    await expect(
-      assistant.welcome.locator('[data-test^="assistant-starter-"]'),
-    ).toHaveCount(3);
+      assistant.sidebar.locator('[data-test="assistant-thread-logo"]'),
+    ).toBeVisible();
     await expect(assistant.sidebar).toHaveAttribute(
       "aria-label",
       "O2 Assistant",
