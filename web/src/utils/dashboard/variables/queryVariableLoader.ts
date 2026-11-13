@@ -272,7 +272,8 @@ export const loadQueryVariableValues = async (
     return { options, capped, columns: [], rows: [] };
   }
 
-  // One extra row tells a capped result apart from one that happens to fill the cap.
+  // One extra row tells a capped result apart from one that fills the cap; counted before
+  // de-duplication, as duplicate rows can hide that more values exist.
   const rows = await params.runSql({
     sql: params.query,
     streamType: params.streamType,
@@ -285,5 +286,5 @@ export const loadQueryVariableValues = async (
     labelField: params.labelField,
     maxRecords: params.maxRecords,
   });
-  return { ...mapped, rows };
+  return { ...mapped, capped: mapped.capped || rows.length > params.maxRecords, rows };
 };

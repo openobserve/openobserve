@@ -229,6 +229,22 @@ describe("loadQueryVariableValues — SQL", () => {
     expect(result.capped).toBe(true);
     expect(result.columns).toEqual(["id", "name"]);
   });
+
+  it("counts a full page of rows as capped even when duplicates leave fewer values", async () => {
+    const load = (rows: Record<string, unknown>[]) =>
+      loadQueryVariableValues(
+        baseParams({
+          language: "sql",
+          query: "SELECT v FROM t",
+          maxRecords: 2,
+          runSql: vi.fn().mockResolvedValue(rows),
+        }),
+      );
+    const full = await load([{ v: "a" }, { v: "a" }, { v: "b" }]);
+    expect(full.options.map((o) => o.value)).toEqual(["a", "b"]);
+    expect(full.capped).toBe(true);
+    expect((await load([{ v: "a" }, { v: "b" }])).capped).toBe(false);
+  });
 });
 
 describe("runSqlVariableQueryOnStream", () => {
