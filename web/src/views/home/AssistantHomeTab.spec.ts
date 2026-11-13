@@ -210,14 +210,10 @@ describe("AssistantHomeTab", () => {
     expect(mocks.load).toHaveBeenCalledTimes(1);
   });
 
-  it("asks the Ask box to take focus on mount, and again on Back from Capabilities", async () => {
-    const wrapper = mountTab();
+  it("asks the Ask box to take focus on mount", async () => {
+    mountTab();
     await flushPromises();
     expect(mocks.focusAsk).toHaveBeenCalledTimes(1);
-    await wrapper.get('[data-test="assistant-home-capabilities"]').trigger("click");
-    await wrapper.get('[data-test="assistant-capabilities-back"]').trigger("click");
-    await flushPromises();
-    expect(mocks.focusAsk).toHaveBeenCalledTimes(2);
   });
 
   it("asks nothing to focus when the agent is off", async () => {
@@ -547,16 +543,6 @@ describe("AssistantHomeTab", () => {
           anomaly.get('[data-test="assistant-home-alert-history"]').attributes("data-type"),
         ).toBe("anomaly_detection"),
       );
-    });
-
-    it("swaps the tab body to the capabilities page and back", async () => {
-      const wrapper = mountTab();
-      await flushPromises();
-      await wrapper.get('[data-test="assistant-home-capabilities"]').trigger("click");
-      expect(wrapper.find('[data-test="assistant-capabilities"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="assistant-home-tab"]').exists()).toBe(false);
-      await wrapper.get('[data-test="assistant-capabilities-back"]').trigger("click");
-      expect(wrapper.find('[data-test="assistant-home-tab"]').exists()).toBe(true);
     });
 
     it("takes View All to the Overview tab through the URL", async () => {

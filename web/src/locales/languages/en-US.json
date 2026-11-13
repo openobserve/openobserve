@@ -10481,46 +10481,6 @@
     "resources": "Resources",
     "explore": "Explore",
     "agent": {
-      "capabilities": {
-        "open": "What Can O2 Assistant Do?",
-        "back": "Back",
-        "progressLabel": "Progress",
-        "problem": "Problem: checkout-api started failing after a deploy",
-        "try": "Try It On My Data",
-        "tryPrompt": "Why is checkout-api failing?",
-        "slides": {
-          "investigate": {
-            "title": "Find Out Why It Broke",
-            "text": "Ask in plain words. The Investigator reads your logs, traces and alerts, then tells you the likely cause with proof.",
-            "alt": "The Investigator finding why checkout-api fails"
-          },
-          "chart": {
-            "title": "See It Over Time",
-            "text": "Ask a follow-up and get a real chart of the numbers, with a button to open it in Traces or Logs.",
-            "alt": "A chart of checkout-api errors over time"
-          },
-          "query": {
-            "title": "Get The Query, Ready To Run",
-            "text": "Need the SQL? The Query Builder writes it against your real fields. Accept it, or accept and run it.",
-            "alt": "The Query Builder proposing a SQL query in the editor"
-          },
-          "dashboard": {
-            "title": "Turn It Into A Dashboard",
-            "text": "Describe what you want to watch. It drafts the panels and waits for your approval, then opens a real dashboard with your data.",
-            "alt": "A dashboard drafted, approved and opened with data"
-          },
-          "alert": {
-            "title": "Get Alerted Next Time",
-            "text": "It drafts an alert from what it learned and picks a destination. Approve it, and the alert is live and ready to edit.",
-            "alt": "An alert drafted, approved and opened"
-          },
-          "share": {
-            "title": "Share What You Found",
-            "text": "Send a link to a teammate. They open the same thread read-only, and the link expires when you choose.",
-            "alt": "Sharing a thread with a link and opening it logged out"
-          }
-        }
-      },
       "askOff": {
         "budget": "AI credits for this month are used up, so {product} cannot answer",
         "oss": "{product}, the AI assistant, is part of OpenObserve Enterprise. This Open Source build has no assistant and no incidents.",

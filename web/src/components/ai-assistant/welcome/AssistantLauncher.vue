@@ -846,13 +846,8 @@ function openBilling(): void {
   void router.push({ name: "plans", query: { org_identifier: org.value } }).catch(() => undefined);
 }
 
-// Home's capabilities page stages its sample question here.
 defineExpose({
   /** Focus on arrival; skipped when the field is gated or the user is elsewhere. */
   focusAsk: () => focusWhenReady(() => input.value?.textarea),
-  fill(line: string): void {
-    text.value = line;
-    input.value?.focus();
-  },
 });
 </script>
