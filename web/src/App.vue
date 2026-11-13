@@ -32,15 +32,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { onMounted, watch } from "vue";
+import { defineAsyncComponent, onMounted, watch } from "vue";
 import { applyCurrentTheme } from "@/utils/themeManager";
 import { getLocale, isRtlLocale } from "@/locales";
 import { ConfigProvider, TooltipProvider } from "reka-ui";
 import { TOOLTIP_DELAY_MS, TOOLTIP_SKIP_DELAY_MS } from "@/lib/styles/motion";
 import OToastProvider from "@/lib/feedback/Toast/OToastProvider.vue";
-import ConfirmDialogProvider from "@/components/ConfirmDialogProvider.vue";
-import CreateAlertDialogProvider from "@/components/alerts/CreateAlertDialogProvider.vue";
-import UpdatePasswordDialog from "@/components/common/UpdatePasswordDialog.vue";
+
+// Closed until asked for, so they stay off the first-load bundle; their state lives in module refs, so a late mount loses nothing.
+const ConfirmDialogProvider = defineAsyncComponent(
+  () => import("@/components/ConfirmDialogProvider.vue"),
+);
+const CreateAlertDialogProvider = defineAsyncComponent(
+  () => import("@/components/alerts/CreateAlertDialogProvider.vue"),
+);
+const UpdatePasswordDialog = defineAsyncComponent(
+  () => import("@/components/common/UpdatePasswordDialog.vue"),
+);
 
 export default {
   components: {
