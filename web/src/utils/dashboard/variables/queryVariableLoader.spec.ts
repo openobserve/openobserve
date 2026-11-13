@@ -154,31 +154,24 @@ describe("loadQueryVariableValues — PromQL", () => {
     expect(result.options.map((o) => o.value)).toEqual(["node_cpu", "node_memory"]);
   });
 
-  it("widens label_names() and metrics() past the stream-stats lag before answering none", async () => {
+  it("looks up label_names() and metrics() over 30 days so stream-stats lag can't hide live metrics", async () => {
     const end = 1_794_552_452;
     const window = { startTime: end - 3600, endTime: end };
+    const monthStart = end - 30 * 24 * 3600;
+    // A fresh metric is visible in the short window while older live ones only show over the long one.
     const lagged =
-      (data: unknown[]) =>
+      (fresh: unknown[], all: unknown[]) =>
       async ({ start_time }: any) =>
-        promOk(start_time <= end - 24 * 3600 ? data : []);
-    labels.mockImplementation(lagged(["cluster", "job"]));
-    labelValues.mockImplementation(lagged(["up", "kube_pod_info"]));
+        promOk(start_time <= monthStart ? all : fresh);
+    labels.mockImplementation(lagged(["cluster"], ["cluster", "job"]));
+    labelValues.mockImplementation(lagged(["new_metric"], ["new_metric", "up", "kube_pod_info"]));
 
     const names = await loadQueryVariableValues(baseParams({ query: "label_names()", ...window }));
     expect(names.options.map((o) => o.value)).toEqual(["cluster", "job"]);
-    expect(labels.mock.calls.map(([args]) => args.start_time)).toEqual([
-      end - 3600,
-      end - 24 * 3600,
-    ]);
+    expect(labels.mock.calls.map(([args]) => args.start_time)).toEqual([monthStart]);
 
     const metrics = await loadQueryVariableValues(baseParams({ query: "metrics(.*)", ...window }));
-    expect(metrics.options.map((o) => o.value)).toEqual(["up", "kube_pod_info"]);
-
-    labels.mockResolvedValue(promOk([]));
-    labels.mockClear();
-    const none = await loadQueryVariableValues(baseParams({ query: "label_names()", ...window }));
-    expect(none.options).toEqual([]);
-    expect(labels).toHaveBeenCalledTimes(3);
+    expect(metrics.options.map((o) => o.value)).toEqual(["new_metric", "up", "kube_pod_info"]);
   });
 
   it("metrics with an invalid regex fails with a readable message", async () => {

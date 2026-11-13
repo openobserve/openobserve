@@ -39,6 +39,7 @@ const MICROS_THRESHOLD = 1e14;
 const MILLIS_THRESHOLD = 1e11;
 const METRIC_SCAN_BATCH = 8;
 const DAY_SECONDS = 24 * 3600;
+const NAME_LOOKBACK_DAYS = 30;
 
 export interface SqlVariableQueryRequest {
   sql: string;
@@ -178,25 +179,15 @@ export const toPromSeconds = (time: number): number => {
   return Math.floor(time);
 };
 
-// Names come from stream stats, which lag fresh ingestion; widen like the metrics explorer instead of answering none.
-const withIndexLagWindows = async (
+// Names come from stream stats, which can lag ingestion by hours; a short window drops live metrics, so look back 30 days.
+const withIndexLagWindows = (
   range: PromRange,
   load: (window: PromRange) => Promise<unknown[]>,
-): Promise<unknown[]> => {
-  const windows = [
-    range,
-    ...[1, 30].map((days) => ({
-      ...range,
-      start_time: Math.min(range.start_time, range.end_time - days * DAY_SECONDS),
-    })),
-  ];
-  let values: unknown[] = [];
-  for (const window of windows) {
-    values = await load(window);
-    if (values.length) break;
-  }
-  return values;
-};
+): Promise<unknown[]> =>
+  load({
+    ...range,
+    start_time: Math.min(range.start_time, range.end_time - NAME_LOOKBACK_DAYS * DAY_SECONDS),
+  });
 
 const loadMetricNames = (range: PromRange): Promise<unknown[]> =>
   withIndexLagWindows(range, async (window) =>
