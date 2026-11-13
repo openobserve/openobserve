@@ -1644,10 +1644,14 @@ export default defineComponent({
     provide(ALERT_SETTING_TIERS_KEY, tiers);
 
     const findAvailable = (id: AlertFindId): boolean => {
-      if (isTieredSetting(id)) return tierAvailable(id);
       const fd = alertForm.formData.value;
       const composite = isCompositeMode.value;
       const mode = fd.query_condition?.type || "custom";
+      // SQL shows its own Simple/Multi toggle outside the tiered group-by row.
+      if (id === "groupBy" && mode === "sql" && !composite) {
+        return fd.is_real_time === "false" && !alertForm.isAnomalyMode.value;
+      }
+      if (isTieredSetting(id)) return tierAvailable(id);
       switch (id) {
         case "streamType":
         case "stream":
