@@ -1328,10 +1328,17 @@ export default defineComponent({
 
         if (!dashboard || typeof dashboard !== "object" || !Object.keys(dashboard).length) {
           if (playlistReporters.missing("notFound")) return;
-          // No id in the URL (for example after an org switch) is not a deleted
-          // dashboard, so go to the list without the error toast.
+          // No id in the URL is not a deleted dashboard, so go to the list of
+          // the current org without the error toast. Replace, not back: the
+          // previous history entry can belong to another org.
           if (!route.query.dashboard) {
-            goBackToDashboardList();
+            router.replace({
+              path: "/dashboards",
+              query: {
+                folder: route.query.folder ?? "default",
+                org_identifier: store.state.selectedOrganization.identifier,
+              },
+            });
             return;
           }
           showErrorNotification(t("dashboard.viewDashboard.dashboardNotFound"));

@@ -8,6 +8,8 @@ const DASHBOARD_ITEM_PATHS = new Set([
   "/dashboards/tv",
 ]);
 
+export const isDashboardItemPath = (path: string): boolean => DASHBOARD_ITEM_PATHS.has(path);
+
 /**
  * Builds the route to open after the user picks another org in the header.
  * Logs pages keep their query. Dashboard item pages go to the dashboard list
@@ -18,7 +20,7 @@ export const getOrgSwitchRoute = (
   query: LocationQuery,
   orgIdentifier: string,
 ): RouteLocationRaw => {
-  if (DASHBOARD_ITEM_PATHS.has(path)) {
+  if (isDashboardItemPath(path)) {
     return { path: "/dashboards", query: { org_identifier: orgIdentifier } };
   }
   const queryParams = path.indexOf(".logs") > -1 ? query : {};

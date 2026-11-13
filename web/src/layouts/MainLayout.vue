@@ -289,7 +289,7 @@ import { useRouteEnterFade } from "@/layouts/useRouteEnterFade";
 import { PAGE_ENTRANCE_KEY } from "@/lib/core/PageLayout/pageEntrance";
 import type { NavItem } from "@/lib/core/Navbar/ONavbar.types";
 import { securityNavLinks as buildSecurityNavLinks } from "@/utils/security/nav";
-import { getOrgSwitchRoute } from "@/utils/orgSwitchRoute";
+import { getOrgSwitchRoute, isDashboardItemPath } from "@/utils/orgSwitchRoute";
 import { featureState, menuState, streamTypeFeature, type FeatureState } from "@/utils/featureGate";
 import { checkFeatureAccess, buildFeatureGateContext } from "@/utils/enterpriseFeatures";
 import AppHeader from "../components/Header.vue";
@@ -1326,17 +1326,27 @@ export default defineComponent({
     }
 
     const updateOrganization = async () => {
+      const currentPath = router.currentRoute.value.path;
+      const target = getOrgSwitchRoute(
+        currentPath,
+        router.currentRoute.value.query,
+        selectedOrg.value.identifier,
+      );
+      if (isDashboardItemPath(currentPath)) {
+        // Leave the dashboard page before the org changes. Otherwise the page
+        // remounts in the new org with the old dashboard id. A leave guard
+        // (unsaved edits) can cancel the move, and then the org stays.
+        const failure = await router.push(target);
+        if (failure) {
+          selectedOrg.value = store.state.selectedOrganization;
+          return;
+        }
+      } else {
+        router.push(target);
+      }
       resetStreams();
       store.dispatch("logs/resetLogs");
       store.dispatch("setIsDataIngested", false);
-      const orgIdentifier = selectedOrg.value.identifier;
-      router.push(
-        getOrgSwitchRoute(
-          router.currentRoute.value.path,
-          router.currentRoute.value.query,
-          orgIdentifier,
-        ),
-      );
       useLocalOrganization(selectedOrg.value);
       store.dispatch("setSelectedOrganization", { ...selectedOrg.value });
       // setSelectedOrganization();

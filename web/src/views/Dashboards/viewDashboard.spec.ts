@@ -792,7 +792,8 @@ describe("ViewDashboard", () => {
     });
 
     it("goes to the dashboard list without the not-found toast when the URL has no dashboard id", async () => {
-      // An org switch drops the dashboard id from the URL; that is not a deleted dashboard.
+      // A dashboard list entry for another org sits behind this page in history.
+      global.mockHistoryState.back = "/dashboards?folder=default&org_identifier=other-org";
       mockExtraRouteQuery.dashboard = "";
       vi.mocked(getDashboard).mockResolvedValueOnce({});
       mockShowErrorNotification.mockClear();
@@ -800,10 +801,12 @@ describe("ViewDashboard", () => {
       await flushPromises();
 
       expect(mockShowErrorNotification).not.toHaveBeenCalled();
-      expect(global.mockRouterPush).toHaveBeenCalledWith({
+      // Replace, not history back: the previous entry can belong to another org.
+      expect(global.mockRouterReplace).toHaveBeenCalledWith({
         path: "/dashboards",
         query: { folder: "default", org_identifier: "test-org" },
       });
+      expect(global.mockRouterBack).not.toHaveBeenCalled();
     });
 
     it("still shows the not-found toast when the dashboard id does not exist", async () => {
