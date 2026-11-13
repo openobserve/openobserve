@@ -399,6 +399,7 @@ import {
   type Starter,
   type TimeWindow,
 } from "@/composables/assistant";
+import { focusWhenReady } from "@/composables/assistant/focusComposer";
 import { onOverviewFocusRequest } from "@/composables/goto/goToRequests";
 import useBreakpoint from "@/composables/useBreakpoint";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -847,6 +848,8 @@ function openBilling(): void {
 
 // Home's capabilities page stages its sample question here.
 defineExpose({
+  /** Focus on arrival; skipped when the field is gated or the user is elsewhere. */
+  focusAsk: () => focusWhenReady(() => input.value?.textarea),
   fill(line: string): void {
     text.value = line;
     input.value?.focus();

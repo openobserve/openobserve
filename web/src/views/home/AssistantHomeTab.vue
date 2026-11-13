@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <AssistantCapabilities
       v-if="view === 'capabilities'"
       class="min-w-0 flex-1"
-      @back="view = 'home'"
+      @back="backHome"
       @try="tryPrompt"
     />
     <div
@@ -91,7 +91,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, defineAsyncComponent, nextTick, onDeactivated, onMounted, ref } from "vue";
+import {
+  computed,
+  defineAsyncComponent,
+  nextTick,
+  onActivated,
+  onDeactivated,
+  onMounted,
+  ref,
+} from "vue";
 import { useRoute, useRouter, type RouteLocationRaw } from "vue-router";
 
 import AssistantLauncher from "@/components/ai-assistant/welcome/AssistantLauncher.vue";
@@ -157,6 +165,13 @@ const railReady = ref(false);
 onMounted(() => {
   void data.load();
   railReady.value = true;
+  focusAsk();
+});
+// A kept-alive return to Home is an arrival too; the first activation follows the mount, which already asked.
+let activatedOnce = false;
+onActivated(() => {
+  if (activatedOnce) focusAsk();
+  activatedOnce = true;
 });
 
 const pageRange = computed<NonNullable<ComposerState["timeOverride"]>>(() => {
@@ -225,6 +240,16 @@ const launcher = ref<InstanceType<typeof AssistantLauncher> | null>(null);
 function tryPrompt(prompt: string): void {
   view.value = "home";
   void nextTick(() => launcher.value?.fill?.(prompt));
+}
+
+// Arriving on the AI tab puts the cursor in the Ask box; the launcher skips it when it must not steal focus.
+function backHome(): void {
+  view.value = "home";
+  focusAsk();
+}
+
+function focusAsk(): void {
+  void nextTick(() => launcher.value?.focusAsk?.());
 }
 
 const historyAlert = ref<{ details: unknown; id: string; type: string } | null>(null);
