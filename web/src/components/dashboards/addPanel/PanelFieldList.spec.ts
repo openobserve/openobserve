@@ -174,6 +174,51 @@ describe("FieldList", () => {
     });
   }
 
+  // ── Chart type ─────────────────────────────────────────────────────
+
+  describe("Chart type select", () => {
+    const select = '[data-test="dashboard-addpanel-chart-type-select"]';
+    const streamType = '[data-test="index-dropdown-stream_type"]';
+    const list = '[data-test="dashboard-addpanel-chart-type-list"]';
+
+    it("is the first control, above Stream type, and names the panel's chart", () => {
+      wrapper = mountComponent();
+      const selectEl = wrapper.find(select).element;
+      const streamTypeEl = wrapper.find(streamType).element;
+      expect(
+        selectEl.compareDocumentPosition(streamTypeEl) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+      expect(wrapper.find(select).attributes("data-test-selected-value")).toBe("bar");
+      expect(wrapper.find(select).text()).toContain("Bar");
+    });
+
+    it("asks to open the list when the select is clicked", async () => {
+      wrapper = mountComponent();
+      await wrapper
+        .find('[data-test="dashboard-addpanel-chart-type-select-trigger"]')
+        .trigger("click");
+      expect(wrapper.emitted("update:chartTypeListOpen")).toEqual([[true]]);
+    });
+
+    it("shows the list in place of the stream selects and fields, which stay mounted", () => {
+      wrapper = mountComponent({ props: { chartTypeListOpen: true } });
+      expect(wrapper.find(list).exists()).toBe(true);
+      const fieldsPane = wrapper.find('[data-test="o-field-list"]').element.parentElement!;
+      expect(fieldsPane.classList.contains("invisible")).toBe(true);
+      expect(fieldsPane.contains(wrapper.find(streamType).element)).toBe(true);
+    });
+
+    it("passes the host's allowed types and hands the pick up", async () => {
+      wrapper = mountComponent({ props: { chartTypeListOpen: true, allowedChartTypes: ["line"] } });
+      expect(
+        wrapper.find('[data-test="selected-chart-bar-item"]').attributes("disabled"),
+      ).toBeDefined();
+      await wrapper.find('[data-test="selected-chart-line-item"]').trigger("click");
+      expect(wrapper.emitted("selectChartType")).toEqual([["line"]]);
+      expect(wrapper.emitted("update:chartTypeListOpen")).toEqual([[false]]);
+    });
+  });
+
   // ── Rendering ──────────────────────────────────────────────────────
 
   describe("Component Rendering", () => {

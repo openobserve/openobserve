@@ -17,23 +17,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="flex h-full min-h-0 w-full flex-1" data-test="panel-editor-container">
     <div class="flex max-md:flex-col" :style="rowStyle">
-      <!-- Chart Type Selection Sidebar -->
-      <div class="max-md:shrink-0">
-        <div
-          class="scroll bg-surface-panel! border-border-default flex h-full max-w-25 min-w-25 flex-col overflow-x-hidden overflow-y-auto border-e max-md:h-auto max-md:w-full max-md:max-w-full max-md:min-w-0 max-md:overflow-x-hidden max-md:border-e-0 max-md:border-b"
-        >
-          <ChartSelection
-            v-model:selectedChartType="dashboardPanelData.data.type"
-            :allowedchartstype="props.allowedChartTypes"
-            @update:selected-chart-type="resetAggregationFunction"
-          />
-        </div>
+      <!-- Types with no Fields column still need somewhere to change the chart type. -->
+      <div
+        v-if="isFieldlessPanel(dashboardPanelData.data.type)"
+        class="bg-surface-panel border-border-default flex w-1/5 shrink-0 flex-col border-e pt-3 max-md:w-full max-md:border-e-0 max-md:border-b"
+        :class="chartTypeListOpen ? 'max-md:h-80' : ''"
+        data-test="panel-editor-chart-type-column"
+      >
+        <ChartTypePicker
+          v-model:open="chartTypeListOpen"
+          class="min-h-0 flex-1"
+          :chart-type="dashboardPanelData.data.type"
+          :allowed-chart-types="props.allowedChartTypes"
+          @select="selectChartType"
+        />
       </div>
 
       <!-- Query-related chart content (not html/markdown/custom_chart) -->
       <div
         v-if="
-          !['html', 'markdown', 'custom_chart', 'alert-list'].includes(dashboardPanelData.data.type)
+          !isFieldlessPanel(dashboardPanelData.data.type) &&
+          dashboardPanelData.data.type !== 'custom_chart'
         "
         :class="mainContentContainerClass"
         :style="mainContentContainerStyle"
@@ -50,6 +54,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm"
             class="mt-2.5 rotate-90 text-xl"
             data-test="panel-editor-field-list-collapsed-icon"
+          />
+          <CollapsedChartTypeButton
+            class="my-2"
+            :chart-type="dashboardPanelData.data.type"
+            @click.stop="openChartTypeListInFields"
           />
           <div class="text-base font-bold [text-orientation:mixed] [writing-mode:vertical-rl]">
             {{ t("panel.fields") }}
@@ -81,7 +90,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :style="fieldListContainerStyle"
               >
                 <div class="flex flex-col" :style="fieldListInnerStyle">
-                  <PanelFieldList :editMode="editMode" @collapse="collapseFieldList" />
+                  <PanelFieldList
+                    v-model:chart-type-list-open="chartTypeListOpen"
+                    :editMode="editMode"
+                    :allowed-chart-types="props.allowedChartTypes"
+                    @collapse="collapseFieldList"
+                    @select-chart-type="selectChartType"
+                  />
                 </div>
               </div>
             </div>
@@ -98,7 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="flex h-full w-full flex-col" :style="layoutPanelContainerStyle">
                   <div
                     v-if="isMobile"
-                    class="border-border-default flex items-center border-b px-2 py-1.5"
+                    class="border-border-default flex items-center gap-2 border-b px-2 py-1.5"
                     data-drawer-anchor="panel-editor-fields"
                   >
                     <OButton
@@ -110,6 +125,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       {{ t("panel.fields") }}
                     </OButton>
+                    <div class="min-w-0 flex-1">
+                      <ChartTypeSelect
+                        :chart-type="dashboardPanelData.data.type"
+                        :expanded="mobileFieldsOpen && chartTypeListOpen"
+                        @toggle="openMobileChartTypeList"
+                      />
+                    </div>
                   </div>
                   <!-- Mode selection + Add To Dashboard row. Skip when empty (e.g.
                        dashboard mode) so its `my-2` margin isn't dead space. -->
@@ -551,6 +573,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="mt-2.5 rotate-90 text-xl"
             data-test="panel-editor-field-list-collapsed-icon"
           />
+          <CollapsedChartTypeButton
+            class="my-2"
+            :chart-type="dashboardPanelData.data.type"
+            @click.stop="openChartTypeListInFields"
+          />
           <div class="text-base font-bold [text-orientation:mixed] [writing-mode:vertical-rl]">
             {{ t("panel.fields") }}
           </div>
@@ -593,7 +620,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :style="fieldListContainerStyle"
               >
                 <div class="flex flex-col" :style="fieldListInnerStyle">
-                  <PanelFieldList :editMode="editMode" @collapse="collapseFieldList" />
+                  <PanelFieldList
+                    v-model:chart-type-list-open="chartTypeListOpen"
+                    :editMode="editMode"
+                    :allowed-chart-types="props.allowedChartTypes"
+                    @collapse="collapseFieldList"
+                    @select-chart-type="selectChartType"
+                  />
                 </div>
               </div>
             </div>
@@ -608,7 +641,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="scroll flex h-full min-w-0 flex-1 flex-col">
                 <div
                   v-if="isMobile"
-                  class="border-border-default flex items-center border-b px-2 py-1.5"
+                  class="border-border-default flex items-center gap-2 border-b px-2 py-1.5"
                   data-drawer-anchor="panel-editor-fields"
                 >
                   <OButton
@@ -620,6 +653,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     {{ t("panel.fields") }}
                   </OButton>
+                  <div class="min-w-0 flex-1">
+                    <ChartTypeSelect
+                      :chart-type="dashboardPanelData.data.type"
+                      :expanded="mobileFieldsOpen && chartTypeListOpen"
+                      @toggle="openMobileChartTypeList"
+                    />
+                  </div>
                 </div>
                 <!-- Editor/Preview splitter -->
                 <div
@@ -789,7 +829,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="panel-editor-mobile-fields-drawer"
     >
       <div class="flex h-full min-h-0 flex-col">
-        <PanelFieldList :editMode="editMode" frameless @collapse="mobileFieldsOpen = false" />
+        <PanelFieldList
+          v-model:chart-type-list-open="chartTypeListOpen"
+          :editMode="editMode"
+          :allowed-chart-types="props.allowedChartTypes"
+          frameless
+          @collapse="mobileFieldsOpen = false"
+          @select-chart-type="selectChartType"
+        />
       </div>
     </ODrawer>
 
@@ -838,13 +885,15 @@ import useBreakpoint from "@/composables/useBreakpoint";
 import { useLicenseLock } from "@/composables/useFeatureLock";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import { SERIES_OVERRIDE_CHART_TYPES } from "@/composables/dashboard/useConfigPanel";
-import { isCustomSqlPanel } from "@/utils/dashboard/chartTypeGroups";
+import { isCustomSqlPanel, isFieldlessPanel } from "@/utils/dashboard/chartTypeGroups";
 
 // ============================================================================
 // Component Imports
 // ============================================================================
 
-import ChartSelection from "@/components/dashboards/addPanel/ChartSelection.vue";
+import ChartTypePicker from "@/components/dashboards/addPanel/ChartTypePicker.vue";
+import ChartTypeSelect from "@/components/dashboards/addPanel/ChartTypeSelect.vue";
+import CollapsedChartTypeButton from "@/components/dashboards/addPanel/CollapsedChartTypeButton.vue";
 import PanelFieldList from "@/components/dashboards/addPanel/PanelFieldList.vue";
 import PanelSidebar from "@/components/dashboards/addPanel/PanelSidebar.vue";
 import DashboardQueryBuilder from "@/components/dashboards/addPanel/DashboardQueryBuilder.vue";
@@ -1100,6 +1149,32 @@ watch(
   { immediate: true },
 );
 
+// One open flag serves the Fields column, the slim column and the phone drawer, since only one shows at a time.
+const chartTypeListOpen = ref(false);
+const selectChartType = (id: string): void => {
+  chartTypeListOpen.value = false;
+  dashboardPanelData.data.type = id;
+  resetAggregationFunction();
+  if (isFieldlessPanel(id)) mobileFieldsOpen.value = false;
+};
+const openChartTypeListInFields = (): void => {
+  if (!dashboardPanelData.layout.showFieldList) collapseFieldList();
+  chartTypeListOpen.value = true;
+};
+const openMobileChartTypeList = (): void => {
+  mobileFieldsOpen.value = true;
+  chartTypeListOpen.value = true;
+};
+// A list left open behind a closed Fields pane would greet its next open instead of the fields.
+watch(
+  () => mobileFieldsOpen.value || dashboardPanelData.layout.showFieldList,
+  (fieldsShowing) => {
+    if (!fieldsShowing && !isFieldlessPanel(dashboardPanelData.data.type)) {
+      chartTypeListOpen.value = false;
+    }
+  },
+);
+
 // The field list and config sidebar can't share a phone-width row, so opening either closes the other.
 watch(
   () => isMobile.value && dashboardPanelData.layout.isConfigPanelOpen,
@@ -1237,7 +1312,7 @@ const mainContentContainerStyle = computed<CSSProperties>(() => {
   //   return { width: "100%", height: "100%" };
   // }
   // flex:1 and minWidth:0 are required so this column fills the remaining row width
-  // (alongside the fixed-width ChartSelection sidebar) and lets the inner OSplitter
+  // (alongside the slim chart-type column) and lets the inner OSplitter
   // resolve its `width: 100%` against a real parent width instead of intrinsic content.
   return {
     display: "flex",
