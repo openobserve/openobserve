@@ -55,7 +55,7 @@ export interface AssistantComposerFrameProps {
   inputAttrs?: Record<string, string | number | boolean | undefined>;
   /** Home's Ask box: a gradient border, a larger radius and a soft glow instead of the plain frame. */
   glow?: boolean;
-  /** Home's Ask box starts three lines tall; the chat composer starts at one. */
+  /** Both composers start three lines tall. */
   tall?: boolean;
 }
 
@@ -68,8 +68,8 @@ export const MAX_ROWS = 6;
 
 // OTextarea's bordered box is its only div child here, so the frame styles it from the root until the lib grows a frame variant.
 const FRAME_CLASS = [
-  "[&>div]:rounded-2xl [&>div]:border-border-default [&>div]:gap-0.5 [&>div]:px-2 [&>div]:pt-1.5 [&>div]:pb-2",
-  "[&>div]:focus-within:border-input-border-focus [&>div]:focus-within:ring-3 [&>div]:focus-within:ring-focus-ring-accent",
+  "[&>div]:rounded-surface [&>div]:border-border-default [&>div]:gap-0.5 [&>div]:px-2 [&>div]:pt-1.5 [&>div]:pb-2",
+  "[&>div]:ring-offset-0 [&>div]:motion-reduce:transition-none [&>div]:focus-within:border-input-border-focus [&>div]:focus-within:ring-1 [&>div]:focus-within:ring-focus-ring-accent",
 ].join(" ");
 
 // A gradient has no border-color form, so the glow frame paints it on the wrapper and its box drops its own border; on focus the gradient drifts and blooms instead of a ring.

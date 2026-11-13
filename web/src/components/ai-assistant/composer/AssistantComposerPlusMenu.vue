@@ -63,7 +63,7 @@ const ITEMS = [
   { id: "context", icon: assistantGlyph.chipStream, test: "assistant-composer-add-context" },
   { id: "time", icon: assistantGlyph.chipTime, test: "assistant-composer-time-range" },
   { id: "recall", icon: assistantGlyph.history, test: "assistant-recall-open" },
-] as const satisfies readonly { id: ComposerPlusAction }[];
+] as const satisfies readonly { id: ComposerPlusAction; icon: string; test: string }[];
 </script>
 
 <script setup lang="ts">

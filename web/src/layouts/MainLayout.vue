@@ -1213,11 +1213,10 @@ export default defineComponent({
 
     // Profiles is inserted right after Traces, so anchoring on Traces would land between the two.
     const updateAIObservabilityMenu = () => {
-      // The assistant owns the sparkle glyph, so this LLM tooling entry gets its own name and icon.
       syncFeatureLink(
         {
-          title: assistantV2 ? t("menu.llmObservability") : t("menu.aiObservability"),
-          icon: assistantV2 ? "insights" : "auto-awesome",
+          title: t("menu.aiObservability"),
+          icon: "auto-awesome",
           link: "/ai",
           name: "aiObservability",
         },

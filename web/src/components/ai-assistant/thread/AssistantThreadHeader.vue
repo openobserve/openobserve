@@ -62,6 +62,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <slot name="container-actions" :narrow="narrow" />
       </div>
+      <span v-if="logoShown" class="inline-flex shrink-0" data-test="assistant-thread-logo">
+        <img :src="aiLogo" alt="" class="size-6 dark:hidden" />
+        <img :src="aiLogoDark" alt="" class="hidden size-6 dark:block" />
+      </span>
       <div
         v-if="renaming"
         :class="toolbar ? 'w-64 max-w-full' : 'min-w-0 flex-1'"
@@ -160,7 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @open="openChat"
               @all="openChats"
             >
-              <template v-if="chatActions || foldedLayout" #default>
+              <template v-if="chatActions || foldedLayout || slots['menu-sees']" #default>
                 <template v-if="chatActions">
                   <div
                     class="flex min-w-0 flex-col gap-1 px-3 py-1.5"
@@ -209,10 +213,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </ODropdownItem>
                   </ODropdownSub>
                 </template>
+                <slot name="menu-sees" />
                 <slot v-if="foldedLayout && layoutDirect" name="menu-layout" />
                 <ODropdownSub v-else-if="foldedLayout" :text-value="t('assistant.shell.openAs')">
                   <template #icon-left
-                    ><OIcon :name="assistantGlyph.openFull" size="sm"
+                    ><OIcon :name="assistantGlyph.fullPage" size="sm"
                   /></template>
                   <template #trigger>
                     <span data-test="assistant-title-menu-layout">{{
@@ -327,6 +332,8 @@ import {
 } from "vue";
 import { useStore } from "vuex";
 
+import aiLogoDark from "@/assets/images/common/o2_ai_logo_dark.svg";
+import aiLogo from "@/assets/images/common/o2_ai_logo.svg";
 import AssistantIconButton from "@/components/ai-assistant/common/AssistantIconButton.vue";
 import AssistantStatusDot from "@/components/ai-assistant/common/AssistantStatusDot.vue";
 import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
@@ -368,6 +375,7 @@ defineSlots<{
   "container-actions"?: (props: { narrow: boolean }) => unknown;
   "menu-layout"?: () => unknown;
   "menu-share"?: () => unknown;
+  "menu-sees"?: () => unknown;
   "title-anchor"?: () => unknown;
 }>();
 
@@ -404,6 +412,8 @@ const titleText = computed(
   () => session.value?.title ?? object.value?.title ?? t("assistant.thread.newChatTitle"),
 );
 const readonly = computed(() => capability.value.canChat === "no");
+// The full view keeps its own bar; the panels lead with the product's logo.
+const logoShown = computed(() => !props.toolbar && props.placement !== "full");
 const pinned = computed(() => !!session.value?.record.pinned);
 const renamePending = computed(() => !!props.sid && history.pending[props.sid] === "rename");
 const running = computed(

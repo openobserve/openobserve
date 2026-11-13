@@ -22,8 +22,8 @@ import { raw } from "@/types/i18n";
 
 import { fakeAssistant, fakeRouter, fakeVuex } from "../__tests__/fakeAssistant";
 import { historyStubs } from "../__tests__/historyStubs";
-import AssistantOpenAsMenu, { placementMode } from "./AssistantOpenAsMenu.vue";
-import type { AssistantOpenAsMenuProps } from "./AssistantOpenAsMenu.vue";
+import AssistantModeButtons, { placementMode } from "./AssistantModeButtons.vue";
+import type { AssistantModeButtonsProps } from "./AssistantModeButtons.vue";
 
 const { fake, lg, track } = vi.hoisted(() => ({
   fake: { current: null as any },
@@ -67,7 +67,7 @@ vi.mock("@/services/assistantAnalytics", async (importOriginal) => ({
 const ORIGIN = { entryKind: "header_button", objectKind: "none", container: "sidebar" } as const;
 
 // The bare menu renders its items inside whichever dropdown hosts it, so a spec opens one around it.
-async function setup(props: Partial<AssistantOpenAsMenuProps>) {
+async function setup(props: Partial<AssistantModeButtonsProps>) {
   const router = fakeRouter();
   await router.push("/logs");
   const wrapper = mount(
@@ -79,7 +79,7 @@ async function setup(props: Partial<AssistantOpenAsMenuProps>) {
           {
             trigger: () => h("button", "open"),
             default: () =>
-              h(AssistantOpenAsMenu, {
+              h(AssistantModeButtons, {
                 placement: "sidebar",
                 sid: fake.current.store.state.shell.activeSid,
                 bare: true,
@@ -118,12 +118,26 @@ afterEach(() => {
 });
 
 describe("Open as", () => {
-  it("offers sidebar, window and full view on a desktop sidebar with the current one checked", async () => {
+  it("offers only the other places: full page and floating window from the sidebar", async () => {
     await setup({});
-    expect(item("sidebar")!.getAttribute("aria-checked")).toBe("true");
-    expect(item("window")!.getAttribute("aria-checked")).toBe("false");
+    expect(item("sidebar")).toBeNull();
+    expect(item("window")).not.toBeNull();
     expect(item("full")).not.toBeNull();
     expect(item("dock")).toBeNull();
+  });
+
+  it("offers side panel and floating window from the full page, and side panel and full page from a window", async () => {
+    await setup({ placement: "full" });
+    expect(item("full")).toBeNull();
+    expect(item("sidebar")).not.toBeNull();
+    expect(item("window")).not.toBeNull();
+    document.body.innerHTML = "";
+    const sid = fake.current.store.state.shell.activeSid;
+    fake.current.store.floatChat(sid);
+    await setup({ placement: "window", sid });
+    expect(item("window")).toBeNull();
+    expect(item("sidebar")).not.toBeNull();
+    expect(item("full")).not.toBeNull();
   });
 
   it("floats the chat and closes the sidebar", async () => {
@@ -142,13 +156,13 @@ describe("Open as", () => {
     });
   });
 
-  it("disables Floating window at the cap of 4", async () => {
+  it("hides Floating window at the cap of 4", async () => {
     const { store } = fake.current;
     const sid = store.state.shell.activeSid;
     for (let i = 0; i < 4; i += 1)
       store.floatChat(store.createSession({ origin: ORIGIN, detached: true }), { focus: "none" });
     await setup({ sid });
-    expect(item("window")!.getAttribute("aria-disabled")).toBe("true");
+    expect(item("window")).toBeNull();
   });
 
   it("drops Floating window below lg, where windows do not exist", async () => {
@@ -156,7 +170,7 @@ describe("Open as", () => {
     await setup({ placement: "full" });
     expect(item("window")).toBeNull();
     expect(item("sidebar")).not.toBeNull();
-    expect(item("full")).not.toBeNull();
+    expect(item("full")).toBeNull();
   });
 
   it("offers only Full view on the sheet", async () => {
@@ -224,92 +238,42 @@ describe("Open as", () => {
     expect(store.state.shell.placement.kind).toBe("sidebar");
   });
 
-  it("names the moves Side panel, Full page and Floating window, in the board's order", async () => {
+  it("names the two other moves, in the board's order, with no check mark", async () => {
     await setup({});
     const items = document.body.querySelectorAll('[role="menuitemradio"], [role="menuitem"]');
     expect([...items].map((el) => el.getAttribute("data-test"))).toEqual([
-      "assistant-shell-place-sidebar",
       "assistant-shell-place-full",
       "assistant-shell-place-window",
     ]);
     expect([...items].map((el) => el.textContent?.trim())).toEqual([
-      "Side panel",
-      "Full page",
-      "Floating window",
+      "Full Page",
+      "Floating Window",
     ]);
+    expect(document.body.querySelector("[aria-checked]")).toBeNull();
     expect(document.body.querySelector('[role="separator"]')).toBeNull();
   });
 
-  it("opens from its own Open as trigger with the moves under one label", async () => {
+  it("draws the other moves as direct buttons named by their mode, with no trigger", async () => {
     const router = fakeRouter();
     await router.push("/logs");
-    const wrapper = mount(AssistantOpenAsMenu, {
+    const wrapper = mount(AssistantModeButtons, {
       props: { placement: "sidebar", sid: fake.current.store.state.shell.activeSid },
       global: { plugins: [router, fakeVuex()] },
       attachTo: document.body,
     });
     await flushPromises();
-    const trigger = wrapper.get('[data-test="assistant-open-as-button"]');
-    expect(trigger.attributes("aria-label")).toBe("Open as");
-    await trigger.trigger("click");
-    await flushPromises();
-    expect(document.body.querySelector('[data-test="assistant-open-as"]')?.textContent).toContain(
-      "Open as",
+    expect(wrapper.find('[data-test="assistant-open-as-button"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="assistant-shell-place-sidebar"]').exists()).toBe(false);
+    expect(wrapper.get('[data-test="assistant-shell-place-full"]').attributes("aria-label")).toBe(
+      "Full Page",
     );
-    expect(item("full")).not.toBeNull();
+    expect(wrapper.get('[data-test="assistant-shell-place-window"]').attributes("aria-label")).toBe(
+      "Floating Window",
+    );
+    await wrapper.get('[data-test="assistant-shell-place-window"]').trigger("click");
+    await flushPromises();
+    expect(fake.current.store.state.shell.placement.kind).toBe("hidden");
     wrapper.unmount();
-  });
-
-  it("reads Open as on the full page, where the bar has room for the word", async () => {
-    const router = fakeRouter();
-    await router.push("/logs");
-    const wrapper = mount(AssistantOpenAsMenu, {
-      props: { placement: "full", sid: null, labelled: true },
-      global: { plugins: [router, fakeVuex()] },
-      attachTo: document.body,
-    });
-    await flushPromises();
-    expect(wrapper.get('[data-test="assistant-open-as-button"]').text()).toBe("Open as");
-    wrapper.unmount();
-  });
-
-  it("drops the labelled button's word to assistive tech on a phone, keeping its name, so the title has room", async () => {
-    const router = fakeRouter();
-    await router.push("/logs");
-    const wrapper = mount(AssistantOpenAsMenu, {
-      props: { placement: "full", sid: null, labelled: true },
-      global: { plugins: [router, fakeVuex()] },
-      attachTo: document.body,
-    });
-    await flushPromises();
-    const button = wrapper.get('[data-test="assistant-open-as-button"]');
-    expect(button.attributes("aria-label")).toBe("Open as");
-    expect(button.get("span.max-md\\:sr-only").text()).toBe("Open as");
-    expect(button.classes()).toContain("max-md:min-w-11");
-    wrapper.unmount();
-  });
-
-  it("drops the labelled button's chevron on a phone, so the bar keeps one 44px icon (B-shell3-7)", async () => {
-    const router = fakeRouter();
-    await router.push("/logs");
-    const mountMenu = () =>
-      mount(AssistantOpenAsMenu, {
-        props: { placement: "full", sid: null, labelled: true },
-        global: { plugins: [router, fakeVuex()] },
-        attachTo: document.body,
-      });
-    const wide = mountMenu();
-    await flushPromises();
-    const icons = (w: typeof wide) =>
-      w.get('[data-test="assistant-open-as-button"]').findAllComponents({ name: "OIcon" }).length;
-    const wideIcons = icons(wide);
-    wide.unmount();
-    lg.value = false;
-    const phone = mountMenu();
-    await flushPromises();
-    expect(icons(phone)).toBe(wideIcons - 1);
-    phone.unmount();
-    lg.value = true;
   });
 });
 

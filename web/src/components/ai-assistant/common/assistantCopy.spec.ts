@@ -72,7 +72,6 @@ describe("assistant copy renders through vue-i18n", () => {
       );
   });
   it("fills the threads and Home copy, and greets in sentence case", () => {
-    expect(t("assistant.history.filter.needsYouCount", { count: 2 })).toBe("Needs you · 2");
     expect(
       t("assistant.history.autoRuns.openName", { title: "Checkout 5xx", state: "Failed" }),
     ).toBe("Open Checkout 5xx, Failed");

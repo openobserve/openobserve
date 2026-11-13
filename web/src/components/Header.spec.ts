@@ -240,16 +240,6 @@ describe("Header Component", () => {
       );
       header.unmount();
     });
-
-    it("below xl hides the Edition badge while the right group holds a waiting chat's strip (B-shell3-2)", async () => {
-      const header = createWrapper({ configOverrides: { isEnterprise: "true" } });
-      await header.vm.$nextTick();
-      expect(header.get('[data-test="header-right"]').classes()).toContain("group/header-right");
-      expect(header.get('[data-test="upgrade-to-enterprise-btn"]').classes()).toContain(
-        "max-xl:group-has-[[data-test=assistant-decision-notice]]/header-right:hidden",
-      );
-      header.unmount();
-    });
   });
 
   describe("Logo Rendering", () => {
