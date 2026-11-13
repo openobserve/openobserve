@@ -158,89 +158,82 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span class="text-text-secondary tabular-nums">· {{ sectionRows.length }}</span>
       </p>
     </template>
+    <template #cell-id="{ row }">
+      <span
+        class="text-text-body font-mono text-xs whitespace-nowrap tabular-nums"
+        :title="row.id"
+        data-test="autoobserve-live-issues-id"
+        >{{ row.shortId }}</span
+      >
+    </template>
     <template #cell-incident="{ row }">
       <!-- The padding sits outside the clamp, which would otherwise show the top of line three in it. -->
-      <div class="py-1.5">
+      <div class="flex min-w-0 flex-col gap-1 py-1.5 whitespace-normal">
         <OTruncatedText
           as="p"
           :lines="2"
-          class="text-text-heading leading-snug font-medium wrap-anywhere whitespace-normal"
+          class="text-text-heading leading-snug font-medium wrap-anywhere"
           data-test="autoobserve-live-issues-sentence"
           >{{ row.sentence }}</OTruncatedText
         >
-      </div>
-    </template>
-    <template #cell-severity="{ row }">
-      <OTag type="severity" :value="row.severity" size="sm" />
-    </template>
-    <template #cell-status="{ row }">
-      <OTag type="incidentStatus" :value="row.status" :label="row.statusText" size="sm" />
-    </template>
-    <template #cell-stream="{ row }">
-      <OTag
-        v-if="row.stream"
-        variant="default-soft"
-        shape="rounded"
-        size="sm"
-        class="max-w-full"
-        :title="row.streamTitle"
-        data-test="autoobserve-live-issues-stream"
-      >
-        <OTruncatedText as="span" data-test="autoobserve-live-issues-stream-text">{{
-          row.stream
-        }}</OTruncatedText>
-      </OTag>
-    </template>
-    <template #cell-page="{ row }">
-      <OTag
-        v-if="row.page"
-        :variant="PAGE_VARIANT[row.page.tone]"
-        size="sm"
-        class="max-w-full"
-        :data-tone="row.page.tone"
-        data-test="autoobserve-live-issues-page"
-      >
-        <OTruncatedText as="span" data-test="autoobserve-live-issues-page-text">{{
-          row.page.text
-        }}</OTruncatedText>
-      </OTag>
-      <span v-else class="text-text-secondary">—</span>
-    </template>
-    <template #cell-opened="{ row }">
-      <span class="text-text-secondary text-xs whitespace-nowrap" :title="row.openedAt">{{
-        row.opened
-      }}</span>
-    </template>
-    <template #cell-analysis="{ row }">
-      <div class="flex min-w-0 flex-col items-start gap-0.5 py-1.5 whitespace-normal">
-        <button
-          v-if="row.analysis.hasRun"
-          type="button"
-          class="focus-visible:ring-focus-ring-accent rounded-full focus-visible:ring-2 focus-visible:outline-none"
-          data-test="autoobserve-live-issues-analysis-link"
-          @click="openAnalysis(row)"
+        <!-- Time facts on one line, then who was paged and the analysis, so every row wraps the same way. -->
+        <span
+          class="text-text-secondary text-2xs flex flex-col gap-0.5 leading-4 tabular-nums"
+          data-test="autoobserve-live-issues-meta"
         >
-          <OBadge
-            :variant="RCA_BADGE_VARIANT[row.analysis.tone]"
-            size="sm"
-            :data-tone="row.analysis.tone"
-            data-test="autoobserve-live-issues-analysis"
-          >
-            <template v-if="row.analysis.spinner" #icon>
-              <OSpinner size="xs" />
-            </template>
-            {{ row.analysis.label }}
-          </OBadge>
-        </button>
-        <OBadge
-          v-else
-          :variant="RCA_BADGE_VARIANT[row.analysis.tone]"
-          size="sm"
-          :data-tone="row.analysis.tone"
-          data-test="autoobserve-live-issues-analysis"
-        >
-          {{ row.analysis.label }}
-        </OBadge>
+          <span class="flex flex-wrap items-center gap-x-1.5">
+            <!-- A separator trails its part, so a wrapped line never starts with a dot; the last part has none. -->
+            <span v-for="(part, i) in row.meta" :key="i" class="whitespace-nowrap"
+              >{{ part
+              }}<span
+                v-if="i < row.meta.length - 1"
+                aria-hidden="true"
+                class="text-text-muted ms-1.5"
+                >·</span
+              ></span
+            >
+          </span>
+          <span class="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5">
+            <span v-if="row.page" class="flex max-w-full min-w-0 items-center">
+              <OTruncatedText
+                as="span"
+                class="max-w-full"
+                :class="PAGE_INK[row.page.tone]"
+                :data-tone="row.page.tone"
+                data-test="autoobserve-live-issues-page"
+                >{{ row.page.text }}</OTruncatedText
+              >
+            </span>
+            <button
+              v-if="row.analysis.hasRun"
+              type="button"
+              class="focus-visible:ring-focus-ring-accent rounded-full focus-visible:ring-2 focus-visible:outline-none"
+              data-test="autoobserve-live-issues-analysis-link"
+              @click.stop="openIncident(row, 'analysis')"
+            >
+              <OBadge
+                :variant="RCA_BADGE_VARIANT[row.analysis.tone]"
+                size="sm"
+                :data-tone="row.analysis.tone"
+                data-test="autoobserve-live-issues-analysis"
+              >
+                <template v-if="row.analysis.spinner" #icon>
+                  <OSpinner size="xs" />
+                </template>
+                {{ row.analysis.label }}
+              </OBadge>
+            </button>
+            <OBadge
+              v-else
+              :variant="RCA_BADGE_VARIANT[row.analysis.tone]"
+              size="sm"
+              :data-tone="row.analysis.tone"
+              data-test="autoobserve-live-issues-analysis"
+            >
+              {{ row.analysis.label }}
+            </OBadge>
+          </span>
+        </span>
         <OTruncatedText
           v-if="row.analysis.detail && !shared?.covers(row.analysis)"
           as="p"
@@ -250,6 +243,65 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >{{ row.analysis.detail }}</OTruncatedText
         >
       </div>
+    </template>
+    <template #cell-severity="{ row }">
+      <OTag type="severity" :value="row.severity" size="sm" />
+    </template>
+    <template #cell-signal="{ row }">
+      <IssueSignal
+        :stream="row.lead"
+        :anchor-us="row.item.finding.first_seen_at"
+        :end-us="issueEndUs(row.item)"
+        :active="row.status !== 'resolved'"
+        class="py-1.5"
+      />
+    </template>
+    <template #cell-stream="{ row }">
+      <div
+        v-if="row.streams.length"
+        class="flex min-w-0 flex-nowrap items-center gap-1 overflow-hidden"
+        :title="row.streamTitle"
+        data-test="autoobserve-live-issues-stream"
+      >
+        <OTag
+          v-for="name in row.streams.slice(0, STREAM_CHIPS)"
+          :key="name"
+          variant="default-soft"
+          shape="rounded"
+          size="xs"
+          class="min-w-0"
+        >
+          <OTruncatedText as="span" data-test="autoobserve-live-issues-stream-text">{{
+            name
+          }}</OTruncatedText>
+        </OTag>
+        <OTag
+          v-if="row.streams.length > STREAM_CHIPS"
+          variant="default-soft"
+          shape="rounded"
+          size="xs"
+          class="shrink-0"
+          data-test="autoobserve-live-issues-stream-more"
+          >{{ row.streamsMore }}</OTag
+        >
+      </div>
+    </template>
+    <template #cell-opened="{ row }">
+      <span class="text-text-secondary text-xs whitespace-nowrap" :title="row.openedAt">{{
+        row.opened
+      }}</span>
+    </template>
+    <template #cell-status="{ row }">
+      <OTag type="incidentStatus" :value="row.status" :label="row.statusText" size="sm" />
+    </template>
+    <template #cell-cause="{ row }">
+      <OTruncatedText
+        as="p"
+        :lines="2"
+        class="text-text-secondary text-xs leading-snug whitespace-normal"
+        data-test="autoobserve-live-issues-cause"
+        >{{ row.cause }}</OTruncatedText
+      >
     </template>
     <template v-if="settled && issues.capped.value" #footer-note>
       <span class="text-text-secondary text-xs" data-test="autoobserve-live-issues-cap-note">{{
@@ -301,12 +353,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </template>
   </OTable>
+  <AutoObserveIssueDrawer
+    :open="!!selected"
+    :live-item="selected"
+    :live-tab="selectedTab"
+    @update:open="(v: boolean) => !v && closeIncident()"
+  />
 </template>
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, toRef, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { useI18nTyped, type I18nText } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -320,17 +378,19 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import type { OTableColumnDef, OTableExposed } from "@/lib/core/Table/OTable.types";
 import type { RowRailTone } from "@/lib/core/Table/OTable.types";
+import type { AutoObserveIncidentItem } from "@/services/autoobserve";
 import type { Incident } from "@/services/incidents";
 import { RCA_BADGE_VARIANT } from "@/utils/incidents/rcaCell";
-import { PRIORITY_FILTERS, type IssuesRange, type PriorityFilter } from "../v2/fixtures";
+import AutoObserveIssueDrawer from "../AutoObserveIssueDrawer.vue";
+import { PRIORITY_FILTERS, type PriorityFilter } from "../v2/requestTypes";
+import type { IssuesRange } from "../v2/autoobserveRoute";
+import IssueSignal from "./IssueSignal.vue";
 import LiveNoticeState from "./LiveNoticeState.vue";
 import LiveRefreshFailed from "./LiveRefreshFailed.vue";
 import {
   analysisLine,
-  analysisLink,
   capNote,
   findingSentence,
-  incidentLink,
   issuesCopy,
   issuesCountText,
   issuesDayKey,
@@ -340,15 +400,22 @@ import {
   issuesNoMatch,
   issuesOpenedText,
   issuesPageCell,
-  issuesStreamLabel,
   issuesStreamNames,
-  issuesStreamType,
   sharedAnalysis,
   type PageCell,
   statusLabel,
   type AnalysisLine,
 } from "./incidentsCopy";
 import { formatWhen, liveNotice, type LiveFailure, type LiveNoticeView } from "./liveCopy";
+import {
+  issueCause,
+  issueEndUs,
+  issueMeta,
+  issueShortId,
+  issueStreams,
+  type IssueStreamInfo,
+  type LiveIssueTab,
+} from "./issueModel";
 import { useLiveZone } from "./liveModel";
 import { useLiveIssues } from "./useLiveIssues";
 
@@ -356,12 +423,18 @@ type StatusFilter = "open" | "resolved" | "all";
 
 interface IssueRow {
   id: string;
+  shortId: string;
+  item: AutoObserveIncidentItem;
   sentence: I18nText;
+  meta: I18nText[];
+  lead: IssueStreamInfo | null;
+  streams: string[];
+  streamsMore: I18nText;
+  cause: I18nText;
   severity: Incident["severity"];
   tone: RowRailTone;
   status: Incident["status"];
   statusText: I18nText;
-  stream: I18nText | null;
   streamTitle: string | undefined;
   page: PageCell | null;
   opened: I18nText;
@@ -371,11 +444,14 @@ interface IssueRow {
   haystack: string;
 }
 
-const PAGE_VARIANT: Record<PageCell["tone"], "default-soft" | "amber-soft" | "error-soft"> = {
-  neutral: "default-soft",
-  warning: "amber-soft",
-  error: "error-soft",
+const PAGE_INK: Record<PageCell["tone"], string> = {
+  neutral: "",
+  warning: "text-status-warning-text",
+  error: "text-status-error-text",
 };
+
+// Two names fit the column; the rest fold into one "+N" chip whose title lists them.
+const STREAM_CHIPS = 2;
 
 const NOTICE_TEST: Record<LiveFailure, string> = {
   denied: "autoobserve-live-issues-denied",
@@ -470,24 +546,32 @@ const all = computed<IssueRow[]>(() =>
   rows.value.map((item) => {
     const sentence = findingSentence(t, item);
     const created = item.incident.created_at / 1000;
+    const streams = issueStreams(item);
+    const names = streams.map((s) => s.name);
+    const cause = issueCause(t, zone.value, item, issues.now.value);
     return {
       id: item.incident.id,
+      shortId: issueShortId(item.incident.id),
+      item,
       sentence,
+      meta: issueMeta(t, zone.value, item, issues.now.value),
+      lead: streams[0] ?? null,
+      streams: names,
+      streamsMore: raw(`+${names.length - STREAM_CHIPS}`),
+      cause,
       severity: item.incident.severity,
       tone: String(item.incident.severity).toLowerCase() as RowRailTone,
       status: item.incident.status,
       statusText: statusLabel(t, item.incident.status),
-      stream: issuesStreamLabel(t, item),
-      streamTitle:
-        (item.members?.length ?? 0) > 1
-          ? issuesStreamNames(item).slice(1).join(", ")
-          : issuesStreamType(t, item.finding.stream_type),
+      streamTitle: names.length > STREAM_CHIPS ? names.join(", ") : undefined,
       page: issuesPageCell(t, item),
       opened: issuesOpenedText(t, locale.value, created, issues.now.value),
       openedAt: formatWhen(created, locale.value, zone.value.timeZone, issues.now.value),
       analysis: analysisLine(t, item, issues.rcaEnabled.value),
       day: issuesDayKey(item.finding.first_seen_at, zone.value.timeZone),
-      haystack: [sentence, ...issuesStreamNames(item)].join("\n").toLowerCase(),
+      haystack: [sentence, item.incident.id, cause, ...issuesStreamNames(item)]
+        .join("\n")
+        .toLowerCase(),
     };
   }),
 );
@@ -569,23 +653,55 @@ const dayLabels = computed(
     ),
 );
 
-const openIncident = (row: IssueRow) => void router.push(incidentLink(issues.org.value, row.id));
+// The open incident lives in the URL, so reload and browser Back reopen it.
+const linked = computed(() =>
+  typeof route.query.incident === "string" ? route.query.incident : null,
+);
+const selectedTab = ref<LiveIssueTab>("overview");
+const selected = computed<AutoObserveIncidentItem | null>(
+  () => (linked.value && rows.value.find((i) => i.incident.id === linked.value)) || null,
+);
 
-const openAnalysis = (row: IssueRow) => void router.push(analysisLink(issues.org.value, row.id));
+const openIncident = (row: IssueRow, tab: LiveIssueTab = "overview") => {
+  selectedTab.value = tab;
+  if (route.query.incident !== row.id)
+    void router.replace({ query: { ...route.query, incident: row.id } });
+};
+
+const closeIncident = () => {
+  if (route.query.incident !== undefined)
+    void router.replace({ query: { ...route.query, incident: undefined } });
+};
 
 const columns = computed<OTableColumnDef<IssueRow>[]>(() => [
+  { id: "id", header: t("autoobserve.issueLive.columns.id"), accessorKey: "shortId", size: 96 },
   {
     id: "incident",
     header: copy.value.colIncident,
     accessorKey: "sentence",
-    size: 420,
+    size: 380,
     meta: { flex: true },
   },
-  { id: "severity", header: copy.value.colSeverity, accessorKey: "severity", size: 92 },
-  { id: "status", header: copy.value.colStatus, accessorKey: "status", size: 140 },
-  { id: "stream", header: copy.value.colStream, accessorKey: "stream", size: 168 },
-  { id: "page", header: copy.value.colPage, accessorKey: "page", size: 168 },
-  { id: "opened", header: copy.value.colOpened, accessorKey: "opened", size: 140 },
-  { id: "analysis", header: copy.value.colAnalysis, accessorKey: "analysis", size: 240 },
+  { id: "severity", header: copy.value.colSeverity, accessorKey: "severity", size: 84 },
+  {
+    id: "signal",
+    header: t("autoobserve.issueLive.columns.signal"),
+    accessorKey: "lead",
+    size: 176,
+  },
+  {
+    id: "stream",
+    header: t("autoobserve.issueLive.columns.streams"),
+    accessorKey: "streams",
+    size: 176,
+  },
+  { id: "opened", header: copy.value.colOpened, accessorKey: "opened", size: 120 },
+  { id: "status", header: copy.value.colStatus, accessorKey: "status", size: 120 },
+  {
+    id: "cause",
+    header: t("autoobserve.issueLive.columns.cause"),
+    accessorKey: "cause",
+    size: 260,
+  },
 ]);
 </script>

@@ -234,6 +234,14 @@ pub trait FileList: Sync + Send + 'static {
 
     // stream stats table
     async fn get_updated_streams(&self, time_range: (i64, i64)) -> Result<Vec<String>>;
+    /// Records per `(stream, date)` partition of live files, or of dumped ones from the dump
+    /// stats, for the given stream keys only.
+    async fn records_by_date(
+        &self,
+        streams: &[String],
+        date_range: (String, String),
+        dumped: bool,
+    ) -> Result<Vec<(String, String, i64)>>;
     async fn stats_by_date_range(
         &self,
         org_id: &str,
@@ -689,6 +697,35 @@ pub async fn get_updated_streams(time_range: (i64, i64)) -> Result<Vec<String>> 
     CLIENT.get_updated_streams(time_range).await
 }
 
+/// Records per `(stream, date)` of live files, then of dumped ones when dumping is on; a dumped
+/// row, marked `true`, covers its whole day.
+pub async fn records_by_date(
+    streams: &[String],
+    date_range: (String, String),
+) -> Result<Vec<(String, String, i64, bool)>> {
+    let mut out: Vec<(String, String, i64, bool)> = CLIENT
+        .records_by_date(streams, date_range.clone(), false)
+        .await?
+        .into_iter()
+        .map(|(s, d, r)| (s, d, r, false))
+        .collect();
+    if !get_config().compact.file_list_dump_enabled {
+        return Ok(out);
+    }
+    let live: stdHashMap<String, &String> = streams
+        .iter()
+        .filter_map(|s| Some((dump_stream_key(s)?, s)))
+        .collect();
+    let keys: Vec<String> = live.keys().cloned().collect();
+    let days = (day_start_key(&date_range.0), date_range.1);
+    for (key, date, records) in CLIENT.records_by_date(&keys, days, true).await? {
+        if let Some(stream) = live.get(&key) {
+            out.push(((*stream).clone(), date, records, true));
+        }
+    }
+    Ok(out)
+}
+
 #[inline]
 pub async fn stats_by_date_range(
     org_id: &str,
@@ -864,6 +901,22 @@ pub async fn local_cache_gc() -> Result<()> {
     });
 
     Ok(())
+}
+
+/// `{org}/{type}/{name}` as file list dumps key it, `{org}/file_list/{name}_{type}`.
+fn dump_stream_key(stream: &str) -> Option<String> {
+    let mut parts = stream.splitn(3, '/');
+    let (org, stream_type, name) = (parts.next()?, parts.next()?, parts.next()?);
+    Some(format!(
+        "{org}/{}/{name}_{stream_type}",
+        StreamType::Filelist
+    ))
+}
+
+/// Dumps are partitioned by day at hour `00`, so a range starting mid-day still reads that day.
+fn day_start_key(date: &str) -> String {
+    date.rsplit_once('/')
+        .map_or_else(|| date.to_string(), |(day, _)| format!("{day}/00"))
 }
 
 #[inline]
@@ -1128,6 +1181,22 @@ mod tests {
     use config::meta::stream::StreamStats;
 
     use super::*;
+
+    #[test]
+    fn a_stream_maps_to_its_dump_key_and_day_start() {
+        for (live, dumped) in [
+            ("org/logs/app_web", Some("org/file_list/app_web_logs")),
+            ("org/traces/default", Some("org/file_list/default_traces")),
+            (
+                "org/enrichment_tables/geo",
+                Some("org/file_list/geo_enrichment_tables"),
+            ),
+            ("org/logs", None),
+        ] {
+            assert_eq!(dump_stream_key(live).as_deref(), dumped);
+        }
+        assert_eq!(day_start_key("2026/01/02/13"), "2026/01/02/00");
+    }
 
     #[test]
     fn test_stream_key_length_boundary() {

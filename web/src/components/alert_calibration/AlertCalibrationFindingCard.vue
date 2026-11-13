@@ -200,7 +200,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="text-text-body text-end text-xs tabular-nums"
               data-test="alert-calibration-finding-lag-cell"
             >
-              {{ formatEvidence(t, row[column.field], "count") }}
+              {{ formatEvidence(t, row[column.field], "count", locale) }}
             </span>
           </div>
         </div>
@@ -421,7 +421,7 @@ const evidence = computed(() =>
   evidenceFor(props.finding).map((field) => ({
     column: field.column,
     label: t(field.labelKey),
-    value: formatEvidenceField(t, props.finding, field),
+    value: formatEvidenceField(t, props.finding, field, locale.value),
     // Free text and the time sentences run long, so each takes its own line.
     wide:
       field.format === "text" || field.format === "evaluationTimes" || field.format === "nearLimit",

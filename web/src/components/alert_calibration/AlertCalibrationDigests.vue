@@ -137,6 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :count="row.finding_count ?? undefined"
             >
               {{ t("alertCalibration.digests.findings") }}
+              <template #trailing>{{ countOrDash(row.finding_count, locale) }}</template>
             </OBadge>
           </template>
 
@@ -231,6 +232,7 @@ import AlertCalibrationLastRun from "./AlertCalibrationLastRun.vue";
 import { useDigestSearch, useLatestRead } from "./useDigestSearch";
 import {
   countOrDash,
+  countTile,
   coverageNotes,
   coverageVerdict,
   isClean,
@@ -304,7 +306,7 @@ const stats = computed<StatItem[]>(() => {
     {
       key: "latest",
       label: t("alertCalibration.digests.latestFindings"),
-      value: countOrDash(run?.finding_count, locale.value),
+      ...countTile(run?.finding_count, locale.value),
       sub: run ? t(coverageBadge(run).labelKey) : undefined,
       icon: "fact-check",
       tone: (run?.finding_count ?? 0) > 0 ? "warning" : "neutral",

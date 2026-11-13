@@ -202,6 +202,15 @@ describe("AlertCalibrationDigestDetail definition not checked", () => {
     wrapper.unmount();
   });
 
+  it("a run listing unchecked definitions reads as partial, never full coverage", async () => {
+    const wrapper = await mountDetail([notChecked(1, 1, "probe_timeout")]);
+    expect(wrapper.find('[data-test="alert-calibration-digest-partial"]').exists()).toBe(true);
+    expect(wrapper.get('[data-test="alert-calibration-digest-stats"]').text()).not.toContain(
+      "Full coverage",
+    );
+    wrapper.unmount();
+  });
+
   it("Review query opens the alert editor at the query with the skip as its handoff", async () => {
     const wrapper = await mountDetail([notChecked(1, 7, "probe_rejected")]);
     const button = wrapper.get(`${GROUP} [data-test="alert-calibration-skip-group-row"] button`);
@@ -460,19 +469,15 @@ describe("AlertCalibrationDigestDetail dismissed tile", () => {
       (item) => item.key === "dismissed",
     );
 
-  it("strip counts read in the reader's locale", async () => {
+  it("strip counts read in the reader's locale, four digits and up compact", async () => {
     const wrapper = await mountDetail([
-      { ...finding(12_345, 1), alerts_in_scope: 12_345, dismissed_count: 1_000 },
+      { ...finding(12_345, 1), alerts_in_scope: 999, dismissed_count: 1_000 },
     ]);
     await flushPromises();
     const items = wrapper.findComponent(OStatStrip).props("items") as StatItem[];
     const value = (key: string) => items.find((item) => item.key === key)?.value;
-    expect([value("findings"), value("scope"), value("dismissed")]).toEqual([
-      "12,345",
-      "12,345",
-      "1,000",
-    ]);
-    expect(wrapper.findComponent(OStatStrip).text()).toContain("12,345");
+    expect([value("findings"), value("scope"), value("dismissed")]).toEqual(["12.3K", "999", "1K"]);
+    expect(wrapper.findComponent(OStatStrip).text()).toContain("12.3K");
     wrapper.unmount();
   });
 
@@ -480,7 +485,7 @@ describe("AlertCalibrationDigestDetail dismissed tile", () => {
     const written = await mountDetail([{ ...finding(1, 1), dismissed_count: 2 }]);
     await flushPromises();
     expect(tile(written)?.value).toBe("2");
-    expect(tile(written)?.sub).toBe("Hidden when this run was made");
+    expect(tile(written)?.subTooltip).toBeTruthy();
     expect(tile(written)?.label).toBe("Dismissed");
     written.unmount();
 

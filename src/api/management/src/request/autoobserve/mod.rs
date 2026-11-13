@@ -22,7 +22,7 @@ pub mod review;
 pub mod slack_feed;
 
 use std::{
-    collections::{BTreeSet, HashMap},
+    collections::{BTreeMap, BTreeSet, HashMap},
     future::Future,
     str::FromStr,
 };
@@ -33,7 +33,14 @@ use axum::{
     extract::{Path, Query, RawQuery, rejection::QueryRejection},
     response::Response,
 };
-use config::{meta::autoobserve::marks::ENTITY_TYPE_ALERT, utils::time::now_micros};
+use config::{
+    meta::{
+        autoobserve::marks::ENTITY_TYPE_ALERT,
+        folder::{DEFAULT_FOLDER, FolderType},
+    },
+    utils::time::now_micros,
+};
+use futures::{StreamExt, stream};
 use infra::db::get_orm_client_ro;
 use o2_enterprise::enterprise::autoobserve::{
     alert_findings::{AlertFindingsRead, DigestRun, RUN_LOOKBACK_US},
@@ -42,6 +49,7 @@ use o2_enterprise::enterprise::autoobserve::{
         STORAGE_FAILED, SuggestionFilter,
     },
     contract::EntityRef,
+    coverage_scope::CoverageReader,
     marks::MarkSource,
     names::{dims, kinds},
 };
@@ -62,6 +70,7 @@ use crate::{
 
 /// Only whether a DELETE carries a body matters, so reading stops here.
 const MAX_DELETE_BODY: usize = 64 * 1024;
+const FOLDER_CHECK_CONCURRENCY: usize = 16;
 const DISABLED_MESSAGE: &str = "AutoObserve is disabled (O2_AUTOOBSERVE_ENABLED=false)";
 
 #[derive(Debug, Default, Deserialize, IntoParams)]
@@ -79,6 +88,17 @@ pub struct HistoryQuery {
     /// Start of the first day, in microseconds.
     pub from: i64,
     /// Start of the last day, in microseconds; at most 90 days after `from`.
+    pub to: i64,
+}
+
+#[derive(Debug, Deserialize, IntoParams)]
+#[into_params(parameter_in = Query)]
+pub struct VolumeQuery {
+    /// Comma-separated `stream_type/stream_name` ids, 1 to 50, e.g. `logs/default`.
+    pub ids: String,
+    /// Range start, in microseconds.
+    pub from: i64,
+    /// Range end, in microseconds; at most 7 days after `from`.
     pub to: i64,
 }
 
@@ -163,6 +183,47 @@ impl<'a> Subject<'a> {
     }
 }
 
+/// The coverage caller's rights as RBAC grants them; with RBAC off every check passes.
+struct LiveReader<'a> {
+    org_id: &'a str,
+    user_id: &'a str,
+}
+
+#[async_trait]
+impl CoverageReader for LiveReader<'_> {
+    async fn all_streams(&self, types: Vec<String>) -> bool {
+        if !rbac_enforced().await {
+            return true;
+        }
+        for t in &types {
+            if !org_wide_allows(self.org_id, self.user_id, t, "GET").await {
+                return false;
+            }
+        }
+        true
+    }
+
+    async fn streams(&self, ids: Vec<(String, String)>) -> Vec<bool> {
+        readable_streams(self.org_id, self.user_id, ids).await
+    }
+
+    async fn monitors(&self, subjects: Vec<EntityRef>) -> Vec<bool> {
+        readable_subjects(self.org_id, self.user_id, subjects).await
+    }
+
+    async fn all_monitors(&self) -> bool {
+        if !rbac_enforced().await {
+            return true;
+        }
+        for resource in ["alerts", "synthetics"] {
+            if !org_wide_allows(self.org_id, self.user_id, resource, "GET").await {
+                return false;
+            }
+        }
+        true
+    }
+}
+
 /// The calibration digest, searched only through calibration's protected reader (P5b-D-read).
 struct LiveDigest;
 
@@ -189,6 +250,68 @@ impl AlertFindingsRead for ReaderDigest<'_> {
             offer_reader_changes(org, self.0, &mut run.records).await;
         }
         Ok(run)
+    }
+}
+
+/// Whether the caller may create an alert in each alert folder, keyed by folder id.
+#[derive(Debug, PartialEq, Eq, Serialize, ToSchema)]
+pub struct WritableFolders {
+    pub folders: BTreeMap<String, bool>,
+}
+
+/// The check alert creation makes on its folder; tests answer it from a table.
+trait FolderWrites {
+    async fn enforced(&self) -> bool;
+    async fn every_folder(&self) -> bool;
+    async fn readable(&self, ids: &BTreeSet<String>) -> anyhow::Result<BTreeSet<String>>;
+    async fn folder(&self, folder_id: &str) -> bool;
+}
+
+struct LiveFolderWrites<'a> {
+    org_id: &'a str,
+    user_id: &'a str,
+}
+
+impl FolderWrites for LiveFolderWrites<'_> {
+    async fn enforced(&self) -> bool {
+        rbac_enforced().await
+    }
+
+    async fn every_folder(&self) -> bool {
+        org_wide_allows(self.org_id, self.user_id, "alert_folders", "POST").await
+    }
+
+    async fn readable(&self, ids: &BTreeSet<String>) -> anyhow::Result<BTreeSet<String>> {
+        let objects =
+            db::authz::list_permitted_objects(self.org_id, self.user_id, "GET", "afolder").await?;
+        Ok(ids
+            .iter()
+            .filter(|id| {
+                openobserve_core::auth::is_ofga_object_visible(
+                    self.org_id,
+                    "afolder",
+                    id,
+                    objects.as_deref(),
+                )
+            })
+            .cloned()
+            .collect())
+    }
+
+    // The `POST /v2/{org}/alerts` route row: the folder itself, with self-parent.
+    async fn folder(&self, folder_id: &str) -> bool {
+        check_permissions(
+            folder_id,
+            self.org_id,
+            self.user_id,
+            "alert_folders",
+            "POST",
+            None,
+            false,
+            false,
+            true,
+        )
+        .await
     }
 }
 
@@ -228,7 +351,7 @@ pub async fn entity_types(Path(_org_id): Path<String>) -> Response {
     tag = "AutoObserve",
     operation_id = "AutoObserveCoverage",
     summary = "Get the coverage matrix",
-    description = "This region's newest coverage matrix: one row per watched service with the evidence for each signal class. `pass_at`, `refreshed_at` and `quality` are null, and `rows` is empty, when the engine has written no pass in the last day. `learning` is present unless the learning state could not be read, in which case it and every `learning_until` are left out: how many of the org's streams the stream watches still learn and how many have the `history_days_needed` days they need, with `next_ready_at` (microseconds) the soonest a learning stream is ready, null when none learns. Each listed stream's `learning_until` is when its history will be enough, null once it is or when no stream watch applies.",
+    description = "This region's newest coverage matrix: one row per watched service with the evidence for each signal class. `pass_at`, `refreshed_at` and `quality` are null, and `rows` is empty, when the engine has written no pass in the last day. `learning` is present unless the learning state could not be read, in which case it and every `learning_until` are left out: how many of the org's streams the stream watches still learn and how many have the `history_days_needed` days they need, with `next_ready_at` (microseconds) the soonest a learning stream is ready, null when none learns. Each listed stream's `learning_until` is when its history will be enough, null once it is or when no stream watch applies. Streams and monitors the caller may not read are left out, with each cell judged again from the monitors left, and a service with no readable stream is left out.",
     security(("Authorization" = [])),
     params(("org_id" = String, Path, description = "Organization name"), CoverageQuery),
     responses(
@@ -246,6 +369,7 @@ pub async fn entity_types(Path(_org_id): Path<String>) -> Response {
 )]
 pub async fn coverage(
     Path(org_id): Path<String>,
+    Headers(user): Headers<UserEmail>,
     query: Result<Query<CoverageQuery>, QueryRejection>,
 ) -> Response {
     if let Some(disabled) = deployment_disabled() {
@@ -261,7 +385,11 @@ pub async fn coverage(
     };
     serve(|deps| async move {
         let service = query.service.as_deref().filter(|s| !s.is_empty());
-        api::coverage(&deps, &org_id, view, service, now_micros()).await
+        let reader = LiveReader {
+            org_id: &org_id,
+            user_id: &user.user_id,
+        };
+        api::coverage_for(&deps, &org_id, view, service, now_micros(), &reader).await
     })
     .await
 }
@@ -273,7 +401,7 @@ pub async fn coverage(
     tag = "AutoObserve",
     operation_id = "AutoObserveCoverageHistory",
     summary = "Get daily coverage snapshots",
-    description = "The daily coverage snapshot of each day whose start lies in [from, to].",
+    description = "The daily coverage snapshot of each day whose start lies in [from, to]. Services with no stream the caller may read are left out, and each cell is judged again from the monitors the caller may read. A day stored before per-monitor states were kept cannot be judged again: unless the caller reads every stream and monitor, its rows are left out with the day's `unknown` set to true, or kept with the classes that name a monitor listed in the row's `unknown` instead of `cells`.",
     security(("Authorization" = [])),
     params(("org_id" = String, Path, description = "Organization name"), HistoryQuery),
     responses(
@@ -291,6 +419,7 @@ pub async fn coverage(
 )]
 pub async fn coverage_history(
     Path(org_id): Path<String>,
+    Headers(user): Headers<UserEmail>,
     query: Result<Query<HistoryQuery>, QueryRejection>,
 ) -> Response {
     if let Some(disabled) = deployment_disabled() {
@@ -300,8 +429,115 @@ pub async fn coverage_history(
         Ok(query) => query,
         Err(refused) => return refused,
     };
-    serve(|deps| async move { api::coverage_history(&deps, &org_id, query.from, query.to).await })
+    serve(|deps| async move {
+        let reader = LiveReader {
+            org_id: &org_id,
+            user_id: &user.user_id,
+        };
+        api::coverage_history_for(&deps, &org_id, query.from, query.to, &reader).await
+    })
+    .await
+}
+
+#[utoipa::path(
+    get,
+    path = "/v2/{org_id}/autoobserve/folders/writable",
+    context_path = "/api",
+    tag = "AutoObserve",
+    operation_id = "AutoObserveWritableFolders",
+    summary = "List the alert folders the caller may create alerts in",
+    description = "Each alert folder the caller may list or create alerts in, and the default folder, with whether the caller may create an alert in it. The answer is the permission check alert creation makes, so a folder that reads false refuses the create.",
+    security(("Authorization" = [])),
+    params(("org_id" = String, Path, description = "Organization name")),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = WritableFolders),
+        (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
+        (status = 404, description = "AutoObserve is disabled for this deployment", content_type = "application/json", body = Object),
+        (status = 500, description = "The alert folders could not be read", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "AutoObserve", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
+pub async fn writable_folders(
+    Path(org_id): Path<String>,
+    Headers(user): Headers<UserEmail>,
+) -> Response {
+    if let Some(disabled) = deployment_disabled() {
+        return disabled;
+    }
+    let candidates = match infra::table::folders::list_folders(&org_id, FolderType::Alerts).await {
+        Ok(candidates) => candidates,
+        Err(e) => {
+            log::error!("[AUTOOBSERVE] org {org_id}: listing alert folders failed: {e}");
+            return MetaHttpResponse::internal_error("the alert folders could not be read");
+        }
+    };
+    let auth = LiveFolderWrites {
+        org_id: &org_id,
+        user_id: &user.user_id,
+    };
+    let ids = candidates.into_iter().map(|f| f.folder_id).collect();
+    match folder_writes(&auth, ids).await {
+        Ok(folders) => MetaHttpResponse::json(WritableFolders { folders }),
+        Err(e) => {
+            log::error!("[AUTOOBSERVE] org {org_id}: reading folder grants failed: {e}");
+            MetaHttpResponse::internal_error("the alert folder permissions could not be read")
+        }
+    }
+}
+
+#[utoipa::path(
+    get,
+    path = "/v2/{org_id}/autoobserve/streams/volume",
+    context_path = "/api",
+    tag = "AutoObserve",
+    operation_id = "AutoObserveStreamVolume",
+    summary = "Get stream volume series",
+    description = "Each named stream's ingested records over [from, to) as the stream watch judged them, rebuilt from its stored daily presence and today's usage. Per stream: `status` (`volume`, `presence_only`, `warmup`, `irregular` for a trained stream too irregular to judge, or `no_data`), `width_secs`, `rows_per_day`, `exact` (false when a stored day was missing or a finding's stamped baseline differs), `days` (each UTC day with the `trained_day` that judged it and its `resolution` in seconds), `buckets` (`t`, `actual`, `expected`, `lower`, `upper`, `expected_present`, `class`: one of `low`, `high`, `normal`, `spread`, `quiet`, `missing`, `busy_missing`; null where unjudged), `forecast` for buckets after now, and `markers` for the stream's silence, drop and rise findings. Streams the caller may not read are listed in `denied` instead.",
+    security(("Authorization" = [])),
+    params(("org_id" = String, Path, description = "Organization name"), VolumeQuery),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "A malformed or unknown id, more than 50 ids, from not before to, or a span over 7 days", content_type = "application/json", body = Object),
+        (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
+        (status = 404, description = "AutoObserve is disabled for this deployment", content_type = "application/json", body = Object),
+        (status = 500, description = "Internal Server Error", content_type = "application/json", body = Object),
+        (status = 503, description = "The engine is not running on this node", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "AutoObserve", "operation": "get"})),
+        ("x-o2-mcp" = json!({"description": "Get AutoObserve stream volume series with their usual level", "category": "autoobserve"}))
+    )
+)]
+pub async fn stream_volume(
+    Path(org_id): Path<String>,
+    Headers(user): Headers<UserEmail>,
+    query: Result<Query<VolumeQuery>, QueryRejection>,
+) -> Response {
+    if let Some(disabled) = deployment_disabled() {
+        return disabled;
+    }
+    let query = match parse_query(query) {
+        Ok(query) => query,
+        Err(refused) => return refused,
+    };
+    if let Err(e) = api::check_series_request(&query.ids, query.from, query.to) {
+        return failed(&e);
+    }
+    serve(|deps| async move {
+        let readable = |ids| readable_streams(&org_id, &user.user_id, ids);
+        api::stream_volume_series(
+            &deps,
+            &org_id,
+            (&query.ids, query.from, query.to),
+            now_micros(),
+            readable,
+        )
         .await
+    })
+    .await
 }
 
 #[utoipa::path(
@@ -639,6 +875,44 @@ async fn readable_subjects(org_id: &str, user_id: &str, subjects: Vec<EntityRef>
     readable_mask(&LiveAuthority { org_id, user_id }, &subjects).await
 }
 
+/// Each stream needs the read right a search of it needs; one org-wide check per type comes first.
+async fn readable_streams(org_id: &str, user_id: &str, ids: Vec<(String, String)>) -> Vec<bool> {
+    if !rbac_enforced().await {
+        return vec![true; ids.len()];
+    }
+    let mut org_wide: HashMap<&str, bool> = HashMap::new();
+    let mut out = Vec::with_capacity(ids.len());
+    for (stream_type, name) in &ids {
+        let wide = match org_wide.get(stream_type.as_str()) {
+            Some(wide) => *wide,
+            None => {
+                let wide = org_wide_allows(org_id, user_id, stream_type, "GET").await;
+                org_wide.insert(stream_type, wide);
+                wide
+            }
+        };
+        if wide {
+            out.push(true);
+            continue;
+        }
+        out.push(
+            check_permissions(
+                &config::utils::str::into_ofga_supported_format(name),
+                org_id,
+                user_id,
+                stream_type,
+                "GET",
+                None,
+                false,
+                true,
+                false,
+            )
+            .await,
+        );
+    }
+    out
+}
+
 /// One org-wide check per resource, then one grant listing and one folder read for the alerts left.
 async fn readable_mask<A: AlertAuthority>(auth: &A, subjects: &[Subject<'_>]) -> Vec<bool> {
     let mut org_wide: HashMap<&'static str, bool> = HashMap::new();
@@ -676,6 +950,31 @@ async fn readable_mask<A: AlertAuthority>(auth: &A, subjects: &[Subject<'_>]) ->
                 })
         })
         .collect()
+}
+
+/// A create grant need not include a read grant; unreadable, unwritable folders stay hidden.
+async fn folder_writes<W: FolderWrites>(
+    auth: &W,
+    mut ids: BTreeSet<String>,
+) -> anyhow::Result<BTreeMap<String, bool>> {
+    // A draft with no team lands in the default folder, which a folder-scoped role may not list.
+    ids.insert(DEFAULT_FOLDER.to_string());
+    if !auth.enforced().await || auth.every_folder().await {
+        return Ok(ids.into_iter().map(|id| (id, true)).collect());
+    }
+    let readable = auth.readable(&ids).await?;
+    Ok(stream::iter(ids)
+        .map(|id| {
+            let readable = id == DEFAULT_FOLDER || readable.contains(&id);
+            async move {
+                let allowed = auth.folder(&id).await;
+                (readable || allowed).then_some((id, allowed))
+            }
+        })
+        .buffer_unordered(FOLDER_CHECK_CONCURRENCY)
+        .filter_map(std::future::ready)
+        .collect()
+        .await)
 }
 
 /// A mark whose alert is gone has no per-alert grant left, so it needs alerts PUT org-wide.
@@ -747,8 +1046,16 @@ mod tests {
                 routing::get(coverage_history),
             )
             .route(
+                "/v2/{org_id}/autoobserve/folders/writable",
+                routing::get(writable_folders),
+            )
+            .route(
                 "/v2/{org_id}/autoobserve/suggestions",
                 routing::get(suggestions),
+            )
+            .route(
+                "/v2/{org_id}/autoobserve/streams/volume",
+                routing::get(stream_volume),
             )
             .route("/v2/{org_id}/autoobserve/marks", routing::get(list_marks))
             .route(
@@ -1055,6 +1362,102 @@ mod tests {
         assert_eq!(readable_mask(&org_reader, &[subject]).await, [true]);
     }
 
+    /// Answers the create check per folder from `allowed`; `None` stands for RBAC switched off.
+    struct Writes {
+        every_folder: bool,
+        allowed: Option<&'static [&'static str]>,
+        readable: &'static [&'static str],
+        read_lists: std::sync::atomic::AtomicUsize,
+        folder_checks: std::sync::atomic::AtomicUsize,
+    }
+
+    impl FolderWrites for Writes {
+        async fn enforced(&self) -> bool {
+            self.allowed.is_some()
+        }
+
+        async fn every_folder(&self) -> bool {
+            self.every_folder
+        }
+
+        async fn readable(&self, ids: &BTreeSet<String>) -> anyhow::Result<BTreeSet<String>> {
+            self.read_lists.fetch_add(1, Ordering::SeqCst);
+            Ok(ids
+                .iter()
+                .filter(|id| self.readable.contains(&id.as_str()))
+                .cloned()
+                .collect())
+        }
+
+        async fn folder(&self, folder_id: &str) -> bool {
+            self.folder_checks.fetch_add(1, Ordering::SeqCst);
+            self.allowed.is_some_and(|ids| ids.contains(&folder_id))
+        }
+    }
+
+    #[tokio::test]
+    async fn only_readable_or_writable_folders_report_the_create_check_answer() {
+        let ids = [DEFAULT_FOLDER, "ops", "pay", "write_only", "hidden"];
+        let candidates = || ids.iter().map(|id| id.to_string()).collect();
+        for (name, every_folder, allowed, readable, want, checks) in [
+            ("editor", true, Some(&[][..]), &[][..], [Some(true); 5], 0),
+            (
+                "one folder",
+                false,
+                Some(&["ops"][..]),
+                &["ops", "pay"][..],
+                [Some(false), Some(true), Some(false), None, None],
+                5,
+            ),
+            (
+                "viewer with create-only grant",
+                false,
+                Some(&["write_only"][..]),
+                &["ops", "pay"][..],
+                [Some(false), Some(false), Some(false), Some(true), None],
+                5,
+            ),
+            (
+                "viewer without create grant",
+                false,
+                Some(&[][..]),
+                &["ops", "pay"][..],
+                [Some(false), Some(false), Some(false), None, None],
+                5,
+            ),
+            (
+                "list_only_permitted off, no folder grants",
+                false,
+                Some(&[][..]),
+                &[][..],
+                [Some(false), None, None, None, None],
+                5,
+            ),
+            ("RBAC off", false, None, &[][..], [Some(true); 5], 0),
+        ] {
+            let auth = Writes {
+                every_folder,
+                allowed,
+                readable,
+                read_lists: Default::default(),
+                folder_checks: Default::default(),
+            };
+            let got = folder_writes(&auth, candidates()).await.unwrap();
+            let want: BTreeMap<_, _> = ids
+                .iter()
+                .zip(want)
+                .filter_map(|(id, allowed)| allowed.map(|allowed| (id.to_string(), allowed)))
+                .collect();
+            assert_eq!(got, want, "{name}");
+            assert_eq!(auth.folder_checks.load(Ordering::SeqCst), checks, "{name}");
+            assert_eq!(
+                auth.read_lists.load(Ordering::SeqCst),
+                usize::from(checks > 0),
+                "{name}"
+            );
+        }
+    }
+
     /// Calibration v1's convention: a switched-off deployment answers 404 before any other check.
     #[tokio::test]
     async fn every_route_is_a_404_while_the_deployment_switch_is_off() {
@@ -1065,7 +1468,14 @@ mod tests {
             ("GET", "/v2/o/autoobserve/coverage", ""),
             ("GET", "/v2/o/autoobserve/coverage?view=loose", ""),
             ("GET", "/v2/o/autoobserve/coverage/history?from=0&to=1", ""),
+            ("GET", "/v2/o/autoobserve/folders/writable", ""),
             ("GET", "/v2/o/autoobserve/suggestions?limit=abc", ""),
+            (
+                "GET",
+                "/v2/o/autoobserve/streams/volume?ids=logs/a&from=0&to=1",
+                "",
+            ),
+            ("GET", "/v2/o/autoobserve/streams/volume?ids=bad", ""),
             ("GET", "/v2/o/autoobserve/marks", ""),
             ("PUT", mark, ""),
             ("DELETE", mark, r#"{"group_key":"host=a"}"#),
@@ -1108,6 +1518,11 @@ mod tests {
             ("GET", "/v2/o/autoobserve/coverage", ""),
             ("GET", "/v2/o/autoobserve/coverage/history?from=0&to=1", ""),
             ("GET", "/v2/o/autoobserve/suggestions?limit=5&offset=5", ""),
+            (
+                "GET",
+                "/v2/o/autoobserve/streams/volume?ids=logs/a,metrics/b&from=0&to=3600000000",
+                "",
+            ),
             ("GET", "/v2/o/autoobserve/marks", ""),
             ("PUT", mark, ""),
             ("DELETE", mark, ""),
@@ -1130,6 +1545,27 @@ mod tests {
             ("GET", "/v2/o/autoobserve/suggestions?limit=abc", ""),
             ("GET", "/v2/o/autoobserve/marks?offset=-3", ""),
             ("GET", "/v2/o/autoobserve/coverage/history?from=1", ""),
+            ("GET", "/v2/o/autoobserve/streams/volume?from=0&to=1", ""),
+            (
+                "GET",
+                "/v2/o/autoobserve/streams/volume?ids=a&from=0&to=1",
+                "",
+            ),
+            (
+                "GET",
+                "/v2/o/autoobserve/streams/volume?ids=files/a&from=0&to=1",
+                "",
+            ),
+            (
+                "GET",
+                "/v2/o/autoobserve/streams/volume?ids=logs/a&from=5&to=5",
+                "",
+            ),
+            (
+                "GET",
+                "/v2/o/autoobserve/streams/volume?ids=logs/a&from=0&to=604800000001",
+                "",
+            ),
         ] {
             let response = send(method, uri, body).await;
             assert_eq!(response.status(), StatusCode::BAD_REQUEST, "{method} {uri}");

@@ -29,7 +29,7 @@ import {
   type ServiceScope,
 } from "@/utils/alerts/prefill/fromAutoObserve";
 import { syntheticPrefillFor } from "@/utils/synthetics/syntheticPrefill";
-import type { CoverageCell, CoverageRow, LiveCheck } from "../fixtures";
+import type { CoverageCell, CoverageRow, LiveCheck } from "../aoTypes";
 import type { SyntheticsLocation } from "@/types/synthetics";
 import {
   cantBuild,

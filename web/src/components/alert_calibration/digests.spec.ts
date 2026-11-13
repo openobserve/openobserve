@@ -20,11 +20,14 @@ import {
   coverageNoteRows,
   coverageNotes,
   countOrDash,
+  countTile,
   coverageVerdict,
+  dismissedByRule,
   findingsByRule,
   insightActionsOf,
   titleAfterName,
   isClean,
+  isQuiet,
   isScoped,
   latestEmission,
   latestPerWindow,
@@ -192,6 +195,8 @@ describe("a run's verdict", () => {
     expect(isClean(run())).toBe(true);
     expect(isClean(run({ skip_count: 1 }))).toBe(false);
     expect(isClean(run({ coverage_gap: true }))).toBe(false);
+    expect(isClean(run({ coverage_definitions_not_checked: 4 }))).toBe(false);
+    expect(isQuiet(run(), 4)).toBe(false);
   });
 
   it("reads a run that measured nothing as such, even though it is also a gap", () => {
@@ -200,6 +205,20 @@ describe("a run's verdict", () => {
     expect(
       coverageVerdict(run({ coverage_gap: true, coverage_stream_substrate_empty: true })),
     ).toBe("none");
+  });
+
+  it("reads a run with unchecked definitions as a gap, from its count or its listed skips", () => {
+    expect(coverageVerdict(run({ coverage_definitions_not_checked: 7 }))).toBe("gap");
+    expect(coverageVerdict(run(), 7)).toBe("gap");
+    expect(coverageVerdict(run({ coverage_definitions_not_checked: 0 }))).toBe("full");
+    expect(coverageVerdict(run({ coverage_definitions_not_checked: null }))).toBe("full");
+    expect(coverageNoteRows(gt, run({ coverage_definitions_not_checked: 1 }))).toContainEqual({
+      text: "AutoObserve did not check 1 alert definition, so it was not judged.",
+      gap: true,
+    });
+    expect(coverageNotes(gt, run({ coverage_definitions_not_checked: 2 }), 7)).toContain(
+      "AutoObserve did not check 7 alert definitions, so they were not judged.",
+    );
   });
 
   it("a_v2_run_hides_the_silent_group_and_explains_definition_checks", () => {
@@ -329,6 +348,13 @@ describe("the formatting", () => {
     const micros = new Date(2026, 10, 4, 9, 30).getTime() * 1000;
     expect(formatEvidence(gt, micros, "time")).toBe("Nov 4, 09:30");
     expect(formatEvidence(gt, undefined, "time")).toBe("—");
+  });
+
+  it("formats evidence numbers in the app's locale, not the browser's", () => {
+    expect(formatEvidence(gt, 12345, "count", "en-US")).toBe("12,345");
+    expect(formatEvidence(gt, 12345, "count", "de-DE")).toBe("12.345");
+    expect(formatEvidence(gt, 0.371, "ratio", "de-DE")).toMatch(/^37,1\s%$/);
+    expect(formatEvidence(gt, 1500.5, "durationMs", "de-DE")).toBe("1,5 seconds");
   });
 });
 
@@ -690,5 +716,36 @@ describe("the colours a run's words take", () => {
 
   it("shows High severity in the same orange Incidents uses for High", () => {
     expect(SEVERITY_BADGE.High).toBe("orange-soft");
+  });
+});
+
+describe("dismissedByRule", () => {
+  it("reads the stored text and the raw array, and counts nothing it cannot read", () => {
+    expect([...dismissedByRule('[{"rule_id":"noise","alerts":2}]')]).toEqual([["noise", 2]]);
+    expect([...dismissedByRule([{ rule_id: "failure", alerts: 1 }])]).toEqual([["failure", 1]]);
+    for (const bad of [
+      undefined,
+      null,
+      "",
+      "not json",
+      "{}",
+      '[{"rule_id":3,"alerts":1}]',
+      '[{"rule_id":"noise","alerts":-1}]',
+      '[{"rule_id":"noise","alerts":"many"}]',
+    ]) {
+      expect(dismissedByRule(bad).size).toBe(0);
+    }
+  });
+});
+
+describe("countTile", () => {
+  it("keeps a short count exact and moves four digits and up into the compact tile", () => {
+    expect(countTile(999, "en-US")).toEqual({ value: "999" });
+    expect(countTile(0, "en-US")).toEqual({ value: "0" });
+    expect(countTile(1000, "en-US")).toEqual({ value: "1K" });
+    expect(countTile(12_345, "en-US")).toEqual({ value: "12.3K" });
+    expect(countTile(1_234_567, "de-DE").value).toMatch(/^1,2\sMio\.$/);
+    expect(countTile(null, "en-US")).toEqual({ value: "—" });
+    expect(countTile(undefined, "en-US")).toEqual({ value: "—" });
   });
 });
