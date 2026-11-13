@@ -479,6 +479,30 @@ describe("AssistantLauncher", () => {
     ).toBe(false);
   });
 
+  it("types example prompts while idle and empty, and shows the plain hint on focus or with a draft", async () => {
+    vi.useFakeTimers();
+    try {
+      const { wrapper } = setupOn({ layout: "overview" });
+      const shown = () => input(wrapper).attributes("placeholder") ?? "";
+      await vi.advanceTimersByTimeAsync(500 + 85 * 6);
+      expect(shown()).not.toBe("");
+      expect("Show me errors from the last hour…".startsWith(shown())).toBe(true);
+      // The field keeps its own name and nothing announces the typing.
+      expect(input(wrapper).attributes("aria-label")).toBe("Ask O2 Assistant");
+      expect(input(wrapper).attributes("aria-placeholder")).toBeUndefined();
+      expect(wrapper.find("[aria-live] textarea, textarea[aria-live]").exists()).toBe(false);
+      await input(wrapper).trigger("focus");
+      expect(shown()).toBe("Ask anything · @ to add context");
+      await vi.advanceTimersByTimeAsync(2_000);
+      expect(shown()).toBe("Ask anything · @ to add context");
+      await input(wrapper).setValue("why?");
+      await input(wrapper).trigger("blur");
+      expect(shown()).toBe("Ask anything · @ to add context");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("fades the focus glow in once, never loops it, and holds it still under reduced motion", () => {
     const css = readFileSync(resolve(__dirname, "../../../styles/tailwind.css"), "utf8");
     const start = css.indexOf("@utility assistant-focus-glow {");

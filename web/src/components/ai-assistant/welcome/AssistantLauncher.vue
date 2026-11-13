@@ -102,6 +102,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="assistant-launcher-input"
           @update:model-value="onInput"
           @keydown="onKeydown"
+          @focus="focused = true"
+          @blur="focused = false"
         >
           <template v-if="trayChips.length > 0" #strip>
             <div
@@ -440,6 +442,7 @@ import { useComposerWidth } from "@/components/ai-assistant/composer/useComposer
 import AssistantLauncherAgent from "./AssistantLauncherAgent.vue";
 import AssistantStarterRow from "./AssistantStarterRow.vue";
 import { starterIcon } from "./starterIcons";
+import { useTypewriterPlaceholder } from "./useTypewriterPlaceholder";
 
 const props = withDefaults(
   defineProps<{
@@ -549,7 +552,22 @@ const hiddenTrayLabels = computed(() =>
 );
 
 const mentionsOn = computed(() => fieldReady.value);
-const placeholder = computed(() => t("assistant.composer.placeholderAt"));
+// An idle, empty field types example prompts as on main's Home; focus, a draft or a chip brings back the plain hint.
+const focused = ref(false);
+const typing = computed(
+  () => fieldReady.value && !focused.value && !text.value && trayChips.value.length === 0,
+);
+const { placeholder: typed } = useTypewriterPlaceholder(
+  computed(() => [
+    t("aiAssistant.placeholderRotation.one"),
+    t("aiAssistant.placeholderRotation.two"),
+    t("aiAssistant.placeholderRotation.three"),
+  ]),
+  { enabled: typing, typeSpeedMs: 85, eraseSpeedMs: 45, holdMs: 2800, initialDelayMs: 500 },
+);
+const placeholder = computed(() =>
+  typing.value ? raw(typed.value) : t("assistant.composer.placeholderAt"),
+);
 
 const coarse = ref(!!globalThis.matchMedia?.("(pointer: coarse)")?.matches);
 const voice = useAssistantVoice({
