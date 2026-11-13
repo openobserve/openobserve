@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# Usage: assign-milestone.sh pr|issue <number>. Env: GH_REPO, TAG_REPO (default GH_REPO),
-# DRY_RUN=1 only reads and prints the decision. GH overrides the gh binary (tests).
+# Usage: assign-milestone.sh pr|issue <number>; env GH_REPO, TAG_REPO, DRY_RUN=1, GH (test stub).
 set -euo pipefail
 
 GH=${GH:-gh}
@@ -98,8 +97,7 @@ create_milestone() {
   echo "Milestone $title was created concurrently; using it"
 }
 
-# Lowest open numeric milestone with no release tag yet; if all are frozen and $1=1,
-# create the next minor after the highest one.
+# A milestone with an rc/GA tag is frozen; if all are, $1=1 creates the next minor.
 find_target() {
   local create=$1 list num title highest=""
   list=$(open_numeric_milestones) || die "could not list milestones"

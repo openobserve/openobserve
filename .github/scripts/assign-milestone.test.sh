@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# Scenario tests for assign-milestone.sh against a fake gh that serves fixtures.
-# Run: bash .github/scripts/assign-milestone.test.sh (exits non-zero on any failure).
+# Fixture-backed scenarios for assign-milestone.sh; exits non-zero on any failure.
 set -euo pipefail
 
 HERE=$(cd "$(dirname "$0")" && pwd)

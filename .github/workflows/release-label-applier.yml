@@ -37,8 +37,7 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            // The run payload already carries the tag; fetching the run needs actions:read,
-            // which private repos do not grant this job (403 "Resource not accessible").
+            // Tag comes from the run payload: getWorkflowRun needs actions:read, which this job omits.
             let releaseTag;
             if (context.eventName === 'workflow_dispatch') {
               releaseTag = process.env.RELEASE_TAG_INPUT;
