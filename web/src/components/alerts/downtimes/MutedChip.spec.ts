@@ -8,7 +8,6 @@ import store from "@/test/unit/helpers/store";
 import announcements from "@/services/announcements";
 import { useAnnouncementBanners } from "@/composables/useAnnouncementBanners";
 import MutedChip from "./MutedChip.vue";
-import { createMemoryHistory, createRouter } from "vue-router";
 
 const lookupRoute = vi.hoisted(() => ({ value: null as null | Record<string, unknown> }));
 vi.mock("@/composables/downtimes/useDowntimeLookup", () => ({

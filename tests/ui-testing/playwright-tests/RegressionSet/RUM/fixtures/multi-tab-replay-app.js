@@ -370,6 +370,7 @@ module.exports = {
   startMultiTabReplayServer,
   localSdkBundleDir,
   recordTwoTabSession,
+  nextReplayUpload,
   recordPageChangeSession,
   recordPageChangeScenarios,
   readStoredReplay,

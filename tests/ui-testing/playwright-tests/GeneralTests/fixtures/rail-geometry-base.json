@@ -97,13 +97,13 @@
       },
       "colours": {
         "activeLabel": "rgb(107, 118, 227)",
-        "activeIcon": "rgb(107, 118, 227)",
+        "activeIcon": "rgb(90, 100, 219)",
         "activeBg": "rgba(0, 0, 0, 0)",
         "pillBg": "rgb(255, 255, 255)",
         "inactiveLabel": "rgb(38, 38, 38)",
         "hoverLabel": "rgb(107, 118, 227)",
-        "hoverBg": "color(srgb 0.943137 0.945098 0.990196)",
-        "hoverIcon": "rgb(107, 118, 227)"
+        "hoverBg": "color(srgb 0.935294 0.939216 0.986274)",
+        "hoverIcon": "rgb(90, 100, 219)"
       }
     },
     "1000x600-ltr-light": {

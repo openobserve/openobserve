@@ -24,7 +24,7 @@ pub mod resources;
 pub mod values;
 
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{BTreeSet, HashMap, HashSet},
     sync::{Arc, LazyLock, RwLock},
     time::{Duration, Instant},
 };
@@ -95,6 +95,11 @@ pub enum DowntimeError {
     Forbidden(String),
     Conflict(String),
     Internal(String),
+    /// Too many test sends by one user; retry after the given seconds.
+    RateLimited {
+        message: String,
+        retry_after_secs: i64,
+    },
 }
 
 impl std::fmt::Display for DowntimeError {
@@ -105,6 +110,7 @@ impl std::fmt::Display for DowntimeError {
             Self::BadRequest(m) | Self::Forbidden(m) | Self::Conflict(m) | Self::Internal(m) => {
                 f.write_str(m)
             }
+            Self::RateLimited { message, .. } => f.write_str(message),
         }
     }
 }
@@ -382,7 +388,17 @@ pub async fn send_test(
             start: row.schedule.starts_at,
             end: row.schedule.ends_at.unwrap_or(row.schedule.starts_at),
         });
-    Ok(notify::send_test(&row, window, &req.destinations, now).await)
+    notify::send_test(&row, user_id, window, &req.destinations, now)
+        .await
+        .map_err(|e| match e {
+            crate::alerts::notifications::TestSendError::RateLimited { retry_after_secs } => {
+                DowntimeError::RateLimited {
+                    message: e.to_string(),
+                    retry_after_secs,
+                }
+            }
+            e => DowntimeError::Internal(e.to_string()),
+        })
 }
 
 /// Lengthens the active window; a recurring row gets a one-time follow-up instead.
@@ -473,7 +489,11 @@ pub async fn delete(org: &str, user_id: &str, id: &str) -> Result<(), DowntimeEr
     ensure_enabled()?;
     let row = load(org, id).await?;
     access::authorize_row(org, user_id, &row, "DELETE").await?;
-    check_deletable(&row, now_micros())?;
+    let now = now_micros();
+    check_deletable(&row, now)?;
+    if row.schedule.repeat != Repeat::None {
+        check_no_live_follow_up(&primary_rows(org).await?, &row.id, now)?;
+    }
     let read = infra::table::downtimes::RowVersion {
         version: row.version,
         updated_at: row.updated_at,
@@ -987,6 +1007,9 @@ async fn checked_request(
     req.check_alert_targets()
         .map_err(DowntimeError::BadRequest)?;
     span_as_duration(&mut req.schedule);
+    req.schedule.timezone = canonical_timezone(&req.schedule.timezone);
+    let has_slo = scope::target_for(&req.targets, TargetModule::Slos).is_some();
+    check_not_past(&req.schedule, has_slo, stored, now_micros())?;
     if let Some(notifications) = &req.notifications {
         check_notifications(org, notifications, &req.schedule, check_destinations).await?;
     }
@@ -1036,6 +1059,106 @@ fn check_version(requested: Option<i64>, row: &Downtime) -> Result<(), DowntimeE
             "Someone changed this downtime since you loaded it. Reload and try again.".to_string(),
         )),
         _ => Ok(()),
+    }
+}
+
+const END_IN_PAST: &str = "The end time is in the past. Pick an end time after now.";
+
+/// A new or changed schedule must still have a window ahead (D7: an SLO target may correct the
+/// past). A row whose first window started is left to the started-edit rule.
+fn check_not_past(
+    req: &DowntimeSchedule,
+    has_slo: bool,
+    stored: Option<&Downtime>,
+    now: i64,
+) -> Result<(), DowntimeError> {
+    if has_slo {
+        return Ok(());
+    }
+    if let Some(stored) = stored
+        && (same_schedule(&stored.schedule, req) || first_window_started(&stored.schedule, now))
+    {
+        return Ok(());
+    }
+    if matches!(schedule::status(req, None, now), DowntimeStatus::Ended) {
+        return Err(DowntimeError::BadRequest(END_IN_PAST.to_string()));
+    }
+    Ok(())
+}
+
+/// The first occurrence starts at or before `now`; a recurring row between two windows counts.
+fn first_window_started(s: &DowntimeSchedule, now: i64) -> bool {
+    if s.repeat == Repeat::None {
+        return s.starts_at <= now;
+    }
+    schedule::next_window(s, s.starts_at.saturating_sub(1)).is_some_and(|w| w.start <= now)
+}
+
+/// Legacy IANA links mapped to the current name, the same map as
+/// `web/src/utils/timezoneAliases.ts`.
+const TIMEZONE_ALIASES: &[(&str, &str)] = &[
+    ("Africa/Asmera", "Africa/Asmara"),
+    ("America/Buenos_Aires", "America/Argentina/Buenos_Aires"),
+    ("America/Catamarca", "America/Argentina/Catamarca"),
+    ("America/Coral_Harbour", "America/Atikokan"),
+    ("America/Cordoba", "America/Argentina/Cordoba"),
+    ("America/Fort_Wayne", "America/Indiana/Indianapolis"),
+    ("America/Godthab", "America/Nuuk"),
+    ("America/Indianapolis", "America/Indiana/Indianapolis"),
+    ("America/Jujuy", "America/Argentina/Jujuy"),
+    ("America/Louisville", "America/Kentucky/Louisville"),
+    ("America/Mendoza", "America/Argentina/Mendoza"),
+    ("Asia/Calcutta", "Asia/Kolkata"),
+    ("Asia/Dacca", "Asia/Dhaka"),
+    ("Asia/Katmandu", "Asia/Kathmandu"),
+    ("Asia/Rangoon", "Asia/Yangon"),
+    ("Asia/Saigon", "Asia/Ho_Chi_Minh"),
+    ("Asia/Thimbu", "Asia/Thimphu"),
+    ("Asia/Ujung_Pandang", "Asia/Makassar"),
+    ("Asia/Ulan_Bator", "Asia/Ulaanbaatar"),
+    ("Atlantic/Faeroe", "Atlantic/Faroe"),
+    ("Europe/Kiev", "Europe/Kyiv"),
+    ("Etc/UCT", "UTC"),
+    ("Etc/Universal", "UTC"),
+    ("Etc/UTC", "UTC"),
+    ("Etc/Zulu", "UTC"),
+    ("Pacific/Enderbury", "Pacific/Kanton"),
+    ("Pacific/Ponape", "Pacific/Pohnpei"),
+    ("Pacific/Truk", "Pacific/Chuuk"),
+    ("UCT", "UTC"),
+    ("Universal", "UTC"),
+    ("Zulu", "UTC"),
+];
+
+/// The current tz-database name, so one zone is never stored under two names.
+pub fn canonical_timezone(zone: &str) -> String {
+    TIMEZONE_ALIASES
+        .iter()
+        .find(|(legacy, _)| *legacy == zone)
+        .map_or(zone, |(_, current)| current)
+        .to_string()
+}
+
+/// Two schedules give the same windows: zones compare canonically and weekdays as a set.
+pub fn same_schedule(a: &DowntimeSchedule, b: &DowntimeSchedule) -> bool {
+    let weekdays = |s: &DowntimeSchedule| s.weekdays.iter().copied().collect::<BTreeSet<u8>>();
+    a.repeat == b.repeat
+        && a.starts_at == b.starts_at
+        && a.ends_at == b.ends_at
+        && a.start_time_local == b.start_time_local
+        && a.duration_secs == b.duration_secs
+        && canonical_timezone(&a.timezone) == canonical_timezone(&b.timezone)
+        && weekdays(a) == weekdays(b)
+}
+
+const EXTENSION_RUNNING: &str = "An extension of this downtime is still running. End it first.";
+
+/// A parent with a live extension is not deleted, so the extension never outlives its link.
+fn check_no_live_follow_up(rows: &[Downtime], id: &str, now: i64) -> Result<(), DowntimeError> {
+    if follow_ups_to_cancel(rows, id, now).is_empty() {
+        Ok(())
+    } else {
+        Err(DowntimeError::Conflict(EXTENSION_RUNNING.to_string()))
     }
 }
 
@@ -1384,6 +1507,7 @@ fn extended_once(before: &Downtime, new_end: i64, user_id: &str, now: i64) -> Do
         schedule: DowntimeSchedule {
             ends_at: Some(new_end),
             duration_secs: (new_end - before.schedule.starts_at) / MICROS_PER_SEC,
+            timezone: canonical_timezone(&before.schedule.timezone),
             ..before.schedule.clone()
         },
         version: before.version + 1,
@@ -1411,7 +1535,7 @@ fn follow_up(parent: &Downtime, start: i64, end: i64, user_id: &str, now: i64) -
             repeat: Repeat::None,
             starts_at: start,
             ends_at: Some(end),
-            timezone: parent.schedule.timezone.clone(),
+            timezone: canonical_timezone(&parent.schedule.timezone),
             start_time_local: None,
             duration_secs: (end - start) / MICROS_PER_SEC,
             weekdays: vec![],
@@ -1774,6 +1898,181 @@ mod tests {
             updated_by: "lin".to_string(),
             updated_at: 0,
         }
+    }
+
+    fn alerts_daily(start_time: &str, duration_secs: i64, starts_at: i64) -> Downtime {
+        let mut d = row(vec![TargetModule::Alerts], 0, 0);
+        d.schedule = DowntimeSchedule {
+            repeat: Repeat::Daily,
+            starts_at,
+            ends_at: None,
+            timezone: "UTC".to_string(),
+            start_time_local: Some(start_time.to_string()),
+            duration_secs,
+            weekdays: vec![],
+        };
+        d
+    }
+
+    fn is_end_in_past(r: Result<(), DowntimeError>) -> bool {
+        matches!(r, Err(DowntimeError::BadRequest(m)) if m == END_IN_PAST)
+    }
+
+    #[test]
+    fn a_new_one_time_window_must_end_after_now() {
+        let now = 20 * HOUR;
+        let past = row(vec![TargetModule::Alerts], 10 * HOUR, 12 * HOUR).schedule;
+        assert!(is_end_in_past(check_not_past(&past, false, None, now)));
+        let at_now = row(vec![TargetModule::Alerts], 10 * HOUR, now).schedule;
+        assert!(is_end_in_past(check_not_past(&at_now, false, None, now)));
+        let future = row(vec![TargetModule::Alerts], 19 * HOUR, 21 * HOUR).schedule;
+        assert!(check_not_past(&future, false, None, now).is_ok());
+    }
+
+    #[test]
+    fn a_past_window_with_an_slo_target_corrects_slo_data() {
+        let past = row(vec![TargetModule::Slos], 10 * HOUR, 12 * HOUR).schedule;
+        assert!(check_not_past(&past, true, None, 20 * HOUR).is_ok());
+    }
+
+    #[test]
+    fn a_recurring_until_day_in_the_past_is_refused_and_no_until_passes() {
+        let day = 24 * HOUR;
+        let now = 10 * day + 12 * HOUR;
+        let mut ended = alerts_daily("02:00", 3_600, 0).schedule;
+        ended.ends_at = Some(5 * day + 23 * HOUR + 59 * 60_000_000);
+        assert!(is_end_in_past(check_not_past(&ended, false, None, now)));
+        let open = alerts_daily("02:00", 3_600, 0).schedule;
+        assert!(check_not_past(&open, false, None, now).is_ok());
+        // The until day is today, sent as 23:59, and tonight's 22:00 window is still ahead.
+        let mut tonight = alerts_daily("22:00", 3_600, 0).schedule;
+        tonight.ends_at = Some(10 * day + 23 * HOUR + 59 * 60_000_000);
+        assert!(check_not_past(&tonight, false, None, now).is_ok());
+        // A window whose tail runs into the day after the until day is still active.
+        let mut tail = alerts_daily("23:00", 3 * 3_600, 0).schedule;
+        tail.ends_at = Some(9 * day + 23 * HOUR + 59 * 60_000_000);
+        assert!(check_not_past(&tail, false, None, 10 * day + HOUR).is_ok());
+    }
+
+    #[test]
+    fn an_unchanged_or_started_stored_schedule_skips_the_past_rule() {
+        let now = 20 * HOUR;
+        let stored = row(vec![TargetModule::Alerts], 10 * HOUR, 12 * HOUR);
+        assert!(check_not_past(&stored.schedule, false, Some(&stored), now).is_ok());
+        let mut aliased = stored.schedule.clone();
+        aliased.timezone = "Etc/UTC".to_string();
+        assert!(check_not_past(&aliased, false, Some(&stored), now).is_ok());
+        let not_started = row(vec![TargetModule::Alerts], 30 * HOUR, 32 * HOUR);
+        let moved_back = row(vec![TargetModule::Alerts], 10 * HOUR, 12 * HOUR).schedule;
+        assert!(is_end_in_past(check_not_past(
+            &moved_back,
+            false,
+            Some(&not_started),
+            now
+        )));
+        // An active row whose end moves to exactly now passes; the started-edit rule owns it.
+        let active = row(vec![TargetModule::Alerts], 10 * HOUR, 22 * HOUR);
+        let to_now = row(vec![TargetModule::Alerts], 10 * HOUR, now).schedule;
+        assert!(check_not_past(&to_now, false, Some(&active), now).is_ok());
+    }
+
+    #[test]
+    fn a_recurring_row_between_two_windows_has_started() {
+        let d = alerts_daily("02:00", 3_600, 0);
+        assert!(!first_window_started(&d.schedule, HOUR));
+        assert!(first_window_started(&d.schedule, 2 * HOUR));
+        assert!(first_window_started(&d.schedule, 12 * HOUR));
+        let one_time = row(vec![TargetModule::Alerts], 10 * HOUR, 12 * HOUR);
+        assert!(!first_window_started(&one_time.schedule, 10 * HOUR - 1));
+        assert!(first_window_started(&one_time.schedule, 10 * HOUR));
+    }
+
+    #[test]
+    fn timezone_names_are_stored_canonically() {
+        assert_eq!(canonical_timezone("Asia/Calcutta"), "Asia/Kolkata");
+        assert_eq!(canonical_timezone("Etc/UTC"), "UTC");
+        assert_eq!(canonical_timezone("Asia/Kolkata"), "Asia/Kolkata");
+        assert_eq!(canonical_timezone("Nope/Zone"), "Nope/Zone");
+        let groups: Vec<config::meta::correlation::FieldAlias> = vec![];
+        let mut bad = request_of(&row(vec![TargetModule::Alerts], 10 * HOUR, 12 * HOUR));
+        bad.schedule.timezone = canonical_timezone("Nope/Zone");
+        assert!(
+            validate(&bad, &groups).is_err(),
+            "an invalid zone is still refused"
+        );
+    }
+
+    #[test]
+    fn same_schedule_compares_zones_canonically_and_weekdays_as_a_set() {
+        let mut a = alerts_daily("02:00", 3_600, 0).schedule;
+        a.repeat = Repeat::Weekly;
+        a.weekdays = vec![5, 1, 3];
+        a.timezone = "Asia/Calcutta".to_string();
+        let mut b = a.clone();
+        b.weekdays = vec![1, 3, 5];
+        b.timezone = "Asia/Kolkata".to_string();
+        assert!(same_schedule(&a, &b));
+        let mut moved = b.clone();
+        moved.starts_at += HOUR;
+        assert!(!same_schedule(&a, &moved));
+        let mut other_day = b.clone();
+        other_day.weekdays = vec![1, 3];
+        assert!(!same_schedule(&a, &other_day));
+    }
+
+    #[test]
+    fn extensions_store_the_canonical_zone() {
+        let mut parent = alerts_daily("10:00", 2 * 3_600, 0);
+        parent.schedule.timezone = "Asia/Calcutta".to_string();
+        let follow = follow_up(&parent, 12 * HOUR, 13 * HOUR, "ops", 11 * HOUR);
+        assert_eq!(follow.schedule.timezone, "Asia/Kolkata");
+        let mut once = row(vec![TargetModule::Alerts], 10 * HOUR, 12 * HOUR);
+        once.schedule.timezone = "Asia/Calcutta".to_string();
+        let extended = extended_once(&once, 13 * HOUR, "ops", 11 * HOUR);
+        assert_eq!(extended.schedule.timezone, "Asia/Kolkata");
+    }
+
+    #[test]
+    fn a_parent_with_a_live_extension_is_not_deleted() {
+        let day = 24 * HOUR;
+        let mut parent = alerts_daily("10:00", 2 * 3_600, 0);
+        parent.schedule.ends_at = Some(23 * HOUR + 59 * 60_000_000);
+        let live = follow_up(&parent, 12 * HOUR, 14 * HOUR, "ops", 11 * HOUR);
+        let now = 13 * HOUR;
+        assert!(matches!(
+            schedule::status(&parent.schedule, None, now),
+            DowntimeStatus::Ended
+        ));
+        let rows = [parent.clone(), live.clone()];
+        assert!(matches!(
+            check_no_live_follow_up(&rows, &parent.id, now),
+            Err(DowntimeError::Conflict(m)) if m == EXTENSION_RUNNING
+        ));
+        assert!(check_deletable(&parent, now).is_ok());
+        let ended = cancelled(&live, "ops", now);
+        assert!(check_no_live_follow_up(&[parent.clone(), ended], &parent.id, now).is_ok());
+        assert!(check_no_live_follow_up(&rows, &parent.id, 14 * HOUR).is_ok());
+        assert!(
+            check_cancellable(&live, now).is_ok(),
+            "End now on the extension works"
+        );
+        let _ = day;
+    }
+
+    #[test]
+    fn an_exhausted_series_is_deletable_unless_it_corrected_slo_data() {
+        let mut plain = alerts_daily("02:00", 3_600, 0);
+        plain.schedule.ends_at = Some(23 * HOUR + 59 * 60_000_000);
+        assert!(check_deletable(&plain, 10 * HOUR).is_ok());
+        let mut slo = plain.clone();
+        slo.targets = row(vec![TargetModule::Slos], 0, 0).targets;
+        assert!(matches!(
+            check_deletable(&slo, 10 * HOUR),
+            Err(DowntimeError::Conflict(_))
+        ));
+        let mut never_ran = slo.clone();
+        never_ran.cancelled_at = Some(HOUR);
+        assert!(check_deletable(&never_ran, 10 * HOUR).is_ok());
     }
 
     #[test]

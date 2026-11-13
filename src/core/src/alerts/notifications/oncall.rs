@@ -130,6 +130,7 @@ pub fn on_call_context(n: &OnCallNotification) -> NotificationContext {
         render_hints: super::context::RenderHints {
             fallback_subject: Some(n.title.clone()),
             escape_email_attributes: true,
+            ..Default::default()
         },
         ..Default::default()
     }

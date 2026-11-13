@@ -159,6 +159,10 @@ impl TryFrom<synthetics_checks::Model> for Synthetic {
             next_run_at: m.next_run_at,
             last_triggered_at: m.last_triggered_at,
             last_check_status,
+            last_run_class: m.last_run_class,
+            last_run_class_at: m.last_run_class_at,
+            confirm_failures: Some(settings.confirm_failures),
+            alert_on: settings.alert_on,
             owner: m.owner,
             created_at: m.created_at,
             updated_at: m.updated_at,
@@ -988,13 +992,91 @@ pub async fn templates_in_use<C: ConnectionTrait>(
 }
 
 /// The status badge and the status page run streaks, as one completed run leaves them.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct StatusStreaks {
     pub last_check_status: i32,
     pub down_runs: i32,
     pub up_runs: i32,
     /// `scheduled_ts` of the run that wrote these values, in microseconds.
     pub run_ts: i64,
+    /// `RunClass` DB integer of that run.
+    pub run_class: i32,
+    /// `scheduled_ts` of the first run in the current `run_class`, in microseconds.
+    pub run_class_at: i64,
+    /// `scheduled_ts` of the newest run that tested the site, in microseconds. 0 = none.
+    pub tested_at: i64,
+    /// Finish time of the run that started the current Up streak, in microseconds. It never goes
+    /// down, so a false alarm hold that saved an older value ends. 0 = no recovery yet.
+    pub recovered_at: i64,
+    /// The row's streaks match `status_streak_sig`, so a writer of this build wrote them. An older
+    /// build does not move the recovery stamp; when it wrote the row, a recovery may be missing
+    /// from the stamp. Always true on a value that this build computes.
+    pub signed: bool,
+}
+
+/// Signature of the streak columns and the recovery stamp. Every writer of this build stores it
+/// with them, and an older build changes the streaks without it, which [`StatusStreaks::signed`]
+/// detects. The stamp is part of it, so streaks paired with a stamp from another snapshot (an older
+/// replicated copy after the stamp merge kept a newer stamp) read as unsigned. All zeros, as on a
+/// new check, signs to 0, which is the column default.
+pub fn streak_sig(
+    down_runs: i32,
+    up_runs: i32,
+    run_ts: i64,
+    run_class: i32,
+    recovered_at: i64,
+) -> i64 {
+    if down_runs == 0 && up_runs == 0 && run_ts == 0 && run_class == 0 && recovered_at == 0 {
+        return 0;
+    }
+    // FNV-1a over the five values: stable across builds and platforms.
+    let mut h: u64 = 0xcbf2_9ce4_8422_2325;
+    for v in [
+        down_runs as i64,
+        up_runs as i64,
+        run_ts,
+        run_class as i64,
+        recovered_at,
+    ] {
+        for b in v.to_le_bytes() {
+            h ^= u64::from(b);
+            h = h.wrapping_mul(0x0100_0000_01b3);
+        }
+    }
+    // Never 0, so a changed row cannot match the default by chance.
+    ((h >> 1) as i64).max(1)
+}
+
+/// A new check: all zeros, which signs to the column default, so it is signed.
+impl Default for StatusStreaks {
+    fn default() -> Self {
+        Self {
+            last_check_status: 0,
+            down_runs: 0,
+            up_runs: 0,
+            run_ts: 0,
+            run_class: 0,
+            run_class_at: 0,
+            tested_at: 0,
+            recovered_at: 0,
+            signed: true,
+        }
+    }
+}
+
+/// A signature value that [`streak_sig`] never returns, so the row reads as unsigned.
+const UNSIGNED: i64 = -1;
+
+impl StatusStreaks {
+    fn sig(&self) -> i64 {
+        streak_sig(
+            self.down_runs,
+            self.up_runs,
+            self.run_ts,
+            self.run_class,
+            self.recovered_at,
+        )
+    }
 }
 
 /// Reads the badge and run streaks of one check. `None` when the check is not in this region.
@@ -1008,15 +1090,35 @@ pub async fn get_status_streaks<C: ConnectionTrait>(
         .column(Column::StatusDownRuns)
         .column(Column::StatusUpRuns)
         .column(Column::StatusRunTs)
-        .into_tuple::<(i32, i32, i32, i64)>()
+        .column(Column::LastRunClass)
+        .column(Column::LastRunClassAt)
+        .column(Column::LastTestedAt)
+        .column(Column::StatusRecoveredAt)
+        .column(Column::StatusStreakSig)
+        .into_tuple::<(i32, i32, i32, i64, i32, i64, i64, i64, i64)>()
         .one(conn)
         .await?;
     Ok(row.map(
-        |(last_check_status, down_runs, up_runs, run_ts)| StatusStreaks {
+        |(
             last_check_status,
             down_runs,
             up_runs,
             run_ts,
+            run_class,
+            run_class_at,
+            tested_at,
+            recovered_at,
+            sig,
+        )| StatusStreaks {
+            last_check_status,
+            down_runs,
+            up_runs,
+            run_ts,
+            run_class,
+            run_class_at,
+            tested_at,
+            recovered_at,
+            signed: sig == streak_sig(down_runs, up_runs, run_ts, run_class, recovered_at),
         },
     ))
 }
@@ -1033,16 +1135,36 @@ pub async fn lock_status_streaks<C: ConnectionTrait>(
         .column(Column::StatusDownRuns)
         .column(Column::StatusUpRuns)
         .column(Column::StatusRunTs)
+        .column(Column::LastRunClass)
+        .column(Column::LastRunClassAt)
+        .column(Column::LastTestedAt)
+        .column(Column::StatusRecoveredAt)
+        .column(Column::StatusStreakSig)
         .lock_exclusive()
-        .into_tuple::<(i32, i32, i32, i64)>()
+        .into_tuple::<(i32, i32, i32, i64, i32, i64, i64, i64, i64)>()
         .one(conn)
         .await?;
     Ok(row.map(
-        |(last_check_status, down_runs, up_runs, run_ts)| StatusStreaks {
+        |(
             last_check_status,
             down_runs,
             up_runs,
             run_ts,
+            run_class,
+            run_class_at,
+            tested_at,
+            recovered_at,
+            sig,
+        )| StatusStreaks {
+            last_check_status,
+            down_runs,
+            up_runs,
+            run_ts,
+            run_class,
+            run_class_at,
+            tested_at,
+            recovered_at,
+            signed: sig == streak_sig(down_runs, up_runs, run_ts, run_class, recovered_at),
         },
     ))
 }
@@ -1059,7 +1181,12 @@ pub async fn swap_status_streaks<C: ConnectionTrait>(
         .col_expr(Column::LastCheckStatus, Expr::value(next.last_check_status))
         .col_expr(Column::StatusDownRuns, Expr::value(next.down_runs))
         .col_expr(Column::StatusUpRuns, Expr::value(next.up_runs))
-        .col_expr(Column::StatusRunTs, Expr::value(next.run_ts));
+        .col_expr(Column::StatusRunTs, Expr::value(next.run_ts))
+        .col_expr(Column::LastRunClass, Expr::value(next.run_class))
+        .col_expr(Column::LastRunClassAt, Expr::value(next.run_class_at))
+        .col_expr(Column::LastTestedAt, Expr::value(next.tested_at))
+        .col_expr(Column::StatusRecoveredAt, Expr::value(next.recovered_at))
+        .col_expr(Column::StatusStreakSig, Expr::value(next.sig()));
     if streaks_differ(expected, next) {
         q = q.col_expr(
             Column::UpdatedAt,
@@ -1072,6 +1199,9 @@ pub async fn swap_status_streaks<C: ConnectionTrait>(
         .filter(Column::StatusDownRuns.eq(expected.down_runs))
         .filter(Column::StatusUpRuns.eq(expected.up_runs))
         .filter(Column::StatusRunTs.eq(expected.run_ts))
+        .filter(Column::LastRunClass.eq(expected.run_class))
+        .filter(Column::LastRunClassAt.eq(expected.run_class_at))
+        .filter(Column::StatusRecoveredAt.eq(expected.recovered_at))
         .exec(conn)
         .await?;
     Ok(res.rows_affected > 0)
@@ -1085,13 +1215,25 @@ pub async fn apply_replicated_streaks<C: ConnectionTrait>(
     next: &StatusStreaks,
 ) -> Result<bool, errors::Error> {
     if next.run_ts == 0 {
-        return update_last_check_status(conn, id, next.last_check_status).await;
+        // Only an older producer sends a badge-only message. It can stand for a recovery that did
+        // not move the stamp, so the row stops being signed.
+        let badge = update_last_check_status(conn, id, next.last_check_status).await?;
+        void_recovery_stamp(conn, id, config::utils::time::now_micros()).await?;
+        return Ok(badge);
     }
     let res = Entity::update_many()
         .col_expr(Column::LastCheckStatus, Expr::value(next.last_check_status))
         .col_expr(Column::StatusDownRuns, Expr::value(next.down_runs))
         .col_expr(Column::StatusUpRuns, Expr::value(next.up_runs))
         .col_expr(Column::StatusRunTs, Expr::value(next.run_ts))
+        .col_expr(Column::LastRunClass, Expr::value(next.run_class))
+        .col_expr(Column::LastRunClassAt, Expr::value(next.run_class_at))
+        .col_expr(Column::LastTestedAt, Expr::value(next.tested_at))
+        // A message from an older producer carries no proof that its stamp is complete.
+        .col_expr(
+            Column::StatusStreakSig,
+            Expr::value(if next.signed { next.sig() } else { UNSIGNED }),
+        )
         .col_expr(
             Column::UpdatedAt,
             Expr::value(config::utils::time::now_micros()),
@@ -1101,7 +1243,93 @@ pub async fn apply_replicated_streaks<C: ConnectionTrait>(
         .filter(Column::StatusRunTs.lte(next.run_ts))
         .exec(conn)
         .await?;
+    let stamp_moved = apply_replicated_recovery(conn, id, next.recovered_at).await?;
+    if !next.signed {
+        // The `run_ts` filter can drop this message, and a later signed snapshot can overwrite it.
+        // Either way it can stand for a recovery that this row never saw, so no hold may survive.
+        void_recovery_stamp(conn, id, config::utils::time::now_micros()).await?;
+    }
+    Ok(res.rows_affected > 0 || stamp_moved || !next.signed)
+}
+
+/// For a message from an older producer: marks the row unsigned and moves its recovery stamp past
+/// `now`, whatever `run_ts` the row holds. The stamp never goes down, so no mark armed before this
+/// can match again. Safe to run twice.
+async fn void_recovery_stamp<C: ConnectionTrait>(
+    conn: &C,
+    id: &str,
+    now: i64,
+) -> Result<(), errors::Error> {
+    // Two updates, so no SQL dialect needs GREATEST. The second one sets values that the first one
+    // would move again, so it runs last.
+    Entity::update_many()
+        .col_expr(
+            Column::StatusRecoveredAt,
+            Expr::col(Column::StatusRecoveredAt).add(1),
+        )
+        .col_expr(Column::StatusStreakSig, Expr::value(UNSIGNED))
+        .filter(Column::Id.eq(id))
+        .filter(Column::StatusRecoveredAt.gt(now))
+        .exec(conn)
+        .await?;
+    Entity::update_many()
+        .col_expr(Column::StatusRecoveredAt, Expr::value(now + 1))
+        .col_expr(Column::StatusStreakSig, Expr::value(UNSIGNED))
+        .filter(Column::Id.eq(id))
+        .filter(Column::StatusRecoveredAt.lte(now))
+        .exec(conn)
+        .await?;
+    Ok(())
+}
+
+/// Moves the recovery stamp forward, whatever `run_ts` the local row holds. A late recovery
+/// message must still end a false alarm hold after the local row took a newer run.
+async fn apply_replicated_recovery<C: ConnectionTrait>(
+    conn: &C,
+    id: &str,
+    recovered_at: i64,
+) -> Result<bool, errors::Error> {
+    if recovered_at <= 0 {
+        return Ok(false);
+    }
+    let res = Entity::update_many()
+        .col_expr(Column::StatusRecoveredAt, Expr::value(recovered_at))
+        .col_expr(
+            Column::UpdatedAt,
+            Expr::value(config::utils::time::now_micros()),
+        )
+        .filter(Column::Id.eq(id))
+        .filter(Column::StatusRecoveredAt.lt(recovered_at))
+        .exec(conn)
+        .await?;
     Ok(res.rows_affected > 0)
+}
+
+/// After the job cluster claim moves to this cluster: moves every recovery stamp past `now` and
+/// disarms every false alarm hold, so no hold from the old owner can match a new stamp. Safe to
+/// run twice. A marked failure that still goes on then opens a new incident.
+pub async fn reset_false_alarm_holds<C: ConnectionTrait>(
+    conn: &C,
+    now: i64,
+) -> Result<(), errors::Error> {
+    // Two updates, so no SQL dialect needs GREATEST. The order matters: the second one sets
+    // values that the first one would move again.
+    Entity::update_many()
+        .col_expr(
+            Column::StatusRecoveredAt,
+            Expr::col(Column::StatusRecoveredAt).add(1),
+        )
+        .col_expr(Column::UpdatedAt, Expr::value(now))
+        .filter(Column::StatusRecoveredAt.gt(now))
+        .exec(conn)
+        .await?;
+    Entity::update_many()
+        .col_expr(Column::StatusRecoveredAt, Expr::value(now + 1))
+        .col_expr(Column::UpdatedAt, Expr::value(now))
+        .filter(Column::StatusRecoveredAt.lte(now))
+        .exec(conn)
+        .await?;
+    super::status_pages::disarm_false_alarm_holds(conn).await
 }
 
 /// The alert bookkeeping a completed run needs in order to decide whether to
@@ -1118,6 +1346,14 @@ pub struct AlertState {
     /// degraded. Degradation persists for as long as the certificate takes to
     /// expire, so it is suppressed by transition rather than by a time window.
     pub degraded_notified_at: i64,
+    /// When the current Not measured gap started, in microseconds. 0 = no gap.
+    pub gap_since: i64,
+    /// Not measured runs in a row in the current gap.
+    pub gap_runs: i32,
+    /// When the gap notice of the current gap was sent. 0 = not sent, so no resumed notice is due.
+    pub gap_notified_at: i64,
+    /// When the run that closed the gap finished, while its "Monitoring resumed" notice is owed.
+    pub gap_resumed_at: i64,
 }
 
 /// Reads the alert state without pulling the whole check (config, secrets and
@@ -1132,15 +1368,32 @@ pub async fn get_alert_state<C: ConnectionTrait>(
         .column(Column::LastAlertAt)
         .column(Column::Alerting)
         .column(Column::DegradedNotifiedAt)
-        .into_tuple::<(i32, i64, bool, i64)>()
+        .column(Column::GapSince)
+        .column(Column::GapRuns)
+        .column(Column::GapNotifiedAt)
+        .column(Column::GapResumedAt)
+        .into_tuple::<(i32, i64, bool, i64, i64, i32, i64, i64)>()
         .one(conn)
         .await?;
     Ok(row.map(
-        |(consecutive_failures, last_alert_at, alerting, degraded_notified_at)| AlertState {
+        |(
             consecutive_failures,
             last_alert_at,
             alerting,
             degraded_notified_at,
+            gap_since,
+            gap_runs,
+            gap_notified_at,
+            gap_resumed_at,
+        )| AlertState {
+            consecutive_failures,
+            last_alert_at,
+            alerting,
+            degraded_notified_at,
+            gap_since,
+            gap_runs,
+            gap_notified_at,
+            gap_resumed_at,
         },
     ))
 }
@@ -1182,6 +1435,10 @@ pub async fn update_alert_state_if<C: ConnectionTrait>(
             Column::DegradedNotifiedAt,
             Expr::value(state.degraded_notified_at),
         )
+        .col_expr(Column::GapSince, Expr::value(state.gap_since))
+        .col_expr(Column::GapRuns, Expr::value(state.gap_runs))
+        .col_expr(Column::GapNotifiedAt, Expr::value(state.gap_notified_at))
+        .col_expr(Column::GapResumedAt, Expr::value(state.gap_resumed_at))
         // Watermark for the status-page rebuilder's delta read. Safe here
         // because the caller only writes when `next != prior` (job_api), so a
         // healthy check acking every minute never bumps it.
@@ -1194,9 +1451,93 @@ pub async fn update_alert_state_if<C: ConnectionTrait>(
         .filter(Column::LastAlertAt.eq(expected.last_alert_at))
         .filter(Column::Alerting.eq(expected.alerting))
         .filter(Column::DegradedNotifiedAt.eq(expected.degraded_notified_at))
+        .filter(Column::GapSince.eq(expected.gap_since))
+        .filter(Column::GapRuns.eq(expected.gap_runs))
+        .filter(Column::GapNotifiedAt.eq(expected.gap_notified_at))
+        .filter(Column::GapResumedAt.eq(expected.gap_resumed_at))
         .exec(conn)
         .await?;
     Ok(res.rows_affected > 0)
+}
+
+/// Records that the "Monitoring gap" notice of the gap that began at `since` went out. Only a
+/// delivery sets it, so a failed send stays owed. `false` when the gap ended or another sender
+/// marked it first.
+pub async fn mark_gap_notified<C: ConnectionTrait>(
+    conn: &C,
+    id: &str,
+    since: i64,
+    at: i64,
+) -> Result<bool, errors::Error> {
+    let res = Entity::update_many()
+        .col_expr(Column::GapNotifiedAt, Expr::value(at))
+        .filter(Column::Id.eq(id))
+        .filter(Column::GapSince.eq(since))
+        .filter(Column::GapNotifiedAt.eq(0))
+        .exec(conn)
+        .await?;
+    Ok(res.rows_affected > 0)
+}
+
+/// Closes the gap that began at `since`, once its "Monitoring resumed" notice went out or the
+/// reaper gave up on it. Only that gap, and only while the notice is still owed: a Not measured run
+/// that reopened the gap keeps it.
+pub async fn clear_resumed_gap<C: ConnectionTrait>(
+    conn: &C,
+    id: &str,
+    since: i64,
+) -> Result<bool, errors::Error> {
+    let res = Entity::update_many()
+        .col_expr(Column::GapSince, Expr::value(0_i64))
+        .col_expr(Column::GapRuns, Expr::value(0_i32))
+        .col_expr(Column::GapNotifiedAt, Expr::value(0_i64))
+        .col_expr(Column::GapResumedAt, Expr::value(0_i64))
+        .filter(Column::Id.eq(id))
+        .filter(Column::GapSince.eq(since))
+        .filter(Column::GapResumedAt.gt(0))
+        .exec(conn)
+        .await?;
+    Ok(res.rows_affected > 0)
+}
+
+/// Enabled checks whose "Monitoring resumed" notice is still owed from at or before `before`:
+/// `(org_id, id, gap_since, gap_resumed_at)`.
+pub async fn list_due_resumed_notices<C: ConnectionTrait>(
+    conn: &C,
+    before: i64,
+) -> Result<Vec<(String, String, i64, i64)>, errors::Error> {
+    Ok(Entity::find()
+        .select_only()
+        .column(Column::OrgId)
+        .column(Column::Id)
+        .column(Column::GapSince)
+        .column(Column::GapResumedAt)
+        .filter(Column::Enabled.eq(true))
+        .filter(Column::GapResumedAt.gt(0))
+        .filter(Column::GapResumedAt.lte(before))
+        .into_tuple::<(String, String, i64, i64)>()
+        .all(conn)
+        .await?)
+}
+
+/// Enabled checks whose open gap began at or before `before` and still owes its notice:
+/// `(org_id, id, gap_since)`.
+pub async fn list_due_gap_notices<C: ConnectionTrait>(
+    conn: &C,
+    before: i64,
+) -> Result<Vec<(String, String, i64)>, errors::Error> {
+    Ok(Entity::find()
+        .select_only()
+        .column(Column::OrgId)
+        .column(Column::Id)
+        .column(Column::GapSince)
+        .filter(Column::Enabled.eq(true))
+        .filter(Column::GapSince.gt(0))
+        .filter(Column::GapSince.lte(before))
+        .filter(Column::GapNotifiedAt.eq(0))
+        .into_tuple::<(String, String, i64)>()
+        .all(conn)
+        .await?)
 }
 
 // ── Private helpers ───────────────────────────────────────────────────────────
@@ -1289,6 +1630,8 @@ fn pack_settings(check: &Synthetic) -> Result<serde_json::Value, errors::Error> 
         session_replay: check.session_replay,
         start: check.start,
         environments: check.environments.clone(),
+        confirm_failures: check.confirms_failures(),
+        alert_on: check.alert_on,
     })?)
 }
 
@@ -1381,6 +1724,9 @@ fn streaks_differ(a: &StatusStreaks, b: &StatusStreaks) -> bool {
     a.last_check_status != b.last_check_status
         || a.down_runs != b.down_runs
         || a.up_runs != b.up_runs
+        || a.run_class != b.run_class
+        || a.recovered_at != b.recovered_at
+        || a.signed != b.signed
 }
 
 fn check_type_to_str(t: &SyntheticType) -> &'static str {
@@ -1454,6 +1800,15 @@ pub(crate) mod tests {
             status_down_runs: 0,
             status_up_runs: 0,
             status_run_ts: 0,
+            last_run_class: 0,
+            last_run_class_at: 0,
+            last_tested_at: 0,
+            status_recovered_at: 0,
+            status_streak_sig: 0,
+            gap_since: 0,
+            gap_runs: 0,
+            gap_notified_at: 0,
+            gap_resumed_at: 0,
             owner: None,
             created_at: 1750000000000000,
             updated_at: 1750000000000000,
@@ -2113,6 +2468,83 @@ pub(crate) mod tests {
         let am: ActiveModel = model.into();
         am.reset_all().insert(&db).await.unwrap();
         db
+    }
+
+    /// The gap state is what makes each gap send one notice pair across restarts and nodes, so
+    /// it must round-trip through the row and be guarded by the compare-and-swap.
+    #[tokio::test]
+    async fn gap_state_round_trips_and_is_guarded() {
+        let db = db_with_one_check(0).await;
+        let prior = get_alert_state(&db, "mon-1").await.unwrap().unwrap();
+        assert_eq!(prior, AlertState::default());
+        let gap = AlertState {
+            gap_since: 1_000,
+            gap_runs: 3,
+            gap_notified_at: 2_000,
+            ..prior
+        };
+        assert!(
+            update_alert_state_if(&db, "mon-1", prior, gap)
+                .await
+                .unwrap()
+        );
+        assert_eq!(get_alert_state(&db, "mon-1").await.unwrap(), Some(gap));
+        // A node that read the state before the gap notice must lose, or it sends a second one.
+        let stale = AlertState {
+            gap_notified_at: 0,
+            ..gap
+        };
+        let other = AlertState {
+            gap_notified_at: 3_000,
+            ..gap
+        };
+        assert!(
+            !update_alert_state_if(&db, "mon-1", stale, other)
+                .await
+                .unwrap()
+        );
+        assert_eq!(get_alert_state(&db, "mon-1").await.unwrap(), Some(gap));
+    }
+
+    #[tokio::test]
+    async fn a_resumed_notice_stays_due_until_its_gap_is_cleared() {
+        let db = db_with_one_check(0).await;
+        let prior = get_alert_state(&db, "mon-1").await.unwrap().unwrap();
+        let owed = AlertState {
+            gap_since: 1_000,
+            gap_notified_at: 2_000,
+            gap_resumed_at: 3_000,
+            ..prior
+        };
+        assert!(
+            update_alert_state_if(&db, "mon-1", prior, owed)
+                .await
+                .unwrap()
+        );
+        assert!(
+            list_due_resumed_notices(&db, 2_999)
+                .await
+                .unwrap()
+                .is_empty()
+        );
+        let due = list_due_resumed_notices(&db, 3_000).await.unwrap();
+        assert_eq!(
+            due.iter().map(|d| (d.2, d.3)).collect::<Vec<_>>(),
+            vec![(1_000, 3_000)]
+        );
+        // Another gap's notice does not clear this one.
+        assert!(!clear_resumed_gap(&db, "mon-1", 999).await.unwrap());
+        assert!(clear_resumed_gap(&db, "mon-1", 1_000).await.unwrap());
+        assert_eq!(
+            get_alert_state(&db, "mon-1").await.unwrap(),
+            Some(AlertState::default())
+        );
+        assert!(
+            list_due_resumed_notices(&db, 3_000)
+                .await
+                .unwrap()
+                .is_empty()
+        );
     }
 
     #[tokio::test]

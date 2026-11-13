@@ -17,6 +17,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   promRulePreviewQuery,
   alertHistoryQuery,
+  alertHistorySummaryQuery,
   alertAcksQuery,
   alertDetailQuery,
   ackAlertMutation,
@@ -50,6 +51,7 @@ vi.mock("./product_analytics", () => ({ default: { track: vi.fn() } }));
 vi.mock("./alerts", () => ({
   default: {
     getHistory: vi.fn().mockResolvedValue({ data: { hits: [], total: 0 } }),
+    getHistorySummary: vi.fn().mockResolvedValue({ data: { rows: [] } }),
     listAlertAcks: vi.fn(),
     ackAlert: vi.fn(),
     unackAlert: vi.fn(),
@@ -86,18 +88,21 @@ describe("alertHistoryQuery", () => {
     expect(JSON.stringify(first.queryKey)).toContain(String(BUCKETED_END_US));
   });
 
-  it("requests the caller's exact window — a bucketed end hides the current minute's evaluations", async () => {
-    const options = alertHistoryQuery(ORG, {
-      alert_id: "a1",
-      start_time: START_US,
-      end_time: END_US,
-    });
-    await (options.queryFn as any)();
-    expect(alerts.getHistory).toHaveBeenCalledWith(
-      ORG,
-      expect.objectContaining({ start_time: START_US, end_time: END_US }),
-    );
-  });
+  it.each([
+    ["history", alertHistoryQuery, () => alerts.getHistory],
+    ["summary", alertHistorySummaryQuery, () => alerts.getHistorySummary],
+  ] as const)(
+    "the %s requests the caller's exact window — a bucketed end hides the current minute's evaluations",
+    async (_name, query, api) => {
+      const options = query(ORG, { start_time: START_US, end_time: END_US, from: 0, size: 1 });
+      expect(JSON.stringify(options.queryKey)).toContain(String(BUCKETED_END_US));
+      await (options.queryFn as any)();
+      expect(api()).toHaveBeenCalledWith(
+        ORG,
+        expect.objectContaining({ start_time: START_US, end_time: END_US }),
+      );
+    },
+  );
 });
 
 describe("promRulePreviewQuery", () => {

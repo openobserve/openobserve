@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <div class="px-1.5 pb-1.5">
+    <div class="px-1 pb-1.5">
       <OSearchInput
         v-model="searchQuery"
         :placeholder="t('synthetics.environments.searchPlaceholder')"
@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </div>
 
-    <div class="flex-1 overflow-y-auto px-1.5">
+    <div class="flex-1 overflow-y-auto px-1">
       <OTabs
         orientation="vertical"
         dense

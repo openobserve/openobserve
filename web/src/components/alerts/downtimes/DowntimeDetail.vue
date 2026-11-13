@@ -143,6 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 type="downtimeTarget"
                 value="condition"
                 :label="conditionText"
+                :title="conditionKeys"
                 data-test="downtime-detail-condition"
               />
             </ODescriptionItem>
@@ -166,8 +167,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   : t("alerts.downtimes.detail.bannerOff")
               }}
             </ODescriptionItem>
-            <ODescriptionItem :label="t('alerts.downtimes.columns.schedule')">
+            <ODescriptionItem
+              :label="
+                stoppedAt
+                  ? t('alerts.downtimes.detail.plannedSchedule')
+                  : t('alerts.downtimes.columns.schedule')
+              "
+            >
               {{ scheduleSentence(downtime.schedule, t) }}
+            </ODescriptionItem>
+            <ODescriptionItem
+              v-if="stoppedAt"
+              :label="stoppedAt.label"
+              data-test="downtime-detail-stopped-at"
+            >
+              {{ stoppedAt.time }}
             </ODescriptionItem>
             <ODescriptionItem :label="t('alerts.downtimes.form.reason')">
               <template v-if="downtime.reason">{{ downtime.reason }}</template>
@@ -268,7 +282,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :disabled="testDestinations.length === 0"
               :loading="testMutation.isPending.value"
               data-test="downtime-detail-send-test"
-              @click="sendTest"
+              @click="testConfirmOpen = true"
             >
               {{ t("alerts.downtimes.notify.test.send") }}
             </OButton>
@@ -337,10 +351,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="endsNow"
       v-model="cancelOpen"
       :title="t('alerts.downtimes.confirmEndNow.title')"
-      :message="t('alerts.downtimes.confirmEndNow.message')"
-      :ok-label="t('alerts.downtimes.confirmEndNow.ok')"
+      :message="
+        repeats
+          ? t('alerts.downtimes.confirmEndNow.recurringMessage')
+          : t('alerts.downtimes.confirmEndNow.message')
+      "
+      :ok-label="
+        repeats
+          ? t('alerts.downtimes.confirmEndNow.recurringOk')
+          : t('alerts.downtimes.confirmEndNow.ok')
+      "
       :cancel-label="t('alerts.downtimes.confirmEndNow.keep')"
-      ok-color="destructive"
+      ok-variant="destructive"
+      focus-cancel
       @update:ok="confirmCancel"
       @update:cancel="cancelOpen = false"
     />
@@ -348,11 +371,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-else
       v-model="cancelOpen"
       :title="t('alerts.downtimes.confirmCancel.title')"
-      :message="t('alerts.downtimes.confirmCancel.message')"
+      :message="
+        repeats
+          ? t('alerts.downtimes.confirmCancel.recurringMessage')
+          : t('alerts.downtimes.confirmCancel.message')
+      "
       :ok-label="t('alerts.downtimes.confirmCancel.confirm', { count: 1 }, 1)"
+      ok-variant="destructive"
+      focus-cancel
       :cancel-label="t('alerts.downtimes.confirmCancel.keep', { count: 1 }, 1)"
       @update:ok="confirmCancel"
       @update:cancel="cancelOpen = false"
+    />
+
+    <ConfirmDialog
+      v-model="testConfirmOpen"
+      :title="t('alerts.downtimes.notify.test.confirmTitle')"
+      :message="
+        t('alerts.downtimes.notify.test.confirmMessage', {
+          names: testDestinations.map((d) => d.name).join(', '),
+        })
+      "
+      :ok-label="t('alerts.downtimes.notify.test.send')"
+      :cancel-label="t('common.cancel')"
+      data-test="downtime-detail-send-test-confirm"
+      @update:ok="sendTest"
+      @update:cancel="testConfirmOpen = false"
     />
 
     <ExtendDowntimeDialog
@@ -395,6 +439,7 @@ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import {
   currentOrNextWindow,
   formatWindow,
+  formatWindowTime,
   recentWindows,
   scheduleSentence,
 } from "@/utils/downtimes/schedule";
@@ -428,6 +473,7 @@ import ExtendDowntimeMenu from "./ExtendDowntimeMenu.vue";
 import { useExtendDowntime } from "@/composables/downtimes/useExtendDowntime";
 import { useListBoundaryRefetch } from "@/composables/downtimes/useListBoundaryRefetch";
 import { useNowMicros } from "@/composables/downtimes/useNowMicros";
+import { useDowntimeValueLabels } from "@/composables/downtimes/useDowntimeValueLabels";
 import { isExtendable } from "@/utils/downtimes/extend";
 import { isEditable } from "@/utils/downtimes/listOrder";
 import { suppressedPage } from "@/utils/downtimes/suppressed";
@@ -507,9 +553,32 @@ const muteMutation = useMutation(() => quickMuteMutation(orgId.value));
 const title = computed<I18nText>(() =>
   downtime.value ? raw(downtime.value.name) : t("alerts.downtimes.detailTitle"),
 );
-const subtitle = computed<I18nText | undefined>(() =>
-  downtime.value ? scheduleSentence(downtime.value.schedule, t) : undefined,
-);
+// After an End now or a cancel, the planned schedule is not what happened, so the real stop is shown too.
+const stoppedAt = computed<{ label: I18nText; time: string; line: I18nText } | null>(() => {
+  const d = downtime.value;
+  if (!d?.cancelled_at || (d.status !== "ended_early" && d.status !== "cancelled")) return null;
+  const time = formatWindowTime(d.cancelled_at, viewerZone.value);
+  const zoned = t("alerts.downtimes.detail.stoppedTime", { time, zone: viewerZone.value });
+  return d.status === "ended_early"
+    ? {
+        label: t("alerts.downtimes.detail.endedEarlyAt"),
+        time: zoned,
+        line: t("alerts.downtimes.detail.endedEarlyAtTime", { time: zoned }),
+      }
+    : {
+        label: t("alerts.downtimes.detail.cancelledAt"),
+        time: zoned,
+        line: t("alerts.downtimes.detail.cancelledAtTime", { time: zoned }),
+      };
+});
+
+const subtitle = computed<I18nText | undefined>(() => {
+  if (!downtime.value) return undefined;
+  const planned = scheduleSentence(downtime.value.schedule, t);
+  return stoppedAt.value ? raw(`${planned} · ${stoppedAt.value.line}`) : planned;
+});
+
+const repeats = computed(() => !!downtime.value && downtime.value.schedule.repeat !== "none");
 
 const folderNameIn = (list: { folderId: string; name: string }[] | undefined, fid: string) =>
   list?.find((f) => f.folderId === fid)?.name;
@@ -537,15 +606,27 @@ const isCalledOff = (d: { status: string }) =>
 const { extendBy } = useExtendDowntime();
 const extendOpen = ref(false);
 
-const conditionText = computed(() =>
-  downtime.value ? conditionSummary(downtime.value.condition, t) : null,
+const valueLabel = useDowntimeValueLabels(
+  orgId,
+  computed(() => downtime.value?.folder_id || undefined),
+  () => downtime.value?.condition,
 );
+const conditionText = computed(() =>
+  downtime.value ? conditionSummary(downtime.value.condition, t, valueLabel.value) : null,
+);
+// The stored keys stay one hover away when the chip shows display names.
+const conditionKeys = computed(() => {
+  const keys = downtime.value ? conditionSummary(downtime.value.condition, t) : null;
+  return keys && keys !== conditionText.value ? keys : undefined;
+});
 const missingModules = computed(() =>
   MODULE_ORDER.filter((m) => !(downtime.value?.targets ?? []).some((tg) => tg.module === m)),
 );
 
 const pastWindows = computed(() =>
-  downtime.value ? recentWindows(downtime.value.schedule, nowMicros.value, 3) : [],
+  downtime.value
+    ? recentWindows(downtime.value.schedule, nowMicros.value, 3, downtime.value.cancelled_at)
+    : [],
 );
 
 const nextWindow = computed(() =>
@@ -716,7 +797,19 @@ const testDestinations = computed<TestDestination[]>(() => {
   return names.flatMap((name) => known.filter((d) => d.name === name));
 });
 
+const testConfirmOpen = ref(false);
+// One reason per destination; a skip reads in words, not as the server's key.
+const SKIP_TEXT: Record<string, I18nKey> = {
+  PlatformNotForKind: "alerts.downtimes.notify.test.skipped",
+  NoOrgMemberRecipient: "alerts.downtimes.notify.test.noMember",
+};
+const failureText = (r: { destination: string; error?: string }) => {
+  const skip = r.error ? SKIP_TEXT[r.error] : undefined;
+  if (skip) return `${r.destination} (${t(skip)})`;
+  return r.error ? `${r.destination} (${r.error})` : r.destination;
+};
 const sendTest = async () => {
+  testConfirmOpen.value = false;
   const d = downtime.value;
   if (!d) return;
   const href = router.resolve({ name: "downtimes", query: orgQuery() }).href;
@@ -725,7 +818,7 @@ const sendTest = async () => {
     destinations: testDestinations.value,
     url: `${window.location.origin}${href}`,
   });
-  const failed = results.filter((r) => !r.ok).map((r) => r.destination);
+  const failed = results.filter((r) => !r.ok);
   if (failed.length === 0) {
     toast({
       variant: "success",
@@ -735,7 +828,9 @@ const sendTest = async () => {
   }
   toast({
     variant: "error",
-    message: t("alerts.downtimes.notify.test.failed", { names: failed.join(", ") }),
+    message: t("alerts.downtimes.notify.test.failed", {
+      names: failed.map(failureText).join(", "),
+    }),
   });
 };
 

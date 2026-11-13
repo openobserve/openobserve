@@ -69,6 +69,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <template #icon-left><OIcon name="radio-button-unchecked" size="sm" /></template>
                 {{ t("alerts.incidents.filterActive") }}
               </OToggleGroupItem>
+              <OToggleGroupItem value="open" size="sm" data-test="incident-status-filter-open">
+                <template #icon-left><OIcon name="error-outline" size="sm" /></template>
+                {{ t("alerts.incidents.statusOpen") }}
+              </OToggleGroupItem>
               <OToggleGroupItem
                 value="resolved"
                 size="sm"
@@ -182,15 +186,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="getSortedDimensions(row.group_values).length"
             class="flex min-w-0 flex-nowrap items-center gap-1 overflow-hidden"
           >
-            <ODimensionChip
-              v-for="dim in displayDimensions(row.group_values).slice(0, 2)"
-              :key="dim.key"
-              :dim-key="dim.key"
-              :key-label="dim.label"
-              :value="dim.value"
-              :tooltip="!dim.label"
-              class="min-w-0"
-            />
+            <template v-for="dim in displayDimensions(row.group_values).slice(0, 2)" :key="dim.key">
+              <span
+                v-if="dim.key === 'service'"
+                class="min-w-0"
+                data-test="incident-list-service-chip"
+                ><ServiceNameLabel
+                  layout="chip"
+                  :service-key="row.group_values?.[dim.key] ?? ''"
+                  :display-name="row.group_values_display?.service"
+              /></span>
+              <ODimensionChip
+                v-else
+                :dim-key="dim.key"
+                :key-label="dim.label"
+                :value="dim.value"
+                :tooltip="!dim.label"
+                class="min-w-0"
+              />
+            </template>
             <OTag
               v-if="getSortedDimensions(row.group_values).length > 2"
               type="countChip"
@@ -287,7 +301,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               v-if="row.status === 'open'"
               variant="ghost-warning"
-              size="icon-sm"
+              size="icon-xs-sq"
               :aria-label="t('alerts.incidents.acknowledgeAriaLabel')"
               class="max-md:hidden"
               @click.stop="acknowledgeIncident(row)"
@@ -298,7 +312,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               v-if="row.status !== 'resolved'"
               variant="ghost-primary"
-              size="icon-sm"
+              size="icon-xs-sq"
               class="max-md:hidden"
               @click.stop="resolveIncident(row)"
               data-test="incident-resolve-btn"
@@ -308,7 +322,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               v-if="row.status === 'resolved'"
               variant="ghost-warning"
-              size="icon-sm"
+              size="icon-xs-sq"
               class="max-md:hidden"
               @click.stop="reopenIncident(row)"
               data-test="incident-reopen-btn"
@@ -415,6 +429,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
 import { chipDimensionKeys, dimensionDisplay } from "@/utils/incidents/findingDimensions";
+import ServiceNameLabel from "@/components/shared/ServiceNameLabel.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
@@ -444,6 +459,7 @@ export default defineComponent({
     OTable,
     OTag,
     ODimensionChip,
+    ServiceNameLabel,
     OTimeCell,
     OStatStrip,
     OToggleGroup,
@@ -518,16 +534,17 @@ export default defineComponent({
         ? t("alerts.downtimes.incident.notLoadedTooltip", { id })
         : t("alerts.downtimes.incident.mutedBy", { name: nameOf(id) });
     const searchQuery = ref("");
-    // Primary filter groups the lifecycle like other list pages: Active covers
-    // both open and acknowledged (still needs attention), Resolved is done.
-    const validStatuses = ["all", "active", "resolved"];
-    // Default to "active" so the page opens focused on incidents that need
-    // attention (a saved state or ?status= query still wins).
-    const statusFilter = ref(
-      validStatuses.includes(route.query.status as string)
-        ? (route.query.status as string)
-        : "active",
-    );
+    // Active covers open and acknowledged; Open is open only, matching the Overview count.
+    const validStatuses = ["all", "active", "open", "resolved"];
+    // Default to "active"; a valid ?status= query wins over the saved state.
+    const urlStatus = validStatuses.includes(route.query.status as string)
+      ? (route.query.status as string)
+      : null;
+    if (route.query.status !== undefined) {
+      const { status: _status, ...rest } = route.query;
+      router.replace({ query: rest });
+    }
+    const statusFilter = ref(urlStatus ?? "active");
     const isRestoringState = ref(false);
     const viewState = useListViewState("incidents", {
       severityFilter: "all",
@@ -545,7 +562,8 @@ export default defineComponent({
       savePageState();
     };
     // Severity facet — independent of status ("all" | "P1".."P4").
-    const severityFilter = ref(viewState.severityFilter);
+    // A status link lands on every severity of that status, so the saved facet is dropped.
+    const severityFilter = ref(urlStatus ? "all" : viewState.severityFilter);
     watch([severityFilter, pageSize, sortBy, sortOrder], () => {
       Object.assign(viewState, {
         severityFilter: severityFilter.value,
@@ -608,7 +626,7 @@ export default defineComponent({
         accessorKey: "group_values",
         resizable: true,
         hideable: true,
-        size: 320,
+        size: 340,
         meta: { align: "left" },
       },
       {
@@ -678,6 +696,9 @@ export default defineComponent({
       const rows = searchedIncidents.value;
       if (statusFilter.value === "active") {
         return rows.filter((i) => i.status === "open" || i.status === "acknowledged");
+      }
+      if (statusFilter.value === "open") {
+        return rows.filter((i) => i.status === "open");
       }
       if (statusFilter.value === "resolved") {
         return rows.filter((i) => i.status === "resolved");
@@ -1090,13 +1111,13 @@ export default defineComponent({
         if (cachedData && cachedData.length > 0) {
           allIncidents.value = cachedData;
         }
-        if (savedState.searchQuery !== undefined) {
+        if (savedState.searchQuery !== undefined && !urlStatus) {
           searchQuery.value = savedState.searchQuery;
         }
-        if (savedState.statusFilter !== undefined) {
+        if (savedState.statusFilter !== undefined && !urlStatus) {
           statusFilter.value = savedState.statusFilter;
         }
-        if (savedState.pagination?.page) {
+        if (savedState.pagination?.page && !urlStatus) {
           currentPage.value = savedState.pagination.page;
         }
         return true;

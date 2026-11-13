@@ -6,6 +6,7 @@
 // beforeAll/afterAll run on a raw browser.newPage() which carries none of the
 // custom fixture's helpers, so navigateToBase() must NOT be called there.
 
+const { randomUUID } = require('crypto');
 const { getAuthHeaders, getOrgIdentifier } = require('../utils/cloud-auth.js');
 
 const PREFIX = 'ui_auto';
@@ -40,6 +41,7 @@ const ownPrefix = (prefix, who) => {
     return prefix;
 };
 const uniq = () => `${Date.now()}x${Math.floor(Math.random() * 10000)}`;
+const uniqueEmail = (prefix) => `${prefix}_${randomUUID().slice(0, 8)}_${Date.now()}@example.com`;
 const org = () => getOrgIdentifier();
 const api = () => `${process.env.ZO_BASE_URL.replace(/\/$/, '')}/api`;
 
@@ -104,6 +106,8 @@ const listGroups = async (page) => (await req(page, 'GET', '/groups')).body || [
 const getGroup = async (page, name) => (await req(page, 'GET', `/groups/${name}`)).body || {};
 const listUsers = async (page) => (await req(page, 'GET', '/users')).body?.data ?? [];
 const getPerms = async (page, role) => (await req(page, 'GET', `/roles/${role}/permissions`)).body || [];
+const listServiceAccounts = async (page) => (await req(page, 'GET', '/service_accounts')).body?.data ?? [];
+const listMemberRoles = async (page) => (await req(page, 'GET', '/users/roles/all')).body || {};
 
 // Role names are underscore-only on purpose: POST /roles normalizes anything
 // outside [A-Za-z0-9_] to "_", while a later PUT does NOT normalize — so a
@@ -132,6 +136,21 @@ const clearRolePerms = async (page, name) => {
 const setRolePerms = (page, name, add, remove = []) =>
     req(page, 'PUT', `/roles/${name}`, { add, remove, add_users: [], remove_users: [] });
 
+const addRoleMembers = async (page, name, emails) => {
+    const { status } = await req(page, 'PUT', `/roles/${name}`, {
+        add: [], remove: [], add_users: emails, remove_users: [],
+    });
+    if (status >= 400) throw new Error(`add members to role ${name}: ${status}`);
+};
+
+const createServiceAccount = async (page, email) => {
+    const { status } = await req(page, 'POST', '/service_accounts', {
+        email, first_name: 'Automation', last_name: 'TestUser',
+    });
+    if (status >= 400) throw new Error(`create service account ${email}: ${status}`);
+    return email;
+};
+
 const setGroup = (page, name, patch) =>
     req(page, 'PUT', `/groups/${name}`, {
         add_roles: [], remove_roles: [], add_users: [], remove_users: [], ...patch,
@@ -157,11 +176,12 @@ const createGroupApi = async (page, name) => {
  * dashboards inside it, so children go before parents.
  */
 const makeTracker = () => {
-    const roles = [], groups = [], users = [], folders = [];
+    const roles = [], groups = [], users = [], folders = [], serviceAccounts = [];
     return {
         role: (n) => { if (n) roles.push(n); return n; },
         group: (n) => { if (n) groups.push(n); return n; },
         user: (e) => { if (e) users.push(e); return e; },
+        serviceAccount: (e) => { if (e) serviceAccounts.push(e); return e; },
         folder: (id) => { if (id) folders.push(id); return id; },
 
         /**
@@ -174,7 +194,7 @@ const makeTracker = () => {
          * deletion for the check to mean anything.
          */
         async cleanup(page) {
-            const gone = { groups: [], roles: [], users: [], folders: [] };
+            const gone = { groups: [], roles: [], users: [], folders: [], serviceAccounts: [] };
             for (const g of [...groups]) {
                 await req(page, 'DELETE', `/groups/${g}`).catch(() => {});
                 gone.groups.push(g);
@@ -186,6 +206,10 @@ const makeTracker = () => {
             for (const u of [...users]) {
                 await req(page, 'DELETE', `/users/${u}`).catch(() => {});
                 gone.users.push(u);
+            }
+            for (const sa of [...serviceAccounts]) {
+                await req(page, 'DELETE', `/service_accounts/${sa}`).catch(() => {});
+                gone.serviceAccounts.push(sa);
             }
             for (const f of [...folders]) {
                 const listed = (await req(page, 'GET', `/dashboards?folder=${f}`)).body;
@@ -210,11 +234,15 @@ const makeTracker = () => {
             const liveGroups = new Set(await listGroups(page));
             const liveUsers = new Set((await listUsers(page)).map((u) => u?.email));
             const liveFolders = new Set((await listDashboardFolders(page)).map((f) => f?.folderId));
+            const liveServiceAccounts = serviceAccounts.length
+                ? new Set((await listServiceAccounts(page)).map((a) => a?.email))
+                : new Set();
             return [
                 ...groups.filter((g) => liveGroups.has(g)),
                 ...roles.filter((r) => liveRoles.has(r)),
                 ...users.filter((u) => liveUsers.has(u)),
                 ...folders.filter((f) => liveFolders.has(f)),
+                ...serviceAccounts.filter((sa) => liveServiceAccounts.has(sa)),
             ];
         },
     };
@@ -293,9 +321,9 @@ const loginAs = async (browser, email, password) => {
 
 const MEMBER_PASSWORD = 'Complexpass#123';
 
-const createMember = async (page, email, role = 'admin') => {
+const createMember = async (page, email, role = 'admin', { firstName = 'IAM', lastName = 'Automation' } = {}) => {
     const { status } = await req(page, 'POST', '/users', {
-        email, password: MEMBER_PASSWORD, first_name: 'IAM', last_name: 'Automation', role,
+        email, password: MEMBER_PASSWORD, first_name: firstName, last_name: lastName, role,
     });
     if (status >= 400 && status !== 400) throw new Error(`create member ${email}: ${status}`);
     return email;
@@ -434,9 +462,10 @@ const rbacEnabled = async (page) => {
 
 module.exports = {
     loginAs, MEMBER_PASSWORD, createMember, sweepUsers, rbacEnabled,
-    PREFIX, ns, uniq, org, api, req, reqAs, reqAsV2, allowed,
-    listRoles, listGroups, getGroup, listUsers, getPerms,
-    createRole, setRolePerms, clearRolePerms, setGroup, createGroupApi, sweepRoles, makeTracker,
+    PREFIX, ns, uniq, uniqueEmail, org, api, req, reqAs, reqAsV2, allowed,
+    listRoles, listGroups, getGroup, listUsers, getPerms, listServiceAccounts, listMemberRoles,
+    createRole, setRolePerms, clearRolePerms, addRoleMembers, createServiceAccount,
+    setGroup, createGroupApi, sweepRoles, makeTracker,
     createDashboardFolder, createDashboardIn, listDashboardFolders, sweepDashboardFolders,
     reqV2, dashboardIdOf,
 };

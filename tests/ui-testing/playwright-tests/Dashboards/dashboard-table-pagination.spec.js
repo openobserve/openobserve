@@ -880,8 +880,8 @@ test.describe("Dashboard Table Chart Pagination Feature - SQL Tables", () => {
     await expect(infoIcon).toBeVisible();
     await infoIcon.hover();
 
-    // Verify tooltip appears with expected text
-    const tooltip = pm.dashboardPanelConfigs.infoTooltip;
+    // The expand-all button's tooltip can still be open from openConfigPanel, so match this one by text.
+    const tooltip = pm.dashboardPanelConfigs.infoTooltip.filter({ hasText: 'default number of records' });
     await expect(tooltip).toBeVisible();
     const tooltipText = await tooltip.textContent();
     expect(tooltipText).toContain('default number of records');
@@ -928,7 +928,7 @@ test.describe("Dashboard Table Chart Pagination Feature - SQL Tables", () => {
 
     // Fill the SQL query
     await pm.chartTypeSelector.queryEditor.getByRole('code').click();
-    await pm.chartTypeSelector.queryEditor.locator('.inputarea').fill(
+    await pm.chartTypeSelector.fillQueryEditorInputArea(
       'SELECT kubernetes_container_name, count(*) as count FROM "e2e_automate" GROUP BY kubernetes_container_name'
     );
 
@@ -1029,7 +1029,7 @@ test.describe("Dashboard Table Chart Pagination Feature - PromQL Tables", () => 
     // the passing custom SQL test (line 934). keyboard.type() leaves autocomplete open
     // and doesn't reliably trigger Vue's reactive model update, causing "Query-1 is empty".
     await queryEditor.getByRole('code').click();
-    await queryEditor.locator('.inputarea').fill('cpu_usage{}');
+    await pm.chartTypeSelector.fillQueryEditorInputArea('cpu_usage{}');
 
     // Apply
     await pm.dashboardPanelActions.applyDashboardBtn();
@@ -1117,7 +1117,7 @@ test.describe("Dashboard Table Chart Pagination Feature - PromQL Tables", () => 
     // Fill the Monaco input directly; typing lets autocomplete corrupt the query
     await queryEditor.getByRole('code').click();
     // Each seeded cpu_usage series has only a few samples, so one legend's rows can fit a single page; the sum has a row per step.
-    await queryEditor.locator('.inputarea').fill('sum(cpu_usage)');
+    await pm.chartTypeSelector.fillQueryEditorInputArea('sum(cpu_usage)');
 
     // Apply
     await pm.dashboardPanelActions.applyAndWaitForPromQLQuery();

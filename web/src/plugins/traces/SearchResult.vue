@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="traces-count-badge"
           type="logsResultChip"
           value="neutral"
-          class="me-[0.6rem] tabular-nums"
+          class="me-2.5 tabular-nums"
           :aria-busy="countState.loading ? 'true' : undefined"
         >
           <template v-if="countState.loading">
@@ -80,9 +80,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTag
           v-if="shownErrorCount > 0"
           data-test="traces-error-count-badge"
-          variant="error"
+          type="logsResultChip"
+          value="error"
           :clickable="true"
-          class="rounded-default! px-2.5! py-[0.4rem]! text-xs text-xs! tabular-nums transition-opacity"
+          class="tabular-nums transition-opacity"
           :class="[
             showErrorOnly
               ? 'bg-badge-error-solid-bg! text-badge-error-solid-text!'

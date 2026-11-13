@@ -173,11 +173,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                      search/tabs and above the rows. Always rendered (skeleton
                      while loading) so data arriving never shifts the layout. -->
               <template #subheader>
+                <div v-if="levelFilter" class="px-3 pt-2" data-test="alert-list-level-filter">
+                  <OButton
+                    variant="outline"
+                    size="xs"
+                    icon-right="close"
+                    data-test="alert-list-level-filter-clear"
+                    :aria-label="t('alerts.levelFilterRemove', { label: levelFilterLabel })"
+                    @click="clearLevelFilter"
+                  >
+                    {{ levelFilterLabel }}
+                  </OButton>
+                </div>
                 <div data-test="alert-list-summary">
                   <OStatStrip
                     :items="summaryStats"
                     :loading="loading"
                     compact
+                    stacked
                     selectable
                     :selected-key="stateFilter"
                     default-key="total"
@@ -212,8 +225,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </OToggleGroupItem>
                     </template>
                   </OToggleGroup>
-                  <!-- flex-1 is basis-0, so the min-w floor is what wraps the input before its scope chips spill. -->
-                  <div class="min-w-0 flex-1 md:max-lg:min-w-80">
+                  <!-- flex-1 is basis-0, so below lg the full-width basis is what wraps the input before its scope chips spill. -->
+                  <div class="min-w-0 flex-1 md:max-lg:basis-full">
                     <OInput
                       v-model="dynamicQueryModel"
                       :placeholder="
@@ -635,7 +648,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :data-test="`alert-list-${row.name}-pause-start-alert`"
                     class="ms-1 max-md:hidden"
                     :variant="row.enabled ? 'ghost-destructive' : 'ghost-success'"
-                    size="icon-sm"
+                    size="icon-xs-sq"
                     :icon-left="row.enabled ? 'pause' : 'play-arrow'"
                     :loading="!!alertStateLoadingMap[row.uuid]"
                     @click.stop="toggleAlertState(row)"
@@ -669,7 +682,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-row-action="edit"
                     :data-test="`alert-list-${row.name}-update-alert`"
                     variant="ghost"
-                    size="icon-sm"
+                    size="icon-xs-sq"
                     icon-left="edit"
                     class="max-md:hidden"
                     @click.stop="editAlert(row)"
@@ -701,7 +714,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OButton
                       data-row-action="duplicate"
                       variant="ghost"
-                      size="icon-sm"
+                      size="icon-xs-sq"
                       :icon-left="anomalyRowLocked(row) ? 'lock' : 'content-copy'"
                       :disabled="isSloRow(row) || anomalyRowLocked(row)"
                       :aria-label="isSloRow(row) ? t('alerts.sloCloneDisabled') : t('alerts.clone')"
@@ -740,7 +753,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <template #trigger>
                       <OButton
                         variant="ghost"
-                        size="icon-sm"
+                        size="icon-xs-sq"
                         icon-left="more-vert"
                         :aria-label="t('alerts.moreActions')"
                         @click.stop="openMenu($event, row)"
@@ -954,15 +967,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-else
                   size="block"
                   preset="no-alerts"
-                  :filtered="!!(filterQuery || searchQuery || stateFilter)"
+                  :filtered="!!(filterQuery || searchQuery || stateFilter || levelFilter)"
                   @action="
                     (id) =>
                       id === 'clear-filters' &&
-                      ((filterQuery = ''), (searchQuery = ''), (stateFilter = null))
+                      ((filterQuery = ''),
+                      (searchQuery = ''),
+                      (stateFilter = null),
+                      (levelFilter = null))
                   "
                 >
                   <!-- First run only: the filtered state keeps its single Clear filters action. -->
-                  <template v-if="!(filterQuery || searchQuery || stateFilter)" #actions>
+                  <template
+                    v-if="!(filterQuery || searchQuery || stateFilter || levelFilter)"
+                    #actions
+                  >
                     <OButton
                       v-if="showAlertLibrary"
                       variant="primary"
@@ -1280,7 +1299,13 @@ import useStreams from "@/composables/useStreams";
 
 import { convertUnixToDateFormat as convertUnixToFormat } from "@/utils/date";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
-import { isFiringOutcome, outcomeLabel, shouldShowRunOutcome } from "@/utils/alerts/runOutcome";
+import {
+  isErrorOutcome,
+  isFiringOutcome,
+  isNotifyFailedOutcome,
+  outcomeLabel,
+  shouldShowRunOutcome,
+} from "@/utils/alerts/runOutcome";
 import { debounce } from "lodash-es";
 import alertsService from "@/services/alerts";
 import { oncallTeamsQuery } from "@/services/oncall.queries";
@@ -1379,7 +1404,28 @@ import {
 
 // import alertList from "./alerts";
 
+const ALERT_STATE_FILTERS = [
+  "active",
+  "paused",
+  "failed",
+  "firing",
+  "acknowledged",
+  "recent",
+  "error",
+  "notify_failed",
+] as const;
+const ALERT_LEVEL_FILTERS = ["critical", "warning"] as const;
+
 type AlertRowRef = { alert_id?: unknown; folder_name?: { id?: unknown } };
+type AlertStateFilter = (typeof ALERT_STATE_FILTERS)[number];
+type AlertLevelFilter = (typeof ALERT_LEVEL_FILTERS)[number];
+
+// An unknown or repeated query value is ignored rather than guessed at.
+function parseQueryChoice<T extends string>(value: unknown, choices: readonly T[]): T | null {
+  return typeof value === "string" && (choices as readonly string[]).includes(value)
+    ? (value as T)
+    : null;
+}
 
 export default defineComponent({
   name: "AlertList",
@@ -1470,8 +1516,7 @@ export default defineComponent({
       searchQuery: "",
       filterQuery: "",
       searchAcrossFolders: false,
-      stateFilter: null as
-        "active" | "paused" | "failed" | "firing" | "acknowledged" | "recent" | null,
+      stateFilter: null as AlertStateFilter | null,
       sortBy: "",
       sortOrder: "asc" as "asc" | "desc",
       perPage: 20,
@@ -1873,6 +1918,8 @@ export default defineComponent({
       let firing = 0;
       let acknowledged = 0;
       let recent = 0;
+      let error = 0;
+      let notify_failed = 0;
       for (const r of rows) {
         // active = unpaused (enabled); paused = disabled. These two partition the
         // rows. `failed` is an orthogonal health overlay (a failed anomaly is still
@@ -1884,8 +1931,20 @@ export default defineComponent({
         if (isFiringRow(r)) firing += 1;
         if (isAckedFiring(r)) acknowledged += 1;
         if (recencyLevel(r.last_satisfied_at_raw) === "hot") recent += 1;
+        if (showRunOutcome(r) && isErrorOutcome(r.last_outcome)) error += 1;
+        if (showRunOutcome(r) && isNotifyFailedOutcome(r.last_outcome)) notify_failed += 1;
       }
-      return { active, paused, failed, firing, acknowledged, recent, total: rows.length };
+      return {
+        active,
+        paused,
+        failed,
+        firing,
+        acknowledged,
+        recent,
+        error,
+        notify_failed,
+        total: rows.length,
+      };
     });
 
     // Stat tiles for the summary strip. `tone` is the single source of colour so
@@ -1926,6 +1985,24 @@ export default defineComponent({
           tone: "blue",
           max: share,
           dataTest: "alert-summary-acknowledged",
+        },
+        {
+          key: "error",
+          label: t("alerts.summaryEvalError"),
+          value: v(c.error),
+          icon: "report-problem",
+          tone: "error",
+          max: share,
+          dataTest: "alert-summary-error",
+        },
+        {
+          key: "notify_failed",
+          label: t("alerts.summaryDeliveryFailed"),
+          value: v(c.notify_failed),
+          icon: "notifications-paused",
+          tone: "error",
+          max: share,
+          dataTest: "alert-summary-notify-failed",
         },
         {
           key: "recent",
@@ -1969,14 +2046,18 @@ export default defineComponent({
     });
 
     // ── Stat-tile quick filter ──────────────────────────────────────────────
-    // Clicking a summary tile filters the table to that state (toggle); the
-    // "total" tile clears it. Counts on the tiles stay full (from filteredResults)
-    // so you always see the folder totals; only the table rows are filtered.
-    const stateFilter = ref<
-      "active" | "paused" | "failed" | "firing" | "acknowledged" | "recent" | null
-    >(savedAlertListFilters.stateFilter);
-    const matchesStateFilter = (r: any, f: NonNullable<typeof stateFilter.value>): boolean => {
+    // Tile counts stay full so the folder totals show while only the rows are filtered.
+    const urlQuery = router.currentRoute.value.query;
+    const urlState = parseQueryChoice(urlQuery.state, ALERT_STATE_FILTERS);
+    const stateFilter = ref<AlertStateFilter | null>(urlState ?? savedAlertListFilters.stateFilter);
+    // URL-only: the saved state never carries it.
+    const levelFilter = ref<AlertLevelFilter | null>(
+      parseQueryChoice(urlQuery.level, ALERT_LEVEL_FILTERS),
+    );
+    const matchesStateFilter = (r: any, f: AlertStateFilter): boolean => {
       if (f === "firing") return isFiringRow(r);
+      if (f === "error") return showRunOutcome(r) && isErrorOutcome(r.last_outcome);
+      if (f === "notify_failed") return showRunOutcome(r) && isNotifyFailedOutcome(r.last_outcome);
       if (f === "acknowledged") return isAckedFiring(r);
       if (f === "recent") return recencyLevel(r.last_satisfied_at_raw) === "hot";
       if (f === "failed")
@@ -2001,10 +2082,13 @@ export default defineComponent({
       if (anomalyTabLicenseLocked.value) return [];
       const rows = filteredResults.value || [];
       const f = stateFilter.value;
-      if (!f) return rows;
-      return rows.filter(
-        (r: any) => matchesStateFilter(r, f) || leftFilterIds.value.has(String(r.alert_id)),
-      );
+      const level = levelFilter.value;
+      const byState = f
+        ? rows.filter(
+            (r: any) => matchesStateFilter(r, f) || leftFilterIds.value.has(String(r.alert_id)),
+          )
+        : rows;
+      return level ? byState.filter((r: any) => r.level === level) : byState;
     });
     const markIfLeftFilter = (row: any): boolean => {
       const f = stateFilter.value;
@@ -2058,15 +2142,24 @@ export default defineComponent({
             return write && write.seq >= requestStart ? { ...r, enabled: write.enabled } : r;
           })
         : rows;
+    const levelFilterLabel = computed<I18nText>(() =>
+      t("alerts.levelFilter", {
+        level: (levelFilter.value === "critical"
+          ? t("alerts.levelCritical")
+          : t("alerts.levelWarning")
+        ).toLowerCase(),
+      }),
+    );
+    const clearLevelFilter = () => {
+      levelFilter.value = null;
+    };
     const onStatSelect = (key: string) => {
+      levelFilter.value = null;
       if (key === "total") {
         stateFilter.value = null;
         return;
       }
-      stateFilter.value =
-        stateFilter.value === key
-          ? null
-          : (key as "active" | "paused" | "failed" | "firing" | "acknowledged" | "recent");
+      stateFilter.value = stateFilter.value === key ? null : (key as AlertStateFilter);
     };
 
     const activeFolderToMove = ref("default");
@@ -2319,9 +2412,18 @@ export default defineComponent({
       immediate: true,
     });
 
-    const searchQuery = ref<any>(savedAlertListFilters.searchQuery || "");
-    const filterQuery = ref<any>(savedAlertListFilters.filterQuery || "");
-    const searchAcrossFolders = ref<any>(savedAlertListFilters.searchAcrossFolders || false);
+    // A state or level link lands on exactly the rows clicked, so the saved search is not restored.
+    const linkedFilter = urlState !== null || levelFilter.value !== null;
+    const searchQuery = ref<any>(linkedFilter ? "" : savedAlertListFilters.searchQuery || "");
+    const filterQuery = ref<any>(linkedFilter ? "" : savedAlertListFilters.filterQuery || "");
+    const searchAcrossFolders = ref<any>(
+      !linkedFilter && (savedAlertListFilters.searchAcrossFolders || false),
+    );
+    // The link filters apply once; leaving them in the URL would override the saved search on Back or reload.
+    if (urlQuery.state !== undefined || urlQuery.level !== undefined) {
+      const { state: _state, level: _level, ...rest } = router.currentRoute.value.query;
+      router.replace({ query: rest });
+    }
     const selectedAlertToMove: Ref<any[]> = ref([]);
     const selectedAnomalyConfigsToMove: Ref<any[]> = ref([]);
     const folderIdToBeCloned = ref<any>(router.currentRoute.value.query.folder ?? "default");
@@ -4649,6 +4751,9 @@ export default defineComponent({
       stateCounts,
       summaryStats,
       stateFilter,
+      levelFilter,
+      levelFilterLabel,
+      clearLevelFilter,
       displayedAlerts,
       leftFilterIds,
       onStatSelect,

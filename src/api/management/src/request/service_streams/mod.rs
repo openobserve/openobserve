@@ -26,13 +26,16 @@ use openobserve_core::auth::check_permissions;
 
 use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 
-/// One registry row as the service list returns it.
+/// One registry row as the service list returns it; display fields are computed per request.
 #[derive(Debug, serde::Serialize)]
 struct ServiceRow {
     #[serde(flatten)]
     record: infra::table::service_streams::ServiceRecord,
     /// Discovery fell back to the stream's name, so the row names no service.
     named_after_stream: bool,
+    #[cfg(feature = "enterprise")]
+    #[serde(flatten)]
+    display: openobserve_core::service_identity::display_feed::DisplayFields,
 }
 
 /// GET /api/{org_id}/service_streams/_analytics
@@ -97,7 +100,11 @@ pub async fn get_dimension_analytics(
         match o2_enterprise::enterprise::service_streams::storage::ServiceStorage::calculate_dimension_analytics(&org_id, semantic_groups)
             .await
         {
-            Ok(analytics) => MetaHttpResponse::json(analytics),
+            Ok(mut analytics) => {
+                openobserve_core::service_identity::display_feed::ensure(&org_id).await;
+                analytics.value_display = Some(service_value_display(&org_id, &analytics).await);
+                MetaHttpResponse::json(analytics)
+            }
             Err(e) => MetaHttpResponse::internal_error(
                 format!("Failed to calculate dimension analytics: {e}")
             ),
@@ -156,7 +163,7 @@ pub async fn list_services(
             return MetaHttpResponse::forbidden("Unauthorized Access");
         }
         let records = match infra::table::service_streams::list(&org_id).await {
-            Ok(r) => r,
+            Ok(r) => r.into_iter().filter_map(without_o2_streams).collect(),
             Err(e) => {
                 return MetaHttpResponse::internal_error(format!("Failed to list services: {e}"));
             }
@@ -176,6 +183,7 @@ pub async fn list_services(
             records,
         )
         .await;
+        openobserve_core::service_identity::display_feed::ensure(&org_id).await;
         // The ids ingest names a service from, set `distinguish_by` included.
         let tracked = &identity_config.naming_alias_ids();
         let rows: Vec<ServiceRow> = records
@@ -196,6 +204,12 @@ pub async fn list_services(
                             &dimensions,
                             tracked,
                         ),
+                    display: openobserve_core::service_identity::display_feed::display_of(
+                        &org_id,
+                        &record.service_name,
+                        &record.disambiguation,
+                        &record.all_dimensions,
+                    ),
                     record,
                 }
             })
@@ -208,6 +222,7 @@ pub async fn list_services(
         Ok(records) => MetaHttpResponse::json(
             records
                 .into_iter()
+                .filter_map(without_o2_streams)
                 .map(|record| ServiceRow {
                     record,
                     named_after_stream: false,
@@ -686,6 +701,58 @@ pub use config::meta::service_streams::{
     RelatedStreams, ServiceStreams, StreamInfo, StreamSummary,
 };
 
+/// Each `service` dimension value (the key) mapped to its display name.
+#[cfg(feature = "enterprise")]
+async fn service_value_display(
+    org_id: &str,
+    analytics: &config::meta::service_streams::DimensionAnalyticsSummary,
+) -> std::collections::HashMap<String, String> {
+    let mut values = std::collections::BTreeSet::new();
+    for dimension in analytics
+        .dimensions
+        .iter()
+        .filter(|d| d.dimension_name == "service")
+    {
+        values.extend(dimension.value_counts.keys().cloned());
+        values.extend(dimension.value_children.keys().cloned());
+        values.extend(
+            dimension
+                .sample_values
+                .values()
+                .flat_map(|by_stream| by_stream.values().flatten().cloned()),
+        );
+    }
+    openobserve_core::service_identity::display_feed::labels(org_id, values)
+        .await
+        .into_iter()
+        .collect()
+}
+
+/// Older rows may still list O2's own streams; a row listing nothing else is no service.
+fn without_o2_streams(
+    mut record: infra::table::service_streams::ServiceRecord,
+) -> Option<infra::table::service_streams::ServiceRecord> {
+    use config::meta::stream::StreamType;
+    let mut kept = record.profiles_streams.as_array().map_or(0, Vec::len);
+    let mut dropped = 0;
+    for (stream_type, streams) in [
+        (StreamType::Logs, &mut record.logs_streams),
+        (StreamType::Traces, &mut record.traces_streams),
+        (StreamType::Metrics, &mut record.metrics_streams),
+    ] {
+        if let Some(names) = streams.as_array_mut() {
+            let before = names.len();
+            names.retain(|name| {
+                name.as_str()
+                    .is_none_or(|name| infra::schema::is_service_source_stream(stream_type, name))
+            });
+            dropped += before - names.len();
+            kept += names.len();
+        }
+    }
+    (kept > 0 || dropped == 0).then_some(record)
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
@@ -1094,9 +1161,58 @@ mod tests {
         let row = serde_json::to_value(ServiceRow {
             record,
             named_after_stream: true,
+            #[cfg(feature = "enterprise")]
+            display: Default::default(),
         })
         .unwrap();
         assert_eq!(row["service_name"], "slo_slices");
         assert_eq!(row["named_after_stream"], true);
+    }
+
+    #[test]
+    fn listed_services_drop_streams_o2_writes_or_derives() {
+        let record =
+            |logs: serde_json::Value, traces: serde_json::Value, metrics: serde_json::Value| {
+                infra::table::service_streams::ServiceRecord {
+                    id: "id".into(),
+                    org_id: "org".into(),
+                    service_name: "svc".into(),
+                    set_id: "k8s".into(),
+                    disambiguation: serde_json::json!({}),
+                    all_dimensions: serde_json::json!({}),
+                    logs_streams: logs,
+                    traces_streams: traces,
+                    metrics_streams: metrics,
+                    profiles_streams: serde_json::json!([]),
+                    field_name_mapping: None,
+                    last_seen: 1,
+                }
+            };
+        let none = serde_json::json!([]);
+        assert!(
+            super::without_o2_streams(record(
+                none.clone(),
+                none.clone(),
+                serde_json::json!(["traces_service_graph_request_total"])
+            ))
+            .is_none()
+        );
+        assert!(
+            super::without_o2_streams(record(
+                serde_json::json!(["triggers"]),
+                none.clone(),
+                none.clone()
+            ))
+            .is_none()
+        );
+        let mixed = super::without_o2_streams(record(
+            serde_json::json!(["shop_logs", "triggers"]),
+            serde_json::json!(["default", "_evaluator"]),
+            none.clone(),
+        ))
+        .unwrap();
+        assert_eq!(mixed.logs_streams, serde_json::json!(["shop_logs"]));
+        assert_eq!(mixed.traces_streams, serde_json::json!(["default"]));
+        assert!(super::without_o2_streams(record(none.clone(), none.clone(), none)).is_some());
     }
 }

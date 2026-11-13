@@ -117,6 +117,8 @@ pub struct RenderHints {
     pub fallback_subject: Option<String>,
     /// HTML-escape context attributes in email bodies, as the producer's own sender did.
     pub escape_email_attributes: bool,
+    /// A producer's test send: every title and subject starts with `[TEST] `.
+    pub test_marker: bool,
 }
 
 /// Builds a producer's pre-template JSON body only when the legacy rule selects it.

@@ -88,6 +88,7 @@ import searchService from "@/services/search";
 import apiDashboard from "@/utils/rum/api.json";
 import RenderDashboardCharts from "@/views/Dashboards/RenderDashboardCharts.vue";
 import useRumPerformanceTab from "@/composables/rum/useRumPerformanceTab";
+import { useDeployMarkerClicks } from "@/composables/dashboard/deployMarkerScope";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { sqlEquals } from "@/utils/query/sqlFilterBuilder";
@@ -118,6 +119,7 @@ export default defineComponent({
     // the survivors. See docs/designs/MOBILE_RUM_ADAPTIVE_UI_DESIGN.md.
     const { dashboardData, schemaResolved, showEmptyState, ensureRumSchema } =
       useRumPerformanceTab(apiDashboard);
+    useDeployMarkerClicks(() => dashboardData.value);
 
     const showDashboardSettingsDialog = ref(false);
     const apiDashboardChartsRef: Ref<any> = ref(null);

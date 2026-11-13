@@ -76,6 +76,7 @@ const mockRouter = {
     }),
   },
   push: vi.fn(),
+  replace: vi.fn(),
 };
 
 vi.mock("vue-router", () => ({
@@ -842,6 +843,74 @@ describe("PipelinesList", () => {
 
       expect(wrapper.vm.currentPage).toBe(1);
       expect(wrapper.vm.activeTab).toBe("scheduled");
+    });
+  });
+
+  describe("state link from the Overview", () => {
+    const mountWithQuery = (query: Record<string, string>) => {
+      mockRouter.currentRoute.value.query = query as any;
+      const linked = createWrapper();
+      mockRouter.currentRoute.value.query = {};
+      return linked;
+    };
+
+    it("opens on ?state=errored over the saved facet, on every tab, with no saved search", () => {
+      resetListViewState();
+      useListViewState("pipelines", {
+        filterQuery: "etl",
+        tab: "scheduled",
+        stateFilter: "paused",
+      });
+      const linked = mountWithQuery({ state: "errored" });
+      const vm = linked.vm as any;
+      expect(vm.stateFilter).toBe("errored");
+      expect(vm.activeTab).toBe("all");
+      expect(vm.filterQuery).toBe("");
+      linked.unmount();
+    });
+
+    it("strips ?state after reading it and keeps the other query keys", () => {
+      mockRouter.replace.mockClear();
+      const linked = mountWithQuery({ state: "errored", org_identifier: "test-org" });
+      expect(mockRouter.replace).toHaveBeenCalledWith({
+        query: { org_identifier: "test-org" },
+      });
+      linked.unmount();
+    });
+
+    it("restores the saved search on a later mount without the param", () => {
+      resetListViewState();
+      useListViewState("pipelines", {
+        filterQuery: "etl",
+        tab: "scheduled",
+        stateFilter: "paused",
+      });
+      mountWithQuery({ state: "errored" }).unmount();
+      const again = createWrapper();
+      const vm = again.vm as any;
+      expect(vm.filterQuery).toBe("etl");
+      expect(vm.stateFilter).toBe("paused");
+      again.unmount();
+    });
+
+    it("counts a disabled pipeline with an old error as paused, not errored", () => {
+      const vm = wrapper.vm as any;
+      expect(vm.pipelineState({ enabled: false, last_error: { error_summary: "x" } })).toBe(
+        "paused",
+      );
+      expect(vm.pipelineState({ enabled: true, last_error: { error_summary: "x" } })).toBe(
+        "errored",
+      );
+    });
+
+    it("ignores an unknown state and keeps the saved view", () => {
+      resetListViewState();
+      useListViewState("pipelines", { tab: "scheduled", stateFilter: "paused" });
+      const linked = mountWithQuery({ state: "bogus" });
+      const vm = linked.vm as any;
+      expect(vm.stateFilter).toBe("paused");
+      expect(vm.activeTab).toBe("scheduled");
+      linked.unmount();
     });
   });
 

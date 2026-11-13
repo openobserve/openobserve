@@ -74,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
           <!-- Search Input -->
-          <div class="px-1.5 pb-1.5" :class="mobileRail ? 'pt-1' : ''">
+          <div class="px-1 pb-1.5" :class="mobileRail ? 'pt-1' : ''">
             <OSearchInput
               v-model="searchQuery"
               data-test="folder-search"
@@ -84,7 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
         </div>
-        <div class="folders-tabs flex-1 overflow-y-auto px-1.5">
+        <div class="folders-tabs flex-1 overflow-y-auto px-1">
           <OTabs
             orientation="vertical"
             dense

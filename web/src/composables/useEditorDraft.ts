@@ -34,6 +34,7 @@ import { useI18nTyped, type I18nText } from "@/types/i18n";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { usePanelDraftAutosave } from "@/composables/dashboard/usePanelDraft";
 import { draftUserSignedOut, registerSignOutLeaveAsker } from "@/utils/drafts/draftSession";
+import { orgSwitchPending } from "@/utils/orgScopedRoutes";
 import {
   cleanupEditorDraftsOnce,
   countAllDraftsFor,
@@ -752,7 +753,9 @@ export const useEditorDraft = <T>(options: UseEditorDraftOptions<T>): EditorDraf
   };
 
   const orgChanged = () =>
-    started && String(store.state.selectedOrganization?.identifier ?? "") !== scopeParts.org;
+    started &&
+    (orgSwitchPending.value ||
+      String(store.state.selectedOrganization?.identifier ?? "") !== scopeParts.org);
 
   // The old session is already dead and its drafts stay, so the work is kept as after an expired session.
   const keepForForcedSignOut = (): boolean => {

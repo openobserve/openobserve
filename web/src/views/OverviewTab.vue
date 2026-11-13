@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="pageState !== 'forbidden' && !errorIsForbidden"
       class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2"
     >
-      <OverviewStatusLine v-if="showOverviewCards" :status="status" @select="onHeadlineSelect" />
+      <OverviewStatusLine v-if="showStatusLine" :status="status" />
       <div class="ms-auto flex items-center gap-2">
         <ORefreshButton
           :last-run-at="lastFetched ? lastFetched.getTime() : null"
@@ -75,6 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :incidents-state="incidentsTile"
       :incidents-total="incidentsTotal"
       @select="onHeadlineSelect"
+      @ask-ai="onAskAi"
     />
 
     <div
@@ -91,9 +92,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :incidents-total="incidentsTotal"
         :locked-reason="alertsLocked ? alertsLock.lockedReason.value : undefined"
         @retry="() => loadOverview(true)"
-        @open="goToAlertList"
+        @open="() => openAlertList()"
         @create="goToAddAlert"
-        @select="onHeadlineSelect"
+        @select="onAlertsSelect"
+        @ask-ai="onAskAi"
       />
       <OverviewDataHealthCard
         :overview="overview"
@@ -102,6 +104,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :forbidden="overviewForbidden"
         @retry="() => loadOverview(true)"
         @open="onHealthOpen"
+        @view-all="goToPipelines()"
+        @ask-ai="onAskAi"
       />
     </div>
 
@@ -127,7 +131,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="ghost-primary"
           size="sm"
           data-test="overview-incidents-view-all"
-          @click="goToIncidentList"
+          @click="goToAllIncidents"
         >
           {{ t("overview.viewAll") }}
         </OButton>
@@ -180,6 +184,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span
             class="shrink-0 whitespace-nowrap opacity-0 group-focus-within:opacity-100 group-hover:opacity-100 max-md:opacity-100"
           >
+            <OverviewAskAiButton
+              kind="incident"
+              :item-key="inc.id"
+              :label="inc.title || t('overview.untitledIncident')"
+              @ask="
+                onAskAi({
+                  kind: 'incident',
+                  incident: { ...inc, title: inc.title || t('overview.untitledIncident') },
+                })
+              "
+            />
             <OButton variant="ghost-primary" size="sm" @click="goToIncident(inc)">
               {{ t("overview.investigate") }}
             </OButton>
@@ -642,7 +657,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="ghost-primary"
               size="sm"
               data-test="overview-recent-events-view-all"
-              @click="goToAlertList"
+              @click="() => openAlertList()"
             >
               {{ t("overview.viewAll") }}
             </OButton>
@@ -830,12 +845,14 @@ import OverviewHeadlineStrip, {
   type OverviewTarget,
   type IncidentsTile,
 } from "./overview/OverviewHeadlineStrip.vue";
-import OverviewAlertsCard from "./overview/OverviewAlertsCard.vue";
+import OverviewAlertsCard, { type AlertsBoxTarget } from "./overview/OverviewAlertsCard.vue";
 import OverviewDataHealthCard from "./overview/OverviewDataHealthCard.vue";
 import OverviewTopStreamsCard from "./overview/OverviewTopStreamsCard.vue";
 import OverviewLimitCard from "./overview/OverviewLimitCard.vue";
 import OverviewSignalCards from "./overview/OverviewSignalCards.vue";
+import OverviewAskAiButton from "./overview/OverviewAskAiButton.vue";
 import OverviewStatusLine from "./overview/OverviewStatusLine.vue";
+import { buildOverviewAskAi, type OverviewAskAiTarget } from "./overview/overviewAskAi";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import { OVERVIEW_TOP, orgOverviewQuery } from "@/services/overview.queries";
 import { formatTimestampInTimezone } from "@/utils/date";
@@ -852,13 +869,14 @@ import { overviewKeys } from "@/services/overview.querykeys";
 import type { OrgOverview } from "@/ts/interfaces/overview";
 import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
 import ServiceGraphNodeSidePanel from "@/plugins/traces/ServiceGraphNodeSidePanel.vue";
-import { sqlEquals } from "@/utils/query/sqlFilterBuilder";
+import { buildViewTracesFilter } from "@/plugins/traces/viewTracesHandoff";
 import { serviceHealthFromErrorRate, type ServiceHealthStatus } from "@/utils/traces/serviceHealth";
 import { useLockedAffordance } from "@/composables/useLockedAffordance";
 import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
 import { useLicenseLock } from "@/composables/useFeatureLock";
 import analytics from "@/services/product_analytics";
 import { chipDimensionKeys, dimensionDisplay } from "@/utils/incidents/findingDimensions";
+import type { AiChatHandoff } from "@/plugins/traces/utils/traceAiPayload";
 
 const AlertHistoryDrawer = defineAsyncComponent(
   () => import("@/components/alerts/AlertHistoryDrawer.vue"),
@@ -867,6 +885,8 @@ const AlertHistoryDrawer = defineAsyncComponent(
 const { t } = useI18nTyped();
 const store = useStore();
 const router = useRouter();
+
+const emit = defineEmits<{ sendToAiChat: [payload: AiChatHandoff] }>();
 
 // ── Feature flags ────────────────────────────────────────────────────────────
 // Services shares this same gate — it's the service-graph half of the same
@@ -1312,6 +1332,11 @@ const status = computed(() =>
       incidents: incidentsCheck.value,
     }),
   ),
+);
+// The cards already show every count and problem, so the line speaks only when none can.
+const showStatusLine = computed(
+  () =>
+    showOverviewCards.value && status.value.kind !== "danger" && status.value.kind !== "warning",
 );
 
 // only the flag-on page can tell that nothing is watched
@@ -1786,6 +1811,9 @@ const goToAlert = (item: any) => {
   showAlertHistoryDrawer.value = true;
 };
 
+// Gen-AI node names live in gen_ai_* fields, and their streams may lack infer_service_name (a 400).
+const INFER_NAME_SERVICE_TYPES = new Set(["database", "queue", "rpc", "external"]);
+
 const goToService = (svc: any, e?: MouseEvent) => {
   // Fired from the per-card info-icon button — stop it bubbling to the card
   // click (which opens the latency/info side panel).
@@ -1793,7 +1821,10 @@ const goToService = (svc: any, e?: MouseEvent) => {
   // the service panel's View traces emits here too, outside this file's lock markup
   if (tracesLock.locked.value) return;
   trackDrilldown("service_traces");
-  let filter = sqlEquals("service_name", svc.label ?? svc.id);
+  let filter = buildViewTracesFilter({
+    serviceName: svc.label ?? svc.id,
+    serviceType: INFER_NAME_SERVICE_TYPES.has(svc.service_type) ? svc.service_type : undefined,
+  });
   if (svc.errorFlag) filter += ` AND span_status = 'ERROR'`;
 
   const query: Record<string, string> = {
@@ -1845,11 +1876,20 @@ const showLogsCard = computed(() => router.hasRoute("logs"));
 // events without a stream carry a dash placeholder, which a phone row has no room to repeat
 const hasEventStream = (ev: { service: string }) => ev.service !== "—";
 
-const goToAlertList = () => {
+const openAlertList = (filter: Record<string, string> = {}) => {
   if (alertsLocked.value) return;
   trackDrilldown("alerts");
-  router.push({ name: "alertList", query: { org_identifier: orgId.value } });
+  router.push({ name: "alertList", query: { org_identifier: orgId.value, ...filter } });
 };
+
+// Each filter yields exactly the rows its count tallies.
+const ALERT_LIST_FILTERS = {
+  firing: { state: "firing" },
+  failing: { state: "error" },
+  delivery: { state: "notify_failed" },
+  critical: { state: "firing", level: "critical" },
+  warning: { state: "firing", level: "warning" },
+} as const;
 
 const goToAddAlert = () => {
   if (alertsLocked.value) return;
@@ -1857,9 +1897,12 @@ const goToAddAlert = () => {
   router.push({ name: "addAlert", query: { org_identifier: orgId.value } });
 };
 
-const goToPipelines = () => {
+const goToPipelines = (state?: "errored") => {
   trackDrilldown("pipelines");
-  router.push({ name: "pipelines", query: { org_identifier: orgId.value } });
+  router.push({
+    name: "pipelines",
+    query: { org_identifier: orgId.value, ...(state && { state }) },
+  });
 };
 
 const goToStreams = () => {
@@ -1873,8 +1916,9 @@ const goToIngestion = () => {
 };
 
 const onHealthOpen = (destination: OverviewDestination) => {
-  if (destination === "alerts") goToAlertList();
-  else if (destination === "pipelines") goToPipelines();
+  if (destination === "failing" || destination === "delivery")
+    openAlertList(ALERT_LIST_FILTERS[destination]);
+  else if (destination === "pipelines") goToPipelines("errored");
   else goToStreams();
 };
 
@@ -1884,9 +1928,15 @@ const onSignalOpen = (signal: OverviewSignal) => {
   router.push({ name: signal, query: { org_identifier: orgId.value } });
 };
 
+const onAlertsSelect = (target: AlertsBoxTarget) => {
+  if (target === "critical" || target === "warning") openAlertList(ALERT_LIST_FILTERS[target]);
+  else onHeadlineSelect(target);
+};
+
 const onHeadlineSelect = (target: OverviewTarget) => {
-  if (target === "firing" || target === "failing" || target === "delivery") goToAlertList();
-  else if (target === "pipelines") goToPipelines();
+  if (target in ALERT_LIST_FILTERS)
+    openAlertList(ALERT_LIST_FILTERS[target as keyof typeof ALERT_LIST_FILTERS]);
+  else if (target === "pipelines") goToPipelines("errored");
   else if (target === "quiet") goToStreams();
   else if (incidentsLicenseLocked.value) return;
   else if (incidentsTile.value === "locked") openUpgradeDialog();
@@ -1895,9 +1945,31 @@ const onHeadlineSelect = (target: OverviewTarget) => {
   }
 };
 
+const onAskAi = (target: OverviewAskAiTarget) => {
+  emit(
+    "sendToAiChat",
+    buildOverviewAskAi(
+      target,
+      {
+        orgId: orgId.value ?? "",
+        startTime: timeRange.value.startTime,
+        endTime: timeRange.value.endTime,
+        rangeLabel: rangeLabel.value,
+        generatedAt: overview.value?.generated_at,
+      },
+      t,
+    ),
+  );
+};
+
 const goToIncidentList = () => {
   trackDrilldown("incidents");
   router.push({ name: "incidentList", query: { org_identifier: orgId.value, status: "open" } });
+};
+
+const goToAllIncidents = () => {
+  trackDrilldown("incidents");
+  router.push({ name: "incidentList", query: { org_identifier: orgId.value } });
 };
 
 const goToAnomalies = () => {

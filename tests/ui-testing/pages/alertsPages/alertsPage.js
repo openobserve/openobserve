@@ -267,7 +267,7 @@ export class AlertsPage {
             tracesTab: '[data-test="incident-traces-tab"]',
 
             // Incident detail — Service Graph content
-            serviceGraphContainer: '.incident-service-graph',
+            serviceGraphContainer: '[data-test="incident-unfold-graph"], [data-test="incident-unfold-empty"]',
 
             // Telemetry tab state selectors
             loadingSpinner: '[data-test="incident-telemetry-loading-indicator"]',
@@ -795,6 +795,38 @@ export class AlertsPage {
 
     async openCloneDialog(alertName) {
         return this.management.openCloneDialog(alertName);
+    }
+
+    rowLastOutcome(alertName) {
+        return this.management.rowLastOutcome(alertName);
+    }
+
+    async openAlertListAndSearch(search, org) {
+        return this.management.openAlertListAndSearch(search, org);
+    }
+
+    async expectRowsFiring(org, search, names) {
+        return this.management.expectRowsFiring(org, search, names);
+    }
+
+    async holdAlertDetailLoad(alertId) {
+        return this.management.holdAlertDetailLoad(alertId);
+    }
+
+    waitForAlertDetailLoad(alertId) {
+        return this.management.waitForAlertDetailLoad(alertId);
+    }
+
+    alertDetailUrl(alertId) {
+        return this.management.alertDetailUrl(alertId);
+    }
+
+    async saveCloneDialog() {
+        return this.management.saveCloneDialog();
+    }
+
+    async settlePendingUiTasks() {
+        return this.management.settlePendingUiTasks();
     }
 
     cloneSaveButton() {
@@ -2748,6 +2780,7 @@ export class AlertsPage {
         overview:         'incident-overview-tab',
         activity:         'incident-activity-tab',
         incidentAnalysis: 'incident-analysis-tab',
+        report:           'incident-report-tab',
         serviceGraph:     'incident-alert-graph-tab',
         alertTriggers:    'incident-alert-triggers-tab',
         logs:             'incident-logs-tab',
@@ -2757,7 +2790,7 @@ export class AlertsPage {
 
     /**
      * Click a tab on the incident detail page by its data-test attribute.
-     * @param {string} tabName - One of: overview, activity, incidentAnalysis, serviceGraph, alertTriggers, logs, metrics, traces
+     * @param {string} tabName - One of: overview, activity, incidentAnalysis, report, serviceGraph, alertTriggers, logs, metrics, traces
      */
     async clickIncidentDetailTab(tabName) {
         testLogger.info(`Clicking incident detail tab: ${tabName}`);
@@ -2775,8 +2808,8 @@ export class AlertsPage {
     /**
      * Verify the service graph tab content rendered.
      * Tabs are v-if gated (no tab-panel wrapper). The serviceGraph tab
-     * renders IncidentServiceGraph inside an absolute-positioned div.
-     * Checks for the .incident-service-graph container OR the detail page
+     * renders IncidentUnfoldGraph inside an absolute-positioned div.
+     * Checks for the unfold graph or its empty state OR the detail page
      * still being visible (confirming no crash).
      */
     async expectServiceGraphTabContentVisible() {
@@ -4898,7 +4931,7 @@ export class AlertsPage {
     }
 
     async expectLastOutcome(name, text) {
-        await expect(this.page.locator(`[data-test="alert-list-${name}-last-outcome"]`)).toHaveText(text, { timeout: 20000 });
+        await expect(this.rowLastOutcome(name)).toHaveText(text, { timeout: 20000 });
     }
 
     /** Throws when no element renders exactly the full name, since measuring the whole cell could report "not clipped" by accident. */

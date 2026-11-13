@@ -50,6 +50,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :suffix-icon="correlationLocked ? 'lock' : undefined"
         />
         <OTab
+          v-if="versionsEnabled"
+          name="env-versions"
+          data-test="svcver-correlation-settings-env-versions-tab"
+          :label="t('serviceVersions.settings.tab')"
+          :suffix-icon="correlationLocked ? 'lock' : undefined"
+        />
+        <OTab
           name="field-aliases"
           data-test="correlation-settings-field-aliases-tab"
           :label="t('settings.correlation.fieldAliasesTab')"
@@ -66,7 +73,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :features="['correlation']"
           data-test="correlation-services-license-denied"
         />
-        <DiscoveredServices v-else @navigate-to-configuration="onTabChange('discovery')" />
+        <DiscoveredServices
+          v-else
+          :view="servicesView"
+          @update:view="onServicesViewChange"
+          @navigate-to-configuration="onTabChange('discovery')"
+          @navigate-to-env-versions="onTabChange('env-versions')"
+        />
+      </div>
+
+      <div
+        v-if="versionsEnabled && activeTab === 'env-versions'"
+        class="px-page-edge h-full overflow-y-auto"
+      >
+        <LicenseDeniedState
+          v-if="correlationLocked"
+          :features="['correlation']"
+          data-test="svcver-env-versions-license-denied"
+        />
+        <ServiceEnvVersionSettings v-else />
       </div>
 
       <div v-show="activeTab === 'discovery'" class="px-page-edge h-full overflow-y-auto py-4">
@@ -123,6 +148,8 @@ import { useI18nTyped } from "@/types/i18n";
 import { useRouter, useRoute, onBeforeRouteLeave } from "vue-router";
 import DiscoveredServices from "@/components/settings/DiscoveredServices.vue";
 import ServiceIdentitySetup from "@/components/settings/ServiceIdentitySetup.vue";
+import ServiceEnvVersionSettings from "@/components/settings/ServiceEnvVersionSettings.vue";
+import config from "@/aws-exports";
 import SemanticFieldGroupsConfig from "@/components/alerts/SemanticFieldGroupsConfig.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
@@ -135,11 +162,14 @@ import { confirmForcedSignOutDiscard, draftSignOutForced } from "@/utils/drafts/
 import { useLicenseLock } from "@/composables/useFeatureLock";
 import LicenseDeniedState from "@/components/common/LicenseDeniedState.vue";
 
+const versionsEnabled = config.isEnterprise === "true" || config.isCloud === "true";
+
 export default defineComponent({
   name: "CorrelationSettings",
   components: {
     DiscoveredServices,
     ServiceIdentitySetup,
+    ServiceEnvVersionSettings,
     SemanticFieldGroupsConfig,
     LicenseDeniedState,
     OTabs,
@@ -160,12 +190,23 @@ export default defineComponent({
     const slugToTab: Record<string, string> = {
       "service-discovery": "discovery",
       services: "services",
+      ...(versionsEnabled ? { "env-versions": "env-versions" } : {}),
       "field-aliases": "field-aliases",
     };
     const tabToSlug: Record<string, string> = {
       discovery: "service-discovery",
       services: "services",
+      "env-versions": "env-versions",
       "field-aliases": "field-aliases",
+    };
+
+    // Name review is a view of Discovered Services, deep-linked as ?view=name-review.
+    const servicesView = computed(() =>
+      versionsEnabled && route.query.view === "name-review" ? "name-review" : "services",
+    );
+    const withoutView = () => {
+      const { view: _view, ...rest } = route.query;
+      return rest;
     };
 
     const initialSlug = route.params.tab as string;
@@ -285,7 +326,16 @@ export default defineComponent({
       router.push({
         name: "correlationSettings",
         params: { tab: tabToSlug[tab] ?? tab },
-        query: route.query,
+        query: tab === "services" ? route.query : withoutView(),
+      });
+    };
+
+    const onServicesViewChange = (view: string) => {
+      if (view === servicesView.value) return;
+      router.push({
+        name: "correlationSettings",
+        params: { tab: "services" },
+        query: view === "name-review" ? { ...route.query, view } : withoutView(),
       });
     };
 
@@ -337,10 +387,13 @@ export default defineComponent({
 
     return {
       store,
+      versionsEnabled,
       activeTab,
       aliasScrollToGroup,
       tabs,
       onTabChange,
+      servicesView,
+      onServicesViewChange,
       onNavigateToAliases,
       onDraftSemanticGroupsChange,
       saveSemanticGroups,

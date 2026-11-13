@@ -6,6 +6,7 @@ import { createRouter, createMemoryHistory } from "vue-router";
 import { createStore } from "vuex";
 import { createI18n } from "vue-i18n";
 import ONavGroup from "./ONavGroup.vue";
+import buildConfig from "@/aws-exports";
 import type { SubnavChild } from "./ONavbar.types";
 import { NAV_GROUPS } from "./navGroups";
 import { AIM_IDLE, aim } from "./hoverIntent";
@@ -85,6 +86,12 @@ const i18n = createI18n({
         pipeline: "Pipelines",
         trialFlyoutNote: "Your trial has ended. Pages with a lock need a plan.",
         trialPageNeedsPlan: "{page} needs a plan",
+        serviceGraph: "Service Graph",
+        onCall: "On-Call",
+        pages: "Pages",
+      },
+      featureLock: {
+        availableInEnterprise: "{feature} is available in OpenObserve Enterprise",
       },
     },
   },
@@ -296,11 +303,17 @@ describe("ONavGroup", () => {
       expect(style).toContain("top: 8px");
     });
 
-    it("moves a flyout that fits up just enough to clear the bottom margin", async () => {
+    it("centres a flyout that does not fit below its tile in the window", async () => {
       const style = await openWithFlyoutHeight(300);
 
       expect(style).toContain("max-height: 484px");
-      expect(style).toContain("top: 192px");
+      expect(style).toContain("top: 100px");
+    });
+
+    it("keeps a flyout that just fits below its tile at the tile's top", async () => {
+      const style = await openWithFlyoutHeight(192);
+
+      expect(style).toContain("top: 300px");
     });
 
     it("keeps a flyout that fits comfortably at the tile's top", async () => {
@@ -317,6 +330,147 @@ describe("ONavGroup", () => {
       await flyout().find("a[data-test^='nav-group-item-']").trigger("mouseenter");
 
       expect(focus).toHaveBeenCalledWith({ preventScroll: true });
+    });
+  });
+
+  describe("flyout column layout", () => {
+    const spies: Array<{ mockRestore: () => void }> = [];
+    const section = (key: string, names: string[]) =>
+      names.map((name) => ({ titleKey: "menu.streams", icon: "table", name, categoryKey: key }));
+
+    // Heights per layout: the mock reads the layout the component has chosen.
+    async function openWith(
+      kids: unknown[],
+      heights: { single: number; columns: number },
+      tileTop = 300,
+      columnsWidth = 0,
+      tileLeft = 10,
+    ) {
+      spies.push(vi.spyOn(window, "innerHeight", "get").mockReturnValue(500));
+      wrapper = mountGroup();
+      await wrapper.setProps({ children: kids });
+      spies.push(
+        vi.spyOn(wrapper.element, "getBoundingClientRect").mockReturnValue({
+          left: tileLeft,
+          right: tileLeft + 88,
+          top: tileTop,
+          bottom: tileTop + 60,
+          width: 88,
+          height: 60,
+          x: tileLeft,
+          y: tileTop,
+          toJSON: () => ({}),
+        }),
+        vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockImplementation(function (
+          this: HTMLElement,
+        ) {
+          return this.getAttribute("data-layout") === "columns" ? heights.columns : heights.single;
+        }),
+        vi.spyOn(HTMLElement.prototype, "offsetWidth", "get").mockImplementation(function (
+          this: HTMLElement,
+        ) {
+          return this.getAttribute("data-layout") === "columns" ? columnsWidth : 0;
+        }),
+      );
+      await hoverOpen();
+    }
+
+    const twoSections = [
+      ...section("menu.alerts", ["logstreams", "pipelines"]),
+      ...section("menu.onCall", ["home"]),
+    ];
+
+    beforeEach(() => {
+      spies.push(vi.spyOn(document.documentElement, "clientWidth", "get").mockReturnValue(1024));
+    });
+
+    afterEach(() => {
+      spies.splice(0).forEach((spy) => spy.mockRestore());
+    });
+
+    it("lays sections out as columns when one column is taller than the window", async () => {
+      await openWith(twoSections, { single: 600, columns: 300 });
+
+      expect(flyout().attributes("data-layout")).toBe("columns");
+      expect(flyout().findAll('[data-test="nav-group-column"]')).toHaveLength(2);
+      expect(flyout().attributes("style")).toContain("top: 100px");
+    });
+
+    it("keeps one column for a short menu", async () => {
+      await openWith(twoSections, { single: 200, columns: 100 }, 100);
+
+      expect(flyout().attributes("data-layout")).toBe("single");
+      expect(flyout().findAll('[data-test="nav-group-column"]')).toHaveLength(1);
+    });
+
+    it("keeps one column when a tall menu has only one section", async () => {
+      await openWith(section("menu.alerts", ["logstreams", "pipelines"]), {
+        single: 600,
+        columns: 300,
+      });
+
+      expect(flyout().attributes("data-layout")).toBe("single");
+    });
+
+    it("falls back to one scrolling column when columns do not fit either", async () => {
+      await openWith(twoSections, { single: 700, columns: 600 });
+
+      expect(flyout().attributes("data-layout")).toBe("single");
+      expect(flyout().attributes("style")).toContain("max-height: 484px");
+      expect(flyout().attributes("style")).toContain("top: 8px");
+      expect(flyout().classes()).toEqual(
+        expect.arrayContaining(["overflow-y-auto", "overscroll-contain"]),
+      );
+    });
+
+    it("falls back to one column when the columns are wider than the space beside the rail", async () => {
+      spies.push(vi.spyOn(document.documentElement, "clientWidth", "get").mockReturnValue(800));
+      await openWith(twoSections, { single: 600, columns: 300 }, 300, 760);
+
+      expect(flyout().attributes("data-layout")).toBe("single");
+    });
+
+    it("keeps columns when they fit the space beside the rail", async () => {
+      spies.push(vi.spyOn(document.documentElement, "clientWidth", "get").mockReturnValue(800));
+      await openWith(twoSections, { single: 600, columns: 300 }, 300, 600);
+
+      expect(flyout().attributes("data-layout")).toBe("columns");
+    });
+
+    it("uses the space before the rail in RTL, so columns that fit there stay", async () => {
+      document.documentElement.dir = "rtl";
+      spies.push(vi.spyOn(document.documentElement, "clientWidth", "get").mockReturnValue(1000));
+      await openWith(twoSections, { single: 600, columns: 300 }, 300, 500, 600);
+
+      expect(flyout().attributes("data-layout")).toBe("columns");
+    });
+
+    it("falls back to one column in RTL when the columns are wider than the space before the rail", async () => {
+      document.documentElement.dir = "rtl";
+      spies.push(vi.spyOn(document.documentElement, "clientWidth", "get").mockReturnValue(1000));
+      await openWith(twoSections, { single: 600, columns: 300 }, 300, 700, 600);
+
+      expect(flyout().attributes("data-layout")).toBe("single");
+    });
+
+    it("uses columns when the menu fits the window but not below its tile", async () => {
+      await openWith(twoSections, { single: 300, columns: 150 }, 300);
+
+      expect(flyout().attributes("data-layout")).toBe("columns");
+    });
+
+    it("keeps menu items in reading order across columns", async () => {
+      await openWith(twoSections, { single: 600, columns: 300 });
+
+      const names = flyout()
+        .findAll("a[data-test^='nav-group-item-']")
+        .map((a) => a.attributes("data-test"));
+      expect(names).toEqual([
+        "nav-group-item-logstreams",
+        "nav-group-item-pipelines",
+        "nav-group-item-home",
+      ]);
+      expect(flyout().findAll('[role="group"]')).toHaveLength(2);
     });
   });
 
@@ -1204,6 +1358,7 @@ describe("ONavGroup", () => {
         tab: "service-graph",
         gate: "enterprise",
       },
+      { titleKey: "menu.pages", icon: "bell", name: "traces", tab: "pages", gate: "oncall" },
     ];
 
     async function mountLocked(path: string) {
@@ -1245,6 +1400,39 @@ describe("ONavGroup", () => {
       const el = w.get('[data-test="nav-group-item-traces-service-graph-locked"]');
       expect(el.element.tagName).toBe("DIV");
       expect(el.attributes("href")).toBeUndefined();
+      wrapper = w;
+    });
+
+    it("explains the edition lock with a tooltip on the locked child", async () => {
+      const { wrapper: w } = await mountLocked("/traces");
+      const row = w.get('[data-test="nav-group-item-traces-service-graph-locked"]');
+      const tooltip = row.findComponent({ name: "OTooltip" });
+      expect(tooltip.exists()).toBe(true);
+      expect(String(tooltip.props("content"))).toBe(
+        "Service Graph is available in OpenObserve Enterprise",
+      );
+      wrapper = w;
+    });
+
+    it("names the feature, not the row title, in the tooltip and the accessible name", async () => {
+      const { wrapper: w } = await mountLocked("/traces");
+      const row = w.get('[data-test="nav-group-item-traces-pages-locked"]');
+      expect(String(row.findComponent({ name: "OTooltip" }).props("content"))).toBe(
+        "On-Call is available in OpenObserve Enterprise",
+      );
+      expect(row.text()).toContain("On-Call is available in OpenObserve Enterprise");
+      wrapper = w;
+    });
+
+    it("shows the same tooltip on the inline rows in the mobile menu", async () => {
+      mobile.set(true);
+      const { wrapper: w } = await mountLocked("/traces");
+      await w.get('[data-test="tile"]').trigger("click");
+      await flushPromises();
+      const row = w.get('[data-test="nav-group-item-traces-service-graph-locked"]');
+      expect(String(row.findComponent({ name: "OTooltip" }).props("content"))).toBe(
+        "Service Graph is available in OpenObserve Enterprise",
+      );
       wrapper = w;
     });
 
@@ -1447,6 +1635,13 @@ describe("ONavGroup", () => {
   });
 
   describe("license feature state of a child", () => {
+    beforeEach(() => {
+      buildConfig.isEnterprise = "true";
+    });
+    afterEach(() => {
+      buildConfig.isEnterprise = "false";
+    });
+
     const workflowsChild: SubnavChild = {
       titleKey: "menu.workflows",
       icon: "schema",
@@ -1495,6 +1690,16 @@ describe("ONavGroup", () => {
       await hoverOpen();
       return router;
     }
+
+    it("on an OSS build names the missing edition, not a licence, in the tooltip and screen-reader text", async () => {
+      buildConfig.isEnterprise = "false";
+      await mountWithFeature("locked");
+      const item = flyout().get('[data-test="nav-group-item-workflows-license-lock"]');
+      expect(item.find(".sr-only").text()).toBe("workflows is available in OpenObserve Enterprise");
+      expect(String(item.findComponent({ name: "OTooltip" }).props("content"))).toBe(
+        "workflows is available in OpenObserve Enterprise",
+      );
+    });
 
     it("shows a locked child as a real link with a gold lock and screen-reader text", async () => {
       const router = await mountWithFeature("locked");

@@ -375,6 +375,9 @@ test.describe("FTS Default Column Selection testcases", () => {
     const firstFtsField = await pm.logsPage.resolveFtsDefaultField(10000);
     await pm.logsPage.expectFieldInTableHeader(firstFtsField);
 
+    // The header shows while the search still streams, and a reset made then is undone when it ends, since an empty selection re-picks the default.
+    await pm.logsPage.waitForRunQueryButton();
+
     // Click the field-list reset icon — this clears selectedFields and sets
     // isFtsDefaultColumn to false, so the FTS column should disappear from
     // the table immediately.
@@ -400,7 +403,8 @@ test.describe("FTS Default Column Selection testcases", () => {
     expect(resultsReady, 'Search results did not render after field reset').toBe(true);
 
     // Assert that an FTS default column re-appears (could be same or different field).
-    const secondFtsField = await pm.logsPage.resolveFtsDefaultField(15000);
+    // The old rows stay on screen, so the header only returns once the search ends, which on a busy shared org takes over 15s.
+    const secondFtsField = await pm.logsPage.resolveFtsDefaultField(60000);
     await pm.logsPage.expectLogTableColumnVisible(secondFtsField, 0);
 
     testLogger.info('TC-FTS-009 completed: field reset re-resolved FTS default');

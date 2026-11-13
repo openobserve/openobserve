@@ -73,6 +73,7 @@ import type { Incident } from "@/services/incidents";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
+import { labelRows } from "@/components/shared/ServiceNameLabel.fixtures";
 
 // ── stubs ─────────────────────────────────────────────────────────────────────
 
@@ -755,6 +756,83 @@ describe("IncidentList.vue", () => {
     });
   });
 
+  describe("status link from the Overview", () => {
+    const mountWithStatus = async (status: string) => {
+      router.currentRoute.value.query = { status } as any;
+      wrapper = createWrapper();
+      await flushPromises();
+      router.currentRoute.value.query = {};
+      return wrapper.vm as any;
+    };
+
+    it("shows exactly the open incidents for ?status=open, not the acknowledged ones", async () => {
+      const vm = await mountWithStatus("open");
+      expect(vm.statusFilter).toBe("open");
+      expect(vm.visibleIncidents.map((i: any) => i.id)).toEqual(["1"]);
+    });
+
+    it("strips ?status from the URL after reading it, keeping other keys", async () => {
+      const replace = vi.spyOn(router, "replace").mockResolvedValue(undefined as any);
+      router.currentRoute.value.query = { status: "open", org_identifier: "default" } as any;
+      wrapper = createWrapper();
+      await flushPromises();
+      router.currentRoute.value.query = {};
+      expect(replace).toHaveBeenCalledWith({ query: { org_identifier: "default" } });
+      replace.mockRestore();
+    });
+
+    it("keeps Active as open plus acknowledged and falls back to it for an unknown status", async () => {
+      expect((await mountWithStatus("active")).visibleIncidents).toHaveLength(2);
+      wrapper.unmount();
+      expect((await mountWithStatus("bogus")).statusFilter).toBe("active");
+    });
+
+    it("lets ?status win over the saved state and drops a saved severity facet", async () => {
+      store.state.incidents = {
+        incidents: {
+          searchQuery: "",
+          statusFilter: "resolved",
+          pagination: { page: 1, rowsPerPage: 20 },
+          organizationIdentifier: "default",
+        },
+        cachedData: [],
+        isInitialized: true,
+        shouldRefresh: false,
+      };
+      useListViewState("incidents", { severityFilter: "P3" }).severityFilter = "P3";
+      const vm = await mountWithStatus("open");
+      store.state.incidents = { incidents: {}, isInitialized: false };
+
+      expect(vm.statusFilter).toBe("open");
+      expect(vm.severityFilter).toBe("all");
+    });
+
+    it("starts without the saved search and page when ?status is present", async () => {
+      store.state.incidents = {
+        incidents: {
+          searchQuery: "saved",
+          statusFilter: "resolved",
+          pagination: { page: 4, rowsPerPage: 20 },
+          organizationIdentifier: "default",
+        },
+        cachedData: [],
+        isInitialized: true,
+        shouldRefresh: false,
+      };
+      const vm = await mountWithStatus("open");
+      store.state.incidents = { incidents: {}, isInitialized: false };
+
+      expect(vm.searchQuery).toBe("");
+      expect(vm.currentPage).toBe(1);
+    });
+
+    it("offers Open as a status toggle", async () => {
+      wrapper = createWrapper();
+      await flushPromises();
+      expect(wrapper.find('[data-test="incident-status-filter-open"]').exists()).toBe(true);
+    });
+  });
+
   // ── Page persistence across navigation (Vuex-backed, like searchQuery/statusFilter) ──
 
   describe("currentPage persistence", () => {
@@ -850,6 +928,52 @@ describe("IncidentList.vue", () => {
   });
 
   // ── AI analysis column ─────────────────────────────
+
+  describe("Service display name", () => {
+    it("shows the display name in the service chip while the row keeps the key", async () => {
+      const row = labelRows.differs;
+      (incidentsService.list as any).mockResolvedValue({
+        data: {
+          incidents: [
+            createIncident({
+              id: "1",
+              group_values: { service: row.service_name },
+              group_values_display: { service: row.display_name },
+            }),
+          ],
+          total: 1,
+        },
+      });
+      wrapper = createWrapper();
+      await flushPromises();
+
+      const chip = wrapper.find('[data-test="incident-list-service-chip"]');
+      expect(chip.exists()).toBe(true);
+      // The stubbed tooltip renders its hover text inline, so the chip value is read from its props.
+      expect(chip.findComponent({ name: "ODimensionChip" }).props("value")).toBe(row.display_name);
+      expect((wrapper.vm as any).visibleIncidents[0].group_values.service).toBe(row.service_name);
+    });
+
+    it("leaves non-service dimensions as plain dimension chips", async () => {
+      (incidentsService.list as any).mockResolvedValue({
+        data: {
+          incidents: [
+            createIncident({
+              id: "1",
+              group_values: { "k8s-namespace": "prod" },
+              group_values_display: { service: "ignored" },
+            }),
+          ],
+          total: 1,
+        },
+      });
+      wrapper = createWrapper();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="incident-list-service-chip"]').exists()).toBe(false);
+      expect(wrapper.text()).not.toContain("ignored");
+    });
+  });
 
   describe("AI analysis column", () => {
     const liveRca = (): Incident["rca"] => ({
@@ -1176,8 +1300,8 @@ describe("IncidentList.vue", () => {
         stream_name: "s1",
       });
       expect(chips.map((c) => c.props("dimKey"))).toEqual(["k8s-namespace", "service"]);
-      expect(chips.map((c) => c.props("keyLabel"))).toEqual([undefined, undefined]);
-      expect(chips.map((c) => c.props("tooltip"))).toEqual([true, true]);
+      expect(chips.map((c) => c.props("keyLabel"))).toEqual([undefined, "service"]);
+      expect(chips.map((c) => c.props("tooltip"))).toEqual([true, false]);
       expect(chips.map((c) => c.text())).toEqual(["k8s-namespace" + "prod", "service" + "api"]);
       expect(more.find('[data-test="o-tooltip"]').text().replace(/\s+/g, "")).toBe(
         "stream_name=s1",

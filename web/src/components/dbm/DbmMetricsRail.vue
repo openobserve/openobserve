@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :aria-label="ariaLabel"
     data-test="dbm-metrics-rail"
   >
-    <div class="flex-1 overflow-y-auto px-1.5 pt-2 pb-3 max-md:pt-0 max-md:pb-0">
+    <div class="flex-1 overflow-y-auto px-1 pt-2 pb-3 max-md:pt-0 max-md:pb-0">
       <OTabs
         :model-value="activeKey ?? ''"
         :orientation="isMobile ? 'horizontal' : 'vertical'"

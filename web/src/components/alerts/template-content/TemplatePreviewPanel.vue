@@ -203,8 +203,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template v-else-if="view === 'visual'">
         <div
           v-if="previewModel"
-          class="rounded-surface bg-surface-panel border-border-default flex flex-col gap-2 border border-s-4 p-3"
-          :class="severityAccentClass"
+          class="rounded-surface bg-surface-panel border-border-default flex flex-col gap-2 border p-3"
           data-test="template-preview-panel-visual-card"
         >
           <!-- The card is a NORMALISED shape — the backend returns the same
@@ -226,8 +225,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                bold/bullets look broken to the author. Same treatment the
                dashboard markdown panel uses (MarkdownRenderer.vue). -->
           <!-- eslint-disable-next-line vue/no-v-html -- sanitized via DOMPurify.sanitize above -->
+          <!-- No backticks around inline code: real messages show none. -->
           <div
-            class="prose prose-sm max-w-none text-sm"
+            class="prose prose-sm prose-code:before:content-none prose-code:after:content-none max-w-none text-sm"
             :class="isDark && 'prose-invert'"
             data-test="template-preview-panel-body"
             v-html="sanitizedBodyHtml"
@@ -246,6 +246,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span class="text-sm">{{ field.value }}</span>
             </div>
           </div>
+          <!-- Rows as the real message lists them: the template's row lines win over columns. -->
+          <div
+            v-if="previewModel.row_lines?.length"
+            class="flex flex-col text-sm"
+            data-test="template-preview-panel-row-lines"
+          >
+            <span v-for="(line, index) in previewModel.row_lines" :key="index">{{ line }}</span>
+          </div>
+          <table
+            v-else-if="!previewModel.row_lines && previewModel.rows?.length"
+            class="text-sm"
+            data-test="template-preview-panel-rows"
+          >
+            <thead>
+              <tr>
+                <th
+                  v-for="cell in previewModel.rows[0]"
+                  :key="cell.label"
+                  class="text-text-secondary pe-4 text-start text-xs font-normal"
+                >
+                  {{ cell.label }}
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(row, index) in previewModel.rows" :key="index">
+                <td v-for="cell in row" :key="cell.label" class="pe-4">{{ cell.value }}</td>
+              </tr>
+            </tbody>
+          </table>
           <div
             v-if="previewModel.links.length > 0 || previewModel.footer"
             class="flex flex-wrap gap-2"
@@ -380,6 +410,10 @@ interface PreviewModel {
   // Boolean in the backend (preview.rs `chart_placeholder: bool`); the old
   // `string | null` here was a latent type mismatch.
   chart_placeholder: boolean;
+  /** The sample's rows, column-ordered. */
+  rows?: PreviewField[][];
+  /** Set when the template formats each row; shown instead of `rows`. */
+  row_lines?: string[] | null;
 }
 interface PreviewResponseData {
   payload: unknown;
@@ -524,28 +558,6 @@ const previewModel = computed(() => previewData.value?.preview_model ?? null);
 const unknownVariables = computed(() => previewData.value?.unknown_variables ?? []);
 const emptyVariables = computed(() => previewData.value?.empty_variables ?? []);
 
-/**
- * Severity accent for the preview card.
- *
- * The response also carries `preview_model.color` (a hex the non-web renderers
- * embed in their payloads), but a literal colour may not enter a component —
- * including through a `:style` binding, which the design linter cannot see.
- * So the card maps the `severity` enum to registered token utilities instead,
- * and the hex stays where it belongs: in the raw payload tab.
- */
-const severityAccentClass = computed(() => {
-  switch (previewModel.value?.severity) {
-    case "critical":
-      return "border-s-status-negative";
-    case "warning":
-      return "border-s-status-warning-text";
-    case "ok":
-      return "border-s-status-positive";
-    default:
-      return "border-s-accent";
-  }
-});
-
 const sanitizedBodyHtml = computed(() =>
   previewModel.value ? DOMPurify.sanitize(previewModel.value.body_html) : "",
 );
@@ -667,10 +679,11 @@ const runTestSend = async () => {
     });
     toast({ variant: "success", message: t("alert_templates.testSendSuccess") });
   } catch (err: any) {
+    // The server's text names the reason, and on a 429 the wait time.
+    const serverText = err?.response?.data?.message ?? err?.response?.data?.error;
     const message =
-      err?.response?.status === 429
-        ? t("alert_templates.testSendRateLimited")
-        : (err?.response?.data?.message ?? err?.response?.data?.error ?? String(err));
+      serverText ??
+      (err?.response?.status === 429 ? t("alert_templates.testSendRateLimited") : String(err));
     toast({ variant: "error", message });
   } finally {
     isTestSending.value = false;

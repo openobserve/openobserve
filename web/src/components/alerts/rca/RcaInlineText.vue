@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template v-if="segment.kind === 'cite'">[{{ segment.id }}]</template>
     <code
       v-else-if="segment.code"
-      class="rounded-default bg-surface-subtle text-text-code px-1 font-mono text-[0.875em]"
+      class="rounded-default bg-surface-subtle text-text-code px-1 font-mono text-[0.875em] wrap-anywhere"
       :class="{ 'font-bold': segment.bold, italic: segment.italic }"
       >{{ segment.text }}</code
     >

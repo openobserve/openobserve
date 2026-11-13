@@ -97,6 +97,23 @@ export class RumReplayPlayerPage {
         await expect(this.replayFrameBody).not.toContainText(text);
     }
 
+    frameElement(selector) {
+        return this.page.frameLocator('#player iframe').locator(selector);
+    }
+
+    /** The replayed element's whole text, not a substring, so a half-decoded string fails. */
+    async expectFrameElementText(selector, text, timeoutMs = 30000) {
+        await expect(this.frameElement(selector)).toHaveText(text, { timeout: timeoutMs });
+    }
+
+    async expectFrameInputValue(selector, value, timeoutMs = 30000) {
+        await expect(this.frameElement(selector)).toHaveValue(value, { timeout: timeoutMs });
+    }
+
+    async expectFrameChecked(selector, checked, timeoutMs = 30000) {
+        await expect(this.frameElement(selector)).toBeChecked({ checked, timeout: timeoutMs });
+    }
+
     /** Switches the player from its default 4x to real-time speed, so a short-lived tab stays on screen long enough to read. */
     async playAtNormalSpeed() {
         await this.speedSelect.click();

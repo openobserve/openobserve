@@ -6,6 +6,7 @@ import {
 } from "./useMetricsCorrelationDashboard";
 import type { StreamInfo } from "@/services/service_streams";
 import i18nInstance from "@/locales";
+import { labelRows } from "@/components/shared/ServiceNameLabel.fixtures";
 
 const t = (i18nInstance.global as any).t;
 
@@ -77,6 +78,29 @@ describe("useMetricsCorrelationDashboard", () => {
       expect(panel.queries[0].query).toContain('FROM "cpu_usage"');
       expect(panel.queries[0].query).toContain("\"service\" = 'api'");
       expect(panel.queries[0].query).toContain("\"k8s-cluster\" = 'prod'");
+    });
+
+    it("filters metrics and logs on every spelling of the service key", () => {
+      const spelled: StreamInfo = {
+        stream_name: "checkout_metric",
+        stream_type: "metrics",
+        filters: { service_name: "checkout" },
+        filter_spellings: { service_name: ["checkout", "checkout.service"] },
+      };
+      const config: MetricsCorrelationConfig = {
+        serviceName: "checkout",
+        matchedDimensions: {},
+        metricStreams: [],
+        orgIdentifier: "test-org",
+        timeRange: { startTime: 1000000000000000, endTime: 1000000900000000 },
+      };
+      const condition = "lower(trim(\"service_name\")) IN ('checkout', 'checkout.service')";
+
+      const metrics = composable.generateDashboard([spelled], config);
+      expect(metrics.tabs[0].panels[0].queries[0].query).toContain(condition);
+
+      const logs = composable.generateLogsDashboard([{ ...spelled, stream_type: "logs" }], config);
+      expect(logs?.tabs[0].panels[0].queries[0].query).toContain(condition);
     });
 
     it("should handle special characters in filter values", () => {
@@ -210,6 +234,34 @@ describe("useMetricsCorrelationDashboard", () => {
       expect(panels[0].layout.y).toBe(0); // row 0 * 20
       expect(panels[1].layout.y).toBe(customHeight); // row 1 * 20
       expect(panels[3].layout.y).toBe(customHeight * 3); // row 3 * 20
+    });
+  });
+
+  describe("service display name", () => {
+    const row = labelRows.differs;
+    const streams: StreamInfo[] = [
+      { stream_name: "o2_logs", filters: { service_name: row.service_name } },
+    ];
+    const config = (displayServiceName?: string): MetricsCorrelationConfig => ({
+      serviceName: row.service_name,
+      displayServiceName,
+      matchedDimensions: { service: row.service_name },
+      metricStreams: [],
+      orgIdentifier: "test-org",
+      timeRange: { startTime: 1000000000000000, endTime: 1000000900000000 },
+    });
+    const queriesOf = (dashboard: any) =>
+      dashboard.tabs[0].panels.map((panel: any) => panel.queries);
+
+    it("titles and describes the metrics dashboard with the display name, queries unchanged", () => {
+      const shown = composable.generateDashboard(streams, config(row.display_name));
+      const keyed = composable.generateDashboard(streams, config());
+
+      expect(shown.title).toBe(`Correlated Streams - ${row.display_name}`);
+      expect(shown.description).toContain(row.display_name);
+      expect(shown.description).not.toContain(row.service_name);
+      expect(keyed.title).toBe(`Correlated Streams - ${row.service_name}`);
+      expect(queriesOf(shown)).toEqual(queriesOf(keyed));
     });
   });
 

@@ -593,6 +593,56 @@ describe("FilterBuilder", () => {
     });
   });
 
+  describe("value labels", () => {
+    const NAMES: Record<string, string> = {
+      "payments-api": "PaymentService",
+      checkoutservice: "CheckoutService",
+      nats: "nats",
+    };
+    const valueLabel = (field: string, value: string) =>
+      field === "service" && NAMES[value]
+        ? {
+            label: NAMES[value],
+            detail: NAMES[value].toLowerCase() === value ? undefined : `detected as ${value}`,
+          }
+        : undefined;
+    const servicePair = (value: string) => ({ type: "pair", key: "service", operator: "=", value });
+    const labels = () => wrapper!.findAll(`[data-test^="${DT}-value-label-"]`);
+
+    it("names a row's stored value beside its chip and keeps the value in the chip", async () => {
+      mountBuilder("downtime", servicePair("payments-api"), { valueLabel });
+      await flushPromises();
+      expect(labels()).toHaveLength(1);
+      expect(find("value-label-0").text()).toBe("PaymentService");
+      expect(find("chip-service").text()).toContain("payments-api");
+      expect(find("chip-service").text()).not.toContain("PaymentService");
+    });
+
+    it("lists a named value by its display name with the stored value on the end edge", async () => {
+      const state = mountBuilder("downtime", null, {
+        valueLabel,
+        loadValues: vi.fn(async () => ["payments-api", "checkoutservice", "orders"]),
+      });
+      await find("input").trigger("click");
+      await flushPromises();
+      await type("service");
+      await press("Enter");
+      await pickRow("eq");
+      await vi.waitFor(() =>
+        expect(rowKeys()).toEqual(["payments-api", "checkoutservice", "orders"]),
+      );
+      const row = (key: string) =>
+        document.body.querySelector(`[data-test="${DT}-suggest-item-${key}"]`)!.textContent ?? "";
+      expect(row("payments-api")).toContain("PaymentService");
+      expect(row("payments-api")).toContain("detected as payments-api");
+      expect(row("checkoutservice")).toContain("CheckoutService");
+      expect(row("checkoutservice")).not.toContain("detected as");
+      expect(row("orders")).toContain("orders");
+      await pickRow("payments-api");
+      expect(JSON.stringify(state.value)).toContain(`"value":"payments-api"`);
+    });
+  });
+
   describe("horizontal layout", () => {
     it("starts a group from the field picker and draws it as a box with an ungroup button", async () => {
       const state = mountBuilder("logs", "level = 'error'");

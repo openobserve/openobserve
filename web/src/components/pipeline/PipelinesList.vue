@@ -170,7 +170,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :data-test="`pipeline-list-${row.name}-pause-start-action`"
                 :data-row-action="row.enabled ? 'pause' : 'resume'"
                 :variant="row.enabled ? 'ghost-destructive' : 'ghost'"
-                size="icon-sm"
+                size="icon-xs-sq"
                 :icon-left="row.enabled ? 'pause' : 'play-arrow'"
                 class="max-md:hidden"
                 @click.stop="togglePipeline(row)"
@@ -185,7 +185,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 :data-test="`pipeline-list-${row.name}-view-pipeline`"
                 variant="ghost"
-                size="icon-sm"
+                size="icon-xs-sq"
                 :title="t('pipeline.view')"
                 class="max-md:hidden"
                 icon-left="visibility"
@@ -198,7 +198,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :data-test="`pipeline-list-${row.name}-update-pipeline`"
                 data-row-action="edit"
                 variant="ghost"
-                size="icon-sm"
+                size="icon-xs-sq"
                 class="max-md:hidden"
                 @click.stop="editPipeline(row)"
                 icon-left="edit"
@@ -232,7 +232,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OButton
                     :aria-label="t('common.moreActions')"
                     variant="ghost"
-                    size="icon-sm"
+                    size="icon-xs-sq"
                     @click.stop
                     :data-test="`pipeline-list-${row.name}-more-options`"
                     icon-left="more-vert"
@@ -592,7 +592,14 @@ const viewState = useListViewState("pipelines", {
   sortBy: "",
   sortOrder: "asc" as "asc" | "desc",
 });
-const filterQuery = ref(viewState.filterQuery);
+// A state link shows that state across every tab with no saved search, so its rows match the count behind it.
+const urlState = router.currentRoute.value.query.state;
+const urlPipelineState = (["errored", "paused", "active"] as const).find((s) => s === urlState);
+if (urlState !== undefined) {
+  const { state: _consumed, ...rest } = router.currentRoute.value.query;
+  router.replace({ query: rest });
+}
+const filterQuery = ref(urlPipelineState ? "" : viewState.filterQuery);
 const pageSize = ref(viewState.pageSize);
 const sortBy = ref(viewState.sortBy);
 const sortOrder = ref<"asc" | "desc">(viewState.sortOrder);
@@ -723,7 +730,7 @@ const confirmDialogMeta: any = ref({
   data: null,
   onConfirm: () => {},
 });
-const activeTab = ref(viewState.tab);
+const activeTab = ref(urlPipelineState ? "all" : viewState.tab);
 // Derived, not assigned: a copy written only by updateActiveTab() is empty on a cold mount.
 const filteredPipelines = computed<any[]>(() =>
   activeTab.value === "all"
@@ -766,13 +773,10 @@ const currentRouteName = computed(() => {
 
 const otableColumns = computed(() => columns.value);
 
-// ── Pipeline operational state (single source of truth) ─────────────────────
-// errored → last run reported an error (needs attention, whether or not it runs)
-// active  → enabled and running
-// paused  → disabled
+// errored needs enabled plus a last-run error, matching the backend count; paused wins over any error
 const pipelineState = (row: any): "errored" | "active" | "paused" => {
-  if (row?.last_error) return "errored";
-  return row?.enabled ? "active" : "paused";
+  if (!row?.enabled) return "paused";
+  return row.last_error ? "errored" : "active";
 };
 
 const stateVariant = (row: any): BadgeVariant => {
@@ -819,7 +823,9 @@ const pipelineRowStyle = (row: any): Record<string, string> => {
 // ── State facet + summary strip ─────────────────────────────────────────────
 // Counts run over the TYPE-filtered rows (not the state-filtered ones) so the
 // tiles keep their totals while a facet is active.
-const stateFilter = ref<"errored" | "paused" | "active" | null>(viewState.stateFilter);
+const stateFilter = ref<"errored" | "paused" | "active" | null>(
+  urlPipelineState ?? viewState.stateFilter,
+);
 watch([filterQuery, activeTab, stateFilter, pageSize, sortBy, sortOrder], () => {
   Object.assign(viewState, {
     filterQuery: filterQuery.value,
