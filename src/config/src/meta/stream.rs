@@ -108,6 +108,8 @@ impl PartialEq for DataField {
     }
 }
 
+/// Object-store key prefix of every RUM replay resource; org deletion removes `{prefix}/{org}/`.
+pub const RUM_REPLAY_RESOURCE_PREFIX: &str = "rum_replay_resources";
 pub const MIN_DATA_RETENTION_DAYS: i64 = 3;
 pub const DEFAULT_DATA_RETENTION_DAYS: i64 = 3650;
 // Date math in the retention callers overflows past this; no stored data can be that old.

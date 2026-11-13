@@ -1740,6 +1740,7 @@ fn service_route_table() -> Router {
 
         // RUM trace lookup
         .route("/{org_id}/rum/lookup", post(rum_query::lookup::lookup))
+        .route("/{org_id}/rum/replay_resources/{app_id}/{resource_id}", get(rum::ingest::get_replay_resource))
 
         // RUM Product Analytics
         .route("/{org_id}/rum/analytics/named_events", get(rum_analytics::list_named_events).post(rum_analytics::create_named_event))

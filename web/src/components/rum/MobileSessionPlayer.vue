@@ -16,6 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from "vue";
+import { useStore } from "vuex";
 import { raw, useI18nTyped } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
@@ -32,6 +33,7 @@ import {
   type MobileTimeline,
   type Wireframe,
 } from "@/composables/rum/useMobileSessionReplay";
+import { apiOriginOf } from "@/utils/apiOrigin";
 import { MAX_ATTEMPTS } from "@/utils/rum/sessionReplayLoader";
 import {
   canResume,
@@ -69,6 +71,8 @@ const props = withDefaults(
     speed?: number;
     skipInactivity?: boolean;
     intent?: ReplayIntent;
+    /** RUM application that owns the session; image resources are fetched per application. */
+    applicationId?: string;
   }>(),
   {
     events: () => [],
@@ -85,6 +89,7 @@ const props = withDefaults(
     speed: undefined,
     skipInactivity: undefined,
     intent: "pause",
+    applicationId: undefined,
   },
 );
 
@@ -101,6 +106,7 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18nTyped();
+const store = useStore();
 
 // Skip gaps longer than this (ms) when "Skip inactivity" is on.
 const SKIP_THRESHOLD_MS = 1500;
@@ -185,8 +191,21 @@ const canvasStyle = computed(() => ({
   "transform-origin": "top left",
 }));
 
+const failedResourceIds = ref(new Set<string>());
+
+// A 404 for a not-yet-uploaded image must get another try once a later batch lands.
+watch(
+  () => props.timeline,
+  () => failedResourceIds.value.clear(),
+);
+
 function imageSrc(w: Wireframe): string | undefined {
-  return w.base64 ? `data:image/png;base64,${w.base64}` : undefined;
+  if (w.base64) return `data:image/png;base64,${w.base64}`;
+  if (!w.resourceId || !props.applicationId) return undefined;
+  if (failedResourceIds.value.has(w.resourceId)) return undefined;
+  const org = encodeURIComponent(store.state.selectedOrganization.identifier);
+  const app = encodeURIComponent(props.applicationId);
+  return `${apiOriginOf(store.state.API_ENDPOINT)}/api/${org}/rum/replay_resources/${app}/${encodeURIComponent(w.resourceId)}`;
 }
 
 // ---- event timeline markers (error highlight) ----------------------------
@@ -542,6 +561,7 @@ defineExpose({ seekTo, play, pause, togglePlay, playbackState });
               :style="wireframeStyle(wf)"
               :src="imageSrc(wf)"
               alt=""
+              @error="wf.resourceId && failedResourceIds.add(wf.resourceId)"
             />
             <!-- text/placeholder text is rendered as a text node (never v-html). -->
             <div v-else :style="wireframeStyle(wf)">

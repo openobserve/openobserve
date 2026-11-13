@@ -18,6 +18,7 @@ import { mount } from "@vue/test-utils";
 import MobileSessionPlayer from "@/components/rum/MobileSessionPlayer.vue";
 import { buildMobileTimeline } from "@/composables/rum/useMobileSessionReplay";
 import i18n from "@/locales";
+import store from "@/test/unit/helpers/store";
 
 const T = 1_700_000_000_000;
 
@@ -58,7 +59,7 @@ function mountPlayer(props: Record<string, any> = {}) {
       ...props,
     },
     global: {
-      plugins: [i18n],
+      plugins: [i18n, store],
       stubs: {
         OIcon: {
           template: '<i data-test="OIcon" :data-name="name" @click="$emit(\'click\')"></i>',
@@ -255,6 +256,93 @@ describe("MobileSessionPlayer", () => {
     await wrapper.setProps({ timeline: tl([segmentA]) });
     await wrapper.setProps({ timeline: tl([segmentA, segmentB]) });
     expect(wrapper.emitted("ready")).toHaveLength(1);
+    wrapper.unmount();
+  });
+});
+
+describe("MobileSessionPlayer image wireframes", () => {
+  const RESOURCE_ID = "d41d8cd98f00b204e9800998ecf8427e";
+  const imageFrame = (extra: Record<string, any>) => ({
+    id: 7,
+    x: 0,
+    y: 0,
+    width: 50,
+    height: 50,
+    type: "image",
+    ...extra,
+  });
+  const imageSegment = (extra: Record<string, any>) => ({
+    records: [
+      { type: 4, timestamp: T, data: { width: 400, height: 800 } },
+      { type: 10, timestamp: T, data: { wireframes: [imageFrame(extra)] } },
+      { type: 11, timestamp: T + 5_000, data: {} },
+    ],
+  });
+
+  it("renders an inline base64 image", () => {
+    const wrapper = mountPlayer({ timeline: tl([imageSegment({ base64: "AAAA" })]) });
+    expect(wrapper.find("img").attributes("src")).toBe("data:image/png;base64,AAAA");
+    wrapper.unmount();
+  });
+
+  const mountRef = (props: Record<string, any>, extra: Record<string, any> = {}) =>
+    mountPlayer({ timeline: tl([imageSegment({ resourceId: RESOURCE_ID, ...extra })]), ...props });
+
+  it("builds the resource URL from the endpoint, org and application", () => {
+    const org = encodeURIComponent(store.state.selectedOrganization.identifier);
+    const wrapper = mountRef({ applicationId: "my app/1" });
+    expect(wrapper.find("img").attributes("src")).toBe(
+      `${store.state.API_ENDPOINT}/api/${org}/rum/replay_resources/my%20app%2F1/${RESOURCE_ID}`,
+    );
+    wrapper.unmount();
+  });
+
+  it("does not emit a protocol-relative URL when the endpoint is /", () => {
+    const original = store.state.API_ENDPOINT;
+    store.state.API_ENDPOINT = "/";
+    const wrapper = mountRef({ applicationId: "app-1" });
+    const src = wrapper.find("img").attributes("src");
+    store.state.API_ENDPOINT = original;
+    expect(src?.startsWith("/api/")).toBe(true);
+    wrapper.unmount();
+  });
+
+  it("prefers base64 when the frame carries both", () => {
+    const wrapper = mountRef({ applicationId: "app-1" }, { base64: "AAAA" });
+    expect(wrapper.find("img").attributes("src")).toBe("data:image/png;base64,AAAA");
+    wrapper.unmount();
+  });
+
+  it("renders no image when the frame has neither base64 nor resourceId", () => {
+    const wrapper = mountPlayer({
+      timeline: tl([imageSegment({})]),
+      applicationId: "app-1",
+    });
+    expect(wrapper.find("img").exists()).toBe(false);
+    wrapper.unmount();
+  });
+
+  it("falls back to the placeholder when the image resource fails to load", async () => {
+    const wrapper = mountRef({ applicationId: "app-1" });
+    await wrapper.find("img").trigger("error");
+    await wrapper.vm.$nextTick();
+    expect(wrapper.find("img").exists()).toBe(false);
+    expect(wrapper.find(".bg-white > div").exists()).toBe(true);
+    wrapper.unmount();
+  });
+
+  it("retries a failed image when a new timeline batch arrives", async () => {
+    const wrapper = mountRef({ applicationId: "app-1" });
+    await wrapper.find("img").trigger("error");
+    expect(wrapper.find("img").exists()).toBe(false);
+    await wrapper.setProps({ timeline: tl([imageSegment({ resourceId: RESOURCE_ID })]) });
+    expect(wrapper.find("img").exists()).toBe(true);
+    wrapper.unmount();
+  });
+
+  it("renders no image when the application id is unavailable", () => {
+    const wrapper = mountRef({});
+    expect(wrapper.find("img").exists()).toBe(false);
     wrapper.unmount();
   });
 });

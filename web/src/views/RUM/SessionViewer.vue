@@ -228,6 +228,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :timeline="mobileTimeline"
               :events="segmentEvents"
               :is-loading="segmentsLoading"
+              :application-id="sessionState.data.selectedSession?.application_id"
               class="min-h-0 flex-1"
               @ready="handlePlayerReady"
               @seek-request="requestSeek"
@@ -975,11 +976,16 @@ const getSession = async () => {
     ? "min(case when has_full_snapshot then start end) as replay_start,"
     : "";
 
+  // The image endpoint is keyed by application, and only newer streams carry the column.
+  const appField = performanceState.data.streams["_sessionreplay"]["schema"]["application_id"]
+    ? "min(application_id) as application_id,"
+    : "";
+
   const timestampColumn = store.state.zoConfig.timestamp_column;
   const range = routeRangeUs();
   const req = {
     query: {
-      sql: `select min(${timestampColumn}) as zo_sql_timestamp, max(${timestampColumn}) as max_ts, min(start) as start_time, max(end) as end_time, ${replayStartField} min(user_agent_user_agent_family) as browser, min(user_agent_os_family) as os, min(ip) as ip, min(source) as source, ${geoFields} min(session_id) as session_id from "_sessionreplay" where ${sqlEquals("session_id", getSessionId.value)} order by zo_sql_timestamp`,
+      sql: `select min(${timestampColumn}) as zo_sql_timestamp, max(${timestampColumn}) as max_ts, min(start) as start_time, max(end) as end_time, ${replayStartField} ${appField} min(user_agent_user_agent_family) as browser, min(user_agent_os_family) as os, min(ip) as ip, min(source) as source, ${geoFields} min(session_id) as session_id from "_sessionreplay" where ${sqlEquals("session_id", getSessionId.value)} order by zo_sql_timestamp`,
       start_time: range.start,
       end_time: range.end,
       from: 0,
