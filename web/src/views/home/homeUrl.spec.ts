@@ -13,15 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it, vi } from "vitest";
-import { ref } from "vue";
+import { describe, expect, it } from "vitest";
 
-import { homeReturnState, homeUrlQuery, readHomeUrl, writeHomeUrl } from "./homeUrl";
+import { periodToMs, readHomeUrl } from "./homeUrl";
 
 describe("readHomeUrl", () => {
-  it("reads a row and a relative period", () => {
-    expect(readHomeUrl({ row: "service:checkout-api", period: "1h" })).toEqual({
-      row: "service:checkout-api",
+  it("reads a relative period", () => {
+    expect(readHomeUrl({ period: "1h" })).toEqual({
       range: { type: "relative", period: "1h" },
     });
   });
@@ -35,72 +33,20 @@ describe("readHomeUrl", () => {
   });
 
   it.each([
-    [{ row: "bogus" }, { row: null, range: null }],
-    [{ period: "soon" }, { row: null, range: null }],
-    [
-      { period: "1h", from: "1", to: "2" },
-      { row: null, range: null },
-    ],
-    [
-      { from: "200", to: "100" },
-      { row: null, range: null },
-    ],
-    [{ from: "100" }, { row: null, range: null }],
-    [
-      { from: "1e5", to: "2e5" },
-      { row: null, range: null },
-    ],
+    [{ period: "soon" }, { range: null }],
+    [{ period: "1h", from: "1", to: "2" }, { range: null }],
+    [{ from: "200", to: "100" }, { range: null }],
+    [{ from: "100" }, { range: null }],
+    [{ from: "1e5", to: "2e5" }, { range: null }],
   ])("restores nothing from a malformed part %#", (query, expected) => {
     expect(readHomeUrl(query)).toEqual(expected);
   });
 });
 
-describe("homeUrlQuery", () => {
-  it("replaces the Overview keys and keeps org_identifier last", () => {
-    const query = homeUrlQuery(
-      { org_identifier: "o1", period: "15m", keep: "x" },
-      { row: "incident:7", range: { type: "absolute", from: 1, to: 2 } },
-    );
-    expect(Object.keys(query)).toEqual(["keep", "row", "from", "to", "org_identifier"]);
-    expect(query).toMatchObject({ row: "incident:7", from: "1", to: "2" });
-  });
-
-  it("drops the row when none is selected", () => {
-    expect(
-      homeUrlQuery({ row: "incident:7" }, { row: null, range: { type: "relative", period: "1h" } }),
-    ).toEqual({ period: "1h" });
-  });
-});
-
-describe("homeReturnState", () => {
-  it("maps the state and the focus", () => {
-    expect(
-      homeReturnState({ row: "alert:a", range: { type: "relative", period: "1h" } }, "ask"),
-    ).toEqual({ row: "alert:a", period: "1h", focus: "ask" });
-  });
-});
-
-describe("writeHomeUrl", () => {
-  const routerAt = (name: string, query: Record<string, string>) => ({
-    replace: vi.fn(() => Promise.resolve()),
-    currentRoute: ref({ name, query }) as never,
-  });
-
-  it("replaces, never pushes, on home", () => {
-    const router = routerAt("home", { org_identifier: "o1" });
-    writeHomeUrl(router, { row: "service:a", range: { type: "relative", period: "1h" } });
-    expect(router.replace).toHaveBeenCalledWith({
-      name: "home",
-      query: { row: "service:a", period: "1h", org_identifier: "o1" },
-    });
-  });
-
-  it("does nothing when the query already says it, or off home", () => {
-    const same = routerAt("home", { period: "1h", org_identifier: "o1" });
-    writeHomeUrl(same, { row: null, range: { type: "relative", period: "1h" } });
-    expect(same.replace).not.toHaveBeenCalled();
-    const away = routerAt("logs", {});
-    writeHomeUrl(away, { row: null, range: { type: "relative", period: "1h" } });
-    expect(away.replace).not.toHaveBeenCalled();
+describe("periodToMs", () => {
+  it("reads relative periods and falls back to 15 minutes", () => {
+    expect(periodToMs("24h")).toBe(86_400_000);
+    expect(periodToMs("15m")).toBe(900_000);
+    expect(periodToMs("bogus")).toBe(900_000);
   });
 });
