@@ -185,3 +185,38 @@ test.describe(
     });
   },
 );
+
+test.describe("Correlation Settings — Detection Rules editing (ENT#1846)", { tag: ["@correlation", "@regression", "@P2"] }, () => {
+  test.beforeEach(async ({ page }, testInfo) => {
+    testLogger.testStart(testInfo.title, testInfo.file);
+    await navigateToBase(page);
+  });
+
+  test("the field picker search narrows the options, a pick adds a field, and the one Save enables", async ({ page }) => {
+    const pm = new PageManager(page);
+    await pm.correlationSettingsPage.navigateToCorrelationSettings(process.env["ORGNAME"]);
+    await pm.correlationSettingsPage.expectPageLoaded();
+    await pm.correlationSettingsPage.clickServiceDiscoveryTab();
+    await pm.correlationSettingsPage.expectServiceDiscoveryContentVisible();
+
+    const save = pm.correlationSettingsPage.getIdentitySaveButton();
+    await expect(save, "one Save Configuration button for the whole page").toHaveCount(1);
+    await expect(save).toBeDisabled();
+
+    await pm.correlationSettingsPage.openAddFieldPicker();
+
+    const options = pm.correlationSettingsPage.getAddFieldOptions();
+    await expect(options.first()).toBeVisible({ timeout: 15000 });
+    const labels = await pm.correlationSettingsPage.readAddFieldOptionLabels();
+    test.skip(labels.length < 2, "needs at least two candidate fields to prove the search filters");
+    const target = labels[labels.length - 1].trim();
+    await pm.correlationSettingsPage.searchAddFieldOptions(target);
+    await expect.poll(async () => options.count(), { timeout: 10000, message: "the search must narrow the list" }).toBeLessThan(labels.length);
+    const filtered = await options.evaluateAll((els) => els.map((e) => (e.getAttribute("data-test-label") || e.textContent || "").toLowerCase()));
+    expect(filtered.length).toBeGreaterThan(0);
+    for (const l of filtered) expect(l).toContain(target.toLowerCase());
+
+    await options.first().click();
+    await expect(save, "an edit enables Save Configuration").toBeEnabled({ timeout: 10000 });
+  });
+});
