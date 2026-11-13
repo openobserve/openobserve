@@ -390,14 +390,6 @@ function detailOf(row: OverviewNowRow): DetailPart[] {
         `${formatTimestampInTimezone(row.changedAt, "YYYY-MM-DD HH:mm", props.timezone)} (${props.timezone})`,
       ),
     });
-  if (row.coverage === "none")
-    parts.push({
-      id: "no-alert",
-      text: t("home.agent.problems.noAlert"),
-      tone: "text-status-warning-text",
-    });
-  else if (row.coverage === "unknown")
-    parts.push({ id: "coverage-unknown", text: t("overview.now.coverageUnknown") });
   if (row.partial) parts.push({ id: "partial", text: t("overview.now.partialRow") });
   return parts;
 }
