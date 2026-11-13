@@ -798,6 +798,14 @@ describe("resolveFieldValues — a typed prefix asks the server for matches", ()
     expect(requestFieldValuesMatching).not.toHaveBeenCalled();
   });
 
+  it("still asks when local values hold the prefix only mid-way, so values starting with it are not missed", async () => {
+    const c = makeComposable({
+      inSessionValues: { service_name: ["a-open-1", "b-open-2", "c-open-3"] },
+    });
+    await c.resolveFieldValues("service_name", { prefix: "open" });
+    expect(requestFieldValuesMatching).toHaveBeenCalled();
+  });
+
   it("does not ask without a prefix", async () => {
     const c = makeComposable();
     await c.resolveFieldValues("service_name", { prefix: "  " });

@@ -147,7 +147,7 @@ log.workspace = true
 maxminddb.workspace = true
 md5.workspace = true
 memchr.workspace = true
-mimalloc = { version = "0.1.48", features = ["v3"], optional = true }
+mimalloc = { version = "0.1.52", optional = true }
 opentelemetry.workspace = true
 opentelemetry_sdk.workspace = true
 opentelemetry-otlp.workspace = true
