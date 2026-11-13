@@ -39,6 +39,10 @@ describe("diffAlertValues", () => {
     expect(diffAlertValues(loaded(), loaded())).toEqual([]);
   });
 
+  it("labels a priority as the editor does", () => {
+    expect(changeValueText(2, t, "priority")).toBe("P2");
+  });
+
   it("ignores the server's last-triggered timestamp", () => {
     const after = { ...loaded(), last_triggered_at: 1_793_955_660_244_308 };
     expect(diffAlertValues(loaded(), after)).toEqual([]);

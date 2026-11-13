@@ -169,6 +169,8 @@ export function changeValueText(value: unknown, t: TranslateFn, path = ""): I18n
   if (ATOMIC_PATHS.has(path) && typeof value === "object") {
     return t("alerts.editMode.unsaved.edited");
   }
+  // The editor labels priorities P1–P5, so the list reads them the same way.
+  if (path === "priority" && typeof value === "number") return raw(`P${value}`);
   const text = Array.isArray(value)
     ? value.map((v) => (typeof v === "object" ? stableJson(v) : String(v))).join(", ")
     : typeof value === "object"

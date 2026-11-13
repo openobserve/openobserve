@@ -1478,6 +1478,8 @@ export default defineComponent({
         current.stream_type !== base.stream_type || current.stream_name !== base.stream_name;
       alertForm.resetForm(cloneDeep(base));
       alertForm.isAggregationEnabled.value = aggregationEnabled === true;
+      // The restored form matches the saved alert, so no stored draft should offer the edits back.
+      alertEditorDraft.draft.discard();
       // Steps hold local copies of what they first read, so they remount on the restored values.
       alertEditorDraft.formKey.value += 1;
       if (streamChanged && base.stream_name) {
