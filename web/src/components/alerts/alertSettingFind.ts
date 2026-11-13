@@ -171,11 +171,11 @@ export const ALERT_FIND_ENTRIES: readonly AlertFindEntry[] = [
   {
     id: "groupBy",
     labelKey: "alerts.find.labels.groupBy",
-    aliases: ["group", "multi", "multi alert", "per", "split by", "simple"],
+    aliases: ["group", "multi", "multi alert", "per", "split by", "simple", "aggregation"],
     section: "condition",
     tier: "tucked",
     groupKey: MORE,
-    targets: ["alert-group-by-select-0", "alert-group-by-add-btn"],
+    targets: ["alert-group-by-select-0", "alert-group-by-add-btn", "alerts-alertmultitoggle-row"],
   },
   {
     id: "compareWithPast",
