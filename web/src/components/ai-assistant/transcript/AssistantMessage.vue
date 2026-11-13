@@ -468,6 +468,7 @@ import { decisionsAfterProposal } from "@/components/ai-assistant/approvals/appr
 
 import AssistantAttachmentBlock from "./AssistantAttachmentBlock.vue";
 import { PROSE_CLASSES } from "./markdownCore";
+import { splitFollowUps } from "./followUpsText";
 import {
   AssistantMarkdownCode,
   AssistantMarkdownPart,
@@ -514,14 +515,24 @@ const blocks = computed<ContentBlock[]>(() => {
   return [{ type: "text", text: String(content) }];
 });
 
+// Follow-ups the model typed into its prose leave the text; the transcript shows them as chips.
+const unfencedBlocks = computed<ContentBlock[]>(() => {
+  const last = blocks.value.findLastIndex((block) => block.type === "text");
+  const text = blocks.value[last]?.text;
+  if (!text) return blocks.value;
+  const split = splitFollowUps(text);
+  if (!split.items.length) return blocks.value;
+  return blocks.value.map((block, i) => (i === last ? { ...block, text: split.text } : block));
+});
+
 const baseBlocks = computed<ContentBlock[]>(() =>
-  blocks.value.some((block) => block.type === "findings")
-    ? blocks.value.map((block) =>
+  unfencedBlocks.value.some((block) => block.type === "findings")
+    ? unfencedBlocks.value.map((block) =>
         block.type === "text" && block.text
           ? { ...block, text: withoutFindingsLabel(block.text) }
           : block,
       )
-    : blocks.value,
+    : unfencedBlocks.value,
 );
 
 // The decision follows the "I proposed …" text it answers; the model's words stay as written.

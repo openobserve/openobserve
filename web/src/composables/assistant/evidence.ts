@@ -266,6 +266,20 @@ export function boundedQuery(raw: unknown, callId?: string): QueryBlockData | nu
   };
 }
 
+const NON_MEASURE_NAME =
+  /(^|[\s_.])(timestamp|time|ts|date|id|uuid)$|^_?timestamp$|_(time|at|id)$/i;
+const EPOCH_RANGES: [number, number][] = [
+  [1e9, 4.1e9],
+  [1e12, 4.1e12],
+  [1e15, 4.1e15],
+];
+
+// A column that is a time or an id, or whose values are all epochs, is not a measure to plot.
+function isNonMeasure(name: string, points: [number, number][]): boolean {
+  if (NON_MEASURE_NAME.test(name.split(" / ").at(-1) ?? name)) return true;
+  return EPOCH_RANGES.some(([lo, hi]) => points.every(([, y]) => y >= lo && y <= hi));
+}
+
 // The wire is untrusted: a set past the series cap, or a point that is not two finite numbers, is dropped, never the answer.
 export function boundedChartSeries(value: unknown): ChartSeries | null {
   if (!value || typeof value !== "object") return null;
@@ -287,6 +301,7 @@ export function boundedChartSeries(value: unknown): ChartSeries | null {
       .map(([x, y]) => [x, y] as [number, number]);
     if (!points.length) return [];
     const name = typeof line.name === "string" && line.name ? line.name : "value";
+    if (isNonMeasure(name, points)) return [];
     return [{ name: name.slice(0, MAX_SERIES_NAME_CHARS), points }];
   });
   return series.some((line) => line.points.length >= 2) ? { xUnit: "us", series } : null;

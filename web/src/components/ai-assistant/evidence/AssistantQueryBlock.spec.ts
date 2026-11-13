@@ -75,18 +75,28 @@ describe("AssistantQueryBlock", () => {
     const group = wrapper.get('[data-test="assistant-query-block"]');
     expect(group.attributes("role")).toBe("group");
     expect(group.attributes("aria-label")).toMatch(/^SQL query on default, .+–.+$/);
-    expect(wrapper.get('[data-test="assistant-query-run"]').text()).toBe("Run");
-    expect(wrapper.get('[data-test="assistant-query-open"]').text()).toBe("Open in Logs");
-    expect(wrapper.get('[data-test="assistant-query-copy"]').attributes("aria-label")).toBe(
+    const run = wrapper.get('[data-test="assistant-query-run"]');
+    expect(run.text()).toBe("Run");
+    const open = wrapper.get('[data-test="assistant-query-open"]');
+    expect(open.text()).toBe("Logs");
+    expect(open.attributes("aria-label")).toBe("Open in Logs");
+    const head = wrapper.get('[data-test="assistant-query-text-chrome"]');
+    expect(head.get('[data-test="assistant-query-text-copy"]').attributes("aria-label")).toBe(
       "Copy query",
     );
+    expect(
+      head
+        .find('[data-test="assistant-query-text-foot"] [data-test="assistant-query-open"]')
+        .exists(),
+    ).toBe(true);
+    expect(wrapper.find('[data-test="assistant-query-copy"]').exists()).toBe(false);
     expect(wrapper.text()).not.toContain("Retry");
   });
 
   it("names a new tab when Open goes to one, and still opens through the applier", async () => {
     const { wrapper } = mountBlock();
     expect(wrapper.get('[data-test="assistant-query-open"]').attributes("aria-label")).toBe(
-      undefined,
+      "Open in Logs",
     );
     const docked = mountBlock({}, true, true);
     const tab = docked.wrapper.get('[data-test="assistant-query-open"]');
@@ -117,26 +127,47 @@ describe("AssistantQueryBlock", () => {
     expect(wrapper.find('[data-test="assistant-query-open-all"]').exists()).toBe(false);
   });
 
-  it("renders one code card: language, stream and range in its head, actions in its foot", () => {
+  it("renders one code card: actions in its head (Copy, Open, More) and Run in the foot", () => {
     const { wrapper } = mountBlock();
     const card = wrapper.get('[data-test="assistant-query-text-chrome"]');
     expect(card.get('[data-test="assistant-query-text-lang"]').text()).toBe("SQL");
     expect(card.get('[data-test="assistant-query-text-meta"]').text()).toMatch(
       /^stream default · /,
     );
+    const ids = [
+      "assistant-query-text-copy",
+      "assistant-query-more",
+      "assistant-query-open",
+      "assistant-query-run",
+    ];
+    const order = card
+      .findAll("[data-test]")
+      .map((el) => el.attributes("data-test"))
+      .filter((id) => ids.includes(id!));
+    expect(order).toEqual(ids);
+    const foot = card.get('[data-test="assistant-query-text-foot"]');
     expect(
       card
-        .get('[data-test="assistant-query-text-foot"]')
-        .find('[data-test="assistant-query-open"]')
+        .find('[data-test="assistant-query-text-foot"] [data-test="assistant-query-more"]')
         .exists(),
-    ).toBe(true);
+    ).toBe(false);
+    const footRun = foot.get('[data-test="assistant-query-run"]');
+    expect(footRun.text()).toBe("Run");
+    expect(footRun.classes()).toContain("ms-auto");
+    const logs = foot.get('[data-test="assistant-query-open"]');
+    expect(logs.classes()).not.toContain("border");
+    expect(logs.classes().filter((c) => c !== "ms-auto")).toEqual(
+      footRun.classes().filter((c) => c !== "ms-auto"),
+    );
   });
 
-  it("makes Run primary only on the last block", () => {
-    const { wrapper } = mountBlock({ isLast: false });
-    expect(wrapper.get('[data-test="assistant-query-run"]').classes().join(" ")).not.toContain(
-      "bg-button-primary",
-    );
+  it("never makes Run primary, on the last block or any other", () => {
+    for (const isLast of [true, false]) {
+      const { wrapper } = mountBlock({ isLast });
+      expect(wrapper.get('[data-test="assistant-query-run"]').classes().join(" ")).not.toContain(
+        "bg-button-primary",
+      );
+    }
   });
 
   it("dispatches Run and shows the rows, the stop control while running, and announces the count", async () => {
@@ -184,6 +215,7 @@ describe("AssistantQueryBlock", () => {
     expect(outcome.text()).toBe("You don't have access to stream default");
     expect(outcome.find("code").text()).toBe("default");
     expect(wrapper.find('[data-test="assistant-query-run"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="assistant-query-text-foot"]').exists()).toBe(true);
     expect(wrapper.get('[data-test="assistant-query-open"]').classes().join(" ")).not.toContain(
       "bg-button-primary",
     );
@@ -284,12 +316,16 @@ describe("AssistantQueryBlock", () => {
     const promql = mountBlock({
       block: { ...block, query: { ...block.query, language: "promql", streamType: "metrics" } },
     });
-    expect(promql.wrapper.get('[data-test="assistant-query-open"]').text()).toBe("Open in Metrics");
+    expect(promql.wrapper.get('[data-test="assistant-query-open"]').attributes("aria-label")).toBe(
+      "Open in Metrics",
+    );
     expect(promql.wrapper.find('[data-test="assistant-query-run"]').exists()).toBe(false);
     const traces = mountBlock({
       block: { ...block, query: { ...block.query, streamType: "traces" } },
     });
-    expect(traces.wrapper.get('[data-test="assistant-query-open"]').text()).toBe("Open in Traces");
+    expect(traces.wrapper.get('[data-test="assistant-query-open"]').attributes("aria-label")).toBe(
+      "Open in Traces",
+    );
   });
 
   it("reads Inserted until the editor's label goes, then offers Insert again", async () => {
@@ -314,14 +350,19 @@ describe("AssistantQueryBlock", () => {
       handle.accept();
       return { ok: true, detail: { decision: "accepted", note: null } } as never;
     });
-    const insert = () => wrapper.get('[data-test="assistant-query-insert"]');
-    await insert().trigger("click");
+    const state = () => wrapper.vm.$.setupState.insertState as string;
+    const insert = () =>
+      (wrapper.vm.$.setupState.menuItems as { id: string; run(): void; disabled?: boolean }[]).find(
+        (entry) => entry.id === "insert",
+      )!;
+    insert().run();
     await flushPromises();
-    expect(insert().attributes("data-state")).toBe("inserted");
+    expect(state()).toBe("inserted");
+    expect(insert().disabled).toBe(true);
     proposal.revert("original");
     await flushPromises();
-    expect(insert().attributes("data-state")).toBe("idle");
-    expect(insert().attributes("aria-disabled")).toBeUndefined();
+    expect(state()).toBe("idle");
+    expect(insert().disabled).toBe(false);
     scope.stop();
     resetEditorProposalsForTests();
   });
@@ -349,6 +390,7 @@ describe("AssistantQueryBlock", () => {
       block: { ...block, query: { ...block.query, language: "vrl", text: ".a = 1" } },
     });
     expect(wrapper.find('[data-test="assistant-query-open"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="assistant-query-text-foot"]').exists()).toBe(false);
     const items = wrapper.vm.$.setupState.menuItems as { id: string }[];
     expect(items.map((entry) => entry.id)).not.toContain("add-dashboard");
     expect(items.map((entry) => entry.id)).not.toContain("create-alert");
@@ -361,20 +403,7 @@ describe("AssistantQueryBlock", () => {
 
   it("links the source step", () => {
     const linked = mountBlock({ block: { ...block, sourceCallId: "c3" }, sourceStep: 3 });
-    expect(linked.wrapper.get('[data-test="assistant-query-source-step"]').text()).toBe(
-      "from step 3",
-    );
-  });
-
-  it("copies through the clipboard applier and offers the text by hand when that fails", async () => {
-    const { wrapper, host } = mountBlock();
-    host.dispatch.mockResolvedValueOnce({ ok: false, reason: "failed" } as never);
-    await wrapper.get('[data-test="assistant-query-copy"]').trigger("click");
-    await flushPromises();
-    expect(host.announce).toHaveBeenCalledWith(
-      expect.any(String),
-      "Couldn't copy. Select the text and copy it.",
-    );
-    expect(wrapper.find('[data-test="assistant-query-copy-manual"]').exists()).toBe(true);
+    const items = linked.wrapper.vm.$.setupState.menuItems as { id: string; label: string }[];
+    expect(items.find((entry) => entry.id === "source-step")?.label).toBe("from step 3");
   });
 });

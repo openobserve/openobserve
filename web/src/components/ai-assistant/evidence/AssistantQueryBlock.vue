@@ -31,93 +31,71 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :meta="metaLine"
       data-test="assistant-query-text"
     >
-      <template v-if="run?.status !== 'running' && footActions" #foot>
-        <div
-          class="flex min-w-0 flex-1 flex-wrap items-center gap-1"
-          data-test="assistant-query-actions"
+      <template #head-actions>
+        <ODropdown v-if="menuItems.length" align="end" privacy="mask">
+          <template #trigger>
+            <AssistantIconButton
+              :label="t('assistant.query.more')"
+              :icon="assistantGlyph.more"
+              data-test="assistant-query-more"
+            />
+          </template>
+          <ODropdownItem
+            v-for="item in menuItems"
+            :key="item.id"
+            :icon-left="item.icon"
+            :disabled="item.disabled"
+            :focusable-unavailable="item.disabled"
+            class="max-md:min-h-11 pointer-coarse:min-h-11"
+            :data-test="item.dataTest"
+            @select="item.run"
+          >
+            {{ item.label }}
+          </ODropdownItem>
+        </ODropdown>
+      </template>
+      <template v-if="canRun || canOpen" #foot>
+        <OButton
+          v-if="canOpen"
+          variant="secondary"
+          size="sm"
+          as="a"
+          :href="openHref"
+          :target="openInNewTab ? '_blank' : undefined"
+          :rel="openInNewTab ? 'noopener noreferrer' : undefined"
+          :icon-left="assistantGlyph.newTab"
+          :aria-label="
+            openInNewTab ? t('assistant.evidence.opensNewTab', { label: openLabel }) : openLabel
+          "
+          :class="FOOT_BUTTON_CLASS"
+          data-test="assistant-query-open"
+          @click="onOpen"
         >
-          <OButton
-            v-if="canRun && mdUp"
-            :variant="isLast ? 'primary' : 'secondary'"
-            size="sm"
-            :icon-left="assistantGlyph.run"
-            :class="['shrink-0', TOUCH_TARGET_CLASS]"
-            data-test="assistant-query-run"
-            @click="startRun"
-          >
-            {{ t("assistant.query.run") }}
-          </OButton>
-          <OButton
-            v-if="canOpen"
-            :variant="canRun && mdUp ? 'ghost' : run?.status === 'forbidden' ? 'ghost' : 'outline'"
-            size="sm"
-            as="a"
-            :href="openHref"
-            :target="openInNewTab ? '_blank' : undefined"
-            :rel="openInNewTab ? 'noopener noreferrer' : undefined"
-            :icon-left="assistantGlyph.newTab"
-            :aria-label="
-              openInNewTab ? t('assistant.evidence.opensNewTab', { label: openLabel }) : undefined
-            "
-            :class="['min-w-0 max-md:flex-1', TOUCH_TARGET_CLASS]"
-            data-test="assistant-query-open"
-            @click="onOpen"
-          >
-            {{ openLabel }}
-            <OTooltip :content="t('assistant.evidence.openHint')" />
-          </OButton>
-          <OButton
-            v-if="sourceStep && block.sourceCallId"
-            variant="ghost-primary"
-            size="xs"
-            :class="TOUCH_TARGET_CLASS"
-            data-test="assistant-query-source-step"
-            @click="openSource"
-          >
-            {{ t("assistant.evidence.fromStep", { n: sourceStep }) }}
-          </OButton>
-          <span class="flex-1" />
-          <AssistantIconButton
-            v-if="mdUp"
-            :label="t('assistant.query.copy')"
-            :icon="assistantGlyph.copy"
-            data-test="assistant-query-copy"
-            @click="copyQuery"
-          />
-          <OButton
-            v-if="canInsert && mdUp"
-            variant="ghost"
-            size="sm"
-            :disabled="insertState !== 'idle'"
-            :focusable-unavailable="insertState !== 'idle'"
-            :icon-left="insertState === 'inserted' ? assistantGlyph.done : undefined"
-            :class="['shrink-0', TOUCH_TARGET_CLASS]"
-            data-test="assistant-query-insert"
-            :data-state="insertState"
-            @click="insert"
-          >
-            {{ insertLabel }}
-          </OButton>
-          <ODropdown v-if="menuItems.length" align="end" privacy="mask">
-            <template #trigger>
-              <AssistantIconButton
-                :label="t('assistant.query.more')"
-                :icon="assistantGlyph.more"
-                data-test="assistant-query-more"
-              />
-            </template>
-            <ODropdownItem
-              v-for="item in menuItems"
-              :key="item.id"
-              :icon-left="item.icon"
-              class="max-md:min-h-11 pointer-coarse:min-h-11"
-              :data-test="item.dataTest"
-              @select="item.run"
-            >
-              {{ item.label }}
-            </ODropdownItem>
-          </ODropdown>
-        </div>
+          {{ t("assistant.query.openShort") }}
+          <OTooltip :content="openLabel" />
+        </OButton>
+        <OButton
+          v-if="canRun && run?.status === 'running'"
+          variant="secondary"
+          size="sm"
+          :icon-left="assistantGlyph.stop"
+          :class="[FOOT_BUTTON_CLASS, 'ms-auto']"
+          data-test="assistant-query-stop"
+          @click="stopRun"
+        >
+          {{ t("assistant.query.stop") }}
+        </OButton>
+        <OButton
+          v-else-if="canRun"
+          variant="secondary"
+          size="sm"
+          :icon-left="assistantGlyph.run"
+          :class="[FOOT_BUTTON_CLASS, 'ms-auto']"
+          data-test="assistant-query-run"
+          @click="startRun"
+        >
+          {{ t("assistant.query.run") }}
+        </OButton>
       </template>
     </AssistantQueryText>
 
@@ -141,15 +119,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       {{ insertNote }}
     </OText>
 
-    <OInput
-      v-if="manualCopy"
-      :model-value="block.query.text"
-      readonly
-      :label="t('assistant.client.copyManually')"
-      data-test="assistant-query-copy-manual"
-      @focus="selectAll"
-    />
-
     <div
       v-if="run"
       ref="results"
@@ -165,16 +134,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OText variant="meta" data-test="assistant-query-running">
           {{ t("assistant.query.running", { n: elapsedSeconds }) }}
         </OText>
-        <OButton
-          variant="secondary"
-          size="sm"
-          :icon-left="assistantGlyph.stop"
-          :class="TOUCH_TARGET_CLASS"
-          data-test="assistant-query-stop"
-          @click="stopRun"
-        >
-          {{ t("assistant.query.stop") }}
-        </OButton>
       </div>
       <template v-else-if="run.status === 'done'">
         <OText variant="meta" data-test="assistant-query-summary">{{ summaryLine }}</OText>
@@ -263,19 +222,16 @@ import {
   type AssistantAction,
   type InsertOutcome,
 } from "@/composables/assistant/pure";
-import useBreakpoint from "@/composables/useBreakpoint";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OCode from "@/lib/core/Code/OCode.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.types";
 import OText from "@/lib/core/Typography/OText.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { explorerOf, explorerTarget } from "@/utils/assistant/explorerRoutes";
-import { copyToClipboard } from "@/utils/clipboard";
 import { formatBytes, formatCount, formatElapsed } from "@/utils/formatters";
 
 import AssistantQueryText from "./AssistantQueryText.vue";
@@ -288,20 +244,17 @@ interface MenuItem {
   label: I18nText;
   icon: IconName;
   dataTest: string;
-  /** Shown in the overflow only on a phone, where the row keeps Open alone. */
-  phoneOnly: boolean;
+  disabled?: boolean;
   shown: boolean;
   run(): void;
 }
 
-type MenuKey =
-  | "assistant.query.run"
-  | "assistant.query.copy"
-  | "assistant.query.insert"
-  | "assistant.query.dashboard"
-  | "assistant.query.alert";
+type MenuKey = "assistant.query.insert" | "assistant.query.dashboard" | "assistant.query.alert";
 
 const MINUTE_MS = 60_000;
+
+// Logs, Run and Stop share one look so the footer buttons cannot drift.
+const FOOT_BUTTON_CLASS = `shrink-0 ${TOUCH_TARGET_CLASS}`;
 
 const props = withDefaults(defineProps<AssistantQueryBlockProps>(), {
   readonly: false,
@@ -315,11 +268,9 @@ const props = withDefaults(defineProps<AssistantQueryBlockProps>(), {
 const { t } = useI18nTyped();
 const evidence = props.readonly ? null : inject(assistantEvidenceHostKey, null);
 const router = useRouter();
-const { mdUp } = useBreakpoint();
 
 const root = ref<HTMLElement | null>(null);
 const results = ref<HTMLElement | null>(null);
-const manualCopy = ref(false);
 const now = ref(Date.now());
 let ticker: ReturnType<typeof setInterval> | null = null;
 
@@ -387,16 +338,6 @@ const metaLine = computed<I18nText | undefined>(() => {
     ? t("assistant.message.fenceSource", { stream: raw(stream), range: rangeLine.value })
     : rangeLine.value;
 });
-
-// The head already offers Copy, so a foot that would hold only Copy is left out.
-const footActions = computed(
-  () =>
-    (canRun.value && mdUp.value) ||
-    canOpen.value ||
-    (!!props.sourceStep && !!props.block.sourceCallId) ||
-    (canInsert.value && mdUp.value) ||
-    menuItems.value.length > 0,
-);
 
 const previewRows = computed(() => (run.value?.rows ?? []).slice(0, PREVIEW_ROWS));
 const hiddenRows = computed(() => {
@@ -471,20 +412,25 @@ const outcomeLine = computed<I18nText>(() => {
     : t("assistant.evidence.queryFailedPlain");
 });
 
-// A phone keeps Open in the row; Run, Copy and Insert join the drafts in the overflow.
+// Insert, the drafts and the source step live in the head overflow.
 const menuItems = computed<MenuItem[]>(() => {
   if (!live.value) return [];
   const query = props.block.query;
   const turnId = props.turnId ? { turnId: props.turnId } : {};
   const all: MenuItem[] = [
-    item("run", "assistant.query.run", assistantGlyph.run, true, canRun.value, startRun),
-    item("copy", "assistant.query.copy", assistantGlyph.copy, true, true, copyQuery),
-    item("insert", "assistant.query.insert", assistantGlyph.edit, true, canInsert.value, insert),
+    {
+      id: "insert",
+      label: insertLabel.value,
+      icon: insertState.value === "inserted" ? assistantGlyph.done : assistantGlyph.edit,
+      dataTest: "assistant-query-insert",
+      disabled: insertState.value !== "idle",
+      shown: canInsert.value,
+      run: insert,
+    },
     item(
       "add-dashboard",
       "assistant.query.dashboard",
       assistantGlyph.chipPanel,
-      false,
       runnable.value && props.permissions.dashboardCreate !== false && !otherOrg.value,
       () => void act({ kind: "add_to_dashboard_draft", query, ...turnId }),
     ),
@@ -492,19 +438,25 @@ const menuItems = computed<MenuItem[]>(() => {
       "create-alert",
       "assistant.query.alert",
       assistantGlyph.chipAlert,
-      false,
       runnable.value && props.permissions.alertCreate !== false && !otherOrg.value,
       () => void act({ kind: "create_alert_draft", query, ...turnId }),
     ),
+    {
+      id: "source-step",
+      label: t("assistant.evidence.fromStep", { n: props.sourceStep ?? 0 }),
+      icon: assistantGlyph.history,
+      dataTest: "assistant-query-source-step",
+      shown: !!props.sourceStep && !!props.block.sourceCallId,
+      run: openSource,
+    },
   ];
-  return all.filter((entry) => entry.shown && (!entry.phoneOnly || !mdUp.value));
+  return all.filter((entry) => entry.shown);
 });
 
 function item(
   id: string,
   key: MenuKey,
   icon: IconName,
-  phoneOnly: boolean,
   shown: boolean,
   onSelect: () => void,
 ): MenuItem {
@@ -513,7 +465,6 @@ function item(
     label: t(key),
     icon,
     dataTest: `assistant-query-${id}`,
-    phoneOnly,
     shown,
     run: onSelect,
   };
@@ -572,21 +523,6 @@ function onOpen(event: MouseEvent): void {
   void act({ kind: "open_in_explorer", query: props.block.query, explorer: explorer.value });
 }
 
-async function copyQuery(): Promise<void> {
-  if (!live.value || !props.sid || !evidence) {
-    await copyToClipboard(props.block.query.text, t, {
-      successMessage: t("assistant.evidence.copied"),
-    });
-    return;
-  }
-  const result = await dispatch({ kind: "copy", text: props.block.query.text, what: "query" });
-  manualCopy.value = !result.ok;
-  evidence.announce(
-    props.sid,
-    result.ok ? t("assistant.evidence.copied") : t("assistant.client.copyManually"),
-  );
-}
-
 async function insert(): Promise<void> {
   const host = editorHost.value;
   if (!host || insertState.value !== "idle") return;
@@ -628,10 +564,6 @@ function openSource(): void {
   const callId = props.block.sourceCallId;
   if (!callId) return;
   void dispatch({ kind: "open_step", callId }).then(() => revealStep(root.value, callId));
-}
-
-function selectAll(event: FocusEvent): void {
-  (event.target as HTMLInputElement | null)?.select?.();
 }
 
 function onKeydown(event: KeyboardEvent): void {
