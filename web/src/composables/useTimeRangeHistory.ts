@@ -100,9 +100,21 @@ export const sameHistoryEntry = (a: TimeRangeHistoryEntry, b: TimeRangeHistoryEn
   return a.startUs === b.startUs && a.endUs === b.endUs;
 };
 
+let watchingOtherTabs = false;
+
+// Another tab's write reaches this one only as a storage event, which the version bump turns into a re-read.
+const watchOtherTabs = () => {
+  if (watchingOtherTabs || typeof window === "undefined") return;
+  watchingOtherTabs = true;
+  window.addEventListener("storage", (event) => {
+    if (event.key === null || event.key.startsWith(KEY_PREFIX)) version.value += 1;
+  });
+};
+
 /** Recently applied ranges and periods, newest first, shared by every time picker of the current org and user. */
 export default function useTimeRangeHistory() {
   const store = useStore();
+  watchOtherTabs();
 
   const storageKey = computed(() =>
     timeRangeHistoryKey(

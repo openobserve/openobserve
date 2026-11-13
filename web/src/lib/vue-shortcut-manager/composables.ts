@@ -96,6 +96,21 @@ function resolveShortcuts(
   return { toRegister, resolvedScope: scope ?? inferredScope };
 }
 
+/** Registers shortcuts outside a component's lifecycle; returns the release, or null with no manager. */
+export function registerShortcuts(shortcuts: ShortcutInput[], scope?: string): (() => void) | null {
+  const manager = getManager();
+  if (!manager) return null;
+  const { toRegister, resolvedScope } = resolveShortcuts(shortcuts, scope);
+  const scopeToken = resolvedScope ? manager.acquireScope(resolvedScope) : null;
+  const ids = toRegister.map((s) =>
+    manager.register(resolvedScope && !s.scope ? { ...s, scope: resolvedScope } : s),
+  );
+  return () => {
+    ids.forEach((id) => manager.unregisterById(id));
+    if (scopeToken) manager.releaseScope(scopeToken);
+  };
+}
+
 /**
  * Register a component's keyboard shortcuts in a single call.
  *
@@ -119,30 +134,17 @@ export function useShortcuts(
   scope?: string,
   options: UseShortcutsOptions = {},
 ): void {
-  let ids: string[] = [];
-  let scopeToken: symbol | null = null;
   let isMounted = false;
-  let isRegistered = false;
+  let release: (() => void) | null = null;
 
   const activate = () => {
-    const manager = getManager();
-    if (!manager || isRegistered) return;
-    isRegistered = true;
-    const { toRegister, resolvedScope } = resolveShortcuts(shortcuts, scope);
-    if (resolvedScope) scopeToken = manager.acquireScope(resolvedScope);
-    ids = toRegister.map((s) =>
-      manager.register(resolvedScope && !s.scope ? { ...s, scope: resolvedScope } : s),
-    );
+    if (release) return;
+    release = registerShortcuts(shortcuts, scope);
   };
 
   const deactivate = () => {
-    const manager = getManager();
-    if (!manager || !isRegistered) return;
-    isRegistered = false;
-    ids.forEach((id) => manager.unregisterById(id));
-    ids = [];
-    if (scopeToken) manager.releaseScope(scopeToken);
-    scopeToken = null;
+    release?.();
+    release = null;
   };
 
   onMounted(() => {

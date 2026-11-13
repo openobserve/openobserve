@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
+import { defineComponent, h, KeepAlive } from "vue";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import DateTime from "@/components/DateTime.vue";
 import i18n from "@/locales";
@@ -813,6 +814,43 @@ describe("DateTime layout", () => {
       await wrapper!.setProps({ shortcuts: true });
       await press("t");
       expect(wrapper!.vm.menuOpen).toBe(true);
+    });
+
+    it("keeps the keys working on a page reopened after a kept-alive page with its own picker", async () => {
+      const page = (name: string) =>
+        defineComponent({
+          name,
+          setup: () => () => h(DateTime, { autoApply: true, shortcuts: true }),
+        });
+      const views: Record<string, ReturnType<typeof page>> = {
+        logs: page("Logs"),
+        traces: page("Traces"),
+      };
+      const host = mount(
+        defineComponent({
+          props: { view: { type: String, required: true } },
+          setup: (hostProps) => () =>
+            h(KeepAlive, { include: ["Traces"] }, [
+              h(views[hostProps.view], { key: hostProps.view }),
+            ]),
+        }),
+        { props: { view: "logs" }, attachTo: document.body, global: { plugins: [i18n, store] } },
+      );
+      await flushPromises();
+      await host.setProps({ view: "traces" });
+      await flushPromises();
+      await host.setProps({ view: "logs" });
+      await flushPromises();
+
+      const logs = host.findComponent(views.logs).findComponent(DateTime);
+      for (const key of ["[", "]", "-", "z"]) {
+        const before = logs.emitted("on:date-change")?.length ?? 0;
+        await press(key);
+        expect(logs.emitted("on:date-change")?.length ?? 0).toBeGreaterThan(before);
+      }
+      await press("t");
+      expect(logs.vm.menuOpen).toBe(true);
+      host.unmount();
     });
 
     it("binds no keys for a picker that does not own them", async () => {

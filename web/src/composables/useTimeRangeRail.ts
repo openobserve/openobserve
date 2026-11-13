@@ -14,11 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { computed, nextTick, ref, type ComputedRef, type Ref } from "vue";
-import {
-  formatRangeTooltip,
-  parseCalendarToken,
-  resolveCalendarPeriod,
-} from "@/utils/dashboard/calendarPeriods";
+import { parseCalendarToken, resolveCalendarPeriod } from "@/utils/dashboard/calendarPeriods";
 import { CALENDAR_RAIL_ITEMS, formatCivilDay } from "@/utils/timeRangeRail";
 import {
   TIME_RANGE_CHIP_SETS,
@@ -30,7 +26,13 @@ import {
   type TimeRangeListRow,
   type TimeRangePreset,
 } from "@/utils/timeRangeList";
-import { formatRangeDates, formatRangeDuration, formatRangeLabel } from "@/utils/timeRangeLabel";
+import {
+  formatRangeDates,
+  formatRangeDuration,
+  formatRangeLabel,
+  formatRangeStamps,
+  formatZoneOffset,
+} from "@/utils/timeRangeLabel";
 import useTimeRangeHistory, {
   isRelativeHistoryEntry,
   type TimeRangeHistoryEntry,
@@ -115,7 +117,7 @@ export default function useTimeRangeRail(props: TimeRangeRailProps, deps: TimeRa
     const reason = range ? limitReason(range.startTime, range.endTime) : null;
     const tooltip = isRelativeHistoryEntry(entry)
       ? calendarTooltip(parseCalendarToken(entry.relative) ? entry.relative : null)
-      : formatRangeTooltip(entry.startUs, entry.endUs, zone.value);
+      : `${formatRangeStamps(entry, labelOptions())} ${formatZoneOffset(zone.value, entry.startUs / 1000)}`;
     return {
       ...base,
       meta: reason ?? base.meta,

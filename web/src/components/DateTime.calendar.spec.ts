@@ -264,7 +264,7 @@ describe("DateTime calendar", () => {
       el("date-time-next-btn")!.click();
       await flushPromises();
       expect(lastEmit().relativeTimePeriod).toBe("calendar:month:-1");
-      expect(storedHistory()).toEqual([]);
+      expect(storedHistory()).toEqual([{ relative: "calendar:month:-2" }]);
     });
 
     it("re-resolves the same token in a new timezone", async () => {

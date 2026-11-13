@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <span v-if="showLabel" class="ms-1">{{ t("search.shareLink") }}</span>
       <OTooltip
         v-if="!isWebUrlNotConfigured"
-        :content="kindTitle(kinds[0])"
+        :content="tooltip || kindTitle(kinds[0])"
         :shortcut="shortcut || undefined"
         :shortcut-id="shortcutId || undefined"
       />
@@ -240,8 +240,10 @@ export default defineComponent({
         : props.liveLabel
           ? t("dateTime.shareLiveHint", { name: props.liveLabel })
           : "";
+    const fixedRange = () => props.fixedCopyLabel || props.fixedLabel;
+    // A live link opens on a later window, so the line also pins the dates the sender saw.
     const kindRange = (kind: ShareTimeKind) =>
-      kind === "fixed" ? props.fixedCopyLabel || props.fixedLabel : props.liveLabel;
+      kind === "fixed" ? fixedRange() : [props.liveLabel, fixedRange()].filter(Boolean).join(" · ");
     // The toast names the kind only when the caller said which window the link holds.
     const copiedMessage = (kind: ShareTimeKind) => {
       if (kind === "live" && props.liveLabel) {

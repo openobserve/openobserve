@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     ref="groupEl"
     icon="info"
-    class="date-time-container inline-flex max-w-full min-w-0 items-stretch [&_button:focus-visible]:z-1"
+    class="date-time-container inline-flex max-w-full shrink-0 items-stretch [&_button:focus-visible]:z-1"
     :class="{
       'rounded-default border-button-outline-border min-h-8.5 border': !hideRangeShift,
       'w-full [&>*]:flex-1': fieldAppearance,
@@ -75,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               fieldAppearance,
             'max-md:rounded-default!': !hideRangeShift,
           }"
-          class="max-md:max-w-full max-md:min-w-0"
+          class="justify-start! max-md:max-w-full max-md:min-w-0"
           :aria-label="triggerAriaLabel"
           :disabled="disable"
           @mouseenter="onTriggerHover(true)"
@@ -479,7 +479,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="xs"
                 class="shrink-0 px-3!"
                 :disabled="applyDisabled"
-                @click="applyAndClose"
+                @click="onApplyClick"
               >
                 {{ t("common.apply") }}
               </OButton>
@@ -671,12 +671,14 @@ import {
 import { CALENDAR_RAIL_ITEMS, PAST_PERIOD_KEYS, formatZoneBadge } from "@/utils/timeRangeRail";
 import {
   isRelativeHistoryEntry,
+  sameHistoryEntry,
   type TimeRangeHistoryEntry,
 } from "@/composables/useTimeRangeHistory";
 import type { TimeRangeListRow, TimeRangePreset } from "@/utils/timeRangeList";
 import { instantFromShiftedMs } from "@/utils/timeRangeZoom";
 import {
   formatRangeCopyText,
+  formatRangeDates,
   formatRangeDuration,
   formatRangeLabel,
   formatRangeStamps,
@@ -695,6 +697,7 @@ import useBreakpoint from "@/composables/useBreakpoint";
 import useTimeRangeZone, {
   MICROS_PER_MINUTE,
   MICROS_PER_SECOND,
+  addCivilDays,
   zoneOffset,
 } from "@/composables/useTimeRangeZone";
 import useTimeRangeLimits, { MAX_CUSTOM_RELATIVE_VALUE } from "@/composables/useTimeRangeLimits";
@@ -910,6 +913,7 @@ export default defineComponent({
       refreshTooltipNow,
       labelOptions,
       convertUnixTime,
+      civilDayStart,
       absoluteToMicros,
       endFieldToMicros,
       isZoneMidnight,
@@ -925,6 +929,10 @@ export default defineComponent({
     // A selected calendar period overrides relativePeriod/relativeValue while the type is relative.
     const calendarToken = ref<string | null>(null);
     const appliedCalendarToken = ref<string | null>(null);
+    // A typed running period (`Q4`, `FY26`) keeps its typed name only while its token is the one set by that typing.
+    const calendarName = ref<string | null>(null);
+    const appliedCalendarName = ref<string | null>(null);
+    watch(calendarToken, () => (calendarName.value = null), { flush: "sync" });
     // Type and relative selection last applied; closing without Apply restores these.
     let appliedSelection = {
       selectedType: "relative",
@@ -1061,6 +1069,7 @@ export default defineComponent({
       cancelPendingRead,
       clearInput,
       onInputEdit,
+      applyTypedReading,
       onInputKeydown,
       onBarFocusOut,
       escapeInput,
@@ -1436,9 +1445,11 @@ export default defineComponent({
       });
     };
 
+    let entryAtOpen: TimeRangeHistoryEntry | null = null;
     // The trigger shows only what is in force, so this runs on every path that applies a range.
     // Panel edits without autoApply stay pending until Apply.
     const markApplied = () => {
+      const outgoing = appliedHistoryEntry();
       appliedSinceOpen = true;
       appliedPeriod.value =
         selectedType.value === "relative" && calendarToken.value === null
@@ -1453,13 +1464,33 @@ export default defineComponent({
         appliedRange.value = null;
       }
       appliedCalendarToken.value = selectedType.value === "relative" ? calendarToken.value : null;
+      appliedCalendarName.value = appliedCalendarToken.value ? calendarName.value : null;
       appliedSelection = {
         selectedType: selectedType.value,
         calendarToken: calendarToken.value,
         relativePeriod: relativePeriod.value,
         relativeValue: relativeValue.value,
       };
+      const incoming = appliedHistoryEntry();
+      if (outgoing && incoming && !sameHistoryEntry(outgoing, incoming)) recordOutgoing(outgoing);
     };
+
+    // A range from a link or a step never passed through the panel, so Recent keeps it once the user replaces it.
+    // Inside the panel only the range in force at open counts, not each auto-applied edit.
+    function recordOutgoing(outgoing: TimeRangeHistoryEntry) {
+      if (!isUserInitiated || !showRail.value) return;
+      if (menuOpen.value && !(entryAtOpen && sameHistoryEntry(outgoing, entryAtOpen))) return;
+      recordEntry(outgoing);
+    }
+
+    function appliedHistoryEntry(): TimeRangeHistoryEntry | null {
+      const range = appliedRange.value;
+      if (appliedType.value === "absolute") {
+        return range ? { startUs: range.startTime, endUs: range.endTime } : null;
+      }
+      const period = appliedCalendarToken.value ?? appliedPeriod.value;
+      return period ? { relative: period } : null;
+    }
 
     // Closing without Apply restores the fields seen at open, so a zone change redraws them from the applied instants.
     const redrawAbsoluteAtOpen = () => {
@@ -1477,6 +1508,7 @@ export default defineComponent({
     const restoreAppliedSelection = () => {
       selectedType.value = appliedSelection.selectedType;
       calendarToken.value = appliedSelection.calendarToken;
+      calendarName.value = appliedCalendarName.value;
       relativePeriod.value = appliedSelection.relativePeriod;
       relativeValue.value = appliedSelection.relativeValue;
       const atOpen = absoluteAtOpen;
@@ -1651,22 +1683,38 @@ export default defineComponent({
       if (!period) return null;
       const range = resolveRelativePeriod(period, tooltipNow.value);
       if (!range) return null;
+      const typedName = shownApplied ? appliedCalendarName.value : calendarName.value;
       return {
         startUs: range.startTime,
         endUs: range.endTime,
-        name: String(relativeLabel(period)),
+        name: typedName ?? String(relativeLabel(period)),
         live: true,
         calendar: parseCalendarToken(period) !== null,
       };
     });
 
+    // A day-only picker names the days its range touches; an exclusive midnight end belongs to the day before.
+    const wholeDaysOf = (range: RangeLabelInput): RangeLabelInput => {
+      const lastUs = isZoneMidnight(range.endUs) ? range.endUs - 1 : range.endUs;
+      return {
+        startUs: civilDayStart(convertUnixTime(range.startUs).date),
+        endUs: civilDayStart(addCivilDays(convertUnixTime(lastUs).date, 1)),
+      };
+    };
+
     const triggerLabel = computed(() => {
       if (props.triggerText) return props.triggerText;
       const range = triggerRange.value;
-      if (props.disableRelative || !range) {
+      if (!range) {
         return showsApplied.value
           ? appliedDisplayValue.value || getDisplayValue.value
           : getDisplayValue.value;
+      }
+      if (props.disableRelative) {
+        return formatRangeDates(props.hideRelativeTime ? wholeDaysOf(range) : range, {
+          ...labelOptions(),
+          surface: labelSurface.value,
+        });
       }
       return formatRangeLabel(range, {
         ...labelOptions(),
@@ -1775,6 +1823,7 @@ export default defineComponent({
       pendingDay.value = null;
       if (plan.kind === "calendar") {
         calendarToken.value = plan.token;
+        calendarName.value = plan.name ?? null;
         if (props.autoApply) saveDate("relative");
         return;
       }
@@ -1803,7 +1852,7 @@ export default defineComponent({
       return {
         startUs: range.startTime,
         endUs: range.endTime,
-        name: String(relativeLabel(period)),
+        name: calendarName.value ?? String(relativeLabel(period)),
         live: true,
         calendar: parseCalendarToken(period) !== null,
       };
@@ -1989,6 +2038,7 @@ export default defineComponent({
     const computeRelativePeriod = () => {
       markProgrammaticDateChange();
       computeRelativeMaxima();
+      const periodBefore = currentRelativePeriod();
       if (selectedType.value === "relative") {
         if (calendarExceedsRestriction(calendarToken.value)) {
           // Clamped like a too-long rolling range: to the largest window the page allows.
@@ -2020,6 +2070,7 @@ export default defineComponent({
             console.log("Error while setting relative date", e);
           }
         }
+        if (currentRelativePeriod() !== periodBefore) limits.showRestrictionToast();
       }
     };
 
@@ -2110,6 +2161,7 @@ export default defineComponent({
         appliedSinceOpen = false;
         absoluteAtOpen = fields.snapshotFields();
         rangeKeyAtOpen = selectionKey.value;
+        entryAtOpen = appliedHistoryEntry();
         onBeforeShow();
         onShow();
       } else {
@@ -2190,6 +2242,7 @@ export default defineComponent({
       clearUndo();
       selectedType.value = "relative";
       calendarToken.value = preset.token;
+      calendarName.value = null;
       pendingDay.value = null;
       saveDate("relative");
       recordSelection();
@@ -2214,8 +2267,10 @@ export default defineComponent({
       closeMenu();
     };
 
+    // The toggle clears on a click of the lit chip, which applies that chip again so the page re-runs it.
     const onChipToggle = (value: unknown) => {
-      if (typeof value === "string" && value) pickChip(value);
+      const chip = typeof value === "string" && value ? value : litChip.value;
+      if (chip) pickChip(chip);
     };
 
     const applyRecentPeriod = (period: string) => {
@@ -2223,6 +2278,7 @@ export default defineComponent({
       pendingDay.value = null;
       if (parseCalendarToken(period)) {
         calendarToken.value = period;
+        calendarName.value = null;
       } else {
         calendarToken.value = null;
         readRelativeTime(period);
@@ -2255,6 +2311,7 @@ export default defineComponent({
         startTime: start.time,
         endTime: end.time,
       });
+      holdUnshownInstants(range.start, range.end);
       selectedType.value = "absolute";
       calendarToken.value = null;
       saveDate("absolute");
@@ -2363,8 +2420,17 @@ export default defineComponent({
       return { selection, preview };
     });
 
+    // Text in the bar is what Apply applies, so a reading Enter would refuse leaves Apply off.
+    const barBlockReason = computed<I18nText | null>(() => {
+      if (!inputText.value.trim()) return null;
+      if (inputError.value) return inputErrorText.value;
+      const plan = typingBar.inputPlan.value;
+      return plan?.kind === "refused" || plan?.kind === "restricted" ? plan.message : null;
+    });
+
     const applyDisabled = computed(
       () =>
+        barBlockReason.value !== null ||
         needsStartDate.value ||
         unreadableFields.value.start ||
         unreadableFields.value.end ||
@@ -2372,10 +2438,16 @@ export default defineComponent({
     );
 
     const applyBlockedReason = computed<I18nText | undefined>(() => {
+      if (barBlockReason.value) return barBlockReason.value;
       if (needsStartDate.value) return t("dateTime.pickStartDate");
       const reason = calendarLimit.value.selection;
       return reason ? raw(reason) : undefined;
     });
+
+    const onApplyClick = () => {
+      if (inputText.value.trim()) applyTypedReading();
+      else applyAndClose();
+    };
 
     // The native change fires after keydown, so blurring commits the typed text before Apply reads it.
     const onTimeFieldEnter = (event: KeyboardEvent) => {
@@ -2602,6 +2674,7 @@ export default defineComponent({
       menuEl,
       onTimeFieldInvalid,
       onTimeFieldEnter,
+      onApplyClick,
       summaryError,
       showLiveButton,
       liveDurationLabel,

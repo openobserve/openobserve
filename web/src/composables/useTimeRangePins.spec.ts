@@ -17,7 +17,10 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { defineComponent, h } from "vue";
 import { mount } from "@vue/test-utils";
 import store from "@/test/unit/helpers/store";
-import useTimeRangeHistory, { TIME_RANGE_HISTORY_LIMIT } from "./useTimeRangeHistory";
+import useTimeRangeHistory, {
+  TIME_RANGE_HISTORY_LIMIT,
+  timeRangeHistoryKey,
+} from "./useTimeRangeHistory";
 import useTimeRangePins, { readTimeRangePins, timeRangePinsKey } from "./useTimeRangePins";
 
 const KEY = timeRangePinsKey("default", "example@gmail.com");
@@ -48,6 +51,23 @@ describe("useTimeRangePins", () => {
       { startUs: 1_000_000, endUs: 2_000_000 },
       { relative: "6h" },
     ]);
+  });
+
+  it("re-reads pins and Recent when another tab writes them", () => {
+    const { pins, history } = setup();
+    expect(pins.pins.value).toEqual([]);
+    expect(history.entries.value).toEqual([]);
+    const historyKey = timeRangeHistoryKey("default", "example@gmail.com");
+    const otherTab = (key: string, value: unknown) => {
+      localStorage.setItem(key, JSON.stringify(value));
+      window.dispatchEvent(new StorageEvent("storage", { key }));
+    };
+
+    otherTab(KEY, [{ id: "a", name: "", range: { relative: "6h" } }]);
+    otherTab(historyKey, [{ relative: "2d" }]);
+
+    expect(pins.pins.value.map((pin) => pin.range)).toEqual([{ relative: "6h" }]);
+    expect(history.entries.value).toEqual([{ relative: "2d" }]);
   });
 
   it("returns the existing pin rather than pinning a range twice", () => {

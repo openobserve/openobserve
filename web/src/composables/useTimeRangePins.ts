@@ -83,9 +83,21 @@ const newPinId = (pins: TimeRangePin[]): string => {
   return id;
 };
 
+let watchingOtherTabs = false;
+
+// Another tab's write reaches this one only as a storage event, which the version bump turns into a re-read.
+const watchOtherTabs = () => {
+  if (watchingOtherTabs || typeof window === "undefined") return;
+  watchingOtherTabs = true;
+  window.addEventListener("storage", (event) => {
+    if (event.key === null || event.key.startsWith(KEY_PREFIX)) version.value += 1;
+  });
+};
+
 /** Pinned ranges of the current org and user, newest first; kept apart from Recent so its limit never evicts them. */
 export default function useTimeRangePins() {
   const store = useStore();
+  watchOtherTabs();
 
   const storageKey = computed(() =>
     timeRangePinsKey(

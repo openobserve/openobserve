@@ -111,7 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ref="pinNameEdit"
             :model-value="''"
             size="sm"
-            class="text-compact font-normal"
+            class="text-compact w-full font-normal"
             :maxlength="80"
             :placeholder="t('dateTime.name')"
             :aria-label="t('dateTime.nameRange', { range: row.label })"
@@ -138,7 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="row.id === editingId"
           class="text-text-secondary shrink-0 text-xs tabular-nums"
           data-test="date-time-list-pin-range"
-          >{{ row.meta || row.label }}</span
+          >{{ row.label }}</span
         >
         <span
           v-else-if="row.meta"

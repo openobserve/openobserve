@@ -762,6 +762,10 @@ describe("ViewPanel", () => {
     };
     const picker = () => wrapper.findComponent({ name: "DateTimePickerDashboard" });
     const pick = async (value: any) => {
+      picker().vm.$emit("update:modelValue", value, { userChanged: false });
+      await flushPromises();
+    };
+    const applyInPicker = async (value: any) => {
       picker().vm.$emit("update:modelValue", value);
       await flushPromises();
     };
@@ -790,6 +794,30 @@ describe("ViewPanel", () => {
 
       expect(picker().props("autoApplyDashboard")).toBe(true);
       expect(chartSpan()).toBe(15 * MINUTE);
+    });
+
+    it("runs a range the user applies in the picker at once, Auto Run off", async () => {
+      setAutoRun(false);
+      await mountOnRange();
+
+      await applyInPicker(relative("1h"));
+
+      expect(wrapper.vm.selectedDate.relativeTimePeriod).toBe("1h");
+      expect(chartSpan()).toBe(60 * MINUTE);
+      expect(wrapper.vm.showApplyHint).toBe(false);
+    });
+
+    it("holds an open-panel field edit until the picker closes, then runs it", async () => {
+      setAutoRun(false);
+      await mountOnRange();
+      picker().vm.$emit("show");
+
+      await applyInPicker({ valueType: "absolute", startTime: 0, endTime: 30 * MINUTE });
+      expect(chartSpan()).toBe(15 * MINUTE);
+
+      picker().vm.$emit("hide");
+      await flushPromises();
+      expect(wrapper.vm.selectedDate.valueType).toBe("absolute");
     });
 
     it("keeps a picked range waiting with Auto Run off and turns Refresh yellow", async () => {
