@@ -1500,6 +1500,111 @@ async fn correlate_rows(
     }))
 }
 
+#[cfg(feature = "enterprise")]
+pub async fn open_manual_incident(
+    org: &str,
+    user: &str,
+    request: &config::meta::alerts::incidents::ManualIncidentRequest,
+) -> anyhow::Result<(String, bool)> {
+    use config::meta::alerts::incidents::{IncidentSeverity, KeyType};
+    let service = request.service.trim().to_lowercase();
+    let labels = HashMap::from([
+        ("service".to_string(), service.clone()),
+        ("where".to_string(), request.where_key.clone()),
+    ]);
+    let semantic_groups = crate::db::system_settings::get_semantic_field_groups(org).await;
+    let parallel = correlate_parallel(org, &labels, &semantic_groups).await;
+    let service = parallel
+        .service_discovery
+        .as_ref()
+        .map(|result| result.service_name.clone())
+        .unwrap_or(service);
+    let mut groups = parallel.final_group_values;
+    groups.insert("service".into(), service.clone());
+    groups.insert("where".into(), request.where_key.clone());
+    let subject = CorrelationSubject {
+        id: config::meta::service_identity::version_key(
+            org,
+            &service,
+            &request.where_key,
+            &request.verdict_key,
+        ),
+        name: request.title.clone(),
+        org_id: org.into(),
+        kind: AlertKind::Internal,
+        base_destinations: Vec::new(),
+        severity: Some(
+            request
+                .severity
+                .parse::<IncidentSeverity>()
+                .map_err(anyhow::Error::msg)?,
+        ),
+        title_inputs: None,
+        case_title: None,
+        siem_case_window: None,
+        security_case: false,
+        historical: false,
+        case_activity: None,
+        case_entity: None,
+        incident_id: None,
+        fence: None,
+    };
+    let now = config::utils::time::now_micros();
+    let Correlation { outcome, .. } = find_or_create_incident(
+        org,
+        &groups,
+        KeyType::Primary,
+        &subject,
+        now,
+        "manual_service_verdict",
+        &service,
+        None,
+        None,
+    )
+    .await?;
+    let id = outcome.incident_id().to_string();
+    let created = matches!(
+        outcome,
+        IncidentCorrelationOutcome::NewIncidentCreated { .. }
+    );
+    if created {
+        infra::table::alert_incidents::update_title(org, &id, &request.title).await?;
+    }
+    let baseline = if request.baseline_version.is_empty() {
+        String::new()
+    } else {
+        format!(" vs {}", request.baseline_version)
+    };
+    let body = format!(
+        "{}\n\n{} {} in {} ({}){baseline}\n{}",
+        request.summary, service, request.version, request.where_key, request.env, request.link
+    );
+    crate::incidents::append_event(org, &id, IncidentEvent::comment(user, body)).await?;
+    if !matches!(
+        outcome,
+        IncidentCorrelationOutcome::ExistingAlertRepeated { .. }
+    ) {
+        let destinations = collect_incident_destinations(org, &id, &[]).await;
+        let send = IncidentSend {
+            ctx: subject_notification_context(org, &request.title, now).await,
+            dest_names: destinations,
+            alert_template: None,
+        };
+        send_incident_notifications_inner(
+            org,
+            &id,
+            if created {
+                "new_incident_created"
+            } else {
+                "new_alert_correlated"
+            },
+            vec![send],
+        )
+        .await;
+    }
+    Ok((id, created))
+}
+
 /// External-event twin of [`correlate_alert_to_incident`].
 ///
 /// Feeds an externally-ingested alert (from the External Alert Sources feature)
@@ -2242,14 +2347,22 @@ async fn create_new_incident(
         ),
         None => None,
     };
-    let title = custom_title
-        .or_else(|| subject.case_title.clone())
-        .unwrap_or_else(|| {
+    let title = match custom_title.or_else(|| subject.case_title.clone()) {
+        Some(title) => title,
+        None => {
+            // The stored title names the service by display; `group_values` keep the key.
+            crate::service_identity::display_feed::ensure(org_id).await;
+            let identities = crate::service_identity::display_feed::identities(org_id).await;
             o2_enterprise::enterprise::alerts::incidents::generate_title(
                 &subject.name,
-                group_values,
+                &crate::service_identity::display_feed::title_dimensions(
+                    org_id,
+                    group_values,
+                    &identities,
+                ),
             )
-        });
+        }
+    };
 
     subject.fence_at(FenceStep::Open).await?;
     let incident = if subject.security_case {
@@ -3599,7 +3712,7 @@ pub async fn get_incident_with_alerts(
     incident_id: &str,
     user_id: &str,
 ) -> Result<Option<IncidentWithAlerts>, anyhow::Error> {
-    incident_with_alerts(
+    let mut found = incident_with_alerts(
         org_id,
         incident_id,
         true,
@@ -3607,7 +3720,17 @@ pub async fn get_incident_with_alerts(
             can_read_alert(org_id, user_id, &alert_id, &folder_id).await
         },
     )
-    .await
+    .await?;
+    if let Some(found) = found.as_mut() {
+        crate::service_identity::display_feed::ensure(org_id).await;
+        let identities = crate::service_identity::display_feed::identities(org_id).await;
+        crate::service_identity::display_feed::decorate_incident(
+            org_id,
+            &mut found.incident,
+            &identities,
+        );
+    }
+    Ok(found)
 }
 
 /// [get_incident_with_alerts] without the RCA runs, for callers that never read them.
@@ -3912,8 +4035,14 @@ pub async fn list_incidents_filtered(
 
             incident
         })
-        .collect();
+        .collect::<Vec<_>>();
 
+    crate::service_identity::display_feed::ensure(org_id).await;
+    let identities = crate::service_identity::display_feed::identities(org_id).await;
+    let mut incidents_list = incidents_list;
+    for incident in &mut incidents_list {
+        crate::service_identity::display_feed::decorate_incident(org_id, incident, &identities);
+    }
     Ok((incidents_list, total))
 }
 
@@ -3966,6 +4095,7 @@ pub async fn enrich_with_topology(
             alert_count: 1,
             first_fired_at: alert_fired_at,
             last_fired_at: alert_fired_at,
+            display_name: None,
         };
         topology.nodes.push(new_node);
         let idx = topology.nodes.len() - 1;
@@ -4841,6 +4971,7 @@ fn model_to_incident_with_topology(
         rca_off_reason: db_model.rca_off_reason,
         alert_groups: None,
         historical: db_model.historical,
+        group_values_display: None,
     }
 }
 

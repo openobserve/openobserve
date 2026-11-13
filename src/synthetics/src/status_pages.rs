@@ -41,8 +41,14 @@ struct TickData {
     components: Vec<infra::table::entity::status_page_components::Model>,
     mappings: Vec<infra::table::entity::status_page_component_checks::Model>,
     states: Vec<table::CheckStateRow>,
+    /// Manual snoozes and downtime mutes: the engine opens no notice for these.
     snoozed: HashSet<String>,
+    /// Downtime mutes only; a muted check that fails shows Maintenance (D2).
+    muted: HashSet<String>,
     notices: Vec<status_page_notices::Model>,
+    /// False alarm holds apply only while every node runs this build. See
+    /// [`infra::cluster::all_online_nodes_run_this_build`].
+    holds_allowed: bool,
 }
 
 /// Renders one page's snapshot on demand, through the exact same serializer
@@ -100,13 +106,18 @@ pub async fn preview_snapshot(
         .into_iter()
         .collect();
     let (states, _) = table::get_check_states(conn, &preview_check_ids, None).await?;
+    // The same mutes as the tick, so the admin preview matches the public page.
+    let muted = muted_checks(conn, &mappings).await;
     let data = TickData {
         pages: vec![page.clone()],
         components,
         mappings,
         states,
         snoozed: HashSet::new(),
+        muted,
         notices: notices.clone(),
+        // A preview renders the snapshot only. It runs no engine actions, so it holds nothing.
+        holds_allowed: false,
     };
     let (current, history, page_notice_ids) =
         build_page_snapshot(&page, &data, &notices_by_component, now);
@@ -189,6 +200,74 @@ struct RebuilderState {
     /// Highest `updated_at` consumed so far (the delta watermark).
     watermark: i64,
     tick_count: u64,
+    /// This process confirmed that the holds are safe for its build, see [`holds_ready`].
+    holds_build_checked: bool,
+    /// When the build gate was first seen open in a row, for the drain grace of [`holds_ready`].
+    gate_open_since: Option<i64>,
+    /// The stored build key was already removed during the current closed-gate period.
+    gate_closed_cleared: bool,
+}
+
+/// Metadata key with the git commit that last checked the false alarm holds.
+const HOLDS_BUILD_KEY: &str = "/synthetics/false_alarm_holds_build";
+
+/// Whether false alarm holds may apply this tick. They need every online node on this build (the
+/// gate), and once per new build a reset of all holds.
+///
+/// During a rolling deploy an old node can finish a recovery without moving the recovery stamp,
+/// so a hold armed before or during the deploy could match the next outage. An old node leaves the
+/// online list before it stops writing (it drains its HTTP requests after it goes offline), so
+/// the reset waits until the gate stayed open for longer than that drain, then moves every stamp
+/// and disarms every hold. A restart of the same build finds its commit under
+/// [`HOLDS_BUILD_KEY`]: no old node can be left, so the holds apply at once and nothing resets.
+async fn holds_ready(
+    conn: &sea_orm::DatabaseConnection,
+    now: i64,
+    rt: &mut RebuilderState,
+) -> Result<bool, infra::errors::Error> {
+    let db = infra::db::get_db().await;
+    if !infra::cluster::all_online_nodes_run_this_build().await {
+        // Another build writes now, for example a rollback. Its recoveries may not move the stamp,
+        // so the next opening must wait for the grace and reset again, also after a restart.
+        rt.gate_open_since = None;
+        if rt.holds_build_checked || !rt.gate_closed_cleared {
+            let _ = db.delete(HOLDS_BUILD_KEY, false, false, None).await;
+            rt.holds_build_checked = false;
+            rt.gate_closed_cleared = true;
+        }
+        return Ok(false);
+    }
+    rt.gate_closed_cleared = false;
+    if rt.holds_build_checked {
+        return Ok(true);
+    }
+    if db.get(HOLDS_BUILD_KEY).await.ok().as_deref() == Some(config::COMMIT_HASH.as_bytes()) {
+        rt.holds_build_checked = true;
+        return Ok(true);
+    }
+    let since = *rt.gate_open_since.get_or_insert(now);
+    if now - since < holds_drain_grace_micros() {
+        return Ok(false);
+    }
+    infra::table::synthetics_checks::reset_false_alarm_holds(conn, now).await?;
+    db.put(
+        HOLDS_BUILD_KEY,
+        config::COMMIT_HASH.as_bytes().to_vec().into(),
+        false,
+        None,
+    )
+    .await?;
+    tracing::info!("[status_pages] new build — false alarm holds reset");
+    rt.holds_build_checked = true;
+    Ok(true)
+}
+
+/// Twice the HTTP drain timeout plus a minute, and at least ten minutes, so an old node that went
+/// offline has stopped finishing runs before a new build resets the holds. The floor covers an old
+/// node with a longer drain timeout than this one, and its background workers.
+fn holds_drain_grace_micros() -> i64 {
+    let drain = config::get_config().limit.http_shutdown_timeout.max(1) as i64;
+    (2 * drain + 60).max(600) * 1_000_000
 }
 
 /// Per-check thresholds from the pages the check is mapped to. A check on
@@ -296,6 +375,19 @@ async fn load(
         .collect::<HashSet<_>>()
         .into_iter()
         .collect();
+    // Before the notice and state reads, so a reset in this call is in the data this tick uses.
+    let holds_allowed = match holds_ready(conn, now, rt).await {
+        Ok(ready) => ready,
+        Err(e) => {
+            tracing::error!("[status_pages] false alarm hold check failed: {e}");
+            false
+        }
+    };
+    // Notices before check state: a false alarm mark that lands between the two reads must not
+    // meet an older recovery stamp, which would open a new incident for the marked failure. A
+    // mark after this read is not seen this tick, and `update_notice_runtime` skips a marked
+    // notice.
+    let notices = table::list_notices_since(conn, now - RESOLVED_LOOKBACK_MICROS).await?;
 
     // Delta by default; full sweep on the Nth tick. The sweep replaces the
     // cache wholesale (so deleted/unmapped checks drop out); the delta merges
@@ -329,15 +421,43 @@ async fn load(
         .into_iter()
         .map(|s| s.synthetics_id)
         .collect();
-    snoozed.extend(muted_checks(conn, &mappings).await);
-    let notices = table::list_notices_since(conn, now - RESOLVED_LOOKBACK_MICROS).await?;
+    let muted = muted_checks(conn, &mappings).await;
+    snoozed.extend(muted.iter().cloned());
     Ok(TickData {
         pages,
         components,
         mappings,
         states,
         snoozed,
+        muted,
         notices,
+        holds_allowed,
+    })
+}
+
+/// The engine's view of a check: per-run verdict streaks written at run
+/// finalization, never the badge.
+fn engine_check(s: &table::CheckStateRow) -> engine::EngineCheck {
+    engine::EngineCheck {
+        id: s.id.clone(),
+        down_runs: s.down_runs,
+        up_runs: s.up_runs,
+        first_fail_at: None,
+        failing_since: None,
+    }
+}
+
+/// A mapped check that a downtime mutes and that meets the open condition of the
+/// rendered page. A passing muted check changes nothing, so a quick mute of a
+/// flaky check never announces maintenance while the service works.
+fn muted_and_failing(mapped: &[&str], data: &TickData, th: &engine::Thresholds, now: i64) -> bool {
+    mapped.iter().any(|id| {
+        data.muted.contains(*id)
+            && data
+                .states
+                .iter()
+                .find(|s| s.id == *id)
+                .is_some_and(|s| engine::is_confirmed_failing(&engine_check(s), th, now))
     })
 }
 
@@ -378,18 +498,7 @@ async fn apply_engine_actions(
     data: &TickData,
     now: i64,
 ) -> Result<(), infra::errors::Error> {
-    let checks: Vec<engine::EngineCheck> = data
-        .states
-        .iter()
-        .map(|s| engine::EngineCheck {
-            id: s.id.clone(),
-            // Per-run verdict streaks written at run finalization; never the badge.
-            down_runs: s.down_runs,
-            up_runs: s.up_runs,
-            first_fail_at: None,
-            failing_since: None,
-        })
-        .collect();
+    let checks: Vec<engine::EngineCheck> = data.states.iter().map(engine_check).collect();
 
     let mut open_by_check = HashMap::new();
     let mut recently_resolved = HashMap::new();
@@ -397,6 +506,11 @@ async fn apply_engine_actions(
         let Some(check_id) = n.auto_check_id.clone() else {
             continue;
         };
+        // A false alarm stays hidden: a new failure opens a new incident, it never reopens this
+        // one.
+        if n.false_alarm_at.is_some() {
+            continue;
+        }
         if n.state == 1 {
             open_by_check.insert(
                 check_id.clone(),
@@ -420,11 +534,12 @@ async fn apply_engine_actions(
     }
 
     let th_by_check = thresholds_by_check(data);
+    let held = held_checks(data);
     let actions = engine::incident_actions_with(
         &checks,
         &open_by_check,
         &recently_resolved,
-        &data.snoozed,
+        &held,
         |id| th_by_check.get(id).copied().unwrap_or_default(),
         now,
     );
@@ -432,6 +547,58 @@ async fn apply_engine_actions(
         apply_one(conn, data, action, now).await?;
     }
     Ok(())
+}
+
+/// Checks the engine must not open an incident for this tick: snoozed checks, and checks held by
+/// a false alarm mark while [`holds_ready`] allows holds.
+fn held_checks(data: &TickData) -> HashSet<String> {
+    let mut held = if data.holds_allowed {
+        false_alarm_holds(&data.notices, &data.states)
+    } else {
+        HashSet::new()
+    };
+    held.extend(data.snoozed.iter().cloned());
+    held
+}
+
+/// The recovery stamps that armed false alarm marks saved, per check. A mark is armed when it
+/// closed the incident (`resolved_at == false_alarm_at`) while the check was failing, so it saved
+/// the check's stamp.
+fn false_alarm_marks(notices: &[status_page_notices::Model]) -> HashMap<&str, HashSet<i64>> {
+    let mut marked: HashMap<&str, HashSet<i64>> = HashMap::new();
+    for n in notices {
+        if let (Some(check_id), Some(at), Some(stamp)) = (
+            n.auto_check_id.as_deref(),
+            n.false_alarm_at,
+            n.false_alarm_recovered_at,
+        ) && n.resolved_at == Some(at)
+        {
+            marked.entry(check_id).or_default().insert(stamp);
+        }
+    }
+    marked
+}
+
+/// Checks held by a false alarm mark: the check is failing and an armed mark saved its current
+/// recovery stamp. Each recovery moves the stamp, so only a mark of the failure that is still
+/// going on matches, and a new failure after a recovery opens a new incident. The rule does not
+/// compare mark times, so it does not depend on wall clocks.
+fn false_alarm_holds(
+    notices: &[status_page_notices::Model],
+    states: &[table::CheckStateRow],
+) -> HashSet<String> {
+    let marks = false_alarm_marks(notices);
+    states
+        .iter()
+        .filter(|s| {
+            s.down_runs > 0
+                && s.signed
+                && marks
+                    .get(s.id.as_str())
+                    .is_some_and(|stamps| stamps.contains(&s.recovered_at))
+        })
+        .map(|s| s.id.clone())
+        .collect()
 }
 
 async fn apply_one(
@@ -533,6 +700,10 @@ async fn open_notice(
             auto_check_id: Some(check_id.to_string()),
             auto_recovery_streak: 0,
             owner: None,
+            false_alarm_by: None,
+            false_alarm_at: None,
+            false_alarm_reason: None,
+            false_alarm_recovered_at: None,
             created_at: now,
             updated_at: now,
         },
@@ -659,6 +830,10 @@ fn build_page_snapshot(
         let mut incident_segments = Vec::new();
         let mut maint_segments = Vec::new();
         for n in &notices {
+            // A false alarm leaves the public page: no history entry, no downtime.
+            if n.excluded_from_uptime {
+                continue;
+            }
             page_notice_ids.insert(n.id.clone());
             let impact = engine::Impact::from_i16(n.impact as i16);
             if n.state == 1 {
@@ -693,10 +868,18 @@ fn build_page_snapshot(
             // service is up, so show "no data" rather than plain Operational.
             status = engine::ComponentStatus::NoData;
         }
+        // A downtime-muted check that fails opens no notice, so without this the
+        // component would read Operational during a muted outage (D2).
+        if muted_and_failing(&mapped, data, &page_thresholds(page), now) {
+            status = status.max(engine::ComponentStatus::Maintenance);
+        }
+        let (last_checked_at, stale_after_secs) = last_checked(&mapped, &data.states);
         current_components.push(engine::CurrentComponent {
             key: key.clone(),
             name: component.name.clone(),
             status,
+            last_checked_at,
+            stale_after_secs,
         });
         history_components.push(engine::HistoryComponent {
             key,
@@ -742,6 +925,45 @@ fn all_checks_in_error(mapped: &[&str], states: &[table::CheckStateRow]) -> bool
             // data.
             .is_some_and(|s| s.last_check_status == engine::CHECK_STATUS_ERROR && s.up_runs == 0)
     })
+}
+
+/// When a check last tested the site: `last_tested_at`, the newest finalized run that tested it.
+fn tested_at(s: &table::CheckStateRow) -> Option<i64> {
+    use config::meta::synthetics::RunClass;
+    if s.last_tested_at > 0 {
+        return Some(s.last_tested_at);
+    }
+    // A row from before the run class existed: trust the badge.
+    let legacy = RunClass::from_db(s.last_run_class) == RunClass::Unknown
+        && s.last_check_status != engine::CHECK_STATUS_ERROR;
+    let ts = if legacy {
+        s.status_run_ts.max(s.last_triggered_at)
+    } else {
+        0
+    };
+    (ts > 0).then_some(ts)
+}
+
+/// A component's "Last checked" time, floored to the minute, and its stale threshold: three
+/// intervals of its slowest mapped check.
+fn last_checked(mapped: &[&str], states: &[table::CheckStateRow]) -> (Option<i64>, Option<i64>) {
+    const MINUTE_US: i64 = 60_000_000;
+    let rows: Vec<&table::CheckStateRow> = states
+        .iter()
+        .filter(|s| mapped.contains(&s.id.as_str()))
+        .collect();
+    let last = rows
+        .iter()
+        .filter_map(|s| tested_at(s))
+        .max()
+        .map(|ts| ts - ts.rem_euclid(MINUTE_US));
+    let stale_after = rows
+        .iter()
+        .map(|s| s.interval_secs)
+        .max()
+        .filter(|secs| *secs > 0)
+        .map(|secs| secs * 3);
+    (last, stale_after)
 }
 
 fn public_notice(
@@ -824,7 +1046,153 @@ mod fast_pass_tests {
             down_runs: 0,
             up_runs: 0,
             last_triggered_at: 0,
+            status_run_ts: 0,
+            last_run_class: 0,
+            last_run_class_at: 0,
+            last_tested_at: 0,
+            recovered_at: 0,
+            signed: true,
+            interval_secs: 60,
+            created_at: 0,
         }
+    }
+
+    #[test]
+    fn a_false_alarm_holds_only_the_failure_whose_stamp_it_saved() {
+        let notice = |check: &str, resolved: Option<i64>, mark: Option<i64>, stamp: Option<i64>| {
+            status_page_notices::Model {
+                id: format!("{check}-{mark:?}-{stamp:?}"),
+                org_id: "org".into(),
+                kind: 0,
+                impact: 0,
+                source: 0,
+                title: String::new(),
+                body: String::new(),
+                state: 2,
+                starts_at: 0,
+                resolved_at: resolved,
+                segments: "[]".into(),
+                excluded_from_uptime: mark.is_some(),
+                deleted_at: None,
+                auto_check_id: Some(check.into()),
+                auto_recovery_streak: 0,
+                owner: None,
+                false_alarm_by: None,
+                false_alarm_at: mark,
+                false_alarm_reason: None,
+                false_alarm_recovered_at: stamp,
+                created_at: 0,
+                updated_at: 0,
+            }
+        };
+        let failing = |id: &str, recovered_at: i64| {
+            let mut r = row(id, 3);
+            r.down_runs = 2;
+            r.recovered_at = recovered_at;
+            r
+        };
+        let notices = vec![
+            // Marked while failing at stamp 7, and no recovery since: held.
+            notice("same", Some(500), Some(500), Some(7)),
+            // Marked at stamp 7, then a recovery moved the stamp to 9: a new failure.
+            notice("recovered", Some(500), Some(500), Some(7)),
+            // Marked while the check was not failing: the mark saved nothing.
+            notice("unarmed", Some(500), Some(500), None),
+            // Resolved at 300 and marked at 500: the mark did not close it.
+            notice("old", Some(300), Some(500), Some(7)),
+            // Two marks. The newer mark time has the older stamp, as after a clock step back.
+            notice("two", Some(900), Some(900), Some(3)),
+            notice("two", Some(400), Some(400), Some(7)),
+            // Not a false alarm.
+            notice("real", Some(500), None, None),
+        ];
+        let mut up = failing("up", 7);
+        up.down_runs = 0;
+        let notices = [
+            notices,
+            vec![
+                notice("up", Some(500), Some(500), Some(7)),
+                notice("unsigned", Some(500), Some(500), Some(7)),
+            ],
+        ]
+        .concat();
+        let states = [
+            failing("same", 7),
+            failing("recovered", 9),
+            failing("unarmed", 7),
+            failing("old", 7),
+            failing("two", 7),
+            failing("real", 7),
+            // Armed stamp matches, but the check is not failing: nothing to hold.
+            up,
+            // Armed stamp matches, but an older build wrote the streaks.
+            {
+                let mut r = failing("unsigned", 7);
+                r.signed = false;
+                r
+            },
+        ];
+        let held = false_alarm_holds(&notices, &states);
+        assert_eq!(held, HashSet::from(["same".to_string(), "two".to_string()]));
+
+        // A closed gate holds nothing, so a matching armed mark still opens an incident.
+        let mut data = TickData {
+            pages: vec![],
+            components: vec![],
+            mappings: vec![],
+            states: states.to_vec(),
+            snoozed: HashSet::from(["snoozed".to_string()]),
+            muted: HashSet::new(),
+            notices,
+            holds_allowed: false,
+        };
+        assert_eq!(held_checks(&data), HashSet::from(["snoozed".to_string()]));
+        data.holds_allowed = true;
+        assert_eq!(
+            held_checks(&data),
+            HashSet::from(["same".to_string(), "two".to_string(), "snoozed".to_string()])
+        );
+    }
+
+    #[test]
+    fn last_checked_is_the_newest_run_that_tested_the_site() {
+        const MIN: i64 = 60_000_000;
+        let mut up = row("a", 1);
+        up.last_run_class = 1;
+        up.status_run_ts = 10 * MIN + 42_000_000;
+        up.last_tested_at = 10 * MIN + 42_000_000;
+        // Not measured since minute 20; the stored test time is used, not one worked out from the
+        // interval.
+        let mut gap = row("b", 4);
+        gap.last_run_class = 4;
+        gap.status_run_ts = 25 * MIN;
+        gap.last_run_class_at = 20 * MIN;
+        gap.last_tested_at = 13 * MIN + 5_000_000;
+        gap.interval_secs = 120;
+        let states = vec![up.clone(), gap.clone()];
+        assert_eq!(last_checked(&["a"], &states), (Some(10 * MIN), Some(180)));
+        assert_eq!(
+            last_checked(&["a", "b"], &states),
+            (Some(13 * MIN), Some(360))
+        );
+        // A check whose runs were all Not measured was never tested.
+        let mut first = gap.clone();
+        first.last_tested_at = 0;
+        assert_eq!(tested_at(&first), None);
+    }
+
+    #[test]
+    fn last_checked_is_absent_without_a_tested_run() {
+        let mut fresh = row("a", 0);
+        fresh.interval_secs = 0;
+        assert_eq!(last_checked(&["a"], &[fresh.clone()]), (None, None));
+        // A legacy row with an error badge has no known test time.
+        let legacy = row("b", engine::CHECK_STATUS_ERROR);
+        assert_eq!(tested_at(&legacy), None);
+        let mut legacy_ok = row("c", 1);
+        legacy_ok.last_triggered_at = 7;
+        assert_eq!(tested_at(&legacy_ok), Some(7));
+        assert_eq!(last_checked(&["missing"], &[fresh]), (None, None));
     }
 
     #[test]
@@ -871,6 +1239,206 @@ mod fast_pass_tests {
         let mut up = row("a", e);
         up.up_runs = 1;
         assert!(!all_checks_in_error(&["a"], &[up]));
+    }
+
+    const NOW: i64 = 1_800_000_000_000_000;
+
+    fn page(id: &str, confirm_failures: i32) -> infra::table::entity::status_pages::Model {
+        infra::table::entity::status_pages::Model {
+            id: id.into(),
+            org_id: "org".into(),
+            name: id.into(),
+            slug: format!("{id}-slug"),
+            description: None,
+            visibility: 1,
+            password_hash: None,
+            noindex: false,
+            show_uptime_percent: true,
+            show_timeline_bars: true,
+            show_response_time: false,
+            confirm_failures,
+            confirm_recovery: 2,
+            confirm_after_secs: None,
+            brand_name: None,
+            accent_color: None,
+            logo_img: None,
+            favicon_img: None,
+            tracking_since: Some(NOW - 86_400_000_000),
+            owner: None,
+            created_at: 0,
+            updated_at: 0,
+        }
+    }
+
+    fn component(page_id: &str) -> infra::table::entity::status_page_components::Model {
+        infra::table::entity::status_page_components::Model {
+            id: format!("{page_id}-comp"),
+            status_page_id: page_id.into(),
+            org_id: "org".into(),
+            name: "Checkout API".into(),
+            description: None,
+            sort_order: 0,
+            backfill_days: None,
+            created_at: 0,
+            updated_at: 0,
+        }
+    }
+
+    fn mapping(
+        page_id: &str,
+        check: &str,
+    ) -> infra::table::entity::status_page_component_checks::Model {
+        infra::table::entity::status_page_component_checks::Model {
+            id: format!("{page_id}-map"),
+            component_id: format!("{page_id}-comp"),
+            synthetics_id: check.into(),
+            org_id: "org".into(),
+        }
+    }
+
+    fn state(id: &str, badge: i32, down_runs: i32, up_runs: i32) -> table::CheckStateRow {
+        table::CheckStateRow {
+            down_runs,
+            up_runs,
+            ..row(id, badge)
+        }
+    }
+
+    fn tick(pages: &[&str], states: Vec<table::CheckStateRow>, muted: &[&str]) -> TickData {
+        TickData {
+            pages: pages.iter().map(|p| page(p, 3)).collect(),
+            components: pages.iter().map(|p| component(p)).collect(),
+            mappings: pages.iter().map(|p| mapping(p, "chk")).collect(),
+            states,
+            snoozed: muted.iter().map(|s| s.to_string()).collect(),
+            muted: muted.iter().map(|s| s.to_string()).collect(),
+            notices: vec![],
+            holds_allowed: false,
+        }
+    }
+
+    fn status_of(
+        page: &infra::table::entity::status_pages::Model,
+        data: &TickData,
+        notices: &HashMap<&str, Vec<&status_page_notices::Model>>,
+    ) -> engine::ComponentStatus {
+        build_page_snapshot(page, data, notices, NOW).0.components[0].status
+    }
+
+    const DOWN: i32 = engine::CHECK_STATUS_DOWN;
+    const ERROR: i32 = engine::CHECK_STATUS_ERROR;
+
+    #[test]
+    fn a_muted_check_that_meets_the_open_condition_shows_maintenance() {
+        let data = tick(&["p1"], vec![state("chk", DOWN, 3, 0)], &["chk"]);
+        assert_eq!(
+            status_of(&data.pages[0], &data, &HashMap::new()),
+            engine::ComponentStatus::Maintenance
+        );
+    }
+
+    #[test]
+    fn a_muted_check_that_passes_or_errors_keeps_todays_status() {
+        // One failing location of three: the badge is Down, the quorum verdict Up.
+        let quorum_up = tick(&["p1"], vec![state("chk", DOWN, 0, 1)], &["chk"]);
+        assert_eq!(
+            status_of(&quorum_up.pages[0], &quorum_up, &HashMap::new()),
+            engine::ComponentStatus::Operational
+        );
+        let up = tick(&["p1"], vec![state("chk", 1, 0, 5)], &["chk"]);
+        assert_eq!(
+            status_of(&up.pages[0], &up, &HashMap::new()),
+            engine::ComponentStatus::Operational
+        );
+        let error = tick(&["p1"], vec![state("chk", ERROR, 0, 0)], &["chk"]);
+        assert_eq!(
+            status_of(&error.pages[0], &error, &HashMap::new()),
+            engine::ComponentStatus::NoData
+        );
+        let below = tick(&["p1"], vec![state("chk", DOWN, 2, 0)], &["chk"]);
+        assert_eq!(
+            status_of(&below.pages[0], &below, &HashMap::new()),
+            engine::ComponentStatus::Operational,
+            "a streak below the threshold keeps the current status"
+        );
+    }
+
+    #[test]
+    fn a_confirmed_down_streak_counts_after_a_no_verdict_run_and_with_an_error_badge() {
+        // Two failed locations and one error: a Down verdict with an Error badge.
+        let data = tick(&["p1"], vec![state("chk", ERROR, 4, 0)], &["chk"]);
+        assert_eq!(
+            status_of(&data.pages[0], &data, &HashMap::new()),
+            engine::ComponentStatus::Maintenance
+        );
+    }
+
+    #[test]
+    fn a_manual_snooze_without_a_downtime_keeps_todays_status() {
+        let mut data = tick(&["p1"], vec![state("chk", DOWN, 3, 0)], &[]);
+        data.snoozed.insert("chk".into());
+        assert_eq!(
+            status_of(&data.pages[0], &data, &HashMap::new()),
+            engine::ComponentStatus::Operational
+        );
+        data.muted.clear();
+        assert!(!muted_and_failing(
+            &["chk"],
+            &data,
+            &page_thresholds(&data.pages[0]),
+            NOW
+        ));
+    }
+
+    #[test]
+    fn an_open_major_outage_notice_wins_over_maintenance() {
+        let data = tick(&["p1"], vec![state("chk", DOWN, 3, 0)], &["chk"]);
+        let notice: status_page_notices::Model = serde_json::from_value(serde_json::json!({
+            "id": "n1", "org_id": "org", "kind": 0, "impact": 3, "source": 0,
+            "title": "Down", "body": "", "state": 1, "starts_at": NOW - 1,
+            "resolved_at": null, "segments": "[]", "excluded_from_uptime": false,
+            "deleted_at": null, "auto_check_id": "chk", "auto_recovery_streak": 0,
+            "owner": null, "created_at": 0, "updated_at": 0
+        }))
+        .unwrap();
+        let notices = HashMap::from([("p1-comp", vec![&notice])]);
+        assert_eq!(
+            status_of(&data.pages[0], &data, &notices),
+            engine::ComponentStatus::MajorOutage
+        );
+    }
+
+    #[test]
+    fn each_page_uses_its_own_thresholds() {
+        let mut data = tick(&["p1", "p2"], vec![state("chk", DOWN, 3, 0)], &["chk"]);
+        data.pages[0].confirm_failures = 2;
+        data.pages[1].confirm_failures = 5;
+        assert_eq!(
+            status_of(&data.pages[0], &data, &HashMap::new()),
+            engine::ComponentStatus::Maintenance
+        );
+        let p2: Vec<_> = build_page_snapshot(&data.pages[1], &data, &HashMap::new(), NOW)
+            .0
+            .components;
+        assert_eq!(p2[0].status, engine::ComponentStatus::Operational);
+    }
+
+    #[test]
+    fn the_status_follows_the_current_rules_once_the_mute_ends() {
+        let mut data = tick(&["p1"], vec![state("chk", DOWN, 3, 0)], &["chk"]);
+        let before = build_page_snapshot(&data.pages[0], &data, &HashMap::new(), NOW).1;
+        data.muted.clear();
+        data.snoozed.clear();
+        let (current, after, _) = build_page_snapshot(&data.pages[0], &data, &HashMap::new(), NOW);
+        assert_eq!(
+            current.components[0].status,
+            engine::ComponentStatus::Operational
+        );
+        assert_eq!(
+            serde_json::to_value(&before).unwrap(),
+            serde_json::to_value(&after).unwrap(),
+            "the uptime history does not change"
+        );
     }
 }
 

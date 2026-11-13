@@ -1254,14 +1254,8 @@ async fn delete_org_pipelines(org_id: &str) -> Result<(), anyhow::Error> {
 }
 
 async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
-    #[cfg(not(feature = "enterprise"))]
-    use infra::table::service_streams;
     #[cfg(feature = "cloud")]
     use infra::table::trial_quota_usage;
-    // `service_streams` is NOT imported here: this branch routes the enterprise
-    // build through the storage layer instead, and imports the table module only
-    // under #[cfg(not(feature = "enterprise"))] above. Importing it twice would
-    // collide on the OSS build.
     use infra::table::{
         ai_chat_sessions, ai_chat_shares, ai_chat_turns, alert_acks, alert_calibration,
         alert_incidents, anomaly_detection, compactor_manual_jobs, distinct_values,
@@ -1533,24 +1527,7 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     crate::db::org_ingestion_tokens::delete_by_org(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/org_ingestion_tokens: {e}"))?;
-    // Same F6 pattern as the `_reset` handler: the table-layer delete alone leaves
-    // every node's org cache intact forever (no TTL). On enterprise builds go
-    // through the storage layer (clears local cache + super-cluster replication)
-    // and emit an org-scope reload so remote nodes drop their cached copies too.
-    #[cfg(feature = "enterprise")]
-    {
-        o2_enterprise::enterprise::service_streams::evict_org(org_id).await;
-        o2_enterprise::enterprise::service_streams::storage::ServiceStorage::delete_all(org_id)
-            .await
-            .map_err(|e| anyhow::anyhow!("step_delete_db_resources/service_streams: {e}"))?;
-        infra::coordinator::service_streams::emit_reload_event(org_id)
-            .await
-            .map_err(|e| anyhow::anyhow!("step_delete_db_resources/service_streams_reload: {e}"))?;
-    }
-    #[cfg(not(feature = "enterprise"))]
-    service_streams::delete_all(org_id)
-        .await
-        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/service_streams: {e}"))?;
+    delete_org_service_rows(org_id).await?;
     crate::db::system_settings::delete_org_settings(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/system_settings: {e}"))?;
@@ -1613,6 +1590,51 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/org_setting: {e}"))?;
 
+    Ok(())
+}
+
+async fn delete_org_service_rows(org_id: &str) -> Result<(), anyhow::Error> {
+    #[cfg(not(feature = "enterprise"))]
+    use infra::table::service_streams;
+    use infra::table::{
+        service_identity_rules, service_name_aliases, service_version_deploys,
+        service_version_verdicts, service_versions, service_where_summary,
+    };
+
+    // Org caches on every node never expire, so a plain table delete is not enough here.
+    #[cfg(feature = "enterprise")]
+    {
+        o2_enterprise::enterprise::service_streams::evict_org(org_id).await;
+        o2_enterprise::enterprise::service_streams::storage::ServiceStorage::delete_all(org_id)
+            .await
+            .map_err(|e| anyhow::anyhow!("step_delete_db_resources/service_streams: {e}"))?;
+        infra::coordinator::service_streams::emit_reload_event(org_id)
+            .await
+            .map_err(|e| anyhow::anyhow!("step_delete_db_resources/service_streams_reload: {e}"))?;
+    }
+    #[cfg(not(feature = "enterprise"))]
+    service_streams::delete_all(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/service_streams: {e}"))?;
+    service_version_verdicts::delete_by_org(get_orm_client_rw().await, org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/service_version_verdicts: {e}"))?;
+    service_version_deploys::delete_by_org(get_orm_client_rw().await, org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/service_version_deploys: {e}"))?;
+    service_versions::delete_by_org(get_orm_client_rw().await, org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/service_versions: {e}"))?;
+    service_identity_rules::delete_by_org(get_orm_client_rw().await, org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/service_identity_rules: {e}"))?;
+    service_name_aliases::delete_by_org(get_orm_client_rw().await, org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/service_name_aliases: {e}"))?;
+    db::service_identity::invalidate_aliases(org_id).await;
+    service_where_summary::delete_by_org(get_orm_client_rw().await, org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/service_where_summary: {e}"))?;
     Ok(())
 }
 
@@ -1839,6 +1861,8 @@ pub fn forget_gone_org(org_id: &str) {
     crate::self_reporting::triggers_schema::forget_org(org_id);
     #[cfg(feature = "enterprise")]
     crate::ai_chat::forget_org(org_id);
+    #[cfg(feature = "enterprise")]
+    crate::service_identity::signals::snapshot::forget_org(org_id);
     #[cfg(feature = "enterprise")]
     o2_enterprise::enterprise::oncall::notify::forget_org_breakers(org_id);
 }
@@ -4889,6 +4913,25 @@ mod tests {
             !body.contains("delete_dashboard(") && !body.contains("get_by_id("),
             "the dashboard teardown must not re-read the row through the read pool"
         );
+    }
+
+    #[test]
+    fn test_db_resources_deletes_the_orgs_service_identity_rows() {
+        for table in [
+            "service_version_verdicts",
+            "service_version_deploys",
+            "service_versions",
+            "service_identity_rules",
+            "service_where_summary",
+            "service_name_aliases",
+        ] {
+            let call = format!("{table}::delete_by_org(get_orm_client_rw().await, org_id)");
+            assert!(
+                fn_body(SOURCE, "delete_org_service_rows").contains(&call),
+                "the service identity teardown never calls {call}"
+            );
+        }
+        position_of("delete_org_service_rows(org_id)");
     }
 
     #[test]

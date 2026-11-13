@@ -75,11 +75,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
 
           <span class="inline-flex cursor-default">
-            <OTag type="countChip" value="alerts"
-              >{{ triggers.length }} {{ t("alerts.incidents.alertCount") }}</OTag
-            >
+            <OTag type="countChip" value="alerts">{{
+              t("alerts.incidents.alertCountChip", { count: triggers.length }, triggers.length)
+            }}</OTag>
             <OTooltip
-              :content="t('alerts.incidents.correlatedAlertsCount', { count: triggers.length })"
+              :content="
+                t(
+                  'alerts.incidents.correlatedAlertsCount',
+                  { count: triggers.length },
+                  triggers.length,
+                )
+              "
             />
           </span>
 
@@ -367,7 +373,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </div>
 
-                <!-- SECTION 2: Main Content (2:1 Ratio Layout) with calc(100vh - 236px) height (was 276px) -->
                 <div class="flex h-[calc(100vh-23.75rem)] flex-1 gap-3">
                   <!-- PART 1: Primary Content (66.67% width) -->
                   <div class="flex w-2/3 flex-col gap-3">
@@ -893,7 +898,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               {{ dim.label }}:
                             </div>
                             <div :class="'text-text-body'" class="flex-1 text-xs break-words">
-                              {{ dim.value }}
+                              <span
+                                v-if="dim.key === 'service'"
+                                data-test="incident-detail-dimension-service"
+                                ><ServiceNameLabel
+                                  :service-key="incidentDetails.group_values[dim.key]"
+                                  :display-name="incidentDetails.group_values_display?.service"
+                              /></span>
+                              <template v-else>{{ dim.value }}</template>
                             </div>
                           </div>
                         </div>
@@ -1371,6 +1383,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     mode="embedded-tabs"
                     :externalActiveTab="'metrics'"
                     :serviceName="correlationData.serviceName"
+                    :display-service-name="correlationData.displayServiceName"
+                    :service-display="correlationData.serviceDisplay"
                     :matchedDimensions="correlationData.matchedDimensions"
                     :additionalDimensions="correlationData.additionalDimensions"
                     :matched-set-id="correlationMatchedSetId"
@@ -1472,6 +1486,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     mode="embedded-tabs"
                     :externalActiveTab="'traces'"
                     :serviceName="correlationData.serviceName"
+                    :display-service-name="correlationData.displayServiceName"
+                    :service-display="correlationData.serviceDisplay"
                     :matchedDimensions="correlationData.matchedDimensions"
                     :additionalDimensions="correlationData.additionalDimensions"
                     :logStreams="correlationData.logStreams"
@@ -1541,6 +1557,7 @@ import serviceStreamsApi, {
 } from "@/services/service_streams";
 import { buildConditionsString } from "@/utils/alerts/conditionsFormatter";
 import TelemetryCorrelationDashboard from "@/plugins/correlation/TelemetryCorrelationDashboard.vue";
+import ServiceNameLabel from "@/components/shared/ServiceNameLabel.vue";
 import CorrelatedLogsTable from "@/plugins/correlation/CorrelatedLogsTable.vue";
 import IncidentServiceGraph from "./IncidentServiceGraph.vue";
 import IncidentRCAAnalysis from "./IncidentRCAAnalysis.vue";
@@ -1631,6 +1648,7 @@ export default defineComponent({
     OTabs,
     OTab,
     TelemetryCorrelationDashboard,
+    ServiceNameLabel,
     CorrelatedLogsTable,
     IncidentServiceGraph,
     IncidentAlertTriggersTable,
@@ -2308,6 +2326,11 @@ export default defineComponent({
         // Build correlation response with only the source stream type
         correlationData.value = {
           serviceName: `dimension-match-${groupValues.service || "unknown"}`,
+          // The synthetic id above is internal only; titles show the service's display name.
+          displayServiceName:
+            incidentDetails.value?.group_values_display?.service ||
+            groupValues.service ||
+            undefined,
           matchedDimensions: groupValues,
           additionalDimensions: {},
           logStreams: streamType === "logs" ? [streamInfo] : [],

@@ -84,6 +84,8 @@ const props = withDefaults(
 const emit = defineEmits<{
   "update:open": [value: boolean];
   done: [];
+  /** The server refused the extend: the dialog stays open and its screen refreshes. */
+  settled: [];
 }>();
 
 const { t } = useI18nTyped();
@@ -101,8 +103,11 @@ const form = useOForm<ExtendForm>({
     const until = extendUntil(values, timezone);
     const target = props.target;
     if (!target || !props.downtime || until === null) return;
-    if (!(await actions.extend(target, props.downtime, { endsAt: until }))) return;
-    emit("done");
+    const result = await actions.extend(target, props.downtime, { endsAt: until });
+    // No answer means nothing changed. A refusal leaves the row's version stale, so it closes too.
+    if (result === "failed") return;
+    if (result === "conflict") emit("settled");
+    else emit("done");
     emit("update:open", false);
   },
 });

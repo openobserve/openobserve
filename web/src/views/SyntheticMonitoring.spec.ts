@@ -1125,6 +1125,48 @@ describe("SyntheticMonitoring", () => {
     });
   });
 
+  describe("run class", () => {
+    const table = () => wrapper.findComponent('[data-test="synthetic-monitoring-monitors-table"]');
+    const base = {
+      type: "http",
+      frequency: { type: "minutes", interval: 5 },
+      last_response_ms: null,
+      last_check_at: null,
+      enabled: true,
+      folder_id: "default",
+    };
+
+    it("badges the run class and falls back to last_check_status without one", async () => {
+      mockServiceList.mockResolvedValue({
+        data: {
+          monitors: [
+            {
+              ...base,
+              id: "a",
+              name: "a",
+              status: "error",
+              last_run_class: 4,
+              last_run_class_at: 7,
+            },
+            { ...base, id: "b", name: "b", status: "failed", last_run_class: 2 },
+            { ...base, id: "c", name: "c", status: "error", last_run_class: 0 },
+            { ...base, id: "d", name: "d", status: "passed" },
+          ],
+        },
+      });
+      wrapper = mountPage();
+      await flushPromises();
+
+      const rows = table().props("data") as { id: string; status: string; statusSince: number }[];
+      const byId = Object.fromEntries(rows.map((r) => [r.id, r]));
+      expect(byId.a.status).toBe("not_measured");
+      expect(byId.a.statusSince).toBe(7);
+      expect(byId.b.status).toBe("partial");
+      expect(byId.c.status).toBe("error");
+      expect(byId.d.status).toBe("passed");
+    });
+  });
+
   describe("product analytics", () => {
     const table = () => wrapper.findComponent('[data-test="synthetic-monitoring-monitors-table"]');
     const runs = () =>

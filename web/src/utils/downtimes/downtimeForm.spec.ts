@@ -3,6 +3,8 @@
 import { describe, it, expect } from "vitest";
 import { gt } from "@/types/i18n";
 import type { Downtime } from "@/services/downtimes";
+import type { ValueLabelFn } from "./targetSummary";
+import stage8 from "@/test/unit/fixtures/serviceVersions/stage8.json";
 import {
   ALL_FOLDERS,
   applyPrefill,
@@ -443,5 +445,30 @@ describe("notifications in the form", () => {
     });
     expect(buildDowntimeRequest(values).notifications).toEqual(saved.notifications);
     expect(downtimeToFormValues(flow1).notifications.destinations).toEqual([]);
+  });
+});
+
+// Display names as the real values endpoint returns them for `service` (stage 8 golden).
+const goldenLabel: ValueLabelFn = (key, value) =>
+  key === "service"
+    ? stage8.downtime_values.values.find((v) => v.value === value)?.label
+    : undefined;
+
+describe("generated name with display names", () => {
+  it("titles a service condition with the service's display name, not its stored key", () => {
+    const values = defaultDowntimeValues(NOW, "UTC");
+    values.condition_open = true;
+    values.condition = {
+      type: "pair",
+      key: "service",
+      operator: "=",
+      value: "checkoutservice",
+    };
+    expect(buildDowntimeAutoName(values, gt, undefined, undefined, "en-US", goldenLabel)).toBe(
+      "service=CheckoutService · once Thu 17 Sep",
+    );
+    expect(buildDowntimeAutoName(values, gt, undefined, undefined, "en-US")).toBe(
+      "service=checkoutservice · once Thu 17 Sep",
+    );
   });
 });

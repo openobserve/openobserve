@@ -1,6 +1,6 @@
-const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
-const testLogger = require('../utils/test-logger.js');
-const PageManager = require('../../pages/page-manager.js');
+const { test, expect, navigateToBase } = require('../../utils/enhanced-baseFixtures.js');
+const testLogger = require('../../utils/test-logger.js');
+const PageManager = require('../../../pages/page-manager.js');
 const {
   seedMinimalStream,
   createSloViaApi,
@@ -13,7 +13,7 @@ const {
   listSlosByName,
   sloDefinitionOf,
   uniqueName,
-} = require('../utils/slo-seed.js');
+} = require('../../utils/slo-seed.js');
 
 const PREFIX = 'e2e_slo_import';
 const ORG = process.env['ORGNAME'];

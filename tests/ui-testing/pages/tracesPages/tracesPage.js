@@ -5,6 +5,7 @@ import { confirmDraftSignOut } from '../generalPages/draftSignOut.js';
 
 import { dateTimeButtonLocator, relative30SecondsButtonLocator, absoluteTabLocator, Past30SecondsValue } from '../commonActions.js';
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
+const MonacoEditorHelper = require('../../playwright-tests/utils/MonacoEditorHelper.js');
 const { isCloudEnvironment } = require('../cloudPages/cloud-env.js');
 const { ingestTraces } = require('../../playwright-tests/utils/trace-ingestion.js');
 
@@ -1014,14 +1015,8 @@ export class TracesPage {
 
     try {
       await expect(queryEditor).toBeVisible({ timeout: 5000 });
-
-      // Use .fill() method to avoid pointer interception issues
-      // Try different selectors: .inputarea (Monaco's input area) or textarea (fallback)
-      const monacoInput = queryEditor.locator('.inputarea, textarea').first();
-      await expect(monacoInput).toBeVisible({ timeout: 3000 });
-
-      // Fill directly without clicking to avoid pointer interception
-      await monacoInput.fill(query);
+      // A textarea fill, not a click: overlays intercept pointer events on the editor.
+      await new MonacoEditorHelper(this.page).fillInputArea(queryEditor, query, 5000);
       await this.page.waitForTimeout(500);
 
     } catch (error) {
@@ -2499,12 +2494,10 @@ export class TracesPage {
    * @returns {Promise<boolean>} true once the editor holds no text
    */
   async clearTraceQueryByKeyboard() {
-    const input = this.page
-      .locator(`${this.queryEditor} .inputarea, ${this.queryEditor} textarea`)
-      .first();
+    const monaco = new MonacoEditorHelper(this.page);
     for (let attempt = 0; attempt < QUERY_CLEAR_ATTEMPTS; attempt++) {
-      // Monaco's .inputarea is intentionally non-actionable — force focus to type real keystrokes.
-      await input.click({ force: true });
+      // Focus, not a forced click: Firefox renders Monaco's textarea 0px wide, so a click on it lands outside the viewport.
+      await monaco.focus(this.page.locator(this.queryEditor));
       await this.page.waitForTimeout(250);
       await this.page.keyboard.press('ControlOrMeta+A');
       await this.page.waitForTimeout(200);
@@ -2524,11 +2517,8 @@ export class TracesPage {
   async typeTraceQuery(query) {
     if (!(await this.clearTraceQueryByKeyboard())) return false;
     if (query) {
-      const input = this.page
-        .locator(`${this.queryEditor} .inputarea, ${this.queryEditor} textarea`)
-        .first();
-      // Monaco's .inputarea is intentionally non-actionable — force focus to type real keystrokes.
-      await input.click({ force: true });
+      // Focus, not a forced click: Firefox renders Monaco's textarea 0px wide, so a click on it lands outside the viewport.
+      await new MonacoEditorHelper(this.page).focus(this.page.locator(this.queryEditor));
       await this.page.keyboard.type(query, { delay: 25 });
       await this.page.waitForTimeout(600);
     }
@@ -3166,6 +3156,12 @@ export class TracesPage {
       .toHaveAttribute('data-test-loading', 'false', { timeout });
   }
 
+  // The pager comes from a separate count query; until it lands J on the last row reports the end instead of crossing a page.
+  async expectTraceListPageCountAtLeast(pageNumber, timeout = 60000) {
+    await expect(this.page.locator(`[data-test="traces-search-result-pagination-page-${pageNumber}"]`))
+      .toBeVisible({ timeout });
+  }
+
   async expectTraceListPageLoaded(prevLastIndex = 24, timeout = 30000) {
     await expect(this.page.locator(`${this.searchResultList} [data-test="o2-table-row-${prevLastIndex}"]`))
       .toHaveCount(0, { timeout });
@@ -3240,8 +3236,9 @@ export class TracesPage {
     return this.page.locator(`${this.errorMessage} [data-test="error-detail-body"]`);
   }
 
+  // One catalog row per service and place, so the name can match several rows.
   servicesCatalogServiceLink(serviceName) {
-    return this.page.locator(`[data-test="services-catalog-service-link-${serviceName}"]`);
+    return this.page.locator(`[data-test="services-catalog-service-link-${serviceName}"]`).first();
   }
 
   async expectServicesCatalogServiceVisible(serviceName) {

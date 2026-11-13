@@ -42,6 +42,7 @@ import { convertFlameGraphPanelData } from "./convertFlameGraphPanelData";
 import { convertBoxplotData } from "./convertBoxplotData";
 import { convertLogsPanelData } from "./convertLogsPanelData";
 import { convertHostmapData } from "./convertHostmapData";
+import { reserveAnnotationLabelRoom } from "./markLineLabelRoom";
 /**
  * Converts panel data based on the panel schema and data.
  *
@@ -129,7 +130,7 @@ export const convertPanelData = async (
         applyCartesianOptions(result?.options, panelSchema);
         applyPanelTypeOptions(result?.options, panelSchema, chartPanelRef);
         applyMetricOptions(result?.options, panelSchema);
-        return { chartType: panelSchema.type, ...result };
+        return reserveAnnotationLabelRoom({ chartType: panelSchema.type, ...result });
       } catch (error) {
         if (panelSchema?.queryType == "promql") throw error;
         console.error(error);

@@ -39,6 +39,10 @@ const alertPath = (org: string, alertId: string) =>
 // The route permission check reads the alert folder from `?folder=`.
 const inFolder = (folder?: string) => (folder ? { params: { folder } } : {});
 
+// A cancel at a stale version is a 409 `version_changed` that ends nothing.
+const atVersion = (folder?: string, version?: number) =>
+  version === undefined ? inFolder(folder) : { params: { ...(folder ? { folder } : {}), version } };
+
 const ALERT_ACTION_CODES = new Set<string>([
   "ack_refused",
   "mute_refused",
@@ -446,11 +450,17 @@ const alerts = {
       body,
       inFolder(folder),
     ),
-  cancelAlertMute: (org: string, alertId: string, downtimeId: string, folder?: string) =>
+  cancelAlertMute: (
+    org: string,
+    alertId: string,
+    downtimeId: string,
+    folder?: string,
+    version?: number,
+  ) =>
     http().post(
       `${alertPath(org, alertId)}/mute/${encodeURIComponent(downtimeId)}/cancel`,
       undefined,
-      inFolder(folder),
+      atVersion(folder, version),
     ),
 };
 

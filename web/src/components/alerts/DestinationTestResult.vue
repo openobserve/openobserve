@@ -28,7 +28,9 @@ limitations under the License. -->
           {{
             result.issue
               ? t("alerts.prebuiltDestinations.jiraTestCreated", { key: result.issue.key })
-              : t("alerts.testSuccessMessage")
+              : result.genericSample
+                ? t("alerts.testSuccessGenericSample")
+                : t("alerts.testSuccessMessage")
           }}
         </div>
         <OButton

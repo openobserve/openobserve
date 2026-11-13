@@ -74,10 +74,280 @@ pub struct CheckNotification {
     pub passing_locations: Vec<String>,
     /// Environments that did not pass, worst first.
     pub failing_environments: Vec<String>,
+    /// "Failing in 1 of 2 locations (aws-us-east-1)" on a firing partial or down run.
+    pub coverage: Option<String>,
     /// The check's template override.
     pub template: Option<String>,
     /// Firing for failed and error, Resolved for recovered, Informational for the notices.
     pub event: config::meta::alerts::notification_kind::NotificationEvent,
+}
+
+#[cfg(feature = "enterprise")]
+impl CheckNotification {
+    /// The notification for a completed run. `status`, `error` and `error_source` describe the
+    /// ack that completed it, and `status` is the fallback when the run has no aggregate status.
+    pub fn from_ack(
+        resp: &openobserve_synthetics::job_api::AckResponse,
+        status: &str,
+        error: Option<String>,
+        error_source: String,
+        checked_at: i64,
+    ) -> Self {
+        use openobserve_synthetics::job_api::AlertDecision;
+        Self {
+            org_id: resp.org_id.clone(),
+            check_name: resp.synthetics_name.clone(),
+            check_id: resp.synthetics_id.clone(),
+            check_type: resp.synthetic_type.clone(),
+            target: resp.target.clone(),
+            destinations: resp.destinations.clone(),
+            run_id: resp.run_id.clone(),
+            status: resp
+                .run_status
+                .clone()
+                .unwrap_or_else(|| status.to_string()),
+            job_count: resp.job_count as i64,
+            error,
+            checked_at,
+            recovery: matches!(resp.alert, AlertDecision::Recovered),
+            consecutive_failures: resp.consecutive_failures,
+            flaky: matches!(resp.alert, AlertDecision::Flaky),
+            // A degrading target is `warning` on every run for as long as the condition lasts,
+            // so this one is throttled by transition upstream, not by cooldown.
+            degraded: matches!(resp.alert, AlertDecision::Degraded),
+            status_reason: resp.status_reason.clone(),
+            error_source,
+            failing_locations: resp.failing_locations.clone(),
+            failing_environments: resp.failing_environments.clone(),
+            passing_locations: resp.passing_locations.clone(),
+            coverage: resp.coverage.clone(),
+            template: resp.template.clone(),
+            event: check_event(
+                matches!(resp.alert, AlertDecision::Recovered),
+                matches!(resp.alert, AlertDecision::Flaky),
+                matches!(resp.alert, AlertDecision::Degraded),
+            ),
+        }
+    }
+}
+
+/// Sends the notification of a run that finalized outside an ack, for
+/// `openobserve_synthetics::job_api::register_run_notifier`.
+#[cfg(feature = "enterprise")]
+pub fn notify_finalized_run(
+    resp: openobserve_synthetics::job_api::AckResponse,
+) -> openobserve_synthetics::alerting::BoxFuture<'static, ()> {
+    Box::pin(async move {
+        if resp.destinations.is_empty() {
+            return;
+        }
+        if let Some(gap) = GapNotification::from_ack(&resp) {
+            notify_gap(gap).await;
+        }
+        if matches!(
+            resp.alert,
+            openobserve_synthetics::job_api::AlertDecision::Silent
+        ) {
+            return;
+        }
+        let checked_at = config::utils::time::now_micros();
+        let status = resp.run_status.clone().unwrap_or_default();
+        let n = CheckNotification::from_ack(&resp, &status, None, String::new(), checked_at);
+        notify_check_result(n).await;
+    })
+}
+
+/// A gap notice owed by a run, with what it names. Owned, so it can move into a spawned task.
+#[cfg(feature = "enterprise")]
+pub struct GapNotification {
+    pub org_id: String,
+    pub synthetics_id: String,
+    pub synthetics_name: String,
+    pub target: String,
+    pub destinations: Vec<String>,
+    pub notice: openobserve_synthetics::alerting::GapNotice,
+}
+
+#[cfg(feature = "enterprise")]
+impl GapNotification {
+    /// `None` when the run owes no gap notice or the check has nowhere to send one.
+    pub fn from_ack(resp: &openobserve_synthetics::job_api::AckResponse) -> Option<Self> {
+        let notice = resp.gap_notice?;
+        if resp.destinations.is_empty() {
+            return None;
+        }
+        Some(Self {
+            org_id: resp.org_id.clone(),
+            synthetics_id: resp.synthetics_id.clone(),
+            synthetics_name: resp.synthetics_name.clone(),
+            target: resp.target.clone(),
+            destinations: resp.destinations.clone(),
+            notice,
+        })
+    }
+}
+
+/// The platform event of a run's message: a recovery resolves, the notices never open a record.
+#[cfg(feature = "enterprise")]
+pub fn check_event(
+    recovery: bool,
+    flaky: bool,
+    degraded: bool,
+) -> config::meta::alerts::notification_kind::NotificationEvent {
+    use config::meta::alerts::notification_kind::NotificationEvent;
+    if recovery {
+        NotificationEvent::Resolved
+    } else if flaky || degraded {
+        NotificationEvent::Informational
+    } else {
+        NotificationEvent::Firing
+    }
+}
+
+/// Sends a "Monitoring gap" or "Monitoring resumed" notice to every destination of the check.
+///
+/// Low severity: it says our side could not test the site, not that the site failed. It is an
+/// Informational event, so a platform destination such as PagerDuty skips it.
+///
+/// A notice counts as sent when at least one destination took or skipped it. A notice that every
+/// destination failed is owed again, on the next run or reaper sweep. One broken destination does
+/// not hold it, or the working destinations get the notice again on every sweep.
+#[cfg(feature = "enterprise")]
+pub async fn notify_gap(resp: GapNotification) {
+    use openobserve_synthetics::alerting::GapNotice;
+
+    if !send_gap_notice(&resp).await {
+        return;
+    }
+    let conn = infra::db::get_orm_client_rw().await;
+    let marked = match resp.notice {
+        GapNotice::Opened { since } => {
+            let now = config::utils::time::now_micros();
+            let marked = infra::table::synthetics_checks::mark_gap_notified(
+                conn,
+                &resp.synthetics_id,
+                since,
+                now,
+            )
+            .await;
+            // The gap closed while its notice was on the way, so no run owes the resumed notice.
+            // The owner got the gap notice, so send it here, once.
+            if matches!(marked, Ok(false)) {
+                let state =
+                    infra::table::synthetics_checks::get_alert_state(conn, &resp.synthetics_id)
+                        .await;
+                if let Ok(Some(state)) = state
+                    && gap_closed_during_delivery(state.gap_since, since)
+                {
+                    let resumed = GapNotification {
+                        notice: GapNotice::Resumed { since, until: now },
+                        ..resp
+                    };
+                    send_gap_notice(&resumed).await;
+                }
+                return;
+            }
+            marked
+        }
+        GapNotice::Resumed { since, .. } => {
+            infra::table::synthetics_checks::clear_resumed_gap(conn, &resp.synthetics_id, since)
+                .await
+        }
+    };
+    if let Err(e) = marked {
+        log::error!(
+            "[synthetics] mark gap notice check={}: {e}",
+            resp.synthetics_id
+        );
+    }
+}
+
+/// A gap that the row no longer holds closed before its notice could be marked. The same gap with
+/// a mark in place means that another sender got there first.
+#[cfg(feature = "enterprise")]
+fn gap_closed_during_delivery(stored_since: i64, since: i64) -> bool {
+    stored_since != since
+}
+
+/// Sends one gap notice to every destination. True when at least one took or skipped it.
+#[cfg(feature = "enterprise")]
+async fn send_gap_notice(resp: &GapNotification) -> bool {
+    use crate::alerts::notifications::notify::{NotifyError, notify};
+
+    let ctx = gap_notification_context(resp);
+    let mut delivered = false;
+    for dest_name in &resp.destinations {
+        let mut ctx = ctx.clone();
+        match notify(&resp.org_id, dest_name, &[], None, &mut ctx).await {
+            Ok(_) | Err(NotifyError::Skipped(_)) => delivered = true,
+            Err(e) => log::error!(
+                "[synthetics] gap notice dest={dest_name} check={}: {e}",
+                resp.synthetics_id
+            ),
+        }
+    }
+    delivered
+}
+
+/// The shared path's context for a gap notice: the check's variables, with the notice's words.
+#[cfg(feature = "enterprise")]
+fn gap_notification_context(
+    resp: &GapNotification,
+) -> crate::alerts::notifications::NotificationContext {
+    use config::meta::alerts::{level::AlertLevel, notification_kind::NotificationEvent};
+    use openobserve_synthetics::alerting::GapNotice;
+
+    use crate::alerts::notifications::LegacyPayload;
+
+    let (subject, body) = openobserve_synthetics::alerting::gap_notice_text(
+        resp.notice,
+        &resp.synthetics_name,
+        &resp.target,
+    );
+    let (status, label, level) = match resp.notice {
+        GapNotice::Opened { .. } => ("not_measured", "Not measured", AlertLevel::Warning),
+        GapNotice::Resumed { .. } => ("resumed", "Monitoring resumed", AlertLevel::Ok),
+    };
+    let check = CheckNotification {
+        org_id: resp.org_id.clone(),
+        check_name: resp.synthetics_name.clone(),
+        check_id: resp.synthetics_id.clone(),
+        check_type: String::new(),
+        target: resp.target.clone(),
+        destinations: Vec::new(),
+        run_id: String::new(),
+        status: status.to_string(),
+        job_count: 0,
+        error: None,
+        checked_at: config::utils::time::now_micros(),
+        recovery: false,
+        consecutive_failures: 0,
+        flaky: false,
+        status_reason: None,
+        error_source: String::new(),
+        degraded: false,
+        failing_locations: Vec::new(),
+        passing_locations: Vec::new(),
+        failing_environments: Vec::new(),
+        coverage: None,
+        template: None,
+        event: NotificationEvent::Informational,
+    };
+    let mut ctx = synthetics_notification_context(&check);
+    ctx.alert_status = status.to_string();
+    ctx.alert_description = body.clone();
+    ctx.level = Some(level);
+    ctx.render_hints.fallback_subject = Some(subject.clone());
+    for (key, value) in &mut ctx.context_attributes {
+        match key.as_str() {
+            "check_title" => *value = subject.clone(),
+            "check_status_label" => *value = label.to_string(),
+            _ => {}
+        }
+    }
+    let legacy = serde_json::json!({ "text": format!("*{subject}*\n{body}") });
+    ctx.legacy_payload = Some(LegacyPayload::new(move || legacy.clone()));
+    ctx
 }
 
 /// Fires once per run (when all jobs have completed) for non-passing runs.
@@ -135,6 +405,12 @@ fn check_title(n: &CheckNotification) -> String {
         }
     } else if n.flaky {
         format!("[OpenObserve Synthetics] 🔁 {} is FLAKY", n.check_name)
+    } else if let Some(coverage) = &n.coverage {
+        format!(
+            "[OpenObserve Synthetics] {} {}: {coverage}",
+            status_emoji(n),
+            n.check_name
+        )
     } else {
         format!(
             "[OpenObserve Synthetics] {} {} is {}",
@@ -193,6 +469,7 @@ pub fn synthetics_notification_context(
         render_hints: RenderHints {
             fallback_subject: Some(check_title(n)),
             escape_email_attributes: true,
+            ..Default::default()
         },
         ..Default::default()
     }
@@ -328,6 +605,9 @@ fn status_headline(n: &CheckNotification) -> String {
             "{} passed only after retries (flaky) — it recovered on its own",
             n.check_name
         );
+    }
+    if let Some(coverage) = &n.coverage {
+        return format!("{}: {coverage}", n.check_name);
     }
     match n.status.as_str() {
         "warning" => format!("{} passed only after retries (flaky)", n.check_name),
@@ -771,6 +1051,7 @@ mod tests {
             failing_locations: vec!["aws-us-east-1".into(), "aws-us-west-1".into()],
             passing_locations: vec!["aws-eu-central-1".into()],
             failing_environments: vec![],
+            coverage: None,
             template: None,
             event: config::meta::alerts::notification_kind::NotificationEvent::Firing,
         }
@@ -1227,6 +1508,43 @@ mod tests {
         assert_eq!(down_notified_at(&db).await, 200);
         assert_eq!(sent.load(std::sync::atomic::Ordering::SeqCst), 1);
     }
+
+    #[test]
+    fn a_gap_that_closed_during_delivery_owes_its_resumed_notice() {
+        assert!(gap_closed_during_delivery(0, 100));
+        assert!(gap_closed_during_delivery(200, 100));
+        assert!(!gap_closed_during_delivery(100, 100));
+    }
+
+    #[test]
+    fn a_gap_notice_is_informational_and_carries_its_own_words() {
+        use config::meta::alerts::{level::AlertLevel, notification_kind::NotificationEvent};
+        use openobserve_synthetics::alerting::GapNotice;
+
+        let gap = GapNotification {
+            org_id: "org1".into(),
+            synthetics_id: "c1".into(),
+            synthetics_name: "Checkout".into(),
+            target: "example.com".into(),
+            destinations: vec!["d1".into()],
+            notice: GapNotice::Opened { since: 1 },
+        };
+        let ctx = gap_notification_context(&gap);
+        assert_eq!(ctx.event, NotificationEvent::Informational);
+        assert_eq!(ctx.episode_id, None);
+        assert_eq!(ctx.level, Some(AlertLevel::Warning));
+        let subject = "[OpenObserve Synthetics] Monitoring gap: Checkout";
+        assert_eq!(ctx.render_hints.fallback_subject.as_deref(), Some(subject));
+        assert!(ctx.alert_description.contains("could not test example.com"));
+        let attr = |k: &str| {
+            ctx.context_attributes
+                .iter()
+                .find(|(key, _)| key == k)
+                .map(|(_, v)| v.as_str())
+        };
+        assert_eq!(attr("check_title"), Some(subject));
+        assert_eq!(attr("check_status_label"), Some("Not measured"));
+    }
 }
 
 /// Sends the "location down" notification through the shared path.
@@ -1311,6 +1629,7 @@ fn location_down_context(
         render_hints: RenderHints {
             fallback_subject: Some(subject),
             escape_email_attributes: true,
+            ..Default::default()
         },
         ..Default::default()
     }

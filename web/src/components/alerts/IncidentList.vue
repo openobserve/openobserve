@@ -165,15 +165,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="getSortedDimensions(row.group_values).length"
             class="flex min-w-0 flex-nowrap items-center gap-1 overflow-hidden"
           >
-            <ODimensionChip
-              v-for="dim in displayDimensions(row.group_values).slice(0, 2)"
-              :key="dim.key"
-              :dim-key="dim.key"
-              :key-label="dim.label"
-              :value="dim.value"
-              :tooltip="!dim.label"
-              class="min-w-0"
-            />
+            <template v-for="dim in displayDimensions(row.group_values).slice(0, 2)" :key="dim.key">
+              <span
+                v-if="dim.key === 'service'"
+                class="min-w-0"
+                data-test="incident-list-service-chip"
+                ><ServiceNameLabel
+                  layout="chip"
+                  :service-key="row.group_values?.[dim.key] ?? ''"
+                  :display-name="row.group_values_display?.service"
+              /></span>
+              <ODimensionChip
+                v-else
+                :dim-key="dim.key"
+                :key-label="dim.label"
+                :value="dim.value"
+                :tooltip="!dim.label"
+                class="min-w-0"
+              />
+            </template>
             <OTag
               v-if="getSortedDimensions(row.group_values).length > 2"
               type="countChip"
@@ -270,7 +280,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               v-if="row.status === 'open'"
               variant="ghost-warning"
-              size="icon-sm"
+              size="icon-xs-sq"
               :aria-label="t('alerts.incidents.acknowledgeAriaLabel')"
               class="max-md:hidden"
               @click.stop="acknowledgeIncident(row)"
@@ -281,7 +291,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               v-if="row.status !== 'resolved'"
               variant="ghost-primary"
-              size="icon-sm"
+              size="icon-xs-sq"
               class="max-md:hidden"
               @click.stop="resolveIncident(row)"
               data-test="incident-resolve-btn"
@@ -291,7 +301,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               v-if="row.status === 'resolved'"
               variant="ghost-warning"
-              size="icon-sm"
+              size="icon-xs-sq"
               class="max-md:hidden"
               @click.stop="reopenIncident(row)"
               data-test="incident-reopen-btn"
@@ -398,6 +408,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
 import { chipDimensionKeys, dimensionDisplay } from "@/utils/incidents/findingDimensions";
+import ServiceNameLabel from "@/components/shared/ServiceNameLabel.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
@@ -427,6 +438,7 @@ export default defineComponent({
     OTable,
     OTag,
     ODimensionChip,
+    ServiceNameLabel,
     OTimeCell,
     OStatStrip,
     OToggleGroup,
@@ -587,7 +599,7 @@ export default defineComponent({
         accessorKey: "group_values",
         resizable: true,
         hideable: true,
-        size: 320,
+        size: 340,
         meta: { align: "left" },
       },
       {

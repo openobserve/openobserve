@@ -339,6 +339,14 @@ test.describe("Pre-Test Cleanup", () => {
         /^e2e_sev_str_/,               // logs-histogram-severity.spec.js (#11353)
         /^e2e_sev_num_/,               // logs-histogram-severity.spec.js (#11441)
         /^e2e_ms7332_/,                // logs-multistream-share-url.spec.js (#7332)
+        /^e2e_kbd_logs_/,              // logs-query-editor-keyboard.spec.js seed stream (suffixed per worker)
+        /^e2e_action_logs_/,           // logsActionReasons.spec.js seed stream (suffixed per worker)
+        /^e2e_cancel_logs_/,           // logsSearchCancelled.spec.js seed stream (suffixed per worker)
+        /^e2e_freetext_/,              // logsFreeText.spec.js fts/nofts/notext seed streams (suffixed per worker)
+        /^e2e_ftsrecovery_/,           // logsNoFtsRecovery.spec.js fts/nofts seed streams (suffixed per worker)
+        /^e2e_guarded_24h_/,           // logsAutoRunGuard.spec.js seed stream (suffixed per worker)
+        /^e2e_jk_logs_/,               // logs-jk-navigation.spec.js seed stream (suffixed per worker)
+        /^e2e_lnk_(line|other|wide|orig)_/, // shareLink.spec.js line-link seed streams (suffixed per worker)
         /^e2e_12647_dest_/,            // pipeline-preview-bounds.spec.js (#12647) destination stream
         /^e2e7030[a-z0-9]+-(alpha|beta)_dest$/, // pipeline-export.spec.js (#7030) destination streams
         /^e2e_10602_/,                 // logs-v040-limit-and-stream-list.spec.js (#10602)
@@ -400,7 +408,7 @@ test.describe("Pre-Test Cleanup", () => {
         /^e2e_panel_notices_/                       // panelNotices.spec.js (high-cardinality series-cap streams)
       ],
       // Protected streams to never delete
-      ['default', 'sensitive', 'important', 'critical', 'production', 'staging', 'automation', 'e2e_automate', 'k8s_json']
+      ['default', 'sensitive', 'important', 'critical', 'production', 'staging', 'automation', 'e2e_automate', 'k8s_json', 'triggers'] // triggers = server alert-history stream, matches the 8-9 letter pattern
     );
 
     // Clean up TRACES streams created by the traces SDR suite (sdr_traces_* — one
@@ -411,6 +419,7 @@ test.describe("Pre-Test Cleanup", () => {
         /^sdr_traces_/,                // sdr_traces_* (traces SDR test streams: redact/drop/hash × ingestion/query)
         /^trace_genai_parts_/,         // trace_genai_parts_* (GenAI v5 parts rendering test streams)
         /^e2e_prof_trace_/,            // Profiles/profiles-navigation-entry.spec.js linked-span traces stream
+        /^e2e_jk_traces_/,             // Traces/traces-jk-navigation.spec.js seed stream (suffixed per worker)
       ],
       ['default'],                     // protect the default traces stream
       { streamType: 'traces' }

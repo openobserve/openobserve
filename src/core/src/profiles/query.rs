@@ -1060,6 +1060,18 @@ mod tests {
     }
 
     #[test]
+    fn uds_keeps_every_column_the_profiles_queries_read() {
+        let required = schema::required_uds_fields(config::meta::stream::StreamType::Profiles);
+        let read = INSTANCE_KEY_COLUMNS
+            .iter()
+            .chain(META_DIMENSION_COLUMNS)
+            .chain(&[PROFILE_DURATION_COLUMN, "stack", "value"]);
+        for column in read {
+            assert!(required.contains(*column), "UDS would pack away {column}");
+        }
+    }
+
+    #[test]
     fn label_names_from_schema_fields_drops_reserved_and_meta() {
         let names = label_names_from_schema_fields([
             "_timestamp",
