@@ -22890,6 +22890,8 @@
       "noResults": "Không có biểu tượng nào khớp với tìm kiếm của bạn",
       "groups": {
         "results": "Kết quả",
+        "icons": "Biểu tượng",
+        "monoLogos": "Logo",
         "status": "Trạng thái",
         "services": "Dịch vụ",
         "ai": "AI",

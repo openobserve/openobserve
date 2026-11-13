@@ -22890,6 +22890,8 @@
       "noResults": "검색과 일치하는 아이콘이 없습니다.",
       "groups": {
         "results": "결과",
+        "icons": "아이콘",
+        "monoLogos": "로고",
         "status": "상태",
         "services": "서비스",
         "ai": "AI",

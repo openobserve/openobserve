@@ -22890,6 +22890,8 @@
       "noResults": "検索に一致するアイコンがありません",
       "groups": {
         "results": "結果",
+        "icons": "アイコン",
+        "monoLogos": "ロゴ",
         "status": "ステータス",
         "services": "サービス",
         "ai": "AI",

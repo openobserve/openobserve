@@ -22890,6 +22890,8 @@
       "noResults": "没有图标匹配您的搜索",
       "groups": {
         "results": "结果",
+        "icons": "图标",
+        "monoLogos": "标志",
         "status": "状态",
         "services": "服务",
         "ai": "AI",

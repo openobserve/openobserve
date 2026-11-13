@@ -22887,6 +22887,8 @@
       "noResults": "No icons match your search",
       "groups": {
         "results": "Results",
+        "icons": "ไอคอน",
+        "monoLogos": "โลโก้",
         "status": "สถานะ",
         "services": "Services",
         "ai": "AI",

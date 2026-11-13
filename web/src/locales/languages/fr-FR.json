@@ -22890,6 +22890,8 @@
       "noResults": "Aucune icône ne correspond à votre recherche",
       "groups": {
         "results": "Résultats",
+        "icons": "Icônes",
+        "monoLogos": "Logos",
         "status": "Statut",
         "services": "Services",
         "ai": "IA",

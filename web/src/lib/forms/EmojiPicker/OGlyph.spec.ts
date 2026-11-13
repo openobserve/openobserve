@@ -73,6 +73,51 @@ describe("OGlyph", () => {
   });
 });
 
+describe("OGlyph flat tokens", () => {
+  let wrapper: VueWrapper;
+
+  afterEach(() => wrapper?.unmount());
+
+  it("should render an icon: token as an OIcon in currentColor with no plate", () => {
+    wrapper = mount(OGlyph, { props: { token: "icon:dashboard" } });
+    const icon = wrapper.find('[data-test="glyph-icon"]');
+    expect(icon.exists()).toBe(true);
+    expect(icon.find("svg").exists()).toBe(true);
+    expect(icon.classes().some((c) => c.startsWith("text-"))).toBe(false);
+    expect(wrapper.find('[data-test="glyph-plate"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="glyph-emoji"]').exists()).toBe(false);
+  });
+
+  it("should render a mono: token as a currentColor svg with no plate", () => {
+    wrapper = mount(OGlyph, { props: { token: "mono:docker", size: "sm" } });
+    const svg = wrapper.find('[data-test="glyph-mono"]');
+    expect(svg.element.tagName.toLowerCase()).toBe("svg");
+    expect(svg.html()).toContain("currentColor");
+    expect(svg.classes()).toContain("size-4");
+    expect(wrapper.find('[data-test="glyph-plate"]').exists()).toBe(false);
+  });
+
+  it.each(["icon:no-such-icon", "mono:no-such-logo"])(
+    "should render nothing, not the raw string, for the unknown token %s",
+    (token) => {
+      wrapper = mount(OGlyph, { props: { token } });
+      expect(wrapper.text()).toBe("");
+      expect(wrapper.find("svg").exists()).toBe(false);
+    },
+  );
+
+  it("should leave emoji and o2: tokens on their existing render paths", () => {
+    wrapper = mount(OGlyph, { props: { token: "🚀" } });
+    expect(wrapper.find('[data-test="glyph-emoji"]').text()).toBe("🚀");
+    expect(wrapper.find('[data-test="glyph-icon"]').exists()).toBe(false);
+    wrapper.unmount();
+
+    wrapper = mount(OGlyph, { props: { token: "o2:redis" } });
+    expect(wrapper.find('[data-test="glyph-plate"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="glyph-mono"]').exists()).toBe(false);
+  });
+});
+
 describe("glyphRegistry", () => {
   it("should resolve every registered name", () => {
     for (const name of Object.keys(GLYPH_REGISTRY)) {
