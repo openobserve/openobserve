@@ -289,6 +289,7 @@ import { useRouteEnterFade } from "@/layouts/useRouteEnterFade";
 import { PAGE_ENTRANCE_KEY } from "@/lib/core/PageLayout/pageEntrance";
 import type { NavItem } from "@/lib/core/Navbar/ONavbar.types";
 import { securityNavLinks as buildSecurityNavLinks } from "@/utils/security/nav";
+import { getOrgSwitchRoute } from "@/utils/orgSwitchRoute";
 import { featureState, menuState, streamTypeFeature, type FeatureState } from "@/utils/featureGate";
 import { checkFeatureAccess, buildFeatureGateContext } from "@/utils/enterpriseFeatures";
 import AppHeader from "../components/Header.vue";
@@ -1329,15 +1330,13 @@ export default defineComponent({
       store.dispatch("logs/resetLogs");
       store.dispatch("setIsDataIngested", false);
       const orgIdentifier = selectedOrg.value.identifier;
-      const queryParams =
-        router.currentRoute.value.path.indexOf(".logs") > -1 ? router.currentRoute.value.query : {};
-      router.push({
-        path: router.currentRoute.value.path,
-        query: {
-          ...queryParams,
-          org_identifier: orgIdentifier,
-        },
-      });
+      router.push(
+        getOrgSwitchRoute(
+          router.currentRoute.value.path,
+          router.currentRoute.value.query,
+          orgIdentifier,
+        ),
+      );
       useLocalOrganization(selectedOrg.value);
       store.dispatch("setSelectedOrganization", { ...selectedOrg.value });
       // setSelectedOrganization();

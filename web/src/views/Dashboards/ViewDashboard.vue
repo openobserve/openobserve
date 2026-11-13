@@ -1328,6 +1328,12 @@ export default defineComponent({
 
         if (!dashboard || typeof dashboard !== "object" || !Object.keys(dashboard).length) {
           if (playlistReporters.missing("notFound")) return;
+          // No id in the URL (for example after an org switch) is not a deleted
+          // dashboard, so go to the list without the error toast.
+          if (!route.query.dashboard) {
+            goBackToDashboardList();
+            return;
+          }
           showErrorNotification(t("dashboard.viewDashboard.dashboardNotFound"));
           goBackToDashboardList();
           return;

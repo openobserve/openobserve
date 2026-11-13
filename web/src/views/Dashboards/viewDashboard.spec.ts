@@ -791,6 +791,36 @@ describe("ViewDashboard", () => {
       });
     });
 
+    it("goes to the dashboard list without the not-found toast when the URL has no dashboard id", async () => {
+      // An org switch drops the dashboard id from the URL; that is not a deleted dashboard.
+      mockExtraRouteQuery.dashboard = "";
+      vi.mocked(getDashboard).mockResolvedValueOnce({});
+      mockShowErrorNotification.mockClear();
+      wrapper = createWrapper();
+      await flushPromises();
+
+      expect(mockShowErrorNotification).not.toHaveBeenCalled();
+      expect(global.mockRouterPush).toHaveBeenCalledWith({
+        path: "/dashboards",
+        query: { folder: "default", org_identifier: "test-org" },
+      });
+    });
+
+    it("still shows the not-found toast when the dashboard id does not exist", async () => {
+      vi.mocked(getDashboard).mockResolvedValueOnce({});
+      mockShowErrorNotification.mockClear();
+      wrapper = createWrapper();
+      await flushPromises();
+
+      expect(mockShowErrorNotification).toHaveBeenCalledWith(
+        "dashboard.viewDashboard.dashboardNotFound",
+      );
+      expect(global.mockRouterPush).toHaveBeenCalledWith({
+        path: "/dashboards",
+        query: { folder: "default", org_identifier: "test-org" },
+      });
+    });
+
     it("should navigate to add panel when addPanelData is called", async () => {
       wrapper = createWrapper();
       await flushPromises();
