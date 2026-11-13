@@ -35,7 +35,7 @@ import serviceStreamsApi, {
 import { featureState } from "@/utils/featureGate";
 import { b64EncodeUnicode, generateTraceContext } from "@/utils/zincutils";
 import { STEPS, type ChartRange, type MetricSeries, type MetricUnit } from "../coverageSeries";
-import type { CoverageRow, LiveIdentity } from "../fixtures";
+import type { CoverageRow, LiveIdentity } from "../aoTypes";
 import { chartText, statusOf, type ChartReasonKind } from "./liveCopy";
 import {
   chartWindow,

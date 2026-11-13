@@ -349,6 +349,7 @@ import {
 import {
   buildPromqlValueEntries,
   parsePromqlValueContext,
+  promqlValueFilter,
   resolvePromqlLabelValues,
   type PromqlValueContext,
 } from "@/composables/usePromqlSuggestions";
@@ -1641,10 +1642,7 @@ export default defineComponent({
         if (!resolver || typedIsColumn || unknownField) return fields;
 
         const outcome = await awaitValues(config, token, (options) =>
-          resolver(context.field, {
-            ...options,
-            prefix: context.hasOpenQuote ? context.typed : "",
-          }),
+          resolver(context.field, { ...options, prefix: context.typed }),
         );
         if (outcome === null) return null;
         if (outcome === "nolookup") return fields;
@@ -1671,6 +1669,7 @@ export default defineComponent({
           range: caretRange(position, context.typed.length),
           fieldType,
           pattern: context.operator === "like",
+          typed: context.typed,
         });
         return [...values, ...fields, ...capRow(context.field, outcome.length, position)];
       };
@@ -1685,8 +1684,12 @@ export default defineComponent({
       ): Promise<any[] | null> => {
         const org = store.state.selectedOrganization?.identifier;
         if (!org) return [];
+        const typed = promqlValueFilter(context);
         const outcome = await awaitValues(config, token, (options) =>
-          resolvePromqlLabelValues(org, context.metric, context.label, options),
+          resolvePromqlLabelValues(org, context.metric, context.label, {
+            ...options,
+            prefix: typed,
+          }),
         );
         // Another organization's label values must never appear in this one's menu.
         if (outcome === null || store.state.selectedOrganization?.identifier !== org) return null;
@@ -1702,6 +1705,7 @@ export default defineComponent({
           hasOpenQuote: context.hasOpenQuote,
           closingQuoteAhead: lineAfterCaret(model, position).startsWith('"'),
           range: caretRange(position, context.typed.length),
+          typed,
         });
         return [...values, ...capRow(context.label, outcome.length, position)];
       };

@@ -378,6 +378,9 @@ jobs:
 
       - name: Merge shard coverage and check thresholds
         working-directory: web
+        env:
+          # Merging the shard reports outgrows the default ~2GB heap and dies with exit 134.
+          NODE_OPTIONS: "--max-old-space-size=4096"
         run: ./coverage.sh merge
 
   ui_code_quality:

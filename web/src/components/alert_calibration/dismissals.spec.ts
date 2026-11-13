@@ -25,6 +25,7 @@ import {
   dismissBodyOf,
   dismissableOf,
   dismissedSinceRun,
+  hiddenByRunPerRule,
   DISMISS_REASONS,
   DURATION_OPTIONS,
   FINDING_PATTERN_LABEL,
@@ -342,5 +343,33 @@ describe("dismissableOf: a rail item of a calibration finding (test 9)", () => {
       scope_kind: "alert",
       scope_key: "a2",
     });
+  });
+});
+
+describe("hiddenByRunPerRule", () => {
+  const view = (rule_id: string, scope_key: string, dismissed_at: number, state = "active") =>
+    ({ rule_id, scope_kind: "alert", scope_key, dismissed_at, state }) as never;
+
+  it("reads the run's own per-rule count, and nothing for a run from before it", () => {
+    const counted = { emitted_at: 100, dismissed_rules: '[{"rule_id":"noise","alerts":2}]' };
+    expect([...hiddenByRunPerRule(counted, null)]).toEqual([["noise", 2]]);
+    expect(hiddenByRunPerRule({ emitted_at: 100 }, { items: [view("noise", "a1", 50)] }).size).toBe(
+      0,
+    );
+  });
+
+  it("a scoped reader's earlier active dismissals stand in, one per alert", () => {
+    const page = {
+      items: [
+        view("noise", "a1", 50),
+        view("noise", "a1", 60),
+        view("noise", "a2", 70),
+        view("failure", "a3", 150),
+        view("failure", "a4", 20, "reopened"),
+      ],
+    };
+    expect([...hiddenByRunPerRule({ emitted_at: 100, dismissed_rules: null }, page)]).toEqual([
+      ["noise", 2],
+    ]);
   });
 });

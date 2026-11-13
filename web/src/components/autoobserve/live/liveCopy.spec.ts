@@ -472,6 +472,12 @@ describe("liveCellWord / liveCellLook (the coverage table's cells)", () => {
     expect(liveCellWord(gt, "none", true)).toBe("Added");
   });
 
+  it("an unwatched check of a learning service waits, and a watched one stays watched", () => {
+    expect(liveCellLook("none", false, true)).toBe("learning");
+    expect(liveCellLook("covered", false, true)).toBe("covered");
+    expect(liveCellWord(gt, "silent", false, true)).toBe(coverageWord(gt, "learning"));
+  });
+
   it("draws covered green and every gap with the one amber", () => {
     expect(liveCellLook("covered")).toBe("covered");
     expect(

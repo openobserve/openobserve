@@ -289,8 +289,20 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
   {
     fg: "--color-timeline-dot-fg",
     bg: "--color-timeline-dot-primary",
-    category: "non-text",
-    why: "the glyph is drawn inside the timeline dot",
+    category: "text",
+    why: "a timeline label pill draws its time inside the dot",
+  },
+  {
+    fg: "--color-timeline-dot-fg",
+    bg: "--color-timeline-dot-success",
+    category: "text",
+    why: "a timeline label pill draws its time inside the dot",
+  },
+  {
+    fg: "--color-timeline-dot-fg",
+    bg: "--color-timeline-dot-info",
+    category: "text",
+    why: "a timeline label pill draws its time inside the dot",
   },
   {
     fg: "--color-badge-amber-ol-border",
@@ -904,13 +916,6 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
   },
   {
     fg: "--color-timeline-dot-muted",
-    category: "pending",
-    why: "fails the threshold against the page surface it is painted on",
-    issue: "WCAG-AA colour remediation (follow-up PR)",
-    themes: ["light"],
-  },
-  {
-    fg: "--color-timeline-dot-success",
     category: "pending",
     why: "fails the threshold against the page surface it is painted on",
     issue: "WCAG-AA colour remediation (follow-up PR)",
