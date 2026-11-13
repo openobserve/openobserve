@@ -2116,6 +2116,58 @@ describe("ONavGroup", () => {
       expect(document.activeElement).not.toBe(tile());
     });
 
+    it("Space on the link tile clicks nothing, so a later programmatic item click is a mouse choice", async () => {
+      wrapper = mountGroup(true);
+      await hoverOpen();
+      const tileEl = wrapper.find('[data-test="tile"]');
+      await tileEl.trigger("keydown", { key: " " });
+      await tileEl.trigger("keyup", { key: " " });
+      vi.advanceTimersByTime(0);
+      click(firstItem().element, 1);
+      await flushPromises();
+      expect(flyout().exists()).toBe(false);
+      expect(document.activeElement).not.toBe(tile());
+    });
+
+    it("Space on the link tile clicks nothing, so a later programmatic tile click keeps the flyout open", async () => {
+      wrapper = mountGroup(true);
+      await hoverOpen();
+      const tileEl = wrapper.find('[data-test="tile"]');
+      await tileEl.trigger("keydown", { key: " " });
+      await tileEl.trigger("keyup", { key: " " });
+      vi.advanceTimersByTime(0);
+      click(tileEl.element, 1);
+      await flushPromises();
+      expect(flyout().exists()).toBe(true);
+    });
+
+    it("an Enter whose keyup lands elsewhere without a click does not mark the next click as keyboard", async () => {
+      wrapper = mountGroup(true);
+      await hoverOpen();
+      const item = firstItem();
+      (item.element as HTMLElement).focus();
+      await item.trigger("keydown", { key: "Enter" });
+      document.body.dispatchEvent(new KeyboardEvent("keyup", { key: "Enter", bubbles: true }));
+      vi.advanceTimersByTime(0);
+      click(item.element, 1);
+      await flushPromises();
+      expect(flyout().exists()).toBe(false);
+      expect(document.activeElement).not.toBe(tile());
+    });
+
+    it("a click dispatched by the key release itself still counts as keyboard", async () => {
+      wrapper = mountGroup(true);
+      await hoverOpen();
+      const item = firstItem();
+      (item.element as HTMLElement).focus();
+      await item.trigger("keydown", { key: "Enter" });
+      await item.trigger("keyup", { key: "Enter" });
+      click(item.element, 1);
+      await flushPromises();
+      expect(flyout().exists()).toBe(false);
+      expect(document.activeElement).toBe(tile());
+    });
+
     it("a mouse click after an arrow-key move is still a mouse choice", async () => {
       wrapper = mountGroup(true);
       await hoverOpen();

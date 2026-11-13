@@ -541,14 +541,29 @@ function scheduleClose(event?: MouseEvent) {
 
 // Firefox reports Enter on a link as a click with detail 1, so the keydown is the reliable signal.
 let activatedByKey = false;
+let activationKeyTimer: ReturnType<typeof setTimeout> | undefined;
 
 function clearActivationKey() {
   activatedByKey = false;
+  clearTimeout(activationKeyTimer);
+  document.removeEventListener("keyup", onActivationKeyup, true);
+}
+
+// Space clicks a button in the keyup default action, after every keyup listener, so clear one task later.
+function onActivationKeyup() {
+  document.removeEventListener("keyup", onActivationKeyup, true);
+  activationKeyTimer = setTimeout(clearActivationKey, 0);
 }
 
 function noteActivationKey(event: KeyboardEvent) {
-  if (event.key === "Enter" || event.key === " ") activatedByKey = true;
-  else clearActivationKey();
+  if (event.key !== "Enter" && event.key !== " ") {
+    clearActivationKey();
+    return;
+  }
+  clearTimeout(activationKeyTimer);
+  activatedByKey = true;
+  // Capture on document: focus may have left the group before the key is released.
+  document.addEventListener("keyup", onActivationKeyup, true);
 }
 
 function isKeyboardActivation(event?: MouseEvent): boolean {
@@ -657,6 +672,7 @@ watch(isOpen, (open) => {
 
 onBeforeUnmount(() => {
   clearTimers();
+  clearActivationKey();
   removeOpenListeners();
   if (openGroupKey.value === props.groupKey) openGroupKey.value = null;
 });
