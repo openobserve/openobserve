@@ -17,7 +17,7 @@ const { openNavFlyoutChild } = require('../../pages/commonActions.js');
 const testLogger = require('../utils/test-logger.js');
 const {
     ns, req, listRoles, listUsers, createRole, getPerms, makeTracker,
-    MEMBER_PASSWORD, uniq, uniqueEmail, org, rbacEnabled,
+    uniq, uniqueEmail, org, rbacEnabled,
     createMember, createServiceAccount, addRoleMembers, listMemberRoles,
 } = require('./iam-fixtures.js');
 
@@ -61,11 +61,7 @@ test.describe('IAM · Edit Role · tabs and leaving', { tag: '@enterprise' }, ()
     test.beforeAll(async ({ browser }) => {
         const page = await browser.newPage();
         try {
-            made.user(U_MEMBER);
-            await req(page, 'POST', '/users', {
-                email: U_MEMBER, password: MEMBER_PASSWORD,
-                first_name: 'IAM', last_name: 'Tabs', role: 'user',
-            });
+            await createMember(page, made.user(U_MEMBER), 'user', { firstName: 'Automation', lastName: 'TestUser' });
             testLogger.info('tabs fixtures ready');
         } finally {
             await page.close();
@@ -105,9 +101,9 @@ test.describe('IAM · Edit Role · tabs and leaving', { tag: '@enterprise' }, ()
         await pm.rolesPage.grantScope('function', 'AllowList');
 
         await pm.rolesPage.switchTab('users');
-        const row = page.locator(`[data-test*="${U_MEMBER}"] [role="checkbox"]`).first();
-        const hasRow = await row.isVisible({ timeout: 15000 }).catch(() => false);
-        test.skip(!hasRow, 'the seeded member is not listed in the users tab');
+        const row = await pm.rolesPage.findUserMember(U_MEMBER);
+        await expect(row, `the seeded member ${U_MEMBER} is not listed under All on the Users tab`)
+            .toBeVisible({ timeout: 30000 });
         await pm.rolesPage.setCheckbox(row, true);
 
         // Count the PUTs, not just the last one: two requests mean a partial save is
@@ -119,8 +115,9 @@ test.describe('IAM · Edit Role · tabs and leaving', { tag: '@enterprise' }, ()
             }
         };
         page.on('request', onReq);
-        await pm.rolesPage.saveButton.click();
-        await page.waitForTimeout(4000);
+        const put = await pm.rolesPage.saveAndWaitForPut(name);
+        expect(put.ok(), `role PUT failed with ${put.status()}`).toBe(true);
+        await pm.rolesPage.waitForSaveSettled();
         page.off('request', onReq);
 
         expect(puts, `expected one PUT carrying both, got ${puts.length}`).toHaveLength(1);

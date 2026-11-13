@@ -129,6 +129,8 @@ export class RolesPage {
         this.serviceAccountMemberRows = page.locator(
             '[data-test="iam-service-accounts-selection-table"] [data-test^="iam-service-accounts-selection-table-body-row-"][data-test$="-checkbox"]',
         );
+        // The wrapper, not the field: GroupUsers reuses the `alert-list-search-input` slug.
+        this.userMemberSearch = page.locator('[data-test="iam-users-selection-search-input"] input');
         this.serviceAccountMembersEmpty = page.locator(
             '[data-test="iam-service-accounts-selection-table"] [data-test="o2-empty-state"]',
         );
@@ -440,6 +442,18 @@ export class RolesPage {
         );
     }
 
+    userShowToggle(value) {
+        return this.page.locator(`[data-test="iam-users-selection-show-${value}-btn"]`);
+    }
+
+    /** Users opens on Selected, which hides anyone not yet in the role, so list All and search for them. */
+    async findUserMember(email) {
+        await this.userShowToggle('all').click();
+        await expect(this.userShowToggle('all')).toHaveAttribute('data-state', 'on', { timeout: 15000 });
+        await this.userMemberSearch.fill(email);
+        return this.userMemberCheckbox(email);
+    }
+
     async openRole(name) {
         // The list pages at 20 rows; search first rather than assume the row rendered.
         await this.listSearch.fill(name);
@@ -610,6 +624,13 @@ export class RolesPage {
         );
         await this.saveButton.click();
         return put;
+    }
+
+    /** A save is done once Save stops being busy and nothing is left staged on either tab. */
+    async waitForSaveSettled({ timeout = 30000 } = {}) {
+        await expect(this.saveButton).not.toHaveAttribute('aria-busy', 'true', { timeout });
+        await expect(this.unsavedCount).toHaveCount(0, { timeout });
+        await expect(this.tabDirtyDot('users')).toHaveCount(0, { timeout });
     }
 
     async openDrawer() {
