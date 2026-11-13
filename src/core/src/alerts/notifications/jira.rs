@@ -1142,6 +1142,7 @@ mod tests {
         let mut ctx = alert_ctx();
         ctx.alert_name = "Payment latency".into();
         ctx.incident_id = "inc-7".into();
+        ctx.alert_url_label = "Open incident".into();
         ctx.context_attributes = [
             ("incident_id", "inc-7"),
             ("incident_title", "Checkout degraded"),
@@ -1165,6 +1166,7 @@ mod tests {
             alert_trigger_time: 1_792_751_400_000_000,
             alert_description: "score 4.20 over threshold 3.00 [p95]\nsecond line".into(),
             alert_url: "https://o2.example.com/web/alerts/anomaly/edit/an-42".into(),
+            alert_url_label: "Open detector".into(),
             context_attributes: vec![
                 ("anomaly_id".into(), "an-42".into()),
                 ("anomaly_kind".into(), kind.into()),
@@ -1339,7 +1341,7 @@ mod tests {
             comment(&recovered),
             "[OpenObserve] Recovered at 2026-10-23 10:30 UTC. View in OpenObserve: https://o2.example.com/s/abc"
         );
-        let link = " View incident: https://o2.example.com/s/abc";
+        let link = " Open incident: https://o2.example.com/s/abc";
         for (event, said) in [
             ("new_alert_correlated", "New alert joined: Payment latency."),
             ("severity_escalated", "Severity changed to P1."),
@@ -1351,6 +1353,12 @@ mod tests {
                 format!("[OpenObserve] {said}{link}")
             );
         }
+        let mut unlabelled = incident_ctx("new_incident_created");
+        unlabelled.alert_url_label.clear();
+        assert_eq!(
+            comment(&unlabelled),
+            "[OpenObserve] New incident created. View incident: https://o2.example.com/s/abc"
+        );
     }
 
     #[test]
@@ -1440,7 +1448,7 @@ mod tests {
                 "Window start: 2026-10-23 10:00 UTC",
                 "Window end: 2026-10-23 10:30 UTC",
                 "Details: score 4.20 over threshold 3.00 p95\nsecond line",
-                "View in OpenObserve: https://o2.example.com/web/alerts/anomaly/edit/an-42",
+                "Open detector: https://o2.example.com/web/alerts/anomaly/edit/an-42",
             ]
             .join("\n")
         );
@@ -1448,7 +1456,7 @@ mod tests {
 
     #[test]
     fn anomaly_comments_print_the_kind_and_first_line() {
-        let link = " View in OpenObserve: https://o2.example.com/web/alerts/anomaly/edit/an-42";
+        let link = " Open detector: https://o2.example.com/web/alerts/anomaly/edit/an-42";
         assert_eq!(
             comment(&anomaly_ctx("value", STATUS_FIRING)),
             format!(

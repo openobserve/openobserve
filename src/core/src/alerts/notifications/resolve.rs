@@ -1341,16 +1341,17 @@ mod tests {
     }
 
     fn authored(links: &[(&str, &str)]) -> ContentSpec {
-        let mut spec = ContentSpec::default();
-        spec.links = links
-            .iter()
-            .map(|(label, url)| ContentLink {
-                label: (*label).into(),
-                url: (*url).into(),
-                show_when: None,
-            })
-            .collect();
-        spec
+        ContentSpec {
+            links: links
+                .iter()
+                .map(|(label, url)| ContentLink {
+                    label: (*label).into(),
+                    url: (*url).into(),
+                    show_when: None,
+                })
+                .collect(),
+            ..Default::default()
+        }
     }
 
     #[test]
