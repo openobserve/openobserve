@@ -24,14 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <HomeChatsRail v-if="railReady" />
     </aside>
-    <AssistantCapabilities
-      v-if="view === 'capabilities'"
-      class="min-w-0 flex-1"
-      @back="backHome"
-      @try="tryPrompt"
-    />
     <div
-      v-else
       class="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-y-auto px-4 py-4"
       data-test="assistant-home-tab"
       :data-state="state"
@@ -55,16 +48,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :page-range="pageRange"
           class="mx-auto max-w-3xl"
         />
-        <OButton
-          v-if="!offReason"
-          variant="ghost-primary"
-          size="sm"
-          class="mx-auto"
-          data-test="assistant-home-capabilities"
-          @click="view = 'capabilities'"
-        >
-          {{ t("home.agent.capabilities.open") }}
-        </OButton>
         <HomeNeedsAttention
           class="mt-4"
           :snapshot="attentionSnapshot"
@@ -103,7 +86,6 @@ import {
 import { useRoute, useRouter, type RouteLocationRaw } from "vue-router";
 
 import AssistantLauncher from "@/components/ai-assistant/welcome/AssistantLauncher.vue";
-import OButton from "@/lib/core/Button/OButton.vue";
 import type { ComposerState } from "@/composables/assistant";
 import { HOME_TAB_QUERY_KEY } from "@/composables/assistant/pure";
 import type { OverviewNowRow, OverviewNowSnapshot } from "@/composables/contextProviders/types";
@@ -115,7 +97,6 @@ import { sqlEquals } from "@/utils/query/sqlFilterBuilder";
 
 import AgentHomeAskNote from "./AgentHomeAskNote.vue";
 import AgentHomeGreeting from "./AgentHomeGreeting.vue";
-import AssistantCapabilities from "./AssistantCapabilities.vue";
 import HomeNeedsAttention, { type EmptyState } from "./HomeNeedsAttention.vue";
 import type { NowRowMeta } from "./HomeNowRow.vue";
 import { healthState } from "./homeHealth";
@@ -233,20 +214,7 @@ const attentionEmpty = computed<EmptyState | null>(() => {
 const entering = ref(true);
 onDeactivated(() => (entering.value = false));
 
-const view = ref<"home" | "capabilities">("home");
 const launcher = ref<InstanceType<typeof AssistantLauncher> | null>(null);
-
-// Back on Home the field is mounted again, so the sample question is staged after the swap.
-function tryPrompt(prompt: string): void {
-  view.value = "home";
-  void nextTick(() => launcher.value?.fill?.(prompt));
-}
-
-// Arriving on the AI tab puts the cursor in the Ask box; the launcher skips it when it must not steal focus.
-function backHome(): void {
-  view.value = "home";
-  focusAsk();
-}
 
 function focusAsk(): void {
   void nextTick(() => launcher.value?.focusAsk?.());
