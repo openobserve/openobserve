@@ -30,6 +30,8 @@ const THIRD_PARTY_CONSOLE_NOISE = [
   /RS SDK/,
   /e1\.zinclabs\.dev/,
   /sourceConfig/,
+  // reo.dev analytics is CORS-blocked from alpha too.
+  /api\.reo\.dev/,
 ];
 
 /**
