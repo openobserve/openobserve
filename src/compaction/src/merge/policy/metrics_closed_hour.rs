@@ -58,12 +58,10 @@ pub(super) async fn plan(
 ) -> RoundPlan {
     let (files, legacy_files) = split_legacy_metrics(files);
     let mut batches = legacy_batches(legacy_files, limits);
-    let indexed = indexed_plan(files, limits, schema, stream).await;
-    batches.extend(indexed.batches);
-    RoundPlan {
-        batches,
-        needs_another_round: indexed.needs_another_round,
-    }
+    let mut plan = indexed_plan(files, limits, schema, stream).await;
+    batches.append(&mut plan.batches);
+    plan.batches = batches;
+    plan
 }
 
 /// The hash-ordered files: a pre-merge while over the merge-group cap, else the indexed merge.
@@ -94,12 +92,9 @@ async fn indexed_plan(
 
     let pre_merge = pre_merge_batches(&files, limits.max_merge_groups, schema, stream).await;
     if pre_merge.is_empty() {
-        return RoundPlan::last(vec![(files, MergeMode::MetricsIndexed)]);
+        return RoundPlan::new(vec![(files, MergeMode::MetricsIndexed)]);
     }
-    RoundPlan {
-        batches: pre_merge,
-        needs_another_round: true,
-    }
+    RoundPlan::new(pre_merge).with_another_round()
 }
 
 fn metrics_index_merge_scope(files: &[FileKey], max_file_size: usize) -> MetricsIndexMergeScope {

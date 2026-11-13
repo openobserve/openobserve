@@ -79,12 +79,16 @@ pub(super) struct RoundPlan {
 }
 
 impl RoundPlan {
-    /// A round after which the window is settled.
-    fn last(batches: Vec<PlannedBatch>) -> Self {
+    fn new(batches: Vec<PlannedBatch>) -> Self {
         Self {
             batches,
             needs_another_round: false,
         }
+    }
+
+    fn with_another_round(mut self) -> Self {
+        self.needs_another_round = true;
+        self
     }
 }
 
@@ -155,7 +159,7 @@ impl MergePolicy {
             }
             #[cfg(feature = "enterprise")]
             Self::Downsampling(rule) => {
-                RoundPlan::last(vec![(files, MergeMode::Downsampling(rule.clone()))])
+                RoundPlan::new(vec![(files, MergeMode::Downsampling(rule.clone()))])
             }
         };
         // a rule may plan a batch of no files: nothing to merge

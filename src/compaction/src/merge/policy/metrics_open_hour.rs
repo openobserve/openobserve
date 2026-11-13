@@ -32,7 +32,7 @@ pub(super) fn plan(files: Vec<FileKey>, limits: &BatchLimits<'_>) -> RoundPlan {
     let (files, legacy_files) = split_legacy_metrics(files);
     let mut batches = legacy_batches(legacy_files, limits);
     batches.extend(pending_batches(&files, limits));
-    RoundPlan::last(batches)
+    RoundPlan::new(batches)
 }
 
 /// The pending ingester files, once enough piled up, in batches of at most the merge-group cap.

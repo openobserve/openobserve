@@ -24,7 +24,7 @@ use super::{BatchLimits, PlannedBatch, RoundPlan};
 pub(super) const READS_WHOLE_WINDOW: bool = false;
 
 pub(super) fn plan(files: &[FileKey], limits: &BatchLimits<'_>, mode: &MergeMode) -> RoundPlan {
-    RoundPlan::last(batches(files, limits, mode))
+    RoundPlan::new(batches(files, limits, mode))
 }
 
 /// Size-bounded groups of `files`, each merged in `mode`.
