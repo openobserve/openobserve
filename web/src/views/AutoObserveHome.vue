@@ -34,9 +34,13 @@ import { useAutoObserveView } from "@/components/autoobserve/v2/useAutoObserveVi
 // Loaded on demand, so a visitor downloads the live pages or the sample pages, never both.
 const AutoObserve = defineAsyncComponent(() => import("@/views/AutoObserve.vue"));
 const AutoObserve2 = defineAsyncComponent(() => import("@/views/AutoObserve2.vue"));
-// The sample pages read their data synchronously, so it is installed before they mount.
+// The sample pages read their data and their copy synchronously, so both are installed before they mount.
 const AutoObserveMock = defineAsyncComponent(async () => {
-  const facts = await import("@/components/autoobserve/mock/data/facts");
+  const [facts, locale] = await Promise.all([
+    import("@/components/autoobserve/mock/data/facts"),
+    import("@/components/autoobserve/mock/locale"),
+  ]);
+  locale.installMockLocale();
   await facts.factsReady;
   return import("@/components/autoobserve/mock/views/AutoObserveMockHome.vue");
 });

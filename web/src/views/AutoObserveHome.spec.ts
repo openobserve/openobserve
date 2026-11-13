@@ -18,7 +18,10 @@ import { mount } from "@vue/test-utils";
 import { h, reactive, ref } from "vue";
 import type { RouteLocationNormalized } from "vue-router";
 import type { InsightAskPayload } from "@/components/autoobserve/insight/insightCta";
+import mockMessages from "@/components/autoobserve/mock/locale/en-US.json";
 import { keepLiveMode, liveQuery } from "@/components/autoobserve/v2/autoobserveRoute";
+import i18n from "@/locales";
+import appMessages from "@/locales/languages/en-US.json";
 import AutoObserveHome from "./AutoObserveHome.vue";
 
 const view = ref<"standard" | "nerd">("standard");
@@ -80,8 +83,25 @@ const mountHome = async (query: Record<string, string>) => {
 
 const at = (query: Record<string, string>) => ({ path: "/autoobserve", hash: "", query });
 
+const leafKeys = (node: object, path = ""): string[] =>
+  Object.entries(node).flatMap(([key, value]) =>
+    typeof value === "object" ? leafKeys(value, `${path}${key}.`) : [`${path}${key}`],
+  );
+
 describe("AutoObserveHome", () => {
   afterEach(() => vi.unstubAllEnvs());
+
+  // Runs first: the i18n instance is shared, so a later test would see the copy already registered.
+  it("the sample page registers its own copy before it mounts, and replaces none of the app's", async () => {
+    const sampleKeys = leafKeys(mockMessages);
+    const registered = () => sampleKeys.filter((key) => i18n.global.te(key, "en-us"));
+    expect(registered()).toEqual([]);
+    const appKeys = new Set(leafKeys(appMessages));
+    expect(sampleKeys.filter((key) => appKeys.has(key))).toEqual([]);
+    const w = await mountHome({});
+    expect(registered()).toEqual(sampleKeys);
+    w.unmount();
+  });
 
   it.each([
     [{}, "sample"],
