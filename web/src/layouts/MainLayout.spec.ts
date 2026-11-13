@@ -2318,7 +2318,12 @@ describe("license search banner mount", () => {
 
 describe("MainLayout — org switch on a dashboard route", () => {
   const StubDiv = defineComponent({ name: "StubDiv", setup: () => () => h("div") });
-  const switchOrgAt = async (routeName: string, path: string) => {
+  const switchOrgAt = async (
+    routeName: string,
+    path: string,
+    opts: { blockLeave?: boolean; currentOrg?: string; picked?: string } = {},
+  ) => {
+    const { blockLeave = false, currentOrg, picked = "other_org" } = opts;
     const router = createRouter({
       history: createMemoryHistory(),
       routes: [
@@ -2326,6 +2331,7 @@ describe("MainLayout — org switch on a dashboard route", () => {
         { path: "/dashboards", name: "dashboards", component: StubDiv },
       ],
     });
+    if (blockLeave) router.beforeEach((to) => (to.name === "dashboards" ? false : true));
     await router.push({ name: routeName, query: { dashboard: "d1", folder: "f1" } });
     const wrapper = mount(MainLayout, {
       global: {
@@ -2348,21 +2354,57 @@ describe("MainLayout — org switch on a dashboard route", () => {
       },
     });
     await flushPromises();
+    if (currentOrg)
+      store.state.selectedOrganization = { identifier: currentOrg, label: currentOrg };
+    const orgBefore = store.state.selectedOrganization?.identifier;
+    const dispatchSpy = vi.spyOn(store, "dispatch");
     const vm = wrapper.vm as any;
-    vm.selectedOrg = { identifier: "other_org", label: "other_org" };
+    vm.selectedOrg = { identifier: picked, label: picked };
     await vm.updateOrganization();
     await flushPromises();
     const route = router.currentRoute.value;
+    const orgAfter = store.state.selectedOrganization?.identifier;
+    const pickerAfter = vm.selectedOrg?.identifier;
+    const resets = dispatchSpy.mock.calls.filter(([action]) => action === "logs/resetLogs").length;
+    dispatchSpy.mockRestore();
     wrapper.unmount();
-    return route;
+    return { route, orgBefore, orgAfter, resets, pickerAfter };
   };
 
   it.each([
     ["viewDashboard", "/dashboards/view"],
     ["addPanel", "/dashboards/add_panel"],
   ])("sends %s to the dashboards list of the new org", async (name, path) => {
-    const route = await switchOrgAt(name, path);
+    const { route } = await switchOrgAt(name, path);
     expect(route.name).toBe("dashboards");
     expect(route.query).toEqual({ org_identifier: "other_org" });
+  });
+
+  it("keeps the current org when leaving the dashboard is declined", async () => {
+    const { route, orgBefore, orgAfter, resets, pickerAfter } = await switchOrgAt(
+      "viewDashboard",
+      "/dashboards/view",
+      { blockLeave: true, currentOrg: "current_org" },
+    );
+    expect(orgBefore).toBe("current_org");
+    expect(route.name).toBe("viewDashboard");
+    expect(orgAfter).toBe("current_org");
+    expect(pickerAfter).toBe("current_org");
+    expect(resets).toBe(0);
+  });
+
+  it("keeps a non-dashboard route on its own path with the new org", async () => {
+    const { route, resets } = await switchOrgAt("somewhere", "/somewhere");
+    expect(route.name).toBe("somewhere");
+    expect(route.query).toEqual({ org_identifier: "other_org" });
+    expect(resets).toBe(1);
+  });
+
+  it("stays on the dashboard when the org picked is the current one", async () => {
+    const { route } = await switchOrgAt("viewDashboard", "/dashboards/view", {
+      currentOrg: "same_org",
+      picked: "same_org",
+    });
+    expect(route.name).toBe("viewDashboard");
   });
 });

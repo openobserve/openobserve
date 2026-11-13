@@ -323,7 +323,7 @@ import {
 } from "vue";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
-import { useRoute, useRouter, RouterView } from "vue-router";
+import { useRoute, useRouter, RouterView, isNavigationFailure } from "vue-router";
 import { solutionModeForPath } from "@/utils/security/solutionMode";
 import { useSecurityAccess } from "@/composables/security/useSecurityAccess";
 import config from "../aws-exports";
@@ -1326,16 +1326,32 @@ export default defineComponent({
     }
 
     const updateOrganization = async () => {
+      const targetOrg = { ...selectedOrg.value };
+      const orgIdentifier = targetOrg.identifier;
+      const onDashboardRoute = DASHBOARD_SCOPED_ROUTES.includes(
+        String(router.currentRoute.value.name),
+      );
+      if (onDashboardRoute) {
+        if (orgIdentifier === store.state.selectedOrganization?.identifier) return;
+        // leave before anything resets: a dashboard id is org-scoped and would 404 in the new org
+        const failure = await router.push({
+          name: "dashboards",
+          query: { org_identifier: orgIdentifier },
+        });
+        if (isNavigationFailure(failure)) {
+          // the leave was blocked (e.g. the unsaved-changes prompt was declined), so the user stays in the current org
+          selectedOrg.value = { ...store.state.selectedOrganization };
+          return;
+        }
+      }
       resetStreams();
       store.dispatch("logs/resetLogs");
       store.dispatch("setIsDataIngested", false);
-      const orgIdentifier = selectedOrg.value.identifier;
-      const queryParams =
-        router.currentRoute.value.path.indexOf(".logs") > -1 ? router.currentRoute.value.query : {};
-      if (DASHBOARD_SCOPED_ROUTES.includes(String(router.currentRoute.value.name))) {
-        // leave before the org changes: a dashboard id is org-scoped and would 404 in the new org
-        await router.push({ name: "dashboards", query: { org_identifier: orgIdentifier } });
-      } else {
+      if (!onDashboardRoute) {
+        const queryParams =
+          router.currentRoute.value.path.indexOf(".logs") > -1
+            ? router.currentRoute.value.query
+            : {};
         router.push({
           path: router.currentRoute.value.path,
           query: {
@@ -1344,8 +1360,8 @@ export default defineComponent({
           },
         });
       }
-      useLocalOrganization(selectedOrg.value);
-      store.dispatch("setSelectedOrganization", { ...selectedOrg.value });
+      useLocalOrganization(targetOrg);
+      store.dispatch("setSelectedOrganization", targetOrg);
       // setSelectedOrganization();
       // if (
       //   config.isCloud &&
@@ -1374,7 +1390,7 @@ export default defineComponent({
         store.state.zoConfig.restricted_routes_on_empty_data == true &&
         store.state.organizationData.isDataIngested == false
       ) {
-        await verifyStreamExist(selectedOrg.value);
+        await verifyStreamExist(targetOrg);
       }
     };
 
