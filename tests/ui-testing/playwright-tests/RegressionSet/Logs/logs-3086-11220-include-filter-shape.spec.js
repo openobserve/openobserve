@@ -1,8 +1,8 @@
 const { test, expect, navigateToBase } = require('../../utils/enhanced-baseFixtures.js');
 const testLogger = require('../../utils/test-logger.js');
 const PageManager = require('../../../pages/page-manager.js');
-const { getHeaders, getIngestionUrl, waitForStreamData } = require('../../utils/data-ingestion.js');
-const { getAuthHeaders, getOrgIdentifier } = require('../../utils/cloud-auth.js');
+const { waitForStreamData } = require('../../utils/data-ingestion.js');
+const { ingestLogRows, deleteLogStreamQuietly } = require('../../utils/regression-seed-api.js');
 
 const ROWS = [
   { svc: 'alpha', ns: 'ns-a', host: 'host-a', pod: 'pod-a', level: 'info', message: 'ovn-b-include alpha 1' },
@@ -10,22 +10,6 @@ const ROWS = [
   { svc: 'beta', ns: 'ns-b', host: 'host-b', pod: 'pod-b', level: 'info', message: 'ovn-b-include beta 1' },
   { svc: 'beta', ns: 'ns-b', host: 'host-b', pod: 'pod-b', level: 'warn', message: 'ovn-b-include beta 2' },
 ];
-
-function orgId() {
-  return getOrgIdentifier() || 'default';
-}
-
-async function openLogsWithFilter(page, stream, filter) {
-  const query = encodeURIComponent(Buffer.from(filter).toString('base64'));
-  await page.goto(`${process.env.ZO_BASE_URL}/web/logs?org_identifier=${orgId()}&stream_type=logs&stream=${stream}&period=15m&sql_mode=false&quick_mode=false&query=${query}`);
-}
-
-async function includeFromFirstRow(pm, rowText, field) {
-  await pm.logsPage.openLogDetailForRowContaining(rowText);
-  await pm.logsPage.clickLogDetailTableTab();
-  await pm.logsPage.includeLogDetailFieldValue(field);
-  await pm.logsPage.clickCloseDialog();
-}
 
 test.describe('Logs Include Search Term query shape (ENT#3086, OSS#11220)', () => {
   test.describe.configure({ mode: 'parallel' });
@@ -37,27 +21,26 @@ test.describe('Logs Include Search Term query shape (ENT#3086, OSS#11220)', () =
     await navigateToBase(page);
     pm = new PageManager(page);
     stream = 'ovn_b_include_' + Math.random().toString(36).slice(2, 8);
-    const ingest = await page.request.post(getIngestionUrl(orgId(), stream), { headers: getHeaders(), data: ROWS });
+    const ingest = await ingestLogRows(page.request, stream, ROWS);
     expect(ingest.status(), 'Precondition: rows must ingest').toBe(200);
     await waitForStreamData(page, stream, ROWS.length);
   });
 
   test.afterEach(async ({ page }, testInfo) => {
-    const base = process.env.ZO_BASE_URL_SC || process.env.ZO_BASE_URL;
-    await page.request.delete(`${base}/api/${orgId()}/streams/${stream}?type=logs`, { headers: getAuthHeaders() }).catch(() => {});
+    await deleteLogStreamQuietly(page.request, stream);
     testLogger.testEnd(testInfo.title, testInfo.status);
   });
 
   test('three includes in a row keep one bracket around the original filter (ENT#3086)', {
     tag: ['@bug-ent3086', '@P2', '@regression', '@logsRegression'],
   }, async ({ page }) => {
-    await openLogsWithFilter(page, stream, "svc = 'alpha'");
+    await pm.logsPage.openLogsWithFilter(stream, "svc = 'alpha'");
     await pm.logsPage.getQueryEditorTextWhenReady("svc = 'alpha'");
     await pm.logsPage.clickRefreshButton();
     await expect.poll(async () => (await pm.logsPage.getResultRowTexts()).length, { timeout: 30000 }).toBe(2);
 
     for (const field of ['ns', 'host', 'pod']) {
-      await includeFromFirstRow(pm, 'ovn-b-include alpha', field);
+      await pm.logsPage.includeFieldFromRowContaining('ovn-b-include alpha', field);
       await pm.logsPage.getQueryEditorTextWhenReady(`${field} = '${field}-a'`);
     }
 
@@ -79,7 +62,7 @@ test.describe('Logs Include Search Term query shape (ENT#3086, OSS#11220)', () =
     await pm.logsPage.clickRefreshButton();
     await expect.poll(async () => (await pm.logsPage.getResultRowTexts()).length, { timeout: 30000 }).toBe(2);
 
-    await includeFromFirstRow(pm, '"svc":"alpha"', 'svc');
+    await pm.logsPage.includeFieldFromRowContaining('"svc":"alpha"', 'svc');
     const query = (await pm.logsPage.getQueryEditorTextWhenReady("svc = 'alpha'")).replace(/\s+/g, ' ');
     testLogger.info(`Query after include: ${query}`);
 

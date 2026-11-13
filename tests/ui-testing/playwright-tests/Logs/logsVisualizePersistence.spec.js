@@ -17,26 +17,6 @@ async function ingestTestData(page) {
   await _ingestData(page);
 }
 
-// SQL of every Visualize panel query the page sends from now on, read from the request body.
-function collectVisualizeSql(page) {
-  const seen = [];
-  page.on('request', (req) => {
-    const url = req.url();
-    if (req.method() !== 'POST' || !/\/(_search_stream|_search|result_schema)\?/.test(url)) return;
-    if (!url.includes('type=dashboards') && !url.includes('fallback_order_by_col')) return;
-    try {
-      const body = JSON.parse(req.postData() || '{}');
-      let sql = body?.query?.sql;
-      // With sql_base64_enabled the UI sends URL-safe base64.
-      if (sql && (body.encoding === 'base64' || body?.query?.encoding === 'base64')) {
-        sql = Buffer.from(sql.replace(/-/g, '+').replace(/_/g, '/').replace(/\./g, '='), 'base64').toString('utf-8');
-      }
-      if (sql) seen.push(sql);
-    } catch { /* non-JSON body */ }
-  });
-  return seen;
-}
-
 // ----- Test Suite -----
 
 test.describe("Logs Visualization State Persistence testcases", () => {
@@ -616,7 +596,7 @@ test.describe("Logs Visualization State Persistence testcases", () => {
     await pm.logsPage.openLogsWithSqlQuery('e2e_automate', sql);
     await pm.logsPage.applyQueryAndWaitForSearchResponse();
 
-    const visualizeSql = collectVisualizeSql(page);
+    const visualizeSql = pm.logsPage.collectVisualizeSql();
     await pm.logsPage.clickVisualizeToggle();
     await pm.logsPage.expectVisualizeTabContentVisible();
     // Pre-fix the generated chart query dropped the NOT IN, so the chart counted the excluded rows too.
@@ -633,7 +613,7 @@ test.describe("Logs Visualization State Persistence testcases", () => {
     await pm.logsPage.getQueryEditorTextWhenReady(filter);
     await pm.logsPage.applyQueryAndWaitForSearchResponse();
 
-    const visualizeSql = collectVisualizeSql(page);
+    const visualizeSql = pm.logsPage.collectVisualizeSql();
     await pm.logsPage.clickVisualizeToggle();
     await pm.logsPage.expectVisualizeTabContentVisible();
     await expect.poll(() => visualizeSql.join('\n'), { timeout: 30000 })

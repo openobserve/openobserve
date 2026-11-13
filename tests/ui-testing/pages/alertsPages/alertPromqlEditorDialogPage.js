@@ -1,5 +1,7 @@
 import { expect } from '@playwright/test';
 
+const WHEEL_SPACING_MS = 150;
+
 export class AlertPromqlEditorDialogPage {
   constructor(page) {
     this.page = page;
@@ -65,14 +67,36 @@ export class AlertPromqlEditorDialogPage {
     }, this.dialogRoot);
   }
 
-  async wheelOverEditor(times, deltaY, pauseMs) {
+  /** Returns a live list of "ResizeObserver loop" console messages and page errors from now on. */
+  collectResizeObserverErrors() {
+    const errors = [];
+    this.page.on('console', (msg) => { if (/ResizeObserver loop/i.test(msg.text())) errors.push(msg.text()); });
+    this.page.on('pageerror', (err) => { if (/ResizeObserver loop/i.test(err.message)) errors.push(err.message); });
+    return errors;
+  }
+
+  async wheelOverEditor(times, deltaY) {
     const box = await this.editor().boundingBox();
     await this.page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
     for (let i = 0; i < times; i++) {
       await this.page.mouse.wheel(0, deltaY);
       // Spaced wheels give a ResizeObserver feedback loop time to grow the editor between events.
-      await this.page.waitForTimeout(pauseMs);
+      await this.page.waitForTimeout(WHEEL_SPACING_MS);
     }
+  }
+
+  /** Polls until the editor has held `height` with no dialog scroll for `samples` consecutive reads. */
+  async expectEditorSteadyAt(height, { samples = 8, timeout = 20000 } = {}) {
+    let streak = 0;
+    await expect.poll(async () => {
+      const { height: h, scrolled } = await this.measureEditor();
+      streak = h === height && scrolled === 0 ? streak + 1 : 0;
+      return streak;
+    }, {
+      timeout,
+      intervals: [500],
+      message: `editor must hold ${height}px with no dialog scroll after the wheel stops`,
+    }).toBeGreaterThanOrEqual(samples);
   }
 
   async expectFirstLineInsideEditor() {

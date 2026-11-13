@@ -73,6 +73,27 @@ export class LogsAutoRefreshPage {
     await expect(this.page.locator(this.histogram)).not.toContainText(/no data/i);
   }
 
+  /** Returns a live list of the URLs of every search POST the page sends from now on. */
+  trackSearchUrls() {
+    const urls = [];
+    this.page.on('request', (req) => {
+      if (req.method() === 'POST' && /\/_search(_stream)?\?/.test(req.url())) urls.push(req.url());
+    });
+    return urls;
+  }
+
+  /** Returns a live list of { org, histogram } for every search POST whose body names `stream`. */
+  trackStreamSearches(stream) {
+    const log = [];
+    this.page.on('request', (req) => {
+      const url = req.url();
+      if (req.method() === 'POST' && /\/_search(_stream)?\?/.test(url) && (req.postData() || '').includes(stream)) {
+        log.push({ org: url.split('/api/')[1].split('/')[0], histogram: url.includes('is_ui_histogram=true') });
+      }
+    });
+    return log;
+  }
+
   async switchOrg(orgId) {
     await this.page.locator(this.orgSelectTrigger).click();
     await this.page.locator(this.orgMenuItem(orgId)).first().click();

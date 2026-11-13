@@ -1,12 +1,8 @@
 const { test, expect, navigateToBase } = require('../../utils/enhanced-baseFixtures.js');
 const testLogger = require('../../utils/test-logger.js');
 const PageManager = require('../../../pages/page-manager.js');
-const { getHeaders, getIngestionUrl, waitForStreamData } = require('../../utils/data-ingestion.js');
-const { getAuthHeaders, getOrgIdentifier } = require('../../utils/cloud-auth.js');
-
-function orgId() {
-  return getOrgIdentifier() || 'default';
-}
+const { waitForStreamData } = require('../../utils/data-ingestion.js');
+const { ingestLogRows, deleteLogStreamQuietly } = require('../../utils/regression-seed-api.js');
 
 test.describe('Logs Recent searches drawer: status chips, run counts, footer (OSS#16429)', () => {
   test.describe.configure({ mode: 'serial' });
@@ -19,14 +15,13 @@ test.describe('Logs Recent searches drawer: status chips, run counts, footer (OS
     pm = new PageManager(page);
     stream = 'ovn_b_recent_' + Math.random().toString(36).slice(2, 8);
     const rows = [{ marker: 'hit', message: 'ovn-b-16429 a' }, { marker: 'hit', message: 'ovn-b-16429 b' }];
-    const ingest = await page.request.post(getIngestionUrl(orgId(), stream), { headers: getHeaders(), data: rows });
+    const ingest = await ingestLogRows(page.request, stream, rows);
     expect(ingest.status(), 'Precondition: rows must ingest').toBe(200);
     await waitForStreamData(page, stream, rows.length);
   });
 
   test.afterEach(async ({ page }, testInfo) => {
-    const base = process.env.ZO_BASE_URL_SC || process.env.ZO_BASE_URL;
-    await page.request.delete(`${base}/api/${orgId()}/streams/${stream}?type=logs`, { headers: getAuthHeaders() }).catch(() => {});
+    await deleteLogStreamQuietly(page.request, stream);
     testLogger.testEnd(testInfo.title, testInfo.status);
   });
 
