@@ -1056,12 +1056,11 @@ export default defineComponent({
 
     const { builderOn: filterBuilderOn, toggle: toggleFilterBuilder } =
       useFilterBuilderPreference("o2.traces.queryInput");
-    const filterBuilderRef = ref(null);
+    const filterBuilderRef = ref<InstanceType<typeof SqlFilterBuilder> | null>(null);
     // The query pane grows with the builder's lines (it caps itself at three), so nothing in it is cut.
     const filterBuilderGrowth = useFilterBarGrowth(filterBuilderRef);
     // The pane is taller than the bar, so a press on its blank part must still start a filter.
-    const activateFilterBuilder = () =>
-      (filterBuilderRef.value as { activate?: () => void } | null)?.activate?.();
+    const activateFilterBuilder = () => filterBuilderRef.value?.activate();
     watch(filterBuilderGrowth, (growth) => emit("filterBuilderGrowth", growth), {
       immediate: true,
     });
