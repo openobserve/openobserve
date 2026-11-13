@@ -879,7 +879,7 @@ const buildWhereClause = (filterData: any, dashboardPanelData: any) => {
  * operator before empty ones are dropped; dropping first shifts the operators
  * and can leave a trailing AND.
  */
-const joinConditions = (conditions: any[], dashboardPanelData: any): string =>
+export const joinConditions = (conditions: any[], dashboardPanelData: any): string =>
   buildConditionList(conditions ?? [], dashboardPanelData)
     .map((part, index) => (index === 0 ? part.sql : `${part.logicalOperator} ${part.sql}`))
     .join(" ");

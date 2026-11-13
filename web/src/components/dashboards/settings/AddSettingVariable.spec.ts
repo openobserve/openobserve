@@ -187,6 +187,14 @@ vi.mock("./common/DashboardHeader.vue", () => ({
   },
 }));
 
+vi.mock("./QueryVariableEditor.vue", () => ({
+  default: {
+    name: "QueryVariableEditor",
+    template: '<div data-test="query-variable-editor-mock"></div>',
+    props: ["dashboardVariablesList"],
+  },
+}));
+
 vi.mock("../addPanel/CommonAutoComplete.vue", () => ({
   default: {
     name: "CommonAutoComplete",
@@ -226,6 +234,32 @@ describe("AddSettingVariable", () => {
   });
 
   describe("Variable Types", () => {
+    it("describes the selected type below the type picker", async () => {
+      expect(wrapper.vm.selectedTypeDescription).toBe(
+        "dashboard.queryVariable.typeQueryValuesDescription",
+      );
+      wrapper.vm.variableData.type = "custom";
+      await nextTick();
+      expect(wrapper.vm.selectedTypeDescription).toBe(
+        "dashboard.queryVariable.typeCustomDescription",
+      );
+    });
+
+    it("renders the query editor and the shared multi-select options in custom mode", async () => {
+      await wrapper.vm.onQueryModeChange("custom");
+      await flushPromises();
+      expect(wrapper.find('[data-test="query-variable-editor-mock"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-variable-stream-select"]').exists()).toBe(false);
+      expect(
+        wrapper.find('[data-test="dashboard-query_values-show_multiple_values"]').exists(),
+      ).toBe(true);
+      expect(
+        wrapper
+          .find('[data-test="dashboard-multi-select-default-value-toggle-first-value"]')
+          .exists(),
+      ).toBe(true);
+    });
+
     it("should show appropriate fields based on variable type", async () => {
       // Test query_values type
       wrapper.vm.variableData.type = "query_values";
@@ -425,6 +459,43 @@ describe("AddSettingVariable", () => {
       expect(builder().props("dataTest")).toBe("dashboard-variable-filter-builder");
     });
 
+    const orGroup = {
+      filterType: "group",
+      logicalOperator: "AND",
+      conditions: [
+        {
+          type: "condition",
+          column: { field: "env" },
+          filterType: "condition",
+          operator: "=",
+          value: "$env",
+          logicalOperator: "AND",
+          values: [],
+        },
+        {
+          type: "condition",
+          column: { field: "level" },
+          filterType: "condition",
+          operator: "=",
+          value: "error",
+          logicalOperator: "OR",
+          values: [],
+        },
+      ],
+    };
+    const payloadFor = (queryData: Record<string, unknown>) =>
+      wrapper.vm.buildVariablePayload({
+        ...JSON.parse(JSON.stringify(wrapper.vm.form.state.values)),
+        name: "v",
+        query_data: {
+          ...JSON.parse(JSON.stringify(wrapper.vm.form.state.values.query_data)),
+          stream_type: "logs",
+          stream: "s1",
+          field: "f1",
+          ...queryData,
+        },
+      }).query_data;
+
     it("hands the builder the saved rows untouched", async () => {
       const saved = [
         { name: "k8s_namespace_name", operator: "IN", value: "('prod','dev')" },
@@ -433,14 +504,47 @@ describe("AddSettingVariable", () => {
       ];
       wrapper.vm.form.setFieldValue("query_data.filter", JSON.parse(JSON.stringify(saved)));
       await flushPromises();
-      expect(JSON.stringify(builder().props("modelValue"))).toBe(JSON.stringify(saved));
+      expect(JSON.stringify(builder().props("modelValue"))).toBe(JSON.stringify({ filter: saved }));
     });
 
     it("writes the builder's rows into the form", async () => {
       const next = [{ name: "level", operator: "=", value: "error" }];
-      builder().vm.$emit("update:modelValue", next);
+      builder().vm.$emit("update:modelValue", { filter: next });
       await flushPromises();
       expect(wrapper.vm.form.state.values.query_data.filter).toEqual(next);
+      expect(wrapper.vm.form.state.values.query_data.filter_group).toBeUndefined();
+    });
+
+    it("saves AND-only rows as the flat filter, exactly as written", async () => {
+      const rows = [{ name: "level", operator: "!=", value: "$level" }];
+      builder().vm.$emit("update:modelValue", { filter: rows });
+      await flushPromises();
+      const queryData = payloadFor({});
+      expect(queryData.filter).toEqual(rows);
+      expect(queryData).not.toHaveProperty("filter_group");
+    });
+
+    it("saves an OR filter as filter_group without a flat filter copy", async () => {
+      builder().vm.$emit("update:modelValue", { filter_group: orGroup });
+      await flushPromises();
+      expect(wrapper.vm.form.state.values.query_data.filter).toBeUndefined();
+      const queryData = payloadFor({});
+      expect(queryData.filter_group).toEqual(orGroup);
+      expect(queryData).not.toHaveProperty("filter");
+    });
+
+    it("uses the AND-only profile for PromQL and keeps a SQL group as it is", async () => {
+      wrapper.vm.form.setFieldValue("query_data.stream_type", "metrics");
+      wrapper.vm.form.setFieldValue("query_data.query_type", "promql");
+      await flushPromises();
+      expect(builder().props("profile")).toBe("dashboard-variable-promql");
+      const queryData = payloadFor({
+        stream_type: "metrics",
+        filter: [],
+        filter_group: JSON.parse(JSON.stringify(orGroup)),
+      });
+      expect(queryData.filter_group).toEqual(orGroup);
+      expect(queryData).not.toHaveProperty("filter");
     });
 
     it("offers the stream's fields and the visible $variables", async () => {
@@ -457,6 +561,29 @@ describe("AddSettingVariable", () => {
       wrapper.vm.dashboardVariablesFilterItems.forEach((item: any) =>
         expect(suggestions).toContain(item.value),
       );
+    });
+
+    it("offers PromQL only the metric's labels, not its storage columns", async () => {
+      wrapper.vm.form.setFieldValue("query_data.stream_type", "metrics");
+      wrapper.vm.form.setFieldValue("query_data.query_type", "promql");
+      await flushPromises();
+      wrapper.vm.data.currentFieldsList = [
+        { name: "__hash__", type: "Utf8" },
+        { name: "__name__", type: "Utf8" },
+        { name: "_timestamp", type: "Int64" },
+        { name: "cluster", type: "Utf8" },
+        { name: "value", type: "Float64" },
+      ];
+      await flushPromises();
+      expect(builder().props("fields")).toEqual([{ name: "cluster", type: "string" }]);
+      const fieldOptions = wrapper
+        .findComponent('[data-test="dashboard-variable-field-select"]')
+        .props("options")
+        .map((option: any) => option.name);
+      expect(fieldOptions).toContain("cluster");
+      expect(fieldOptions).not.toContain("__hash__");
+      expect(fieldOptions).not.toContain("_timestamp");
+      expect(fieldOptions).not.toContain("value");
     });
 
     it("loads no values while the stream is itself a $variable", async () => {
@@ -834,6 +961,318 @@ describe("AddSettingVariable", () => {
     });
   });
 
+  describe("query mode and language", () => {
+    const setQueryData = async (values: Record<string, unknown>) => {
+      for (const [key, value] of Object.entries(values)) {
+        wrapper.vm.form.setFieldValue(`query_data.${key}`, value);
+      }
+      await flushPromises();
+    };
+    const exists = (dataTest: string) => wrapper.find(`[data-test="${dataTest}"]`).exists();
+
+    it("starts in auto mode with the stream, field and filters", () => {
+      expect(wrapper.vm.isCustomQuery).toBe(false);
+      expect(exists("dashboard-variable-query-mode")).toBe(true);
+      expect(exists("dashboard-variable-stream-select")).toBe(true);
+      expect(exists("dashboard-variable-field-select")).toBe(true);
+      expect(exists("dashboard-variable-filter-builder-root")).toBe(true);
+      expect(exists("query-variable-editor-mock")).toBe(false);
+    });
+
+    it("offers PromQL only for a metrics stream", async () => {
+      await setQueryData({ stream_type: "logs" });
+      expect(exists("dashboard-variable-query-language")).toBe(false);
+      await setQueryData({ stream_type: "metrics" });
+      expect(exists("dashboard-variable-query-language")).toBe(true);
+      await setQueryData({ stream_type: "traces" });
+      expect(exists("dashboard-variable-query-language")).toBe(false);
+    });
+
+    it("puts Auto/Custom in the options header and the language row alone under Stream Type", async () => {
+      const el = (dataTest: string) =>
+        wrapper.find(`[data-test="${dataTest}"]`).element as HTMLElement;
+      const follows = (a: string, b: string) =>
+        (el(a).compareDocumentPosition(el(b)) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+
+      await setQueryData({ stream_type: "metrics" });
+      expect(
+        follows("dashboard-variable-query-mode", "dashboard-variable-stream-type-select"),
+      ).toBe(true);
+      expect(
+        follows("dashboard-variable-stream-type-select", "dashboard-variable-query-language"),
+      ).toBe(true);
+      expect(follows("dashboard-variable-query-language", "dashboard-variable-stream-select")).toBe(
+        true,
+      );
+      expect(el("dashboard-variable-query-mode").parentElement?.textContent).toContain(
+        "Extra Options",
+      );
+      expect(el("dashboard-variable-query-mode").parentElement?.textContent).not.toContain(
+        "panel.SQL",
+      );
+
+      const row = wrapper.find('[data-test="dashboard-variable-query-language-row"]');
+      expect(row.text()).toContain("dashboard.queryVariable.queryLanguage");
+      expect(row.find('[data-test="dashboard-variable-query-language-sql"]').exists()).toBe(true);
+      expect(row.find('[data-test="dashboard-variable-stream-type-select"]').exists()).toBe(false);
+      expect(row.find('[data-test="dashboard-variable-stream-select"]').exists()).toBe(false);
+      expect(row.find('[data-test="dashboard-variable-query-mode"]').exists()).toBe(false);
+
+      wrapper.vm.onQueryModeChange("custom");
+      await flushPromises();
+      expect(
+        follows("dashboard-variable-stream-type-select", "dashboard-variable-query-language"),
+      ).toBe(true);
+      expect(follows("dashboard-variable-query-language", "query-variable-editor-mock")).toBe(true);
+    });
+
+    it("goes back to SQL when the stream type leaves metrics", async () => {
+      await setQueryData({ stream_type: "metrics", query_type: "promql" });
+      await wrapper.vm.streamTypeUpdated("logs");
+      await flushPromises();
+      expect(wrapper.vm.variableData.query_data.query_type).toBe("sql");
+    });
+
+    it("switches to custom with the prefilled query in the same tick, $variable filters included", async () => {
+      for (const [streamType, language, expected] of [
+        ["logs", "sql", `SELECT DISTINCT "host" FROM "default" WHERE "env" = '$env'`],
+        ["metrics", "sql", `SELECT DISTINCT "host" FROM "default" WHERE "env" = '$env'`],
+        ["metrics", "promql", 'label_values(default{env=~"$env"}, host)'],
+      ]) {
+        await setQueryData({
+          custom_query: false,
+          query: "",
+          stream_type: streamType,
+          stream: "default",
+          field: "host",
+          query_type: language,
+          filter: [{ name: "env", operator: "=", value: "$env" }],
+        });
+        wrapper.vm.onQueryModeChange("custom");
+        expect(wrapper.vm.variableData.query_data.custom_query).toBe(true);
+        expect(wrapper.vm.variableData.query_data.query).toBe(expected);
+        wrapper.vm.onQueryModeChange("auto");
+        await flushPromises();
+      }
+    });
+
+    it("offers PromQL in custom mode only for a metrics stream, and leaves it for SQL", async () => {
+      wrapper.vm.onQueryModeChange("custom");
+      await flushPromises();
+      expect(wrapper.vm.variableData.query_data.stream_type).toBe("logs");
+      expect(exists("dashboard-variable-query-language")).toBe(false);
+
+      await setQueryData({ stream_type: "metrics" });
+      expect(exists("dashboard-variable-query-language")).toBe(true);
+      wrapper.vm.onQueryLanguageChange("promql");
+      await setQueryData({ query: "label_names()" });
+
+      await setQueryData({ stream_type: "logs" });
+      await wrapper.vm.streamTypeUpdated("logs");
+      await flushPromises();
+      expect(wrapper.vm.variableData.query_data.query_type).toBe("sql");
+      expect(exists("dashboard-variable-query-language")).toBe(false);
+    });
+
+    it("prefills the custom editor with the SQL auto would run", async () => {
+      await setQueryData({ stream_type: "logs", stream: "default", field: "host" });
+      await wrapper.vm.onQueryModeChange("custom");
+      await flushPromises();
+      expect(wrapper.vm.variableData.query_data.custom_query).toBe(true);
+      expect(wrapper.vm.variableData.query_data.query).toBe(
+        'SELECT DISTINCT "host" FROM "default"',
+      );
+      expect(exists("query-variable-editor-mock")).toBe(true);
+      expect(exists("dashboard-variable-field-select")).toBe(false);
+    });
+
+    it("prefills label_values with the filters as matchers for PromQL", async () => {
+      await setQueryData({
+        stream_type: "metrics",
+        stream: "up",
+        field: "job",
+        query_type: "promql",
+        filter: [{ name: "env", operator: "=", value: "$env" }],
+      });
+      await wrapper.vm.onQueryModeChange("custom");
+      await flushPromises();
+      expect(wrapper.vm.variableData.query_data.query).toBe('label_values(up{env=~"$env"}, job)');
+    });
+
+    it("prefills custom SQL with the panel builder's AND/OR WHERE of a nested group", async () => {
+      const leaf = (field: string, value: string, logicalOperator = "AND") => ({
+        type: "condition",
+        column: { field },
+        filterType: "condition",
+        operator: "=",
+        value,
+        logicalOperator,
+        values: [],
+      });
+      await setQueryData({
+        stream_type: "logs",
+        stream: "default",
+        field: "host",
+        filter_group: {
+          filterType: "group",
+          logicalOperator: "AND",
+          conditions: [
+            leaf("env", "$env"),
+            {
+              filterType: "group",
+              logicalOperator: "AND",
+              conditions: [leaf("level", "error"), leaf("level", "warn", "OR")],
+            },
+          ],
+        },
+      });
+      await wrapper.vm.onQueryModeChange("custom");
+      await flushPromises();
+      expect(wrapper.vm.variableData.query_data.query).toBe(
+        `SELECT DISTINCT "host" FROM "default" WHERE "env" = '$env' AND ("level" = 'error' OR "level" = 'warn')`,
+      );
+    });
+
+    it("keeps the auto fields and the custom text when switching back and forth", async () => {
+      await setQueryData({ stream_type: "logs", stream: "default", field: "host" });
+      await wrapper.vm.onQueryModeChange("custom");
+      await setQueryData({ query: "SELECT host FROM default LIMIT 5" });
+      await wrapper.vm.onQueryModeChange("auto");
+      await flushPromises();
+      expect(wrapper.vm.variableData.query_data).toMatchObject({
+        custom_query: false,
+        stream: "default",
+        field: "host",
+      });
+      expect(exists("dashboard-variable-field-select")).toBe(true);
+
+      await setQueryData({ field: "pod" });
+      await wrapper.vm.onQueryModeChange("custom");
+      await flushPromises();
+      expect(wrapper.vm.variableData.query_data.query).toBe("SELECT host FROM default LIMIT 5");
+    });
+
+    it("keeps a hand edit made right before switching to auto", async () => {
+      await setQueryData({ stream_type: "logs", stream: "default", field: "host" });
+      wrapper.vm.onQueryModeChange("custom");
+      await flushPromises();
+      wrapper.vm.form.setFieldValue("query_data.query", "SELECT host FROM default LIMIT 3");
+      wrapper.vm.onQueryModeChange("auto");
+      await flushPromises();
+      wrapper.vm.onQueryModeChange("custom");
+      expect(wrapper.vm.variableData.query_data.query).toBe("SELECT host FROM default LIMIT 3");
+    });
+
+    it("refreshes an untouched prefill when the auto settings changed", async () => {
+      await setQueryData({ stream_type: "logs", stream: "default", field: "host" });
+      wrapper.vm.onQueryModeChange("custom");
+      await flushPromises();
+      wrapper.vm.onQueryModeChange("auto");
+      await setQueryData({ field: "pod" });
+      wrapper.vm.onQueryModeChange("custom");
+      expect(wrapper.vm.variableData.query_data.query).toBe('SELECT DISTINCT "pod" FROM "default"');
+    });
+
+    it("keeps one custom text per language", async () => {
+      await setQueryData({ stream_type: "metrics", stream: "up", field: "job" });
+      await wrapper.vm.onQueryModeChange("custom");
+      await setQueryData({ query: "SELECT job FROM up" });
+      await wrapper.vm.onQueryLanguageChange("promql");
+      await flushPromises();
+      expect(wrapper.vm.variableData.query_data.query).toBe("label_values(up, job)");
+      await wrapper.vm.onQueryLanguageChange("sql");
+      await flushPromises();
+      expect(wrapper.vm.variableData.query_data.query).toBe("SELECT job FROM up");
+    });
+  });
+
+  describe("saved query_data shape", () => {
+    const variable = (query_data: Record<string, unknown>) => ({
+      scope: "global",
+      selectedTabs: [],
+      selectedPanels: [],
+      name: "service",
+      type: "query_values",
+      query_data: {
+        stream_type: "logs",
+        stream: "default",
+        field: "service",
+        max_record_size: "20",
+        filter: [{ name: "a", operator: "=", value: "b" }],
+        query_type: "sql",
+        custom_query: false,
+        query: "SELECT service FROM logs",
+        value_field: "service",
+        label_field: "",
+        ...query_data,
+      },
+      options: [{ label: "", value: "", selected: true }],
+      multiSelect: true,
+      selectAllValueForMultiSelect: "all",
+      customMultiSelectValue: [],
+    });
+    const autoFields = {
+      stream: "default",
+      field: "service",
+      max_record_size: 20,
+      filter: [{ name: "a", operator: "=", value: "b" }],
+    };
+
+    it("saves auto SQL in the legacy shape, without any query keys", () => {
+      const payload = wrapper.vm.buildVariablePayload(variable({}));
+      expect(payload.query_data).toEqual({ stream_type: "logs", ...autoFields });
+      expect(payload.options).toEqual([{ label: "", value: "", selected: true }]);
+    });
+
+    it("saves auto PromQL with only its language added", () => {
+      const payload = wrapper.vm.buildVariablePayload(
+        variable({ stream_type: "metrics", query_type: "promql" }),
+      );
+      expect(payload.query_data).toEqual({
+        stream_type: "metrics",
+        ...autoFields,
+        query_type: "promql",
+      });
+    });
+
+    it("saves custom SQL with its query and columns, keeping the auto fields", () => {
+      const payload = wrapper.vm.buildVariablePayload(
+        variable({ custom_query: true, label_field: "name" }),
+      );
+      expect(payload.query_data).toEqual({
+        stream_type: "logs",
+        ...autoFields,
+        query: "SELECT service FROM logs",
+        value_field: "service",
+        label_field: "name",
+      });
+      expect(payload.options).toEqual([]);
+      expect(payload.selectAllValueForMultiSelect).toBe("all");
+    });
+
+    it("saves custom PromQL without the SQL-only columns", () => {
+      const payload = wrapper.vm.buildVariablePayload(
+        variable({
+          custom_query: true,
+          stream_type: "metrics",
+          query_type: "promql",
+          query: "label_values(job)",
+        }),
+      );
+      expect(payload.query_data).toEqual({
+        stream_type: "metrics",
+        ...autoFields,
+        query_type: "promql",
+        query: "label_values(job)",
+      });
+    });
+
+    it("never saves PromQL for a stream type other than metrics", () => {
+      const payload = wrapper.vm.buildVariablePayload(variable({ query_type: "promql" }));
+      expect(payload.query_data).not.toHaveProperty("query_type");
+    });
+  });
+
   describe("product analytics", () => {
     it("tracks dashboard_variable_saved as new once addVariable resolves", async () => {
       await wrapper.vm.saveData({ name: "v", type: "constant" });
@@ -914,6 +1353,170 @@ describe("AddSettingVariable", () => {
 
     it("should have correct title in edit mode", () => {
       expect(wrapper.vm.title).toBe("Edit Variable");
+    });
+
+    const mountSaved = async (queryData: Record<string, unknown>) => {
+      vi.mocked(getDashboard).mockResolvedValueOnce({
+        tabs: [],
+        variables: {
+          list: [
+            { name: "savedVar", label: "savedVar", type: "query_values", query_data: queryData },
+          ],
+        },
+      });
+      const saved = mount(AddSettingVariable, {
+        props: { variableName: "savedVar", dashboardVariablesList: [] },
+      });
+      await flushPromises();
+      return saved;
+    };
+    const savedQueryData = (saved: any) =>
+      saved.vm.buildVariablePayload(JSON.parse(JSON.stringify(saved.vm.form.state.values)))
+        .query_data;
+
+    it("loads a legacy filter array into the builder and re-saves it unchanged", async () => {
+      const legacyQueryData = {
+        stream_type: "logs",
+        stream: "stream1",
+        field: "field1",
+        max_record_size: null,
+        filter: [
+          { name: "env", operator: "=", value: "$env" },
+          { name: "level", operator: "Is Null", value: "" },
+        ],
+      };
+      const saved = await mountSaved(legacyQueryData);
+      expect(saved.findComponent(FilterBuilder).props("modelValue")).toEqual({
+        filter: legacyQueryData.filter,
+      });
+      expect(JSON.stringify(savedQueryData(saved))).toBe(JSON.stringify(legacyQueryData));
+      saved.unmount();
+    });
+
+    it("turns AND into OR from the real builder's connector and saves filter_group", async () => {
+      const saved = await mountSaved({
+        stream_type: "logs",
+        stream: "stream1",
+        field: "field1",
+        max_record_size: null,
+        filter: [
+          { name: "env", operator: "=", value: "prod" },
+          { name: "level", operator: "=", value: "error" },
+        ],
+      });
+      const connector = saved.find('[data-test="dashboard-variable-filter-builder-connector-1"]');
+      expect(connector.text()).toBe("AND");
+      await connector.trigger("click");
+      await flushPromises();
+      const queryData = savedQueryData(saved);
+      expect(queryData).not.toHaveProperty("filter");
+      expect(queryData.filter_group.conditions.map((c: any) => c.logicalOperator)).toEqual([
+        "AND",
+        "OR",
+      ]);
+      saved.unmount();
+    });
+
+    it("blocks saving an OR group after switching to PromQL until the OR is removed", async () => {
+      vi.mocked(updateVariable).mockClear();
+      const saved = await mountSaved({
+        stream_type: "metrics",
+        stream: "up",
+        field: "job",
+        max_record_size: null,
+        filter: [
+          { name: "env", operator: "=", value: "prod" },
+          { name: "region", operator: "=", value: "eu" },
+        ],
+      });
+      await saved
+        .find('[data-test="dashboard-variable-filter-builder-connector-1"]')
+        .trigger("click");
+      await flushPromises();
+      expect(saved.vm.form.state.values.query_data.filter_group).toBeTruthy();
+
+      saved.vm.onQueryLanguageChange("promql");
+      await flushPromises();
+      const form = saved.vm.form;
+      await form.handleSubmit();
+      await flushPromises();
+      expect(form.state.isValid).toBe(false);
+      expect(updateVariable).not.toHaveBeenCalled();
+      expect(form.state.values.query_data.filter_group.conditions[1].logicalOperator).toBe("OR");
+      const issues = saved.find('[data-test="dashboard-variable-filter-builder-issues"]');
+      expect(issues.text()).toContain("dashboard.queryVariable.promqlFiltersAndOnly");
+
+      saved.findAllComponents({ name: "FilterBarChip" })[1].vm.$emit("remove");
+      await flushPromises();
+      expect(form.state.values.query_data.filter_group).toBeUndefined();
+      expect(form.state.values.query_data.filter).toEqual([
+        { name: "env", operator: "=", value: "prod" },
+      ]);
+      await form.handleSubmit();
+      await flushPromises();
+      expect(form.state.isValid).toBe(true);
+      expect(savedQueryData(saved)).toMatchObject({
+        query_type: "promql",
+        filter: [{ name: "env", operator: "=", value: "prod" }],
+      });
+      expect(savedQueryData(saved)).not.toHaveProperty("filter_group");
+      saved.unmount();
+    });
+
+    it("offers no OR connector for an auto PromQL variable", async () => {
+      const saved = await mountSaved({
+        stream_type: "metrics",
+        stream: "up",
+        field: "job",
+        max_record_size: null,
+        query_type: "promql",
+        filter: [
+          { name: "env", operator: "=", value: "prod" },
+          { name: "region", operator: "=", value: "eu" },
+        ],
+      });
+      expect(saved.findComponent(FilterBuilder).props("profile")).toBe("dashboard-variable-promql");
+      expect(
+        saved.find('[data-test^="dashboard-variable-filter-builder-connector-"]').exists(),
+      ).toBe(false);
+      saved.unmount();
+    });
+
+    it("loads a saved filter_group and re-saves it without a flat filter", async () => {
+      const group = {
+        filterType: "group",
+        logicalOperator: "AND",
+        conditions: [
+          {
+            type: "condition",
+            column: { field: "env" },
+            filterType: "condition",
+            operator: "=",
+            value: "prod",
+            logicalOperator: "AND",
+            values: [],
+          },
+          {
+            filterType: "group",
+            logicalOperator: "OR",
+            conditions: [],
+          },
+        ],
+      };
+      const saved = await mountSaved({
+        stream_type: "logs",
+        stream: "stream1",
+        field: "field1",
+        max_record_size: null,
+        filter_group: group,
+      });
+      expect(saved.findComponent(FilterBuilder).props("modelValue")).toMatchObject({
+        filter_group: group,
+      });
+      const queryData = savedQueryData(saved);
+      expect(queryData.filter_group).toEqual(group);
+      expect(queryData).not.toHaveProperty("filter");
+      saved.unmount();
     });
   });
   describe("Custom Value Management", () => {

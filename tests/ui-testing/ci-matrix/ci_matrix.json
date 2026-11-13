@@ -234,6 +234,19 @@
     "disabled": []
   },
   {
+    "testfolder": "Dashboards-Variables-Query",
+    "actual_folder": "Dashboards",
+    "browser": "chrome",
+    "run_files": [
+      "dashboard-variables-query-compat.spec.js",
+      "dashboard-variables-filter-groups.spec.js",
+      "dashboard-variables-promql.spec.js",
+      "dashboard-variables-custom-sql.spec.js",
+      "dashboard-variables-query-runtime.spec.js"
+    ],
+    "disabled": []
+  },
+  {
     "testfolder": "Dashboards-Visualize",
     "actual_folder": "Dashboards",
     "browser": "chrome",

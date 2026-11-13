@@ -137,7 +137,7 @@ const hasIssue = (group: FilterGroup) =>
             :data-test="`${dataTest}-connector-${pathOf(index)}`"
             @click.stop="emit('toggle-connector', item.id)"
           />
-          <span v-else class="text-text-secondary text-xs">{{ raw("AND") }}</span>
+          <span v-else class="text-text-secondary text-xs">{{ raw(item.connector) }}</span>
         </div>
         <span v-if="item.kind === 'group' && canAdd && !isFolded(item.id)" class="inline-flex">
           <OButton
