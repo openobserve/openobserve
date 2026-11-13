@@ -13,11 +13,16 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-/** Per-execution status, as the runs table and the timeline both model it. */
+/**
+ * Per-execution status, as the runs table and the timeline both model it.
+ * `error` is a run that did not test the site ("Not measured"): our own
+ * dispatch or probe infrastructure failed. A config error the owner must fix
+ * maps to `fail` before it reaches here.
+ */
 export type ExecutionStatus = "pass" | "warning" | "fail" | "error";
 
 /** The aggregate of every execution inside one logical run, or one location. */
-export type AggregateStatus = "all-pass" | "all-warning" | "mixed" | "all-fail";
+export type AggregateStatus = "all-pass" | "all-warning" | "mixed" | "all-fail" | "not-measured";
 
 /**
  * Roll a set of execution statuses up to one aggregate — the timeline's segment
@@ -30,33 +35,29 @@ export type AggregateStatus = "all-pass" | "all-warning" | "mixed" | "all-fail";
  * (`MonitorRuns.visibleRuns`), so the timeline and the table contradicted each
  * other on the same run, and the timeline was the one hiding the problem.
  *
- * `monitor-results.md` §"Status Timeline Design" specifies three colours over
- * pass/fail; it predates the four-state model and is silent on `warning`. Every
- * other surface — the table badge, `SyntheticKpi.warningRuns`, the status
- * filter, this timeline's own orange legend entry — treats warning as its own
- * state, so the roll-up follows them.
- *
- * `error` ("we could not look") aggregates with `fail` rather than forming a
- * fifth colour: at run level both mean "this run produced no healthy result",
- * and `SyntheticKpi` already reports `errorRuns` separately for the distinction.
+ * `error` ("we could not look") takes no side. The run takes its answer from
+ * the executions that tested the site, the same rule the server applies to the
+ * run class, and a run where nothing tested the site is `not-measured`: a gray
+ * gap, never a red failure the site did not cause.
  */
 export function rollUpStatus(statuses: readonly ExecutionStatus[]): AggregateStatus {
   if (statuses.length === 0) return "all-pass";
+  let measured = 0;
   let healthy = 0;
   let warning = 0;
-  let down = 0;
   for (const s of statuses) {
+    if (s === "error") continue;
+    measured++;
     if (s === "warning") {
       warning++;
       healthy++;
     } else if (s === "pass") {
       healthy++;
-    } else {
-      down++;
     }
   }
-  if (down === statuses.length) return "all-fail";
-  if (healthy === statuses.length) return warning > 0 ? "all-warning" : "all-pass";
+  if (measured === 0) return "not-measured";
+  if (healthy === 0) return "all-fail";
+  if (healthy === measured) return warning > 0 ? "all-warning" : "all-pass";
   return "mixed";
 }
 
@@ -74,6 +75,7 @@ export interface StatusTally {
   passed: number;
   warning: number;
   failed: number;
+  notMeasured: number;
   total: number;
 }
 
@@ -81,10 +83,12 @@ export function tallyStatuses(statuses: readonly ExecutionStatus[]): StatusTally
   let passed = 0;
   let warning = 0;
   let failed = 0;
+  let notMeasured = 0;
   for (const s of statuses) {
     if (s === "pass") passed++;
     else if (s === "warning") warning++;
+    else if (s === "error") notMeasured++;
     else failed++;
   }
-  return { passed, warning, failed, total: statuses.length };
+  return { passed, warning, failed, notMeasured, total: statuses.length };
 }

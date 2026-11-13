@@ -300,15 +300,7 @@ async fn persist_stream_settings(
 
     let required_fields = required_uds_fields(stream_type);
     if !settings.defined_schema_fields.is_empty() {
-        let mut fields = effective_uds_fields(
-            stream_type,
-            &std::mem::take(&mut settings.defined_schema_fields),
-        )
-        .into_iter()
-        .collect::<Vec<_>>();
-        fields.sort_unstable();
-        fields.retain(|field| schema_fields.contains(field));
-        settings.defined_schema_fields = fields;
+        settings.defined_schema_fields = uds_fields_to_save(stream_type, &settings, &schema_fields);
     }
 
     // required columns are product-mandated, so they never occupy user field slots
@@ -451,6 +443,74 @@ async fn persist_stream_settings(
         settings,
         previous_settings,
     })
+}
+
+/// The UDS a save stores: the saved fields, required columns and enabled partition keys in schema.
+fn uds_fields_to_save(
+    stream_type: StreamType,
+    settings: &StreamSettings,
+    schema_fields: &HashSet<&String>,
+) -> Vec<String> {
+    let mut fields = effective_uds_fields(stream_type, &settings.defined_schema_fields);
+    fields.extend(enabled_partition_fields(settings).cloned());
+    let mut fields = fields
+        .into_iter()
+        .filter(|field| schema_fields.contains(field))
+        .collect::<Vec<_>>();
+    fields.sort_unstable();
+    fields
+}
+
+/// The fields an auto-enabled UDS keeps: the keep fields, then current and new schema fields.
+fn auto_uds_fields(
+    stream_type: StreamType,
+    settings: &StreamSettings,
+    final_schema: &Schema,
+    current_schema: Option<&Schema>,
+    limit: usize,
+) -> HashSet<String> {
+    let mut uds_fields = HashSet::with_capacity(limit);
+
+    // Fields that must survive auto-enable
+    let mut keep_fields = required_uds_fields(stream_type);
+    keep_fields.extend(SQL_FULL_TEXT_SEARCH_FIELDS.iter().cloned());
+    keep_fields.extend(SQL_SECONDARY_INDEX_SEARCH_FIELDS.iter().cloned());
+    keep_fields.extend(settings.full_text_search_keys.iter().cloned());
+    keep_fields.extend(settings.index_fields.iter().cloned());
+    keep_fields.extend(enabled_partition_fields(settings).cloned());
+    for field in keep_fields {
+        if !is_uds_internal_column(&field) && final_schema.field_with_name(&field).is_ok() {
+            uds_fields.insert(field);
+        }
+    }
+
+    // existing fields go before the batch's new ones
+    if let Some(schema) = current_schema {
+        fill_uds_fields(&mut uds_fields, schema, limit);
+    }
+    fill_uds_fields(&mut uds_fields, final_schema, limit);
+    uds_fields
+}
+
+fn fill_uds_fields(uds_fields: &mut HashSet<String>, schema: &Schema, limit: usize) {
+    for field in schema.fields() {
+        if uds_fields.len() >= limit {
+            break;
+        }
+        let field = field.name();
+        if !is_uds_internal_column(field) {
+            uds_fields.insert(field.to_string());
+        }
+    }
+}
+
+/// A partition key outside the UDS is packed into `_all`, so its rows would partition as null.
+fn enabled_partition_fields(settings: &StreamSettings) -> impl Iterator<Item = &String> {
+    settings
+        .partition_keys
+        .iter()
+        .filter(|partition| !partition.disabled)
+        .map(|partition| &partition.field)
 }
 
 /// Make stream settings internally consistent before validation and persistence.
@@ -752,63 +812,15 @@ pub async fn handle_diff_schema(
         && defined_schema_fields.is_empty()
         && final_schema.fields().len() > cfg.limit.schema_max_fields_to_enable_uds
     {
-        let mut uds_fields = HashSet::with_capacity(cfg.limit.schema_max_fields_to_enable_uds);
-
-        // Fields that must survive auto-enable
-        let mut keep_fields = required_uds_fields(stream_type);
-        // add FTS fields (default SQL FTS fields)
-        for field in SQL_FULL_TEXT_SEARCH_FIELDS.iter() {
-            keep_fields.insert(field.to_string());
-        }
-        // add secondary index fields (default SQL secondary index fields)
-        for field in SQL_SECONDARY_INDEX_SEARCH_FIELDS.iter() {
-            keep_fields.insert(field.to_string());
-        }
-        // add user-configured FTS fields
-        for field in stream_setting.full_text_search_keys.iter() {
-            keep_fields.insert(field.to_string());
-        }
-        // add user-configured index fields
-        for field in stream_setting.index_fields.iter() {
-            keep_fields.insert(field.to_string());
-        }
-
-        // Add keep fields first
-        for field in keep_fields {
-            if !is_uds_internal_column(&field) && final_schema.field_with_name(&field).is_ok() {
-                uds_fields.insert(field);
-            }
-        }
-
-        // Add fields from current schema if available
-        if let Some(stream_schema) = stream_schema_map.get(stream_name) {
-            for field in stream_schema.schema().fields() {
-                let field = field.name();
-                if is_uds_internal_column(field) {
-                    continue;
-                }
-                if uds_fields.insert(field.to_string())
-                    && uds_fields.len() >= cfg.limit.schema_max_fields_to_enable_uds
-                {
-                    break;
-                }
-            }
-        }
-
-        // Add remaining fields from final schema
-        if uds_fields.len() < cfg.limit.schema_max_fields_to_enable_uds {
-            for field in final_schema.fields() {
-                let field = field.name();
-                if is_uds_internal_column(field) {
-                    continue;
-                }
-                if uds_fields.insert(field.to_string())
-                    && uds_fields.len() >= cfg.limit.schema_max_fields_to_enable_uds
-                {
-                    break;
-                }
-            }
-        }
+        let uds_fields = auto_uds_fields(
+            stream_type,
+            &stream_setting,
+            &final_schema,
+            stream_schema_map
+                .get(stream_name)
+                .map(|schema| schema.schema().as_ref()),
+            cfg.limit.schema_max_fields_to_enable_uds,
+        );
 
         let mut candidate_settings = stream_setting.clone();
         candidate_settings.defined_schema_fields = uds_fields.into_iter().collect();
@@ -1079,6 +1091,7 @@ mod tests {
     use std::str::FromStr;
 
     use arrow_schema::DataType;
+    use config::meta::stream::StreamPartition;
 
     use super::*;
 
@@ -1377,6 +1390,59 @@ mod tests {
                 "trace_id",
                 "value",
             ]
+        );
+    }
+
+    fn partitioned_settings(disabled: bool) -> StreamSettings {
+        StreamSettings {
+            partition_keys: vec![StreamPartition {
+                disabled,
+                ..StreamPartition::new("pk")
+            }],
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn test_auto_uds_fields_keeps_partition_key_past_the_cap() {
+        let schema = Schema::new(
+            ["_timestamp", "a", "b", "c", "pk"]
+                .map(|name| Field::new(name, DataType::Utf8, true))
+                .to_vec(),
+        );
+        let fields = |disabled, limit| {
+            let fields = auto_uds_fields(
+                StreamType::Logs,
+                &partitioned_settings(disabled),
+                &schema,
+                Some(&schema),
+                limit,
+            );
+            let mut fields = fields.into_iter().collect::<Vec<_>>();
+            fields.sort_unstable();
+            fields
+        };
+        assert_eq!(fields(false, 2), ["a", "pk"]);
+        assert_eq!(fields(true, 2), ["a", "b"]);
+        assert_eq!(fields(false, 1), ["pk"]);
+    }
+
+    #[test]
+    fn test_uds_fields_to_save_adds_enabled_partition_keys_in_schema() {
+        let mut settings = partitioned_settings(false);
+        settings.defined_schema_fields = vec!["a".to_string()];
+        settings.partition_keys.extend([
+            StreamPartition {
+                disabled: true,
+                ..StreamPartition::new("old")
+            },
+            StreamPartition::new("missing"),
+        ]);
+        let names = ["a", "b", "pk", "old"].map(String::from);
+        let schema_fields = names.iter().collect::<HashSet<_>>();
+        assert_eq!(
+            uds_fields_to_save(StreamType::Logs, &settings, &schema_fields),
+            ["a", "pk"]
         );
     }
 

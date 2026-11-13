@@ -9,6 +9,8 @@ import downtimes, { type DowntimeDetail as Detail } from "@/services/downtimes";
 import destination from "@/services/alert_destination";
 import { queryClient } from "@/composables/query/queryClient";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import ConfirmDialog from "@/components/ConfirmDialog.vue";
+import { dismissAll, toastRecords } from "@/lib/feedback/Toast/useToast";
 
 vi.mock("@/services/downtimes", () => ({
   default: {
@@ -114,6 +116,18 @@ const DETAIL = {
   ],
 } as unknown as Detail;
 
+const testConfirm = (wrapper: ReturnType<typeof mount>) =>
+  wrapper
+    .findAllComponents(ConfirmDialog)
+    .find((c) => c.props("title") === "Send a test message?")!;
+
+const confirmSendTest = async (wrapper: ReturnType<typeof mount>) => {
+  await wrapper.get('[data-test="downtime-detail-send-test"]').trigger("click");
+  await flushPromises();
+  testConfirm(wrapper).vm.$emit("update:ok");
+  await flushPromises();
+};
+
 const makeRouter = () =>
   createRouter({
     history: createMemoryHistory(),
@@ -187,8 +201,7 @@ describe("DowntimeDetail notifications tab", () => {
       data: [{ destination: "slack-oncall", ok: true }],
     } as any);
     const wrapper = await mountDetail();
-    await wrapper.get('[data-test="downtime-detail-send-test"]').trigger("click");
-    await flushPromises();
+    await confirmSendTest(wrapper);
     expect(downtimes.test).toHaveBeenCalledTimes(1);
     const [org, id, names] = vi.mocked(downtimes.test).mock.calls[0] as any;
     expect([org, id, names]).toEqual(["default", DETAIL.id, ["slack-oncall"]]);
@@ -203,6 +216,57 @@ describe("DowntimeDetail notifications tab", () => {
     } as any);
     const wrapper = await mountDetail();
     expect(wrapper.find('[data-test="downtime-detail-notifications-empty"]').exists()).toBe(true);
+    wrapper.unmount();
+  });
+
+  it("asks first and sends nothing until the test is confirmed", async () => {
+    vi.mocked(downtimes.test).mockReset();
+    const wrapper = await mountDetail();
+    await wrapper.get('[data-test="downtime-detail-send-test"]').trigger("click");
+    await flushPromises();
+    const dialog = testConfirm(wrapper);
+    expect(dialog.props("modelValue")).toBe(true);
+    expect(dialog.props("message")).toContain("[TEST]");
+    expect(dialog.props("message")).toContain("slack-oncall");
+    dialog.vm.$emit("update:cancel");
+    await flushPromises();
+    expect(downtimes.test).not.toHaveBeenCalled();
+    wrapper.unmount();
+  });
+
+  it("names why each destination failed, in words for a platform skip", async () => {
+    dismissAll();
+    vi.mocked(downtimes.test).mockResolvedValue({
+      data: [
+        { destination: "slack-oncall", ok: false, error: "HTTP 405" },
+        { destination: "pd", ok: false, unsupported: true, error: "PlatformNotForKind" },
+        { destination: "mail", ok: false, unsupported: true, error: "NoOrgMemberRecipient" },
+      ],
+    } as any);
+    const wrapper = await mountDetail();
+    await confirmSendTest(wrapper);
+    const error = toastRecords.find((r) => r.variant === "error");
+    expect(String(error?.message)).toContain("slack-oncall (HTTP 405)");
+    expect(String(error?.message)).toContain("pd (skipped, a live downtime does not notify");
+    expect(String(error?.message)).toContain("mail (skipped, no recipient is a member");
+    expect(String(error?.message)).not.toContain("PlatformNotForKind");
+    dismissAll();
+    wrapper.unmount();
+  });
+
+  it("shows the server's limit text when the test is rate limited", async () => {
+    dismissAll();
+    vi.mocked(downtimes.test).mockRejectedValue({
+      response: {
+        status: 429,
+        data: { code: 429, message: "Too many test-sends — try again in 30s (limit: 6/min)" },
+      },
+    });
+    const wrapper = await mountDetail();
+    await confirmSendTest(wrapper);
+    const error = toastRecords.find((r) => r.variant === "error");
+    expect(String(error?.message)).toContain("try again in 30s");
+    dismissAll();
     wrapper.unmount();
   });
 });

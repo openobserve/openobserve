@@ -1965,6 +1965,7 @@
     "slos": "SLOs",
     "reliability": "信頼性",
     "onCall": "オンコール",
+    "response": "対応",
     "toggleNavigation": "ナビゲーションを切り替え",
     "ingestionText": "取り込み",
     "navigationLink": "ナビゲーションリンク",

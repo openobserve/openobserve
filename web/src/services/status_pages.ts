@@ -84,6 +84,8 @@ export interface StatusPageNotice {
   resolved_at: number | null;
   excluded_from_uptime: boolean;
   component_ids: string[];
+  /** Set when an owner marked this auto-incident as a false alarm. */
+  false_alarm?: { by: string; at: number; reason: string } | null;
   created_at: number;
   updated_at: number;
 }
@@ -194,15 +196,20 @@ const statusPagesService = {
   listNoticeUpdates: (orgIdentifier: string, noticeId: string) =>
     http().get(`/api/${orgIdentifier}/status_pages/notices/${noticeId}/updates`),
 
-  markFalsePositive: (orgIdentifier: string, noticeId: string, snoozeHours = 6) =>
+  // No snooze: the server holds only the failure the incident was marked on.
+  markFalsePositive: (orgIdentifier: string, noticeId: string, reason: string) =>
     http()
       .post(`/api/${orgIdentifier}/status_pages/notices/${noticeId}/mark_false_positive`, {
-        snooze_hours: snoozeHours,
+        reason,
       })
       .then((res) => {
         analytics.track("status_page_notice_marked_false_positive");
         return res;
       }),
+
+  // Restores a false alarm: it returns to the public history and its downtime counts again.
+  undoFalsePositive: (orgIdentifier: string, noticeId: string) =>
+    http().delete(`/api/${orgIdentifier}/status_pages/notices/${noticeId}/mark_false_positive`),
 
   // Widens impact (never narrows it — see UpdateNoticePayload) on the existing incident.
   updateNotice: (orgIdentifier: string, noticeId: string, payload: UpdateNoticePayload) =>

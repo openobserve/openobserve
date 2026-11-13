@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+mod chains;
 #[cfg(feature = "enterprise")]
 pub mod downsampling;
 mod metrics;
@@ -24,6 +25,7 @@ mod single_file;
 use std::sync::Arc;
 
 use arrow::array::RecordBatch;
+pub use chains::hash_ordered_chains;
 use config::{get_config, meta::stream::FileMeta};
 use datafusion::{
     arrow::datatypes::Schema,

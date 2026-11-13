@@ -45,6 +45,7 @@
   },
   {
     "testfolder": "Alerts-Composite-Library",
+    "_comment": "list-quick-filter-cards.spec.js counts every pipeline and public link of the org, so no spec in this shard may create either.",
     "actual_folder": "Alerts",
     "browser": "chrome",
     "run_files": [
@@ -58,7 +59,8 @@
       "alerts-composite-preview.spec.js",
       "alerts-clone-dialog.spec.js",
       "alerts-save-query-mode.spec.js",
-      "alerts-evaluation-chart.spec.js"
+      "alerts-evaluation-chart.spec.js",
+      "list-quick-filter-cards.spec.js"
     ],
     "disabled": []
   },
@@ -642,8 +644,7 @@
       "slo-crud.spec.js",
       "slo-form-validation.spec.js",
       "slo-required-fields.spec.js",
-      "slo-alert-sli.spec.js",
-      "slo-import.spec.js"
+      "slo-alert-sli.spec.js"
     ],
     "disabled": []
   },

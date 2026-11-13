@@ -1,11 +1,12 @@
 // Copyright 2026 OpenObserve Inc.
 
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
-const { trackSearches, ingestRows } = require('../utils/auto-run-helpers.js');
+const { trackSearches, ingestRows, waitForSearchable } = require('../utils/auto-run-helpers.js');
+const { getOrgIdentifier } = require('../utils/cloud-auth.js');
 const PageManager = require('../../pages/page-manager.js');
 
-const ORG = `actionreasons${Date.now()}`;
-const STREAM = 'action_logs';
+const ORG = getOrgIdentifier() || 'default';
+const STREAM = `e2e_action_logs_${Math.random().toString(36).slice(2, 7)}`;
 const run = '[data-test="logs-search-bar-refresh-btn"]';
 const table = '[data-test="logs-search-result-logs-table"]';
 const ids = {
@@ -55,6 +56,7 @@ test.describe('G1 visible action reasons C2', () => {
   test.beforeAll(async ({ request }) => {
     const at = (Date.now() - 120000) * 1000;
     await ingestRows(request, ORG, STREAM, [{ _timestamp: at, level: 'error', body: 'error request' }, { _timestamp: at + 1, level: 'info', body: 'healthy' }]);
+    await waitForSearchable(request, ORG, STREAM, 2);
   });
 
   for (const theme of ['light', 'dark']) {
@@ -90,7 +92,9 @@ test.describe('G1 visible action reasons C2', () => {
           const first = page.locator('[role="menu"]').last();
           await first.press('Home');
           let reached = false;
-          for (let i = 0; i < 35; i++) {
+          // A shared org lists other specs' saved views ahead of the create item, so the walk scales with the menu.
+          const steps = 35 + await first.locator('[role="menuitem"]').count();
+          for (let i = 0; i < steps; i++) {
             if (await item.evaluate((element) => document.activeElement === element)) { reached = true; break; }
             await page.keyboard.press('ArrowDown');
           }
@@ -126,7 +130,8 @@ test.describe('G1 visible action reasons C2', () => {
       expect(writes).toHaveLength(0);
       expect(requests.hits()).toHaveLength(0);
       await page.locator(run).click();
-      await expect(page.locator(`${table} tbody tr[data-test^="o2-table-row-"]`)).toHaveCount(1);
+      // A slow shared server can hold this search for longer than the default row-count wait.
+      await expect(page.locator(`${table} tbody tr[data-test^="o2-table-row-"]`)).toHaveCount(1, { timeout: 90000 });
       await expect(page.locator(run)).toContainText('Run query');
       await page.locator('[data-test="logs-search-bar-more-options-btn"]').click();
       await expect(page.locator('[data-test="logs-create-alert-btn"]')).not.toHaveAttribute('aria-disabled', 'true');

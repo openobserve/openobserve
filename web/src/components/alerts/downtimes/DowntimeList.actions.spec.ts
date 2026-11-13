@@ -211,7 +211,7 @@ describe("DowntimeList row actions", () => {
     expect(ok.textContent).toContain("End now");
     ok.click();
     await flushPromises();
-    expect(downtimes.cancel).toHaveBeenCalledWith("default", "active", "default");
+    expect(downtimes.cancel).toHaveBeenCalledWith("default", "active", "default", undefined);
     wrapper.unmount();
   });
 

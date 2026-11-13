@@ -1965,6 +1965,7 @@
     "slos": "SLO",
     "reliability": "Надёжность",
     "onCall": "Дежурства",
+    "response": "Реагирование",
     "toggleNavigation": "Переключить навигацию",
     "ingestionText": "Прием данных",
     "navigationLink": "Навигационная ссылка",

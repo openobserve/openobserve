@@ -303,3 +303,56 @@ describe("SloList view state persistence", () => {
     });
   });
 });
+
+describe("SloList health filter", () => {
+  let wrapper: any;
+  const meeting = sloRow({ id: "slo-ok", name: "api-ok" });
+  const blown = sloRow({
+    id: "slo-blown",
+    name: "api-blown",
+    status: { sli: 98, error_budget_remaining: -5, burn_rate: 3, coverage: 1, no_data: false },
+  });
+  const atRisk = sloRow({
+    id: "slo-risk",
+    name: "api-risk",
+    status: { sli: 99.9, error_budget_remaining: 40, burn_rate: 2, coverage: 1, no_data: false },
+  });
+  const card = (key: string) => wrapper.find(`[data-test="slos-slolist-stat-${key}"]`);
+  const listedNames = () => (wrapper.vm as any).visibleRows.map((r: any) => r.name).sort();
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetListViewState();
+    (router as any).currentRoute.value.query = {};
+    vi.mocked(sloService.list).mockResolvedValue({
+      data: { list: [meeting, blown, atRisk] },
+    } as any);
+  });
+
+  afterEach(() => {
+    wrapper?.unmount();
+    resetListViewState();
+    vi.restoreAllMocks();
+  });
+
+  it("clears the health filter when the selected card is clicked again", async () => {
+    wrapper = await mountList();
+    const vm = wrapper.vm as any;
+
+    await card("budget_blown").trigger("click");
+    await flushPromises();
+    expect(vm.healthFilter).toBe("budget_blown");
+    expect(listedNames()).toEqual(["api-blown"]);
+
+    await card("budget_blown").trigger("click");
+    await flushPromises();
+    expect(vm.healthFilter).toBeNull();
+    expect(listedNames()).toEqual(["api-blown", "api-ok", "api-risk"]);
+
+    await card("at_risk").trigger("click");
+    await card("budget_blown").trigger("click");
+    await flushPromises();
+    expect(vm.healthFilter).toBe("budget_blown");
+    expect(listedNames()).toEqual(["api-blown"]);
+  });
+});

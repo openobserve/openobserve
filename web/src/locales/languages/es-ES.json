@@ -1965,6 +1965,7 @@
     "slos": "SLOs",
     "reliability": "Confiabilidad",
     "onCall": "Guardia",
+    "response": "Respuesta",
     "toggleNavigation": "Alternar la navegación",
     "ingestionText": "Ingesta",
     "navigationLink": "Enlace de navegación",

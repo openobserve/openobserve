@@ -129,6 +129,25 @@ describe("useVariablesManager", () => {
       expect(manager.variablesData.panels["panel-1"][0].value).toBe("default");
     });
 
+    it("keeps a multi-select variable an array when its saved value is a scalar", () => {
+      const manager = useVariablesManager(gt);
+      manager.initialize(
+        [
+          {
+            name: "service",
+            type: "custom",
+            scope: "global",
+            multiSelect: true,
+            value: "app.kalender-druck.de",
+            options: [{ label: "app", value: "app.kalender-druck.de" }],
+          },
+        ] as VariableConfig[],
+        {},
+      );
+
+      expect(manager.variablesData.global[0].value).toEqual(["app.kalender-druck.de"]);
+    });
+
     it("should use options marked as default (selected) for multiSelect custom variables", () => {
       const manager = useVariablesManager(gt);
       const config: VariableConfig[] = [

@@ -115,6 +115,7 @@ const push = (next: K8sUrlState) => router.push({ query: toQuery(next, route.que
 
 const ready = computed(() => detection.value === "detected" && !pageError.value);
 
+const clustersLoading = computed(() => !k8s.loaded.value && !pageError.value);
 const clusterOptions = computed(() => k8s.clusters.value.map((c) => ({ label: raw(c), value: c })));
 
 const stats = computed(() => clusterStatsOf(k8s.clusterResults.value, k8s.effectiveCluster.value));
@@ -521,18 +522,22 @@ k8s.loadStreams();
           @update:model-value="(view: unknown) => onView(view as View)"
         />
         <OSelect
-          v-if="detection === 'detected' && clusterOptions.length"
+          v-if="detection === 'detected' && (clusterOptions.length || clustersLoading)"
           class="w-48 max-md:w-32 md:hidden"
           size="sm"
           searchable
-          :model-value="k8s.effectiveCluster.value"
+          :model-value="clusterOptions.length ? k8s.effectiveCluster.value : null"
           :options="clusterOptions"
+          :disabled="!clusterOptions.length"
+          :loading="clustersLoading && !clusterOptions.length"
+          :aria-label="t('infra.k8s2.clusterPickerLabel')"
+          :placeholder="t('infra.k8s2.clusterPickerLoading')"
           data-test="k8s2-cluster-select"
           @update:model-value="onCluster"
         />
         <DateTime
           ref="dateTimePickerRef"
-          auto-apply
+          apply-presets
           menu-align="end"
           default-type="relative"
           :default-relative-time="DEFAULT_RELATIVE_PERIOD"
@@ -550,6 +555,7 @@ k8s.loadStreams();
         :nodes="treeNodes"
         :clusters="pickerClusters"
         :cluster="k8s.effectiveCluster.value"
+        :clusters-loading="clustersLoading"
         @select="onView"
         @cluster="onCluster"
       />

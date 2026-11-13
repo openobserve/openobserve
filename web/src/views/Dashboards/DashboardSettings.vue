@@ -33,7 +33,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OSplitter class="h-full" v-model="splitterModel" unit="px" disabled :horizontal="isMobile">
           <template v-slot:before>
             <div class="functions-tabs w-full">
-              <OTabs v-model="activeTab" :orientation="isMobile ? 'horizontal' : 'vertical'">
+              <OTabs
+                v-model="activeTab"
+                :orientation="isMobile ? 'horizontal' : 'vertical'"
+                :class="isMobile ? undefined : 'px-1'"
+              >
                 <OTab
                   name="generalSettings"
                   icon="settings"

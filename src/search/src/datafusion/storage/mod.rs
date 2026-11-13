@@ -23,7 +23,7 @@ pub mod wal;
 const TRACE_ID_SEPARATOR: &str = "$$";
 const ACCOUNT_SEPARATOR: &str = "::";
 
-fn format_location(location: &Path) -> (String, Path) {
+pub(crate) fn format_location(location: &Path) -> (String, Path) {
     let mut path = location.to_string();
     if let Some(p) = path.find("/$$/") {
         path = path[p + 4..].to_string();

@@ -170,7 +170,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :data-test="`pipeline-list-${row.name}-pause-start-action`"
                 :data-row-action="row.enabled ? 'pause' : 'resume'"
                 :variant="row.enabled ? 'ghost-destructive' : 'ghost'"
-                size="icon-sm"
+                size="icon-xs-sq"
                 :icon-left="row.enabled ? 'pause' : 'play-arrow'"
                 class="max-md:hidden"
                 @click.stop="togglePipeline(row)"
@@ -185,7 +185,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 :data-test="`pipeline-list-${row.name}-view-pipeline`"
                 variant="ghost"
-                size="icon-sm"
+                size="icon-xs-sq"
                 :title="t('pipeline.view')"
                 class="max-md:hidden"
                 icon-left="visibility"
@@ -198,7 +198,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :data-test="`pipeline-list-${row.name}-update-pipeline`"
                 data-row-action="edit"
                 variant="ghost"
-                size="icon-sm"
+                size="icon-xs-sq"
                 class="max-md:hidden"
                 @click.stop="editPipeline(row)"
                 icon-left="edit"
@@ -232,7 +232,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OButton
                     :aria-label="t('common.moreActions')"
                     variant="ghost"
-                    size="icon-sm"
+                    size="icon-xs-sq"
                     @click.stop
                     :data-test="`pipeline-list-${row.name}-more-options`"
                     icon-left="more-vert"

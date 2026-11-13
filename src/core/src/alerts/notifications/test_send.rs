@@ -37,15 +37,17 @@ use config::{
     get_config,
     meta::{
         alerts::{
-            content_spec::ContentSpec, level::AlertLevel, notification_kind::NotificationKind,
+            content_spec::ContentSpec,
+            level::AlertLevel,
+            notification_kind::{NotificationKind, PlatformAction},
         },
         destinations::DestinationType,
     },
 };
 
 use super::{
-    context::NotificationContext, format::derive_channel_format, preview::synthetic_context,
-    render::render, resolve::resolve_content,
+    context::NotificationContext, format::derive_channel_format, platform::platform_of,
+    preview::synthetic_context, render::render, resolve::resolve_content, send::SendError,
 };
 use crate::alerts::alert::dispatch_test_message;
 pub use crate::alerts::notifications::render::RenderedMessage;
@@ -54,7 +56,7 @@ pub use crate::alerts::notifications::render::RenderedMessage;
 /// conditional — it is the entire reason a test-send is safe to build.
 pub const TEST_MARKER: &str = "[TEST] ";
 
-/// Per-user rolling 60s window: `(window_start_unix_secs, count)`.
+/// Per-user fixed 60s window, kept in this node's memory: `(window_start_unix_secs, count)`.
 static RATE_LIMITER: LazyLock<RwLock<HashMap<String, (i64, u32)>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
 
@@ -68,6 +70,8 @@ pub enum TestSendError {
     DispatchFailed(String),
     /// Draft fails the same content validation `templates::save` applies.
     InvalidContent(String),
+    /// A live send of this kind skips the destination's platform, so the test does not send.
+    PlatformSkipped(NotificationKind),
 }
 
 impl std::fmt::Display for TestSendError {
@@ -81,6 +85,10 @@ impl std::fmt::Display for TestSendError {
             Self::RenderFailed(e) => write!(f, "test-send render failed: {e}"),
             Self::DispatchFailed(e) => write!(f, "test-send dispatch failed: {e}"),
             Self::InvalidContent(e) => write!(f, "{e}"),
+            Self::PlatformSkipped(kind) => write!(
+                f,
+                "Not sent: a live {kind} notification skips this destination's platform"
+            ),
         }
     }
 }
@@ -179,6 +187,10 @@ fn build_test_message_with_title(
         NotificationKind::Alert => synthetic_context(Some(AlertLevel::Critical)),
         kind => super::examples::example_context(kind, false),
     };
+    // The live path (`notify::route`) skips this platform for this event, so a test must not send.
+    if platform_of(dest_type).is_some() && kind.platform_action(ctx.event) == PlatformAction::Skip {
+        return Err(TestSendError::PlatformSkipped(kind));
+    }
     let mut content = resolve_content(spec, &ctx, format.channel_family());
     content.title = format!("{TEST_MARKER}{}", content.title);
     let title = content.title.clone();
@@ -189,20 +201,58 @@ fn build_test_message_with_title(
     Ok((title, rendered))
 }
 
-/// Build the `[TEST] `-marked message and dispatch it to the real
-/// destination transport. This is the only function in the module that
-/// performs network I/O — callers that only need to assert on the rendered
-/// shape (tests, previews) should call [`build_test_message`] instead.
+/// Sends the `[TEST] `-marked message; tests call [`build_test_message`] to skip the network.
+/// Charges `user_id`'s rate limit only after validation and rendering pass.
 pub async fn test_send(
     org_id: &str,
+    user_id: &str,
     dest_type: &DestinationType,
     spec: &ContentSpec,
     kind: NotificationKind,
 ) -> Result<String, TestSendError> {
     let (title, rendered) = build_test_message_with_title(dest_type, spec, kind)?;
+    email_reaches_a_member(org_id, dest_type)
+        .await
+        .map_err(|e| TestSendError::DispatchFailed(dispatch_error_text(&e)))?;
+    check_rate_limit(user_id)?;
     dispatch_test_message(org_id, dest_type, &title, rendered)
         .await
-        .map_err(|e| TestSendError::DispatchFailed(e.to_string()))
+        .map_err(|e| TestSendError::DispatchFailed(dispatch_error_text(&e)))
+}
+
+/// Fails when an email destination has no org-member recipient left, so a test that would
+/// send nothing is refused before it is charged.
+pub(crate) async fn email_reaches_a_member(
+    org_id: &str,
+    dest_type: &DestinationType,
+) -> Result<(), anyhow::Error> {
+    if let DestinationType::Email(email) = dest_type {
+        super::send::org_member_email(org_id, email).await?;
+    }
+    Ok(())
+}
+
+/// Longest receiver body a test-send error shows.
+const MAX_ERROR_BODY_CHARS: usize = 200;
+
+/// The dispatch error with the receiver's body cut short, and an HTML page left out.
+fn dispatch_error_text(e: &anyhow::Error) -> String {
+    let Some(SendError::Rejected {
+        status,
+        body: Some(body),
+    }) = e.downcast_ref::<SendError>()
+    else {
+        return e.to_string();
+    };
+    let body = body.trim();
+    if body.starts_with('<') {
+        return format!("sent error status: {status} (the receiver returned an HTML page)");
+    }
+    if body.chars().count() <= MAX_ERROR_BODY_CHARS {
+        return format!("sent error status: {status}, err: {body}");
+    }
+    let cut: String = body.chars().take(MAX_ERROR_BODY_CHARS).collect();
+    format!("sent error status: {status}, err: {cut}…")
 }
 
 #[cfg(test)]
@@ -373,6 +423,120 @@ mod tests {
             RenderedMessage::Sns { subject, .. } => assert_eq!(subject, title),
             other => panic!("expected Sns, got {other:?}"),
         }
+    }
+
+    fn platform_dest(kind: &str) -> DestinationType {
+        DestinationType::Http(Endpoint {
+            url: "https://events.pagerduty.com/v2/enqueue".into(),
+            destination_type: Some(kind.into()),
+            ..Default::default()
+        })
+    }
+
+    #[test]
+    fn a_downtime_test_to_a_platform_is_skipped_like_a_live_send() {
+        for platform in ["pagerduty", "opsgenie", "servicenow"] {
+            let err = build_test_message_with_title(
+                &platform_dest(platform),
+                &sample_spec(),
+                NotificationKind::Downtime,
+            )
+            .expect_err("a live downtime send skips this platform");
+            assert_eq!(
+                err,
+                TestSendError::PlatformSkipped(NotificationKind::Downtime)
+            );
+        }
+    }
+
+    #[test]
+    fn an_alert_test_to_a_platform_still_builds() {
+        build_test_message_with_title(
+            &platform_dest("pagerduty"),
+            &sample_spec(),
+            NotificationKind::Alert,
+        )
+        .expect("a live alert firing triggers the platform");
+    }
+
+    #[test]
+    fn a_downtime_test_to_slack_still_builds() {
+        build_test_message_with_title(&slack_dest(), &sample_spec(), NotificationKind::Downtime)
+            .expect("only platforms are skipped");
+    }
+
+    /// Requests that fail before dispatch do not use the caller's test-send quota.
+    // The guard only serializes tests; no other task here takes it, so the await cannot deadlock.
+    #[allow(clippy::await_holding_lock)]
+    #[tokio::test]
+    async fn an_invalid_draft_or_a_platform_skip_does_not_count_against_the_limit() {
+        let _guard = rate_limit_guard();
+        let user = format!("rate-limit-not-charged-{}", std::process::id());
+        let mut bad = sample_spec();
+        bad.links
+            .push(config::meta::alerts::content_spec::ContentLink {
+                label: "click".into(),
+                url: "javascript:alert(1)".into(),
+                show_when: None,
+            });
+        let invalid = test_send(
+            "default",
+            &user,
+            &slack_dest(),
+            &bad,
+            NotificationKind::Alert,
+        )
+        .await;
+        assert!(matches!(invalid, Err(TestSendError::InvalidContent(_))));
+        let skipped = test_send(
+            "default",
+            &user,
+            &platform_dest("pagerduty"),
+            &sample_spec(),
+            NotificationKind::Downtime,
+        )
+        .await;
+        assert!(matches!(skipped, Err(TestSendError::PlatformSkipped(_))));
+        assert!(
+            !RATE_LIMITER.read().unwrap().contains_key(&user),
+            "no attempt reached dispatch, so none is recorded"
+        );
+    }
+
+    fn rejected(body: &str) -> anyhow::Error {
+        SendError::Rejected {
+            status: reqwest::StatusCode::METHOD_NOT_ALLOWED,
+            body: Some(body.to_string()),
+        }
+        .into()
+    }
+
+    #[test]
+    fn a_receiver_html_page_is_left_out_of_the_error() {
+        let text = dispatch_error_text(&rejected("<!doctype html><html><body>no</body></html>"));
+        assert_eq!(
+            text,
+            "sent error status: 405 Method Not Allowed (the receiver returned an HTML page)"
+        );
+    }
+
+    #[test]
+    fn a_long_receiver_body_is_cut_and_a_short_one_kept() {
+        let long = "x".repeat(MAX_ERROR_BODY_CHARS + 50);
+        let text = dispatch_error_text(&rejected(&long));
+        assert!(text.ends_with('…'), "{text}");
+        assert_eq!(
+            text.chars().count(),
+            "sent error status: 405 Method Not Allowed, err: ".len() + MAX_ERROR_BODY_CHARS + 1
+        );
+        assert_eq!(
+            dispatch_error_text(&rejected("bad token")),
+            "sent error status: 405 Method Not Allowed, err: bad token"
+        );
+        assert_eq!(
+            dispatch_error_text(&anyhow::anyhow!("dns failed")),
+            "dns failed"
+        );
     }
 
     // The remaining rate-limit tests use `check_rate_limit_at` with an

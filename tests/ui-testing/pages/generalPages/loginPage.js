@@ -1,6 +1,7 @@
 // loginPage.js
 import { expect } from '@playwright/test';
 const { isCloudEnvironment } = require('../../playwright-tests/utils/cloud-auth.js');
+const testLogger = require('../../playwright-tests/utils/test-logger.js');
 export class LoginPage {
   constructor(page) {
     this.page = page;
@@ -15,6 +16,27 @@ export class LoginPage {
     // Home menu item is only present once the SPA has an authenticated session;
     // used to confirm a saved/warm session actually loaded.
     this.homeMenuItem = page.locator('[data-test="menu-link-\\/-item"]');
+    this.mainNav = page.locator('[data-test="navbar-main-nav"]');
+  }
+
+  // A form login lands in the user's default org; reload with ORGNAME so menu navigation stays in the test org.
+  async openOrgHome(baseUrl = process.env["ZO_BASE_URL"]) {
+    const org = process.env["ORGNAME"] || 'default';
+    await this.page.goto(`${baseUrl}/web/?org_identifier=${encodeURIComponent(org)}`, {
+      waitUntil: 'domcontentloaded',
+      timeout: 30000
+    });
+    await expect(this.mainNav).toBeVisible({ timeout: 30000 });
+  }
+
+  // Aborts dashboard/report/folder writes to the shared default org, so a lost org context fails the test instead of leaking objects there.
+  async blockDefaultOrgWrites() {
+    if (!process.env["ORGNAME"] || process.env["ORGNAME"] === 'default') return;
+    await this.page.route(/\/api\/(v2\/)?default\/(dashboards|reports|folders)(\/|\?|$)/, async (route) => {
+      if (route.request().method() === 'GET') return route.continue();
+      testLogger.error('Blocked write to the default org', { method: route.request().method(), url: route.request().url() });
+      return route.abort('blockedbyclient');
+    });
   }
 
   // Assert the authenticated Home menu item is visible — proves the SPA loaded
@@ -168,8 +190,10 @@ export class LoginPage {
     // Wait for page to stabilize before checking for internal login button
     await this.page.waitForLoadState('domcontentloaded');
     
-    if (await this.page.getByText('Login as internal user').isVisible()) {
-      await this.page.getByText('Login as internal user').click();
+    // getByText resolves to OButton's display:contents label span, which has no box, so Firefox reports it outside the viewport.
+    const internalUserButton = this.page.locator('[data-test="login-as-internal-user"]');
+    if (await internalUserButton.isVisible()) {
+      await internalUserButton.click();
       await this.page.waitForURL(process.env["ZO_BASE_URL_SC_UI"] + "/web/login", {
         waitUntil: "domcontentloaded",
       });

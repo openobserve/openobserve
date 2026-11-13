@@ -1965,6 +1965,7 @@
     "slos": "SLO",
     "reliability": "신뢰성",
     "onCall": "온콜",
+    "response": "대응",
     "toggleNavigation": "탐색 토글",
     "ingestionText": "수집",
     "navigationLink": "탐색 링크",
