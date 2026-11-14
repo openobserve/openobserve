@@ -23,6 +23,22 @@ describe("OInlineEdit", () => {
     expect(input(wrapper).exists()).toBe(false);
   });
 
+  it("names the display trigger by its value and describes it with the field label", () => {
+    const wrapper = mountInlineEdit({ ariaLabel: "Chat title" });
+    const btn = trigger(wrapper);
+
+    expect(btn.attributes("aria-label")).toBeUndefined();
+    const desc = wrapper.get(`#${btn.attributes("aria-describedby")}`);
+    expect(desc.text()).toBe("Chat title");
+  });
+
+  it("keeps the field label on the input while editing", async () => {
+    const wrapper = mountInlineEdit({ ariaLabel: "Chat title" });
+    await trigger(wrapper).trigger("click");
+
+    expect(input(wrapper).attributes("aria-label")).toBe("Chat title");
+  });
+
   it("falls back to the placeholder when the value is empty", () => {
     const wrapper = mountInlineEdit({ modelValue: "", placeholder: "Untitled panel" });
 

@@ -20,7 +20,7 @@
 // grid cell) rather than a measured pixel width, so it grows with the text
 // without an inline style or a hardcoded px.
 
-import { computed, nextTick, ref, useAttrs, watch } from "vue";
+import { computed, nextTick, ref, useAttrs, useId, watch } from "vue";
 import { useLockedDisabled } from "@/composables/useFeatureLock";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -48,6 +48,8 @@ defineSlots<InlineEditSlots>();
 const $attrs = useAttrs();
 const dataTest = computed(() => $attrs["data-test"] as string | undefined);
 
+// aria-label on the trigger would replace the value as its name; the label describes it instead.
+const labelId = useId();
 const isEditing = ref(false);
 const draft = ref("");
 const valueAtEditStart = ref("");
@@ -342,7 +344,7 @@ defineExpose({ focus: startEdit });
         ref="triggerRef"
         type="button"
         :disabled="isDisabled"
-        :aria-label="ariaLabel"
+        :aria-describedby="ariaLabel ? labelId : undefined"
         :data-test="dataTest ? `${dataTest}-trigger` : undefined"
         data-inline-edit-trigger
         :class="[
@@ -391,6 +393,8 @@ defineExpose({ focus: startEdit });
              unstyled system chrome. -->
         <OTooltip v-if="editHint && !isDisabled" :content="editHint" max-width="18rem" />
       </button>
+
+      <span v-if="ariaLabel && !readonly" :id="labelId" class="sr-only">{{ ariaLabel }}</span>
 
       <!-- Trailing content beside the name — display mode only, so it never
            competes with the input. -->
