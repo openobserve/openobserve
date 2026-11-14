@@ -56,6 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data="rows"
           :loading="loading"
           :forbidden="forbidden"
+          :counts-unavailable="!countsAvailable"
           forbidden-resource="roles"
           :action-loading="bulkDeleteLoading"
           :counts-loading="countsLoading"
@@ -361,6 +362,8 @@ const forbidden = computed(() => {
 const roleUserCounts = ref<Record<string, number> | null>(null);
 const roleServiceAccountCounts = ref<Record<string, number> | null>(null);
 const countsLoading = ref(false);
+// Member counts come from RBAC data that only enterprise and cloud builds serve.
+const countsAvailable = config.isEnterprise === "true" || config.isCloud === "true";
 
 // Members of a service-account list we cannot read stay counted as users, so the Users column survives a 403.
 const loadServiceAccounts = async (): Promise<any[] | null> => {
@@ -379,7 +382,7 @@ const loadServiceAccounts = async (): Promise<any[] | null> => {
 };
 
 const loadRoleUserCounts = async (force = false) => {
-  if (config.isEnterprise !== "true" && config.isCloud !== "true") return;
+  if (!countsAvailable) return;
   countsLoading.value = true;
   try {
     const options = allUserRolesQuery(store.state.selectedOrganization.identifier);

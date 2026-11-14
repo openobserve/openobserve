@@ -5,9 +5,9 @@ import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import RoleTable from "@/components/iam/roles/RoleTable.vue";
 
-const mountTable = (data: any[]) =>
+const mountTable = (data: any[], extra: Record<string, unknown> = {}) =>
   mount(RoleTable, {
-    props: { data, loading: false },
+    props: { data, loading: false, ...extra },
     global: { plugins: [i18n, store, router] },
     attachTo: document.body,
   });
@@ -87,6 +87,20 @@ describe("RoleTable member count columns", () => {
     const wrapper = mountTable([{ role_name: "ops", user_count: 3, service_account_count: null }]);
     await flushPromises();
     expect(wrapper.find('[data-test="iam-roles-ops-users-link"]').exists()).toBe(true);
+    expect(wrapper.text()).not.toContain(i18n.global.t("iam.serviceAccounts"));
+    wrapper.unmount();
+  });
+
+  it("has no count columns when the build cannot load member counts", async () => {
+    const wrapper = mountTable(
+      [{ role_name: "ops", user_count: null, service_account_count: null }],
+      {
+        countsUnavailable: true,
+      },
+    );
+    await flushPromises();
+    expect(wrapper.find('[data-test="iam-roles-ops-users-link"]').exists()).toBe(false);
+    expect(wrapper.text()).not.toContain(i18n.global.t("iam.roleUsers"));
     expect(wrapper.text()).not.toContain(i18n.global.t("iam.serviceAccounts"));
     wrapper.unmount();
   });

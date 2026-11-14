@@ -28,6 +28,8 @@ const props = defineProps<{
   actionLoading?: boolean;
   /** Member counts are still being fetched; unknown counts draw a placeholder instead of a dash. */
   countsLoading?: boolean;
+  /** The build cannot load member counts, so their columns are left out. */
+  countsUnavailable?: boolean;
   selectedIds?: string[];
   globalFilter?: string;
   pageSize?: number;
@@ -72,6 +74,16 @@ const onEmptyStateAction = (id?: string) => {
 const store = useStore();
 // Known before the counts load, so hiding the column for a disabled feature moves nothing later.
 const serviceAccountsEnabled = computed(() => !!store.state.zoConfig?.service_account_enabled);
+const userCountColumn: OTableColumnDef = {
+  id: "user_count",
+  header: t("iam.roleUsers"),
+  accessorKey: "user_count",
+  sortable: true,
+  resizable: true,
+  hideable: true,
+  size: COL.count,
+  meta: { align: "right" },
+};
 const serviceAccountColumn: OTableColumnDef = {
   id: "service_account_count",
   header: t("iam.serviceAccounts"),
@@ -94,17 +106,8 @@ const columns = computed<OTableColumnDef[]>(() => {
       meta: { align: "left", autoWidth: true, isName: true },
     },
     // Declared before the counts load, so their arrival moves no column.
-    {
-      id: "user_count",
-      header: t("iam.roleUsers"),
-      accessorKey: "user_count",
-      sortable: true,
-      resizable: true,
-      hideable: true,
-      size: COL.count,
-      meta: { align: "right" },
-    },
-    ...(serviceAccountsEnabled.value ? [serviceAccountColumn] : []),
+    ...(props.countsUnavailable ? [] : [userCountColumn]),
+    ...(serviceAccountsEnabled.value && !props.countsUnavailable ? [serviceAccountColumn] : []),
   ];
 
   if (props.assignTarget) {
