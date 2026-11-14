@@ -26,11 +26,11 @@ use config::metrics;
 use dashmap::{DashMap, mapref::entry::Entry};
 use datafusion::{
     common::{
-        HashMap, TableReference,
+        ColumnStatistics, HashMap, Statistics, TableReference,
         heap_size::{DFHeapSize, DFHeapSizeCtx},
     },
     execution::cache::{
-        Cache, CacheEntryInfo, CacheValue, SchemaFingerprint, TableScopedPath,
+        Cache, CacheEntryInfo, SchemaFingerprint, TableScopedPath,
         cache_manager::CachedFileMetadata,
     },
     physical_expr::{LexOrdering, PhysicalExpr, PhysicalSortExpr, expressions::Column},
@@ -75,16 +75,15 @@ impl FileStatisticsCache {
     }
 
     fn estimate_entry_size(key: &str, value: &CachedFileMetadata) -> usize {
-        // Count both key copies and inline storage; CacheValue only reports heap allocations.
-        (std::mem::size_of::<String>() + key.len()) * 2
+        // Count both key copies and inline storage, rounding heap blocks to allocator size classes.
+        (std::mem::size_of::<String>() + alloc_size(key.len())) * 2
             + std::mem::size_of::<(CachedFileMetadata, usize)>()
-            + value.size()
+            + value_heap_size(value)
             + Self::estimate_ordering_size(value.ordering.as_ref())
             + 64
     }
 
-    // CacheValue::size skips the ordering; the schema fingerprint is charged by
-    // `intern_fingerprint`.
+    // `value_heap_size` skips the ordering; the fingerprint is charged by `intern_fingerprint`.
     fn estimate_ordering_size(ordering: Option<&LexOrdering>) -> usize {
         ordering.map_or(0, |ordering| {
             ordering
@@ -315,6 +314,42 @@ impl Cache<TableScopedPath, CachedFileMetadata> for FileStatisticsCache {
 fn fingerprint_size(fingerprint: &Arc<SchemaFingerprint>) -> usize {
     std::mem::size_of::<(Arc<SchemaFingerprint>, usize)>()
         + fingerprint.heap_size(&mut DFHeapSizeCtx::default())
+}
+
+/// The heap that `CacheValue::size` counts, with every block rounded to its size class.
+fn value_heap_size(value: &CachedFileMetadata) -> usize {
+    let meta = &value.meta;
+    let tags: usize = [meta.e_tag.as_ref(), meta.version.as_ref()]
+        .into_iter()
+        .flatten()
+        .map(|tag| alloc_size(tag.capacity()))
+        .sum();
+    let columns = &value.statistics.column_statistics;
+    alloc_size(meta.location.as_ref().len())
+        + tags
+        + alloc_size(2 * std::mem::size_of::<usize>() + std::mem::size_of::<Statistics>())
+        + alloc_size(columns.capacity() * std::mem::size_of::<ColumnStatistics>())
+        + columns.iter().map(column_heap_size).sum::<usize>()
+}
+
+fn column_heap_size(column: &ColumnStatistics) -> usize {
+    let mut ctx = DFHeapSizeCtx::default();
+    [&column.min_value, &column.max_value, &column.sum_value]
+        .into_iter()
+        .filter_map(|value| value.get_value())
+        .map(|value| alloc_size(value.heap_size(&mut ctx)))
+        .sum()
+}
+
+/// Block size mimalloc hands out for a `size`-byte request: 8-byte steps up to 64 bytes,
+/// then 4 classes per power of two (jemalloc uses the same classes above 64 bytes).
+fn alloc_size(size: usize) -> usize {
+    let step = if size <= 64 {
+        8
+    } else {
+        size.next_power_of_two() / 8
+    };
+    size.div_ceil(step) * step
 }
 
 #[cfg(test)]
@@ -648,7 +683,32 @@ mod tests {
                 "k",
                 &entry(Statistics::new_unknown(&schema)),
             );
-        assert_eq!(counted, strings.iter().map(String::capacity).sum::<usize>());
+        // 87-byte strings take 96-byte blocks, the 5-byte one an 8-byte block, the empty one none.
+        assert_eq!(counted, 96 + 96 + 8);
+    }
+
+    #[test]
+    fn test_alloc_size_follows_mimalloc_size_classes() {
+        let cases = [
+            (0, 0),
+            (1, 8),
+            (8, 8),
+            (9, 16),
+            (64, 64),
+            (65, 80),
+            (87, 96),
+            (128, 128),
+            (129, 160),
+            (1000, 1024),
+            (1025, 1280),
+        ];
+        for (requested, allocated) in cases {
+            assert_eq!(
+                alloc_size(requested),
+                allocated,
+                "request of {requested} bytes"
+            );
+        }
     }
 
     #[test]
