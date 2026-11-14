@@ -71,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="assistant-query-open"
           @click="onOpen"
         >
-          {{ t("assistant.query.openShort") }}
+          {{ explorerLabel(explorer, t) }}
           <OTooltip :content="openLabel" />
         </OButton>
         <OButton
@@ -253,7 +253,7 @@ type MenuKey = "assistant.query.insert" | "assistant.query.dashboard" | "assista
 
 const MINUTE_MS = 60_000;
 
-// Logs, Run and Stop share one look so the footer buttons cannot drift.
+// Open, Run and Stop share one look so the footer buttons cannot drift.
 const FOOT_BUTTON_CLASS = `shrink-0 ${TOUCH_TARGET_CLASS}`;
 
 const props = withDefaults(defineProps<AssistantQueryBlockProps>(), {

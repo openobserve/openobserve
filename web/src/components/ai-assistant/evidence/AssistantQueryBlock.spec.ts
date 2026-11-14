@@ -316,16 +316,16 @@ describe("AssistantQueryBlock", () => {
     const promql = mountBlock({
       block: { ...block, query: { ...block.query, language: "promql", streamType: "metrics" } },
     });
-    expect(promql.wrapper.get('[data-test="assistant-query-open"]').attributes("aria-label")).toBe(
-      "Open in Metrics",
-    );
+    const metricsOpen = promql.wrapper.get('[data-test="assistant-query-open"]');
+    expect(metricsOpen.attributes("aria-label")).toBe("Open in Metrics");
+    expect(metricsOpen.text()).toBe("Metrics");
     expect(promql.wrapper.find('[data-test="assistant-query-run"]').exists()).toBe(false);
     const traces = mountBlock({
       block: { ...block, query: { ...block.query, streamType: "traces" } },
     });
-    expect(traces.wrapper.get('[data-test="assistant-query-open"]').attributes("aria-label")).toBe(
-      "Open in Traces",
-    );
+    const tracesOpen = traces.wrapper.get('[data-test="assistant-query-open"]');
+    expect(tracesOpen.attributes("aria-label")).toBe("Open in Traces");
+    expect(tracesOpen.text()).toBe("Traces");
   });
 
   it("reads Inserted until the editor's label goes, then offers Insert again", async () => {
