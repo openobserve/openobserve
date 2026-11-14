@@ -1725,22 +1725,48 @@ describe("ServiceGraphNodeSidePanel", () => {
       }
     });
 
-    it.each(["service-version", "metrics", "k8s-deployment"])(
-      "opens on the %s tab the route names and keeps it when the route moves there",
-      async (tab) => {
+    it.each([
+      { tab: "service-version", lands: "service-version" },
+      { tab: "k8s-pod", lands: "k8s-pod" },
+      { tab: "metrics", lands: "metrics" },
+      { tab: "behavior", lands: "operations" },
+      { tab: "stale-tab", lands: "operations" },
+    ])(
+      "opens the route's $tab tab on $lands and keeps it when the route moves there",
+      async ({ tab, lands }) => {
         const previous = config.isEnterprise;
         config.isEnterprise = "true";
+        getStreamMock.mockResolvedValueOnce({
+          schema: ["service_name", "o2_service_version", "service_k8s_pod_name"].map((name) => ({
+            name,
+            type: "keyword",
+          })),
+        });
+        vi.mocked(getDimensionAnalytics).mockResolvedValueOnce({
+          data: {
+            available_groups: [
+              {
+                group_id: "k8s-pod",
+                display: "K8s Pod Name",
+                stream_types: ["traces"],
+                aliases: { traces: "service_k8s_pod_name" },
+                recommended: true,
+              },
+            ],
+          },
+        } as never);
         Object.assign(routeQuery, { panel: tab, panelSvc: "frontend", panelWhere: "" });
         try {
           wrapper = mountPanel();
           await flushPromises();
-          expect((wrapper.vm as any).activeTab).toBe(tab);
+          await flushPromises();
+          expect((wrapper.vm as any).activeTab).toBe(lands);
           reactive(routeQuery).panel = "versions";
           await flushPromises();
           (wrapper.vm as any).onTabChange(tab);
           reactive(routeQuery).panel = tab;
           await flushPromises();
-          expect((wrapper.vm as any).activeTab).toBe(tab);
+          expect((wrapper.vm as any).activeTab).toBe(lands);
         } finally {
           config.isEnterprise = previous;
           for (const key of Object.keys(routeQuery)) delete routeQuery[key];

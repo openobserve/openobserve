@@ -2058,6 +2058,13 @@ export default defineComponent({
                 Number(a.fields?.includes("o2_service_version")),
             ),
     );
+    const resourceTabsSettled = ref(false);
+    const renderedTabIds = computed(() => [
+      "operations",
+      ...(isAgentBehaviorContext.value ? ["behavior"] : []),
+      ...activeResourceTabConfigs.value.map((c) => c.id),
+      ...(isInferred.value ? [] : ["metrics", "versions"]),
+    ]);
     // Deduped list of environments detected from visible resource groups
     const detectedEnvironments = computed<{ key: string; label: string }[]>(() => {
       const seen = new Set<string>();
@@ -2766,6 +2773,7 @@ export default defineComponent({
         resolvedWorkloadFields.value = [];
         selectedWorkloadFields.value = [];
         schemaGeneration++;
+        resourceTabsSettled.value = false;
         schemaResolved.value = false;
         schemaFailed.value = false;
         streamFieldSet.value = new Set();
@@ -2792,14 +2800,29 @@ export default defineComponent({
       ],
       ([visible]) => {
         if (visible && props.selectedNode && props.streamFilter !== "all") {
-          if (isInferred.value) {
-            resolveStreamSchema();
-          } else {
-            resolveWorkloadFields();
-          }
+          const generation = schemaGeneration;
+          const discovery = isInferred.value ? resolveStreamSchema() : resolveWorkloadFields();
+          void discovery.finally(() => {
+            if (generation === schemaGeneration) resourceTabsSettled.value = true;
+          });
         }
       },
       { immediate: true },
+    );
+
+    // A stale or hidden tab name from the URL would leave an empty panel, so it falls back once the tab list is final.
+    watch(
+      () => [activeTab.value, renderedTabIds.value, resourceTabsSettled.value] as const,
+      ([tab, ids, settled]) => {
+        if (!settled || props.streamFilter === "all" || ids.includes(tab)) return;
+        if (availableResourceTabConfigs.value.some((c) => c.id === tab)) {
+          selectedWorkloadFields.value = [...selectedWorkloadFields.value, tab];
+          return;
+        }
+        activeTab.value = "operations";
+        if (versionPanel.state.value.open)
+          void versionPanel.update(versionPanel.state.value.where, "operations");
+      },
     );
 
     // Navigate to traces explore page with contextual filters
