@@ -37,13 +37,6 @@ use o2_enterprise::enterprise::service_identity::{
 use opentelemetry_proto::tonic::common::v1::KeyValue;
 use serde_json::Map;
 
-/// The stamped columns; a client may not send them and a UDS list may not drop them.
-pub const SERVICE_IDENTITY_FIELDS: [&str; 4] = [
-    O2_SERVICE_WHERE,
-    O2_SERVICE_ENV,
-    O2_SERVICE_VERSION,
-    O2_SERVICE_IMAGE,
-];
 pub const SERVICE_IDENTITY_FIELD_PREFIX: &str = "o2_service_";
 // The registry `service_name` column is string_len(256).
 #[cfg(feature = "enterprise")]
