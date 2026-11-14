@@ -18,7 +18,7 @@
   <div class="flex flex-col gap-2.5" data-test="agent-behavior-panel">
     <!-- Summary strip: behaviour signals at a glance (loops, failures, agents). -->
     <div class="shrink-0" data-test="agent-behavior-summary">
-      <OStatStrip :items="behaviorStats" :loading="tableLoading" />
+      <OStatStrip :items="behaviorStats" :loading="tableLoading" inline />
     </div>
     <div
       class="bg-card-glass-bg rounded-default border-border-default flex min-h-0 flex-1 flex-col overflow-hidden border"

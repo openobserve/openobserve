@@ -274,6 +274,7 @@ mod m20261217_000001_add_alert_incidents_unresolved_index;
 mod m20261218_000001_add_security_case_to_alert_incidents;
 mod m20261219_000001_add_historical_to_alert_incidents;
 mod m20261220_000001_create_service_identity_tables;
+mod m20261221_000001_add_last_detection_at_to_alert_incidents;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;
 
@@ -911,6 +912,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20261103_000003_add_gap_state_to_synthetics::Migration),
             Box::new(m20261111_000001_add_false_alarm_recovery_stamp::Migration),
             Box::new(m20261220_000001_create_service_identity_tables::Migration),
+            Box::new(m20261221_000001_add_last_detection_at_to_alert_incidents::Migration),
         ]
     }
 }
@@ -1040,6 +1042,10 @@ mod tests {
         (153, "m20261103_000003_add_gap_state_to_synthetics"),
         (154, "m20261111_000001_add_false_alarm_recovery_stamp"),
         (155, "m20261220_000001_create_service_identity_tables"),
+        (
+            156,
+            "m20261221_000001_add_last_detection_at_to_alert_incidents",
+        ),
     ];
 
     // Two branches that each claim the next version merge cleanly, so a reused number must fail
@@ -1157,6 +1163,10 @@ mod tests {
             (
                 "m20251204_000001_create_alert_incidents_table",
                 "m20261219_000001_add_historical_to_alert_incidents",
+            ),
+            (
+                "m20251204_000001_create_alert_incidents_table",
+                "m20261221_000001_add_last_detection_at_to_alert_incidents",
             ),
             (
                 "m20260725_000001_create_alert_states_tables",

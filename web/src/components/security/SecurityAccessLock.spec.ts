@@ -45,7 +45,7 @@ describe("SecurityAccessLock", () => {
   });
 
   it("tells anyone else which preset to ask an admin for", () => {
-    const lock = mountLock("editor", viewDenial("streams", "list"));
+    const lock = mountLock("editor", viewDenial("alerts", "list"));
     expect(lock.find('[data-test="security-access-lock-ask-admin"]').text()).toBe(
       "Ask an admin for the Security Viewer preset.",
     );

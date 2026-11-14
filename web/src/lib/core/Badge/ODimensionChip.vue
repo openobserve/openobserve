@@ -119,6 +119,6 @@ const emit = defineEmits<{ (e: "remove"): void }>();
         >
       </span>
     </OTag>
-    <OTooltip v-if="tooltip" :delay="300" :content="raw(`${dimKey}=${value}`)" />
+    <OTooltip v-if="tooltip" :content="raw(`${dimKey}=${value}`)" />
   </span>
 </template>

@@ -24,6 +24,9 @@ export type StatTone =
   | "purple"
   | "neutral";
 
+/** How a tile renders: a summary card, a filter chip, or a flat inline KPI. */
+export type StatCardVariant = "card" | "chip" | "kpi";
+
 /** Optional delta shown beside the value (e.g. "▲ 12%"). */
 export interface StatTrend {
   direction: "up" | "down" | "flat";
@@ -36,7 +39,7 @@ export interface StatTrend {
 export interface StatItem {
   /** Stable key for the v-for. */
   key: string;
-  /** Uppercase caption under the value (already localised by the caller). */
+  /** Caption beside the value (already localised by the caller). */
   label: I18nText;
   /** The number / text shown large. */
   value: string | number;
@@ -58,6 +61,7 @@ export interface StatItem {
   /**
    * When set, the tile shows a thin tone-coloured proportion bar filled to
    * `value / max` (e.g. this state's share of the total). Omit for no bar.
+   * Filter chips and inline KPIs draw no bars.
    */
   max?: number;
   /** Show a numeric value as "819.5K"; the exact number moves to the tooltip. */

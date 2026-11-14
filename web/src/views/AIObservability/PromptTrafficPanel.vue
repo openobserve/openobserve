@@ -37,13 +37,19 @@
     />
 
     <template v-else>
-      <OSkeleton v-if="loading" class="h-20" />
+      <OSkeleton v-if="loading && !isDesktop" class="h-20" />
       <ODescriptionList v-else-if="!isDesktop" dense data-test="prompt-traffic-stats">
         <ODescriptionItem v-for="card in cards" :key="card.key" :label="card.label">{{
           card.value
         }}</ODescriptionItem>
       </ODescriptionList>
-      <OStatStrip v-else :items="cards" compact data-test="prompt-traffic-stats" />
+      <OStatStrip
+        v-else
+        :items="cards"
+        :loading="loading"
+        inline
+        data-test="prompt-traffic-stats"
+      />
 
       <section>
         <h4 class="text-text-heading mb-2 text-sm font-semibold">

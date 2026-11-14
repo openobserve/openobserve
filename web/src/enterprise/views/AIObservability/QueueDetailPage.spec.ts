@@ -69,7 +69,7 @@ vi.mock("@/lib/core/Table/OTable.vue", () => ({
     props: ["data", "columns"],
     emits: ["rowClick"],
     template: `<div class="o-table" :data-rows="(data || []).map(r => r.id).join(',')">
-      <slot name="subheader" />
+      <slot name="toolbar" />
       <template v-for="row in data" :key="row.id"><slot name="cell-actions" :row="row" /></template>
     </div>`,
   },
@@ -78,9 +78,9 @@ vi.mock("@/lib/core/Table/OTable.vue", () => ({
 vi.mock("@/lib/data/StatStrip/OStatStrip.vue", () => ({
   default: {
     name: "OStatStrip",
-    props: ["items", "selectedKey"],
-    emits: ["select"],
-    template: `<div class="o-stat-strip" :data-selected="selectedKey"
+    props: ["items", "selectedKeys"],
+    emits: ["update:selectedKeys"],
+    template: `<div class="o-stat-strip" :data-selected="(selectedKeys || []).join(',')"
       :data-stats="(items || []).map(i => i.key + ':' + i.value).join(',')" />`,
   },
 }));
@@ -143,17 +143,26 @@ describe("QueueDetailPage", () => {
     );
   });
 
-  it("filters the table to one status when a tile is picked, and toggles back", async () => {
+  it("filters the table to the picked statuses, ORing them, and back", async () => {
     const wrapper = await mountPage();
     const strip = wrapper.findComponent({ name: "OStatStrip" });
+    const rows = () => wrapper.find(".o-table").attributes("data-rows");
 
-    strip.vm.$emit("select", "reviewed");
+    strip.vm.$emit("update:selectedKeys", ["reviewed"]);
     await wrapper.vm.$nextTick();
-    expect(wrapper.find(".o-table").attributes("data-rows")).toBe("i2");
+    expect(rows()).toBe("i2");
 
-    strip.vm.$emit("select", "reviewed");
+    strip.vm.$emit("update:selectedKeys", ["reviewed", "pending"]);
     await wrapper.vm.$nextTick();
-    expect(wrapper.find(".o-table").attributes("data-rows")).toBe("i1,i2,i3");
+    expect(rows()).toBe("i1,i2,i3");
+
+    strip.vm.$emit("update:selectedKeys", ["pending"]);
+    await wrapper.vm.$nextTick();
+    expect(rows()).toBe("i1,i3");
+
+    strip.vm.$emit("update:selectedKeys", []);
+    await wrapper.vm.$nextTick();
+    expect(rows()).toBe("i1,i2,i3");
   });
 
   it("opens the Workbench on the clicked item, and without one from the header action", async () => {

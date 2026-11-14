@@ -306,7 +306,9 @@ const onRoleAdded = (payload: { role_name: string; startFrom?: string }) => {
     query: {
       org_identifier: store.state.selectedOrganization.identifier,
       tab: "permissions",
-      ...(payload.startFrom && payload.startFrom !== "custom" ? { preset: payload.startFrom } : {}),
+      ...(payload.startFrom && payload.startFrom !== "custom"
+        ? { preset: payload.startFrom, created: "1" }
+        : {}),
     },
   });
 };

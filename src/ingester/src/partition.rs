@@ -261,11 +261,7 @@ impl Partition {
                 path.push(hour.to_string());
                 path.push(file_name);
                 path.set_extension("par");
-                let mut f = create_file(&path).await?;
-                f.write_all(&buf_parquet)
-                    .await
-                    .context(WriteFileSnafu { path: path.clone() })?;
-                drop(f);
+                write_par_file(&path, &buf_parquet).await?;
 
                 // set parquet metadata cache
                 let mut file_key = path.clone();
@@ -367,6 +363,13 @@ async fn create_file(path: &Path) -> Result<File> {
     })
 }
 
+async fn write_par_file(path: &Path, data: &[u8]) -> Result<()> {
+    let mut f = create_file(path).await?;
+    f.write_all(data).await.context(WriteFileSnafu { path })?;
+    // tokio writes on a blocking task; without flush, the .parquet rename can publish a short file
+    f.flush().await.context(WriteFileSnafu { path })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -382,5 +385,19 @@ mod tests {
     fn test_partition_mem_size_at_least_struct_size() {
         let p = Partition::new();
         assert!(p.mem_size() >= std::mem::size_of::<Partition>());
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_write_par_file_is_complete_when_it_returns() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("0").join("large.par");
+        // Past tokio's 2 MiB write buffer, so an unflushed tail is still in flight at return.
+        let content = vec![7u8; 4 << 20];
+        for _ in 0..20 {
+            write_par_file(&path, &content).await.unwrap();
+            let renamed = path.with_extension("parquet");
+            std::fs::rename(&path, &renamed).unwrap();
+            assert_eq!(std::fs::read(&renamed).unwrap(), content);
+        }
     }
 }

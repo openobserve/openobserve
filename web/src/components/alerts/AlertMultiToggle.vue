@@ -39,7 +39,7 @@
       class="text-text-heading text-compact min-w-22.5 shrink-0 leading-8.5 font-bold whitespace-nowrap"
     >
       {{ t("alerts.multiAlert.label") }}
-      <OTooltip :content="t(onDescriptionKey)" :delay="300" side="top" />
+      <OTooltip :content="t(onDescriptionKey)" side="top" />
     </span>
     <div class="flex flex-col gap-1">
       <!-- An explicit two-option choice, not a switch (§5.4 calls it a

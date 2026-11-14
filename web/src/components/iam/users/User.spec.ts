@@ -270,6 +270,20 @@ describe("User Component", () => {
     resetListViewState();
   });
 
+  it("ORs two picked role chips", async () => {
+    wrapper.vm.rows = [
+      { email: "a@x.io", role: "admin" },
+      { email: "e@x.io", role: "editor" },
+      { email: "v@x.io", role: "viewer" },
+    ];
+    wrapper.vm.onStatSelect("admin");
+    wrapper.vm.onStatSelect("viewer");
+    await flushPromises();
+    expect(wrapper.vm.displayedRows.map((r: any) => r.email)).toEqual(["a@x.io", "v@x.io"]);
+    wrapper.vm.onStatSelect("total");
+    expect(wrapper.vm.roleFilters).toEqual([]);
+  });
+
   it("keeps the search text when the user comes back to the list", async () => {
     wrapper.vm.filterQuery = "alice";
     wrapper.unmount();
@@ -966,12 +980,12 @@ describe("User Component", () => {
     it("clears search and role filter from the custom Clear filters card", async () => {
       await mountAs("admin");
       wrapper.vm.filterQuery = "new@example.com";
-      wrapper.vm.roleFilter = "viewer";
+      wrapper.vm.roleFilters = ["viewer"];
       await settleTable();
 
       await wrapper.find('[data-test="user-list-clear-filters"]').trigger("click");
       expect(wrapper.vm.filterQuery).toBe("");
-      expect(wrapper.vm.roleFilter).toBe(null);
+      expect(wrapper.vm.roleFilters).toEqual([]);
     });
 
     it("refreshes the members list after an invite is sent", async () => {

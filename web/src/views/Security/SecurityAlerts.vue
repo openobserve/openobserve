@@ -3,6 +3,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later -->
 
 <!-- Triage state lives on the case, not here: a firing is a fact about one evaluation. -->
 <script setup lang="ts">
+import { securityTime } from "@/utils/security/time";
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import analytics from "@/services/product_analytics";
@@ -51,7 +52,6 @@ import { bucketMsFor, bucketize } from "@/utils/security/history";
 import {
   summarizeError,
   STATUS_VARIANT,
-  evidenceSummary,
   evidenceValueField,
   firingKey,
   firingStatus,
@@ -73,12 +73,15 @@ import {
   type SeverityTone,
 } from "@/utils/security/severity";
 import { normalizeTactic, techniqueUrl } from "@/utils/security/mitre";
-import { fetchSourceMatch } from "@/services/securitySources.queries";
+import { fetchSourceMatch, sourceTypesQuery } from "@/services/securitySources.queries";
+import type { SourceType } from "@/services/securitySources";
+import SecurityEvidenceEvent from "@/components/security/SecurityEvidenceEvent.vue";
 import { detectionEvidenceQuery } from "@/services/securitySigma.queries";
 import type { EvidenceGroup } from "@/services/securitySigma";
 import { useQueryClient } from "@tanstack/vue-query";
 import { normalizeEvents } from "@/utils/security/normalize";
 import { b64EncodeUnicode, formatEventCount } from "@/utils/formatters";
+import { matchesAnyKey, readFilterKeys } from "@/utils/filterKeys";
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -118,7 +121,8 @@ const customWindow = ref<{ startMs: number; endMs: number } | null>(
     : null,
 );
 const showEvaluations = ref(q.evals === "1");
-const facet = ref<Facet | null>(FACETS.includes(q.facet as Facet) ? (q.facet as Facet) : null);
+const isFacet = (key: string): key is Facet => FACETS.includes(key as Facet);
+const facets = ref<Facet[]>(readFilterKeys(q.facet, isFacet));
 const search = ref(q.q ?? "");
 const selectedKey = ref<string | null>(q.firing ?? null);
 
@@ -131,12 +135,12 @@ function syncUrl() {
     query.period = range.value;
   }
   if (showEvaluations.value) query.evals = "1";
-  if (facet.value) query.facet = facet.value;
+  if (facets.value.length) query.facet = facets.value.join(",");
   if (search.value.trim()) query.q = search.value.trim();
   if (selectedKey.value) query.firing = selectedKey.value;
   router.replace({ query });
 }
-watch([showEvaluations, facet, search, selectedKey], syncUrl);
+watch([showEvaluations, facets, search, selectedKey], syncUrl);
 
 const windowEndMs = ref(customWindow.value?.endMs ?? Date.now());
 const windowMs = computed(() =>
@@ -191,7 +195,7 @@ const summaryAt = ref<number | null>(null);
 // Silenced runs are mostly "normal", so the Silenced facet needs every outcome.
 const SIGNAL_OUTCOMES = ["firing", "notify_failed", "error"];
 const outcomeFilter = computed(() =>
-  showEvaluations.value || facet.value === "silenced" ? undefined : SIGNAL_OUTCOMES,
+  showEvaluations.value || facets.value.includes("silenced") ? undefined : SIGNAL_OUTCOMES,
 );
 const siemIds = computed(() => siemRows.value.map((d) => String(d.alert.id ?? "")).filter(Boolean));
 
@@ -275,7 +279,9 @@ const siemScoped = computed(() => joined.value.filter((f) => f.detection));
 const base = computed(() =>
   siemScoped.value.filter(
     (f) =>
-      showEvaluations.value || isSignal(f) || (facet.value === "silenced" && f.row.is_silenced),
+      showEvaluations.value ||
+      isSignal(f) ||
+      (facets.value.includes("silenced") && f.row.is_silenced),
   ),
 );
 const emptyCounts = (): Record<Facet, number> => ({
@@ -313,18 +319,17 @@ const counts = computed(() => ({
 }));
 const statsLoading = computed(() => summaryAt.value === null);
 
+function matchesFacet(f: Firing, key: Facet): boolean {
+  if (key === "error") return f.status === "error";
+  if (key === "silenced") return !!f.row.is_silenced;
+  const tones = FACET_TONES[key] ?? [];
+  return tones.includes(f.tone) && (f.status === "firing" || f.status === "notify_failed");
+}
+
 const filtered = computed(() => {
   const needle = search.value.trim().toLowerCase();
   return base.value.filter((f) => {
-    if (facet.value === "error" && f.status !== "error") return false;
-    if (facet.value === "silenced" && !f.row.is_silenced) return false;
-    const tones = facet.value ? FACET_TONES[facet.value] : undefined;
-    if (
-      tones &&
-      !(tones.includes(f.tone) && (f.status === "firing" || f.status === "notify_failed"))
-    ) {
-      return false;
-    }
+    if (!matchesAnyKey(facets.value, f, matchesFacet)) return false;
     if (!needle) return true;
     return (
       f.name.toLowerCase().includes(needle) ||
@@ -355,9 +360,11 @@ const stats = computed<StatItem[]>(() =>
     dataTest: `security-alerts-stat-${tile.key}`,
   })),
 );
-function onFacet(key: string) {
-  facet.value = facet.value === key ? null : (key as Facet);
-}
+// The chart can point at one severity band only.
+const chartHighlight = computed(() => {
+  const tones = facets.value.filter((key) => key !== "error" && key !== "silenced");
+  return facets.value.length === 1 && tones.length === 1 ? tones[0] : null;
+});
 
 const chartSeries = computed(() =>
   [...SEVERITY_TONES].reverse().map((tone) => ({
@@ -457,10 +464,10 @@ const columns = computed<OTableColumnDef<Firing>[]>(() => [
 const rowRail = (f: Firing) => severityRailColor(f.tone);
 const rowClass = (f: Firing) => (f.id === selectedKey.value ? "!bg-table-row-selected-bg" : "");
 
-const filtersActive = computed(() => !!facet.value || !!search.value.trim());
+const filtersActive = computed(() => facets.value.length > 0 || !!search.value.trim());
 function onEmptyAction(id?: string) {
   if (id === "clear-filters") {
-    facet.value = null;
+    facets.value = [];
     search.value = "";
   }
 }
@@ -498,7 +505,7 @@ const notices = computed<SecurityNotice[]>(() => {
     out.push({
       key: "narrowed",
       tone: "warning",
-      text: t("siem.mitrePage.historyNarrowed", { from: new Date(narrowedFrom).toLocaleString() }),
+      text: t("siem.mitrePage.historyNarrowed", { from: securityTime(narrowedFrom) }),
       dataTest: "security-alerts-narrowed",
     });
   }
@@ -509,7 +516,7 @@ const notices = computed<SecurityNotice[]>(() => {
       text: t("siem.alerts.cappedRows", {
         n: formatEventCount(history.value.length),
         total: formatEventCount(historyTotal.value),
-        from: new Date(cappedFromMs.value).toLocaleString(),
+        from: securityTime(cappedFromMs.value),
       }),
       dataTest: "security-alerts-capped",
     });
@@ -528,8 +535,8 @@ const notices = computed<SecurityNotice[]>(() => {
       key: "custom-window",
       tone: "info",
       text: t("siem.alerts.customWindow", {
-        from: new Date(custom.startMs).toLocaleString(),
-        to: new Date(custom.endMs).toLocaleString(),
+        from: securityTime(custom.startMs),
+        to: securityTime(custom.endMs),
       }),
       actionLabel: t("siem.alerts.backToRange", { range: t(`siem.alerts.range.${range.value}`) }),
       onAction: () => onRange(range.value),
@@ -627,7 +634,7 @@ const facts = computed<RecordFact[]>(() => {
       label: isFiringStatus.value
         ? t("siem.alerts.fact.firedAt")
         : t("siem.alerts.fact.evaluatedAt"),
-      value: new Date(f.timeMs).toLocaleString(),
+      value: securityTime(f.timeMs),
     },
     { label: t("siem.alerts.fact.value"), value: valueVsThreshold(f.row) || "—", mono: true },
     { label: t("siem.alerts.fact.window"), value: mins ? t("siem.alerts.minutes", mins) : "—" },
@@ -683,7 +690,7 @@ const rowFields = computed<KeyValueRow[]>(() => {
 
 function windowText(row: FiringRow): string {
   if (!row.start_time || !row.end_time) return "—";
-  const fmt = (us: number) => new Date(us / 1000).toLocaleString();
+  const fmt = (us: number) => securityTime(us / 1000);
   return `${fmt(row.start_time)} → ${fmt(row.end_time)}`;
 }
 
@@ -761,6 +768,22 @@ let evidenceSeq = 0;
 const queryClient = useQueryClient();
 const shownEvidenceSql = computed(() => evidenceGroupSql.value || evidenceSql.value);
 
+/** The detection's own source type maps its rows; a projection of a few columns rarely classifies. */
+async function evidenceSource(
+  f: NonNullable<typeof selected.value>,
+  sample: Record<string, unknown> | undefined,
+): Promise<SourceType | null> {
+  const id = f.detection?.meta.sourceType;
+  if (id) {
+    const types = await queryClient.fetchQuery(sourceTypesQuery(orgId.value)).catch(() => []);
+    const known = types.find((s) => s.id === id);
+    if (known) return known;
+  }
+  if (!sample) return null;
+  const match = await fetchSourceMatch(orgId.value, Object.keys(sample), sample).catch(() => null);
+  return match?.classification?.source ?? null;
+}
+
 function groupLabel(group: EvidenceGroup): string {
   return Object.entries(group.values ?? {})
     .map(([k, v]) => `${k}=${v ?? "—"}`)
@@ -782,11 +805,8 @@ async function loadFiredGroups(f: NonNullable<typeof selected.value>): Promise<b
     .catch(() => null);
   if (!evidenceResult || evidenceResult.error || !evidenceResult.groups.length) return false;
   const first = evidenceResult.groups.find((g) => g.rows.length)?.rows[0];
-  const match = first
-    ? await fetchSourceMatch(orgId.value, Object.keys(first), first).catch(() => null)
-    : null;
-  const source = match?.classification?.source ?? null;
-  const fmt = (us: number) => new Date(us / 1000).toLocaleString();
+  const source = await evidenceSource(f, first);
+  const fmt = (us: number) => securityTime(us / 1000);
   evidenceGroups.value = evidenceResult.groups.map((g, i) => ({
     key: `${i}`,
     label: groupLabel(g),
@@ -830,11 +850,9 @@ async function loadEvidence() {
     ]);
     if (mine !== evidenceSeq) return;
     const hits = rows.hits;
-    const match = hits.length
-      ? await fetchSourceMatch(orgId.value, Object.keys(hits[0]), hits[0]).catch(() => null)
-      : null;
+    const source = await evidenceSource(f, hits[0]);
     if (mine !== evidenceSeq) return;
-    evidence.value = normalizeEvents(hits, match?.classification?.source ?? null);
+    evidence.value = normalizeEvents(hits, source);
     evidenceCount.value = Number(count.hits[0]?.zo_n ?? hits.length);
   } catch (e: any) {
     if (mine !== evidenceSeq) return;
@@ -1030,16 +1048,7 @@ onUnmounted(() => {
         data-test="security-alerts-notices"
       />
 
-      <div class="border-border-default px-page-edge flex shrink-0 flex-col gap-2 border-b py-3">
-        <OStatStrip
-          compact-values
-          :items="stats"
-          :loading="statsLoading"
-          selectable
-          :selected-key="facet"
-          data-test="security-alerts-stats"
-          @select="onFacet"
-        />
+      <div class="border-border-default px-page-edge shrink-0 border-b py-3">
         <div class="h-28">
           <SecuritySeverityChart
             :buckets="chartBuckets"
@@ -1047,7 +1056,7 @@ onUnmounted(() => {
             :loading="chartLoading"
             :min="windowStartMs"
             :max="windowEndMs"
-            :highlight="facet && facet !== 'error' && facet !== 'silenced' ? facet : null"
+            :highlight="chartHighlight"
             data-test="security-alerts-chart"
           />
         </div>
@@ -1088,8 +1097,8 @@ onUnmounted(() => {
           </OButton>
         </template>
         <template #toolbar>
-          <div class="flex w-full flex-wrap items-center gap-3">
-            <div class="w-72">
+          <div class="contents">
+            <div class="min-w-0 flex-1 max-md:min-w-40 md:min-w-48">
               <OSearchInput
                 v-model="search"
                 :placeholder="t('siem.alerts.search')"
@@ -1103,7 +1112,18 @@ onUnmounted(() => {
               size="sm"
               data-test="security-alerts-evaluations"
             />
-            <div class="flex-1" />
+            <OStatStrip
+              compact-values
+              :items="stats"
+              :loading="statsLoading"
+              selectable
+              :row="false"
+              class="max-md:order-last"
+              multiple
+              :selected-keys="facets"
+              data-test="security-alerts-stats"
+              @update:selected-keys="facets = $event as Facet[]"
+            />
             <span class="text-text-secondary text-xs" data-test="security-alerts-count">
               {{
                 t("siem.alerts.count", { n: formatEventCount(filtered.length) }, filtered.length)
@@ -1383,23 +1403,14 @@ onUnmounted(() => {
                 }}</span>
                 <span class="text-text-secondary text-2xs">{{ group.range }}</span>
               </div>
-              <div
+              <SecurityEvidenceEvent
                 v-for="(ev, i) in group.events"
                 :key="i"
-                class="border-border-subtle flex items-start gap-3 border-b px-3 py-2 last:border-b-0"
-              >
-                <OTag variant="primary-soft" size="xs" class="shrink-0">{{
-                  ev.className || t("siem.drawer.eyebrow")
-                }}</OTag>
-                <div class="flex min-w-0 flex-1 flex-col">
-                  <span class="text-text-heading truncate text-xs">{{
-                    evidenceSummary(ev, group.valueField) || "—"
-                  }}</span>
-                  <span class="text-text-secondary text-2xs font-mono">{{
-                    ev.time ? new Date(ev.time).toLocaleString() : "—"
-                  }}</span>
-                </div>
-              </div>
+                :event="ev"
+                :value-field="group.valueField"
+                class="border-border-subtle border-b last:border-b-0"
+                data-test="security-alerts-drawer-evidence-event"
+              />
               <span
                 v-if="!group.events.length"
                 class="text-text-secondary block px-3 py-2 text-xs"
@@ -1412,23 +1423,14 @@ onUnmounted(() => {
             class="border-border-default rounded-surface overflow-hidden border"
             data-test="security-alerts-drawer-evidence"
           >
-            <div
+            <SecurityEvidenceEvent
               v-for="(ev, i) in evidence"
               :key="i"
-              class="border-border-subtle flex items-start gap-3 border-b px-3 py-2 last:border-b-0"
-            >
-              <OTag variant="primary-soft" size="xs" class="shrink-0">{{
-                ev.className || t("siem.drawer.eyebrow")
-              }}</OTag>
-              <div class="flex min-w-0 flex-1 flex-col">
-                <span class="text-text-heading truncate text-xs">{{
-                  evidenceSummary(ev, evidenceField) || "—"
-                }}</span>
-                <span class="text-text-secondary text-2xs font-mono">{{
-                  ev.time ? new Date(ev.time).toLocaleString() : "—"
-                }}</span>
-              </div>
-            </div>
+              :event="ev"
+              :value-field="evidenceField"
+              class="border-border-subtle border-b last:border-b-0"
+              data-test="security-alerts-drawer-evidence-event"
+            />
           </div>
           <span
             v-else-if="!evidenceLoading && !evidenceError && !evidenceDenials.length"

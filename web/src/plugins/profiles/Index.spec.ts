@@ -6,6 +6,7 @@ import FlameGraphView from "@/components/common/FlameGraphView.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import analytics from "@/services/product_analytics";
+import { LOADER_DELAY_MS } from "@/lib/styles/motion";
 
 const mocks = vi.hoisted(() => ({
   nowMs: 1_700_000_000_000,
@@ -1732,6 +1733,8 @@ describe("Profiles page", () => {
 
       mocks.merge.mockImplementationOnce(() => new Promise(() => {}));
       await wrapper.find('[data-test="profiles-type-select"] select').setValue("heap\u0000bytes");
+      await flushPromises();
+      await new Promise((resolve) => setTimeout(resolve, LOADER_DELAY_MS));
       await flushPromises();
 
       expect(wrapper.find('[data-test-stale="true"]').exists()).toBe(false);

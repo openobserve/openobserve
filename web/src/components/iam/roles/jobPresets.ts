@@ -35,7 +35,7 @@ const READ_TRIAGE: readonly PermissionType[] = ["AllowList", "AllowGet", "AllowP
 // Security POST is detection authoring, kept apart from the analyst's PUT triage.
 const READ_AUTHOR: readonly PermissionType[] = ["AllowList", "AllowGet", "AllowPost"];
 
-/** Role starting points named after a job, with the companion grants each needs; stream reads are org-wide (the stream wildcard, like Read-Only) and the preset detail says so before Add. */
+/** Role starting points named after a job, with the companion grants each needs; a stream grant is org-wide (the stream wildcard, like Read-Only). */
 export const JOB_PRESETS: JobPreset[] = [
   {
     id: "alert_manager",
@@ -83,11 +83,11 @@ export const JOB_PRESETS: JobPreset[] = [
     descriptionKey: "iam.editRole.presetSocAnalystDescription",
     icon: "manage-search",
     tone: "security",
+    // No stream grant: Security read covers the org's Security sources and nothing else.
     grants: {
       security: READ_TRIAGE,
       incidents: READ_TRIAGE,
       afolder: READ,
-      stream: READ,
       // The Intel page lists threat-intel enrichment tables.
       enrichment_table: READ,
     },
@@ -135,12 +135,11 @@ export const JOB_PRESETS: JobPreset[] = [
     descriptionKey: "iam.editRole.presetSecurityViewerDescription",
     icon: "verified-user",
     tone: "security",
+    // No stream grant: Security read covers the org's Security sources and nothing else.
     grants: {
       security: READ,
       incidents: READ,
       afolder: READ,
-      // Entities, UEBA and Events query the source streams.
-      stream: READ,
     },
   },
 ];

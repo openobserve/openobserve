@@ -100,7 +100,7 @@
       @update:current-page="onPageChange"
     >
       <template #toolbar>
-        <div class="flex w-full min-w-0 flex-wrap items-center gap-2 gap-y-1.5 max-md:contents">
+        <div class="contents">
           <OToggleGroup v-model="typeFilter" mobile-dropdown data-test="slos-slolist-type-filter">
             <OToggleGroupItem
               v-for="opt in typeOptions"
@@ -119,7 +119,7 @@
                will not shrink below its content width without it, which is
                how a long placeholder pushes the toolbar wider than the table.
                Same wrapper the Alerts toolbar uses. -->
-          <div class="min-w-0 flex-1 max-md:min-w-40">
+          <div class="min-w-0 flex-1 max-md:min-w-40 md:min-w-48">
             <OSearchInput
               v-model="search"
               class="w-full"
@@ -128,6 +128,18 @@
               data-test="slos-slolist-search"
             />
           </div>
+          <OStatStrip
+            :items="stats"
+            :loading="loading"
+            selectable
+            :row="false"
+            multiple
+            :selected-keys="healthFilters"
+            default-key="total"
+            class="max-md:order-last"
+            data-test="slos-slolist-stats"
+            @update:selected-keys="healthFilters = $event as SloHealth[]"
+          />
         </div>
       </template>
 
@@ -144,23 +156,6 @@
           data-test="slos-slolist-refresh"
           @click="refresh"
         />
-      </template>
-
-      <!-- Health tiles sit in #subheader so search and the type filter stay
-           ABOVE them, matching the Alerts list: you narrow the set first, then
-           read the counts for what you narrowed to. Always rendered (skeleton
-           while loading) so data arriving never shifts the rows below. -->
-      <template #subheader>
-        <div data-test="slos-slolist-stats">
-          <OStatStrip
-            :items="stats"
-            :loading="loading"
-            selectable
-            :selected-key="healthFilter"
-            default-key="total"
-            @select="onStatSelect"
-          />
-        </div>
       </template>
 
       <template #cell-name="{ row }">
@@ -598,6 +593,7 @@ import { useListViewState } from "@/composables/useListViewState";
 import alertsService from "@/services/alerts";
 import { sloDetailRoute } from "@/utils/alerts/sloAlertRouting";
 import { slosToTerraform } from "@/utils/slos/sloTerraform";
+import { matchesAnyKey, readFilterKeys } from "@/utils/filterKeys";
 import {
   ABSENT,
   compareByUrgency,
@@ -663,22 +659,24 @@ const error = computed<string | null>(() => {
 const savedView = useListViewState("slos", {
   search: "",
   typeFilter: "all",
-  healthFilter: null as string | null,
+  healthFilter: [] as SloHealth[],
   sortBy: "",
   sortOrder: "asc" as "asc" | "desc",
   pageSize: 25,
 });
 const search = ref(savedView.search);
 const typeFilter = ref(savedView.typeFilter);
-const healthFilter = ref<string | null>(savedView.healthFilter);
+const SLO_HEALTHS: readonly SloHealth[] = ["budget_blown", "at_risk", "meeting", "no_data"];
+const isSloHealth = (key: string): key is SloHealth => SLO_HEALTHS.includes(key as SloHealth);
+const healthFilters = ref<SloHealth[]>(readFilterKeys(savedView.healthFilter, isSloHealth));
 const sortBy = ref<string>(savedView.sortBy);
 const sortOrder = ref<"asc" | "desc">(savedView.sortOrder);
 const pageSize = ref<number>(savedView.pageSize);
-watch([search, typeFilter, healthFilter, sortBy, sortOrder, pageSize], () => {
+watch([search, typeFilter, healthFilters, sortBy, sortOrder, pageSize], () => {
   Object.assign(savedView, {
     search: search.value,
     typeFilter: typeFilter.value,
-    healthFilter: healthFilter.value,
+    healthFilter: healthFilters.value,
     sortBy: sortBy.value,
     sortOrder: sortOrder.value,
     pageSize: pageSize.value,
@@ -970,7 +968,7 @@ const stats = computed<StatItem[]>(() => {
     {
       key: "total",
       dataTest: "slos-slolist-stat-total",
-      label: t("slos.totalSlos"),
+      label: t("common.allStatuses"),
       value: total,
       tone: "primary",
       selectable: true,
@@ -982,7 +980,7 @@ const visibleRows = computed(() => {
   const term = search.value.trim().toLowerCase();
   return rows.value
     .filter((r) => typeFilter.value === "all" || r.sli_type === typeFilter.value)
-    .filter((r) => !healthFilter.value || health(r) === healthFilter.value)
+    .filter((r) => matchesAnyKey(healthFilters.value, r, (row, key) => health(row) === key))
     .filter(
       (r) =>
         !term ||
@@ -991,10 +989,6 @@ const visibleRows = computed(() => {
     )
     .sort((a, b) => compareByUrgency(a.status, b.status));
 });
-
-function onStatSelect(key: string | null) {
-  healthFilter.value = key === "total" || healthFilter.value === key ? null : key;
-}
 
 // The first real load lands after mount and races TanStack's own auto-reset-on-data-change, which resolves through its own deferred microtask queue — setTimeout(0) runs strictly after that queue drains, so the restored page reliably wins.
 watch(

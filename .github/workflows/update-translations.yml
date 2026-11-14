@@ -36,6 +36,7 @@ on:
     types: [auto_merge_enabled, ready_for_review, synchronize]
     paths:
       - 'web/src/locales/languages/en-US.json'
+      - 'web/src/locales/languages/security/en-US.json'
   workflow_dispatch:
     inputs:
       languages:
@@ -326,7 +327,7 @@ jobs:
         # third-party code fetched on behalf of the PR.
         run: |
           npm ci --ignore-scripts
-          npx prettier --write "src/locales/languages/*.json"
+          npx prettier --write "src/locales/languages/*.json" "src/locales/languages/security/*.json"
 
       - name: Mint the translations App token
         id: app_token
@@ -361,6 +362,7 @@ jobs:
           git remote set-url origin "https://x-access-token:${PUSH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
 
           git add -- 'web/src/locales/languages/*.json' \
+                     'web/src/locales/languages/security/*.json' \
                      'scripts/translations/.translation_state.json'
           if git diff --cached --quiet; then
             echo "Nothing staged after filtering to translation paths."

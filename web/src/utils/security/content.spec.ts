@@ -10,6 +10,9 @@ import {
   rulesForSource,
   sourcesForRule,
   streamsBySource,
+  matchedRunnable,
+  ruleCounts,
+  ruleStreams,
   streamsForRule,
   toMicros,
 } from "./content";
@@ -153,5 +156,43 @@ describe("detection state", () => {
   it("flags a rule whose notifications fail as notify failing, not healthy", () => {
     expect(detectionState({ enabled: true, last_outcome: "notify_failed" })).toBe("notifyFailing");
     expect(detectionState({ enabled: false, last_outcome: "notify_failed" })).toBe("disabled");
+  });
+});
+
+describe("Content counters", () => {
+  it("counts a rule the server compiled for a stream as applying, so ready never exceeds applies", () => {
+    const bySource = new Map([["aws_cloudtrail", ["ct"]]]);
+    const compiled = { where: "x", runnable: true, unsupported: [], assumedAbsent: [], fields: [] };
+    const check = { stream: "edr", source: SOURCE_TYPE_BY_ID.get("aws_cloudtrail")!, compiled };
+    expect(ruleStreams(oktaRule, bySource, [check])).toEqual(["edr"]);
+    expect(ruleStreams(ctRule, bySource, [{ ...check, stream: "ct" }])).toEqual(["ct"]);
+
+    const rows = [
+      { streams: ruleStreams(oktaRule, bySource, [check]), runnable: ["edr"], installed: false },
+      { streams: ["ct"], runnable: ["ct"], installed: true },
+      { streams: ["ct"], runnable: [], installed: false },
+      { streams: [], runnable: [], installed: false },
+    ];
+    const counts = ruleCounts(rows);
+    expect(counts).toEqual({ ready: 1, installed: 1, applies: 3 });
+    expect(counts.ready).toBeLessThanOrEqual(counts.applies);
+  });
+
+  it("does not count a rule as ready when it only compiles on another source's streams", () => {
+    const compiled = { where: "x", runnable: true, unsupported: [], assumedAbsent: [], fields: [] };
+    const okta = SOURCE_TYPE_BY_ID.get("okta_system_log")!;
+    const ct = SOURCE_TYPE_BY_ID.get("aws_cloudtrail")!;
+    const generic = { ...ctRule, sources: ["ocsf_native"] } as CatalogRule;
+    const checks = [
+      { stream: "okta", source: okta, compiled },
+      { stream: "ct", source: ct, compiled },
+    ];
+    expect(matchedRunnable(generic, checks)).toEqual([]);
+    expect(matchedRunnable(ctRule, checks)).toEqual(["ct"]);
+    const counts = ruleCounts([
+      { streams: ["okta", "ct"], runnable: ["okta", "ct"], matched: [], installed: false },
+      { streams: ["ct"], runnable: ["ct"], matched: ["ct"], installed: false },
+    ]);
+    expect(counts.ready).toBe(1);
   });
 });

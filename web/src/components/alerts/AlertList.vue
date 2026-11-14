@@ -129,7 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <!-- Right: Table -->
         <div class="h-full min-w-0 flex-1 max-md:h-auto max-md:min-h-0">
-          <div class="bg-card-glass-bg flex h-full flex-col">
+          <div class="bg-card-glass-bg @container/alert-toolbar flex h-full flex-col">
             <!-- Alert List Table (shows all alert types including anomaly detection rows) -->
             <OTable
               class="min-h-0 flex-1"
@@ -168,12 +168,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :get-row-style="alertRowStyle"
               @row-click="triggerExpand"
             >
-              <!-- Summary strip: at-a-glance operational counts for the folder.
-                     Rendered via OTable's #subheader slot so it sits BELOW the
-                     search/tabs and above the rows. Always rendered (skeleton
-                     while loading) so data arriving never shifts the layout. -->
-              <template #subheader>
-                <div v-if="levelFilter" class="px-3 pt-2" data-test="alert-list-level-filter">
+              <!-- A level from an Overview link has no chip, so it shows as a removable filter here. -->
+              <template v-if="levelFilter" #subheader>
+                <div class="px-3 pt-2" data-test="alert-list-level-filter">
                   <OButton
                     variant="outline"
                     size="xs"
@@ -185,26 +182,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     {{ levelFilterLabel }}
                   </OButton>
                 </div>
-                <div data-test="alert-list-summary">
-                  <OStatStrip
-                    :items="summaryStats"
-                    :loading="loading"
-                    compact
-                    stacked
-                    selectable
-                    :selected-key="stateFilter"
-                    default-key="total"
-                    @select="onStatSelect"
-                  />
-                </div>
               </template>
 
               <!-- Toolbar: alert-type filter + search (inline folder scope) + refresh. -->
               <template #toolbar>
-                <!-- A container, not a viewport breakpoint: the folder rail squeezes this toolbar at any width. -->
-                <div
-                  class="@container/alert-toolbar flex min-w-0 flex-1 flex-wrap items-center gap-2 gap-y-1.5 max-md:contents"
-                >
+                <!-- Children of the toolbar row, so the chips can wrap below them; label queries read the table column. -->
+                <div class="contents">
                   <OToggleGroup
                     mobile-dropdown
                     :model-value="activeTab"
@@ -221,12 +204,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :title="lgUp || tab.locked ? undefined : tab.label"
                         :data-test="`alert-list-tab-${tab.value}`"
                       >
-                        <span class="@max-[42rem]/alert-toolbar:hidden">{{ tab.label }}</span>
+                        <span class="@max-[52rem]/alert-toolbar:hidden">{{ tab.label }}</span>
                       </OToggleGroupItem>
                     </template>
                   </OToggleGroup>
                   <!-- flex-1 is basis-0, so below lg the full-width basis is what wraps the input before its scope chips spill. -->
-                  <div class="min-w-0 flex-1 md:max-lg:basis-full">
+                  <div class="min-w-0 flex-1 md:min-w-48 md:max-lg:basis-full">
                     <OInput
                       v-model="dynamicQueryModel"
                       :placeholder="
@@ -253,7 +236,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             icon-left="folder-outline"
                             data-test="alert-list-search-scope-current"
                             :title="t('alerts.searchThisFolderTooltip')"
-                            ><span class="max-md:hidden @max-[34rem]/alert-toolbar:hidden">{{
+                            ><span class="max-md:hidden @max-[52rem]/alert-toolbar:hidden">{{
                               t("alerts.searchThisFolder")
                             }}</span></OToggleGroupItem
                           >
@@ -263,7 +246,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             icon-left="search"
                             data-test="alert-list-search-across-folders-toggle"
                             :title="t('alerts.searchAllFoldersTooltip')"
-                            ><span class="max-md:hidden @max-[34rem]/alert-toolbar:hidden">{{
+                            ><span class="max-md:hidden @max-[52rem]/alert-toolbar:hidden">{{
                               t("alerts.searchAllFolders")
                             }}</span></OToggleGroupItem
                           >
@@ -271,6 +254,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </template>
                     </OInput>
                   </div>
+                  <OStatStrip
+                    :items="summaryStats"
+                    :loading="loading"
+                    compact
+                    selectable
+                    :row="false"
+                    multiple
+                    :selected-keys="stateFilters"
+                    default-key="total"
+                    class="max-md:order-last"
+                    data-test="alert-list-summary"
+                    @update:selected-keys="onStateFiltersUpdate"
+                  />
                 </div>
               </template>
               <template #toolbar-trailing>
@@ -967,19 +963,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-else
                   size="block"
                   preset="no-alerts"
-                  :filtered="!!(filterQuery || searchQuery || stateFilter || levelFilter)"
+                  :filtered="!!(filterQuery || searchQuery || stateFilters.length || levelFilter)"
                   @action="
                     (id) =>
                       id === 'clear-filters' &&
                       ((filterQuery = ''),
                       (searchQuery = ''),
-                      (stateFilter = null),
+                      (stateFilters = []),
                       (levelFilter = null))
                   "
                 >
                   <!-- First run only: the filtered state keeps its single Clear filters action. -->
                   <template
-                    v-if="!(filterQuery || searchQuery || stateFilter || levelFilter)"
+                    v-if="!(filterQuery || searchQuery || stateFilters.length || levelFilter)"
                     #actions
                   >
                     <OButton
@@ -1119,7 +1115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :isUpdated="isUpdated"
         :destinations="destinations"
         :templates="templates"
-        :folderId="activeFolderId"
+        :folderId="isUpdated && editFolderId ? editFolderId : activeFolderId"
         @update:list="refreshList"
         @cancel:hideform="hideForm"
         @refresh:destinations="refreshDestination"
@@ -1393,6 +1389,7 @@ import { useEditorDraftIds } from "@/composables/useEditorDraft";
 import { isAnomalyDataReadinessStatus } from "@/components/anomaly_detection/steps/AnomalyDetectionConfig.schema";
 import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
 import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
+import { matchesAnyKey, readFilterKeys, toggleFilterKey } from "@/utils/filterKeys";
 import {
   ALERT_DRAFT_KIND,
   ANOMALY_DRAFT_VARIANT,
@@ -1404,7 +1401,7 @@ import {
 
 // import alertList from "./alerts";
 
-const ALERT_STATE_FILTERS = [
+const ALERT_STATE_KEYS = [
   "active",
   "paused",
   "failed",
@@ -1417,8 +1414,11 @@ const ALERT_STATE_FILTERS = [
 const ALERT_LEVEL_FILTERS = ["critical", "warning"] as const;
 
 type AlertRowRef = { alert_id?: unknown; folder_name?: { id?: unknown } };
-type AlertStateFilter = (typeof ALERT_STATE_FILTERS)[number];
+type AlertStateKey = (typeof ALERT_STATE_KEYS)[number];
 type AlertLevelFilter = (typeof ALERT_LEVEL_FILTERS)[number];
+
+const isAlertStateKey = (key: string): key is AlertStateKey =>
+  (ALERT_STATE_KEYS as readonly string[]).includes(key);
 
 // An unknown or repeated query value is ignored rather than guessed at.
 function parseQueryChoice<T extends string>(value: unknown, choices: readonly T[]): T | null {
@@ -1516,7 +1516,7 @@ export default defineComponent({
       searchQuery: "",
       filterQuery: "",
       searchAcrossFolders: false,
-      stateFilter: null as AlertStateFilter | null,
+      stateFilter: [] as AlertStateKey[],
       sortBy: "",
       sortOrder: "asc" as "asc" | "desc",
       perPage: 20,
@@ -1657,6 +1657,8 @@ export default defineComponent({
       },
     ]);
     const activeFolderId = ref<any>(router.currentRoute.value.query.folder ?? "default");
+    // An alert found by a search across folders lives in its own folder, not the open tab's.
+    const editFolderId = ref("");
     const showMoveAlertDialog = ref(false);
     // Clicking a row opens the alert's own status page. It replaced a side
     // drawer: a multi-alert's per-group table, group history and cap banner
@@ -2033,7 +2035,7 @@ export default defineComponent({
         },
         {
           key: "total",
-          label: t("alerts.summaryTotal"),
+          label: t("common.allStates"),
           value: v(c.total),
           icon: "format-list-bulleted",
           tone: "primary",
@@ -2046,15 +2048,19 @@ export default defineComponent({
     });
 
     // ── Stat-tile quick filter ──────────────────────────────────────────────
-    // Tile counts stay full so the folder totals show while only the rows are filtered.
+    // Tiles toggle states in and out (OR'd); the tile counts stay folder totals, only the rows filter.
     const urlQuery = router.currentRoute.value.query;
-    const urlState = parseQueryChoice(urlQuery.state, ALERT_STATE_FILTERS);
-    const stateFilter = ref<AlertStateFilter | null>(urlState ?? savedAlertListFilters.stateFilter);
+    const urlStates = readFilterKeys(urlQuery.state, isAlertStateKey);
+    const stateFilters = ref<AlertStateKey[]>(
+      urlStates.length
+        ? urlStates
+        : readFilterKeys(savedAlertListFilters.stateFilter, isAlertStateKey),
+    );
     // URL-only: the saved state never carries it.
     const levelFilter = ref<AlertLevelFilter | null>(
       parseQueryChoice(urlQuery.level, ALERT_LEVEL_FILTERS),
     );
-    const matchesStateFilter = (r: any, f: AlertStateFilter): boolean => {
+    const matchesStateFilter = (r: any, f: AlertStateKey): boolean => {
       if (f === "firing") return isFiringRow(r);
       if (f === "error") return showRunOutcome(r) && isErrorOutcome(r.last_outcome);
       if (f === "notify_failed") return showRunOutcome(r) && isNotifyFailedOutcome(r.last_outcome);
@@ -2081,19 +2087,21 @@ export default defineComponent({
     const displayedAlerts = computed(() => {
       if (anomalyTabLicenseLocked.value) return [];
       const rows = filteredResults.value || [];
-      const f = stateFilter.value;
+      const f = stateFilters.value;
       const level = levelFilter.value;
-      const byState = f
+      const byState = f.length
         ? rows.filter(
-            (r: any) => matchesStateFilter(r, f) || leftFilterIds.value.has(String(r.alert_id)),
+            (r: any) =>
+              matchesAnyKey(f, r, matchesStateFilter) ||
+              leftFilterIds.value.has(String(r.alert_id)),
           )
         : rows;
       return level ? byState.filter((r: any) => r.level === level) : byState;
     });
     const markIfLeftFilter = (row: any): boolean => {
-      const f = stateFilter.value;
-      if (!f) return false;
-      if (matchesStateFilter(row, f)) {
+      const f = stateFilters.value;
+      if (!f.length) return false;
+      if (matchesAnyKey(f, row, matchesStateFilter)) {
         // A row toggled back into the filter matches again, so its old tag would be false.
         leftFilterIds.value.delete(String(row.alert_id));
         return false;
@@ -2155,11 +2163,12 @@ export default defineComponent({
     };
     const onStatSelect = (key: string) => {
       levelFilter.value = null;
-      if (key === "total") {
-        stateFilter.value = null;
-        return;
-      }
-      stateFilter.value = stateFilter.value === key ? null : (key as AlertStateFilter);
+      stateFilters.value = toggleFilterKey(stateFilters.value, key, "total");
+    };
+    // Any chip change drops the linked level, as the level has no chip of its own.
+    const onStateFiltersUpdate = (keys: string[]) => {
+      levelFilter.value = null;
+      stateFilters.value = keys.filter(isAlertStateKey);
     };
 
     const activeFolderToMove = ref("default");
@@ -2413,7 +2422,7 @@ export default defineComponent({
     });
 
     // A state or level link lands on exactly the rows clicked, so the saved search is not restored.
-    const linkedFilter = urlState !== null || levelFilter.value !== null;
+    const linkedFilter = urlStates.length > 0 || levelFilter.value !== null;
     const searchQuery = ref<any>(linkedFilter ? "" : savedAlertListFilters.searchQuery || "");
     const filterQuery = ref<any>(linkedFilter ? "" : savedAlertListFilters.filterQuery || "");
     const searchAcrossFolders = ref<any>(
@@ -3202,6 +3211,7 @@ export default defineComponent({
       // Handle update action
       if (action === "update" && router.currentRoute.value.query.alert_id) {
         const alertId = router.currentRoute.value.query.alert_id as string;
+        editFolderId.value = String(router.currentRoute.value.query.folder ?? "");
         try {
           const alert = await getAlertById(alertId);
           if (!(await divertSloAlert(alert))) {
@@ -4171,7 +4181,7 @@ export default defineComponent({
           action: "update",
           name: row.name,
           org_identifier: store.state.selectedOrganization.identifier,
-          folder: activeFolderId.value,
+          folder: row.folder_id || activeFolderId.value,
         },
       });
     };
@@ -4298,7 +4308,7 @@ export default defineComponent({
         searchQuery,
         filterQuery,
         searchAcrossFolders,
-        stateFilter,
+        stateFilters,
         sortBy,
         sortOrder,
         pageSize,
@@ -4309,7 +4319,7 @@ export default defineComponent({
           searchQuery: searchQuery.value || "",
           filterQuery: filterQuery.value || "",
           searchAcrossFolders: !!searchAcrossFolders.value,
-          stateFilter: stateFilter.value,
+          stateFilter: stateFilters.value,
           sortBy: sortBy.value,
           sortOrder: sortOrder.value,
           perPage: pageSize.value,
@@ -4319,7 +4329,7 @@ export default defineComponent({
     );
     // The table keeps its page across data changes (a refresh, a toggle), so a new filter, search, tab or sort starts at page 1 here.
     watch(
-      [stateFilter, activeTab, searchQuery, filterQuery, searchAcrossFolders, sortBy, sortOrder],
+      [stateFilters, activeTab, searchQuery, filterQuery, searchAcrossFolders, sortBy, sortOrder],
       () => {
         leftFilterIds.value.clear();
         currentPage.value = 1;
@@ -4750,13 +4760,14 @@ export default defineComponent({
       goToSlo,
       stateCounts,
       summaryStats,
-      stateFilter,
+      stateFilters,
       levelFilter,
       levelFilterLabel,
       clearLevelFilter,
       displayedAlerts,
       leftFilterIds,
       onStatSelect,
+      onStateFiltersUpdate,
       bulkToggleBusy,
       refreshing,
       formData,
@@ -4776,6 +4787,7 @@ export default defineComponent({
       addAlert,
       isUpdated,
       showAddUpdateFn,
+      editFolderId,
       handleActionQuery,
       showDeleteDialogFn,
       duplicateAlert,

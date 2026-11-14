@@ -5,7 +5,13 @@ import { describe, expect, it, vi } from "vitest";
 import type { CatalogRule, SigmaCompileResponse } from "@/services/securitySigma";
 import { raw } from "@/types/i18n";
 
-import { runBulkInstall, type BulkDeps, type BulkTarget } from "./bulkInstall";
+import {
+  runBulkInstall,
+  targetKey,
+  targetMismatch,
+  type BulkDeps,
+  type BulkTarget,
+} from "./bulkInstall";
 import { buildDetectionAlert } from "./detection";
 
 const rule = (key: string, extra: Partial<CatalogRule> = {}): CatalogRule => ({
@@ -250,5 +256,34 @@ describe("runBulkInstall", () => {
       deps({ compile }),
     );
     expect(results.map((r) => r.key)).toEqual(["a", "b", "c"]);
+  });
+});
+
+describe("bulk install choices", () => {
+  it("backfills only when the author opts in, as a single detection does", async () => {
+    const d = deps();
+    await runBulkInstall([target(rule("a"))], settings, d);
+    const [plain] = vi.mocked(d.create).mock.calls[0];
+    expect(plain.context_attributes.siem_backfill_minutes).toBeUndefined();
+
+    const opted = deps();
+    await runBulkInstall([target(rule("a"))], { ...settings, backfillMinutes: 360 }, opted);
+    const [payload] = vi.mocked(opted.create).mock.calls[0];
+    expect(payload.context_attributes.siem_backfill_minutes).toBe("360");
+  });
+
+  it("marks each detection to learn from current data on its first run when chosen", async () => {
+    const d = deps();
+    await runBulkInstall([target(rule("a"))], { ...settings, learnFirstRun: true }, d);
+    const [payload] = vi.mocked(d.create).mock.calls[0];
+    expect(payload.context_attributes.siem_learn_first_run).toBe("true");
+  });
+
+  it("flags a rule written for another log source than its stream's", () => {
+    expect(targetMismatch(target(rule("a")))).toBe(false);
+    expect(targetMismatch({ ...target(rule("a")), sourceType: "firewall" })).toBe(true);
+    // An unclassified stream says nothing either way.
+    expect(targetMismatch({ ...target(rule("a")), sourceType: "" })).toBe(false);
+    expect(targetKey(target(rule("a"), "s1"))).toBe("a/s1");
   });
 });

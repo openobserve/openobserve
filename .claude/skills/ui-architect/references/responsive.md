@@ -210,7 +210,9 @@ The recipe every list toolbar follows:
 ## Stat strips and KPI cards: one row
 
 `OStatStrip` / `OStatCard` and `KpiCard` / `KpiCardRow` compact below lg to icon +
-value; the label moves into the tile's `title`. Use them. A hand-rolled tile row follows
+value; the label moves into the tile's `title`. Use them. Filter chips (`selectable`)
+are the exception: below md they take their own toolbar line and scroll sideways on
+one line (swipe), never wrapping or compacting; see calm-signal § Summary-strip conventions. A hand-rolled tile row follows
 the same recipe so it never takes two rows of chrome:
 
 - row: `max-lg:flex max-lg:flex-wrap max-lg:gap-1.5` (or `max-md:grid-cols-4` for a

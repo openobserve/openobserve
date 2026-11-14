@@ -352,14 +352,23 @@ const scheduleMeasure = () => {
   measureFrame = requestAnimationFrame(measureRows);
 };
 
-onMounted(() => {
-  if (!props.maxRows || typeof ResizeObserver === "undefined") return;
+function observeRows() {
+  rowObserver?.disconnect();
+  treeObserver?.disconnect();
+  rowObserver = treeObserver = null;
+  if (!props.maxRows || typeof ResizeObserver === "undefined") {
+    capHeight.value = null;
+    return;
+  }
   rowObserver = new ResizeObserver(scheduleMeasure);
   if (linesRef.value) rowObserver.observe(linesRef.value);
   treeObserver = new MutationObserver(scheduleMeasure);
   if (linesRef.value) treeObserver.observe(linesRef.value, { childList: true, subtree: true });
   scheduleMeasure();
-});
+}
+
+onMounted(observeRows);
+watch(() => props.maxRows, observeRows);
 
 onBeforeUnmount(() => {
   cancelAnimationFrame(measureFrame);

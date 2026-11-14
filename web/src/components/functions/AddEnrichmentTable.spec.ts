@@ -49,6 +49,12 @@ const { mockToast, mockDismiss } = vi.hoisted(() => {
   return { mockToast: toast, mockDismiss: dismiss };
 });
 
+// The real ODialog portals into <body>; render it inline so the panel stays queryable.
+vi.mock("reka-ui", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("reka-ui")>();
+  return { ...actual, DialogPortal: actual.DialogContent };
+});
+
 vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: mockToast,
   useToast: () => ({ toast: mockToast }),
@@ -81,7 +87,7 @@ describe("AddEnrichmentTable.vue", () => {
 
   const getForm = (w: any) => (w.findComponent(OForm).vm as any).form;
 
-  const createWrapper = (propsData = {}) => {
+  const createWrapper = (propsData = {}, { realDialog = false } = {}) => {
     store = createStore({
       state: {
         selectedOrganization: {
@@ -143,7 +149,7 @@ describe("AddEnrichmentTable.vue", () => {
       global: {
         plugins: [store, i18n],
         stubs: {
-          ODialog: ODialogStub,
+          ...(realDialog ? {} : { ODialog: ODialogStub }),
           OButton: OButtonStub,
           OIcon: OIconStub,
           OSeparator: OSeparatorStub,
@@ -402,6 +408,32 @@ describe("AddEnrichmentTable.vue", () => {
       wrapper = createWrapper();
       wrapper.findComponent(ODialogStub).vm.$emit("update:open", false);
       expect(wrapper.emitted("cancel:hideform")).toBeTruthy();
+    });
+  });
+
+  describe("Dialog position", () => {
+    it("keeps the dialog's top edge still when choosing From URL reveals the URL field", async () => {
+      const height = { value: 300 };
+      const rectSpy = vi
+        .spyOn(HTMLElement.prototype, "getBoundingClientRect")
+        .mockImplementation(() => ({ height: height.value }) as DOMRect);
+      wrapper = createWrapper({}, { realDialog: true });
+      await flushPromises();
+      const panel = () => wrapper.find("[data-o2-dialog]").element as HTMLElement;
+      const urlOption = wrapper.find(
+        '[data-test="add-enrichment-table-source-option"][data-test-value="url"]',
+      );
+
+      await urlOption.trigger("pointerdown");
+      const openedTop = panel().style.top;
+      expect(openedTop).toBe(`${(window.innerHeight - 300) / 2}px`);
+
+      height.value = 322;
+      await urlOption.trigger("click");
+      await flushPromises();
+      expect(wrapper.find('[data-test="add-enrichment-table-url"]').exists()).toBe(true);
+      expect(panel().style.top).toBe(openedTop);
+      rectSpy.mockRestore();
     });
   });
 
