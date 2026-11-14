@@ -20,6 +20,7 @@ import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import config from "@/aws-exports";
 import StarterPackDrawer from "@/components/starterPacks/StarterPackDrawer.vue";
+import StarterPackFindMore from "@/components/starterPacks/StarterPackFindMore.vue";
 import StarterPackHealthLine from "@/components/starterPacks/StarterPackHealthLine.vue";
 import StarterPackUndoDialog from "@/components/starterPacks/StarterPackUndoDialog.vue";
 import TurnOnAlertsDrawer from "@/components/starterPacks/TurnOnAlertsDrawer.vue";
@@ -36,6 +37,7 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import { readQuery } from "@/composables/query/readQuery";
+import { STARTER_PACKS_ENABLED } from "@/constants/starterPacks";
 import { KUBERNETES_PACK } from "@/composables/starterPacks/kubernetesPack";
 import { packScopeValue } from "@/composables/starterPacks/packCopy";
 import { useStarterPackFlow } from "@/composables/starterPacks/useStarterPackFlow";
@@ -57,6 +59,7 @@ const route = useRoute();
 const router = useRouter();
 const org = String(route.query.org_identifier ?? store.state.selectedOrganization?.identifier);
 const pack = KUBERNETES_PACK;
+const packsEnabled = STARTER_PACKS_ENABLED;
 const flow = useStarterPackFlow(org, pack);
 const matcher = useStarterPackMatcher(org);
 const turn = useTurnOnAlerts(org, flow);
@@ -218,6 +221,7 @@ const muteContext = computed(() =>
     title-data-test="starter-pack-page-title"
   >
     <template #actions>
+      <StarterPackFindMore v-if="packsEnabled" :org="org" @changed="flow.load()" />
       <template v-if="pageState === 'installed' && flow.canManage.value">
         <OButton
           variant="ghost-destructive"
