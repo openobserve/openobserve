@@ -129,6 +129,7 @@ const copyLink = () => copyToClipboard(flow.packLink(), t);
     v-model:open="drawerOpen"
     :flow="flow"
     :clusters="clusters"
+    :match-state="matcher.state.value"
     @copy-link="copyLink"
   />
 </template>

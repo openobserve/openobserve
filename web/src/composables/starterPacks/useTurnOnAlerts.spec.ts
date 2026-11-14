@@ -138,6 +138,26 @@ describe("useTurnOnAlerts", () => {
     expect(turnOn.failedIds.value).toEqual(["a"]);
   });
 
+  it("lists an alert that is on with no destination and only routes it", async () => {
+    mocks.list[1].enabled = true;
+    const turnOn = await setup();
+    expect(turnOn.listedRows.value.map(({ id }) => id)).toEqual(["a", "b"]);
+    expect(turnOn.chosenRows.value.map(({ id }) => id)).toEqual(["a", "b"]);
+    expect(await turnOn.turnOn(choice)).toBe(2);
+    expect(mocks.order).toEqual(["save:a", "save:b", "enable:a"]);
+    expect(mocks.save.mock.calls[1][0].payload.destinations).toEqual(["chat"]);
+    expect(turnOn.failedIds.value).toEqual([]);
+  });
+
+  it("leaves out an alert that is already on and routed", async () => {
+    mocks.list[1].enabled = true;
+    mocks.detail.b.destinations = ["chat"];
+    const turnOn = await setup();
+    expect(turnOn.listedRows.value.map(({ id }) => id)).toEqual(["a"]);
+    turnOn.choose("b", true);
+    expect(turnOn.chosenRows.value.map(({ id }) => id)).toEqual(["a"]);
+  });
+
   it("does not enable an alert whose destination save failed, and retries only the failed", async () => {
     mocks.save.mockImplementationOnce(async () => {
       throw new Error("nope");

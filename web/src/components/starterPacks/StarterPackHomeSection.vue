@@ -238,6 +238,7 @@ const compact = computed(() =>
         v-model:open="item.drawerOpen.value"
         :flow="item.flow"
         :clusters="item.matcher.clusters.value"
+        :match-state="item.matcher.state.value"
         @copy-link="item.copyLink"
       />
       <TurnOnAlertsDrawer

@@ -225,6 +225,9 @@ export interface PackInstallRecord {
   flavours?: Record<string, string>;
   /** Set when the chosen folder is not the pack's own; a resumed install must reuse it. */
   folderName?: string;
+  /** The setup's alert choice, so Retry after a reload creates the rest the same way. */
+  enableAlerts?: boolean;
+  destination?: string;
   /** Someone chose Keep off, so Home stops reminding. */
   keptOff?: boolean;
   laterRepair?: PackLaterRepair;
@@ -303,6 +306,8 @@ export interface PackInstallOptions {
   exclude?: string[];
   /** Created alerts start enabled instead of silent. */
   enableAlerts?: boolean;
+  /** Alert destination every created alert routes to, on or off. */
+  destination?: string;
   repairs?: PackRepair[];
   bindings?: PackBinding[];
   flavours?: Record<string, string>;

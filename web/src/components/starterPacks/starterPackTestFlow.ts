@@ -62,6 +62,7 @@ export const fakeFlow = (over: Record<string, unknown> = {}) =>
     skipped: ref([]),
     trackAlertEdit: vi.fn((_pack: unknown, _ids: unknown, work: () => unknown) => work()),
     land: vi.fn(async () => undefined),
+    retry: vi.fn(async () => true),
     licensed: ref(true),
     load: vi.fn(async () => undefined),
     loadFailed: ref(false),

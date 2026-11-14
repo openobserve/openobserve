@@ -155,7 +155,26 @@ describe("StarterPackLibraryTab", () => {
     flow.licensed.value = true;
     delete fake.pack.nativeView;
     vi.mocked(flow.install).mockClear();
+    vi.mocked(flow.retry).mockClear();
     vi.mocked(flow.undo).mockClear();
+  });
+
+  it("opens the popup on Choose content from Set up instead of installing at once", async () => {
+    const wrapper = await render();
+    await wrapper.get('[data-test="library-tab-install-kubernetes"]').trigger("click");
+    await flushPromises();
+    expect(flow.install).not.toHaveBeenCalled();
+    expect(wrapper.findComponent({ name: "StarterPackDrawer" }).exists()).toBe(true);
+  });
+
+  it("refreshes the cards when a setup finishes after its popup was closed", async () => {
+    flow.running.value = true;
+    const wrapper = await render();
+    expect(has(wrapper, "library-tab-meta-one")).toBe(false);
+    fake.records = [record({})];
+    flow.running.value = false;
+    await flushPromises();
+    expect(has(wrapper, "library-tab-meta-one")).toBe(true);
   });
 
   it("counts packs in the stat strip and offers Set up on a pack that fits", async () => {
@@ -232,7 +251,8 @@ describe("StarterPackLibraryTab", () => {
     const retry = wrapper.get('[data-test="library-tab-retry-one"]');
     expect(retry.text()).toBe("Retry 1 item");
     await retry.trigger("click");
-    expect(flow.install).toHaveBeenCalledTimes(1);
+    expect(flow.retry).toHaveBeenCalledTimes(1);
+    expect(flow.install).not.toHaveBeenCalled();
   });
 
   it("counts what setup made on an installed card, not what the pack holds", async () => {

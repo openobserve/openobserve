@@ -175,14 +175,80 @@ describe("useStarterPackFlow", () => {
     expect(fake.installPack.mock.calls[0][1].enableAlerts).toBe(false);
   });
 
-  it("asks for started alerts and counts them on without a re-read", async () => {
+  it("asks for started alerts and counts them on", async () => {
     fake.installPack.mockResolvedValue(record());
+    fake.alerts = [{ alert_id: "al1", enabled: true }] as any;
     const flow = setup();
     await flow.install(undefined, { enableAlerts: true });
     expect(fake.installPack.mock.calls[0][1].enableAlerts).toBe(true);
     expect(flow.alertsOn.value).toBe(1);
     expect(flow.enabledAlertIds.value.has("al1")).toBe(true);
     expect(flow.remindAlerts.value).toBe(false);
+  });
+
+  it("re-reads which pack alerts are on once the install finishes", async () => {
+    const items = [
+      ...record().items,
+      { kind: "alert" as const, itemId: "a2", status: "existing" as const, id: "al2" },
+      { kind: "alert" as const, itemId: "a3", status: "existing" as const, id: "al3" },
+    ];
+    fake.installPack.mockResolvedValue(record({ items }));
+    fake.alerts = [
+      { alert_id: "al1", enabled: true },
+      { alert_id: "al2", enabled: true },
+      { alert_id: "al3", enabled: false },
+    ] as any;
+    const flow = setup();
+    await flow.install(undefined, { enableAlerts: true });
+    expect([...flow.enabledAlertIds.value].sort()).toEqual(["al1", "al2"]);
+  });
+
+  it("keeps alerts it just created on when the tag search has not caught up", async () => {
+    fake.installPack.mockResolvedValue(record());
+    fake.alerts = [] as any;
+    const flow = setup();
+    await flow.install(undefined, { enableAlerts: true });
+    expect(flow.enabledAlertIds.value.has("al1")).toBe(true);
+  });
+
+  it("passes the chosen destination to the install", async () => {
+    fake.installPack.mockResolvedValue(record());
+    const flow = setup();
+    await flow.install(undefined, { enableAlerts: true, destination: "oncall" });
+    expect(fake.installPack.mock.calls[0][1].destination).toBe("oncall");
+  });
+
+  it("never carries an earlier choice into an ordinary install", async () => {
+    fake.installPack.mockResolvedValue(record());
+    const flow = setup();
+    await flow.install(undefined, { exclude: ["v1"], enableAlerts: true, destination: "oncall" });
+    await flow.install();
+    const second = fake.installPack.mock.calls[1][1];
+    expect(second.enableAlerts).toBe(false);
+    expect(second.destination).toBeUndefined();
+    expect(second.exclude).not.toContain("v1");
+  });
+
+  it("retries an interrupted install with the choice stored on its record", async () => {
+    fake.installs = [record({ status: "incomplete", enableAlerts: true, destination: "oncall" })];
+    fake.installPack.mockResolvedValue(record());
+    const flow = setup();
+    await flow.load();
+    expect(await flow.retry()).toBe(true);
+    const retry = fake.installPack.mock.calls[0][1];
+    expect(retry.enableAlerts).toBe(true);
+    expect(retry.destination).toBe("oncall");
+  });
+
+  it("retries a record without a stored choice with alerts off", async () => {
+    fake.installs = [record({ status: "incomplete" })];
+    fake.installPack.mockResolvedValue(record());
+    const flow = setup();
+    await flow.load();
+    await flow.retry();
+    const retry = fake.installPack.mock.calls[0][1];
+    expect(retry.enableAlerts).toBe(false);
+    expect(retry.destination).toBeUndefined();
   });
 
   it("keeps alerts silent by default", async () => {

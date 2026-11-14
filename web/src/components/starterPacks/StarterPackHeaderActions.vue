@@ -44,7 +44,8 @@ const pack = flow.pack;
 
 const installed = computed(() => props.page.installed.value);
 const manage = computed(() => installed.value && props.page.canManage.value);
-const offCount = computed(() => props.page.pausedRows.value.length);
+// Alerts on with no destination are listed too, so they can be routed.
+const offCount = computed(() => props.page.turn.listedRows.value.length);
 const showReview = computed(
   () => STARTER_PACKS_ENABLED && manage.value && props.page.updates.available.value,
 );

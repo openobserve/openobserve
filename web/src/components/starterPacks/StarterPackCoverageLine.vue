@@ -135,6 +135,12 @@ onMounted(async () => {
   await loadGaps(false);
 });
 
+// The popup unmounts on close, so a setup that ends after that is only seen through its flow.
+for (const flow of flows.values()) {
+  watch(flow.running, (now, before) => {
+    if (before && !now) void loadGaps(true);
+  });
+}
 // A toggle or reload in the list below can turn a pack's alerts on or off.
 watch(
   () => props.refreshKey,

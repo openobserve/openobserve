@@ -314,6 +314,7 @@ export function useStarterPacks(org: string) {
     adaptation: PackAdaptation,
     flavour?: PackFlavourAlert,
     enabled = false,
+    destination?: string,
   ) => {
     const flavoured = withFlavour(payload, flavour);
     const doc = await adaptAlert(flavoured, adaptation, rewriteChecks, stream);
@@ -323,7 +324,7 @@ export function useStarterPacks(org: string) {
       ...doc,
       name: stream ? `${doc.name}_${stream}` : doc.name,
       enabled,
-      destinations: [],
+      destinations: destination ? [destination] : [],
       tags: [...new Set(tags)],
     };
   };
@@ -336,6 +337,7 @@ export function useStarterPacks(org: string) {
     adaptation: PackAdaptation,
     flavour?: PackFlavourAlert,
     enabled = false,
+    destination?: string,
   ): PackItemAdapter => {
     let savedId: string | undefined;
     return {
@@ -364,7 +366,7 @@ export function useStarterPacks(org: string) {
           timezone: store.state.timezone,
           scheduledOnly: true,
           decoratePayload: (payload) =>
-            decorateAlert(pack, item, payload, adaptation, flavour, enabled),
+            decorateAlert(pack, item, payload, adaptation, flavour, enabled, destination),
           onSaved: (id) => {
             savedId = id;
           },
@@ -415,13 +417,23 @@ export function useStarterPacks(org: string) {
     adaptation: PackAdaptation = NO_ADAPTATION,
     flavours: Record<string, string> = {},
     enableAlerts = false,
+    destination?: string,
   ): PackItemAdapter => {
     if (item.kind === "folder") return folderAdapter(pack, item.itemId as PackFolderType);
     if (item.kind === "dashboard") return dashboardAdapter(pack, item.itemId, items, adaptation);
     if (item.kind === "alert") {
       const id = item.copyOf ?? item.itemId;
       const flavour = flavourAlert(pack, flavours[id], id);
-      return alertAdapter(pack, item, items, entries, adaptation, flavour, enableAlerts);
+      return alertAdapter(
+        pack,
+        item,
+        items,
+        entries,
+        adaptation,
+        flavour,
+        enableAlerts,
+        destination,
+      );
     }
     return savedViewAdapter(pack, item.itemId, adaptation);
   };
@@ -645,6 +657,7 @@ export function useStarterPacks(org: string) {
     entries: Map<string, AlertLibraryEntry>,
     record: PackInstallRecord,
     enableAlerts = false,
+    destination?: string,
   ): Promise<PackRecordItem> => {
     const adaptation = { repairs: record.repairs ?? [], bindings: record.bindings ?? [] };
     const adapter = adapterFor(
@@ -655,6 +668,7 @@ export function useStarterPacks(org: string) {
       adaptation,
       record.flavours,
       enableAlerts,
+      destination,
     );
     try {
       let found = await adapter.lookup();
@@ -698,6 +712,7 @@ export function useStarterPacks(org: string) {
       copies,
       folderName,
       enableAlerts = false,
+      destination,
     }: PackInstallOptions,
   ): Promise<PackInstallRecord> => {
     const { entries } = await loadEntries(sourcePack);
@@ -710,9 +725,16 @@ export function useStarterPacks(org: string) {
     const excluded = (item: PackRecordItem) =>
       exclude.includes(item.itemId) || exclude.includes(item.copyOf ?? item.itemId);
     const kept = (item: PackRecordItem) => item.status === "created" || !excluded(item);
+    const choice = {
+      ...(enableAlerts ? { enableAlerts } : {}),
+      ...(destination ? { destination } : {}),
+    };
     const record: PackInstallRecord = interrupted
       ? {
           ...interrupted,
+          enableAlerts: undefined,
+          destination: undefined,
+          ...choice,
           status: "installing",
           installedAt: Date.now() * 1000,
           items: interrupted.items.filter(kept),
@@ -728,11 +750,12 @@ export function useStarterPacks(org: string) {
           ...(bindings.length ? { bindings } : {}),
           ...(Object.keys(flavours).length ? { flavours } : {}),
           ...(folderName ? { folderName } : {}),
+          ...choice,
           items: (await planItems(pack, copies)).filter((item) => !excluded(item)),
         };
     await writeFirstRecord(record);
     onProgress?.(record);
-    return settleRecord(pack, record, entries, onProgress, enableAlerts);
+    return settleRecord(pack, record, entries, onProgress, enableAlerts, destination);
   };
 
   const settleRecord = async (
@@ -741,6 +764,7 @@ export function useStarterPacks(org: string) {
     entries: Map<string, AlertLibraryEntry>,
     onProgress?: PackInstallOptions["onProgress"],
     enableAlerts = false,
+    destination?: string,
   ): Promise<PackInstallRecord> => {
     for (let index = 0; index < record.items.length; index += 1) {
       const item = record.items[index];
@@ -752,6 +776,7 @@ export function useStarterPacks(org: string) {
         entries,
         record,
         enableAlerts,
+        destination,
       );
       await records.write(record);
       onProgress?.(record);

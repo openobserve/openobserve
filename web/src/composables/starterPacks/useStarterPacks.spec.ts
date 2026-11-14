@@ -488,6 +488,32 @@ describe("useStarterPacks", () => {
       }
     });
 
+    it("creates each alert once with the chosen destination, on or off", async () => {
+      await packs().installPack(PACK, { enableAlerts: true, destination: "oncall" });
+      expect(fake.state.alerts).toHaveLength(2);
+      for (const alert of fake.state.alerts) {
+        expect(alert.enabled).toBe(true);
+        expect(alert.destinations).toEqual(["oncall"]);
+      }
+      expect(fake.state.calls.filter((c) => c.startsWith("put") && c.includes("/alerts"))).toEqual(
+        [],
+      );
+    });
+
+    it("stores the alert choice on the record so a retry after a reload reuses it", async () => {
+      await packs().installPack(PACK, { enableAlerts: true, destination: "oncall" });
+      const [value] = [...fake.state.kv.values()];
+      expect(JSON.parse(value)).toMatchObject({ enableAlerts: true, destination: "oncall" });
+    });
+
+    it("sets the destination on alerts created off", async () => {
+      await packs().installPack(PACK, { destination: "oncall" });
+      for (const alert of fake.state.alerts) {
+        expect(alert.enabled).toBe(false);
+        expect(alert.destinations).toEqual(["oncall"]);
+      }
+    });
+
     it("leaves out the items the user unticked", async () => {
       const record = await packs().installPack(PACK, { exclude: ["k8s/two", "events"] });
       expect(fake.state.alerts.map((a) => a.tags.at(-1))).toEqual(["library:k8s/one"]);

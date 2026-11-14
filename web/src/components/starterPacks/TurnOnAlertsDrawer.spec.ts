@@ -74,6 +74,7 @@ const turnFor = (rows: any[]) => {
     submitting: ref(false),
     needsCritical: ref(true),
     needsWarning: ref(false),
+    listedRows: computed(() => list.value),
     chosenRows: computed(() => list.value.filter(({ chosen }) => chosen)),
     summary: computed(() => ({
       incidents: 1,
@@ -255,6 +256,54 @@ describe("TurnOnAlertsDrawer", () => {
     await wrapper.get('[data-test="turn-on-alerts-retry-btn"]').trigger("click");
     await flushPromises();
     expect(fake.turn.turnOn).toHaveBeenCalledWith(expect.anything(), ["b"]);
+  });
+
+  const routedTo = (id: string, severity: string, destinations: string[]) => {
+    const base = row(id, severity, result(0));
+    return { ...base, alert: { ...base.alert, destinations } };
+  };
+
+  it("preselects the destination each severity's chosen alerts already share", async () => {
+    fake.destinations = [{ name: "pager" }, { name: "chat" }];
+    fake.turn = turnFor([
+      routedTo("a", "critical", ["pager"]),
+      routedTo("b", "critical", ["pager"]),
+      routedTo("c", "warning", ["chat"]),
+    ]);
+    const wrapper = await render();
+    expect(text(wrapper, "turn-on-alerts-critical-destination")).toContain("pager");
+    expect(text(wrapper, "turn-on-alerts-warning-destination")).toContain("chat");
+    expect(text(wrapper, "turn-on-alerts-warning-destination")).not.toContain("pager");
+  });
+
+  it("never refills a preselected picker the user cleared", async () => {
+    fake.destinations = [{ name: "pager" }];
+    const rows = [routedTo("a", "critical", ["pager"])];
+    fake.turn = turnFor(rows);
+    const wrapper = await render();
+    expect(text(wrapper, "turn-on-alerts-critical-destination")).toContain("pager");
+    const picker = wrapper
+      .findAllComponents({ name: "OSelect" })
+      .find((select) => select.attributes("data-test") === "turn-on-alerts-critical-destination");
+    picker!.vm.$emit("update:modelValue", "");
+    await flushPromises();
+    fake.turn.rows.value = [...rows];
+    await flushPromises();
+    expect(text(wrapper, "turn-on-alerts-critical-destination")).not.toContain("pager");
+  });
+
+  it("keeps the picker empty when the chosen alerts differ or their destination is gone", async () => {
+    fake.destinations = [{ name: "pager" }, { name: "chat" }];
+    fake.turn = turnFor([
+      routedTo("a", "critical", ["pager"]),
+      routedTo("b", "critical", ["chat"]),
+      routedTo("c", "warning", ["deleted"]),
+    ]);
+    const wrapper = await render();
+    for (const field of ["critical", "warning"]) {
+      const picked = text(wrapper, `turn-on-alerts-${field}-destination`);
+      expect(picked).not.toMatch(/pager|chat|deleted/);
+    }
   });
 
   it("offers the on-call preview to nobody on OSS", async () => {

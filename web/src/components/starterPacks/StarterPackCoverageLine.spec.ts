@@ -56,7 +56,10 @@ vi.mock("@/composables/query/readQuery", () => ({
   },
 }));
 
+import { useStarterPackFlow } from "@/composables/starterPacks/useStarterPackFlow";
 import StarterPackCoverageLine from "./StarterPackCoverageLine.vue";
+
+const flow = useStarterPackFlow("org", {} as never);
 
 const mountLine = async (refreshKey = "a") => {
   const wrapper = mount(StarterPackCoverageLine, {
@@ -84,6 +87,7 @@ describe("StarterPackCoverageLine", () => {
       ]),
     }));
     fake.push.mockClear();
+    flow.running.value = false;
   });
 
   it("stays hidden when no pack matches", async () => {
@@ -156,6 +160,18 @@ describe("StarterPackCoverageLine", () => {
     const wrapper = await mountLine();
     expect(wrapper.find('[data-test="starter-pack-coverage-row-kubernetes"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="starter-pack-coverage-row-hosts"]').exists()).toBe(true);
+  });
+
+  it("recounts when a setup finishes after its popup was closed", async () => {
+    fake.ready = { kubernetes: true };
+    flow.running.value = true;
+    const wrapper = await mountLine();
+    expect(wrapper.find('[data-test="starter-pack-coverage-line"]').exists()).toBe(true);
+    fake.installs = { kubernetes: [{ status: "complete" }] };
+    fake.alerts = { kubernetes: [{ enabled: true }] };
+    flow.running.value = false;
+    await flushPromises();
+    expect(wrapper.find('[data-test="starter-pack-coverage-line"]').exists()).toBe(false);
   });
 
   it("recounts when the list reports a toggle, without matching again", async () => {

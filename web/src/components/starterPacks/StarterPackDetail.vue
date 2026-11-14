@@ -163,18 +163,26 @@ const { notices } = useStarterPackNotices(page, {
 // The Library card links here with ?turnOn=1 so one drawer host serves both pages.
 const consumeTurnOnLink = () => {
   if (route.query.turnOn !== "1" || !page.installed.value || !page.canManage.value) return;
-  if (!page.pausedRows.value.length) return;
+  if (!page.turn.listedRows.value.length) return;
   router.replace({ query: { ...route.query, turnOn: undefined } }).catch(() => {});
   openTurnOn();
 };
 
-onMounted(async () => {
-  await page.refresh();
-  consumeTurnOnLink();
-});
+onMounted(() => page.refresh());
+// A Ready link can land while the rows reload, when it finds nothing to list yet.
+watch(
+  () => page.refreshing.value,
+  (busy) => {
+    if (!busy) consumeTurnOnLink();
+  },
+);
+// The setup popup's Ready links add ?turnOn=1 to this same page, which does not remount it.
+watch(
+  () => route.query.turnOn,
+  () => consumeTurnOnLink(),
+);
 watch(setupOpen, (isOpen) => {
   if (isOpen) void flow.loadPreview();
-  else if (flow.installed.value) void page.refresh();
 });
 watch(turnOnOpen, (isOpen) => {
   if (!isOpen) preselect.value = undefined;
@@ -337,6 +345,8 @@ watch(
       :flow="flow"
       :clusters="page.matcher.clusters.value"
       :folder-name="folderName === pack.folder.name ? undefined : folderName"
+      :match-state="page.matcher.state.value"
+      @installed="page.refresh()"
     />
     <StarterPackUpdateDrawer
       v-if="STARTER_PACKS_ENABLED"

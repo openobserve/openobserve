@@ -45,6 +45,8 @@ export interface PackInstallChoice {
   /** Item ids the user unticked, on top of the ones the preview leaves out. */
   exclude?: string[];
   enableAlerts?: boolean;
+  /** Alert destination the created alerts route to, whether they start on or off. */
+  destination?: string;
 }
 
 const countsAsItem = (item: PackRecordItem) => item.kind !== "folder";
@@ -255,11 +257,9 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
     alertsOn.value = enabledAlertIds.value.size;
   };
 
-  const install = async (
-    folderName?: string,
-    { exclude: unticked = [], enableAlerts = false }: PackInstallChoice = {},
-  ): Promise<boolean> => {
+  const install = async (folderName?: string, choice: PackInstallChoice = {}): Promise<boolean> => {
     if (running.value) return false;
+    const { exclude: unticked = [], enableAlerts = false, destination } = choice;
     running.value = true;
     installFailed.value = false;
     forbidden.value = false;
@@ -274,6 +274,7 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
         copies: plan.copies,
         folderName,
         enableAlerts,
+        destination,
         onProgress: (next) => {
           record.value = { ...next, items: [...next.items] };
           if (enableAlerts) trackEnabled(next);
@@ -281,6 +282,12 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
       });
       record.value = { ...done, items: [...done.items] };
       if (enableAlerts) trackEnabled(done);
+      // Alerts the lookup found keep their own state, so only the server knows which are on.
+      const tracked = enabledAlertIds.value;
+      await readAlertsOn().catch(() => {});
+      // The tag search trails a create, so keep the alerts this run just made on.
+      enabledAlertIds.value = new Set([...enabledAlertIds.value, ...tracked]);
+      alertsOn.value = enabledAlertIds.value.size;
       return done.status === "complete";
     } catch (error) {
       if (error instanceof StarterPackPermissionError) forbidden.value = true;
@@ -289,6 +296,12 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
     } finally {
       running.value = false;
     }
+  };
+
+  /** Finishes an interrupted install the way it was asked for, even after a reload. */
+  const retry = () => {
+    const { enableAlerts, destination } = record.value ?? {};
+    return install(undefined, { enableAlerts, destination });
   };
 
   const applyRemoval = async (work: () => Promise<PackRemovalResult>) => {
@@ -360,6 +373,7 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
     remove,
     removal,
     removalFailed,
+    retry,
     running,
     skipped,
     toCreate,

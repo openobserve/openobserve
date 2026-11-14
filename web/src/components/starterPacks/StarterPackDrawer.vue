@@ -15,8 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, markRaw, ref, watch } from "vue";
 import { useRouter } from "vue-router";
+import { useStore } from "vuex";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
@@ -25,34 +26,47 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
-import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OText from "@/lib/core/Typography/OText.vue";
+import OStepper from "@/lib/navigation/Stepper/OStepper.vue";
+import OStep from "@/lib/navigation/Stepper/OStep.vue";
 import { ALERT_LIBRARY_S3_BASE } from "@/constants/alertLibrary";
 import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import { getImageURL } from "@/utils/zincutils";
+import { readQuery } from "@/composables/query/readQuery";
+import { destinationsQuery } from "@/services/alert_destination.queries";
+import { detectPrebuiltType, PREBUILT_DESTINATION_TYPES } from "@/utils/prebuilt-templates";
 import { packScope, packScopeValue } from "@/composables/starterPacks/packCopy";
 import type { PackNotIncludedReason, PackRecordItem } from "@/composables/starterPacks/types";
 import { useAdaptedData } from "@/composables/starterPacks/useAdaptedData";
 import { useBrowserMatches } from "@/composables/starterPacks/useBrowserMatches";
 import type { StarterPackFlow } from "@/composables/starterPacks/useStarterPackFlow";
-import StarterPackInstallDialog from "./StarterPackInstallDialog.vue";
+import type { PackMatchState } from "@/composables/starterPacks/useStarterPackMatcher";
+import { useEmailMeDestination } from "@/composables/starterPacks/useEmailMeDestination";
 import StarterPackAdaptedRows from "./StarterPackAdaptedRows.vue";
+import StarterPackAlertStep, { type AlertStepDestination } from "./StarterPackAlertStep.vue";
 import StarterPackInlineConfirm from "./StarterPackInlineConfirm.vue";
+import StarterPackProgress from "./StarterPackProgress.vue";
+import StarterPackReady, { type ReadyAlerts } from "./StarterPackReady.vue";
+import StarterPackStepSpinner from "./StarterPackStepSpinner.vue";
 
 const props = defineProps<{
   flow: StarterPackFlow;
   clusters: string[];
+  /** Whether the pack's data is arriving, for the Ready data line; absent hides that line. */
+  matchState?: PackMatchState;
+  /** The folder the host's own picker chose; absent means the pack's folder. */
   folderName?: string;
 }>();
 const open = defineModel<boolean>("open", { default: false });
-const emit = defineEmits<{ "copy-link": []; done: [] }>();
+const emit = defineEmits<{ "copy-link": []; done: []; installed: [] }>();
 
 type ShownKind = "dashboard" | "alert" | "savedView";
 type GroupId = "view" | ShownKind | "not" | "adapted";
 type CheckState = boolean | "indeterminate";
+type Step = "content" | "setup" | "ready" | "installed";
 
 interface PackRow {
   key: string;
@@ -78,6 +92,8 @@ interface PackGroup {
 
 const { t } = useI18nTyped();
 const router = useRouter();
+const store = useStore();
+const emailMe = useEmailMeDestination(props.flow.org);
 
 const REASON_KEYS: Record<PackNotIncludedReason, I18nKey> = {
   already_have: "starterPacks.drawer.reasonAlreadyHave",
@@ -117,25 +133,31 @@ const SEVERITY = {
   warning: { variant: "warning-soft", icon: "warning", iconClass: "text-status-warning-text" },
 } as const;
 const KINDS: ShownKind[] = ["dashboard", "alert", "savedView"];
+const HOUR_US = 60 * 60 * 1_000_000;
+const STEP_NUMBER: Record<Step, number> = { content: 1, setup: 2, ready: 3, installed: 1 };
+const SPINNER = markRaw(StarterPackStepSpinner);
 
 const flow = props.flow;
 const pack = flow.pack;
 const title = t(pack.titleKey);
 const inlineConfirm = ref<"undo" | "remove" | null>(null);
 const unticked = ref(new Set<string>());
-const startAlerts = ref(false);
+const turnOn = ref(false);
+const sendTo = ref(false);
+const destination = ref("");
+const destinations = ref<AlertStepDestination[] | null>(null);
+const touched = { turnOn: false, sendTo: false };
+let destinationsRun = 0;
+let ownRun = false;
+const preparing = ref(false);
+const readyShown = ref(false);
+const installedHere = ref(false);
+const outcome = ref<ReadyAlerts>({ turnOn: false, sendTo: false });
 const expanded = ref<Partial<Record<GroupId, boolean>>>({});
 const adapted = useAdaptedData(flow);
-
-const showProgress = computed(() => flow.running.value || flow.interrupted.value);
-const modalOpen = computed({
-  get: () => open.value && !showProgress.value,
-  set: (value) => (open.value = value),
-});
-const dialogOpen = computed({
-  get: () => open.value && showProgress.value,
-  set: (value) => (open.value = value),
-});
+const userEmail = computed<string>(() => store.state.userInfo?.email ?? "");
+// Unknown (an older server without the flag) counts as on, so Email me is still offered.
+const smtpOff = computed(() => store.state.zoConfig?.smtp_enabled === false);
 const host = computed(() => raw(new URL(ALERT_LIBRARY_S3_BASE).host));
 const preview = computed(() => flow.preview.value);
 const installed = computed(() => flow.installed.value);
@@ -219,7 +241,6 @@ const kindTitle = (kind: ShownKind) =>
     savedView: t("starterPacks.drawer.savedViews"),
   })[kind];
 
-// The alerts meta follows the start switch, so the template reads it rather than the groups.
 const planMeta = (kind: ShownKind) =>
   kind === "dashboard" ? panelNote.value : t("starterPacks.drawer.savedViewsNote");
 
@@ -344,15 +365,19 @@ const alertsPicked = computed(() => {
   const group = groups.value.find(({ id }) => id === "alert");
   return group ? pickedIn(group) : 0;
 });
-const startOn = computed(() => startAlerts.value && alertsPicked.value > 0);
+const startOn = computed(() => turnOn.value && alertsPicked.value > 0);
 const metaOf = (group: PackGroup) => {
   if (group.id !== "alert" || installed.value) return group.meta;
-  const count = canPick.value
-    ? pickedIn(group)
-    : group.rows.filter(({ skipped }) => !skipped).length;
-  return startOn.value
-    ? t("starterPacks.whatGetsCreated.alertsStart", { count })
-    : t("starterPacks.whatGetsCreated.alertsSilent", { count });
+  const rows = group.rows.filter((row) =>
+    canPick.value ? row.selectable && isTicked(row) : !row.skipped,
+  );
+  const level = (name: "critical" | "warning") =>
+    rows.filter(({ key }) => entryOf(key)?.severity === name).length;
+  return t("starterPacks.drawer.alertsMeta", {
+    count: rows.length,
+    critical: level("critical"),
+    warning: level("warning"),
+  });
 };
 const excludedIds = computed(() =>
   groups.value.flatMap((group) =>
@@ -369,6 +394,13 @@ const skippedCount = computed(() =>
 const creatable = (group: PackGroup) =>
   group.id !== "not" && group.rows.some(({ skipped }) => !skipped);
 const nothingToCreate = computed(() => !!preview.value && !groups.value.some(creatable));
+const existingCount = computed(
+  () =>
+    (preview.value?.items ?? []).filter(
+      ({ kind, status }) => kind !== "folder" && status === "existing",
+    ).length,
+);
+const allExist = computed(() => nothingToCreate.value && existingCount.value > 0);
 
 const groupState = (group: PackGroup): CheckState => {
   const on = pickedIn(group);
@@ -392,6 +424,8 @@ const toggleGroup = (group: PackGroup) =>
     selectableRows(group).map(({ key }) => key),
     groupState(group) !== true,
   );
+const alertBlockShown = (group: PackGroup) =>
+  group.id === "alert" && canPick.value && groupState(group) !== false;
 
 // The adapted card has no item rows; its body is the adapted rows component.
 const expandable = (group: PackGroup) => group.rows.length > 0 || group.id === "adapted";
@@ -401,6 +435,42 @@ const isOpen = (group: PackGroup) => expanded.value[group.id] ?? openByDefault(g
 const toggleOpen = (group: PackGroup) => {
   if (expandable(group)) expanded.value = { ...expanded.value, [group.id]: !isOpen(group) };
 };
+
+const step = computed<Step>(() => {
+  if (readyShown.value) return "ready";
+  if (flow.running.value || flow.interrupted.value) return "setup";
+  return installed.value ? "installed" : "content";
+});
+const sendMode = computed<"loading" | "select" | "email" | "none">(() => {
+  if (destinations.value === null) return "loading";
+  if (destinations.value.length) return "select";
+  return smtpOff.value ? "none" : "email";
+});
+const waitingForDestinations = computed(
+  () => alertsPicked.value > 0 && sendMode.value === "loading",
+);
+const made = computed(() => flow.made.value.length);
+const total = computed(() => flow.toCreate.value.length);
+const alertsMade = computed(() => flow.made.value.filter(({ kind }) => kind === "alert").length);
+const alreadyHere = computed(
+  () => flow.items.value.filter(({ status }) => status === "existing").length,
+);
+const undoLabel = computed(() => {
+  const hours = Math.floor(flow.undoLeftUs.value / HOUR_US);
+  return hours > 0
+    ? t("starterPacks.landing.available", { hours })
+    : t("starterPacks.landing.availableSoon");
+});
+const dataState = computed<"receiving" | "waiting" | null>(() => {
+  if (props.matchState === "matched") return "receiving";
+  if (props.matchState === "waiting" || props.matchState === "none") return "waiting";
+  return null;
+});
+const routedTo = computed<I18nText | undefined>(() => {
+  const { turnOn: on, sendTo: routed, failure, email, name } = outcome.value;
+  if (!on || !routed || failure) return undefined;
+  return email ? t("starterPacks.progress.emailMe", { email: raw(email) }) : raw(name ?? "");
+});
 
 const installedLine = computed(() => {
   const record = flow.record.value;
@@ -422,10 +492,43 @@ const defaultNote = computed(() =>
       })
     : t("starterPacks.whatGetsCreated.subtitle", { title }),
 );
+const setupNote = (): { icon?: IconName; spin?: boolean; text: I18nText } => {
+  const counts = { made: made.value, total: total.value };
+  if (flow.running.value)
+    return { spin: true, text: t("starterPacks.stepper.noteRunning", counts) };
+  const count = flow.failed.value.length;
+  const summary = t("starterPacks.progress.summary", counts);
+  return {
+    icon: "warning",
+    text: count
+      ? t("starterPacks.installDialog.attention", { title: summary, count }, count)
+      : summary,
+  };
+};
+const readyNote = (): I18nText => {
+  const counts = { made: made.value, total: total.value };
+  if (!installedHere.value) return t("starterPacks.drawer.nothingToCreate");
+  if (alreadyHere.value) {
+    return t("starterPacks.stepper.noteAlreadyHere", { ...counts, count: alreadyHere.value });
+  }
+  if (!alertsMade.value) return t("starterPacks.progress.summary", counts);
+  const on = outcome.value.turnOn && !outcome.value.failure;
+  return on
+    ? t(
+        "starterPacks.stepper.noteAlertsOn",
+        { ...counts, count: alertsMade.value },
+        alertsMade.value,
+      )
+    : t("starterPacks.stepper.noteAlertsOff", counts);
+};
 const note = computed<{ icon?: IconName; spin?: boolean; text: I18nText }>(() => {
+  if (step.value === "setup") return setupNote();
+  if (step.value === "ready") return { icon: "check-circle", text: readyNote() };
   if (installed.value && installedLine.value) return { icon: "person", text: installedLine.value };
   if (loading.value) return { spin: true, text: t("starterPacks.drawer.loadingFit") };
-  if (flow.forbidden.value) return { icon: "lock", text: t("starterPacks.noPermission") };
+  if (flow.forbidden.value) {
+    return { icon: "lock", text: t("starterPacks.drawer.noteForbidden", { title }) };
+  }
   if (skippedCount.value) {
     const count = skippedCount.value;
     return { icon: "info", text: t("starterPacks.whatGetsCreated.skippedNote", { count }, count) };
@@ -457,8 +560,8 @@ const openLabel = computed(() =>
       : "starterPacks.libraryTabs.openPack",
   ),
 );
-const ctaLabel = computed(() =>
-  t("starterPacks.whatGetsCreated.cta", { title, count: picked.value }),
+const summaryLine = computed(() =>
+  t("starterPacks.drawer.summary", { count: picked.value }, picked.value),
 );
 
 const ensurePreview = () => {
@@ -466,16 +569,93 @@ const ensurePreview = () => {
     void flow.loadPreview();
   }
 };
+const typeName = (row: Record<string, any>): I18nText => {
+  const prebuilt = detectPrebuiltType(row);
+  const known = PREBUILT_DESTINATION_TYPES.find(({ id }) => id === prebuilt);
+  if (known) return raw(known.name);
+  if (row.type === "email") return t("alert_destinations.customEmail");
+  return row.type === "http"
+    ? t("alert_destinations.customWebhook")
+    : t("alert_destinations.custom");
+};
+const destinationLabel = (row: Record<string, any>) => raw(`${row.name} · ${typeName(row)}`);
+
+const setTurnOn = (on: boolean) => {
+  turnOn.value = on;
+  touched.turnOn = true;
+};
+const setSendTo = (on: boolean) => {
+  sendTo.value = on;
+  touched.sendTo = true;
+};
+// Both boxes start ticked only when there is somewhere to send; a box the user already changed keeps its value.
+const loadDestinations = async () => {
+  destinationsRun += 1;
+  const run = destinationsRun;
+  touched.turnOn = false;
+  touched.sendTo = false;
+  destinations.value = null;
+  turnOn.value = true;
+  sendTo.value = true;
+  const rows = await readQuery(destinationsQuery(flow.org, "alert")).catch(() => []);
+  if (run !== destinationsRun) return;
+  const usable = rows.filter((row) => !(smtpOff.value && row.type === "email"));
+  destinations.value = usable.map((row) => ({ name: row.name, label: destinationLabel(row) }));
+  const canSend = sendMode.value !== "none";
+  if (!canSend || !touched.sendTo) sendTo.value = canSend;
+  if (!touched.turnOn) turnOn.value = canSend;
+  destination.value = destinations.value[0]?.name ?? "";
+};
+/** The alert choice an install record carries, for a run this popup did not start. */
+const storedOutcome = (): ReadyAlerts => {
+  const record = flow.record.value;
+  const name = record?.destination;
+  const label = destinations.value?.find((row) => row.name === name)?.label;
+  return {
+    turnOn: !!record?.enableAlerts,
+    sendTo: !!name,
+    destination: label ?? (name ? raw(name) : undefined),
+    name,
+  };
+};
+
+const resetChoices = () => {
+  unticked.value = new Set();
+  turnOn.value = false;
+  sendTo.value = false;
+  destination.value = "";
+  readyShown.value = false;
+  installedHere.value = false;
+  outcome.value = { turnOn: false, sendTo: false };
+  expanded.value = {};
+};
 watch(
   open,
   (isOpen) => {
-    if (!isOpen) return;
-    unticked.value = new Set();
-    startAlerts.value = false;
-    expanded.value = {};
+    if (!isOpen) {
+      readyShown.value = false;
+      return;
+    }
+    if (!flow.running.value && !flow.interrupted.value) resetChoices();
+    // A resumed run names its destination by the label step 1 would have shown.
+    if (!installed.value && !flow.forbidden.value) void loadDestinations();
     ensurePreview();
   },
   { immediate: true },
+);
+// A setup that finishes while the popup is open moves it to Ready; nothing navigates by itself.
+watch(
+  () => flow.running.value,
+  (now, before) => {
+    if (before && !now) {
+      if (!ownRun) outcome.value = storedOutcome();
+      ownRun = false;
+    }
+    if (before && !now && flow.installed.value && open.value) {
+      readyShown.value = true;
+      installedHere.value = true;
+    }
+  },
 );
 // Answering the last open question must not collapse the card the user is working in.
 watch(
@@ -487,7 +667,6 @@ watch(
   },
 );
 
-const choice = () => ({ exclude: excludedIds.value, enableAlerts: startOn.value });
 const finishLanding = async () => {
   open.value = false;
   await flow.land();
@@ -496,10 +675,60 @@ const manage = () => {
   open.value = false;
   void router.push(flow.packRoute.value).catch(() => {});
 };
+const openView = () => {
+  const view = pack.nativeView;
+  open.value = false;
+  if (view)
+    void router.push({ name: view.route, query: { org_identifier: flow.org } }).catch(() => {});
+};
+// The pack page owns the Turn on drawer and opens it from this query.
+const openTurnOn = () => {
+  open.value = false;
+  const route = flow.packRoute.value;
+  void router.push({ ...route, query: { ...route.query, turnOn: "1" } }).catch(() => {});
+};
+
+/** Settles where the alerts send before anything is created, so each alert is saved once. */
+const resolveSendTo = async (): Promise<{ alerts: ReadyAlerts; name?: string }> => {
+  const wantsOn = startOn.value;
+  if (!alertsPicked.value || !sendTo.value || sendMode.value === "none") {
+    return { alerts: { turnOn: wantsOn, sendTo: false } };
+  }
+  if (sendMode.value === "email") {
+    const result = await emailMe.ensure(userEmail.value);
+    if ("failure" in result) {
+      return { alerts: { turnOn: wantsOn, sendTo: true, failure: result.failure } };
+    }
+    const alerts = { turnOn: wantsOn, sendTo: true, destination: raw(result.name) };
+    return { alerts: { ...alerts, email: userEmail.value, name: result.name }, name: result.name };
+  }
+  const picked = destinations.value?.find(({ name }) => name === destination.value);
+  return {
+    alerts: { turnOn: wantsOn, sendTo: !!picked, destination: picked?.label, name: picked?.name },
+    name: picked?.name,
+  };
+};
 const startSetup = async () => {
-  if (!(await flow.install(props.folderName, choice()))) return;
+  preparing.value = true;
+  const { alerts, name } = await resolveSendTo().finally(() => (preparing.value = false));
+  outcome.value = alerts;
+  ownRun = true;
+  const done = await flow.install(props.folderName, {
+    exclude: excludedIds.value,
+    enableAlerts: alerts.turnOn && !alerts.failure,
+    destination: name,
+  });
+  if (!done) return;
   useBrowserMatches(flow.org).markInstalled(pack.id, pack.id);
-  await finishLanding();
+  emit("installed");
+};
+const retry = async () => {
+  outcome.value = storedOutcome();
+  ownRun = true;
+  if (await flow.retry()) emit("installed");
+};
+const showReady = () => {
+  readyShown.value = true;
 };
 const confirmDone = () => {
   inlineConfirm.value = null;
@@ -513,10 +742,10 @@ watch(open, (isOpen) => {
 
 <template>
   <ODialog
-    v-model:open="modalOpen"
+    v-model:open="open"
     size="md"
-    :persistent="flow.busy.value"
-    :aria-title="t('starterPacks.drawer.setUpTitle', { title })"
+    :persistent="flow.busy.value || flow.running.value || preparing"
+    :aria-title="t('starterPacks.drawer.packTitle', { title })"
     data-test="starter-pack-drawer"
   >
     <template #header>
@@ -534,7 +763,7 @@ watch(open, (isOpen) => {
         </span>
         <div class="flex min-w-0 flex-col">
           <span class="text-text-heading text-base font-semibold">{{
-            t("starterPacks.drawer.setUpTitle", { title })
+            t("starterPacks.drawer.packTitle", { title })
           }}</span>
           <span
             class="text-text-secondary flex min-w-0 items-center gap-1.5 text-xs"
@@ -548,225 +777,290 @@ watch(open, (isOpen) => {
       </div>
     </template>
 
-    <div class="flex flex-col gap-2 text-sm" data-test="starter-pack-drawer-items">
-      <OBanner
-        v-if="flow.installFailed.value"
-        variant="error-soft"
-        dense
-        :content="t('starterPacks.progress.installError')"
-        data-test="starter-pack-drawer-install-error"
-      />
-
-      <template v-if="loading">
-        <div
-          v-for="index in 4"
-          :key="index"
-          class="border-border-default rounded-default flex items-center gap-3 border px-3 py-2.5"
-          data-test="starter-pack-drawer-loading"
-        >
-          <OSkeleton class="rounded-default size-7 shrink-0" />
-          <div class="flex flex-1 flex-col gap-2">
-            <OSkeleton type="text" class="h-2.5 w-2/5" />
-            <OSkeleton type="text" class="h-2 w-1/2" />
-          </div>
-        </div>
-      </template>
-
-      <div v-else-if="failedToLoad" class="flex items-center justify-between gap-3">
-        <span>{{ t("starterPacks.drawer.error") }}</span>
-        <OButton
-          variant="outline"
-          size="sm-action"
-          data-test="starter-pack-drawer-retry-btn"
-          @click="flow.loadPreview()"
-        >
-          {{ t("common.retry") }}
-        </OButton>
-      </div>
-
-      <section
-        v-for="group in groups"
-        :key="group.id"
-        class="border-border-default rounded-default overflow-hidden border"
-        :data-test="`starter-pack-drawer-group-${group.id}`"
+    <OStepper
+      :model-value="STEP_NUMBER[step]"
+      :hide-header="step === 'installed'"
+      :animated="false"
+      data-test="starter-pack-drawer-stepper"
+    >
+      <OStep
+        :name="1"
+        :title="t('starterPacks.stepper.content')"
+        :done="step !== 'content'"
+        data-test="starter-pack-drawer-step-content"
       >
-        <div
-          :class="[
-            'flex items-center gap-3 px-3 py-2.5',
-            expandable(group) && 'hover:bg-surface-subtle cursor-pointer',
-          ]"
-          @click="toggleOpen(group)"
-        >
-          <OCheckbox
-            v-if="canPick && selectableRows(group).length"
-            size="md"
-            :model-value="groupState(group)"
-            :aria-label="t('starterPacks.whatGetsCreated.selectGroup', { group: group.title })"
-            data-test="starter-pack-drawer-group-check"
-            @update:model-value="toggleGroup(group)"
-          />
-          <span v-else-if="canPick" class="size-4 shrink-0" />
-          <span
-            :class="[
-              'rounded-default flex size-7 shrink-0 items-center justify-center',
-              installed
-                ? 'bg-icon-chip-success-bg text-icon-chip-success-text'
-                : group.id === 'not'
-                  ? 'bg-surface-subtle text-text-secondary'
-                  : group.warn
-                    ? 'bg-icon-chip-warning-bg text-icon-chip-warning-text'
-                    : 'bg-icon-chip-primary-bg text-icon-chip-primary-text',
-            ]"
-          >
-            <OIcon :name="installed ? 'check' : group.icon" size="sm" />
-          </span>
-          <div class="flex min-w-0 flex-1 flex-col">
-            <span
-              :class="[
-                'truncate font-semibold',
-                group.id === 'not' ? 'text-text-secondary' : 'text-text-heading',
-              ]"
-              >{{ group.title }}</span
-            >
-            <span
-              v-if="group.warn"
-              class="text-status-warning-text truncate text-xs leading-none font-normal"
-              data-test="starter-pack-drawer-group-meta"
-              >{{ metaOf(group) }}</span
-            >
-            <OText
-              v-else
-              variant="meta"
-              class="truncate"
-              data-test="starter-pack-drawer-group-meta"
-              >{{ metaOf(group) }}</OText
-            >
-          </div>
-          <span v-if="group.id === 'alert' && canPick" class="shrink-0" @click.stop>
-            <OSwitch
-              v-model="startAlerts"
-              size="sm"
-              label-position="left"
-              :label="t('starterPacks.whatGetsCreated.startAlerts')"
-              :disabled="alertsPicked === 0"
-              data-test="starter-pack-drawer-start-alerts"
+        <div class="flex flex-col gap-2 pt-2 text-sm" data-test="starter-pack-drawer-items">
+          <template v-if="allExist">
+            <OBanner
+              variant="info"
+              icon="info"
+              dense
+              :content="t('starterPacks.drawer.allExist', { count: existingCount })"
+              data-test="starter-pack-drawer-all-exist"
             />
-          </span>
-          <OButton
-            v-if="expandable(group)"
-            variant="ghost-muted"
-            size="icon-xs"
-            :icon-left="isOpen(group) ? 'expand-less' : 'expand-more'"
-            :aria-label="isOpen(group) ? t('common.collapse') : t('common.expand')"
-            :aria-expanded="isOpen(group)"
-            @click.stop="toggleOpen(group)"
-          />
-        </div>
+          </template>
+          <template v-else>
+            <OBanner
+              v-if="flow.installFailed.value"
+              variant="error-soft"
+              dense
+              :content="t('starterPacks.progress.installError')"
+              data-test="starter-pack-drawer-install-error"
+            />
 
-        <div v-if="expandable(group) && isOpen(group)" class="border-border-default border-t">
-          <StarterPackAdaptedRows
-            v-if="group.id === 'adapted'"
-            :flow="flow"
-            class="ps-13 pe-3 pb-1"
-          />
-          <OInlineNotice
-            v-else-if="group.notice"
-            variant="warning"
-            :text="group.notice"
-            class="px-3 py-2"
-            data-test="starter-pack-drawer-name-in-use"
-          />
-          <OTooltip
-            v-for="row in group.rows"
-            :key="row.key"
-            side="bottom"
-            align="start"
-            max-width="17.5rem"
-            :disabled="!row.tip"
-          >
-            <div
-              :tabindex="row.tip ? 0 : undefined"
-              :class="[
-                'border-border-default flex min-h-9 items-center gap-3 border-t px-3 outline-none first:border-t-0',
-                'focus-visible:bg-surface-subtle hover:bg-surface-subtle',
-                row.selectable && 'cursor-pointer',
-              ]"
-              :data-test="`starter-pack-drawer-${group.id}-row`"
-              @click="toggleRow(row)"
-            >
-              <OCheckbox
-                v-if="canPick && selectableRows(group).length"
-                size="md"
-                :class="!row.selectable && 'invisible'"
-                :model-value="row.selectable && isTicked(row)"
-                :disabled="!row.selectable"
-                :aria-label="t('starterPacks.whatGetsCreated.selectRow', { name: row.name })"
-                data-test="starter-pack-drawer-row-check"
-                @update:model-value="toggleRow(row)"
-              />
-              <span class="flex w-7 shrink-0 justify-center">
-                <OIcon :name="row.icon" size="sm" :class="row.iconClass" />
-              </span>
-              <span
-                :class="[
-                  'min-w-0 flex-1 truncate',
-                  row.skipped && 'text-text-muted line-through',
-                  row.selectable && !isTicked(row) && 'text-text-muted',
-                ]"
-                >{{ row.name }}</span
+            <template v-if="loading">
+              <div
+                v-for="index in 4"
+                :key="index"
+                class="border-border-default rounded-default flex items-center gap-3 border px-3 py-2.5"
+                data-test="starter-pack-drawer-loading"
               >
-              <OBadge
-                v-if="row.pill"
-                :variant="row.pill.variant"
-                size="sm"
-                class="shrink-0"
-                data-test="starter-pack-drawer-alert-severity"
-                >{{ row.pill.label }}</OBadge
-              >
-              <OText v-else-if="row.note" variant="meta" class="shrink-0 text-right">{{
-                row.note
-              }}</OText>
-            </div>
-            <template #content>
-              <div class="flex flex-col gap-0.5">
-                <strong>{{ row.name }}</strong>
-                <span>{{ row.tip }}</span>
+                <OSkeleton class="rounded-default size-7 shrink-0" />
+                <div class="flex flex-1 flex-col gap-2">
+                  <OSkeleton type="text" class="h-2.5 w-2/5" />
+                  <OSkeleton type="text" class="h-2 w-1/2" />
+                </div>
               </div>
             </template>
-          </OTooltip>
+
+            <div v-else-if="failedToLoad" class="flex items-center justify-between gap-3">
+              <span>{{ t("starterPacks.drawer.error") }}</span>
+              <OButton
+                variant="outline"
+                size="sm-action"
+                data-test="starter-pack-drawer-retry-btn"
+                @click="flow.loadPreview()"
+              >
+                {{ t("common.retry") }}
+              </OButton>
+            </div>
+
+            <section
+              v-for="group in groups"
+              :key="group.id"
+              class="border-border-default rounded-default overflow-hidden border"
+              :data-test="`starter-pack-drawer-group-${group.id}`"
+            >
+              <div
+                :class="[
+                  'flex items-center gap-3 px-3 py-2.5',
+                  expandable(group) && 'hover:bg-surface-subtle cursor-pointer',
+                ]"
+                @click="toggleOpen(group)"
+              >
+                <OCheckbox
+                  v-if="canPick && selectableRows(group).length"
+                  size="md"
+                  :model-value="groupState(group)"
+                  :aria-label="
+                    t('starterPacks.whatGetsCreated.selectGroup', { group: group.title })
+                  "
+                  data-test="starter-pack-drawer-group-check"
+                  @update:model-value="toggleGroup(group)"
+                />
+                <span v-else-if="canPick" class="size-4 shrink-0" />
+                <span
+                  :class="[
+                    'rounded-default flex size-7 shrink-0 items-center justify-center',
+                    installed
+                      ? 'bg-icon-chip-success-bg text-icon-chip-success-text'
+                      : group.id === 'not'
+                        ? 'bg-surface-subtle text-text-secondary'
+                        : group.warn
+                          ? 'bg-icon-chip-warning-bg text-icon-chip-warning-text'
+                          : 'bg-icon-chip-primary-bg text-icon-chip-primary-text',
+                  ]"
+                >
+                  <OIcon :name="installed ? 'check' : group.icon" size="sm" />
+                </span>
+                <div class="flex min-w-0 flex-1 flex-col">
+                  <span
+                    :class="[
+                      'truncate font-semibold',
+                      group.id === 'not' ? 'text-text-secondary' : 'text-text-heading',
+                    ]"
+                    >{{ group.title }}</span
+                  >
+                  <span
+                    v-if="group.warn"
+                    class="text-status-warning-text truncate text-xs leading-none font-normal"
+                    data-test="starter-pack-drawer-group-meta"
+                    >{{ metaOf(group) }}</span
+                  >
+                  <OText
+                    v-else
+                    variant="meta"
+                    class="truncate"
+                    data-test="starter-pack-drawer-group-meta"
+                    >{{ metaOf(group) }}</OText
+                  >
+                </div>
+                <OButton
+                  v-if="expandable(group)"
+                  variant="ghost-muted"
+                  size="icon-xs"
+                  :icon-left="isOpen(group) ? 'expand-less' : 'expand-more'"
+                  :aria-label="isOpen(group) ? t('common.collapse') : t('common.expand')"
+                  :aria-expanded="isOpen(group)"
+                  @click.stop="toggleOpen(group)"
+                />
+              </div>
+
+              <StarterPackAlertStep
+                v-if="alertBlockShown(group)"
+                :turn-on="turnOn"
+                :send-to="sendTo"
+                @update:turn-on="setTurnOn"
+                @update:send-to="setSendTo"
+                v-model:destination="destination"
+                class="border-border-default border-t"
+                :count="alertsPicked"
+                :destinations="destinations"
+                :smtp-off="smtpOff"
+                :email="userEmail"
+              />
+              <div v-if="expandable(group) && isOpen(group)" class="border-border-default border-t">
+                <StarterPackAdaptedRows
+                  v-if="group.id === 'adapted'"
+                  :flow="flow"
+                  class="ps-13 pe-3 pb-1"
+                />
+                <OInlineNotice
+                  v-else-if="group.notice"
+                  variant="warning"
+                  :text="group.notice"
+                  class="px-3 py-2"
+                  data-test="starter-pack-drawer-name-in-use"
+                />
+                <OTooltip
+                  v-for="row in group.rows"
+                  :key="row.key"
+                  side="bottom"
+                  align="start"
+                  max-width="17.5rem"
+                  :disabled="!row.tip"
+                >
+                  <div
+                    :tabindex="row.tip ? 0 : undefined"
+                    :class="[
+                      'border-border-default flex min-h-9 items-center gap-3 border-t px-3 outline-none first:border-t-0',
+                      'focus-visible:bg-surface-subtle hover:bg-surface-subtle',
+                      row.selectable && 'cursor-pointer',
+                    ]"
+                    :data-test="`starter-pack-drawer-${group.id}-row`"
+                    @click="toggleRow(row)"
+                  >
+                    <OCheckbox
+                      v-if="canPick && selectableRows(group).length"
+                      size="md"
+                      :class="!row.selectable && 'invisible'"
+                      :model-value="row.selectable && isTicked(row)"
+                      :disabled="!row.selectable"
+                      :aria-label="t('starterPacks.whatGetsCreated.selectRow', { name: row.name })"
+                      data-test="starter-pack-drawer-row-check"
+                      @update:model-value="toggleRow(row)"
+                    />
+                    <span class="flex w-7 shrink-0 justify-center">
+                      <OIcon :name="row.icon" size="sm" :class="row.iconClass" />
+                    </span>
+                    <span
+                      :class="[
+                        'min-w-0 flex-1 truncate',
+                        row.skipped && 'text-text-muted line-through',
+                        row.selectable && !isTicked(row) && 'text-text-muted',
+                      ]"
+                      >{{ row.name }}</span
+                    >
+                    <OBadge
+                      v-if="row.pill"
+                      :variant="row.pill.variant"
+                      size="sm"
+                      class="shrink-0"
+                      data-test="starter-pack-drawer-alert-severity"
+                      >{{ row.pill.label }}</OBadge
+                    >
+                    <OText v-else-if="row.note" variant="meta" class="shrink-0 text-right">{{
+                      row.note
+                    }}</OText>
+                  </div>
+                  <template #content>
+                    <div class="flex flex-col gap-0.5">
+                      <strong>{{ row.name }}</strong>
+                      <span>{{ row.tip }}</span>
+                    </div>
+                  </template>
+                </OTooltip>
+              </div>
+            </section>
+
+            <span
+              v-if="installed && installedScope"
+              class="text-text-secondary flex items-center gap-2 px-1 pt-2 text-xs"
+            >
+              <OIcon name="public" size="sm" class="shrink-0" />
+              <span data-test="starter-pack-progress-scope">{{ installedScope }}</span>
+            </span>
+
+            <div
+              v-if="!installed && preview"
+              class="text-text-secondary flex flex-col gap-1.5 px-1 pt-2 text-xs"
+            >
+              <span class="text-text-label font-semibold">{{
+                t("starterPacks.whatGetsCreated.footprint")
+              }}</span>
+              <span class="flex items-center gap-2">
+                <OIcon name="public" size="sm" class="shrink-0" />
+                <span data-test="starter-pack-drawer-reach-line">{{ reachLine }}</span>
+              </span>
+              <span class="flex items-center gap-2">
+                <OIcon name="info" size="sm" class="shrink-0" />
+                <span data-test="starter-pack-drawer-source">{{
+                  t(
+                    preview?.offline
+                      ? "starterPacks.drawer.sourceOffline"
+                      : "starterPacks.drawer.source",
+                    { host },
+                  )
+                }}</span>
+              </span>
+            </div>
+          </template>
         </div>
-      </section>
-
-      <span
-        v-if="installed && installedScope"
-        class="text-text-secondary flex items-center gap-2 px-1 pt-2 text-xs"
+      </OStep>
+      <OStep
+        :name="2"
+        :title="
+          flow.running.value ? t('starterPacks.stepper.settingUp') : t('starterPacks.stepper.setup')
+        "
+        :icon="flow.running.value ? SPINNER : undefined"
+        :description="flow.interrupted.value ? t('starterPacks.stepper.interrupted') : undefined"
+        :done="step === 'ready'"
+        data-test="starter-pack-drawer-step-setup"
       >
-        <OIcon name="public" size="sm" class="shrink-0" />
-        <span data-test="starter-pack-progress-scope">{{ installedScope }}</span>
-      </span>
-
-      <div
-        v-if="!installed && preview"
-        class="text-text-secondary flex flex-col gap-1.5 px-1 pt-2 text-xs"
+        <StarterPackProgress
+          class="pt-2"
+          :flow="flow"
+          :routed-to="routedTo"
+          @copy-link="emit('copy-link')"
+        />
+      </OStep>
+      <OStep
+        :name="3"
+        :title="t('starterPacks.stepper.ready')"
+        data-test="starter-pack-drawer-step-ready"
       >
-        <span class="text-text-label font-semibold">{{
-          t("starterPacks.whatGetsCreated.footprint")
-        }}</span>
-        <span class="flex items-center gap-2">
-          <OIcon name="public" size="sm" class="shrink-0" />
-          <span data-test="starter-pack-drawer-reach-line">{{ reachLine }}</span>
-        </span>
-        <span class="flex items-center gap-2">
-          <OIcon name="info" size="sm" class="shrink-0" />
-          <span data-test="starter-pack-drawer-source">{{
-            t(
-              preview?.offline ? "starterPacks.drawer.sourceOffline" : "starterPacks.drawer.source",
-              { host },
-            )
-          }}</span>
-        </span>
-      </div>
-    </div>
+        <StarterPackReady
+          class="pt-2"
+          :flow="flow"
+          :alerts="outcome"
+          :data="dataState"
+          :clusters="clusters"
+          @open-view="openView"
+          @open-dashboard="finishLanding"
+          @turn-on="openTurnOn"
+        />
+      </OStep>
+    </OStepper>
 
     <template #footer>
       <StarterPackInlineConfirm
@@ -777,6 +1071,77 @@ watch(open, (isOpen) => {
         @cancel="inlineConfirm = null"
         @done="confirmDone"
       />
+      <div v-else-if="step === 'setup'" class="flex w-full items-center justify-end gap-2">
+        <OButton
+          v-if="flow.running.value"
+          variant="primary"
+          size="sm-action"
+          disabled
+          loading
+          :spinner="false"
+          data-test="starter-pack-progress-running-btn"
+        >
+          <template #icon-left><StarterPackStepSpinner /></template>
+          {{ t("starterPacks.stepper.settingUp") }}
+        </OButton>
+        <template v-else>
+          <OButton
+            variant="outline"
+            size="sm-action"
+            data-test="starter-pack-progress-manage-btn"
+            @click="manage"
+          >
+            {{ t("starterPacks.installDialog.manage") }}
+          </OButton>
+          <OButton
+            v-if="flow.failed.value.length && !flow.forbidden.value"
+            variant="primary"
+            size="sm-action"
+            icon-left="refresh"
+            data-test="starter-pack-progress-retry-btn"
+            @click="retry"
+          >
+            {{
+              t(
+                "starterPacks.progress.retry",
+                { count: flow.failed.value.length },
+                flow.failed.value.length,
+              )
+            }}
+          </OButton>
+          <OButton
+            v-else-if="!flow.failed.value.length"
+            variant="primary"
+            size="sm-action"
+            data-test="starter-pack-progress-finish-btn"
+            @click="retry"
+          >
+            {{ t("starterPacks.progress.finish") }}
+          </OButton>
+        </template>
+      </div>
+      <div v-else-if="step === 'ready'" class="flex w-full items-center gap-2">
+        <template v-if="installedHere && flow.canUndo.value">
+          <OButton
+            variant="ghost"
+            size="sm-action"
+            data-test="starter-pack-ready-undo-btn"
+            @click="inlineConfirm = 'undo'"
+          >
+            {{ t("starterPacks.landing.undo") }}
+          </OButton>
+          <OText variant="meta" data-test="starter-pack-ready-undo-left">{{ undoLabel }}</OText>
+        </template>
+        <span class="flex-1" />
+        <OButton
+          variant="outline"
+          size="sm-action"
+          data-test="starter-pack-ready-close-btn"
+          @click="open = false"
+        >
+          {{ t("starterPacks.drawer.close") }}
+        </OButton>
+      </div>
       <div v-else class="flex w-full items-center gap-2">
         <template v-if="installed">
           <OButton
@@ -798,6 +1163,21 @@ watch(open, (isOpen) => {
             {{ t("starterPacks.landing.remove") }}
           </OButton>
         </template>
+        <span
+          v-else-if="flow.forbidden.value"
+          class="text-text-secondary flex min-w-0 items-center gap-2 text-xs"
+          data-test="starter-pack-drawer-forbidden"
+        >
+          <OIcon name="lock" size="sm" class="shrink-0" />
+          <span class="truncate">{{ t("starterPacks.noPermission") }}</span>
+        </span>
+        <OText
+          v-else-if="canPick && preview && !nothingToCreate"
+          variant="meta"
+          class="truncate"
+          data-test="starter-pack-drawer-summary"
+          >{{ summaryLine }}</OText
+        >
         <span class="flex-1" />
         <OButton
           variant="outline"
@@ -818,7 +1198,7 @@ watch(open, (isOpen) => {
           {{ t("starterPacks.copyLink") }}
         </OButton>
         <OButton
-          v-else-if="installed || nothingToCreate"
+          v-else-if="installed"
           variant="primary"
           size="sm-action"
           data-test="starter-pack-drawer-open-btn"
@@ -827,25 +1207,26 @@ watch(open, (isOpen) => {
           {{ openLabel }}
         </OButton>
         <OButton
+          v-else-if="nothingToCreate"
+          variant="primary"
+          size="sm-action"
+          data-test="starter-pack-drawer-continue-btn"
+          @click="showReady"
+        >
+          {{ t("starterPacks.drawer.continue") }}
+        </OButton>
+        <OButton
           v-else
           variant="primary"
           size="sm-action"
-          :disabled="flow.previewState.value !== 'ready' || picked === 0"
+          :loading="preparing"
+          :disabled="flow.previewState.value !== 'ready' || picked === 0 || waitingForDestinations"
           data-test="starter-pack-drawer-submit-btn"
           @click="startSetup"
         >
-          {{ ctaLabel }}
+          {{ t("starterPacks.drawer.setUp") }}
         </OButton>
       </div>
     </template>
   </ODialog>
-  <StarterPackInstallDialog
-    v-model:open="dialogOpen"
-    :flow="flow"
-    @open-landing="finishLanding"
-    @manage="manage"
-    @done="confirmDone"
-    @retry="startSetup"
-    @copy-link="emit('copy-link')"
-  />
 </template>

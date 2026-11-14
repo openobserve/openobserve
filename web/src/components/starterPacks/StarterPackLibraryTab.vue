@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import OCard from "@/lib/core/Card/OCard.vue";
@@ -285,10 +285,7 @@ const setUp = (row: LibraryRow) => {
   drawerPackId.value = row.pack.id;
 };
 
-const retry = async (row: LibraryRow) => {
-  await flowOf(row).install();
-  await load();
-};
+const retry = (row: LibraryRow) => flowOf(row).retry();
 
 const askUndoSetup = (row: LibraryRow) => {
   undoPackId.value = row.pack.id;
@@ -399,6 +396,12 @@ const load = async ({ quiet = false }: { quiet?: boolean } = {}) => {
 };
 
 onMounted(() => void load());
+// The popup unmounts on close, so a setup that ends after that is only seen through its flow.
+for (const flow of flows.values()) {
+  watch(flow.running, (now, before) => {
+    if (before && !now) void load({ quiet: true });
+  });
+}
 defineExpose({ refresh: () => load({ quiet: true }) });
 </script>
 

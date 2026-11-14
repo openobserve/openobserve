@@ -79,6 +79,9 @@ const appliedLimit = (alert: Record<string, any>): string[] => {
 
 const isForbidden = (error: any) => error?.response?.status === 403;
 
+// An alert that is on with no destination was set up that way on purpose and still needs routing.
+const isListed = ({ enabled, alert }: TurnOnRow) => !enabled || !alert.destinations?.length;
+
 const clusterLabel = (alert: Record<string, any>) =>
   JSON.stringify(alert.query_condition ?? {}).includes(ALTERNATE_CLUSTER_LABEL)
     ? ALTERNATE_CLUSTER_LABEL
@@ -161,15 +164,12 @@ export function useTurnOnAlerts(org: string, flow: StarterPackFlow) {
         alert: details[index],
         state: "loading",
         result: null,
-        chosen: !row.enabled,
+        chosen: !row.enabled || !details[index].destinations?.length,
         touched: false,
       }));
       loadState.value = "ready";
       if (!count) return;
-      await countAll(
-        rows.value.filter(({ enabled }) => !enabled),
-        run,
-      );
+      await countAll(rows.value.filter(isListed), run);
     } catch {
       if (run === generation) loadState.value = "error";
     }
@@ -184,14 +184,15 @@ export function useTurnOnAlerts(org: string, flow: StarterPackFlow) {
 
   const choose = (id: string, chosen: boolean) => touch(id, { chosen, touched: true });
 
-  const chosenRows = computed(() => rows.value.filter((row) => row.chosen && !row.enabled));
+  const listedRows = computed(() => rows.value.filter(isListed));
+  const chosenRows = computed(() => listedRows.value.filter(({ chosen }) => chosen));
   const needsCritical = computed(() =>
     chosenRows.value.some(({ severity }) => severity === "critical"),
   );
   const needsWarning = computed(() =>
     chosenRows.value.some(({ severity }) => severity === "warning"),
   );
-  const summary = computed(() => summarize(rows.value.filter(({ enabled }) => !enabled)));
+  const summary = computed(() => summarize(listedRows.value));
 
   const limited = async (body: Record<string, any>, clusters: string[]) => {
     const previous = appliedLimit(body);
@@ -271,7 +272,10 @@ export function useTurnOnAlerts(org: string, flow: StarterPackFlow) {
           for (const row of targets) {
             if (await saveTarget(row, choice)) saved.push(row);
           }
-          return saved.length ? enableInFolders(saved) : new Set<string>();
+          const off = saved.filter(({ enabled }) => !enabled);
+          const done = off.length ? await enableInFolders(off) : new Set<string>();
+          for (const { id, enabled } of saved) if (enabled) done.add(id);
+          return done;
         },
       );
       failedIds.value = targets.filter(({ id }) => !enabled.has(id)).map(({ id }) => id);
@@ -343,6 +347,7 @@ export function useTurnOnAlerts(org: string, flow: StarterPackFlow) {
     chosenRows,
     failedIds,
     forbidden,
+    listedRows,
     load,
     loadState,
     needsCritical,
