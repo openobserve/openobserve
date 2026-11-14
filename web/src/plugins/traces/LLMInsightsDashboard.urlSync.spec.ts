@@ -29,6 +29,7 @@ vi.mock("./composables/useLLMInsights", () => ({
     sparklines: ref({}),
     loading: ref(false),
     p95Loading: ref(false),
+    p95Unavailable: ref(false),
     error: ref(null),
     hasLoadedOnce: ref(false),
     availableStreams: ref([]),
