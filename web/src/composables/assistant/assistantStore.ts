@@ -1384,11 +1384,11 @@ function createTurnSlice(core: StoreCore) {
       const sent = { text, chips: [...chips], timeOverride, removedPageKeys: [...removedPageKeys] };
       return track(sid, sent, () => deps.engine.send(sid, opts));
     },
-    // A card waiting on this turn is declined before the cancel, so no stale batch runs later.
+    // A waiting card's decline goes out before the cancel, so no stale batch runs later; the stream never waits for its answer.
     async stop(sid) {
       // An Enable on its way is answered first: a stop now could leave paid usage on behind a "not sent".
       if (deps.consent.busy?.(sid)) return deps.consent.cancel(sid, "stopped");
-      if (core.session(sid)?.pendingApproval) await deps.approvals.withdraw(sid, "stopped");
+      if (core.session(sid)?.pendingApproval) void deps.approvals.withdraw(sid, "stopped");
       return deps.engine.stop(sid);
     },
     retry(sid) {

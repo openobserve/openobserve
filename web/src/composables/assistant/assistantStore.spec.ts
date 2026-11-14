@@ -613,6 +613,20 @@ describe("composer", () => {
     expect(engine.stop).not.toHaveBeenCalled();
   });
 
+  it("stops the stream at once on Stop while the card's decline is still on its way", () => {
+    const approvals = {
+      ...inertAssistantDeps().approvals,
+      withdraw: vi.fn(() => new Promise<void>(() => undefined)),
+    };
+    const engine = { ...inertAssistantDeps().engine, stop: vi.fn(async () => undefined) };
+    const { store } = makeStore({ approvals, engine });
+    const sid = newSession(store);
+    store.state.sessions[sid].pendingApproval = approval(sid);
+    void store.stop(sid);
+    expect(approvals.withdraw).toHaveBeenCalledWith(sid, "stopped");
+    expect(engine.stop).toHaveBeenCalledWith(sid);
+  });
+
   it("rebuilds a chat's action ledger from its kept records, newest 200 only", () => {
     const sid = "0190f3a0-0000-7000-8000-000000000777";
     for (let card = 0; card < 3; card++)
