@@ -28,7 +28,7 @@ import { useRepairLater, type RepairScope } from "@/composables/starterPacks/use
 import { raw, useI18nTyped } from "@/types/i18n";
 
 const props = defineProps<{ org: string; scope: RepairScope }>();
-const emit = defineEmits<{ repaired: [] }>();
+const emit = defineEmits<{ repaired: []; opened: [] }>();
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -57,6 +57,11 @@ const last = computed(() => (issue.value ? timeOf(issue.value.lastUs) : ""));
 
 onMounted(() => repair.check(props.scope));
 
+const openDrawer = () => {
+  open.value = true;
+  emit("opened");
+};
+
 const apply = async () => {
   if (await repair.apply(props.scope)) {
     open.value = false;
@@ -77,7 +82,7 @@ const undo = async () => {
       icon-left="sensors-off"
       :loading="repair.busy.value"
       data-test="starter-pack-repair-chip"
-      @click="open = true"
+      @click="openDrawer"
     >
       {{ repair.busy.value ? t("starterPacks.repairLater.repointing") : chipText }}
     </OButton>

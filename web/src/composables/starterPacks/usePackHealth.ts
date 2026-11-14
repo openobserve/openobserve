@@ -35,6 +35,17 @@ export const staleSinceUs = (
   return nowUs - newest >= STALE_AFTER_US ? newest : null;
 };
 
+/** The no-data time as the page chip and Pack details both show it, e.g. "12 Nov, 10:27". */
+export const staleSinceText = (at: number | null): string =>
+  at
+    ? new Date(at / 1000).toLocaleString(undefined, {
+        day: "numeric",
+        month: "short",
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : "";
+
 /** Pack health from stream stats, since alerts cannot detect missing data themselves. */
 export function usePackHealth(org: string) {
   const staleSince = ref<number | null>(null);

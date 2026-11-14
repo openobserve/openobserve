@@ -904,13 +904,15 @@ const AlertHistoryDrawer = defineAsyncComponent(
   () => import("@/components/alerts/AlertHistoryDrawer.vue"),
 );
 
+const emit = defineEmits<{
+  "not-monitored": [value: boolean];
+  sendToAiChat: [payload: AiChatHandoff];
+}>();
 const { t } = useI18nTyped();
 const store = useStore();
 const router = useRouter();
 const homePackState = inject(HOME_PACKS, null);
 const homePacks = computed(() => homePackState?.value ?? null);
-
-const emit = defineEmits<{ sendToAiChat: [payload: AiChatHandoff] }>();
 
 // ── Feature flags ────────────────────────────────────────────────────────────
 // Services shares this same gate — it's the service-graph half of the same
@@ -1153,6 +1155,11 @@ const pageState = computed<PageState>(() => {
   }
   return "all-clear";
 });
+watch(
+  () => pageState.value === "not-monitored",
+  (notMonitored) => emit("not-monitored", notMonitored),
+  { immediate: true },
+);
 // every attempted call was refused, so "could not load" would contradict the No access cards
 const errorIsForbidden = computed(
   () =>

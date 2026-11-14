@@ -81,7 +81,7 @@ const render = async (packs = [KUBERNETES_PACK]) => {
         StarterPackUndoDialog: true,
         TurnOnAlertsDrawer: true,
         OIcon: true,
-        OPopover: { template: '<div><slot name="trigger" /><slot /></div>' },
+        OTooltip: { template: '<div><slot name="content" /></div>' },
       },
     },
   });
@@ -169,7 +169,7 @@ describe("StarterPackHomeSection", () => {
     expect(fake.flows.kubernetes.land).toHaveBeenCalledWith();
   });
 
-  it("shows two streams and folds the rest behind a +N chip", async () => {
+  it("shows two streams and folds the rest into a +N badge with a hover list", async () => {
     fake.matchers.kubernetes.streams.value = ["a", "b", "c", "d"];
     fake.matchers.kubernetes.clusters.value = ["staging-eu-1"];
     const wrapper = await render();
@@ -292,6 +292,6 @@ describe("StarterPackHomeSection", () => {
     await wrapper.get('[data-test="home-pack-card-copy-link-btn"]').trigger("click");
     expect(fake.copy).toHaveBeenCalledTimes(1);
     expect(fake.copy.mock.calls[0][0]).toBe(fake.flows.kubernetes.packLink());
-    expect(fake.copy.mock.calls[0][0]).toContain("/alert-library/packs/kubernetes");
+    expect(fake.copy.mock.calls[0][0]).toContain("/starter-packs/kubernetes");
   });
 });

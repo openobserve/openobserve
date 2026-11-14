@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, onMounted, ref } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -25,7 +25,6 @@ import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import ORadio from "@/lib/forms/Radio/ORadio.vue";
 import ORadioGroup from "@/lib/forms/Radio/ORadioGroup.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import { RESERVED_FIELD } from "@/composables/starterPacks/packBinding";
 import { MAX_STREAM_COPIES } from "@/composables/starterPacks/streamCandidates";
 import type { PackBinding, PackQuestion } from "@/composables/starterPacks/types";
@@ -39,7 +38,7 @@ const props = defineProps<{
   /** How the row names this data, already translated. */
   what: string;
 }>();
-const open = defineModel<boolean>("open", { default: false });
+const emit = defineEmits<{ close: [] }>();
 
 const { t } = useI18nTyped();
 
@@ -47,6 +46,7 @@ const picked = ref<string[]>([]);
 const stream = ref<string>();
 const value = ref<string>();
 const column = ref<string>();
+const root = ref<HTMLElement>();
 
 const candidates = computed(() => props.question?.candidates ?? []);
 const kind = computed(() => (props.binding ? "field" : props.question?.kind));
@@ -92,21 +92,25 @@ const reset = () => {
   value.value = props.question?.answer?.filter?.value;
   column.value = props.binding?.to;
 };
-watch(open, (isOpen) => isOpen && reset());
+onMounted(() => {
+  reset();
+  // The form opens inside a scrolling popup, so its buttons may start below the fold.
+  root.value?.scrollIntoView?.({ block: "nearest" });
+});
 
 const toggle = (name: string, on: boolean) => {
   picked.value = on ? [...picked.value, name] : picked.value.filter((row) => row !== name);
 };
 
 const useStreams = async ([to, ...also]: string[]) => {
-  open.value = false;
+  emit("close");
   await props.flow.chooseStream(props.question!.want, { to, ...(also.length ? { also } : {}) });
 };
 
 const useFilter = async () => {
   const to = stream.value!;
   const field = sharedFilter.value!.field;
-  open.value = false;
+  emit("close");
   await props.flow.chooseStream(props.question!.want, {
     to,
     filter: { field, value: value.value! },
@@ -114,7 +118,7 @@ const useFilter = async () => {
 };
 
 const useColumn = async () => {
-  open.value = false;
+  emit("close");
   await props.flow.chooseField(props.binding!.from, column.value!);
 };
 
@@ -132,18 +136,14 @@ const applyPrimary = () => {
 </script>
 
 <template>
-  <ODialog
-    v-model:open="open"
-    size="md"
-    :title="title"
-    :primary-button-label="kind === 'confirm' ? undefined : t('starterPacks.adapted.apply')"
-    :primary-button-disabled="primaryDisabled"
-    primary-button-data-test="starter-pack-repair-apply-btn"
-    :secondary-button-label="t('common.cancel')"
-    data-test="starter-pack-repair-dialog"
-    @click:primary="applyPrimary"
-    @click:secondary="open = false"
+  <div
+    ref="root"
+    class="bg-surface-base flex flex-col gap-3 px-3 py-2.5"
+    data-test="starter-pack-repair-form"
   >
+    <strong class="text-text-heading text-sm" data-test="starter-pack-repair-title">{{
+      title
+    }}</strong>
     <div v-if="kind === 'confirm'" class="flex flex-col gap-2 text-sm">
       <OText v-if="manyStreams" variant="meta">{{
         t("starterPacks.adapted.dialogPickFive", { count: MAX_STREAM_COPIES })
@@ -268,5 +268,25 @@ const applyPrimary = () => {
       :options="columns.map((name) => ({ label: raw(name), value: name }))"
       data-test="starter-pack-repair-field-select"
     />
-  </ODialog>
+    <div class="flex justify-end gap-2">
+      <OButton
+        variant="outline"
+        size="sm-action"
+        data-test="starter-pack-repair-cancel-btn"
+        @click="emit('close')"
+      >
+        {{ t("common.cancel") }}
+      </OButton>
+      <OButton
+        v-if="kind !== 'confirm'"
+        variant="primary"
+        size="sm-action"
+        :disabled="primaryDisabled"
+        data-test="starter-pack-repair-apply-btn"
+        @click="applyPrimary"
+      >
+        {{ t("common.save") }}
+      </OButton>
+    </div>
+  </div>
 </template>

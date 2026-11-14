@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref, watch } from "vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -26,13 +26,14 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { raw, useI18nTyped, type I18nKey } from "@/types/i18n";
 import type { PackItemKind } from "@/composables/starterPacks/types";
 import type { StarterPackFlow } from "@/composables/starterPacks/useStarterPackFlow";
+import StarterPackInlineConfirm from "./StarterPackInlineConfirm.vue";
 
 const props = defineProps<{ flow: StarterPackFlow }>();
 const open = defineModel<boolean>("open", { default: false });
 const emit = defineEmits<{
   "open-landing": [];
   manage: [];
-  undo: [];
+  done: [];
   retry: [];
   "copy-link": [];
 }>();
@@ -46,6 +47,10 @@ const KIND_KEYS: Partial<Record<PackItemKind, I18nKey>> = {
 };
 
 const flow = props.flow;
+const confirming = ref(false);
+watch(open, (isOpen) => {
+  if (!isOpen) confirming.value = false;
+});
 const total = computed(() => flow.toCreate.value.length);
 const made = computed(() => flow.made.value.length);
 const failedCount = computed(() => flow.failed.value.length);
@@ -102,7 +107,9 @@ const openLabel = computed(() =>
     ? t("starterPacks.installDialog.open", {
         name: raw(flow.nameOf(firstDashboard.value.itemId)),
       })
-    : t("starterPacks.drawer.openDashboard"),
+    : flow.dashboardItem.value?.id
+      ? t("starterPacks.drawer.openDashboard")
+      : t("starterPacks.libraryTabs.openPack"),
 );
 </script>
 
@@ -110,8 +117,8 @@ const openLabel = computed(() =>
   <ODialog
     v-model:open="open"
     size="sm"
-    :persistent="flow.running.value"
-    :show-close="!flow.running.value"
+    :persistent="flow.running.value || flow.busy.value"
+    :show-close="!flow.running.value && !flow.busy.value"
     :title="title"
     :sub-title="subTitle"
     data-test="starter-pack-install-dialog"
@@ -198,13 +205,21 @@ const openLabel = computed(() =>
     </div>
 
     <template #footer>
-      <div class="flex w-full items-center gap-2">
+      <StarterPackInlineConfirm
+        v-if="confirming"
+        :flow="flow"
+        mode="undo"
+        data-test="starter-pack-progress-confirm"
+        @cancel="confirming = false"
+        @done="emit('done')"
+      />
+      <div v-else class="flex w-full items-center gap-2">
         <OButton
           v-if="flow.canUndo.value && !flow.running.value && made > 0"
           variant="ghost-destructive"
           size="sm-action"
           data-test="starter-pack-progress-undo-btn"
-          @click="emit('undo')"
+          @click="confirming = true"
         >
           {{ t("starterPacks.installDialog.undoSetup") }}
         </OButton>

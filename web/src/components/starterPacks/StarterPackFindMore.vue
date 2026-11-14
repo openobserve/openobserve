@@ -40,7 +40,7 @@ const props = withDefaults(
   { variant: "button", dailyToggle: false },
 );
 
-const emit = defineEmits<{ changed: [] }>();
+const emit = defineEmits<{ changed: []; opened: [] }>();
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -102,6 +102,7 @@ const hiddenCount = (source: FindMoreSource) => Math.max(0, source.items.length 
 
 const openFinder = () => {
   open.value = true;
+  emit("opened");
   void finder.check();
 };
 
