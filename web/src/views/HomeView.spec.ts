@@ -183,12 +183,13 @@ import settings from "@/services/settings";
 import { resetAssistantV2ForTests } from "@/composables/assistant/flags";
 import { readHome, resetPrefsForTests } from "@/composables/assistant/prefs";
 import { contextRegistry } from "@/composables/contextProviders/registry";
+import { timeRangeShortText, timeWindowOf } from "@/composables/assistant/context/contextChips";
 import { useHomeDashboard } from "@/composables/useHomeDashboard";
 import { onOverviewFocusRequest } from "@/composables/goto/goToRequests";
 import { getManager, resetManager } from "@/lib/vue-shortcut-manager";
 import HomeView from "./HomeView.vue";
 import { HOME_RAIL_CLASS } from "./home/homeState";
-import { raw } from "@/types/i18n";
+import { gt, raw } from "@/types/i18n";
 
 const mountHome = () =>
   mount(HomeView, {
@@ -1084,6 +1085,44 @@ describe("HomeView", () => {
         await flushPromises();
         expect(router.currentRoute.value.query).toEqual({});
         expect(has("overview-tab-stub")).toBe(true);
+      });
+
+      it("gives a chat asked from Home's Ask box no Home range, so its chip keeps the window it asked over", async () => {
+        flagged(true);
+        // The mocked store's state is this object, read when the thread's page is read.
+        Object.assign(assistant, {
+          shell: { activeSid: null },
+          sessions: {
+            asked: { origin: { entryKind: "home_launcher" } },
+            panel: { origin: { entryKind: "header_button" } },
+          },
+        });
+        // The words the thread's time chip draws for its window.
+        const chip = async (override: { from: number; to: number; period: string } | null) => {
+          const window = timeWindowOf(await contextRegistry.getActiveContext(), override);
+          return String(gt("assistant.context.time.last", { period: timeRangeShortText(window) }));
+        };
+        try {
+          await router.replace({
+            name: "home",
+            query: { tab: "ai", thread: "asked", period: "7d" },
+          });
+          wrapper = mountHome();
+          await resolveKey("k1");
+          await settleAsync();
+          expect(await chip(null)).toBe("Last 15 min");
+          expect(await chip({ from: 0, to: 3_600_000, period: "1h" })).toBe("Last 1 h");
+          await router.replace({
+            name: "home",
+            query: { tab: "ai", thread: "panel", period: "7d" },
+          });
+          await flushPromises();
+          expect(await chip(null)).toBe("Last 7 days");
+        } finally {
+          delete (assistant as Record<string, unknown>).shell;
+          delete (assistant as Record<string, unknown>).sessions;
+          contextRegistry.cleanup();
+        }
       });
 
       it("ignores ?thread= with the flag off", async () => {
