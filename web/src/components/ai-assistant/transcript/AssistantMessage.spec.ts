@@ -461,6 +461,20 @@ describe("AssistantMessage", () => {
     expect(wrapper.find('[data-test="assistant-link-card"]').exists()).toBe(false);
   });
 
+  it("shows a query once when the server's query frame repeats the fence in the answer", () => {
+    const sql = 'SELECT service FROM "default"\nGROUP BY service';
+    const promql = 'sum by (pod) (container_memory_working_set_bytes{pod=~"payments-.*"})';
+    const wrapper = mountMessage(
+      answer([
+        { type: "text", text: `Here it is:\n\n\`\`\`sql\n${sql}\n\`\`\`` },
+        { type: "query", query: { language: "sql", text: sql } },
+        { type: "query", query: { language: "promql", text: promql } },
+        { type: "query", query: { language: "promql", text: `${promql};` } },
+      ] as never),
+    );
+    expect(wrapper.findAll('[data-test="assistant-query-block"]')).toHaveLength(2);
+  });
+
   it("is aria-busy and streams only its last text block while live (HT-10 AC 3, EB-01 AC 4)", async () => {
     const blocks = [
       { type: "text" as const, text: "first part" },
@@ -608,7 +622,7 @@ describe("AssistantMessage", () => {
       });
       await flushPromises();
       const cards = wrapper.findAll('[data-test="assistant-query-block"]');
-      expect(cards).toHaveLength(2);
+      expect(cards).toHaveLength(1);
       for (const card of cards) {
         expect(card.text()).not.toContain("range: unknown");
         expect(card.attributes("aria-label")).not.toContain("range: unknown");

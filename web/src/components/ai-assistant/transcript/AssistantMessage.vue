@@ -638,8 +638,24 @@ const rendered = computed<Rendered[]>(() => {
       copyText: null,
     });
   });
-  return withoutCardedLinks(out);
+  return withoutCardedLinks(withoutRepeatedQueries(out));
 });
+
+// The server's query frame repeats the fence the answer already shows; one query is one card, in the prose when it is there.
+function withoutRepeatedQueries(items: Rendered[]): Rendered[] {
+  const shown = new Set<string>();
+  for (const item of items)
+    if (item.kind === "markdown")
+      for (const part of item.parts)
+        if (part.kind === "code" && fenceBlock(item.key, part)) shown.add(queryKey(part.code));
+  return items.filter((item) => {
+    if (item.kind !== "query") return true;
+    const key = queryKey(item.block.query.text);
+    if (shown.has(key)) return false;
+    shown.add(key);
+    return true;
+  });
+}
 
 // A navigation link to a query the answer also shows as a card would be a second Open for the same query.
 function withoutCardedLinks(items: Rendered[]): Rendered[] {
