@@ -265,6 +265,9 @@ async function enter(): Promise<void> {
       return;
     }
     routeState.value = result;
+    // A chat that floated out of this view comes back into it, so it never shows in both.
+    if (opened && store.windowOf(opened))
+      store.open({ kind: "full" }, { sid: opened, focus: "none" });
   } else if (!store.state.shell.activeSid && !deletedElsewhere()) {
     createSession();
   }

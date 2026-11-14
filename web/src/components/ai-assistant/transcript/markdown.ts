@@ -29,6 +29,7 @@ import {
 } from "vue";
 import { useRouter, type RouteLocationRaw, type Router } from "vue-router";
 
+import { pushFromThread } from "@/composables/assistant/pure";
 import { gt } from "@/types/i18n";
 
 import {
@@ -457,7 +458,7 @@ export const AssistantMarkdownPart = defineComponent({
       const target = href && router ? entityRoute(router, href, props.org) : null;
       if (!target) return;
       event.preventDefault();
-      void router.push(target.route).catch(() => undefined);
+      void pushFromThread(router, target.route).catch(() => undefined);
     };
     return () => h("div", { ref: el, onClick });
   },

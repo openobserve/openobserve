@@ -46,6 +46,7 @@ export {
   homeAskLocation,
   isFullThreadRoute,
   isHomeAskShown,
+  pushFromThread,
   threadParam,
   withoutThread,
 } from "./fullThreadRoute";

@@ -19,6 +19,9 @@ import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 
 import { computed, defineComponent, h, nextTick } from "vue";
 import { createMemoryHistory, createRouter } from "vue-router";
 
+import { makeEnv } from "@/composables/assistant/actions/__tests__/actionEnv";
+import { setRuntimeHandle } from "@/composables/assistant/runtimeHandle";
+
 import {
   AssistantMarkdownCode,
   AssistantMarkdownPart,
@@ -1795,6 +1798,43 @@ describe("assistant answer styling (K1, K2)", () => {
       stream: "checkout",
       org_identifier: "chat-org",
     });
+    wrapper.unmount();
+  });
+
+  it("floats the full-page chat over the page a plain click opens, and leaves modified clicks to the browser", async () => {
+    const { store, sid } = makeEnv();
+    store.open({ kind: "full" }, { sid, focus: "none" });
+    setRuntimeHandle({ store } as never);
+    onTestFinished(() => setRuntimeHandle(null));
+    const router = appRouter();
+    await router.push("/");
+    // The full view closes itself on the way out, as AssistantView's leave guard does.
+    router.beforeEach(() => void store.close("route"));
+    const href = `${window.location.origin}/web/logs?stream=checkout&from=1&to=2`;
+    const wrapper = mountEntityHtml(
+      htmlOf(parse(`Errors rose in [checkout](${href}).`, window.location.origin).parts),
+      {},
+      router,
+    );
+    // Records whether the browser still gets each click, then stops jsdom's own navigation.
+    const native: boolean[] = [];
+    const browser = (event: Event) => {
+      native.push(!event.defaultPrevented);
+      event.preventDefault();
+    };
+    document.addEventListener("click", browser);
+    onTestFinished(() => document.removeEventListener("click", browser));
+    const link = wrapper.get("a[data-entity]");
+    for (const init of [{ ctrlKey: true }, { metaKey: true }, { shiftKey: true }, { button: 1 }])
+      await link.trigger("click", init);
+    await flushPromises();
+    expect(native).toEqual([true, true, true, true]);
+    expect(router.currentRoute.value.path).toBe("/");
+    expect(store.state.shell.windows).toEqual([]);
+    await link.trigger("click", { button: 0 });
+    await flushPromises();
+    expect(router.currentRoute.value.name).toBe("logs");
+    expect(store.windowOf(sid)?.state).toBe("open");
     wrapper.unmount();
   });
 
