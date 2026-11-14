@@ -84,6 +84,11 @@ export class SearchHistoryPage {
 
     return reAppliedSql;
   }
+  async gotoDirect(baseUrl, org) {
+    await this.page.goto(`${baseUrl}${this.searchHistoryPath}?org_identifier=${org}`);
+    await this.page.locator(this.refreshHistoryBtn).waitFor({ state: 'visible', timeout: 30000 });
+  }
+
 }
 
 export default SearchHistoryPage;

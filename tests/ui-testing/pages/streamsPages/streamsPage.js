@@ -1229,4 +1229,18 @@ export class StreamsPage {
     async expectSchemaTableVisible(timeout = 5000) {
         await expect(this.schemaTable).toBeVisible({ timeout });
     }
+    async expectStreamsTableVisible(timeout = 30000) {
+        await expect(this.streamsTable).toBeVisible({ timeout });
+    }
+
+    async expectStreamsEmptyStateVisible(timeout = 15000) {
+        await expect(this.page.locator('[data-test="o2-empty-state"]')).toBeVisible({ timeout });
+    }
+
+    async expectStreamsPaginationInfo(pattern, timeout = 10000) {
+        const info = this.page.locator('[data-test="log-stream-table"] [data-test="o2-table-pagination-info"]');
+        await expect(info).toBeVisible({ timeout });
+        await expect(info).toHaveText(pattern);
+    }
+
 }

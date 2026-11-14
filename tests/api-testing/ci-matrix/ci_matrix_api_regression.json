@@ -66,6 +66,20 @@
       "target": "tests/regression/test_wal_month_boundary_search.py",
       "server_env": "ZO_INGEST_ALLOWED_UPTO=3120 ZO_MAX_FILE_RETENTION_TIME=10 ZO_FILE_PUSH_INTERVAL=3600",
       "category": "api_integration_tests"
+    },
+    {
+      "label": "streaming_aggs_limit",
+      "_comment": "ENT#826 only reproduces on the streaming-aggs path: a 0s threshold, and files must leave the WAL because the planner sizes the query from the file list.",
+      "target": "tests/regression/test_streaming_aggs_group_by_limit.py",
+      "server_env": "ZO_AGGS_MIN_NUM_PARTITIONS_SECS=0 ZO_MAX_FILE_RETENTION_TIME=10 ZO_FILE_PUSH_INTERVAL=2",
+      "category": "api_integration_tests"
+    },
+    {
+      "label": "tantivy_after_wal_flush",
+      "_comment": "ENT#536 needs the rows to leave the WAL within the test: 10s WAL retention, 2s push, inverted index on.",
+      "target": "tests/regression/test_tantivy_after_wal_flush.py",
+      "server_env": "ZO_MAX_FILE_RETENTION_TIME=10 ZO_FILE_PUSH_INTERVAL=2 ZO_ENABLE_INVERTED_INDEX=true",
+      "category": "api_integration_tests"
     }
   ]
 }

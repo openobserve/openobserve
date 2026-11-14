@@ -23,6 +23,7 @@ export class ServiceGraphPage {
     this.dateTimePicker = '[data-test="service-graph-date-time-picker"]';
     this.refreshButton = '[data-test="service-graph-refresh-btn"]';
     this.chartContainer = '[data-test="service-graph-chart"]';
+    this.streamSelector = '[data-test="service-graph-stream-selector"]';
 
     // ===== VIEW TOGGLE BUTTONS (page header #subnav — button with .selected class) =====
     this.graphViewTab = '[data-test="service-graph-graph-view-btn"]';
@@ -708,4 +709,25 @@ export class ServiceGraphPage {
       path: `test-results/screenshots/${name}-${Date.now()}.png`,
     });
   }
+  async expectStreamSelectorVisible(timeout = 30000) {
+    await expect(this.page.locator(this.streamSelector)).toBeVisible({ timeout });
+  }
+
+  /** Returns a live list of the stream_name of every topology response from now on. */
+  trackTopologyStreams() {
+    const streams = [];
+    // Responses, not requests: a load still in flight makes the component skip the next one.
+    this.page.on('response', (res) => {
+      if (res.url().includes('/traces/service_graph/topology/current')) {
+        streams.push(new URL(res.url()).searchParams.get('stream_name'));
+      }
+    });
+    return streams;
+  }
+
+  async selectStreamFromDropdown(streamName) {
+    await this.page.locator(this.streamSelector).click();
+    await this.page.getByRole('option', { name: streamName, exact: true }).click();
+  }
+
 }

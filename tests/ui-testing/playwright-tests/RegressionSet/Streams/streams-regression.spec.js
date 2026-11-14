@@ -368,6 +368,20 @@ test.describe("Streams Regression Bugs", () => {
     testLogger.info('✓ PASSED: Bug #7671 field indicators test completed (FTS + Quick Mode validated)');
   });
 
+  test("streams search with no match shows the empty state and a 0 - 0 of 0 footer (ENT#531)", {
+    tag: ['@bug-ent531', '@P2', '@regression', '@streamsRegression']
+  }, async ({ page }) => {
+    const orgId = getOrgIdentifier() || 'default';
+    await pm.streamsPage.navigateToStreamsPage(process.env.ZO_BASE_URL, orgId);
+    await pm.streamsPage.expectStreamsTableVisible();
+
+    await pm.streamsPage.searchStream(`ovn_b_no_such_stream_${RUN_TOKEN}`);
+
+    await pm.streamsPage.expectStreamsEmptyStateVisible();
+    // Pre-fix the footer read "Showing 1 - 0 of 0".
+    await pm.streamsPage.expectStreamsPaginationInfo(/Showing\s+0\s+-\s+0\s+of\s+0\b/);
+  });
+
   test.afterEach(async () => {
     testLogger.info('Streams regression test completed');
   });

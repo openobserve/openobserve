@@ -13970,4 +13970,55 @@ export class LogsPage {
     fieldValueCheckbox(field, text) {
         return this.fieldValueRow(field, text).locator('input[type="checkbox"], [role="checkbox"]').first();
     }
+    runQueryPrompt() {
+        return this.page.locator('[data-test="logs-search-apply-search-text"]');
+    }
+
+    async expectRunQueryPromptVisible(timeout = 30000) {
+        await expect(this.runQueryPrompt()).toBeVisible({ timeout });
+    }
+
+    async expectNoSearchResultGrid() {
+        await expect(this.page.locator('[data-test="logs-search-search-result"]')).toHaveCount(0);
+    }
+
+    async clickRunQueryPromptAction() {
+        await this.runQueryPrompt().locator('[data-test^="o2-empty-state-action-"]').first().click();
+    }
+
+    /** Opens Logs on `stream` with a non-SQL `filter` passed as the base64 `query` URL param. */
+    async openLogsWithFilter(stream, filter) {
+        const query = encodeURIComponent(Buffer.from(filter).toString('base64'));
+        const org = getOrgIdentifier() || 'default';
+        await this.page.goto(`${process.env.ZO_BASE_URL}/web/logs?org_identifier=${org}&stream_type=logs&stream=${stream}&period=15m&sql_mode=false&quick_mode=false&query=${query}`);
+    }
+
+    /** Opens the first row containing `rowText`, includes its `field` value as a search term, and closes the detail. */
+    async includeFieldFromRowContaining(rowText, field) {
+        await this.openLogDetailForRowContaining(rowText);
+        await this.clickLogDetailTableTab();
+        await this.includeLogDetailFieldValue(field);
+        await this.clickCloseDialog();
+    }
+
+    /** Returns a live list of the SQL of every Visualize panel query the page sends from now on, read from the request body. */
+    collectVisualizeSql() {
+        const seen = [];
+        this.page.on('request', (req) => {
+            const url = req.url();
+            if (req.method() !== 'POST' || !/\/(_search_stream|_search|result_schema)\?/.test(url)) return;
+            if (!url.includes('type=dashboards') && !url.includes('fallback_order_by_col')) return;
+            try {
+                const body = JSON.parse(req.postData() || '{}');
+                let sql = body?.query?.sql;
+                // With sql_base64_enabled the UI sends URL-safe base64.
+                if (sql && (body.encoding === 'base64' || body?.query?.encoding === 'base64')) {
+                    sql = Buffer.from(sql.replace(/-/g, '+').replace(/_/g, '/').replace(/\./g, '='), 'base64').toString('utf-8');
+                }
+                if (sql) seen.push(sql);
+            } catch { /* non-JSON body */ }
+        });
+        return seen;
+    }
+
 }
