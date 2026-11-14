@@ -179,6 +179,9 @@ pub const GRPC_HTTP2_CONNECTION_WINDOW_SIZE: u32 = 16 * 1024 * 1024; // 16 MB
 pub const SIZE_IN_GB: f64 = 1024.0 * 1024.0 * 1024.0;
 const MAX_FILE_SIZE_DEFAULT_CAP: usize = 512 * 1024 * 1024;
 const MAX_FILE_SIZE_DEFAULT_FLOOR: usize = 32 * 1024 * 1024;
+const JOB_RUNTIME_BLOCKING_PER_CPU: usize = 8;
+const JOB_RUNTIME_BLOCKING_FLOOR: usize = 32;
+const JOB_RUNTIME_BLOCKING_CAP: usize = 256;
 // The current value is recorded in each tantivy index file (puffin `row_group_size`
 // property) so it can be changed safely without breaking row_id → row_group mapping
 // for older files.
@@ -2964,8 +2967,12 @@ pub struct Limit {
     pub grpc_runtime_blocking_worker_num: usize, // equals to 512 if 0
     #[env_config(name = "ZO_JOB_RUNTIME_WORKER_NUM", default = 0)]
     pub job_runtime_worker_num: usize, // equals to cpu_num if 0
-    #[env_config(name = "ZO_JOB_RUNTIME_BLOCKING_WORKER_NUM", default = 0)]
-    pub job_runtime_blocking_worker_num: usize, // equals to 512 if 0
+    #[env_config(
+        name = "ZO_JOB_RUNTIME_BLOCKING_WORKER_NUM",
+        default = 0,
+        help = "Max tokio blocking threads of the job runtime. 0 means cpu_num * 8, clamped to 32..256. Each blocking thread keeps its own allocator heap, so a higher cap raises resident memory after bursts."
+    )]
+    pub job_runtime_blocking_worker_num: usize,
     #[env_config(name = "ZO_WAL_RUNTIME_WORKER_NUM", default = 0)]
     pub wal_runtime_worker_num: usize, // equals to mem_table_bucket_num if 0
     #[env_config(name = "ZO_CALCULATE_STATS_INTERVAL", default = 600)] // seconds
@@ -4291,7 +4298,8 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.limit.job_runtime_worker_num = cpu_num;
     }
     if cfg.limit.job_runtime_blocking_worker_num == 0 {
-        cfg.limit.job_runtime_blocking_worker_num = 512;
+        cfg.limit.job_runtime_blocking_worker_num =
+            default_job_runtime_blocking_worker_num(cpu_num);
     }
     // HACK for thread_num equal to CPU core * 4
     if cfg.limit.query_thread_num == 0 {
@@ -5045,6 +5053,13 @@ fn default_mem_table_bucket_num(
 fn default_max_file_size(mem_table_max_size: usize) -> usize {
     let mb = 1024 * 1024;
     (mem_table_max_size / 4 / mb * mb).clamp(MAX_FILE_SIZE_DEFAULT_FLOOR, MAX_FILE_SIZE_DEFAULT_CAP)
+}
+
+/// Idle blocking threads pin their allocator heaps, so the cap bounds resident memory after a
+/// burst.
+fn default_job_runtime_blocking_worker_num(cpu_num: usize) -> usize {
+    (cpu_num * JOB_RUNTIME_BLOCKING_PER_CPU)
+        .clamp(JOB_RUNTIME_BLOCKING_FLOOR, JOB_RUNTIME_BLOCKING_CAP)
 }
 
 fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
@@ -6547,6 +6562,19 @@ mod tests {
         assert_eq!(default_mem_table_bucket_num(0, 512 * mb, 28), 1);
         assert_eq!(default_mem_table_bucket_num(32 * 1024 * mb, 0, 28), 28);
         assert_eq!(default_mem_table_bucket_num(32 * 1024 * mb, 512 * mb, 0), 1);
+    }
+
+    #[test]
+    fn test_default_job_runtime_blocking_worker_num() {
+        assert_eq!(default_job_runtime_blocking_worker_num(0), 32);
+        assert_eq!(default_job_runtime_blocking_worker_num(2), 32);
+        assert_eq!(default_job_runtime_blocking_worker_num(3), 32);
+        assert_eq!(default_job_runtime_blocking_worker_num(4), 32);
+        assert_eq!(default_job_runtime_blocking_worker_num(5), 40);
+        assert_eq!(default_job_runtime_blocking_worker_num(8), 64);
+        assert_eq!(default_job_runtime_blocking_worker_num(16), 128);
+        assert_eq!(default_job_runtime_blocking_worker_num(32), 256);
+        assert_eq!(default_job_runtime_blocking_worker_num(64), 256);
     }
 
     #[test]
