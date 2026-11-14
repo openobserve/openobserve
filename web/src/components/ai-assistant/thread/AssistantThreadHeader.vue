@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </template>
     <template v-else>
-      <!-- A toolbar reads New chat, Open as and ⓘ before its More menu -->
+      <!-- A toolbar reads New chat and ⓘ before its More menu -->
       <div v-if="toolbar && !renaming" class="flex shrink-0 items-center gap-1">
         <AssistantIconButton
           v-if="newShown && newInBar"

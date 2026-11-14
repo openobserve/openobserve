@@ -30,8 +30,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     side="top"
     :align="align"
     :aria-label="t('assistant.context.time.swap')"
-    :collision-padding="8"
-    :content-class="`${composerPopoverClass(layout.tight)} ${FIT_VIEWPORT_CLASS} flex flex-col gap-0.5 p-1`"
+    :collision-padding="COLLISION_PADDING"
+    :content-class="contentClass"
     @update:open="setOpen"
     @pointer-down-outside="keepOnChip"
   >
@@ -62,7 +62,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OTooltip>
     </template>
     <div class="flex flex-col gap-0.5" data-test="assistant-context-time-picker">
+      <!-- Custom Range… swaps the presets for the range picker, so only one surface is ever open. -->
+      <div v-if="ranging" ref="range" data-test="assistant-context-time-range">
+        <ODateTimeRange
+          v-bind="pickerValue"
+          inline
+          :timezone="timezone"
+          show-timezone
+          :auto-apply="false"
+          @change="onPick"
+        />
+        <OText
+          v-if="reversed"
+          variant="meta"
+          as="p"
+          role="alert"
+          class="text-status-error-text px-3 pb-2"
+          data-test="assistant-context-time-reversed"
+        >
+          {{ t("assistant.context.time.reversed") }}
+        </OText>
+      </div>
       <div
+        v-else
         ref="group"
         role="radiogroup"
         tabindex="-1"
@@ -88,33 +110,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-test="`assistant-context-time-${period}`"
           @click="pickPeriod(period)"
         />
+        <div class="border-border-default mt-0.5 border-t pt-0.5">
+          <AssistantMenuRow
+            :label="t('assistant.context.time.customRange')"
+            :selected="customSelected"
+            :tabbable="tabbableId === 'custom'"
+            data-test="assistant-context-time-custom"
+            @click="openRange"
+          />
+        </div>
       </div>
-      <!-- The range picker opens in this same surface, never as a second popup over it. -->
-      <OCollapsible
-        :label="t('assistant.context.time.dateRange')"
-        :default-open="window.source === 'custom' && !window.period"
-        class="border-border-default mt-1 border-t pt-1"
-        data-test="assistant-context-time-range"
-      >
-        <ODateTimeRange
-          v-bind="pickerValue"
-          inline
-          :timezone="timezone"
-          show-timezone
-          :auto-apply="false"
-          @change="onPick"
-        />
-      </OCollapsible>
-      <OText
-        v-if="reversed"
-        variant="meta"
-        as="p"
-        role="alert"
-        class="text-status-error-text px-2 py-1"
-        data-test="assistant-context-time-reversed"
-      >
-        {{ t("assistant.context.time.reversed") }}
-      </OText>
     </div>
   </OPopover>
 </template>
@@ -142,9 +147,10 @@ export interface AssistantTimePrefixEmits {
 
 const PERIODS = ["15m", "1h", "24h", "7d"] as const;
 
-/** The picker never outgrows the room on its side; past that it scrolls inside, with Apply pinned. */
-export const FIT_VIEWPORT_CLASS =
-  "max-h-[var(--reka-popper-available-height,75vh)] overflow-y-auto";
+// The main time picker's room rules: clear the app header, and never grow past the space on the open side.
+const COLLISION_PADDING = { top: 48, right: 8, bottom: 8, left: 8 };
+const FIT_CLASS =
+  "max-h-[calc(var(--reka-popper-available-height,37.5rem)-0.75rem)] overflow-y-auto";
 
 const DEFAULT_PERIOD = "15m";
 
@@ -168,7 +174,7 @@ const LETTER_OF: Record<RelativeUnit, string> = {
 </script>
 
 <script setup lang="ts">
-import { computed, ref, type ComponentPublicInstance } from "vue";
+import { computed, nextTick, ref, watch, type ComponentPublicInstance } from "vue";
 
 import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
 import {
@@ -178,7 +184,6 @@ import {
 } from "@/components/ai-assistant/composer/composerUi";
 import { periodMs, timeRangeShortText } from "@/composables/assistant";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
@@ -211,8 +216,25 @@ const open = defineModel<boolean>("open", { default: false });
 const { t } = useI18nTyped();
 const layout = useComposerLayout();
 const reversed = ref(false);
+/** The popup shows the range picker in place of the presets. */
+const ranging = ref(false);
 const group = ref<HTMLElement | null>(null);
+const range = ref<HTMLElement | null>(null);
 const chip = ref<ComponentPublicInstance | null>(null);
+
+// Presets keep the composer's popup width; the range picker keeps its own so the relative grid never wraps.
+const contentClass = computed(() =>
+  ranging.value
+    ? `w-80 max-w-[calc(100vw-1rem)] ${FIT_CLASS}`
+    : `${composerPopoverClass(layout.value.tight)} ${FIT_CLASS} flex flex-col gap-0.5 p-1`,
+);
+
+// Reset on open, not close, so the exit animation never flashes the presets.
+watch(open, (value) => {
+  if (!value) return;
+  ranging.value = false;
+  reversed.value = false;
+});
 
 const text = computed(() => textOf(props.window));
 // Only a range the user picked can be dropped; its ✕ goes back to the page's time or the default.
@@ -246,11 +268,17 @@ const pickerValue = computed(() => {
   };
 });
 
-// Roving tabindex: Tab reaches the checked row, or the first row when a custom range is set.
+// A range the user set that no preset names: an absolute range, or a relative one picked in the range picker.
+const customSelected = computed(
+  () => props.window.source === "custom" && !PERIODS.some((period) => isSelected(period)),
+);
+
+// Roving tabindex: Tab reaches the checked row.
 const tabbableId = computed(() => {
   if (props.pageWindow && props.window.source === "page") return "page";
   const checked = PERIODS.find((period) => isSelected(period));
   if (checked) return checked;
+  if (customSelected.value) return "custom";
   return props.pageWindow ? "page" : PERIODS[0];
 });
 
@@ -270,7 +298,13 @@ function isSelected(period: string): boolean {
 
 function setOpen(value: boolean): void {
   open.value = value;
-  reversed.value = false;
+}
+
+// The row that opened the picker is gone, so focus moves into the picker for keyboard users.
+async function openRange(): Promise<void> {
+  ranging.value = true;
+  await nextTick();
+  range.value?.querySelector<HTMLElement>("button:not([disabled])")?.focus();
 }
 
 // A press on the chip toggles the picker itself, so it must not also count as a press outside.

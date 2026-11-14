@@ -44,10 +44,15 @@ import AgentHomeFirstRun from "./AgentHomeFirstRun.vue";
 const mountFirstRun = () => mount(AgentHomeFirstRun, { global: { plugins: [i18n, fakeVuex()] } });
 
 describe("AgentHomeFirstRun (HomeFirstRun board, B-shell-5)", () => {
-  it("puts the no-data note above Ask, then the Ask launcher, in the main column", () => {
+  it("puts the no-data note above Ask, then the Ask launcher and main's examples, in the main column", () => {
     const main = mountFirstRun().get('[data-test="agent-home-first-run-main"]');
     const order = [...main.element.children].map((el) => el.getAttribute("data-test"));
-    expect(order).toEqual(["greeting-stub", "agent-home-first-run-note", "launcher-stub"]);
+    expect(order).toEqual([
+      "greeting-stub",
+      "agent-home-first-run-note",
+      "launcher-stub",
+      "assistant-home-examples",
+    ]);
     expect(main.get('[data-test="agent-home-first-run-title"]').text()).toContain("No data yet");
     expect(main.get('[data-test="launcher-stub"]').attributes("data-layout")).toBe("overview");
   });

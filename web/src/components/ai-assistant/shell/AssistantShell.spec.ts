@@ -386,19 +386,14 @@ describe("AssistantShell chrome and focus", () => {
     expect(chrome.classes()).not.toContain("border-b");
     expect(chrome.get('[data-test="assistant-thread-title"]').element.tagName).toBe("DIV");
     expect(chrome.find('[data-test="assistant-thread-title-button"]').exists()).toBe(false);
-    const controls = [
-      "assistant-shell-place-window",
-      "assistant-shell-sees-host",
-      "assistant-thread-more",
-    ];
+    const controls = ["assistant-shell-sees-host", "assistant-thread-more"];
     const ids = chrome
       .findAll("[data-test]")
       .map((el) => el.attributes("data-test"))
       .filter((id) => controls.includes(id ?? ""));
     expect(ids).toEqual(controls);
-    // Home offers the floating window only, so it is one direct icon button, not a menu.
-    const openAs = chrome.get('[data-test="assistant-shell-place-window"]');
-    expect(openAs.attributes("aria-label")).toBe("Floating Window");
+    // Home's chat is the page itself, so it offers no move to another container.
+    expect(chrome.find('[data-test^="assistant-shell-place-"]').exists()).toBe(false);
     expect(chrome.find('[data-test="assistant-open-as-button"]').exists()).toBe(false);
     expect(chrome.get('[data-test="assistant-shell-sees-host"]').attributes("data-label")).toBe(
       "What the Assistant Sees",

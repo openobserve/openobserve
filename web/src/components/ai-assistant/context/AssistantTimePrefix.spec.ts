@@ -20,7 +20,7 @@ import type { TimeWindow } from "@/composables/assistant";
 
 import OPopover from "@/lib/overlay/Popover/OPopover.vue";
 
-import AssistantTimePrefix, { FIT_VIEWPORT_CLASS } from "./AssistantTimePrefix.vue";
+import AssistantTimePrefix from "./AssistantTimePrefix.vue";
 
 const DEFAULT: TimeWindow = { from: 0, to: 900_000, period: "15m", source: "default" };
 const PAGE: TimeWindow = { from: 0, to: 3_600_000, period: "1h", source: "page" };
@@ -108,8 +108,8 @@ describe("AssistantTimePrefix", () => {
     row("15m")!.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
     expect(document.activeElement).toBe(row("1h"));
     row("1h")!.dispatchEvent(new KeyboardEvent("keydown", { key: "End", bubbles: true }));
-    expect(document.activeElement).toBe(row("7d"));
-    row("7d")!.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
+    expect(document.activeElement).toBe(row("custom"));
+    row("custom")!.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
     expect(document.activeElement).toBe(row("15m"));
   });
 
@@ -120,39 +120,73 @@ describe("AssistantTimePrefix", () => {
     expect(wrapper.emitted("change")?.[0]?.[0]).toMatchObject({ period: "24h" });
   });
 
-  it("labels the range picker Date range", async () => {
-    await open({ window: DEFAULT });
-    const range = document.body.querySelector<HTMLElement>(
-      '[data-test="assistant-context-time-range"]',
+  it("keeps the popup inside the viewport and below the app header", async () => {
+    const { wrapper } = await open({ window: DEFAULT });
+    const popover = wrapper.findComponent(OPopover);
+    expect(popover.props("collisionPadding")).toEqual({ top: 48, right: 8, bottom: 8, left: 8 });
+    expect(popover.props("contentClass")).toContain(
+      "max-h-[calc(var(--reka-popper-available-height",
     );
-    expect(range?.textContent).toContain("Date range");
+    expect(popover.props("contentClass")).toContain("overflow-y-auto");
     expect(document.body.querySelector('[role="dialog"]')?.getAttribute("aria-label")).toBe(
       "Change time range",
     );
   });
 
-  it("opens the range picker inside the one popup, which fits the room it has and keeps Apply in view", async () => {
-    const { wrapper } = await open({ window: DEFAULT });
-    const popover = wrapper.findComponent(OPopover);
-    expect(popover.props("collisionPadding")).toBe(8);
-    expect(popover.props("contentClass")).toContain(FIT_VIEWPORT_CLASS);
-    const dialog = document.body.querySelector<HTMLElement>('[role="dialog"]')!;
-    expect(dialog.className).toContain("max-h-[var(--reka-popper-available-height,75vh)]");
-    dialog.querySelector<HTMLElement>('[data-test="assistant-context-time-range"] button')!.click();
-    await flushPromises();
-    const panel = dialog.querySelector('[data-test="datetimerange-inline"]');
-    expect(panel).not.toBeNull();
-    expect(document.body.querySelector('[data-test="datetimerange-trigger"]')).toBeNull();
-    expect(document.body.querySelector('[data-test="datetimerange-popup"]')).toBeNull();
-    dialog.querySelector<HTMLElement>('[data-test="datetimerange-tab-absolute"]')?.click();
-    await flushPromises();
-    const apply = dialog.querySelector('[data-test="datetimerange-apply"]')?.parentElement;
-    expect(apply?.className).toContain("sticky");
+  it("lists the presets and Custom Range…, with no range picker until Custom Range… is picked", async () => {
+    const { row } = await open({ window: DEFAULT });
+    expect(row("custom")?.textContent).toContain("Custom Range…");
+    expect(row("custom")?.getAttribute("role")).toBe("radio");
+    expect(row("custom")?.getAttribute("aria-checked")).toBe("false");
+    expect(document.body.querySelector('[data-test="assistant-context-time-range"]')).toBeNull();
+    expect(document.body.querySelector('[data-test^="datetimerange-"]')).toBeNull();
   });
 
-  it("opens a picked date range with the picker already showing it", async () => {
-    await open({ window: { from: 1_000, to: 2_000, source: "custom" } });
-    expect(document.body.querySelector('[data-test="datetimerange-inline"]')).not.toBeNull();
+  it("swaps the presets for the range picker at its own width, and applies the range it sets", async () => {
+    const { wrapper, row } = await open({ window: DEFAULT });
+    row("custom")!.click();
+    await flushPromises();
+    const range = document.body.querySelector<HTMLElement>(
+      '[data-test="assistant-context-time-range"]',
+    )!;
+    expect(range).not.toBeNull();
+    expect(row("15m")).toBeNull();
+    // One surface: the picker sits in the chip's popup, with no trigger or popup of its own.
+    expect(document.querySelectorAll('[role="dialog"]')).toHaveLength(1);
+    expect(range.querySelector('[data-test="datetimerange-inline"]')).not.toBeNull();
+    expect(document.body.querySelector('[data-test="datetimerange-trigger"]')).toBeNull();
+    expect(document.body.querySelector('[data-test="datetimerange-popup"]')).toBeNull();
+    expect(wrapper.findComponent(OPopover).props("contentClass")).toContain("w-80");
+    expect(range.contains(document.activeElement)).toBe(true);
+    range.querySelector<HTMLElement>('[data-test="datetimerange-relative-panel"] button')!.click();
+    range.querySelector<HTMLElement>('[data-test="datetimerange-relative-apply"]')!.click();
+    await flushPromises();
+    expect(wrapper.emitted("change")?.[0]?.[0]).toMatchObject({ period: "1s" });
+    expect(wrapper.emitted("update:open")?.at(-1)).toEqual([false]);
+  });
+
+  it("checks Custom Range… on a picked date range, and its picker opens on that range", async () => {
+    const { row } = await open({ window: { from: 1_000, to: 2_000, source: "custom" } });
+    expect(row("custom")?.getAttribute("aria-checked")).toBe("true");
+    expect(row("custom")?.getAttribute("tabindex")).toBe("0");
+    row("custom")!.click();
+    await flushPromises();
+    expect(
+      document.body.querySelector('[data-test="datetimerange-absolute-panel"]'),
+    ).not.toBeNull();
+  });
+
+  it("opens on the presets again after the range picker was left open", async () => {
+    const { wrapper, row } = await open({ window: DEFAULT });
+    row("custom")!.click();
+    await flushPromises();
+    const chip = wrapper.get('[data-test="assistant-context-chip-time"]');
+    await chip.trigger("click");
+    await flushPromises();
+    await chip.trigger("click");
+    await flushPromises();
+    expect(row("15m")).not.toBeNull();
+    expect(wrapper.findComponent(OPopover).props("contentClass")).not.toContain("w-80");
   });
 
   it("shows a chip-sized skeleton, not a stale range, while the page range loads", () => {

@@ -43,15 +43,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <AgentHomeAskNote v-if="offReason" :reason="offReason" :org="org" />
-      <AssistantLauncher v-else layout="overview" />
+      <AssistantLauncher v-else ref="launcher" layout="overview" />
+      <AssistantHomeExamples v-if="state === 'ai'" @select="launcher?.fill($event)" />
     </div>
   </section>
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import { useStore } from "vuex";
 
+import AssistantHomeExamples from "@/components/ai-assistant/welcome/AssistantHomeExamples.vue";
 import AssistantLauncher from "@/components/ai-assistant/welcome/AssistantLauncher.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
@@ -66,4 +68,5 @@ const store = useStore();
 const { state, offReason } = useAgentHomeState();
 
 const org = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
+const launcher = ref<InstanceType<typeof AssistantLauncher> | null>(null);
 </script>

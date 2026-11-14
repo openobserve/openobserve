@@ -31,6 +31,7 @@ const mocks = vi.hoisted(() => ({
   listOrgRcaRuns: vi.fn(),
   railMounted: vi.fn(),
   focusAsk: vi.fn(),
+  fill: vi.fn(),
 }));
 
 vi.mock("./useAgentHomeState", async () => {
@@ -61,7 +62,7 @@ vi.mock("@/components/ai-assistant/welcome/AssistantLauncher.vue", () => ({
   default: {
     name: "AssistantLauncher",
     props: ["layout", "pageRange"],
-    methods: { focusAsk: () => mocks.focusAsk() },
+    methods: { focusAsk: () => mocks.focusAsk(), fill: (prompt: string) => mocks.fill(prompt) },
     template: '<div data-test="launcher-stub" :data-layout="layout" />',
   },
 }));
@@ -96,6 +97,7 @@ describe("AssistantHomeTab", () => {
     mocks.listOrgRcaRuns.mockReset();
     mocks.railMounted.mockReset();
     mocks.focusAsk.mockReset();
+    mocks.fill.mockReset();
     localStorage.clear();
     store.state.currentuser.role = "admin";
   });
@@ -141,6 +143,37 @@ describe("AssistantHomeTab", () => {
       });
     } finally {
       vi.useRealTimers();
+    }
+  });
+
+  it("lists main's capability cards and prompt chips under the Ask box, and a pick fills the box", async () => {
+    const wrapper = mountTab();
+    await flushPromises();
+    const examples = wrapper.get('[data-test="assistant-home-examples"]');
+    expect(examples.classes()).toEqual(expect.arrayContaining(["mx-auto", "max-w-3xl"]));
+    expect(wrapper.get('[data-test="launcher-stub"]').element.nextElementSibling).toBe(
+      examples.element,
+    );
+    expect(examples.findAll('[data-test^="assistant-home-capability-"]')).toHaveLength(4);
+    expect(examples.findAll(".suggestion-chip")).toHaveLength(6);
+    await examples.get('[data-test="assistant-home-capability-query"]').trigger("click");
+    expect(mocks.fill).toHaveBeenCalledWith("Help me write a query");
+    await examples.get(".suggestion-chip").trigger("click");
+    expect(mocks.fill).toHaveBeenLastCalledWith("Write VRL to parse JSON from my nginx logs");
+  });
+
+  it("shows no examples while the gate loads or when the agent cannot answer", async () => {
+    for (const [state, reason] of [
+      ["loading", null],
+      ["budget", "budget"],
+      ["noai", "off_for_org"],
+    ] as const) {
+      set(mocks.state, state);
+      set(mocks.offReason, reason);
+      const wrapper = mountTab();
+      await flushPromises();
+      expect(wrapper.find('[data-test="assistant-home-examples"]').exists()).toBe(false);
+      wrapper.unmount();
     }
   });
 

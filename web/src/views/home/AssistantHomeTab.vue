@@ -47,6 +47,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :page-range="pageRange"
           class="mx-auto max-w-3xl"
         />
+        <AssistantHomeExamples
+          v-if="state === 'ai'"
+          class="mx-auto max-w-3xl"
+          @select="launcher?.fill($event)"
+        />
       </div>
     </div>
   </div>
@@ -65,6 +70,7 @@ import {
 import { useRoute } from "vue-router";
 import { useStore } from "vuex";
 
+import AssistantHomeExamples from "@/components/ai-assistant/welcome/AssistantHomeExamples.vue";
 import AssistantLauncher from "@/components/ai-assistant/welcome/AssistantLauncher.vue";
 import type { ComposerState } from "@/composables/assistant";
 import useBreakpoint from "@/composables/useBreakpoint";

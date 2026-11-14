@@ -11607,7 +11607,7 @@
         "page": "Time · {range}",
         "swap": "Change time range",
         "hint": "The assistant looks at data from this time range.",
-        "dateRange": "Date range"
+        "customRange": "Custom Range…"
       },
       "title": "What the assistant sees",
       "trayLabel": "Context for your next message",
