@@ -576,15 +576,29 @@ describe("AssistantLauncher", () => {
     expect(rule).toMatch(/prefers-reduced-motion: reduce\)[\s\S]*transition: none/);
   });
 
-  it("turns Ask on only with text, and says why it is off while it stays reachable", async () => {
+  it("turns Ask on only with text or an image, and says why it is off while it stays reachable", async () => {
     const { wrapper } = setup();
     const ask = () => wrapper.get('[data-test="assistant-launcher-ask"]');
     expect(ask().attributes("disabled")).toBeUndefined();
     expect(ask().attributes("aria-disabled")).toBe("true");
     const reason = wrapper.get(`[id="${ask().attributes("aria-describedby")}"]`);
-    expect(reason.text()).toBe("Type a message or add context to send");
+    expect(reason.text()).toBe("Type a question or attach an image to ask");
     await input(wrapper).setValue("why?");
     expect(ask().attributes("aria-disabled")).toBeUndefined();
+  });
+
+  it("does nothing on an empty Enter on Home but say why, and keeps Home's URL", async () => {
+    const { wrapper, router } = setupOn({ layout: "overview" });
+    await router.replace({ name: "home", query: { period: "7d" } });
+    await flushPromises();
+    await input(wrapper).trigger("keydown", { key: "Enter" });
+    await input(wrapper).trigger("keydown", { key: "Enter", shiftKey: true });
+    await flushPromises();
+    expect(open).not.toHaveBeenCalled();
+    expect(router.currentRoute.value).toMatchObject({ name: "home", query: { period: "7d" } });
+    expect(wrapper.get('[data-test="assistant-launcher-status"]').text()).toBe(
+      "Type a question or attach an image to ask",
+    );
   });
 
   it("states a failed list with the same words as the title menu, and retries", async () => {

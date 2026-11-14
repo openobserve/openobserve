@@ -13411,7 +13411,8 @@
         "noThreadsYet": "No threads yet · your first answer shows up here",
         "openFull": "Open full view",
         "recentThreads": "Recent threads",
-        "allThreads": "All threads"
+        "allThreads": "All threads",
+        "askEmpty": "Type a question or attach an image to ask"
       },
       "prefill": {
         "append": "Append",

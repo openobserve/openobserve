@@ -180,7 +180,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :label="t('assistant.welcome.launcher.ask')"
                 :icon="assistantGlyph.send"
                 :disabled="!canSend"
-                :disabled-reason="fieldLoading ? undefined : t('assistant.composer.sendEmpty')"
+                :disabled-reason="
+                  fieldLoading ? undefined : t('assistant.welcome.launcher.askEmpty')
+                "
                 :class="SEND_ACTION_CLASS"
                 data-test="assistant-launcher-ask"
                 @click="ask(false)"
@@ -824,9 +826,13 @@ function ask(stage: boolean): void {
   if (voice.mine.value) voice.stop("send");
   const line = text.value.trim();
   const attached = images.value;
-  if (!line && attached.length === 0) return openFull();
-  text.value = "";
   const overview = props.layout === "overview";
+  // Home's box is the assistant there, so an empty ask only says why instead of leaving the page.
+  if (!line && attached.length === 0)
+    return overview
+      ? announceComposer(LAUNCHER_DRAFT, t("assistant.welcome.launcher.askEmpty"))
+      : openFull();
+  text.value = "";
   const time = sendRange();
   const chips = mentionChips.value;
   const picked = agent.value;
