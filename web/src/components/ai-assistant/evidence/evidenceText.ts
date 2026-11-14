@@ -35,12 +35,7 @@ const LANGUAGE_LABELS: Record<QueryRef["language"], string> = {
 
 const QUERY_KINDS: ReadonlySet<StepFacts["kind"]> = new Set(["query", "promql", "traces"]);
 
-const MINUTE_MS = 60_000;
-
 const HOUR_MS = 3_600_000;
-
-// A window that ended this close to the send is a relative one.
-const NOW_SLACK_MS = 2 * MINUTE_MS;
 
 // Up to two days an age reads in hours, then in days.
 const HOURS_SHOWN = 48;
@@ -72,20 +67,6 @@ export function explorerLabel(explorer: "logs" | "metrics" | "traces", t: Transl
   if (explorer === "metrics") return t("common.metrics");
   if (explorer === "traces") return t("common.traces");
   return t("common.logs");
-}
-
-/** The question line's range: "Last 1 h" when the window ended as it was asked, else its clock range. */
-export function lastRangeText(
-  window: { from: number; to: number },
-  sentAt: number | undefined,
-  t: TranslateFn,
-): I18nText {
-  const minutes = Math.round((window.to - window.from) / MINUTE_MS);
-  if (sentAt === undefined || Math.abs(sentAt - window.to) > NOW_SLACK_MS || minutes < 1)
-    return clockRangeText(window);
-  return minutes % 60 === 0
-    ? t("assistant.turn.lastHours", { n: minutes / 60 })
-    : t("assistant.turn.lastMinutes", { n: minutes });
 }
 
 /** The clock range of a window without its zone: "14:06–15:06". */

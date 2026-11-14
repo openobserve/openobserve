@@ -256,7 +256,8 @@ describe("AssistantHomeTab", () => {
       expect(ask.element.previousElementSibling?.getAttribute("data-test")).toBe(
         "agent-home-greeting",
       );
-      expect(ask.classes()).toEqual(expect.arrayContaining(["mx-auto", "max-w-3xl"]));
+      // mt-3 keeps the chip row that floats above the box clear of the greeting.
+      expect(ask.classes()).toEqual(expect.arrayContaining(["mx-auto", "mt-3", "max-w-3xl"]));
       for (const pinned of ["sticky", "bottom-0", "mt-auto", "z-10", "from-surface-base"]) {
         expect(ask.classes()).not.toContain(pinned);
       }

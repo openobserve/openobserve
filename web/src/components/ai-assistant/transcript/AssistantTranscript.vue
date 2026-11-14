@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data-test="`assistant-turn-${turn.turnId}`"
         :data-turn-id="turn.turnId"
         :aria-label="turnName(turn)"
-        class="[&+article]:border-border-subtle flex min-w-0 flex-col gap-3 [&+article]:border-t [&+article]:pt-4"
+        class="[&+article]:border-border-subtle flex min-w-0 flex-col gap-1 [&+article]:border-t [&+article]:pt-4"
       >
         <div
           v-if="compactionOf(turn.user)"
@@ -97,7 +97,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :turn-id="turn.turnId"
           :readonly="readonly"
           :density="density"
-          :range-label="rangeLabelOf(turn)"
         >
           <template v-if="promptActionsFor(turn)" #actions>
             <AssistantMessageActions
@@ -130,7 +129,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :density="density"
             :turn="views.get(turn.turnId)"
             :agent="turnAgent(turn)"
-            :head="!!turn.user || turn.number === 1"
           >
             <template v-if="turn.version.count > 1 && !answerActionsFor(turn)" #versions>
               <AssistantVersionPicker
@@ -354,7 +352,7 @@ import {
 
 import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
 import { announceComposer, composerRowOf } from "@/components/ai-assistant/composer/composerUi";
-import { lastRangeText, rangeText } from "@/components/ai-assistant/evidence/evidenceText";
+import { rangeText } from "@/components/ai-assistant/evidence/evidenceText";
 import AssistantTurnOutcome, {
   type OutcomeAction,
 } from "@/components/ai-assistant/turn/AssistantTurnOutcome.vue";
@@ -581,13 +579,6 @@ function answerActionsFor(turn: TranscriptTurn): boolean {
 // A sent message's Copy and Edit act on the composer, so a readonly page and a running turn offer none.
 function promptActionsFor(turn: TranscriptTurn): boolean {
   return !!turn.user && !!props.sid && !!live && !props.readonly && !running.value;
-}
-
-// Older turns keep the hour alone, so the last turn's range reads as the chat's current one.
-function rangeLabelOf(turn: TranscriptTurn): I18nText | null {
-  if (!turn.isLast) return null;
-  const window = promptRange(turn.user, askedWindowOf(turn.turnId));
-  return window ? lastRangeText(window, turn.user?.sentAt, t) : null;
 }
 
 // A failed turn acts through its outcome block, and a stale one has Re-run as its one path to new data.

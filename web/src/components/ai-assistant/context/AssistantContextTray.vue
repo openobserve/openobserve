@@ -15,12 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <AssistantChipTray
-    ref="tray"
-    v-model:expanded="expanded"
-    :items="shownChips"
-    :hidden-count="hiddenCount"
-  >
+  <AssistantChipTray ref="tray" :items="shownChips" :hidden="hiddenChips">
     <template #chip="{ item }">
       <AssistantChipPopover
         :chip="item"
@@ -48,6 +43,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </template>
       </AssistantChipPopover>
+    </template>
+    <template #hidden-item="{ item }">
+      <AssistantHiddenChipRow :chip="item" :image-src="imageSrcOf(item)" @remove="remove(item)" />
     </template>
   </AssistantChipTray>
 </template>
@@ -84,19 +82,19 @@ import { explorerOf } from "@/utils/assistant/explorerRoutes";
 import AssistantChipPopover from "./AssistantChipPopover.vue";
 import AssistantChipTray, { useChipCollapse } from "./AssistantChipTray.vue";
 import AssistantContextChip from "./AssistantContextChip.vue";
+import AssistantHiddenChipRow from "./AssistantHiddenChipRow.vue";
 
 const props = defineProps<AssistantContextTrayProps>();
 
 const { t } = useI18nTyped();
 const store = useAssistantStore();
 const route = useRoute();
-const context = useAssistantContext(() => props.sid, { store });
 const layout = useComposerLayout();
+const context = useAssistantContext(() => props.sid, { store });
 // A generic SFC has no constructor type, and only its root element is read.
 const tray = ref<ComponentPublicInstance | null>(null);
 const root = computed<HTMLElement | null>(() => tray.value?.$el ?? null);
 const openId = ref<string | null>(null);
-const expanded = ref(false);
 
 // Another user+org's chat is never shown or edited here (D21, F8).
 const session = computed(() => {
@@ -110,7 +108,7 @@ const allChips = computed(() => [
   ...context.chips.value.filter((chip) => chip.kind !== "time" && chip.provenance !== "page"),
   ...imageChips.value,
 ]);
-const { shown: shownChips, hiddenCount } = useChipCollapse(allChips, layout, expanded);
+const { shown: shownChips, hidden: hiddenChips } = useChipCollapse(allChips, layout);
 
 function changed(
   action: "remove" | "add_back" | "swap_time" | "trim",

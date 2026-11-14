@@ -448,7 +448,7 @@ describe("AssistantView", () => {
     expect(router.currentRoute.value.query.focus).toBe("ask");
   });
 
-  it("floats New Chat, Open As, the ⓘ and More in the chat's corner on a phone, never a Home button", async () => {
+  it("floats New Chat and More in the chat's corner on a phone, never a Home button, a move or the ⓘ", async () => {
     reactive(wide).value = false;
     const { wrapper, router, store } = await setup("/assistant", "available", {}, undefined, true);
     await flushPromises();
@@ -456,7 +456,7 @@ describe("AssistantView", () => {
     store.state.sessions[sid].messages.push({ role: "user", content: "hi" });
     await flushPromises();
     const chrome = wrapper.get('[data-test="assistant-shell-chrome"]');
-    expect(chrome.classes()).not.toContain("border-b");
+    expect(chrome.classes()).toContain("border-b");
     expect(chrome.find('[data-test="assistant-thread-title-button"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="assistant-view-back-home"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="assistant-history"]').exists()).toBe(false);
@@ -464,15 +464,12 @@ describe("AssistantView", () => {
       .findAll("button")
       .map((button) => button.attributes("data-test"))
       .filter(Boolean);
+    // Home's chat is the page itself, so it offers no move; what it sees opens from the composer.
     expect(ids).toEqual([
+      "assistant-thread-heading-edit-trigger",
       "assistant-thread-new",
-      "assistant-shell-place-sidebar",
-      "assistant-context-sees",
       "assistant-thread-more",
     ]);
-    expect(chrome.get('[data-test="assistant-context-sees"]').attributes("aria-label")).toBe(
-      "What the Assistant Sees",
-    );
     await chrome.get('[data-test="assistant-thread-new"]').trigger("click");
     await flushPromises();
     expect(router.currentRoute.value.name).toBe("home");

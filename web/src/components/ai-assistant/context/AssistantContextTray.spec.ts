@@ -145,7 +145,6 @@ describe("AssistantContextTray", () => {
     store.addChip(sid, { ...ROW, id: "row-2", label: raw("Log row · cart · 13:58") });
     await flushPromises();
     const buttons = () => wrapper.findAll('[data-test="assistant-context-chip-button"]');
-    await wrapper.get('[data-test="assistant-context-more"]').trigger("click");
     await buttons()[0].trigger("keydown", { key: "Delete" });
     await flushPromises();
     expect(store.state.sessions[sid].composer.chips.map((c: ContextChip) => c.id)).toEqual([
@@ -154,86 +153,49 @@ describe("AssistantContextTray", () => {
     expect(document.activeElement?.textContent).toContain("13:58");
   });
 
-  it("shows one chip then +N at 27 rem, all behind +N when narrow, and expands in place", async () => {
+  it("shows two chips and +N when narrow, and the +N menu lists exactly the hidden chips", async () => {
     const { wrapper, store, sid, labels } = await setup();
-    store.addChip(sid, ROW);
-    store.addChip(sid, { ...ROW, id: "row-2", label: raw("Log row · cart · 13:58") });
-    await flushPromises();
-    expect(labels()).toEqual(["Log row · cart · 13:57"]);
-    const more = wrapper.get('[data-test="assistant-context-more"]');
-    expect(more.text()).toBe("+1");
-    expect(more.attributes("aria-expanded")).toBe("false");
-    await more.trigger("click");
-    expect(labels()).toHaveLength(2);
-    const fewer = wrapper.get('[data-test="assistant-context-more"]');
-    expect(fewer.attributes("aria-expanded")).toBe("true");
-    expect(fewer.attributes("aria-label")).toBe("Show fewer context chips");
-    expect(trayChipLimit({ narrow: true, wide: false })).toBe(0);
-    expect(trayChipLimit({ narrow: false, wide: true })).toBe(3);
-  });
-
-  it("scrolls the expanded row instead of squashing its chips (B-composer-10)", async () => {
-    const { wrapper, store, sid } = await setup();
-    for (const n of [1, 2, 3, 4]) store.addChip(sid, { ...ROW, id: `row-${n}` });
-    await flushPromises();
-    const items = () => wrapper.findAll('[data-test="assistant-context-tray-list"] > li');
-    expect(items()[0].classes()).toContain("min-w-0");
-    await wrapper.get('[data-test="assistant-context-more"]').trigger("click");
-    expect(wrapper.get('[data-test="assistant-context-tray-scroller"]').classes()).toContain(
-      "overflow-x-auto",
-    );
-    expect(wrapper.get('[data-test="assistant-context-tray-list"]').classes()).toContain(
-      "shrink-0",
-    );
-    const tray = wrapper.get('[data-test="assistant-context-tray"]');
-    expect(tray.classes()).not.toContain("overflow-x-auto");
-    expect(tray.element.lastElementChild?.getAttribute("data-test")).toBe("assistant-context-more");
-    expect(items()).toHaveLength(4);
-    for (const item of items()) {
-      expect(item.classes()).toContain("shrink-0");
-      expect(item.classes()).not.toContain("min-w-0");
+    for (const n of [1, 2, 3, 4]) {
+      store.addChip(sid, { ...ROW, id: `row-${n}`, label: raw(`Row ${n}`) });
     }
+    await flushPromises();
+    expect(labels()).toEqual(["Row 1", "Row 2"]);
+    const more = wrapper.get('[data-test="assistant-context-more"]');
+    expect(more.text()).toBe("+2");
+    expect(more.attributes("aria-haspopup")).toBe("dialog");
+    expect(more.attributes("aria-label")).toBe("Show 2 more context chips");
+    expect(trayChipLimit({ narrow: true, wide: false })).toBe(2);
+    expect(trayChipLimit({ narrow: false, wide: false })).toBe(2);
+    expect(trayChipLimit({ narrow: false, wide: true })).toBe(3);
+    await more.trigger("click");
+    await flushPromises();
+    const rows = Array.from(
+      document.querySelectorAll('[data-test="assistant-context-hidden-row"]'),
+    );
+    expect(rows.map((row) => row.textContent?.trim())).toEqual(["Row 3", "Row 4"]);
   });
 
-  it("fades the hidden edge and maps a vertical wheel onto the expanded row (B-composer-15)", async () => {
+  it("removes a chip from the +N menu out of the draft, and closes the menu after the last", async () => {
     const { wrapper, store, sid } = await setup();
-    for (const n of [1, 2, 3, 4]) store.addChip(sid, { ...ROW, id: `row-${n}` });
+    for (const n of [1, 2, 3]) {
+      store.addChip(sid, { ...ROW, id: `row-${n}`, label: raw(`Row ${n}`) });
+    }
     await flushPromises();
-    const scroller = wrapper.get('[data-test="assistant-context-tray-scroller"]');
-    const el = scroller.element as HTMLElement;
-    let left = 0;
-    Object.defineProperties(el, {
-      scrollWidth: { configurable: true, get: () => 743 },
-      clientWidth: { configurable: true, get: () => 258 },
-      scrollLeft: {
-        configurable: true,
-        get: () => left,
-        set: (v: number) => {
-          left = v;
-        },
-      },
-    });
-    const wheel = (deltaY: number) => {
-      const event = new WheelEvent("wheel", { deltaY, bubbles: true, cancelable: true });
-      el.dispatchEvent(event);
-      return event;
-    };
-    expect(wheel(400).defaultPrevented).toBe(false);
     await wrapper.get('[data-test="assistant-context-more"]').trigger("click");
     await flushPromises();
-    expect(scroller.attributes("data-fade-end")).toBe("");
-    expect(scroller.attributes("data-fade-start")).toBeUndefined();
-    expect(el.style.maskImage).toContain("transparent 100%");
-    expect(wheel(400).defaultPrevented).toBe(true);
-    expect(left).toBe(400);
+    const remove = document.querySelector<HTMLElement>(
+      '[data-test="assistant-context-hidden-remove"]',
+    );
+    expect(remove?.getAttribute("aria-label")).toBe("Remove Row 3 from context");
+    remove?.click();
     await flushPromises();
-    expect(scroller.attributes("data-fade-start")).toBe("");
-    expect(wheel(400).defaultPrevented).toBe(true);
-    expect(left).toBe(485);
-    await flushPromises();
-    expect(scroller.attributes("data-fade-end")).toBeUndefined();
-    expect(wheel(400).defaultPrevented).toBe(false);
-    expect(scroller.classes()).toContain("scroll-px-6");
+    expect(store.state.sessions[sid].composer.chips.map((c: ContextChip) => c.id)).toEqual([
+      "row-1",
+      "row-2",
+    ]);
+    expect(wrapper.find('[data-test="assistant-context-more"]').exists()).toBe(false);
+    expect(document.querySelector('[data-test="assistant-context-hidden-row"]')).toBeNull();
+    expect(document.body.textContent).not.toContain("Fewer chips");
   });
 
   it("carries images as chips, removed like any other (U1)", async () => {

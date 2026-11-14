@@ -17,10 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     ref="root"
-    :class="[
-      'flex min-w-0 items-center gap-1',
-      toolbar ? 'rounded-default bg-surface-base/80 p-0.5 backdrop-blur-sm' : 'flex-1',
-    ]"
+    :class="['flex min-w-0 items-center gap-1', toolbar ? 'flex-1 gap-3' : 'flex-1']"
     data-test="assistant-thread-header"
     :data-narrow="narrow ? '' : undefined"
     :data-view="chatsOpen ? 'chats' : 'chat'"
@@ -51,8 +48,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </template>
     <template v-else>
+      <span v-if="logoShown" class="inline-flex shrink-0" data-test="assistant-thread-logo">
+        <img :src="aiLogo" alt="" class="size-6 dark:hidden" />
+        <img :src="aiLogoDark" alt="" class="hidden size-6 dark:block" />
+      </span>
       <!-- A toolbar reads New chat and ⓘ before its More menu -->
-      <div v-if="toolbar && !renaming" class="flex shrink-0 items-center gap-1">
+      <div
+        v-if="toolbar"
+        role="heading"
+        :aria-level="1"
+        class="min-w-0 flex-1"
+        data-test="assistant-thread-heading"
+      >
+        <OInlineEdit
+          :model-value="String(titleText)"
+          size="lg"
+          tone="title"
+          :readonly="!chatActions"
+          :disabled="renamePending"
+          :aria-label="t('assistant.thread.renameLabel')"
+          :edit-hint="t('assistant.thread.renameHint')"
+          :maxlength="MAX_TITLE"
+          :aria-describedby="describedBy"
+          :aria-busy="renamePending ? 'true' : undefined"
+          data-test="assistant-thread-heading-edit"
+          @commit="saveTitle"
+        />
+      </div>
+      <div v-if="toolbar" class="flex shrink-0 items-center gap-1">
         <AssistantIconButton
           v-if="newShown && newInBar"
           :label="newLabel"
@@ -62,19 +85,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <slot name="container-actions" :narrow="narrow" />
       </div>
-      <span v-if="logoShown" class="inline-flex shrink-0" data-test="assistant-thread-logo">
-        <img :src="aiLogo" alt="" class="size-6 dark:hidden" />
-        <img :src="aiLogoDark" alt="" class="hidden size-6 dark:block" />
-      </span>
-      <div
-        v-if="renaming"
-        :class="toolbar ? 'w-64 max-w-full' : 'min-w-0 flex-1'"
-        data-test="assistant-thread-rename"
-      >
+      <div v-if="!toolbar && renaming" class="min-w-0 flex-1" data-test="assistant-thread-rename">
         <OInlineEdit
           ref="renameInput"
           v-model="draft"
           size="sm"
+          tone="bar"
           :aria-label="t('assistant.thread.renameLabel')"
           :maxlength="MAX_TITLE"
           @commit="commitRename"
@@ -83,17 +99,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div
         v-else-if="!toolbar || chatActions"
-        class="relative flex min-w-0 flex-1 items-center gap-2"
+        :class="['relative flex items-center gap-2', toolbar ? 'shrink-0' : 'min-w-0 flex-1']"
       >
         <component
           :is="toolbar ? 'div' : 'h2'"
-          :aria-describedby="describedBy"
+          :aria-describedby="toolbar ? undefined : describedBy"
           :aria-busy="renamePending ? 'true' : undefined"
           :class="[
             'flex min-w-0 items-center text-sm font-medium',
             renamePending ? 'text-text-secondary' : 'text-text-heading',
           ]"
-          data-test="assistant-thread-title"
+          :data-test="toolbar ? undefined : 'assistant-thread-title'"
         >
           <ODropdown
             v-model:open="menuOpen"
@@ -164,7 +180,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @open="openChat"
               @all="openChats"
             >
-              <template v-if="chatActions || foldedLayout || slots['menu-sees']" #default>
+              <template v-if="chatActions || foldedLayout" #default>
                 <template v-if="chatActions">
                   <div
                     class="flex min-w-0 flex-col gap-1 px-3 py-1.5"
@@ -181,6 +197,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                   <slot name="menu-share" />
                   <ODropdownItem
+                    v-if="!toolbar"
                     :icon-left="assistantGlyph.edit"
                     data-test="assistant-thread-menu-rename"
                     @select="startRenameSoon"
@@ -213,7 +230,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </ODropdownItem>
                   </ODropdownSub>
                 </template>
-                <slot name="menu-sees" />
                 <slot v-if="foldedLayout && layoutDirect" name="menu-layout" />
                 <ODropdownSub v-else-if="foldedLayout" :text-value="t('assistant.shell.openAs')">
                   <template #icon-left
@@ -375,7 +391,6 @@ defineSlots<{
   "container-actions"?: (props: { narrow: boolean }) => unknown;
   "menu-layout"?: () => unknown;
   "menu-share"?: () => unknown;
-  "menu-sees"?: () => unknown;
   "title-anchor"?: () => unknown;
 }>();
 
@@ -505,8 +520,7 @@ function startRenameSoon(): void {
 
 function commitRename(value: string): void {
   if (!renaming.value) return;
-  const next = value.trim().slice(0, MAX_TITLE);
-  if (props.sid && next && next !== String(titleText.value)) void history.rename(props.sid, next);
+  saveTitle(value);
   void finishRename();
 }
 
@@ -522,6 +536,11 @@ async function finishRename(): Promise<void> {
 
 function focusTitle(): void {
   (heading.value?.$el as HTMLElement | undefined)?.focus();
+}
+
+function saveTitle(value: string): void {
+  const next = value.trim().slice(0, MAX_TITLE);
+  if (props.sid && next && next !== String(titleText.value)) void history.rename(props.sid, next);
 }
 
 function togglePin(): void {

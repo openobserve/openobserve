@@ -12,6 +12,30 @@ describe("ODateTimeRange", () => {
     wrapper?.unmount();
   });
 
+  it("auto-apply emits the custom row on a unit pick, not while the amount is typed, and renders no Apply button", async () => {
+    wrapper = mount(ODateTimeRange, {
+      attachTo: document.body,
+      props: {
+        inline: true,
+        autoApply: true,
+        mode: "relative",
+        relativeUnit: "minutes",
+        relativeAmount: 15,
+      },
+    });
+    expect(wrapper.find('[data-test="datetimerange-relative-apply"]').exists()).toBe(false);
+    const input = wrapper.find('[data-test="datetimerange-custom-amount"]');
+    await input.setValue("7");
+    await input.trigger("change");
+    expect(wrapper.emitted("change")).toBeUndefined();
+    await wrapper.find('[data-test="datetimerange-custom-unit"]').setValue("hours");
+    expect(wrapper.emitted("change")?.[0]?.[0]).toMatchObject({
+      type: "relative",
+      unit: "hours",
+      amount: 7,
+    });
+  });
+
   it("should render a trigger button", () => {
     wrapper = mount(ODateTimeRange, { attachTo: document.body });
     expect(wrapper.find('[data-test="datetimerange-trigger"]').exists()).toBe(true);

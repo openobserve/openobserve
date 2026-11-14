@@ -69,15 +69,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </li>
     </ul>
     <OText
-      v-if="rangeLabel || userMeta"
+      v-if="userMeta"
       variant="meta"
       as="p"
       class="max-w-full min-w-0 text-end break-words"
       data-test="assistant-message-meta"
     >
-      <span v-if="rangeLabel" data-test="assistant-message-range">
-        {{ rangeLabel }}<template v-if="userMeta"> ·</template>
-      </span>
       {{ userMeta }}
     </OText>
     <OText
@@ -131,11 +128,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-scroll-anchor
   >
     <div
-      v-if="head || agent !== DEFAULT_AGENT || $slots.versions"
+      v-if="agent !== DEFAULT_AGENT || $slots.versions"
       class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1"
       data-test="assistant-message-head"
     >
-      <AssistantAgentIdentity v-if="head || agent !== DEFAULT_AGENT" size="meta" :agent="agent" />
+      <!-- The main assistant's answers need no byline, the bubble shows who asked; another agent names itself -->
+      <AssistantAgentIdentity v-if="agent !== DEFAULT_AGENT" size="meta" :agent="agent" />
       <slot name="versions" />
     </div>
     <slot name="status" />
@@ -347,10 +345,6 @@ export interface AssistantMessageProps {
   turn?: AssistantTurnView | null;
   /** The agent that answered this turn; a chat or server without agents reads as the default one. */
   agent?: AgentId;
-  /** The question line's "Last 1 h"; the last turn only, the older ones keep the hour. */
-  rangeLabel?: I18nText | null;
-  /** The mark and agent name above an answer; only the first answer of a run carries it. */
-  head?: boolean;
 }
 
 // A decision's record replaces its card in place; the pending card itself renders in the container.
@@ -497,8 +491,6 @@ const props = withDefaults(defineProps<AssistantMessageProps>(), {
   density: "compact",
   turn: null,
   agent: "o2-ai",
-  rangeLabel: null,
-  head: false,
 });
 
 const { t } = useI18nTyped();

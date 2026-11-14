@@ -54,11 +54,15 @@ function measure(): void {
   if (!field || !parent) return;
   const outer = parent.getBoundingClientRect();
   const inner = field.getBoundingClientRect();
+  // The field's end padding grows to clear the corner ⓘ, so the copy takes the field's own padding to wrap alike.
+  const { paddingLeft, paddingRight } = getComputedStyle(field);
   box.value = {
     top: `${inner.top - outer.top}px`,
     left: `${inner.left - outer.left}px`,
     width: `${field.clientWidth}px`,
     height: `${field.clientHeight}px`,
+    paddingLeft,
+    paddingRight,
   };
   mirror.value!.scrollTop = field.scrollTop;
 }

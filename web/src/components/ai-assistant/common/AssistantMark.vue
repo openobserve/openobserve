@@ -19,19 +19,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     aria-hidden="true"
     data-test="assistant-mark"
     :data-size="size"
+    :data-logo="logo ? '' : undefined"
     :class="[
-      'rounded-default bg-assistant-mark-bg shadow-assistant-mark inline-flex shrink-0 items-center justify-center',
+      'inline-flex shrink-0 items-center justify-center',
       chipSize,
       sparkle ? ASSISTANT_MOTION.sparkle : '',
-      muted ? 'text-text-muted' : 'text-assistant-mark-fg',
+      logo
+        ? ''
+        : [
+            'rounded-default bg-assistant-mark-bg shadow-assistant-mark',
+            muted ? 'text-text-muted' : 'text-assistant-mark-fg',
+          ],
     ]"
   >
-    <OIcon :name="glyph ?? assistantGlyph.assistant" :size="size" />
+    <!-- The product's own mark is the O2 AI logo, as in the header and on Home; an agent keeps its glyph -->
+    <template v-if="logo">
+      <img :src="aiLogo" alt="" class="size-full dark:hidden" />
+      <img :src="aiLogoDark" alt="" class="hidden size-full dark:block" />
+    </template>
+    <OIcon v-else :name="glyph ?? assistantGlyph.assistant" :size="size" />
   </span>
 </template>
 
 <script setup lang="ts">
 import { computed } from "vue";
+
+import aiLogoDark from "@/assets/images/common/o2_ai_logo_dark.svg";
+import aiLogo from "@/assets/images/common/o2_ai_logo.svg";
 
 import type { IconName } from "@/lib/core/Icon/OIcon.types";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -55,4 +69,7 @@ const props = withDefaults(
 );
 
 const chipSize = computed(() => CHIP_SIZES[props.size]);
+const logo = computed(
+  () => !props.muted && (!props.glyph || props.glyph === assistantGlyph.assistant),
+);
 </script>

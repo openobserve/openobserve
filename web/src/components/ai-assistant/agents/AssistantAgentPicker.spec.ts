@@ -19,7 +19,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CapabilityAgent } from "@/composables/assistant";
 import { raw } from "@/types/i18n";
 
-import { composerUi } from "@/components/ai-assistant/composer/composerUi";
+import { composerLayoutKey, composerUi } from "@/components/ai-assistant/composer/composerUi";
+import { computed } from "vue";
 
 import { fakeAssistant, fakeVuex } from "../__tests__/fakeAssistant";
 import AssistantAgentPicker from "./AssistantAgentPicker.vue";
@@ -70,7 +71,7 @@ const stubs = {
   },
 };
 
-function setup(roster: CapabilityAgent[] = ROSTER, messages = false) {
+function setup(roster: CapabilityAgent[] = ROSTER, messages = false, narrow = false) {
   fake.current = fakeAssistant("available", { agents: roster });
   const { store } = fake.current;
   store.syncCapability({ ...store.state.capability, agents: roster });
@@ -80,7 +81,13 @@ function setup(roster: CapabilityAgent[] = ROSTER, messages = false) {
   if (messages) store.state.sessions[sid].messages.push({ role: "user", content: raw("q") });
   const wrapper = mount(AssistantAgentPicker, {
     props: { sid },
-    global: { plugins: [fakeVuex()], stubs },
+    global: {
+      plugins: [fakeVuex()],
+      stubs,
+      provide: {
+        [composerLayoutKey as symbol]: computed(() => ({ narrow, tight: false, wide: false })),
+      },
+    },
     attachTo: document.body,
   });
   return { wrapper, sid, store };
@@ -99,6 +106,17 @@ afterEach(() => {
 });
 
 describe("AssistantAgentPicker", () => {
+  it("keeps only the icon in a narrow composer, naming the agent in its label and tooltip", () => {
+    const wide = trigger(setup().wrapper);
+    expect(wide.text()).toContain("O2 Assistant");
+    expect(wide.attributes("aria-label")).toBeUndefined();
+    document.body.innerHTML = "";
+    const { wrapper } = setup(ROSTER, false, true);
+    expect(trigger(wrapper).text()).not.toContain("O2 Assistant");
+    expect(trigger(wrapper).attributes("aria-label")).toBe("O2 Assistant");
+    expect(wrapper.findComponent({ name: "OTooltip" }).props("content")).toBe("O2 Assistant");
+  });
+
   it("shows a plain pill with no menu without a choice to offer", () => {
     for (const roster of [[], [ROSTER[0]]]) {
       const { wrapper } = setup(roster);

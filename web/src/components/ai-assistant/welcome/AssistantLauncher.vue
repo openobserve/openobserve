@@ -77,6 +77,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @select="pickMention"
           @close="closeMention"
         />
+        <!-- Home floats the chips above the box so adding one never moves it -->
+        <div
+          v-if="trayChips.length > 0"
+          :class="[
+            'flex h-7 min-h-7 min-w-0 items-center overflow-hidden px-0.5',
+            layout === 'overview' ? 'absolute inset-x-0 bottom-full mb-1' : 'mb-1',
+          ]"
+          data-test="assistant-launcher-chip-row"
+        >
+          <AssistantChipTray
+            :items="shownTrayChips"
+            :hidden="hiddenTrayChips"
+            data-test="assistant-launcher-chips"
+          >
+            <template #chip="{ item }">
+              <AssistantContextChip
+                :chip="item.chip"
+                compact
+                :short-label="item.chip.short"
+                :image-src="item.src"
+                :popup="false"
+                :data-test="
+                  item.src ? 'assistant-launcher-image-chip' : 'assistant-launcher-mention-chip'
+                "
+                @remove="removeTrayChip(item.chip)"
+              />
+            </template>
+            <template #hidden-item="{ item }">
+              <AssistantHiddenChipRow
+                :chip="item.chip"
+                :image-src="item.src"
+                @remove="removeTrayChip(item.chip)"
+              />
+            </template>
+          </AssistantChipTray>
+        </div>
         <AssistantComposerFrame
           ref="input"
           :model-value="shownText"
@@ -105,33 +141,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @focus="focused = true"
           @blur="focused = false"
         >
-          <template v-if="trayChips.length > 0" #strip>
-            <div
-              class="flex h-7 min-h-7 min-w-0 items-center overflow-hidden px-0.5"
-              data-test="assistant-launcher-chip-row"
-            >
-              <AssistantChipTray
-                v-model:expanded="chipsExpanded"
-                :items="shownTrayChips"
-                :hidden-count="hiddenTrayChips"
-                :hidden-labels="hiddenTrayLabels"
-                data-test="assistant-launcher-chips"
-              >
-                <template #chip="{ item }">
-                  <AssistantContextChip
-                    :chip="item.chip"
-                    compact
-                    :short-label="item.chip.short"
-                    :image-src="item.src"
-                    :popup="false"
-                    :data-test="
-                      item.src ? 'assistant-launcher-image-chip' : 'assistant-launcher-mention-chip'
-                    "
-                    @remove="removeTrayChip(item.chip)"
-                  />
-                </template>
-              </AssistantChipTray>
-            </div>
+          <template v-if="fieldReady" #corner>
+            <AssistantContextSeesPopover :sid="null" :draft="seesDraft" />
           </template>
           <template #bar>
             <AssistantComposerBottomRow divided>
@@ -371,7 +382,10 @@ import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
 import AssistantChipTray, {
   useChipCollapse,
 } from "@/components/ai-assistant/context/AssistantChipTray.vue";
+import AssistantHiddenChipRow from "@/components/ai-assistant/context/AssistantHiddenChipRow.vue";
+import { useComposerWidth } from "@/components/ai-assistant/composer/useComposerWidth";
 import AssistantContextChip from "@/components/ai-assistant/context/AssistantContextChip.vue";
+import AssistantContextSeesPopover from "@/components/ai-assistant/context/AssistantContextSeesPopover.vue";
 import AssistantMentionMenu, {
   type MentionOption,
 } from "@/components/ai-assistant/context/AssistantMentionMenu.vue";
@@ -379,6 +393,7 @@ import AssistantTimePrefix from "@/components/ai-assistant/context/AssistantTime
 import AssistantGateState from "@/components/ai-assistant/gate/AssistantGateState.vue";
 import {
   MAX_IMAGES,
+  focusWhenReady,
   openAssistant,
   starterPayload,
   periodMs,
@@ -390,10 +405,10 @@ import {
   useAssistantStarters,
   useAssistantStore,
   type ComposerState,
+  type ContextDraft,
   type Starter,
   type TimeWindow,
 } from "@/composables/assistant";
-import { focusWhenReady } from "@/composables/assistant/focusComposer";
 import { onOverviewFocusRequest } from "@/composables/goto/goToRequests";
 import useBreakpoint from "@/composables/useBreakpoint";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -429,7 +444,6 @@ import {
   type ImageCap,
 } from "@/components/ai-assistant/composer/composerImages";
 import { useAssistantVoice } from "@/components/ai-assistant/composer/useAssistantVoice";
-import { useComposerWidth } from "@/components/ai-assistant/composer/useComposerWidth";
 
 import AssistantLauncherAgent from "./AssistantLauncherAgent.vue";
 import AssistantStarterRow from "./AssistantStarterRow.vue";
@@ -524,7 +538,6 @@ const chipLayout = computed(() => ({
   narrow: fieldWidth.narrow.value,
   wide: fieldWidth.wide.value,
 }));
-const chipsExpanded = ref(false);
 const trayChips = computed<TrayChip[]>(() => [
   ...mentionChips.value.map((chip) => ({ id: chip.id, chip })),
   ...images.value.map((image) => ({
@@ -533,15 +546,13 @@ const trayChips = computed<TrayChip[]>(() => [
     src: `data:${image.mimeType};base64,${image.data}`,
   })),
 ]);
-const { shown: shownTrayChips, hiddenCount: hiddenTrayChips } = useChipCollapse(
-  trayChips,
-  chipLayout,
-  chipsExpanded,
-);
-
-const hiddenTrayLabels = computed(() =>
-  trayChips.value.slice(shownTrayChips.value.length).map((item) => String(item.chip.label)),
-);
+const { shown: shownTrayChips, hidden: hiddenTrayChips } = useChipCollapse(trayChips, chipLayout);
+// The ⓘ reads what Enter would send: the @ picks, the images and the range `ask` uses.
+const seesDraft = computed<ContextDraft>(() => ({
+  chips: mentionChips.value,
+  images: images.value,
+  timeOverride: timeOverride.value ?? props.pageRange,
+}));
 
 const mentionsOn = computed(() => fieldReady.value);
 // An idle, empty field types example prompts as on main's Home; focus, a draft or a chip brings back the plain hint.

@@ -230,6 +230,7 @@ const onDisplayKeydown = (event: KeyboardEvent) => {
 // otherwise the header jumps as it swaps between the button and the input.
 const textClasses = computed(() => {
   if (props.tone === "meta") return "text-xs leading-normal font-normal";
+  if (props.tone === "bar") return "text-sm leading-[1.45] font-medium";
   const scale = { sm: "text-sm", md: "text-base", lg: "text-lg" }[props.size];
   return `${scale} leading-[1.45] font-semibold tracking-[-0.02em]`;
 });
@@ -372,15 +373,17 @@ defineExpose({ focus: startEdit });
           :data-test="dataTest ? `${dataTest}-value` : undefined"
           >{{ displayValue || placeholder }}</OTruncatedText
         >
-        <!-- Always rendered, never hover-revealed: a pencil that only appears on
-             hover cannot tell you the name is editable BEFORE you hover it. It
-             sits at reduced opacity so it reads as an affordance, not a control,
-             and brightens on hover. -->
+        <!-- Always rendered at reduced opacity, so a name reads as editable before
+             it is hovered; a compact bar's title (tone "bar") hides it until hover
+             or focus and leans on the edit hint, so a 2.5rem bar stays quiet. -->
         <OIcon
           v-if="!isDisabled"
           name="edit"
           size="sm"
-          class="text-text-secondary shrink-0 opacity-50 transition-opacity group-hover/inline-edit:opacity-100"
+          :class="[
+            'text-text-secondary shrink-0 transition-opacity group-hover/inline-edit:opacity-100',
+            tone === 'bar' ? 'opacity-0 group-focus-within/inline-edit:opacity-100' : 'opacity-50',
+          ]"
         />
         <!-- Child-mode OTooltip (attaches to this button). A real tooltip rather
              than a native `title`: this hint is the ONLY place a generated name

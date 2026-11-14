@@ -599,7 +599,10 @@ export function wireDataOf(chip: ContextChip): unknown {
 }
 
 /** The sees row value for the attached chips: "2 attachments · 3 KB". */
-export function attachmentSummary(chips: readonly ContextChip[], t: TranslateFn = gt): I18nText {
+export function attachmentSummary(
+  chips: readonly Pick<ContextChip, "sizeBytes">[],
+  t: TranslateFn = gt,
+): I18nText {
   const bytes = chips.reduce((sum, chip) => sum + chip.sizeBytes, 0);
   return t(
     "assistant.context.attachmentsValue",

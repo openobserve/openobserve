@@ -14,31 +14,49 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <div class="-ms-3 flex min-w-0 flex-col" data-test="assistant-follow-ups">
-    <OButton
-      v-for="item in items"
-      :key="item"
-      variant="ghost-primary"
-      size="sm"
-      :class="ROW_CLASS"
-      data-test="assistant-follow-up"
-      @click="stage(item)"
-    >
-      <OTruncatedText class="min-w-0 text-start">{{ raw(item) }}</OTruncatedText>
-    </OButton>
-  </div>
+  <section
+    class="flex min-w-0 flex-col gap-1"
+    :aria-label="t('assistant.transcript.followUps')"
+    data-test="assistant-follow-ups"
+  >
+    <OText as="span" variant="meta" aria-hidden="true">
+      {{ t("assistant.transcript.followUps") }}
+    </OText>
+    <div class="divide-border-subtle flex min-w-0 flex-col divide-y">
+      <button
+        v-for="item in items"
+        :key="item"
+        type="button"
+        :class="ROW_CLASS"
+        data-test="assistant-follow-up"
+        @click="stage(item)"
+      >
+        <OIcon
+          :name="assistantGlyph.handoff"
+          size="xs"
+          class="text-text-link shrink-0 transition-transform duration-150 group-hover:translate-x-0.5 motion-reduce:transition-none"
+          aria-hidden="true"
+        />
+        <OTruncatedText class="min-w-0 text-start">{{ raw(item) }}</OTruncatedText>
+      </button>
+    </div>
+  </section>
 </template>
 
 <script setup lang="ts">
 import { inject } from "vue";
 
 import { assistantTranscriptHostKey } from "@/composables/assistant/pure";
-import OButton from "@/lib/core/Button/OButton.vue";
+import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OText from "@/lib/core/Typography/OText.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
-import { raw } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 
 const ROW_CLASS =
-  "text-text-link hover:text-assistant-link min-h-7 w-full justify-start font-normal max-md:min-h-11 pointer-coarse:min-h-11";
+  "group text-text-body hover:text-text-heading focus-visible:ring-border-strong rounded-default flex min-h-8 w-full cursor-pointer items-center gap-2 py-1.5 text-sm outline-none focus-visible:ring-2 max-md:min-h-11 pointer-coarse:min-h-11";
+
+const { t } = useI18nTyped();
 
 const props = defineProps<{ sid: string; items: string[] }>();
 

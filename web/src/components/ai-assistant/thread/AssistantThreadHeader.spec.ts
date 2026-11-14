@@ -69,7 +69,12 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast }));
 
 async function setup(
   props: Partial<AssistantThreadHeaderProps> = {},
-  { over = {} as Partial<AssistantCapability>, messages = true, title = "Checkout 5xx spike" } = {},
+  {
+    over = {} as Partial<AssistantCapability>,
+    messages = true,
+    title = "Checkout 5xx spike",
+    slots = {} as Record<string, string>,
+  } = {},
 ) {
   fake.current = fakeAssistant("available", { persistence: false, ...over }, {}, 80, true);
   fake.runs = fakeRuns();
@@ -89,6 +94,7 @@ async function setup(
     slots: {
       "container-actions": '<button data-test="close-stub">×</button>',
       "menu-layout": '<div data-test="layout-stub" />',
+      ...slots,
     },
     global: {
       plugins: [fakeRouter(), fakeVuex()],
@@ -304,6 +310,17 @@ describe("AssistantThreadHeader", () => {
     );
   });
 
+  it("has no slot for what the assistant sees: the composer box's corner holds that ⓘ", async () => {
+    const { wrapper } = await setup(
+      {},
+      { slots: { "menu-sees": '<div data-test="assistant-thread-menu-sees" />' } },
+    );
+    expect(wrapper.find('[data-test="assistant-thread-menu-download-markdown"]').exists()).toBe(
+      true,
+    );
+    expect(wrapper.find('[data-test="assistant-thread-menu-sees"]').exists()).toBe(false);
+  });
+
   it("downloads from the title menu", async () => {
     const { wrapper, sid } = await setup();
     await wrapper.get('[data-test="assistant-thread-menu-download-markdown"]').trigger("click");
@@ -313,11 +330,13 @@ describe("AssistantThreadHeader", () => {
   describe("as a toolbar", () => {
     const toolbar = { placement: "full", container: "full_view", toolbar: true } as const;
 
-    it("draws icons only, the container's controls before More, and no title or +", async () => {
+    it("leads with the chat's title as the page heading, then the container's controls before More, and no +", async () => {
       const { wrapper } = await setup(toolbar);
-      expect(wrapper.find('[data-test="assistant-thread-title"]').element.tagName).toBe("DIV");
+      const heading = wrapper.get('[data-test="assistant-thread-heading"]');
+      expect(heading.attributes("role")).toBe("heading");
+      expect(heading.attributes("aria-level")).toBe("1");
+      expect(heading.text()).not.toBe("");
       expect(wrapper.find(title).exists()).toBe(false);
-      expect(wrapper.find('[data-test="assistant-thread-title-text"]').exists()).toBe(false);
       expect(wrapper.find('[data-test="assistant-thread-new"]').exists()).toBe(false);
       const ids = wrapper
         .findAll("button")
@@ -349,8 +368,8 @@ describe("AssistantThreadHeader", () => {
       lg.value = true;
     });
 
-    it("runs the title menu's own actions from More: download, pin, rename and delete", async () => {
-      const { wrapper, sid, store, history } = await setup(toolbar);
+    it("runs the title menu's own actions from More: download, pin and delete, with no Rename", async () => {
+      const { wrapper, sid, history } = await setup(toolbar);
       await wrapper.get('[data-test="assistant-thread-menu-download-markdown"]').trigger("click");
       expect(exporter.exportChat).toHaveBeenLastCalledWith(sid, "markdown");
       await wrapper.get('[data-test="assistant-thread-menu-download-json"]').trigger("click");
@@ -359,18 +378,28 @@ describe("AssistantThreadHeader", () => {
       await wrapper.get('[data-test="assistant-thread-menu-pin"]').trigger("click");
       expect(pin).toHaveBeenCalledWith(sid, true);
       expect(wrapper.find('[data-test="assistant-thread-menu-delete"]').exists()).toBe(true);
-      vi.useFakeTimers();
-      await wrapper.get('[data-test="assistant-thread-menu-rename"]').trigger("click");
-      await vi.runAllTimersAsync();
-      vi.useRealTimers();
+      expect(wrapper.find('[data-test="assistant-thread-menu-rename"]').exists()).toBe(false);
+    });
+
+    it("renames the chat by clicking its heading, as the incident detail's title does", async () => {
+      const { wrapper, sid, store } = await setup(toolbar);
+      const edit = '[data-test="assistant-thread-heading-edit';
+      await wrapper.get(`${edit}-trigger"]`).trigger("click");
       await flushPromises();
-      expect(wrapper.find('[data-test="assistant-thread-more"]').exists()).toBe(false);
-      const input = wrapper.get('[data-test="assistant-thread-rename"] input');
+      const input = wrapper.get(`${edit}-input"]`);
       await input.setValue("Payments p95");
       await input.trigger("keydown", { key: "Enter" });
       await flushPromises();
       expect(String(store.state.sessions[sid].title)).toBe("Payments p95");
-      expect(document.activeElement).toBe(wrapper.get('[data-test="assistant-thread-more"]').element);
+      expect(wrapper.find('[data-test="assistant-thread-more"]').exists()).toBe(true);
+    });
+
+    it("shows the heading as plain text when the chat cannot be renamed", async () => {
+      const { wrapper } = await setup(toolbar, { over: { canChat: "no" } });
+      expect(wrapper.get('[data-test="assistant-thread-heading"]').text()).not.toBe("");
+      expect(wrapper.find('[data-test="assistant-thread-heading-edit-trigger"]').exists()).toBe(
+        false,
+      );
     });
 
     it("shows no More for a read-only role, as the title menu offers it no actions", async () => {

@@ -72,6 +72,8 @@ export {
   useAssistantShortcuts,
 } from "./shortcuts";
 export { refreshPageContext, useAssistantContext } from "./context/useAssistantContext";
+export type { ContextDraft } from "./context/useAssistantContext";
+export { focusWhenReady } from "./focusComposer";
 export {
   INTERNAL_FIELDS,
   MAX_ATTACHED_BYTES,
@@ -80,6 +82,7 @@ export {
   chipSecondaryOf,
   chipStateOf,
   contextChipFor,
+  fieldRowOf,
   isLongPaste,
   pastedTextChip,
   periodMs,

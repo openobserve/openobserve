@@ -76,14 +76,6 @@ vi.mock("@/composables/assistant", async (importOriginal) => ({
     };
   },
 }));
-// Its context read builds the app runtime, which would replace the handle a spec installs; AssistantHeaderSees.spec covers it.
-vi.mock("./AssistantHeaderSees.vue", () => ({
-  default: {
-    name: "AssistantHeaderSees",
-    props: ["sid", "label", "open"],
-    template: '<span data-test="assistant-shell-sees-host" :data-label="label" />',
-  },
-}));
 vi.mock("@/lib/feedback/Toast/useToast", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/feedback/Toast/useToast")>()),
   toast: vi.fn(),
@@ -383,21 +375,15 @@ describe("AssistantShell chrome and focus", () => {
     store.state.sessions[sid].messages.push({ role: "user", content: raw("hi") });
     await flushPromises();
     const chrome = wrapper.get("[data-assistant-chrome]");
-    expect(chrome.classes()).not.toContain("border-b");
-    expect(chrome.get('[data-test="assistant-thread-title"]').element.tagName).toBe("DIV");
+    expect(chrome.classes()).toEqual(expect.arrayContaining(["border-b", "border-border-subtle"]));
+    expect(chrome.get('[data-test="assistant-thread-heading"]').attributes("aria-level")).toBe("1");
     expect(chrome.find('[data-test="assistant-thread-title-button"]').exists()).toBe(false);
-    const controls = ["assistant-shell-sees-host", "assistant-thread-more"];
-    const ids = chrome
-      .findAll("[data-test]")
-      .map((el) => el.attributes("data-test"))
-      .filter((id) => controls.includes(id ?? ""));
-    expect(ids).toEqual(controls);
+    expect(chrome.find('[data-test="assistant-thread-more"]').exists()).toBe(true);
+    // What the assistant sees opens from the composer box's corner, so the header carries no ⓘ.
+    expect(chrome.find('[data-test="assistant-context-sees"]').exists()).toBe(false);
     // Home's chat is the page itself, so it offers no move to another container.
     expect(chrome.find('[data-test^="assistant-shell-place-"]').exists()).toBe(false);
     expect(chrome.find('[data-test="assistant-open-as-button"]').exists()).toBe(false);
-    expect(chrome.get('[data-test="assistant-shell-sees-host"]').attributes("data-label")).toBe(
-      "What the Assistant Sees",
-    );
     expect(chrome.get('[data-test="assistant-thread-more"]').attributes("aria-label")).toBe(
       "More Actions",
     );
@@ -1433,21 +1419,16 @@ describe("AssistantShell history states", () => {
     expect(document.activeElement).toBe(title);
   });
 
-  it("leads the panel's bar with the logo and opens what it sees from the title menu", async () => {
+  it("leads the panel's bar with the logo and keeps what it sees out of the bar and the title menu", async () => {
     const { wrapper } = mountMenus();
     await flushPromises();
     const chrome = wrapper.get('[data-test="assistant-shell-chrome"]');
     expect(chrome.find('[data-test="assistant-thread-logo"]').exists()).toBe(true);
     expect(chrome.classes()).toContain("ps-3");
-    const sees = () =>
-      wrapper.findAllComponents({ name: "AssistantHeaderSees" }).map((c) => c.props("open"));
-    expect(sees()).toEqual([false]);
-    const item = wrapper.get('[data-test="assistant-thread-menu-sees"]');
-    expect(item.text()).toBe("What the assistant sees");
-    (wrapper.get('[data-test="assistant-thread-title-button"]').element as HTMLElement).focus();
-    await item.trigger("click");
-    await flushPromises();
-    expect(sees()).toEqual([true]);
+    expect(chrome.find('[data-test="assistant-context-sees"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="assistant-thread-menu-sees"]').exists()).toBe(false);
+    const corner = wrapper.get('[data-test="assistant-composer-corner"]');
+    expect(corner.find('[data-test="assistant-context-sees"]').exists()).toBe(true);
   });
 
   it("puts the sheet's only move, Full page, straight into its title menu", async () => {

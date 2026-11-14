@@ -18,10 +18,25 @@ import { describe, expect, it } from "vitest";
 
 import AssistantMark from "./AssistantMark.vue";
 import { ASSISTANT_MOTION } from "./assistantMotion";
+import { agentGlyph } from "./glyphs";
+
+const agent = { glyph: agentGlyph.sre };
 
 describe("AssistantMark", () => {
-  it("is a decorative rounded square, never a circle", () => {
-    const mark = mount(AssistantMark).get('[data-test="assistant-mark"]');
+  it("draws the product as the O2 AI logo, light and dark, with no tile", () => {
+    for (const props of [{}, { glyph: agentGlyph["o2-ai"] }]) {
+      const mark = mount(AssistantMark, { props }).get('[data-test="assistant-mark"]');
+      expect(mark.attributes("data-logo")).toBe("");
+      expect(mark.attributes("aria-hidden")).toBe("true");
+      expect(mark.findAll("img").map((img) => img.attributes("alt"))).toEqual(["", ""]);
+      expect(mark.classes()).not.toContain("bg-assistant-mark-bg");
+      expect(mark.find("svg, [data-test=o-icon]").exists()).toBe(false);
+    }
+  });
+
+  it("draws another agent as a decorative rounded square, never a circle", () => {
+    const mark = mount(AssistantMark, { props: agent }).get('[data-test="assistant-mark"]');
+    expect(mark.attributes("data-logo")).toBeUndefined();
     expect(mark.attributes("aria-hidden")).toBe("true");
     expect(mark.classes()).toContain("rounded-default");
     expect(mark.classes()).not.toContain("rounded-full");
@@ -34,7 +49,9 @@ describe("AssistantMark", () => {
     ["md", "size-9"],
     ["lg", "size-12"],
   ] as const)("size %s renders a %s chip", (size, cls) => {
-    const mark = mount(AssistantMark, { props: { size } }).get('[data-test="assistant-mark"]');
+    const mark = mount(AssistantMark, { props: { size, ...agent } }).get(
+      '[data-test="assistant-mark"]',
+    );
     expect(mark.classes()).toContain(cls);
     expect(mark.attributes("data-size")).toBe(size);
   });
@@ -52,7 +69,7 @@ describe("AssistantMark", () => {
     expect(wrapper.find("button, a, [tabindex]").exists()).toBe(false);
   });
   it("is a tinted tile with its inner ring, and sparkles only when asked", () => {
-    const mark = mount(AssistantMark).get('[data-test="assistant-mark"]');
+    const mark = mount(AssistantMark, { props: agent }).get('[data-test="assistant-mark"]');
     expect(mark.classes()).toContain("shadow-assistant-mark");
     expect(mark.classes()).not.toContain(ASSISTANT_MOTION.sparkle);
     const sparkling = mount(AssistantMark, { props: { sparkle: true } }).get(

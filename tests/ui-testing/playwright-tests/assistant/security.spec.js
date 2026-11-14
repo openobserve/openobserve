@@ -111,7 +111,7 @@ test.describe("assistant security", () => {
     await page.goto(`${harness.ENV.appUrl}/?org_identifier=${harness.ENV.org}`, { waitUntil: "domcontentloaded" });
     await expect(assistant.launcher()).toHaveAttribute("data-dd-privacy", "mask", { timeout: 30_000 });
     // A popover is portalled to body, outside the masked launcher, so it carries the mask itself.
-    await page.locator('[data-test="assistant-launcher-sees"]').click();
+    await assistant.launcher().locator('[data-test="assistant-context-sees"]').click();
     const popover = page.locator("[data-o-popover-content]").filter({
       has: page.locator('[data-test="assistant-context-sees-popover"]'),
     });

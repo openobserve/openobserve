@@ -22,7 +22,7 @@ test.describe("assistant sharing", () => {
     `${harness.ENV.appUrl}/logs?org_identifier=${harness.ENV.org}&stream=e2e_automate&stream_type=logs`;
   const sharedUrl = (token) => `${harness.ENV.appUrl}/ai/shared/${token}?org_identifier=${harness.ENV.org}`;
   const shareCreates = () => state.log.filter((line) => /^POST \/api\/[^/]+\/ai\/chats\/[^/]+\/shares/.test(line));
-  // Share lives in the chat title's menu; it opens a quick popover whose Change settings opens the full form.
+  // Share lives in the chat's title menu; it opens a quick popover whose Change settings opens the full form.
   const shareItem = (page) => page.locator('[role="menu"] [data-test="assistant-thread-menu-share"]');
   const shareForm = (page) => page.locator('[data-test="assistant-share-settings"]').filter({ visible: true });
   async function openShareMenu(page) {

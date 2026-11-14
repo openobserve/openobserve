@@ -28,12 +28,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       autogrow
       :max-rows="MAX_ROWS"
       width="full"
-      :input-attrs="fieldAttrs"
+      :input-attrs="
+        $slots.corner
+          ? { ...fieldAttrs, class: `${fieldAttrs.class} ${CORNER_FIELD_CLASS}` }
+          : fieldAttrs
+      "
       :class="[glow ? GLOW_FRAME_CLASS : FRAME_CLASS, inert ? INERT_CLASS : '']"
       @update:model-value="(value: string) => emit('update:modelValue', value)"
     >
       <template #header>
         <slot name="strip" />
+        <!-- The corner holds the ⓘ without a row of its own; the field's end padding keeps text clear of it -->
+        <span
+          v-if="$slots.corner"
+          class="absolute end-1 top-1 flex"
+          data-test="assistant-composer-corner"
+        >
+          <slot name="corner" />
+        </span>
       </template>
       <template #footer>
         <slot name="bar" />
@@ -55,7 +67,7 @@ export interface AssistantComposerFrameProps {
   inputAttrs?: Record<string, string | number | boolean | undefined>;
   /** Home's Ask box: a solid edge, soft lift and faint halo at rest; on focus a brand ribbon rings the box and the halo brightens. */
   glow?: boolean;
-  /** Both composers start two lines tall. */
+  /** Both composers start three lines tall. */
   tall?: boolean;
 }
 
@@ -82,6 +94,9 @@ const GLOW_FRAME_CLASS = [
 const INERT_CLASS = "[&>div]:bg-surface-subtle";
 
 const FIELD_CLASS = "px-1! py-0! my-0.5! max-h-36! text-sm leading-6! basis-auto!";
+
+// Clears the corner button: its width and inset less the box's own end padding, plus a hair.
+const CORNER_FIELD_CLASS = "pe-7! max-md:pe-11! pointer-coarse:pe-11!";
 </script>
 
 <script setup lang="ts">
@@ -108,6 +123,8 @@ const emit = defineEmits<AssistantComposerFrameEmits>();
 
 defineSlots<{
   strip?: () => unknown;
+  /** Top end of the box, over the field: the ⓘ. */
+  corner?: () => unknown;
   bar?: () => unknown;
 }>();
 
@@ -118,7 +135,7 @@ const textbox = ref<InstanceType<typeof OTextarea> | null>(null);
 
 const fieldAttrs = computed(() => ({
   ...props.inputAttrs,
-  class: [FIELD_CLASS, props.tall ? "min-h-12" : "min-h-6", props.inputAttrs.class ?? ""].join(" "),
+  class: [FIELD_CLASS, props.tall ? "min-h-18" : "min-h-6", props.inputAttrs.class ?? ""].join(" "),
 }));
 
 defineExpose({

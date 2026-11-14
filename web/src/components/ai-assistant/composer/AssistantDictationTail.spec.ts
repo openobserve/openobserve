@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { flushPromises, mount } from "@vue/test-utils";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import AssistantDictationTail from "./AssistantDictationTail.vue";
 
@@ -45,6 +45,24 @@ describe("AssistantDictationTail", () => {
     expect(mirror.get("span").classes()).toEqual(
       expect.arrayContaining(["text-text-muted", "bg-input-bg"]),
     );
+  });
+
+  it("takes the field's own side padding, so it wraps where the field does beside the corner ⓘ", async () => {
+    const parent = vi
+      .spyOn(HTMLElement.prototype, "offsetParent", "get")
+      .mockReturnValue(document.body);
+    const field = document.createElement("textarea");
+    field.style.paddingLeft = "0.25rem";
+    field.style.paddingRight = "1.75rem";
+    document.body.appendChild(field);
+    const wrapper = mount(AssistantDictationTail, {
+      props: { field, before: "why ", tail: "cart" },
+      attachTo: document.body,
+    });
+    await flushPromises();
+    const mirror = wrapper.get<HTMLElement>('[data-test="assistant-dictate-tail"]').element;
+    expect([mirror.style.paddingLeft, mirror.style.paddingRight]).toEqual(["0.25rem", "1.75rem"]);
+    parent.mockRestore();
   });
 
   it("follows the textbox's scroll", async () => {

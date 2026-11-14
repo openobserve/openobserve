@@ -181,12 +181,15 @@ export class AssistantPage {
     return this.history().locator('[data-test="assistant-history-row"]').filter({ hasText: title }).first();
   }
 
-  /** Opens All chats from the thread title menu; the full view's rail already is the list. */
+  /** Opens All chats from the thread's menu button (the title in a panel or window, More on the full page); the full view's rail already is the list. */
   async openHistory() {
     if (await this.history().isVisible().catch(() => false)) return;
     // The header button's tooltip stays open under a resting pointer and covers the thread header.
     await this.page.mouse.move(0, 0);
-    await this.thread().locator('[data-test="assistant-thread-title-button"]').click();
+    await this.thread()
+      .locator('[data-test="assistant-thread-title-button"], [data-test="assistant-thread-more"]')
+      .first()
+      .click();
     const all = this.page.locator('[data-test="assistant-title-menu-all"]').filter({ visible: true });
     await this.page.locator('[role="menu"]').filter({ visible: true }).first().waitFor();
     if (await all.count()) await all.click();
@@ -224,8 +227,18 @@ export class AssistantPage {
     return this.container().locator('[data-test="assistant-context-chip-time"]');
   }
 
-  /** Opens the tray's `+N`, which folds every chip past the first at sidebar width. */
-  async expandTray() {
+  /** The chips folded behind `+N` list in its menu, outside the tray; open it with `openMore()`. */
+  hiddenChips() {
+    return this.container().page().locator('[data-test="assistant-context-hidden-row"]');
+  }
+
+  /** Every chip the user added: those in the tray plus the ones in the open `+N` menu. */
+  allChips() {
+    return this.chips().or(this.hiddenChips());
+  }
+
+  /** Opens the tray's `+N` menu when some chips are folded behind it. */
+  async openMore() {
     const more = this.tray().locator('[data-test="assistant-context-more"]');
     if ((await more.count()) && (await more.getAttribute("aria-expanded")) !== "true") await more.click();
   }
@@ -235,17 +248,16 @@ export class AssistantPage {
     return this.tray().locator('[data-test="assistant-context-chip-image"]');
   }
 
-  /** The ⓘ that opens what the assistant sees, in the composer strip beside chips (or Home's toolbar). */
+  /** The ⓘ that opens what the assistant sees; it always sits in the composer box's top-end corner. */
   sees() {
-    return this.container().locator('[data-test="assistant-context-sees"]').filter({ visible: true });
+    return this.container()
+      .locator('[data-test="assistant-composer-corner"] [data-test="assistant-context-sees"]')
+      .filter({ visible: true });
   }
 
-  /** Opens what the assistant sees: the strip's ⓘ when it shows, else the panel's title menu item. */
+  /** Opens what the assistant sees from the composer's ⓘ. */
   async openSees() {
-    if (await this.sees().count()) return this.sees().click();
-    await this.page.mouse.move(0, 0);
-    await this.thread().locator('[data-test="assistant-thread-title-button"]').click();
-    await this.page.locator('[data-test="assistant-thread-menu-sees"]').filter({ visible: true }).click();
+    await this.sees().click();
   }
 
   /** A host's docked chat; `hostId` is the dock's `data-host`. */

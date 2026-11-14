@@ -496,6 +496,7 @@ const triggerClasses = computed(() => [
               :disabled="isDisabled"
               class="rounded-default border-datepicker-border bg-datepicker-bg text-datepicker-text focus:border-datepicker-focus-border h-7 flex-1 border px-2 text-xs outline-none disabled:opacity-50"
               data-test="datetimerange-custom-unit"
+              @change="autoApply && applyCustomRelative()"
             >
               <option v-for="u in RELATIVE_UNITS" :key="u" :value="u">{{ UNIT_LABELS[u] }}</option>
             </select>

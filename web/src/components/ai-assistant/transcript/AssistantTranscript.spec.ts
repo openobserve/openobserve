@@ -572,7 +572,7 @@ describe("AssistantTranscript: agents (MULTI-AGENT-03, 04, 05)", () => {
     ...over,
   });
 
-  it("names each answer by its own turn's agent, the default one included", () => {
+  it("names each answer by its own turn's agent, in a byline only for an agent other than the default", () => {
     const session = liveSession([
       { ...prompt("first", "t1"), agentId: "o2-ai" },
       reply("one"),
@@ -581,7 +581,10 @@ describe("AssistantTranscript: agents (MULTI-AGENT-03, 04, 05)", () => {
     ]);
     const { wrapper } = mountLive(session);
     const metas = wrapper.findAll('[data-test="assistant-agent-identity"]');
-    expect(metas.map((meta) => meta.attributes("data-agent"))).toEqual(["o2-ai", "sre"]);
+    expect(metas.map((meta) => meta.attributes("data-agent"))).toEqual(["sre"]);
+    expect(wrapper.get('[data-test="assistant-answer-t1"]').attributes("aria-label")).toMatch(
+      /, answer to first$/,
+    );
     expect(wrapper.get('[data-test="assistant-answer-t2"]').attributes("aria-label")).toBe(
       "Investigator, answer to look deeper",
     );

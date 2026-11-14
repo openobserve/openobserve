@@ -40,12 +40,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :org="org"
           class="mx-auto max-w-3xl"
         />
+        <!-- mt-3 leaves room for the chip row that floats above the box, clear of the greeting -->
         <AssistantLauncher
           v-else
           ref="launcher"
           layout="overview"
           :page-range="pageRange"
-          class="mx-auto max-w-3xl"
+          class="mx-auto mt-3 max-w-3xl"
         />
         <AssistantHomeExamples
           v-if="state === 'ai'"

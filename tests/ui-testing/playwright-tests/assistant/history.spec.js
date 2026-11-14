@@ -184,7 +184,7 @@ test.describe("assistant history", () => {
     await expect(assistant.history().locator('[data-test="assistant-history-account"]')).toHaveCount(0);
     await expect(item("Checkout 5xx spike in prod")).toHaveCount(1);
     await page.keyboard.press("Escape");
-    // Download and Share live in the chat title's menu; a browser-only chat offers the first and not the second.
+    // Download and Share live in the chat's title menu; a browser-only chat offers the first and not the second.
     await assistant.thread().locator('[data-test="assistant-thread-title-button"]').click();
     await expect(page.getByRole("menu").getByRole("menuitem", { name: "Download", exact: true })).toBeVisible();
     await expect(page.locator('[data-test="assistant-thread-menu-share"]')).toHaveCount(0);

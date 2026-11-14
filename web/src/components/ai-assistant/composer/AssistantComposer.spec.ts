@@ -211,18 +211,26 @@ describe("rows (§1, S1)", () => {
     vi.unstubAllGlobals();
   });
 
-  it("draws one frame: no strip while empty, else the strip on top, the text, then the bar, all inside the border", async () => {
+  it("draws one frame of text then bar, with the strip above it and outside the border", async () => {
     wide();
     const { wrapper, textarea, store, sid } = setup();
     await flushPromises();
     expect(wrapper.find('[data-test="assistant-composer-strip"]').exists()).toBe(false);
+    const frameRoot = wrapper.get('[data-test="assistant-composer-frame"]');
+    const shape = () => [frameRoot.classes().join(" "), frameRoot.element.innerHTML.length > 0];
+    const before = shape();
     store.addChip(sid, ROW);
     await flushPromises();
     const frame = textarea().element.parentElement!;
     const strip = wrapper.get('[data-test="assistant-composer-strip"]').element;
     const bar = wrapper.get('[data-test="assistant-composer-bar"]').element;
-    expect(frame.contains(strip) && frame.contains(bar)).toBe(true);
-    expect(strip.compareDocumentPosition(textarea().element) & FOLLOWING).toBeTruthy();
+    expect(frame.contains(bar)).toBe(true);
+    expect(frameRoot.element.contains(strip)).toBe(false);
+    expect(strip.nextElementSibling).toBe(frameRoot.element);
+    expect(strip.classList.contains("mb-1")).toBe(true);
+    expect(shape()).toEqual(before);
+    // Three lines tall at rest; it still grows to six before it scrolls.
+    expect(textarea().classes()).toEqual(expect.arrayContaining(["min-h-18", "max-h-36!"]));
     expect(textarea().element.compareDocumentPosition(bar) & FOLLOWING).toBeTruthy();
     const classes = wrapper.get('[data-test="assistant-composer"]').classes();
     expect(classes).toContain("[&>div]:rounded-surface");
@@ -259,7 +267,7 @@ describe("rows (§1, S1)", () => {
     );
   });
 
-  it("puts + and the agent pill on the left and mic, Send on the right, with no @ button", async () => {
+  it("puts + and the agent pill on the left and mic, Send on the right, on one line, with no @ button or ⓘ", async () => {
     resetVoiceForTests(fakeVoiceEngine());
     const { wrapper } = setup();
     setVoiceOptIn("k1", true);
@@ -274,6 +282,10 @@ describe("rows (§1, S1)", () => {
     expect(
       right.findAll('[data-test^="assistant-"]').map((n) => n.attributes("data-test")),
     ).toEqual(["assistant-dictate", "assistant-send"]);
+    expect(wrapper.get('[data-test="assistant-composer-bar"]').classes()).toContain("flex-nowrap");
+    expect(wrapper.get('[data-test="assistant-composer-bar"]').classes()).not.toContain(
+      "flex-wrap",
+    );
     expect(wrapper.findComponent(AssistantComposerPlusMenu).props("actions")).toEqual([
       "attach",
       "context",
@@ -284,25 +296,49 @@ describe("rows (§1, S1)", () => {
     resetVoiceForTests();
   });
 
-  it("ends the strip with the ⓘ only beside chips, and nothing of the composer sits outside the frame", async () => {
-    const { wrapper, store, sid } = setup();
-    const sees = () => wrapper.find('[data-test="assistant-context-sees"]');
-    expect(sees().exists()).toBe(false);
+  it("shows the ⓘ in the frame's top-end corner with no chips, the text padded clear of it, never in the strip", async () => {
+    const { wrapper, store, sid, textarea } = setup();
+    const sees = () => wrapper.findAll('[data-test="assistant-context-sees"]');
+    const corner = () => wrapper.get('[data-test="assistant-composer-corner"]');
+    expect(sees()).toHaveLength(1);
+    expect(corner().element.contains(sees()[0].element)).toBe(true);
+    expect(corner().classes()).toEqual(expect.arrayContaining(["absolute", "end-1", "top-1"]));
+    expect(
+      wrapper.get('[data-test="assistant-composer-frame"]').element.contains(corner().element),
+    ).toBe(true);
+    expect(textarea().classes()).toEqual(
+      expect.arrayContaining(["pe-7!", "max-md:pe-11!", "pointer-coarse:pe-11!"]),
+    );
+    expect(
+      wrapper
+        .get('[data-test="assistant-composer-bar"]')
+        .find('[data-test="assistant-context-sees"]')
+        .exists(),
+    ).toBe(false);
     store.addChip(sid, ROW);
     await flushPromises();
     const strip = wrapper.get('[data-test="assistant-composer-strip"]');
-    expect(strip.element.contains(sees().element)).toBe(true);
-    const frame = wrapper.get('[data-test="assistant-composer-frame"]').element;
-    const outside = [...wrapper.element.children].filter(
-      (child) =>
-        !child.contains(frame) &&
-        !child.classList.contains("sr-only") &&
-        !child.classList.contains("hidden"),
-    );
-    expect(outside).toEqual([]);
+    expect(strip.find('[data-test="assistant-context-sees"]').exists()).toBe(false);
+    expect(sees()).toHaveLength(1);
+    expect(corner().element.contains(sees()[0].element)).toBe(true);
   });
 
-  it("puts the ⓘ after the tray in the strip", async () => {
+  it("drops the ⓘ and its padding while the box is held for a decision or access is gone", async () => {
+    const { wrapper, store, sid, textarea } = setup();
+    const sees = () => wrapper.find('[data-test="assistant-context-sees"]');
+    expect(sees().exists()).toBe(true);
+    await wrapper.setProps({ accessLost: true });
+    expect(sees().exists()).toBe(false);
+    expect(wrapper.find('[data-test="assistant-composer-corner"]').exists()).toBe(false);
+    expect(textarea().classes()).not.toContain("pe-7!");
+    await wrapper.setProps({ accessLost: false });
+    store.state.sessions[sid].pendingConsent = { id: "c1" } as never;
+    await flushPromises();
+    expect(sees().exists()).toBe(false);
+  });
+
+  it("draws the tray before the frame, outside it", async () => {
+    fake.current = fakeAssistant();
     const wrapper = mount(AssistantComposer, {
       props: { sid: null },
       slots: { chips: '<div data-test="tray-stub">tray</div>' },
@@ -317,22 +353,24 @@ describe("rows (§1, S1)", () => {
     store.addChip(sid, ROW);
     await flushPromises();
     const strip = wrapper.get('[data-test="assistant-composer-strip"]');
-    expect(
-      strip
-        .get('[data-test="tray-stub"]')
-        .element.compareDocumentPosition(
-          strip.get('[data-test="assistant-context-sees"]').element,
-        ) & FOLLOWING,
-    ).toBeTruthy();
+    const frame = wrapper.get('[data-test="assistant-composer-frame"]').element;
+    expect(strip.find('[data-test="tray-stub"]').exists()).toBe(true);
+    expect(frame.contains(strip.element)).toBe(false);
+    expect(strip.element.compareDocumentPosition(frame) & FOLLOWING).toBeTruthy();
   });
 
-  it("hides the ⓘ while a notice holds the strip", async () => {
+  it("keeps the ⓘ in the corner while a notice holds the strip", async () => {
     const { wrapper, store, sid } = setup();
     store.addChip(sid, ROW);
     noteCap(sid, raw("Up to 4 images, 2 MB each"));
     await flushPromises();
     expect(wrapper.find(NOTICE).exists()).toBe(true);
-    expect(wrapper.find('[data-test="assistant-context-sees"]').exists()).toBe(false);
+    expect(
+      wrapper
+        .get('[data-test="assistant-composer-corner"]')
+        .find('[data-test="assistant-context-sees"]')
+        .exists(),
+    ).toBe(true);
   });
 
   it("plays the border sweep only on an opening, with L1's sweep utility", async () => {
@@ -447,7 +485,7 @@ describe("refused sends (§1)", () => {
     expect(wrapper.get(NOTICE).attributes("title")).toBe("You're offline. Draft kept.");
   });
 
-  it("keeps the first chip and the ⓘ in the strip; the ⓘ says it is saved with the chat (B-composer-6)", async () => {
+  it("keeps the first chip in the strip and the ⓘ in the corner; the ⓘ says it is saved with the chat (B-composer-6)", async () => {
     const { wrapper, store, sid } = setup();
     localStorage.removeItem("o2.assistant.hints:k1");
     store.addChip(sid, ROW);
@@ -456,15 +494,15 @@ describe("refused sends (§1)", () => {
     expect(wrapper.find('[data-test="assistant-composer-strip"]').text()).not.toContain(
       "Attachments are saved",
     );
-    const strip = wrapper.get('[data-test="assistant-composer-strip"]');
-    expect(strip.find('[data-test="assistant-context-sees"]').exists()).toBe(true);
-    await strip.get('[data-test="assistant-context-sees"]').trigger("click");
+    const corner = wrapper.get('[data-test="assistant-composer-corner"]');
+    expect(corner.find('[data-test="assistant-context-sees"]').exists()).toBe(true);
+    await corner.get('[data-test="assistant-context-sees"]').trigger("click");
     await flushPromises();
     expect(
       document.body
         .querySelector('[data-test="assistant-context-sees-disclosure"]')
         ?.textContent?.trim(),
-    ).toBe("Sent to the assistant and saved with this chat.");
+    ).toBe("Saved with this chat.");
   });
 });
 

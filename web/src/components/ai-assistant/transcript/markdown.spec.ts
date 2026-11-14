@@ -1885,14 +1885,16 @@ describe("assistant answer styling (K1, K2)", () => {
     expect(wrapper.get("code").classes()).not.toContain("border");
   });
 
-  it("sets the lead semibold in the heading colour, in a 72ch tabular-figure column", () => {
+  it("sets the lead in medium weight and the heading colour, in a 90ch column with tabular figures in tables only", () => {
     expect(PROSE_CLASSES.lead.split(" ")).toEqual(
-      expect.arrayContaining(["font-semibold", "text-text-heading"]),
+      expect.arrayContaining(["font-medium", "text-text-heading"]),
     );
-    for (const cls of ["max-w-[72ch]", "tabular-nums", "leading-relaxed"]) {
+    for (const cls of ["max-w-[90ch]", "leading-relaxed"]) {
       expect(PROSE_CLASSES.html.split(" ")).toContain(cls);
       expect(PROSE_CLASSES.plain.split(" ")).toContain(cls);
     }
+    expect(PROSE_CLASSES.html.split(" ")).not.toContain("tabular-nums");
+    expect(PROSE_CLASSES.plain.split(" ")).not.toContain("tabular-nums");
     expect(PROSE_CLASSES.html).not.toContain("blockquote");
   });
 

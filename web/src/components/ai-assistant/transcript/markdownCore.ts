@@ -168,9 +168,9 @@ export const CLASSES = {
   image: "rounded-default my-1 max-h-80 max-w-full",
   tableWrap: "my-2 min-w-0 overflow-x-auto",
   table:
-    "w-full border-collapse text-sm [&_td]:border-b [&_td]:border-border-default [&_td]:px-2 [&_td]:py-1 [&_td]:align-top [&_th]:border-b [&_th]:border-border-default [&_th]:px-2 [&_th]:py-1 [&_th]:font-semibold [&_th]:text-text-heading",
+    "w-full border-collapse text-sm tabular-nums [&_td]:border-b [&_td]:border-border-default [&_td]:px-2 [&_td]:py-1 [&_td]:align-top [&_th]:border-b [&_th]:border-border-default [&_th]:px-2 [&_th]:py-1 [&_th]:font-semibold [&_th]:text-text-heading",
   tableSplit:
-    "w-max min-w-full table-fixed border-collapse text-sm [&_td]:w-32 [&_td]:border-b [&_td]:border-border-default [&_td]:px-2 [&_td]:py-1 [&_td]:align-top [&_th]:w-32 [&_th]:border-b [&_th]:border-border-default [&_th]:px-2 [&_th]:py-1 [&_th]:font-semibold [&_th]:text-text-heading",
+    "w-max min-w-full table-fixed border-collapse text-sm tabular-nums [&_td]:w-32 [&_td]:border-b [&_td]:border-border-default [&_td]:px-2 [&_td]:py-1 [&_td]:align-top [&_th]:w-32 [&_th]:border-b [&_th]:border-border-default [&_th]:px-2 [&_th]:py-1 [&_th]:font-semibold [&_th]:text-text-heading",
   claimGlue: "whitespace-nowrap",
   cellStart: "text-start",
   cellEnd: "text-end",
@@ -202,18 +202,18 @@ export const CLASSES = {
     "inline-block size-3 shrink-0 bg-current me-1 align-[-0.0625rem] [mask-size:contain] [mask-repeat:no-repeat] [mask-position:center] [mask-image:url(data:image/svg+xml,%3Csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20viewBox=%270%200%2024%2024%27%20fill=%27none%27%20stroke=%27black%27%20stroke-width=%272%27%20stroke-linecap=%27round%27%20stroke-linejoin=%27round%27%3E%3Cpath%20d=%27M6%208a6%206%200%200%201%2012%200c0%207%203%209%203%209H3s3-2%203-9%27/%3E%3Cpath%20d=%27M10.3%2021a1.94%201.94%200%200%200%203.4%200%27/%3E%3C/svg%3E)]",
 } as const;
 
-/** The answer's prose column: a 72ch measure, relaxed leading and tabular figures, so numbers line up down a paragraph. */
+/** The answer's prose column: a 90ch measure and relaxed leading; only tables take tabular figures, so prose reads as the app's body text. */
 export const PROSE_CLASSES = {
   html: [
-    "min-w-0 max-w-[72ch] text-sm leading-relaxed text-text-body break-words tabular-nums",
+    "min-w-0 max-w-[90ch] text-sm leading-relaxed text-text-body break-words",
     "[&_p]:my-2.5 [&_p:first-child]:mt-0 [&_p:last-child]:mb-0",
     "[&_ul]:my-2 [&_ul]:list-disc [&_ul]:ps-5 [&_ol]:my-2 [&_ol]:list-decimal [&_ol]:ps-5",
     "[&_li]:my-0.5 [&_hr]:my-3 [&_hr]:border-border-default",
   ].join(" "),
   plain:
-    "text-text-body min-w-0 max-w-[72ch] text-sm leading-relaxed break-words whitespace-pre-wrap tabular-nums",
+    "text-text-body min-w-0 max-w-[90ch] text-sm leading-relaxed break-words whitespace-pre-wrap",
   /** The answer's first sentence states the conclusion, so it alone takes the heading colour at semibold. */
-  lead: "text-text-heading font-semibold",
+  lead: "text-text-heading font-medium",
 } as const;
 
 export type CalloutKind = "cause" | "next" | "watch" | "note";

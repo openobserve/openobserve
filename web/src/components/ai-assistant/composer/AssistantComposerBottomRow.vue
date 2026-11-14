@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     :class="[
-      'flex min-w-0 flex-wrap items-center gap-x-1 gap-y-1',
+      'flex min-w-0 flex-nowrap items-center gap-x-1',
       divided ? 'border-border-default relative -mx-2 mt-1 min-h-10 border-t px-2 pt-2' : 'min-h-8',
     ]"
     data-test="assistant-composer-bar"

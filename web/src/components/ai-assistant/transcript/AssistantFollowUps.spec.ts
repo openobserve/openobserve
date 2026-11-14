@@ -35,6 +35,12 @@ describe("AssistantFollowUps", () => {
       "Show Redis errors by minute",
       "Which endpoints?",
     ]);
+    const list = wrapper.get('[data-test="assistant-follow-ups"]');
+    expect(list.attributes("aria-label")).toBe("Follow-Ups");
+    expect(list.text()).toContain("Follow-Ups");
+    expect(rows[0].element.tagName).toBe("BUTTON");
+    expect(rows[0].findComponent({ name: "OIcon" }).classes()).toContain("text-text-link");
+    expect(rows[0].findComponent({ name: "OIcon" }).props("name")).toBe("arrow-forward");
     await rows[0].trigger("click");
     expect(stageFollowUp).toHaveBeenCalledWith("s1", "Show Redis errors by minute");
     expect(focusComposer).toHaveBeenCalled();

@@ -417,4 +417,17 @@ describe("OInlineEdit", () => {
 
     expect(wrapper.find('[data-test="auto-badge"]').exists()).toBe(false);
   });
+
+  it("draws a bar title in medium weight with its pencil hidden until hover or focus", () => {
+    const bar = mountInlineEdit({ tone: "bar", size: "lg" });
+    const value = bar.get('[data-test="name-value"]');
+    expect(value.classes()).toEqual(expect.arrayContaining(["text-sm", "font-medium"]));
+    expect(value.classes()).not.toContain("font-semibold");
+    const pencil = trigger(bar).findComponent({ name: "OIcon" });
+    expect(pencil.classes()).toEqual(
+      expect.arrayContaining(["opacity-0", "group-focus-within/inline-edit:opacity-100"]),
+    );
+    const title = mountInlineEdit();
+    expect(trigger(title).findComponent({ name: "OIcon" }).classes()).toContain("opacity-50");
+  });
 });

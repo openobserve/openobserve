@@ -167,9 +167,10 @@ describe("AssistantMessage", () => {
     expect(wrapper.find("strong").exists()).toBe(false);
   });
 
-  it("keeps the range on the last turn's question line only, under a right-aligned tinted bubble", () => {
+  it("shows no time range under the question, only a right-aligned tinted bubble", () => {
     const last = mountMessage(user());
     expect(last.find('[data-test="assistant-message-range"]').exists()).toBe(false);
+    expect(last.find('[data-test="assistant-message-meta"]').exists()).toBe(false);
     expect(last.classes()).toContain("items-end");
     const bubble = last.get('[data-test="assistant-message-text"]');
     expect(bubble.classes()).toEqual(
@@ -181,11 +182,6 @@ describe("AssistantMessage", () => {
         "text-text-body",
       ]),
     );
-    const wrapper = mount(AssistantMessage, {
-      props: { message: user(), turnId: "t1", rangeLabel: raw("Last 1 h") },
-    });
-    expect(wrapper.get('[data-test="assistant-message-range"]').text()).toContain("Last 1 h");
-    expect(wrapper.get('[data-test="assistant-message-meta"]').classes()).toContain("text-end");
   });
 
   it("keeps a sent message's action row at a fixed height, its time shown on hover or focus", () => {
@@ -201,17 +197,19 @@ describe("AssistantMessage", () => {
     );
   });
 
-  it("heads an answer with the mark and agent name only when it is the first of its run", () => {
+  it("names the agent above an answer only when another agent answered, never the main assistant", () => {
     const answer: ChatMessage = { role: "assistant", content: raw("Hi"), contentBlocks: [] };
-    const first = mount(AssistantMessage, { props: { message: answer, turnId: "a", head: true } });
-    expect(first.get('[data-test="assistant-agent-identity"]').attributes("data-agent")).toBe(
-      "o2-ai",
+    const main = mount(AssistantMessage, { props: { message: answer, turnId: "a" } });
+    expect(main.find('[data-test="assistant-message-head"]').exists()).toBe(false);
+    const other = mount(AssistantMessage, {
+      props: { message: answer, turnId: "b", agent: "sre" },
+    });
+    expect(other.get('[data-test="assistant-agent-identity"]').attributes("data-agent")).toBe(
+      "sre",
     );
-    const next = mount(AssistantMessage, { props: { message: answer, turnId: "b" } });
-    expect(next.find('[data-test="assistant-message-head"]').exists()).toBe(false);
   });
 
-  it("places the range line and then the sent-context line below the bubble", () => {
+  it("places the author line and then the sent-context line below the bubble", () => {
     const wrapper = mount(AssistantMessage, {
       props: {
         message: user({
@@ -228,7 +226,6 @@ describe("AssistantMessage", () => {
           ],
         }),
         turnId: "t1",
-        rangeLabel: raw("Last 1 h"),
       },
     });
     const order = ["text", "meta", "chips"].map(
@@ -241,9 +238,8 @@ describe("AssistantMessage", () => {
       order[1].compareDocumentPosition(order[2]) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
     expect(order[0].contains(order[1])).toBe(false);
-    expect(wrapper.get('[data-test="assistant-message-meta"]').text()).toBe(
-      "Last 1 h · ada@example.com",
-    );
+    expect(wrapper.get('[data-test="assistant-message-meta"]').text()).toBe("ada@example.com");
+    expect(wrapper.get('[data-test="assistant-message-meta"]').classes()).toContain("text-end");
     expect(wrapper.get('[data-test="assistant-message-chips"]').classes()).toContain("justify-end");
   });
 
@@ -353,11 +349,13 @@ describe("AssistantMessage", () => {
       '[data-test="assistant-block-text"] > :not([data-test="assistant-code-block"])',
     );
     const html = parts.map((part) => part.html());
-    expect(html.filter((h) => h.includes("font-semibold"))).toHaveLength(1);
-    expect(html.find((h) => h.includes("Closing paragraph."))).not.toContain("font-semibold");
+    expect(html.filter((h) => h.includes('data-test="assistant-lead"'))).toHaveLength(1);
+    expect(html.find((h) => h.includes("Closing paragraph."))).not.toContain(
+      'data-test="assistant-lead"',
+    );
   });
 
-  it("B-conversation-17: sets only the lead sentence semibold, never a callout's paragraph or the rest of the lead paragraph", () => {
+  it("B-conversation-17: sets only the lead sentence in medium weight, never a callout's paragraph or the rest of the lead paragraph", () => {
     const text = [
       "Checkout fails because **inventory** resets connections. The db pool is full at **5xx** peaks.",
       "",
@@ -369,7 +367,7 @@ describe("AssistantMessage", () => {
     const leads = wrapper.findAll('[data-test="assistant-lead"]');
     expect(leads).toHaveLength(1);
     expect(leads[0].text()).toBe("Checkout fails because inventory resets connections.");
-    expect(leads[0].classes()).toEqual(expect.arrayContaining(["font-semibold"]));
+    expect(leads[0].classes()).toEqual(expect.arrayContaining(["font-medium"]));
     const html = wrapper.get('[data-test="assistant-block-text"]').html();
     expect(html).not.toMatch(/p:first-child\]:font-semibold/);
     const callouts = wrapper.findAll("blockquote, [class*='assistant-callout']");

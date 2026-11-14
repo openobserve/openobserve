@@ -11567,10 +11567,19 @@
       "chipName": "{label}, {secondary}",
       "dataSharing": "Data sharing · {level}",
       "disclosure": "Attached data is sent to the assistant and saved with this chat.",
-      "seesDisclosure": "Sent to the assistant and saved with this chat.",
+      "seesDisclosure": "Saved with this chat.",
+      "seesEmpty": "Only your message is sent.",
+      "seesGroup": {
+        "added": "You Added",
+        "notRead": "Not Read",
+        "notReadReason": "On this page, but {product} does not read these yet, so they are not sent.",
+        "page": "This Page",
+        "time": "Time"
+      },
+      "seesIntro": "These go with your next message.",
+      "seesIntroRemove": "These go with your next message. To leave out something you added, remove its chip.",
+      "seesTitle": "What {product} Will See",
       "disclosureShared": "Attached data is sent to the assistant, saved with this chat and included in any share.",
-      "fewer": "Fewer chips",
-      "fewerName": "Show fewer context chips",
       "field": {
         "alert": "Alert",
         "attachments": "Attachments",
@@ -11603,7 +11612,8 @@
       "mixedStreams": "One stream type per message. Remove the {type} stream to add this one.",
       "more": "+{count}",
       "moreName": "Show {count} more context chip | Show {count} more context chips",
-      "notRead": "Not read by the assistant yet",
+      "notSent": "Not Sent",
+      "orgLine": "{org} organization",
       "notReadHint": "The assistant does not read this yet",
       "notReadYet": "not read yet",
       "openSource": "Open in {page}",
@@ -11612,7 +11622,6 @@
       "removed": "{label} removed from context",
       "removeRow": "Remove row {n}",
       "rowsCount": "{count} row | {count} rows",
-      "sent": "Sent with your message",
       "sentLine": "Sent:",
       "startNew": "Start a new chat instead",
       "streamsValue": "{names} ({type})",
@@ -13163,6 +13172,7 @@
       "rename": "Rename",
       "renameFailed": "Couldn't rename the chat",
       "renameLabel": "Chat title",
+      "renameHint": "Click to rename this chat",
       "renamed": "Renamed",
       "thisChat": "This chat",
       "renaming": "Renaming…",
@@ -13179,8 +13189,7 @@
       "toolbar": {
         "more": "More Actions",
         "newChat": "New Chat",
-        "openAs": "Open As",
-        "sees": "What the Assistant Sees"
+        "openAs": "Open As"
       }
     },
     "toolsets": {
@@ -13293,6 +13302,7 @@
     "transcript": {
       "answerName": "{agent}, answer to {prompt}",
       "earlierCount": "{count} earlier message | {count} earlier messages",
+      "followUps": "Follow-Ups",
       "name": "Conversation with {product}",
       "showEarlier": "Show earlier messages",
       "turnLabel": "Turn {n}: {prompt}"
@@ -13343,8 +13353,6 @@
       },
       "continueDraft": "Continue the answer above",
       "dataAge": "Data from {age} ago",
-      "lastHours": "Last {n} h",
-      "lastMinutes": "Last {n} min",
       "rerun": "Re-run",
       "stoppedAfter": "Stopped after {n} step, incomplete | Stopped after {n} steps, incomplete",
       "stoppedIncomplete": "Stopped, incomplete"
@@ -13379,7 +13387,7 @@
       "primerEngine": "{engineSentence} OpenObserve doesn't store the audio.",
       "primerTitle": "Dictate into the message",
       "holdLine": "Release {keys} to stop",
-      "seesLine": "Dictation: {engineSentence} OpenObserve doesn't store the audio.",
+      "seesLine": "Dictation uses your browser's speech service. Audio is not stored.",
       "started": "Listening. Press Enter, Escape or the mic to stop.",
       "stopTooltip": "Stop dictation",
       "stopped": "Dictation stopped. {count} word added. | Dictation stopped. {count} words added.",

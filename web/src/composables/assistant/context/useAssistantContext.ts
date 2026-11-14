@@ -29,7 +29,7 @@ import { contextRegistry } from "@/composables/contextProviders/registry";
 import { gt, raw, type I18nText, type TranslateFn } from "@/types/i18n";
 
 import { isRunning, useAssistantStore, type AssistantStoreInternal } from "../assistantStore";
-import type { Sid } from "../assistantStore.types";
+import type { ComposerState, Sid } from "../assistantStore.types";
 import { getAssistantRuntime } from "../runtime";
 import { hostOrgName } from "../runtimeHandle";
 import {
@@ -88,7 +88,13 @@ export interface AssistantContextOptions {
   read?: () => Promise<PageContext | null>;
   /** The display name of an org id; defaults to the host's selected org. */
   orgName?: (id: string) => string;
+  /** What a box with no chat yet (Home's Ask box) will send, read when `sid` has no session. */
+  draft?: MaybeRefOrGetter<ContextDraft | null>;
 }
+
+export type ContextDraft = Partial<
+  Pick<ComposerState, "chips" | "images" | "timeOverride" | "removedPageKeys">
+>;
 
 /** The tray, the sees popover and the placeholder of one session (`00` §6.3). */
 export function useAssistantContext(
@@ -104,7 +110,9 @@ export function useAssistantContext(
     const found = store.state.sessions[toValue(sid) ?? ""];
     return found && found.userOrgKey === store.state.userOrgKey ? found : null;
   });
-  const composer = computed(() => session.value?.composer ?? null);
+  const composer = computed<ContextDraft | null>(
+    () => session.value?.composer ?? toValue(options.draft) ?? null,
+  );
   const org = computed(() => session.value?.org ?? String(page.value?.org_id ?? ""));
   const removedKeys = computed(() => composer.value?.removedPageKeys ?? []);
 
@@ -163,9 +171,10 @@ export function useAssistantContext(
     );
     if (incidentSent.value)
       for (const row of rows) if (row.id === "incident_id") row.group = "sent";
-    const attached = stagedChips.value.filter(
-      (chip) => !!serializedNameOf(chip) && chip.sent !== "not_read",
-    );
+    const attached = [
+      ...stagedChips.value.filter((chip) => !!serializedNameOf(chip) && chip.sent !== "not_read"),
+      ...(composer.value?.images ?? []).map((image) => ({ sizeBytes: image.size })),
+    ];
     if (attached.length === 0) return rows;
     return [
       ...rows,

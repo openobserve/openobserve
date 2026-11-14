@@ -33,10 +33,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :disabled="disabled"
         :data-pending="pending ? '' : undefined"
         :class="['h-7 shrink-0 motion-safe:transition-colors', CHIP_HIT_AREA_CLASS]"
+        :aria-label="layout.narrow ? agentName(shownAgent, t) : undefined"
         data-test="assistant-agent-picker"
         @keydown.up.prevent="menuOpen = true"
       >
-        {{ agentName(shownAgent, t) }}<OIcon :name="assistantGlyph.expand" size="xs" />
+        <!-- A narrow composer keeps the agent's icon and puts its name in the tooltip, so the row never wraps -->
+        <template v-if="!layout.narrow">{{ agentName(shownAgent, t) }}</template
+        ><OIcon :name="assistantGlyph.expand" size="xs" />
+        <OTooltip v-if="layout.narrow" :content="agentName(shownAgent, t)" />
       </OTag>
     </template>
     <ODropdownGroup :label="t('assistant.agent.picker.heading')">
@@ -138,6 +142,7 @@ import {
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";

@@ -159,7 +159,7 @@ describe("AssistantTimePrefix", () => {
     expect(wrapper.findComponent(OPopover).props("contentClass")).toContain("w-80");
     expect(range.contains(document.activeElement)).toBe(true);
     range.querySelector<HTMLElement>('[data-test="datetimerange-relative-panel"] button')!.click();
-    range.querySelector<HTMLElement>('[data-test="datetimerange-relative-apply"]')!.click();
+    expect(range.querySelector('[data-test="datetimerange-relative-apply"]')).toBeNull();
     await flushPromises();
     expect(wrapper.emitted("change")?.[0]?.[0]).toMatchObject({ period: "1s" });
     expect(wrapper.emitted("update:open")?.at(-1)).toEqual([false]);

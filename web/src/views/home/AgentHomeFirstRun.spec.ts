@@ -55,6 +55,8 @@ describe("AgentHomeFirstRun (HomeFirstRun board, B-shell-5)", () => {
     ]);
     expect(main.get('[data-test="agent-home-first-run-title"]').text()).toContain("No data yet");
     expect(main.get('[data-test="launcher-stub"]').attributes("data-layout")).toBe("overview");
+    // The Ask box's chip row floats above it, so the box keeps room for it below the note.
+    expect(main.get('[data-test="launcher-stub"]').classes()).toContain("mt-6");
   });
 
   it("is one centred column with no right rail, Brief me or recent threads", () => {

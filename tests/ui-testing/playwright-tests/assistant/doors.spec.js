@@ -116,9 +116,8 @@ test.describe("assistant doors", () => {
     await expect(record).toHaveAttribute("data-door-state", "added");
     const panel = assistant.container();
     await expect(panel).toBeVisible();
-    await assistant.expandTray();
-    const doorChips = assistant.tray().locator('[data-test="assistant-context-chip-field"], [data-test="assistant-context-chip-log_row"]');
-    await expect(doorChips).toHaveCount(2);
+    await assistant.openMore();
+    await expect(assistant.allChips()).toHaveCount(2);
     // The drawer stops at the panel's edge instead of covering it (U4).
     const [drawerBox, panelBox] = [await drawer.boundingBox(), await panel.boundingBox()];
     expect(drawerBox.x + drawerBox.width).toBeLessThanOrEqual(panelBox.x + 1);

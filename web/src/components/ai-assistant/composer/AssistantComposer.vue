@@ -32,6 +32,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @select="pickMention"
         @close="closeMention"
       />
+      <!-- Above the frame, not in it, so a chip or a notice never resizes the box -->
+      <AssistantComposerStrip
+        v-if="stripShown"
+        :notice="notice"
+        :sentence-id="noticeId"
+        class="mb-1"
+        @action="onNoticeAction"
+      >
+        <slot v-if="!replying" name="chips" />
+        <template #link-askAdmin>
+          <AssistantAskAdminPopover kind="access" :org="org">
+            <template #trigger>
+              <OButton
+                variant="ghost-primary"
+                size="chip"
+                :class="STRIP_LINK_CLASS"
+                data-test="assistant-composer-ask-admin"
+              >
+                {{ t("assistant.gate.noPermission.askAdmin") }}
+              </OButton>
+            </template>
+          </AssistantAskAdminPopover>
+        </template>
+      </AssistantComposerStrip>
       <AssistantComposerFrame
         ref="textbox"
         :model-value="shownText"
@@ -52,33 +76,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @focus="refreshPageContext"
         @blur="onBlur"
       >
-        <template v-if="stripShown" #strip>
-          <AssistantComposerStrip :notice="notice" :sentence-id="noticeId" @action="onNoticeAction">
-            <slot v-if="!replying" name="chips" />
-            <template #link-askAdmin>
-              <AssistantAskAdminPopover kind="access" :org="org">
-                <template #trigger>
-                  <OButton
-                    variant="ghost-primary"
-                    size="chip"
-                    :class="STRIP_LINK_CLASS"
-                    data-test="assistant-composer-ask-admin"
-                  >
-                    {{ t("assistant.gate.noPermission.askAdmin") }}
-                  </OButton>
-                </template>
-              </AssistantAskAdminPopover>
+        <template v-if="!inertKind && !accessLost" #corner>
+          <AssistantContextSeesPopover :sid="liveSid">
+            <template v-if="storageBlocked" #detail>
+              <OText variant="meta" as="p" data-test="assistant-composer-storage-blocked">
+                {{ t("assistant.client.storageBlocked") }}
+              </OText>
             </template>
-            <template v-if="seesShown" #sees>
-              <AssistantContextSeesPopover :sid="liveSid" placement="top">
-                <template v-if="storageBlocked" #detail>
-                  <OText variant="meta" as="p" data-test="assistant-composer-storage-blocked">
-                    {{ t("assistant.client.storageBlocked") }}
-                  </OText>
-                </template>
-              </AssistantContextSeesPopover>
-            </template>
-          </AssistantComposerStrip>
+          </AssistantContextSeesPopover>
         </template>
         <template #bar>
           <AssistantComposerBottomRow divided>
@@ -212,7 +217,6 @@ import AssistantMentionMenu, {
   type MentionOption,
 } from "@/components/ai-assistant/context/AssistantMentionMenu.vue";
 import AssistantAskAdminPopover from "@/components/ai-assistant/gate/AssistantAskAdminPopover.vue";
-import { composerStripHoldsSees } from "@/components/ai-assistant/shell/headerSees";
 import { isCreditsRefusal } from "@/components/ai-assistant/turn/creditsRefusal";
 import {
   MAX_IMAGES,
@@ -367,9 +371,10 @@ const stagedChips = computed(() =>
   (composer.value?.chips ?? []).filter((chip) => chip.provenance !== "page"),
 );
 const attached = computed(() => stagedChips.value.length > 0 || images.value.length > 0);
-// With no chips the panel header carries the ⓘ, so the strip shows it only beside chips and never beside a notice.
-const chipsShown = computed(() => composerStripHoldsSees(composer.value));
-const seesShown = computed(() => !notice.value && chipsShown.value);
+// The strip holds only what the user added: an image, or a staged chip other than the time.
+const chipsShown = computed(
+  () => images.value.length > 0 || stagedChips.value.some((chip) => chip.kind !== "time"),
+);
 // The + menu opens the time pill's picker.
 const timeOpen = ref(false);
 // An empty box draws no strip: it holds only a notice, or the chips the user added.
@@ -801,7 +806,7 @@ const quietNotice = computed<ComposerNotice | null>(() => {
   ]);
 });
 
-// Beside chips this line sits in the ⓘ; an empty strip says it itself, as the header ⓘ does not carry it.
+// The ⓘ always carries this line; the strip says it too only when no chips need the room.
 const storageNotice = computed<ComposerNotice | null>(() =>
   storageBlocked.value && !chipsShown.value
     ? sentenceNotice("storage", t("assistant.client.storageBlocked"), "info")

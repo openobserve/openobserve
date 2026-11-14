@@ -183,8 +183,8 @@ test.describe("assistant incident chat", () => {
     await start(page, context);
     await openIncidentChat(page);
     await expect(assistant.timeChip()).toBeVisible();
-    await assistant.expandTray();
-    const chips = assistant.chips();
+    await assistant.openMore();
+    const chips = assistant.allChips();
     await expect(chips).toHaveCount(2);
     await expect(chips.filter({ hasText: "Checkout latency" })).toHaveCount(1);
     await expect(

@@ -458,6 +458,49 @@ describe("AssistantLauncher", () => {
     expect(wrapper.find('[data-test="assistant-launcher-narrow-tools"]').exists()).toBe(false);
   });
 
+  it("shows the ⓘ in the box's top-end corner with nothing added, keeps the bar one line, and none while gated", async () => {
+    const { wrapper } = setupOn({ layout: "overview" });
+    const right = wrapper.get('[data-test="assistant-composer-bar-right"]');
+    expect(
+      right.findAll('[data-test^="assistant-"]').map((node) => node.attributes("data-test")),
+    ).toEqual(["assistant-launcher-ask"]);
+    expect(wrapper.get('[data-test="assistant-composer-bar"]').classes()).toContain("flex-nowrap");
+    const corner = wrapper.get('[data-test="assistant-composer-corner"]');
+    expect(corner.find('[data-test="assistant-context-sees"]').exists()).toBe(true);
+    expect(input(wrapper).classes()).toEqual(expect.arrayContaining(["min-h-18", "pe-7!"]));
+    const gated = setupOn({ layout: "overview" });
+    fake.current.capability.value = { ...fake.current.capability.value, gate: "no_permission" };
+    await flushPromises();
+    expect(gated.wrapper.find('[data-test="assistant-context-sees"]').exists()).toBe(false);
+  });
+
+  it("opens the ⓘ on what Ask would send: the @ picks under You Added and the picked range", async () => {
+    mentionPick.current = {
+      id: "mention:stream:logs|checkout",
+      kind: "stream",
+      label: raw("checkout"),
+      chip: {
+        id: "mention:stream:logs|checkout",
+        kind: "stream",
+        label: raw("checkout"),
+        ref: { type: "stream", id: "checkout", org: "default", streamType: "logs" },
+        sizeBytes: 8,
+        provenance: "mention",
+        sent: "whitelist",
+      },
+    };
+    const { wrapper } = setupOn({ layout: "overview" });
+    await flushPromises();
+    await input(wrapper).setValue("@check");
+    await flushPromises();
+    await input(wrapper).trigger("keydown", { key: "Enter" });
+    await flushPromises();
+    await wrapper.get('[data-test="assistant-context-sees"]').trigger("click");
+    await flushPromises();
+    const added = document.body.querySelector('[data-test="assistant-context-sees-added"]');
+    expect(added?.textContent).toContain("checkout");
+  });
+
   it("rings Home's field with one flush ribbon on focus, over a solid edge at rest, and keeps the card plain", async () => {
     const { wrapper } = setupOn({ layout: "overview" });
     const frame = wrapper.get('[data-test="assistant-composer-frame"] > div');
@@ -604,7 +647,14 @@ describe("AssistantLauncher", () => {
       await vi.waitFor(() => expect(thumbs(wrapper)).toHaveLength(1));
       const left = wrapper.get('[data-test="assistant-composer-bar-left"]');
       const row = wrapper.get('[data-test="assistant-launcher-chip-row"]');
+      const frame = wrapper.get('[data-test="assistant-composer-frame"]');
       expect(left.find('[data-test="assistant-launcher-chips"]').exists()).toBe(false);
+      // Home floats the row above the box: it takes no flow space, so the box does not move.
+      expect(frame.element.contains(row.element)).toBe(false);
+      expect(row.element.nextElementSibling).toBe(frame.element);
+      expect(row.classes()).toEqual(
+        expect.arrayContaining(["absolute", "inset-x-0", "bottom-full", "mb-1"]),
+      );
       expect(row.element.compareDocumentPosition(wrapper.get("textarea").element)).toBe(
         Node.DOCUMENT_POSITION_FOLLOWING,
       );
@@ -623,7 +673,7 @@ describe("AssistantLauncher", () => {
       await flushPromises();
       pick(wrapper, [png("a.png"), png("b.png", 20)]);
       await vi.waitFor(() =>
-        expect(wrapper.find('[data-test="assistant-launcher-chips"]').text()).toContain("+1"),
+        expect(wrapper.find('[data-test="assistant-launcher-chips"]').text()).toContain("b.png"),
       );
       await input(wrapper).setValue("what is this?");
       await input(wrapper).trigger("keydown", { key: "Enter" });

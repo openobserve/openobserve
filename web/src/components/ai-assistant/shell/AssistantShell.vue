@@ -49,11 +49,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :toolbar="bare"
       >
         <template #container-actions="{ narrow }">
-          <AssistantHeaderSees
-            v-if="headerSees && bare"
-            :sid="activeSid"
-            :label="t('assistant.thread.toolbar.sees')"
-          />
           <AssistantModeButtons
             v-if="!narrow && !bare"
             :placement="placement"
@@ -96,30 +91,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @settings="shareDrawerOpen = true"
           />
         </template>
-        <!-- The bar holds New chat, Open as and × only, so what the assistant sees opens from the title menu -->
-        <template v-if="seesInMenu" #menu-sees>
-          <ODropdownItem
-            :icon-left="assistantGlyph.info"
-            data-test="assistant-thread-menu-sees"
-            @select="afterTitleMenu(() => (seesOpen = true))"
-          >
-            {{ t("assistant.context.title") }}
-          </ODropdownItem>
-        </template>
-        <template v-if="(activeSid && state === 'conversation') || seesInMenu" #title-anchor>
+        <template v-if="activeSid && state === 'conversation'" #title-anchor>
           <AssistantShareControl
-            v-if="activeSid && state === 'conversation'"
             v-model:open="shareQuickOpen"
             :sid="activeSid"
             variant="quick"
             @settings="openShareDrawer"
             @dismissed="threadHeader?.focusChats()"
-          />
-          <AssistantHeaderSees
-            v-if="seesInMenu"
-            :sid="activeSid"
-            :open="seesOpen"
-            @update:open="onSeesOpen"
           />
         </template>
       </AssistantThreadHeader>
@@ -744,7 +722,6 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import { copyToClipboard } from "@/utils/clipboard";
 import { formatCount, formatOrgIsoDay, formatOrgTime } from "@/utils/formatters";
 
-import AssistantHeaderSees from "./AssistantHeaderSees.vue";
 import AssistantModeButtons from "./AssistantModeButtons.vue";
 import AssistantStatusRegion from "./AssistantStatusRegion.vue";
 import { closeLockedPanel, useLockedPanel } from "./lockedPanel";
@@ -861,8 +838,9 @@ const container = computed<Container>(() => {
 const closable = computed(() => props.placement !== "window" && props.placement !== "full");
 
 const chromeClasses = computed(() => {
-  // A bare shell's controls sit in the chat's top corner, never on a bar.
-  if (props.bare) return "flex shrink-0 items-center justify-end px-3 pt-3";
+  // A bare shell's row leads with the chat's title, controls at the end, ruled off like Home's rail.
+  if (props.bare)
+    return "border-border-subtle flex min-h-14 shrink-0 items-center border-b px-4 py-2";
   // The panels' bar opens on the logo, which wants the panel's own inset, not a button's.
   const start = props.placement === "sidebar" || props.placement === "docked" ? "ps-3" : "ps-1";
   const base = `border-border-default flex shrink-0 items-center gap-1 border-b ${start} pe-2`;
@@ -877,7 +855,7 @@ const chromeClasses = computed(() => {
   return [base, props.sheet ? "h-11" : "h-10 max-md:h-11"];
 });
 const readingWidth = computed(() =>
-  props.placement === "full" ? "mx-auto w-full max-w-160" : undefined,
+  props.placement === "full" ? "mx-auto w-full max-w-3xl" : undefined,
 );
 // The Chats view hides the chat instead of unmounting it, so its draft, scroll and stream carry on.
 const chatsOpen = ref(false);
@@ -995,12 +973,6 @@ const visible = computed(() => {
   return kind === props.placement;
 });
 
-// Only a container whose composer shows can owe the header an ⓘ.
-const headerSees = computed(
-  () => (state.value === "empty" || state.value === "conversation") && !composerLocked.value,
-);
-const seesInMenu = computed(() => headerSees.value && !props.bare);
-const seesOpen = ref(false);
 // Home and the dock suggest prompts; the side panel and a window open on the logo alone.
 const startersShown = computed(() => props.placement === "full" || props.placement === "docked");
 
@@ -1655,15 +1627,6 @@ function afterTitleMenu(show: () => void): void {
 
 function openQuickShare(): void {
   afterTitleMenu(() => (shareQuickOpen.value = true));
-}
-
-// Its hidden anchor cannot take focus back, so a close that drops focus returns it to the title.
-function onSeesOpen(open: boolean): void {
-  seesOpen.value = open;
-  if (open) return;
-  void nextTick(() => {
-    if (document.activeElement === document.body) threadHeader.value?.focusChats();
-  });
 }
 
 function openShareDrawer(): void {
