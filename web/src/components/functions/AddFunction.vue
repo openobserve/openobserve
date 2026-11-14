@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="flex h-full min-h-0 w-full flex-col">
+  <div class="@container/page flex h-full min-h-0 w-full flex-col">
     <!-- The toolbar hosts the form-owned name + transType fields and the Save
          button (type="submit"), so it lives INSIDE the <OForm>. The editor +
          TestFunction below stay OUTSIDE the form. Inline form → Enter submits

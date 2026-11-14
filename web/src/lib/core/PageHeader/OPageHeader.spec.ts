@@ -177,6 +177,33 @@ describe("OPageHeader with a status", () => {
   });
 });
 
+describe("OPageHeader with inline tabs", () => {
+  const mountTabs = async (tabsBelow: boolean) => {
+    lgUp.value = true;
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: "/", component: { render: () => null } }],
+    });
+    wrapper = mount(OPageHeader, {
+      props: { title: raw("Function"), tabsBelow },
+      slots: { tabs: () => h("div", "VRL"), actions: () => h("button", "Save") },
+      attachTo: document.body,
+      global: { plugins: [i18n, router] },
+    });
+    await flushPromises();
+  };
+
+  it("floors the title row at its content in a narrow page, so the actions wrap instead of covering the tabs", async () => {
+    await mountTabs(false);
+    expect(titleBlock().className).toContain("@max-4xl/page:min-w-fit");
+  });
+
+  it("adds no floor when the tabs sit on their own row", async () => {
+    await mountTabs(true);
+    expect(titleBlock().className).not.toContain("@max-4xl/page:min-w-fit");
+  });
+});
+
 describe("OPageHeader with the access chip", () => {
   const chip = () => document.querySelector<HTMLElement>('[data-test="access-header-chip"]')!;
   const card = () => document.querySelector('[data-test="access-header-popover"]');

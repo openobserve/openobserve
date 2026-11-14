@@ -143,6 +143,11 @@ describe("AddFunction.vue Branch Coverage", () => {
       (config as any).isCloud = "false";
     });
 
+    it("is a page container, so its header wraps when the side panel narrows the page", () => {
+      const page = mountAddFunction().find('[class~="@container/page"]');
+      expect(page.find('[id="add-function-form"]').exists()).toBe(true);
+    });
+
     it("OSS: offers VRL + a locked JavaScript option", () => {
       const wrapper = mountAddFunction();
       expect(values(wrapper)).toEqual(["0", "1"]);
