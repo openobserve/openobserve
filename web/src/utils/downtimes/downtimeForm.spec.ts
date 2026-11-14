@@ -14,6 +14,7 @@ import {
   notifyAfterPick,
   defaultDowntimeValues,
   downtimeToFormValues,
+  buildSchedule,
   exclusiveAllFolders,
   movePastWindow,
   nextFullHourMs,
@@ -346,12 +347,15 @@ describe("schedule defaults", () => {
     );
   });
 
-  it("picks today's weekday in the form's timezone when the repeat becomes weekly", () => {
+  it("starts a new weekly selection empty and keeps the weekdays of a loaded row", () => {
     const late = Date.parse("2026-09-17T23:30:00Z");
     const s = { ...defaultDowntimeValues(late, "Asia/Tokyo").schedule };
     const weekly = scheduleForRepeat(s, "weekly", late);
     expect(weekly.start_date).toBe("2026-09-18");
-    expect(weekly.weekdays).toEqual([5]);
+    expect(weekly.weekdays).toEqual([]);
+    // On a Thursday, a click on Mon and Fri saves [1, 5], not [1, 4, 5].
+    const picked = { ...weekly, weekdays: [1, 5] };
+    expect(buildSchedule(picked).weekdays).toEqual([1, 5]);
     expect(scheduleForRepeat({ ...s, weekdays: [1, 3] }, "weekly", late).weekdays).toEqual([1, 3]);
   });
 

@@ -184,7 +184,7 @@ test.describe('Downtimes create and edit', { tag: ['@downtimes', '@enterprise', 
     expect(await dt.downtimeCountInFolder(page, folderId)).toBe(before);
   });
 
-  test('DT-C-05 schedule defaults to the next full hour, and weekly preselects today', { tag: ['@P1'] }, async ({ page }) => {
+  test('DT-C-05 schedule defaults to the next full hour, and weekly starts with no day', { tag: ['@P1'] }, async ({ page }) => {
     const folderId = await fx.newDowntimeFolder(page, reg);
     // The form computes its defaults when it opens; an hour or midnight passing before the read below would split them.
     await pm.downtimesPage.waitOutLocalHourBoundary();
@@ -194,9 +194,12 @@ test.describe('Downtimes create and edit', { tag: ['@downtimes', '@enterprise', 
     await pm.downtimesPage.expectScheduleTimes(expected.start, expected.end);
 
     await pm.downtimesPage.setRepeat('weekly');
+    // No day is added for the user, so a click on Mon and Fri saves only those days.
     for (let day = 1; day <= 7; day++) {
-      await pm.downtimesPage.expectWeekdayPressed(day, day === expected.todayIso);
+      await pm.downtimesPage.expectWeekdayPressed(day, false);
     }
+    await pm.downtimesPage.toggleWeekday(expected.todayIso);
+    await pm.downtimesPage.expectWeekdayPressed(expected.todayIso, true);
     await pm.downtimesPage.expectSummary(new RegExp(`^Every ${expected.todayLong} at \\d{2}:\\d{2}`));
   });
 
@@ -280,7 +283,7 @@ test.describe('Downtimes create and edit', { tag: ['@downtimes', '@enterprise', 
   test('DT-C-10 recurring schedule validation', { tag: ['@P1'] }, async ({ page }) => {
     const folderId = await fx.newDowntimeFolder(page, reg);
     const before = await dt.downtimeCountInFolder(page, folderId);
-    // Weekly preselects today, so midnight passing between the form opening and the read below would untick the wrong day.
+    // Weekly starts with no day; the hour wait keeps today's day stable for the check below.
     await pm.downtimesPage.waitOutLocalHourBoundary();
     await pm.downtimesPage.gotoAdd(folderId);
     const { todayIso } = await pm.downtimesPage.nextLocalHour();
@@ -289,7 +292,6 @@ test.describe('Downtimes create and edit', { tag: ['@downtimes', '@enterprise', 
     await pm.downtimesPage.openTab('schedule');
 
     await pm.downtimesPage.setRepeat('weekly');
-    await pm.downtimesPage.toggleWeekday(todayIso);
     await pm.downtimesPage.expectWeekdayPressed(todayIso, false);
     await pm.downtimesPage.save();
     await pm.downtimesPage.expectErrorText('Choose at least one day.');

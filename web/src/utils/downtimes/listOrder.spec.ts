@@ -18,6 +18,19 @@ const row = (
     next_window: window === "next" ? { start, end: start + 10 } : null,
   }) as unknown as DowntimeListItem;
 
+describe("finished rows", () => {
+  it("list newest first, while live rows keep the soonest first", () => {
+    const rows = [
+      row("e1", "ended", 1),
+      row("e3", "ended", 3),
+      row("e2", "ended", 2),
+      row("s2", "scheduled", 20, "next"),
+      row("s1", "scheduled", 10, "next"),
+    ];
+    expect(sortDowntimeRows(rows).map((r) => r.id)).toEqual(["s1", "s2", "e3", "e2", "e1"]);
+  });
+});
+
 describe("downtime list order", () => {
   it("sorts by status, then start, then id, whatever the input order", () => {
     const rows = [

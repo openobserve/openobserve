@@ -53,12 +53,14 @@ export const isFinished = (row: Pick<DowntimeListItem, "status">): boolean => !i
 const startOf = (row: Row): number =>
   row.current_window?.start ?? row.next_window?.start ?? row.schedule.starts_at;
 
-/** Status, then start, then id, so a row keeps its place across refetches. */
+/** Status, then start (finished rows newest first), then id, so a row keeps its place across refetches. */
 export function sortDowntimeRows<T extends Row>(rows: readonly T[]): T[] {
+  const byStart = (a: T, b: T) =>
+    isFinished(a) ? startOf(b) - startOf(a) : startOf(a) - startOf(b);
   return [...rows].sort(
     (a, b) =>
       STATUS_ORDER[a.status] - STATUS_ORDER[b.status] ||
-      startOf(a) - startOf(b) ||
+      byStart(a, b) ||
       (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
   );
 }

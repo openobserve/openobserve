@@ -2,6 +2,8 @@
 
 import { effectScope, ref } from "vue";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { gt } from "@/types/i18n";
+import { countdownText } from "@/utils/downtimes/banner";
 import { useCountdown } from "./useCountdown";
 
 const NOW = Date.parse("2026-09-17T14:00:00Z");
@@ -20,15 +22,33 @@ describe("useCountdown", () => {
   });
   afterEach(() => vi.useRealTimers());
 
-  it("moves once per minute boundary, not every second", () => {
+  it("moves only where the rounded text changes, at each half minute below an hour", () => {
     const { remainingSecs, stop } = run(() => micros(NOW + 3 * 60_000 + 20_000));
     expect(remainingSecs.value).toBe(200);
-    vi.advanceTimersByTime(19_000);
+    vi.advanceTimersByTime(49_000);
     expect(remainingSecs.value).toBe(200);
     vi.advanceTimersByTime(1_100);
-    expect(remainingSecs.value).toBe(179);
+    expect(remainingSecs.value).toBe(149);
     vi.advanceTimersByTime(60_000);
-    expect(remainingSecs.value).toBe(119);
+    expect(remainingSecs.value).toBe(89);
+    stop();
+  });
+
+  it("changes the banner from 4 to 3 minutes at 3 min 30 s left", () => {
+    const { remainingSecs, stop } = run(() => micros(NOW + 3 * 60_000 + 40_000));
+    expect(countdownText(remainingSecs.value!, gt)).toBe("ends in 4 minutes");
+    vi.advanceTimersByTime(9_000);
+    expect(countdownText(remainingSecs.value!, gt)).toBe("ends in 4 minutes");
+    vi.advanceTimersByTime(1_100);
+    expect(countdownText(remainingSecs.value!, gt)).toBe("ends in 3 minutes");
+    stop();
+  });
+
+  it("shows the under-a-minute text at 60 s after starting at 75 s", () => {
+    const { remainingSecs, stop } = run(() => micros(NOW + 75_000));
+    expect(countdownText(remainingSecs.value!, gt)).toBe("ends in 1 minute");
+    vi.advanceTimersByTime(15_100);
+    expect(countdownText(remainingSecs.value!, gt)).toBe("ends in less than a minute");
     stop();
   });
 

@@ -349,13 +349,13 @@ describe("useAlertActions", () => {
 
     it("says tomorrow for the 24 h end of Until it clears", async () => {
       expect(await muteEndingAt(endIn(24))).toBe(
-        "Muted cpu-high until it clears, 8:37 AM tomorrow at the latest",
+        "Muted cpu-high until it clears, 08:37 tomorrow at the latest",
       );
     });
 
     it("keeps the bare time for an end later today", async () => {
       expect(await muteEndingAt(endIn(2))).toBe(
-        "Muted cpu-high until it clears, 10:37 AM at the latest",
+        "Muted cpu-high until it clears, 10:37 at the latest",
       );
     });
 

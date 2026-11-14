@@ -852,16 +852,16 @@ const onFolderChange = (folderId: string) => {
   selectedIds.value = [];
 };
 
+// The same fields as the server search: name, reason and creator.
 const searchText = (row: DowntimeListItem) =>
-  [row.name, row.created_by, JSON.stringify(row.condition ?? "")].join(" ").toLowerCase();
+  [row.name, row.reason ?? "", row.created_by].join(" ").toLowerCase();
 
 const folderRows = computed(() => {
   const term = search.value.trim().toLowerCase();
-  // The org banner links here with every folder and a status filter, and no search term.
-  const scoped =
-    searchAcrossFolders.value && (term || statFilter.value)
-      ? allRows.value
-      : allRows.value.filter((r) => (r.folder_id || "default") === activeFolderId.value);
+  // "All folders" lists every folder, with or without a search term or a status filter.
+  const scoped = searchAcrossFolders.value
+    ? allRows.value
+    : allRows.value.filter((r) => (r.folder_id || "default") === activeFolderId.value);
   const byType = scoped.filter((r) =>
     typeFilter.value === "all"
       ? true
@@ -894,13 +894,9 @@ const isFiltered = computed(
 );
 
 // ── Summary strip ───────────────────────────────────────────────────────────
-// The tiles count `folderRows`, which holds every listed row unfiltered only on the banner's all-folders status link.
+// The tiles count `folderRows`, which holds every listed row unfiltered in "All folders" with no search or type filter.
 const orgWideTiles = computed(
-  () =>
-    searchAcrossFolders.value &&
-    statFilter.value !== null &&
-    !search.value.trim() &&
-    typeFilter.value === "all",
+  () => searchAcrossFolders.value && !search.value.trim() && typeFilter.value === "all",
 );
 
 // The server counts the whole org, so a cut list takes them only where the tiles cover the whole org too.

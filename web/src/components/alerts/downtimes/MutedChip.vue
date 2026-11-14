@@ -24,6 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="link"
       :href="link.href"
       class="focus-visible:outline-focus-ring-accent rounded-default inline-flex max-w-full min-w-0 no-underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-solid"
+      :data-test="`${dataTest}-link`"
       @click.stop="openDowntime"
     >
       <OTag type="downtimeStatus" value="active" class="max-w-full min-w-0">
@@ -41,6 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, getCurrentInstance } from "vue";
 import type { Router } from "vue-router";
 import type { Store } from "vuex";
+import { useDowntimeLookup } from "@/composables/downtimes/useDowntimeLookup";
 import { useI18nTyped } from "@/types/i18n";
 import type { ActiveDowntime } from "@/services/downtimes";
 import { useCountdown } from "@/composables/downtimes/useCountdown";
@@ -68,10 +70,14 @@ const app = getCurrentInstance()?.appContext.config.globalProperties;
 const router = app?.$router as Router | undefined;
 const store = app?.$store as Store<any> | undefined;
 
+// An older node sends no folder; then the chip links only when the lookup knows the row, else it stays plain.
+const lookup = useDowntimeLookup(true);
 const link = computed(() => {
   if (!router) return null;
-  const to = downtimeLink(props.downtime, store?.state?.selectedOrganization?.identifier ?? "");
-  return { to, href: router.resolve(to).href };
+  const to = props.downtime.folder_id
+    ? downtimeLink(props.downtime, store?.state?.selectedOrganization?.identifier ?? "")
+    : lookup.detailRoute(props.downtime.id);
+  return to ? { to, href: router.resolve(to).href } : null;
 });
 
 // A modifier or middle click stays the browser's, so it can open the link in a new tab.

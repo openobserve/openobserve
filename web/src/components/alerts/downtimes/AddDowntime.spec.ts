@@ -8,7 +8,6 @@ import AddDowntime from "./AddDowntime.vue";
 import downtimes from "@/services/downtimes";
 import common from "@/services/common";
 import { queryClient } from "@/composables/query/queryClient";
-import { isoWeekday, utcMicrosToLocal } from "@/utils/downtimes/schedule";
 import AlertDestinationsField from "@/components/alerts/AlertDestinationsField.vue";
 import DowntimeConditionSection from "./DowntimeConditionSection.vue";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
@@ -504,15 +503,15 @@ describe("AddDowntime", () => {
     wrapper.unmount();
   });
 
-  it("picks today's weekday and shows Starts on when the repeat becomes weekly", async () => {
+  it("selects no weekday and shows Starts on when the repeat becomes weekly", async () => {
     const { wrapper } = await mountPage();
     await seeSchedule(wrapper);
     await wrapper.get('[data-test="downtime-schedule-repeat-weekly"]').trigger("click");
     await flushPromises();
-    const zone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
-    const today = utcMicrosToLocal(Date.now() * 1000, zone).date;
-    const day = wrapper.get(`[data-test="downtime-schedule-weekday-${isoWeekday(today)}"]`);
-    expect(day.attributes("data-state")).toBe("on");
+    for (const day of [1, 2, 3, 4, 5, 6, 7]) {
+      const item = wrapper.get(`[data-test="downtime-schedule-weekday-${day}"]`);
+      expect(item.attributes("data-state")).toBe("off");
+    }
     expect(wrapper.find('[data-test="downtime-schedule-starts-on"]').exists()).toBe(true);
     wrapper.unmount();
   });
