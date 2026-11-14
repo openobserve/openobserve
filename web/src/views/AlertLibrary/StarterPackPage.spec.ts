@@ -487,6 +487,41 @@ describe("StarterPackPage", () => {
     expect(text(wrapper, "starter-pack-page-chip")).toBe(t("starterPacks.page.chipNotSetUp"));
   });
 
+  it("opens the setup popup from Set up without installing, and offers no What gets created", async () => {
+    fake.flow = fakeFlow({ isAdmin: ref(true) });
+    const wrapper = await render();
+    expect(has(wrapper, "starter-pack-page-details-btn")).toBe(false);
+    const drawer = wrapper.findComponent({ name: "StarterPackDrawer" });
+    expect(drawer.props("open")).toBe(false);
+    await wrapper.get('[data-test="starter-pack-page-setup-btn"]').trigger("click");
+    expect(drawer.props("open")).toBe(true);
+    expect(fake.flow.install).not.toHaveBeenCalled();
+  });
+
+  it("hands the popup the folder picked on the page", async () => {
+    fake.flow = fakeFlow({ isAdmin: ref(true) });
+    const wrapper = await render();
+    const drawer = wrapper.findComponent({ name: "StarterPackDrawer" });
+    expect(drawer.props("flow")).toBe(fake.flow);
+    expect(drawer.props("folderName")).toBeUndefined();
+    wrapper
+      .findComponent('[data-test="starter-pack-page-folder-select"]')
+      .vm.$emit("update:modelValue", "Team folder");
+    await flushPromises();
+    expect(drawer.props("folderName")).toBe("Team folder");
+  });
+
+  it("re-reads the page when the popup closes after it installed the pack", async () => {
+    fake.flow = fakeFlow({ isAdmin: ref(true) });
+    const wrapper = await render();
+    await wrapper.get('[data-test="starter-pack-page-setup-btn"]').trigger("click");
+    vi.mocked(fake.flow.load).mockClear();
+    fake.flow.installed.value = true;
+    wrapper.findComponent({ name: "StarterPackDrawer" }).vm.$emit("update:open", false);
+    await flushPromises();
+    expect(fake.flow.load).toHaveBeenCalledTimes(1);
+  });
+
   it("hides the folder picker from anyone else", async () => {
     fake.flow = fakeFlow();
     expect(has(await render(), "starter-pack-page-folder-select")).toBe(false);

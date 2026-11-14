@@ -19,7 +19,13 @@ import { describe, expect, it, vi } from "vitest";
 
 import i18n from "@/locales";
 
-const fake = vi.hoisted(() => ({ mounts: 0, refreshes: 0, org: "org" as string | undefined }));
+const fake = vi.hoisted(() => ({
+  mounts: 0,
+  refreshes: 0,
+  org: "org" as string | undefined,
+  check: vi.fn(),
+  release: () => {},
+}));
 
 vi.mock("vuex", async (importOriginal) => ({
   ...(await importOriginal<typeof import("vuex")>()),
@@ -41,6 +47,40 @@ vi.mock("@/components/starterPacks/StarterPackLibraryTab.vue", async () => {
   };
 });
 
+vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: vi.fn() }));
+vi.mock("@/composables/starterPacks/useFindMore", async () => {
+  const { ref } = await import("vue");
+  return {
+    useFindMore: () => {
+      const result = ref<unknown>(null);
+      const state = ref("idle");
+      return {
+        result,
+        state,
+        check: async () => {
+          fake.check();
+          await new Promise<void>((resolve) => (fake.release = resolve));
+          result.value = {
+            checkedAt: 1,
+            sources: [{ id: "library-nginx", items: [] }],
+            dismissed: 0,
+          };
+          state.value = "ready";
+        },
+      };
+    },
+  };
+});
+vi.mock("@/composables/starterPacks/useInstallRecords", () => ({
+  useInstallRecords: () => ({
+    list: async (packId: string) => (packId === "hosts" ? [{ status: "complete", items: [] }] : []),
+  }),
+}));
+
+import {
+  resetBrowserMatches,
+  useBrowserMatches,
+} from "@/composables/starterPacks/useBrowserMatches";
 import StarterPacksPage from "./StarterPacksPage.vue";
 
 const FindMore = defineComponent({
@@ -90,5 +130,47 @@ describe("StarterPacksPage", () => {
     const wrapper = await render();
     expect(wrapper.find('[data-test="library"]').exists()).toBe(false);
     fake.org = "org";
+  });
+
+  it("puts the refresh before Find more and shows when this browser last checked", async () => {
+    window.localStorage.clear();
+    resetBrowserMatches();
+    useBrowserMatches("org").saveFull({ checkedAt: 1, sources: [], dismissed: 0 }, []);
+    const wrapper = await render();
+    const html = wrapper.html();
+    expect(html.indexOf("starter-packs-refresh-btn")).toBeLessThan(html.indexOf("find-more"));
+    expect(wrapper.get('[data-test="starter-packs-checked"]').text()).toBe("Checked just now");
+  });
+
+  it("runs the full check, shows it running, and saves the result for the header", async () => {
+    window.localStorage.clear();
+    resetBrowserMatches();
+    const wrapper = await render();
+    await wrapper.get('[data-test="starter-packs-refresh-btn"]').trigger("click");
+    await flushPromises();
+    expect(fake.check).toHaveBeenCalled();
+    expect(wrapper.get('[data-test="starter-packs-checking"]').text()).toBe(
+      "Checking your streams…",
+    );
+    fake.release();
+    await flushPromises();
+    expect(wrapper.find('[data-test="starter-packs-checking"]').exists()).toBe(false);
+    const copy = useBrowserMatches("org").copy.value;
+    expect(copy?.sources.map(({ id }) => id)).toEqual(["library-nginx"]);
+    expect(copy?.installedPackIds).toEqual(["hosts"]);
+  });
+
+  it("re-reads the pack list in place after a successful check", async () => {
+    window.localStorage.clear();
+    resetBrowserMatches();
+    const wrapper = await render();
+    const before = { mounts: fake.mounts, refreshes: fake.refreshes };
+    await wrapper.get('[data-test="starter-packs-refresh-btn"]').trigger("click");
+    await flushPromises();
+    expect(fake.refreshes).toBe(before.refreshes);
+    fake.release();
+    await flushPromises();
+    expect(fake.mounts).toBe(before.mounts);
+    expect(fake.refreshes).toBe(before.refreshes + 1);
   });
 });

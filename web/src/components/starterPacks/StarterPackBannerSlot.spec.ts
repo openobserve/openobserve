@@ -81,11 +81,22 @@ describe("StarterPackBannerSlot", () => {
     );
   });
 
-  it("starts setup and lands on the pack dashboard", async () => {
+  it("opens the setup popup from Set up without installing", async () => {
     const wrapper = await render("typed");
+    const drawer = wrapper.findComponent({ name: "StarterPackDrawer" });
+    expect(drawer.props("open")).toBe(false);
     await wrapper.get('[data-test="first-event-status-pack-setup-btn"]').trigger("click");
     await flushPromises();
-    expect(fake.flow.land).toHaveBeenCalledWith();
+    expect(drawer.props("open")).toBe(true);
+    expect(drawer.props("flow")).toBe(fake.flow);
+    expect(fake.flow.install).not.toHaveBeenCalled();
+    expect(fake.flow.land).not.toHaveBeenCalled();
+  });
+
+  it("offers no separate What gets created button", async () => {
+    const wrapper = await render();
+    expect(has(wrapper, "first-event-status-pack-card-details-btn")).toBe(false);
+    expect(wrapper.text()).not.toContain("What gets created");
   });
 
   it("offers nothing when no pack matches", async () => {

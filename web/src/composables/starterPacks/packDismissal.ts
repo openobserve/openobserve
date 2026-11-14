@@ -19,7 +19,6 @@ import { useStore } from "vuex";
 
 import { readQuery } from "@/composables/query/readQuery";
 import { kvValueQuery, setKvMutation, deleteKvMutation } from "@/services/kv.queries";
-import { orgUsersQuery } from "@/services/users.queries";
 
 const storageKey = (surface: string, org: string, packId: string, email: string) =>
   `o2_starter_pack_${surface}:${org}:${packId}:${email}`;
@@ -43,12 +42,11 @@ export function usePackDismissal(surface: "home" | "landing", org: string, packI
   return { dismissed, dismiss, restore };
 }
 
-/** Hide for everyone, an org setting offered to admins of orgs with two or more users. */
+/** Hide for everyone, an org setting an admin can undo from Home. */
 export function usePackHiddenForOrg(org: string, packId: string) {
   const setKv = useMutation(() => setKvMutation(org));
   const deleteKv = useMutation(() => deleteKvMutation(org));
   const hidden = ref(false);
-  const sharedOrg = ref(false);
   const loaded = ref(false);
 
   const load = async () => {
@@ -58,14 +56,6 @@ export function usePackHiddenForOrg(org: string, packId: string) {
       hidden.value = false;
     }
     loaded.value = true;
-  };
-
-  const loadUserCount = async () => {
-    try {
-      sharedOrg.value = (await readQuery(orgUsersQuery(org))).length >= 2;
-    } catch {
-      sharedOrg.value = false;
-    }
   };
 
   const hide = async () => {
@@ -78,5 +68,5 @@ export function usePackHiddenForOrg(org: string, packId: string) {
     hidden.value = false;
   };
 
-  return { hidden, sharedOrg, loaded, load, loadUserCount, hide, show };
+  return { hidden, loaded, load, hide, show };
 }

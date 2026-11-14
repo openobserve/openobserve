@@ -2917,33 +2917,39 @@ describe("OverviewTab", () => {
   });
 
   describe("starter packs handed down from Home", () => {
-    const mountWithPacks = (state: { showMenu: boolean; silent: unknown[] }) =>
+    const mountWithPacks = (state: { silent: unknown[] }) =>
       mount(OverviewTab, {
         global: {
           plugins: [i18n, store, router],
           provide: {
             [HOME_PACKS as symbol]: shallowRef({
-              showMenu: ref(state.showMenu),
               silent: computed(() => state.silent),
             } as unknown as HomePacks),
           },
-          stubs: { StarterPackHomeMenu: true, StarterPackSilentAlerts: true },
+          stubs: { StarterPackSilentAlerts: true },
         },
       });
 
-    it("puts the packs button in the toolbar only once Home says a pack is set up", async () => {
-      wrapper = mountWithPacks({ showMenu: true, silent: [] });
+    const SILENT = '[data-test="overview-pack-silent-alerts"]';
+    const openTurnOn = vi.fn();
+    const silentPack = [
+      {
+        pack: { id: "kubernetes" },
+        title: "Kubernetes",
+        testId: (id: string) => id,
+        flow: { alertsOff: ref(5) },
+        openTurnOn,
+      },
+    ];
+
+    it("has no starter packs menu in the toolbar", async () => {
+      wrapper = mountWithPacks({ silent: [] });
       await flushPromises();
-      expect(wrapper.findComponent({ name: "StarterPackHomeMenu" }).exists()).toBe(true);
-      expect(wrapper.find('[data-test="overview-pack-silent-alerts"]').exists()).toBe(false);
-      wrapper.unmount();
-      wrapper = mountWithPacks({ showMenu: false, silent: [] });
-      await flushPromises();
-      expect(wrapper.findComponent({ name: "StarterPackHomeMenu" }).exists()).toBe(false);
+      expect(wrapper.find('[data-test="home-pack-menu"]').exists()).toBe(false);
+      expect(wrapper.text()).not.toContain("Starter packs");
+      expect(wrapper.find(SILENT).exists()).toBe(false);
     });
 
-    const SILENT = '[data-test="overview-pack-silent-alerts"]';
-    const silentPack = [{ pack: { id: "kubernetes" } }];
     const silentRow = () => wrapper.findComponent({ name: "StarterPackSilentAlerts" });
     const givenIncidentsOn = () => {
       config.isEnterprise = "true";
@@ -2951,7 +2957,7 @@ describe("OverviewTab", () => {
     };
 
     it("shows the silent pack alerts without an incidents title where incidents are off", async () => {
-      wrapper = mountWithPacks({ showMenu: true, silent: silentPack });
+      wrapper = mountWithPacks({ silent: silentPack });
       await flushPromises();
       expect(wrapper.find(SILENT).exists()).toBe(true);
       expect(wrapper.find(SILENT).text()).not.toContain("Active incidents");
@@ -2963,7 +2969,7 @@ describe("OverviewTab", () => {
       vi.mocked(incidentsService.list).mockResolvedValue({
         data: mockOverview.buildIncidentList(),
       } as never);
-      wrapper = mountWithPacks({ showMenu: true, silent: silentPack });
+      wrapper = mountWithPacks({ silent: silentPack });
       await flushPromises();
       expect(wrapper.find(INCIDENTS).exists()).toBe(true);
       expect(wrapper.findAll(SILENT)).toHaveLength(1);
@@ -2973,7 +2979,7 @@ describe("OverviewTab", () => {
 
     it("puts the silent pack alerts under Active incidents in place of the empty state", async () => {
       givenIncidentsOn();
-      wrapper = mountWithPacks({ showMenu: true, silent: silentPack });
+      wrapper = mountWithPacks({ silent: silentPack });
       await flushPromises();
       expect(wrapper.findAll(SILENT)).toHaveLength(1);
       expect(wrapper.find(SILENT).text()).toContain("Active incidents");
@@ -2985,7 +2991,7 @@ describe("OverviewTab", () => {
       const boom = () => Object.assign(new Error("boom"), { response: { status: 500 } });
       vi.mocked(alertsService.getHistory).mockRejectedValue(boom());
       vi.mocked(overviewService.getOrgOverview).mockRejectedValue(boom());
-      wrapper = mountWithPacks({ showMenu: true, silent: silentPack });
+      wrapper = mountWithPacks({ silent: silentPack });
       await flushPromises();
       expect(wrapper.find('[data-test="overview-load-error-empty-state"]').exists()).toBe(true);
       expect(wrapper.find(SILENT).exists()).toBe(false);

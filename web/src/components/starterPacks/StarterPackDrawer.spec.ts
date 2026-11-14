@@ -3,13 +3,17 @@ import { describe, expect, it, vi } from "vitest";
 import { nextTick, ref, shallowRef } from "vue";
 
 import i18n from "@/locales";
+import {
+  resetBrowserMatches,
+  useBrowserMatches,
+} from "@/composables/starterPacks/useBrowserMatches";
 
 import StarterPackDrawer from "./StarterPackDrawer.vue";
 import { fakeFlow, PACK } from "./starterPackTestFlow";
 
-const render = (flow = fakeFlow()) =>
+const render = (flow = fakeFlow(), folderName?: string) =>
   mount(StarterPackDrawer, {
-    props: { flow, clusters: ["staging-eu-1"], open: true },
+    props: { flow, clusters: ["staging-eu-1"], open: true, folderName },
     global: {
       plugins: [i18n],
       stubs: {
@@ -157,6 +161,14 @@ describe("StarterPackDrawer", () => {
     await submit(wrapper).trigger("click");
     await flushPromises();
     expect(flow.install).toHaveBeenCalledWith(undefined, { exclude: [], enableAlerts: true });
+  });
+
+  it("installs into the folder it is given", async () => {
+    const flow = ready();
+    const wrapper = render(flow, "Team folder");
+    await submit(wrapper).trigger("click");
+    await flushPromises();
+    expect(flow.install).toHaveBeenCalledWith("Team folder", { exclude: [], enableAlerts: false });
   });
 
   it("keeps the reach line true once alerts start, with or without a cluster scope", async () => {
@@ -349,6 +361,61 @@ describe("StarterPackDrawer", () => {
     await flushPromises();
     expect(flow.land).toHaveBeenCalledWith();
     expect(wrapper.emitted("update:open")?.at(-1)).toEqual([false]);
+  });
+
+  it("is titled Set up <pack> and installs only from its own button", async () => {
+    const flow = ready();
+    const wrapper = render(flow);
+    expect(wrapper.text()).toContain("Set up Kubernetes");
+    expect(wrapper.text()).not.toContain("What gets created");
+    expect(flow.install).not.toHaveBeenCalled();
+    await submit(wrapper).trigger("click");
+    await flushPromises();
+    expect(flow.install).toHaveBeenCalledTimes(1);
+  });
+
+  it("drops the installed pack from this browser's header matches", async () => {
+    window.localStorage.clear();
+    resetBrowserMatches();
+    const source = {
+      id: "kubernetes",
+      packId: "kubernetes",
+      label: "kubernetes",
+      streams: [],
+      items: [],
+      queriesPerDay: 0,
+    };
+    useBrowserMatches("org").saveFull({ checkedAt: 1, sources: [source], dismissed: 0 }, []);
+    const wrapper = render(ready());
+    await submit(wrapper).trigger("click");
+    await flushPromises();
+    expect(useBrowserMatches("org").copy.value).toMatchObject({
+      sources: [],
+      installedPackIds: ["kubernetes"],
+    });
+  });
+
+  it("keeps the header match and stays put when the install failed", async () => {
+    window.localStorage.clear();
+    resetBrowserMatches();
+    const source = {
+      id: "kubernetes",
+      packId: "kubernetes",
+      label: "kubernetes",
+      streams: [],
+      items: [],
+      queriesPerDay: 0,
+    };
+    useBrowserMatches("org").saveFull({ checkedAt: 1, sources: [source], dismissed: 0 }, []);
+    const flow = ready({ install: vi.fn(async () => false) });
+    const wrapper = render(flow);
+    await submit(wrapper).trigger("click");
+    await flushPromises();
+    expect(useBrowserMatches("org").copy.value).toMatchObject({
+      sources: [source],
+      installedPackIds: [],
+    });
+    expect(flow.land).not.toHaveBeenCalled();
   });
 
   it("stays open with Retry after a partial failure, then lands when the retry finishes", async () => {

@@ -19,10 +19,13 @@ import { useRouter } from "vue-router";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useI18nTyped } from "@/types/i18n";
 import { copyToClipboard } from "@/utils/clipboard";
+import { useOrgHasUserData } from "@/composables/useOrgHasUserData";
 
+import type { FindMoreItem, FindMoreSource } from "./findMore";
 import { STARTER_PACKS } from "./kubernetesPack";
 import { usePackDismissal, usePackHiddenForOrg } from "./packDismissal";
 import type { StarterPack } from "./types";
+import { useBrowserMatches, type BrowserInterrupted } from "./useBrowserMatches";
 import { useStarterPackFlow } from "./useStarterPackFlow";
 import { useStarterPackMatcher } from "./useStarterPackMatcher";
 
@@ -38,7 +41,7 @@ type HomePackView =
   | "offer"
   | "empty";
 
-/** One pack's state on Home, built once and shared by the section and the Overview toolbar. */
+/** One pack's state on Home, built once and shared by the section and the Overview status line. */
 function useHomePack(org: string, pack: StarterPack) {
   const { t } = useI18nTyped();
   const title = t(pack.titleKey);
@@ -75,18 +78,10 @@ function useHomePack(org: string, pack: StarterPack) {
   watch(drawerOpen, (isOpen) => {
     if (isOpen && matcher.state.value === "checking") void matcher.check();
   });
-  watch(
-    flow.isAdmin,
-    (admin) => {
-      if (admin) void orgHide.loadUserCount();
-    },
-    { immediate: true },
-  );
   watch(matcher.state, (state) => {
     if (state === "matched") void flow.loadPreview();
   });
 
-  const canHideForAll = computed(() => flow.isAdmin.value && orgHide.sharedOrg.value);
   const view = computed<HomePackView>(() => {
     if (!flow.loaded.value || !orgHide.loaded.value) return "loading";
     if (flow.interrupted.value) return "interrupted";
@@ -100,13 +95,8 @@ function useHomePack(org: string, pack: StarterPack) {
     return "empty";
   });
 
-  const startSetup = async () => {
-    drawerOpen.value = true;
-    if (await flow.install()) {
-      drawerOpen.value = false;
-      await flow.land();
-    }
-  };
+  // Install starts only from the popup's own button, after the user has seen and chosen the items.
+  const startSetup = () => (drawerOpen.value = true);
   const retry = () => Promise.all([flow.load(), matcher.retry()]);
   const keepOff = async () => {
     try {
@@ -136,7 +126,6 @@ function useHomePack(org: string, pack: StarterPack) {
     dismissal,
     orgHide,
     view,
-    canHideForAll,
     drawerOpen,
     turnOnOpen,
     undoOpen,
@@ -153,11 +142,55 @@ function useHomePack(org: string, pack: StarterPack) {
 
 export type HomePack = ReturnType<typeof useHomePack>;
 
-/** Every pack Home offers, plus whether Home shows the setup section or the toolbar menu. */
+const matchItems = (item: HomePack): FindMoreItem[] => {
+  const { flow, pack } = item;
+  const preview = flow.preview.value;
+  if (preview) {
+    return preview.items
+      .filter(
+        ({ kind, status }) => (kind === "dashboard" || kind === "alert") && status !== "existing",
+      )
+      .map(({ kind, itemId }) => ({
+        kind: kind as FindMoreItem["kind"],
+        id: itemId,
+        name: flow.nameOf(itemId),
+        queries: 0,
+      }));
+  }
+  return [
+    ...pack.dashboards.map(({ id, title }) => ({
+      kind: "dashboard" as const,
+      id,
+      name: title,
+      queries: 0,
+    })),
+    ...pack.alerts.map((id) => ({ kind: "alert" as const, id, name: id, queries: 0 })),
+  ];
+};
+
+// Same shape as a pack source from groupFindMore, so the header chip reads both alike.
+const matchSource = (item: HomePack): FindMoreSource => ({
+  id: item.pack.id,
+  packId: item.pack.id,
+  label: item.pack.id,
+  streams: [...item.matcher.streams.value],
+  items: matchItems(item),
+  queriesPerDay: 0,
+});
+
+const interruptedOf = (item: HomePack): BrowserInterrupted => ({
+  packId: item.pack.id,
+  label: item.title,
+  done: item.flow.made.value.length,
+  total: item.flow.toCreate.value.length,
+});
+
+/** Every pack Home offers, plus whether Home shows the setup section. */
 export function useHomePacks(org: string, packs: StarterPack[] = STARTER_PACKS) {
   const router = useRouter();
   const items = packs.map((pack) => useHomePack(org, pack));
-  const menu = usePackDismissal("home", org, "menu");
+  const { hasUserData } = useOrgHasUserData(org);
+  const browser = useBrowserMatches(org);
 
   const anySetUp = computed(() => items.some((item) => item.view.value === "installed"));
   const offered = computed(() =>
@@ -165,15 +198,16 @@ export function useHomePacks(org: string, packs: StarterPack[] = STARTER_PACKS) 
   );
   const setUp = computed(() => items.filter((item) => item.view.value === "installed"));
   const anyLoading = computed(() => items.some((item) => item.view.value === "loading"));
-  // Waits for every pack, so the badge never moves rows and the section never flashes before the menu.
+  // Waits for every pack, so no card moves once the strip shows.
   const showSection = computed(
     () => !anySetUp.value && !anyLoading.value && offered.value.length > 0,
   );
-  const showMenu = computed(() => anySetUp.value && !menu.dismissed.value);
   const loading = computed(() => !anySetUp.value && anyLoading.value);
-  // Said once for all packs, and only when none has anything else to show.
+  const hasData = computed(() => hasUserData.value === true);
+  // Said once for all packs, only when none has anything else to show, and never before the org has data.
   const empty = computed(
     () =>
+      hasData.value &&
       items.every((item) => item.view.value === "empty" || item.view.value === "hidden") &&
       items.some((item) => item.view.value === "empty"),
   );
@@ -181,15 +215,40 @@ export function useHomePacks(org: string, packs: StarterPack[] = STARTER_PACKS) 
   const library = () =>
     router.push({ name: "starterPacks", query: { org_identifier: org } }).catch(() => {});
 
+  // Saved only once every pack answered, so a failed read keeps the last good copy.
+  const settled = computed(
+    () =>
+      !anyLoading.value &&
+      items.every((item) => !item.flow.running.value && item.view.value !== "error"),
+  );
+  // Serialized, so a re-render that changes nothing does not rewrite the browser copy.
+  const builtIn = computed(() => {
+    if (!settled.value) return null;
+    const interrupted = items.find((item) => item.flow.interrupted.value);
+    return JSON.stringify({
+      sources: offered.value.map(matchSource),
+      installed: setUp.value.map((item) => item.pack.id),
+      interrupted: interrupted ? interruptedOf(interrupted) : null,
+    });
+  });
+  watch(
+    builtIn,
+    (state) => {
+      if (!state) return;
+      const { sources, installed, interrupted } = JSON.parse(state);
+      browser.saveBuiltIn(sources, installed, interrupted);
+    },
+    { immediate: true },
+  );
+
   return {
     items,
-    menu,
     offered,
     setUp,
     showSection,
-    showMenu,
     loading,
     empty,
+    hasData,
     silent,
     library,
   };

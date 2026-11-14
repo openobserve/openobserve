@@ -152,6 +152,24 @@ describe("one matcher", () => {
     expect(banner === "matched").toBe(ready);
   });
 
+  it("reads only owned, non-sample streams", async () => {
+    fake.streams = {
+      metrics: [
+        metric(recent()),
+        { name: "o2_demo_container_cpu_usage_percent", stats: { doc_time_max: recent() } },
+        { name: "o2_internal_metric", is_internal: true, stats: { doc_time_max: recent() } },
+      ],
+      logs: [
+        { name: "app", stats: { doc_time_max: recent() } },
+        { name: "o2_demo_app_logs", stats: { doc_time_max: recent() } },
+        { name: "synthetics_results", stats: { doc_time_max: recent() } },
+      ],
+    };
+    const streams = await readOrgStreams("org");
+    expect([...(streams.metrics?.keys() ?? [])]).toEqual(["kube_pod"]);
+    expect([...(streams.logs?.keys() ?? [])]).toEqual(["app"]);
+  });
+
   it("counts a stream with no flushed data yet from its creation", async () => {
     fake.streams = {
       metrics: [{ name: "kube_pod", stats: { doc_time_max: 0, created_at: recent() } }],

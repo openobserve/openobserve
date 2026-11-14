@@ -66,6 +66,7 @@ export const fakeFlow = (over: Record<string, unknown> = {}) =>
     loaded: ref(true),
     made: ref([]),
     nameOf: (id: string) => `name-${id}`,
+    org: "org",
     alertTitle: (_id: string, fallback: string) => fallback,
     pack: PACK,
     preview: shallowRef(null),

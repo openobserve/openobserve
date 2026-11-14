@@ -40,7 +40,7 @@ const props = withDefaults(
   }>(),
   { status: "ready" },
 );
-const emit = defineEmits<{ install: []; details: [] }>();
+const emit = defineEmits<{ install: [] }>();
 
 const { t } = useI18nTyped();
 
@@ -214,15 +214,6 @@ const rows = computed(() => [
         @click="emit('install')"
       >
         {{ primaryText }}
-      </OButton>
-      <OButton
-        v-if="status !== 'forbidden' && status !== 'checking'"
-        variant="ghost-primary"
-        size="sm-action"
-        :data-test="`${testId}-details-btn`"
-        @click="emit('details')"
-      >
-        {{ t("starterPacks.guide.whatGetsCreated") }}
       </OButton>
       <slot name="actions" />
     </div>
