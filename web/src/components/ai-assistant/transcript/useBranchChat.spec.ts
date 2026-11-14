@@ -99,7 +99,11 @@ describe("useBranchChat", () => {
     expect(post).toHaveBeenCalledWith(
       "/api/default/ai/chats/s%201/branch",
       { turn_id: "t2", version: 1, session_id: expect.stringMatching(UUID) },
-      { headers: { "Content-Type": "application/json" } },
+      {
+        headers: { "Content-Type": "application/json" },
+        silentForbidden: true,
+        assistantManaged: true,
+      },
     );
     expect(openSession).toHaveBeenCalledWith({ sid: "new-1" }, { focus: true });
     expect(result).toEqual(created);
