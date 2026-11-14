@@ -27,6 +27,8 @@ export const LOCAL_CAP = 100;
 /** Server chats cached in this browser; the server holds them, so the oldest are simply re-read. */
 export const SERVER_CACHE_CAP = 50;
 export const LIVE_SAVE_GRACE_MS = 10 * 60_000;
+/** Raise when a stored turn keeps a new server field, so a copy stored without it is read again in full. */
+export const CACHED_TURNS_SCHEMA = 1;
 
 /** One stored turn with the time it started, for ordering a merge. */
 export type LocalTurn = StoredTurn & { startedAt?: number };
@@ -46,6 +48,8 @@ export interface LocalRecord {
   cachedApprovals?: ChatApproval[];
   cachedStateVersion?: string;
   cachedTurnSpans?: TurnSpan[];
+  /** `CACHED_TURNS_SCHEMA` when `turns` were stored; absent on a copy stored before agents were kept. */
+  cachedTurnsSchema?: number;
   forkedFromShare?: string;
   liveTurnId?: string;
   liveSavedAt?: number;

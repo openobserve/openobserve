@@ -49,7 +49,13 @@ import type {
   Sid,
 } from "./assistantStore.types";
 import { goneElsewhere, originOf, readLocal, sidTime, type HistoryCtx } from "./historyContext";
-import { LIVE_SAVE_GRACE_MS, messageGroups, type LocalRecord, type LocalTurn } from "./historyDb";
+import {
+  CACHED_TURNS_SCHEMA,
+  LIVE_SAVE_GRACE_MS,
+  messageGroups,
+  type LocalRecord,
+  type LocalTurn,
+} from "./historyDb";
 import { wireOrigin, type HistoryList } from "./historyList";
 import { saveSession, writeCache } from "./historyLocalStore";
 import { readAnnotations } from "./prefs";
@@ -130,7 +136,9 @@ export function createHistoryRecords(ctx: HistoryCtx, list: HistoryList) {
     if (cached && browserOnly(cached, sid, org, ctx)) return openLocal(sid);
     // A `not_modified` answer carries no turns, so only a copy that holds them may claim to be current.
     const known =
-      cached?.cachedLastSeq !== undefined && cached.turns
+      cached?.cachedLastSeq !== undefined &&
+      cached.turns &&
+      cached.cachedTurnsSchema === CACHED_TURNS_SCHEMA
         ? { seq: cached.cachedLastSeq, version: cached.cachedStateVersion }
         : undefined;
     const chatQuery = assistantChatQuery(org, sid, known);
@@ -219,6 +227,7 @@ export function createHistoryRecords(ctx: HistoryCtx, list: HistoryList) {
       ...(settled && { cachedLastSeq: detail.last_committed_seq }),
       ...(detail.state_version && { cachedStateVersion: detail.state_version }),
       turns,
+      cachedTurnsSchema: CACHED_TURNS_SCHEMA,
       ...(detail.seed && { cachedSeed: detail.seed }),
       ...(detail.approvals && { cachedApprovals: detail.approvals }),
     });

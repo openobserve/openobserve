@@ -26,7 +26,7 @@ import { gt, raw } from "@/types/i18n";
 
 import { approvalAnnotationKey } from "./actions/appliers/approval";
 import type { AssistantCapability } from "./assistantStore.types";
-import { LOCAL_CAP, SERVER_CACHE_CAP, type LocalRecord } from "./historyDb";
+import { CACHED_TURNS_SCHEMA, LOCAL_CAP, SERVER_CACHE_CAP, type LocalRecord } from "./historyDb";
 import { writeAnnotation } from "./prefs";
 import { LIVE_SAVE_GRACE_MS } from "./historyDb";
 import { POLL_FAST_MS } from "./historyElsewhere";
@@ -812,7 +812,12 @@ describe("useAssistantHistory reload", () => {
       frames: [{ type: "message_delta", content: "kept answer" }, { type: "complete" }],
       status: "completed" as const,
     };
-    const cached = record(1, { serverBacked: true, cachedLastSeq: 3, turns: [turn] });
+    const cached = record(1, {
+      serverBacked: true,
+      cachedLastSeq: 3,
+      turns: [turn],
+      cachedTurnsSchema: CACHED_TURNS_SCHEMA,
+    });
     const fake = setup({ persistence: true }, [cached]);
     await flushPromises();
     await fake.history.open({ sid });
@@ -824,6 +829,18 @@ describe("useAssistantHistory reload", () => {
     const text = fake.store.state.sessions[sid].messages.map((m) => String(m.content)).join(" ");
     expect(text).toContain("kept question");
     expect(text).toContain("kept answer");
+  });
+
+  it("reads a chat in full when its browser copy was stored before each answer kept its agent", async () => {
+    vi.spyOn(assistant, "listChats").mockResolvedValue({ chats: [] });
+    const getChat = vi.spyOn(assistant, "getChat").mockResolvedValue(detail([]) as never);
+    const turn = { turn_id: "t1", user: { text: "q" }, frames: [], status: "completed" as const };
+    const fake = setup({ persistence: true }, [
+      record(1, { serverBacked: true, cachedLastSeq: 3, turns: [turn] }),
+    ]);
+    await flushPromises();
+    await fake.history.open({ sid });
+    expect(getChat).toHaveBeenCalledWith(expect.any(String), sid, undefined);
   });
 
   it("keeps a branched chat's source on reload, so its Branched from header comes back", async () => {
