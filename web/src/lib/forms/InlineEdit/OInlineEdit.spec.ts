@@ -32,6 +32,29 @@ describe("OInlineEdit", () => {
     expect(desc.text()).toBe("Chat title");
   });
 
+  it("leaves the field label out of a wrapping heading's name", () => {
+    const wrapper = mount(
+      {
+        components: { OInlineEdit },
+        template: '<h1><OInlineEdit model-value="Panel one" aria-label="Chat title" /></h1>',
+      },
+      { global: { stubs: { OIcon: true } } },
+    );
+    // Name from content skips hidden subtrees, as browsers do.
+    const nameFromContent = (el: Element): string =>
+      Array.from(el.childNodes)
+        .map((n) =>
+          n.nodeType === Node.TEXT_NODE
+            ? (n.textContent ?? "")
+            : n instanceof HTMLElement && !n.hidden && n.getAttribute("aria-hidden") !== "true"
+              ? nameFromContent(n)
+              : "",
+        )
+        .join("");
+
+    expect(nameFromContent(wrapper.element).trim()).toBe("Panel one");
+  });
+
   it("keeps the field label on the input while editing", async () => {
     const wrapper = mountInlineEdit({ ariaLabel: "Chat title" });
     await trigger(wrapper).trigger("click");

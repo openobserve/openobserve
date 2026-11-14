@@ -394,7 +394,8 @@ defineExpose({ focus: startEdit });
         <OTooltip v-if="editHint && !isDisabled" :content="editHint" max-width="18rem" />
       </button>
 
-      <span v-if="ariaLabel && !readonly" :id="labelId" class="sr-only">{{ ariaLabel }}</span>
+      <!-- hidden, not sr-only: describedby still reads it, but a wrapping heading's name skips it. -->
+      <span v-if="ariaLabel && !readonly" :id="labelId" hidden>{{ ariaLabel }}</span>
 
       <!-- Trailing content beside the name — display mode only, so it never
            competes with the input. -->
