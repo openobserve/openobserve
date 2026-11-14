@@ -239,7 +239,7 @@ test.describe("Dashboard Panel Time - Part 3: Advanced Features and Edge Cases",
     await safeWaitForNetworkIdle(page, { timeout: 5000 });
 
     // Should fallback to config or global (should not crash)
-    expect(await pm.dashboardPanelTime.isPanelTimePickerVisible(panelIds[0])).toBe(true);
+    await expect(pm.dashboardPanelTime.panelTimePicker(panelIds[0])).toBeVisible();
 
     // Step 3: Test missing panel in URL
     const missingPanelURL = `${currentURL}&pt-period.nonexistent=1h`;
@@ -247,7 +247,7 @@ test.describe("Dashboard Panel Time - Part 3: Advanced Features and Edge Cases",
     await safeWaitForNetworkIdle(page, { timeout: 5000 });
 
     // Should ignore unknown panel (should not crash)
-    expect(await pm.dashboardPanelTime.isPanelTimePickerVisible(panelIds[0])).toBe(true);
+    await expect(pm.dashboardPanelTime.panelTimePicker(panelIds[0])).toBeVisible();
 
     // Step 5: Test concurrent changes
     await pm.dashboardPanelTime.changePanelTimeInView(panelIds[0], "1-d", true);
