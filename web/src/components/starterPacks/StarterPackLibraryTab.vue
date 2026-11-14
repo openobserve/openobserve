@@ -17,6 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
+import { useStore } from "vuex";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -27,13 +28,16 @@ import OText from "@/lib/core/Typography/OText.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import StarterPackParseDialog from "@/components/starterPacks/StarterPackParseDialog.vue";
 import { useAlertLibrary } from "@/composables/alerts/useAlertLibrary";
 import { STARTER_PACKS } from "@/composables/starterPacks/kubernetesPack";
 import { matchPack, readOrgStreams } from "@/composables/starterPacks/packMatchData";
 import { findRawNginxLogs, type RawLogNotice } from "@/composables/starterPacks/rawLogs";
 import type { PackInstallRecord, StarterPack } from "@/composables/starterPacks/types";
 import { useInstallRecords } from "@/composables/starterPacks/useInstallRecords";
-import { useStarterPackFlow } from "@/composables/starterPacks/useStarterPackFlow";
+import { useNginxParse, type ParsePreview } from "@/composables/starterPacks/useNginxParse";
+import { isOrgAdmin, useStarterPackFlow } from "@/composables/starterPacks/useStarterPackFlow";
 import { useStreamValues } from "@/composables/starterPacks/useStreamValues";
 import StarterPackDrawer from "./StarterPackDrawer.vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
@@ -53,7 +57,9 @@ const props = defineProps<{ org: string; view: "packs" | "dashboards" }>();
 
 const { t } = useI18nTyped();
 const router = useRouter();
+const store = useStore();
 const records = useInstallRecords(props.org);
+const parser = useNginxParse(props.org);
 const { loadManifest, loadAlertFile } = useAlertLibrary();
 const { readValues } = useStreamValues(props.org);
 
@@ -65,6 +71,19 @@ const flows = new Map(STARTER_PACKS.map((pack) => [pack.id, useStarterPackFlow(p
 const drawerPackId = ref<string | null>(null);
 const drawerFlow = computed(() => (drawerPackId.value ? flows.get(drawerPackId.value) : undefined));
 const rawLogs = ref<RawLogNotice[]>([]);
+const repairs = ref<PackInstallRecord[]>([]);
+const parsing = ref<RawLogNotice | null>(null);
+const parseOpen = ref(false);
+const undoing = ref<PackInstallRecord | null>(null);
+const undoOpen = ref(false);
+const undoFailed = ref(false);
+
+const isAdmin = computed(() => isOrgAdmin(store.state));
+const repairStream = (record: PackInstallRecord) => record.items[0]?.stream ?? "";
+const unrepaired = computed(() => {
+  const repaired = new Set(repairs.value.map(repairStream));
+  return rawLogs.value.filter(({ stream }) => !repaired.has(stream));
+});
 
 const count = (test: (row: LibraryRow) => boolean) => rows.value.filter(test).length;
 const isReadyRow = (row: LibraryRow) => row.ready;
@@ -199,8 +218,47 @@ let rawLogRun = 0;
 const loadRawLogs = async (logs: Map<string, number>) => {
   rawLogRun += 1;
   const run = rawLogRun;
-  const found = await findRawNginxLogs(props.org, logs, readValues).catch(() => []);
-  if (run === rawLogRun) rawLogs.value = found;
+  const [found, active] = await Promise.all([
+    findRawNginxLogs(props.org, logs, readValues).catch(() => []),
+    parser.active().catch(() => []),
+  ]);
+  if (run !== rawLogRun) return;
+  rawLogs.value = found;
+  repairs.value = active;
+};
+
+const openParse = (notice: RawLogNotice) => {
+  parsing.value = notice;
+  parseOpen.value = true;
+};
+
+const loadParse = (notice: RawLogNotice) =>
+  Promise.all([parser.preview(notice), parser.readers(notice.stream)]);
+
+// A failed create still leaves a record, so the list shows its Undo either way.
+const applyParse = async (notice: RawLogNotice, preview: ParsePreview) => {
+  try {
+    await parser.confirm(notice, preview.format, store.state.userInfo?.email);
+  } finally {
+    repairs.value = await parser.active().catch(() => repairs.value);
+  }
+};
+
+const openUndo = (record: PackInstallRecord) => {
+  undoing.value = record;
+  undoFailed.value = false;
+  undoOpen.value = true;
+};
+
+const confirmUndo = async () => {
+  if (!undoing.value) return;
+  try {
+    await parser.undo(undoing.value);
+    undoOpen.value = false;
+  } catch {
+    undoFailed.value = true;
+  }
+  repairs.value = await parser.active().catch(() => repairs.value);
 };
 
 const load = async () => {
@@ -275,13 +333,52 @@ onMounted(() => void load());
         </OToggleGroup>
       </div>
       <OBanner
-        v-for="notice in rawLogs"
+        v-for="notice in unrepaired"
         :key="notice.stream"
         variant="default"
         dense
+        inline-actions
         :content="t('starterPacks.libraryTabs.rawLogs', { stream: raw(notice.stream) })"
         :data-test="`library-tab-raw-log-${notice.stream}`"
-      />
+      >
+        <template v-if="isAdmin" #actions>
+          <OButton
+            variant="outline"
+            size="sm"
+            :data-test="`library-tab-parse-${notice.stream}`"
+            @click="openParse(notice)"
+          >
+            {{ t("starterPacks.libraryTabs.parse") }}
+          </OButton>
+        </template>
+      </OBanner>
+      <OBanner
+        v-for="record in repairs"
+        :key="record.installId"
+        :variant="record.status === 'complete' ? 'default' : 'warning'"
+        dense
+        inline-actions
+        :content="
+          t(
+            record.status === 'complete'
+              ? 'starterPacks.libraryTabs.parsing'
+              : 'starterPacks.libraryTabs.parsingIncomplete',
+            { stream: raw(repairStream(record)) },
+          )
+        "
+        :data-test="`library-tab-parsing-${repairStream(record)}`"
+      >
+        <template v-if="isAdmin" #actions>
+          <OButton
+            variant="outline"
+            size="sm"
+            :data-test="`library-tab-parse-undo-${repairStream(record)}`"
+            @click="openUndo(record)"
+          >
+            {{ t("starterPacks.parse.undo") }}
+          </OButton>
+        </template>
+      </OBanner>
       <OEmptyState
         v-if="visibleRows.length === 0"
         size="block"
@@ -416,5 +513,36 @@ onMounted(() => void load());
       :clusters="[]"
       @update:open="drawerPackId = null"
     />
+    <StarterPackParseDialog
+      v-if="parsing"
+      v-model:open="parseOpen"
+      :notice="parsing"
+      :load="loadParse"
+      :apply="applyParse"
+    />
+    <ODialog
+      v-model:open="undoOpen"
+      size="sm"
+      :title="t('starterPacks.parse.undoTitle')"
+      :primary-button-label="t('starterPacks.parse.undo')"
+      primary-button-variant="destructive"
+      primary-button-data-test="starter-pack-parse-undo-confirm-btn"
+      :secondary-button-label="t('common.cancel')"
+      initial-focus="secondary"
+      data-test="starter-pack-parse-undo-dialog"
+      @click:primary="confirmUndo"
+      @click:secondary="undoOpen = false"
+    >
+      <div class="flex flex-col gap-2 text-sm">
+        <p>{{ t("starterPacks.parse.undoRemoves") }}</p>
+        <OText variant="meta">{{ t("starterPacks.parse.undoNote") }}</OText>
+        <OText
+          v-if="undoFailed"
+          class="text-text-error"
+          data-test="starter-pack-parse-undo-failed"
+          >{{ t("starterPacks.parse.undoFailed") }}</OText
+        >
+      </div>
+    </ODialog>
   </div>
 </template>
