@@ -46,25 +46,40 @@ describe("ODateTimeRange", () => {
         props: { inline: true, autoApply: true, showTimezone: true, ...props },
       });
 
-    it("keeps an absolute range staged until both dates and both times are set, then applies it on Apply", async () => {
+    const RANGE = {
+      start: parseDate("2026-11-10"),
+      end: parseDate("2026-11-12"),
+    };
+    const pickDates = (range: Record<string, unknown>) =>
+      wrapper.findComponent(RangeCalendarRoot).vm.$emit("update:modelValue", range);
+    const blur = (field: ReturnType<VueWrapper["findComponent"]>, to: Element | null = null) =>
+      field.vm.$emit("blur", new FocusEvent("blur", { relatedTarget: to }));
+
+    it("draws no Apply button on either tab", async () => {
+      wrapper = mountAuto({ mode: "absolute" });
+      expect(wrapper.find('[data-test="datetimerange-apply"]').exists()).toBe(false);
+      await wrapper.get('[data-test="datetimerange-tab-relative"]').trigger("click");
+      expect(wrapper.find('[data-test="datetimerange-relative-apply"]').exists()).toBe(false);
+    });
+
+    it("keeps an absolute range staged until both dates and both times are set, then applies it once when an end time is left", async () => {
       wrapper = mountAuto({ mode: "absolute" });
       const [start, end] = wrapper.findAllComponents(OTime);
-      const apply = () => wrapper.get('[data-test="datetimerange-apply"]');
       start.vm.$emit("update:modelValue", "09:00");
-      start.vm.$emit("change", "09:00");
-      wrapper.findComponent(RangeCalendarRoot).vm.$emit("update:modelValue", {
-        start: parseDate("2026-11-10"),
-        end: parseDate("2026-11-12"),
-      });
+      blur(start);
+      pickDates(RANGE);
       await flushPromises();
       expect(wrapper.emitted("change")).toBeUndefined();
-      expect(apply().attributes("disabled")).toBeDefined();
+      end.vm.$emit("update:modelValue", "17:03");
+      end.vm.$emit("change", "17:03");
       end.vm.$emit("update:modelValue", "17:30");
       end.vm.$emit("change", "17:30");
       await flushPromises();
       expect(wrapper.emitted("change")).toBeUndefined();
-      expect(apply().attributes("disabled")).toBeUndefined();
-      await apply().trigger("click");
+      blur(end, start.element.querySelector("input"));
+      expect(wrapper.emitted("change")).toBeUndefined();
+      blur(end);
+      blur(end);
       expect(wrapper.emitted("change")).toEqual([
         [
           {
@@ -77,6 +92,25 @@ describe("ODateTimeRange", () => {
           },
         ],
       ]);
+    });
+
+    it("applies on the date pick that completes a range with its times, or on Enter in a time, never a reversed one", async () => {
+      wrapper = mountAuto({ mode: "absolute", startTime: "17:00", endTime: "09:00" });
+      pickDates({ start: RANGE.start, end: RANGE.start });
+      await flushPromises();
+      expect(wrapper.emitted("change")).toBeUndefined();
+      pickDates(RANGE);
+      expect(wrapper.emitted("change")?.[0]?.[0]).toMatchObject({
+        startDate: "2026-11-10",
+        startTime: "17:00",
+        endDate: "2026-11-12",
+        endTime: "09:00",
+      });
+      wrapper.findAllComponents(OTime)[1].vm.$emit("update:modelValue", "10:00");
+      await wrapper.get('[data-test="datetimerange-end-time"] input').trigger("keydown", {
+        key: "Enter",
+      });
+      expect(wrapper.emitted("change")?.[1]?.[0]).toMatchObject({ endTime: "10:00" });
     });
 
     it("stages a unit picked before the amount, then applies the custom row when the amount is left", async () => {

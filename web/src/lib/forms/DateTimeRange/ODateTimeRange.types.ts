@@ -29,7 +29,7 @@ export interface DateTimeRangeProps {
   // ── Behaviour ─────────────────────────────────────────────────
   /** Show seconds segments in time fields */
   withSeconds?: boolean;
-  /** Emit immediately on every change (no Apply button needed) */
+  /** No Apply button: a pick applies once its entry is finished (a preset, Enter, leaving a field, or the date that completes a valid range); the relative tab drops its time zone row */
   autoApply?: boolean;
   /** Hide the Relative tab; force absolute-only mode */
   disableRelative?: boolean;

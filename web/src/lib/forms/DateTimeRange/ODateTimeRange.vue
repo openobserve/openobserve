@@ -256,14 +256,35 @@ const rangeLabel = computed((): string | null => {
 function handleRangeChange(value: DateRange | undefined) {
   if (!value) return;
   stagedRange.value = value as DateRange;
+  if (value.start && value.end) autoApplyAbsolute();
 }
 
-const absoluteComplete = computed(
-  () =>
-    !!stagedRange.value.start &&
-    !!stagedRange.value.end &&
-    (props.hideTime || (!!stagedStartTime.value && !!stagedEndTime.value)),
-);
+const absoluteReady = computed(() => {
+  const start = stagedRange.value.start?.toString();
+  const end = stagedRange.value.end?.toString();
+  if (!start || !end) return false;
+  if (props.hideTime) return end >= start;
+  if (!stagedStartTime.value || !stagedEndTime.value) return false;
+  return `${end}T${stagedEndTime.value}` > `${start}T${stagedStartTime.value}`;
+});
+
+const timeRow = ref<HTMLElement | null>(null);
+let autoApplied = "";
+
+function autoApplyAbsolute() {
+  if (!props.autoApply || !absoluteReady.value) return;
+  const { start, end } = stagedRange.value;
+  // The panel unmounting under a focused time blurs it again, which must not apply the same range twice.
+  const key = `${start}|${end}|${stagedStartTime.value}|${stagedEndTime.value}|${stagedTimezone.value}`;
+  if (key === autoApplied) return;
+  autoApplied = key;
+  emitAbsolute();
+}
+
+// Moving between the two time fields, or to a field's own clock, is still entering the range.
+function onTimeBlur(event: FocusEvent) {
+  if (!timeRow.value?.contains(event.relatedTarget as Node | null)) autoApplyAbsolute();
+}
 
 // ── Apply actions ──────────────────────────────────────────────
 function selectRelative(unit: RelativeUnit, amount: number) {
@@ -288,7 +309,7 @@ function commitRelative() {
   _popoverOpen.value = false;
 }
 
-// Auto-apply never closes on a half entry: the custom row applies on Enter, a unit pick after a typed amount, or leaving the amount after a unit pick; absolute keeps Apply, as a time being typed already looks complete.
+// Auto-apply never closes on a half entry: the custom row applies on Enter, a unit pick after a typed amount, or leaving the amount after a unit pick; a complete, valid absolute range applies on the date pick that completes it, Enter in a time, or leaving the times (blur, not change, so 17:30 never applies at 17:03).
 const amountTyped = ref(false);
 const unitPicked = ref(false);
 const unitSelect = ref<HTMLSelectElement | null>(null);
@@ -718,7 +739,9 @@ const triggerClasses = computed(() => [
           <!-- Start / End time -->
           <div
             v-if="!hideTime"
+            ref="timeRow"
             class="flex gap-3 [--color-datepicker-border:var(--color-datepicker-inner-border)]"
+            @keydown.enter="autoApplyAbsolute"
           >
             <OTime
               v-model="stagedStartTime"
@@ -726,6 +749,7 @@ const triggerClasses = computed(() => [
               :with-seconds="withSeconds"
               :disabled="isDisabled"
               data-test="datetimerange-start-time"
+              @blur="onTimeBlur"
             />
             <OTime
               v-model="stagedEndTime"
@@ -733,6 +757,7 @@ const triggerClasses = computed(() => [
               :with-seconds="withSeconds"
               :disabled="isDisabled"
               data-test="datetimerange-end-time"
+              @blur="onTimeBlur"
             />
           </div>
 
@@ -800,10 +825,10 @@ const triggerClasses = computed(() => [
           </div>
 
           <!-- Apply -->
-          <div :class="['flex justify-end', inline && STICKY_APPLY_CLASS]">
+          <div v-if="!autoApply" :class="['flex justify-end', inline && STICKY_APPLY_CLASS]">
             <button
               type="button"
-              :disabled="isDisabled || (autoApply && !absoluteComplete)"
+              :disabled="isDisabled"
               class="rounded-default ring-offset-surface-base bg-datepicker-day-selected-bg text-datepicker-day-selected-text focus-visible:ring-datepicker-focus-ring px-4 py-1.5 text-sm font-medium ring-offset-1 transition-[color,background-color,border-color,box-shadow] duration-150 outline-none hover:opacity-90 focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-50"
               data-test="datetimerange-apply"
               @click="handleApply"
