@@ -58,6 +58,13 @@ vi.mock("@/composables/useConfirmDialog", () => ({
 vi.mock("@/components/security/SecurityNewDetectionDialog.vue", () => ({
   default: { name: "SecurityNewDetectionDialog", template: "<div />" },
 }));
+vi.mock("@/components/security/SecurityTuningDrawer.vue", () => ({
+  default: {
+    name: "SecurityTuningDrawer",
+    props: ["open", "canAuthor", "canAdmin", "detectionNames"],
+    template: '<div data-test="tuning-drawer-stub" />',
+  },
+}));
 vi.mock("@/lib/overlay/Drawer/ODrawer.vue", async () => {
   const f = await import("./__fixtures__/securityFixtures");
   return f.drawerStubModule;
@@ -108,6 +115,22 @@ describe("SecurityDetections", () => {
     expect(w.find('[data-test="security-detections-stat-fired"]').text()).toContain("1");
   });
 
+  it("opens Tuning with each detection's name for scoped suppressions", async () => {
+    const w = await mountView();
+    expect(w.find('[data-test="tuning-drawer-stub"]').exists()).toBe(false);
+    await w.find('[data-test="security-detections-tuning"]').trigger("click");
+    const drawer = w.findComponent({ name: "SecurityTuningDrawer" });
+    expect(drawer.props("open")).toBe(true);
+    expect(drawer.props("detectionNames")).toMatchObject({
+      "alert-access-key": expect.any(String),
+    });
+  });
+
+  it("opens Tuning on arrival from the bulk-install allowlists prompt", async () => {
+    const w = await mountView("/security/detections?tuning=allowlists");
+    expect(w.findComponent({ name: "SecurityTuningDrawer" }).props("open")).toBe(true);
+  });
+
   it("disables a detection from its row switch", async () => {
     const w = await mountView();
     await w.find('[data-test="security-detections-toggle-alert-stop-logging"]').trigger("click");
@@ -132,6 +155,40 @@ describe("SecurityDetections", () => {
     expect(alertsService.delete_by_alert_id).toHaveBeenCalledWith(
       "default",
       "alert-access-key",
+      "default",
+    );
+    expect(rowOf(w, RULE_ACCESS_KEY.title)).toBeUndefined();
+  });
+
+  it("disables and deletes the selected detections in bulk, per folder", async () => {
+    confirmMock.mockResolvedValue(true);
+    vi.mocked(alertsService.bulkToggleState).mockResolvedValue(
+      okResponse({ successful: ["alert-stop-logging", "alert-access-key"] }) as never,
+    );
+    vi.mocked(alertsService.bulkDelete).mockResolvedValue(
+      okResponse({ successful: ["alert-access-key"] }) as never,
+    );
+    const w = await mountView();
+    const table = w.findComponent('[data-test="security-detections-table"]');
+    table.vm.$emit("update:selectedIds", ["alert-stop-logging", "alert-access-key"]);
+    await flushPromises();
+    await w.find('[data-test="security-detections-bulk-disable"]').trigger("click");
+    await flushPromises();
+    expect(alertsService.bulkToggleState).toHaveBeenCalledWith(
+      "default",
+      false,
+      expect.objectContaining({ ids: ["alert-stop-logging", "alert-access-key"] }),
+      "default",
+    );
+
+    table.vm.$emit("update:selectedIds", ["alert-access-key"]);
+    await flushPromises();
+    await w.find('[data-test="security-detections-bulk-delete"]').trigger("click");
+    await flushPromises();
+    expect(confirmMock).toHaveBeenCalled();
+    expect(alertsService.bulkDelete).toHaveBeenCalledWith(
+      "default",
+      { ids: ["alert-access-key"] },
       "default",
     );
     expect(rowOf(w, RULE_ACCESS_KEY.title)).toBeUndefined();

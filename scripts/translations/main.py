@@ -36,17 +36,17 @@ from translator import (
     build_state,
     collect_pending_leaves,
     find_duplicate_keys,
-    get_language_file_path,
+    get_language_file_paths,
     get_state_file_path,
     get_supported_languages,
-    load_json,
+    load_locale,
     load_source,
     load_state,
     new_counters,
     save_state,
     set_trace_outcome,
     translate_pending,
-    write_json,
+    write_locale,
 )
 
 
@@ -67,8 +67,8 @@ def run_check(locales):
     # read the last block and ignore the first, so a file looks up to date while
     # half of it is dead. Structural, so it fails like a bad source.
     duplicated = False
-    for path in [get_language_file_path(SOURCE_LOCALE), get_state_file_path()] + [
-        get_language_file_path(locale) for locale in locales
+    for path in get_language_file_paths(SOURCE_LOCALE) + [get_state_file_path()] + [
+        path for locale in locales for path in get_language_file_paths(locale)
     ]:
         if not os.path.exists(path):
             continue
@@ -83,7 +83,7 @@ def run_check(locales):
     state = load_state()
     total = 0
     for locale in locales:
-        existing = load_json(get_language_file_path(locale), {})
+        existing = load_locale(locale)
         pending = collect_pending_leaves(source, existing, state)
         if not pending:
             continue
@@ -138,7 +138,7 @@ def main():
     counters = new_counters()
     locale_targets = {}
     for locale in locales:
-        existing = load_json(get_language_file_path(locale), {})
+        existing = load_locale(locale)
         pending = collect_pending_leaves(source, existing, state)
         print(f"\nTranslating: {locale} ({len(pending)} strings pending)")
 
@@ -162,7 +162,7 @@ def main():
             # Flushed per locale (atomically), so a run that is cancelled or dies
             # part way through still leaves every completed locale on disk for CI
             # to commit.
-            write_json(get_language_file_path(locale), target)
+            write_locale(locale, target)
 
     # Advance shared state only on a full run, where every supported locale was
     # processed and "present in all locales" is meaningful. Subset runs translate

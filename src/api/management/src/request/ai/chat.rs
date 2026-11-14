@@ -223,7 +223,8 @@ fn keeps_default_agent(stored_agent_type: Option<&str>) -> bool {
     stored_agent_type.is_some_and(|agent| agent != RCA_AGENT_TYPE)
 }
 
-/// Matches the RCA endpoint: RCA enabled, incident in this org, and its `POST .../rca` permission.
+/// Matches the RCA endpoint: RCA enabled, incident in this org, its route read and the handler's
+/// own grant.
 #[cfg(feature = "enterprise")]
 pub(crate) async fn can_run_incident_rca(org_id: &str, user_id: &str, incident_id: &str) -> bool {
     let incidents = &get_o2_config().incidents;
@@ -244,7 +245,7 @@ pub(crate) async fn can_run_incident_rca(org_id: &str, user_id: &str, incident_i
     let Some((object_type, object_id)) = route.o2_type.split_once(':') else {
         return false;
     };
-    openobserve_core::auth::check_permissions(
+    let route_allowed = openobserve_core::auth::check_permissions(
         object_id,
         &route.org_id,
         user_id,
@@ -255,7 +256,18 @@ pub(crate) async fn can_run_incident_rca(org_id: &str, user_id: &str, incident_i
         route.use_self_context,
         route.use_self_parent,
     )
-    .await
+    .await;
+    // The route only checks a read; the RCA handler's own rule decides who may start a run.
+    route_allowed
+        && crate::request::security::guard_case_or_incidents(
+            org_id,
+            user_id,
+            incident_id,
+            "PUT",
+            "POST",
+        )
+        .await
+        .is_ok()
 }
 
 #[cfg(feature = "enterprise")]
@@ -2331,9 +2343,9 @@ mod tests {
 
     #[cfg(feature = "enterprise")]
     #[test]
-    fn rca_gate_is_the_rca_trigger_route_permission() {
+    fn rca_gate_reads_the_rca_trigger_route() {
         let route = incident_rca_route("org-a", "inc-1").unwrap();
-        assert_eq!(route.method, "POST");
+        assert_eq!(route.method, "GET");
         assert_eq!(route.o2_type, "incidents:org-a");
         assert_eq!(route.org_id, "org-a");
         assert!(route.use_all_org);
@@ -2529,6 +2541,7 @@ mod tests {
             rca_off_reason: None,
             security_case: false,
             historical: false,
+            last_detection_at: None,
         };
         alert_incidents::Entity::insert(alert_incidents::ActiveModel::from(row).reset_all())
             .exec(conn)

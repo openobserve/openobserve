@@ -31,7 +31,7 @@ export interface SecurityAuditEvent {
   path: string;
   query: string;
   status_code: number;
-  category: "detection" | "case" | "source" | "security";
+  category: "detection" | "case" | "source" | "access" | "security";
   body: string;
 }
 
@@ -40,6 +40,15 @@ export interface SecurityAuditPage {
   start_time: number;
   end_time: number;
   events: SecurityAuditEvent[];
+  /** Events in the whole window; absent from an older server. */
+  total?: number;
+}
+
+export interface SecurityAuditParams {
+  from: number;
+  size: number;
+  /** Also list Security requests that only read, such as sweeps and searches. */
+  includeReads: boolean;
 }
 
 const LEGACY_OPEN_ACCESS: SecurityAccess = { read: true, triage: true, author: true, admin: true };
@@ -53,8 +62,10 @@ const security = {
         if (error?.response?.status === 404) return { data: LEGACY_OPEN_ACCESS };
         throw error;
       }),
-  getAudit: (org: string, size = 100) =>
-    http().get<SecurityAuditPage>(`/api/${org}/security/audit`, { params: { size } }),
+  getAudit: (org: string, { from, size, includeReads }: SecurityAuditParams) =>
+    http().get<SecurityAuditPage>(`/api/${org}/security/audit`, {
+      params: { from, size, ...(includeReads ? { include_reads: true } : {}) },
+    }),
 };
 
 export default security;
