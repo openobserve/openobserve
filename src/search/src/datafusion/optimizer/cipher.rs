@@ -66,10 +66,6 @@ impl OptimizerRule for RewriteCipherCall {
         Some(ApplyOrder::BottomUp)
     }
 
-    fn supports_rewrite(&self) -> bool {
-        true
-    }
-
     fn rewrite(
         &self,
         plan: LogicalPlan,
@@ -244,10 +240,6 @@ impl OptimizerRule for RewriteCipherKey {
 
     fn apply_order(&self) -> Option<ApplyOrder> {
         Some(ApplyOrder::BottomUp)
-    }
-
-    fn supports_rewrite(&self) -> bool {
-        true
     }
 
     fn rewrite(

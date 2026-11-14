@@ -113,7 +113,7 @@ impl VisitorMut for ColumnVisitor<'_> {
                     let expr_name = name_visitor.field_names.iter().next().unwrap().to_string();
                     self.order_by.push((
                         expr_name,
-                        if order.options.asc.unwrap_or(true) {
+                        if !matches!(order.options.sort, Some(sqlparser::ast::OrderBySort::Desc)) {
                             OrderBy::Asc
                         } else {
                             OrderBy::Desc

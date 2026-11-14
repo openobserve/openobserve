@@ -186,7 +186,10 @@ pub async fn merge_files(
                 return Err(e);
             }
         };
-        let schema = schema.as_ref().clone().with_metadata(Default::default());
+        let schema = schema
+            .as_ref()
+            .clone()
+            .with_metadata(arrow_schema::Metadata::default());
         let schema_key = schema.hash_key();
         if !schemas.contains_key(&schema_key) {
             schemas.insert(schema_key.clone(), schema);

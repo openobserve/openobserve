@@ -28,15 +28,15 @@ use datafusion::{
     arrow::datatypes::Schema,
     error::{DataFusionError, Result},
 };
+#[cfg(feature = "vortex")]
 use vortex::{
     VortexSessionDefault, array::ArrayRef, arrow::ArrowSessionExt, file::VortexWriteOptions,
     io::session::RuntimeSessionExt, session::VortexSession,
 };
 
-use crate::{
-    datafusion::vortex::{VORTEX_RUNTIME, vortex_write_strategy},
-    merge::{MergedFile, append_metadata},
-};
+#[cfg(feature = "vortex")]
+use crate::datafusion::vortex::{VORTEX_RUNTIME, vortex_write_strategy};
+use crate::merge::{MergedFile, append_metadata};
 
 const TIMESTAMP_ALIAS: &str = "_timestamp_alias";
 
@@ -137,6 +137,18 @@ async fn write_downsampled_parquet(
     Ok((bufs, file_metas))
 }
 
+#[cfg(not(feature = "vortex"))]
+async fn write_downsampled_vortex(
+    _rx: tokio::sync::mpsc::Receiver<RecordBatch>,
+    _schema: Arc<datafusion::arrow::datatypes::Schema>,
+    _max_file_size: i64,
+) -> Result<(Vec<Vec<u8>>, Vec<FileMeta>)> {
+    Err(DataFusionError::NotImplemented(
+        "vortex support is not compiled in".to_string(),
+    ))
+}
+
+#[cfg(feature = "vortex")]
 async fn write_downsampled_vortex(
     mut rx: tokio::sync::mpsc::Receiver<RecordBatch>,
     schema: Arc<datafusion::arrow::datatypes::Schema>,

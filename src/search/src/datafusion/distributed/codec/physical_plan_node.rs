@@ -159,7 +159,7 @@ mod tests {
         let plan: Arc<dyn ExecutionPlan> = Arc::new(NewEmptyExec::new(
             "test",
             Arc::clone(&schema),
-            Some(&vec![0]),
+            Some(&[0]),
             &[],
             Some(10),
             FileSortOrder::None,
