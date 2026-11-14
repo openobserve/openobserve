@@ -199,6 +199,16 @@ describe("AssistantLauncher", () => {
     expect(wrapper.findAll('[data-test^="assistant-launcher-starter-"]')).toHaveLength(3);
   });
 
+  it("fills the field with an example prompt and focuses it, sending nothing", async () => {
+    const { wrapper } = setupOn({ layout: "overview" });
+    await flushPromises();
+    (wrapper.vm as unknown as { fill(prompt: string): void }).fill("Help me write a query");
+    await flushPromises();
+    expect((input(wrapper).element as HTMLTextAreaElement).value).toBe("Help me write a query");
+    expect(document.activeElement).toBe(input(wrapper).element);
+    expect(open).not.toHaveBeenCalled();
+  });
+
   it("opens the composer's @ menu on Home and sends the picked stream as a chip, not as text", async () => {
     const chip = {
       id: "mention:stream:logs|ta_composer_logs",

@@ -854,5 +854,10 @@ function openBilling(): void {
 defineExpose({
   /** Focus on arrival; skipped when the field is gated or the user is elsewhere. */
   focusAsk: () => focusWhenReady(() => input.value?.textarea),
+  /** Puts an example prompt in the field and focuses it, as main's welcome cards did. */
+  fill: (prompt: string) => {
+    text.value = prompt;
+    void nextTick(() => input.value?.textarea?.focus());
+  },
 });
 </script>

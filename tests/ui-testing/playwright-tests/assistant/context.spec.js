@@ -111,13 +111,12 @@ test.describe("assistant composer and context", () => {
     await page.mouse.move(0, 0);
 
     await assistant.timeChip().click();
-    // The popover opens on the window in use; the custom range is the last stop of the picker.
+    // The popover opens on the window in use; Custom Range… is the last row and swaps the presets for the range picker.
     await expect(page.locator('[data-test="assistant-context-time-page"]')).toBeFocused();
-    const trigger = page.locator('[data-test="assistant-context-time-picker"] [data-test="datetimerange-trigger"]');
-    for (let i = 0; i < 8 && !(await trigger.evaluate((el) => el === document.activeElement)); i += 1) await page.keyboard.press("Tab");
-    await expect(trigger).toBeFocused();
+    await page.keyboard.press("End");
+    await expect(page.locator('[data-test="assistant-context-time-custom"]')).toBeFocused();
     await page.keyboard.press("Enter");
-    await expect(page.locator('[data-test="datetimerange-popup"]')).toBeVisible();
+    await expect(page.locator('[data-test="assistant-context-time-range"] [data-test="datetimerange-inline"]')).toBeVisible();
   });
 
   test("CTX-02 a refused turn gives back the text, the chips and the images", { tag: ["@mock"] }, async ({ page }) => {

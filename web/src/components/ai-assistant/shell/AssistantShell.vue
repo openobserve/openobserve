@@ -49,13 +49,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :toolbar="bare"
       >
         <template #container-actions="{ narrow }">
-          <AssistantModeButtons
-            v-if="bare"
-            :placement="placement"
-            :sheet="sheet"
-            :sid="activeSid"
-            :dock-host="host?.id"
-          />
           <AssistantHeaderSees
             v-if="headerSees && bare"
             :sid="activeSid"
@@ -600,7 +593,7 @@ export interface AssistantShellProps {
   sheet?: boolean;
   host?: AssistantHostAdapter;
   density?: "compact" | "roomy";
-  /** No chat bar: the chat's controls float in its top corner as icons, and the page around it lists the chats. */
+  /** No chat bar: the chat's controls float in its top corner as icons, and the page around it lists the chats. It is the page's main surface, so it offers no Open as move. */
   bare?: boolean;
 }
 
