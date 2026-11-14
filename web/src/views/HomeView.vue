@@ -113,6 +113,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :org="store.state.selectedOrganization?.identifier"
           @ready="homePacks = $event"
         />
+        <div
+          v-if="hideOverviewPanel && activeHomeTab === 'overview' && streamTotals"
+          class="bg-surface-panel border-border-default rounded-surface mb-3 flex flex-wrap items-center gap-x-3 gap-y-1 border px-3.5 py-2 text-sm"
+          data-test="home-stream-totals"
+        >
+          <OIcon name="layers" size="xs" class="text-text-secondary shrink-0" />
+          <span class="text-text-heading" data-test="home-stream-totals-count">{{
+            t("starterPacks.home.streamCount", { count: streamTotals.count }, streamTotals.count)
+          }}</span>
+          <template v-if="streamTotals.today">
+            <span class="text-text-secondary" aria-hidden="true">{{ raw("·") }}</span>
+            <span class="text-text-heading" data-test="home-stream-totals-today">{{
+              t("starterPacks.home.ingestedToday", { size: streamTotals.today })
+            }}</span>
+          </template>
+          <span class="text-text-secondary" aria-hidden="true">{{ raw("·") }}</span>
+          <OButton
+            variant="ghost-primary"
+            size="sm"
+            data-test="home-stream-totals-open-btn"
+            @click="openStreams"
+          >
+            {{ t("starterPacks.home.openStreams") }}
+          </OButton>
+        </div>
         <SampleDataHomeBanner v-if="activeHomeTab === 'overview'" class="mt-2.5 mb-1" />
         <FirstDataPanel
           v-if="flagOn && isDataTab && arrived"
@@ -275,8 +300,9 @@ import {
   onMounted,
   onUnmounted,
 } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
+import { useQuery } from "@tanstack/vue-query";
 import { useRouter } from "vue-router";
 import config from "../aws-exports";
 import OverviewTab from "@/views/OverviewTab.vue";
@@ -313,6 +339,8 @@ import analytics from "@/services/product_analytics";
 import StarterPackHomeSection from "@/components/starterPacks/StarterPackHomeSection.vue";
 import { HOME_PACKS, type HomePacks } from "@/composables/starterPacks/useHomePacks";
 import { STARTER_PACKS_ENABLED } from "@/constants/starterPacks";
+import { orgOverviewQuery } from "@/services/overview.queries";
+import { formatSizeFromMB } from "@/utils/formatters";
 
 export default defineComponent({
   name: "PageHome",
@@ -330,6 +358,28 @@ export default defineComponent({
     const hideOverviewPanel = computed(
       () => packsEnabled && !!homePacks.value?.showSection.value && overviewNotMonitored.value,
     );
+    // Overview already loads these totals, so the line under the pack strip reads the same cache entry.
+    const overviewTotals = useQuery(() => ({
+      ...orgOverviewQuery(store.state.selectedOrganization?.identifier ?? ""),
+      enabled: hideOverviewPanel.value,
+    }));
+    const streamTotals = computed(() => {
+      const data = overviewTotals.data.value;
+      const streams = data?.streams?.data;
+      if (!streams) return null;
+      const todayGb = data?.limits?.data?.used_today_gb;
+      return {
+        count: streams.total_streams,
+        today: todayGb == null ? null : raw(formatSizeFromMB(todayGb * 1024)),
+      };
+    });
+    const openStreams = () =>
+      router
+        .push({
+          name: "logstreams",
+          query: { org_identifier: store.state.selectedOrganization?.identifier },
+        })
+        .catch(() => {});
     const LS_TAB_ORDER_KEY = "o2_home_tab_order";
     const LS_ACTIVE_TAB_KEY = "o2_home_active_tab";
 
@@ -672,6 +722,9 @@ export default defineComponent({
       homePacks,
       overviewNotMonitored,
       hideOverviewPanel,
+      streamTotals,
+      openStreams,
+      raw,
       homeChat,
       aiChatPayload,
       onSendToAiChat,

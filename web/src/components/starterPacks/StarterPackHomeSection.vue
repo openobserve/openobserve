@@ -16,7 +16,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount } from "vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
@@ -24,7 +23,7 @@ import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import type { StarterPack } from "@/composables/starterPacks/types";
 import { useHomePacks, type HomePacks } from "@/composables/starterPacks/useHomePacks";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import StarterPackDrawer from "./StarterPackDrawer.vue";
 import StarterPackFindMore from "./StarterPackFindMore.vue";
 import StarterPackHealthLine from "./StarterPackHealthLine.vue";
@@ -33,7 +32,7 @@ import StarterPackUndoDialog from "./StarterPackUndoDialog.vue";
 import TurnOnAlertsDrawer from "./TurnOnAlertsDrawer.vue";
 
 const props = defineProps<{ org: string; packs?: StarterPack[] }>();
-// Hands the one copy of pack state to Home, which shares it with the Overview toolbar.
+// Hands the one copy of pack state to Home, which shares it with the Overview tab.
 const emit = defineEmits<{ ready: [packs: HomePacks | null] }>();
 
 const { t } = useI18nTyped();
@@ -177,39 +176,60 @@ const compact = computed(() =>
       </template>
     </OBanner>
 
-    <section v-if="home.showSection.value" class="flex flex-col gap-3" data-test="home-pack-offer">
-      <div
-        class="bg-surface-subtle rounded-surface flex items-center gap-4 px-4 py-3 max-md:flex-wrap"
-        data-test="home-pack-offer-header"
-      >
-        <span
-          class="bg-surface-panel rounded-default text-status-positive flex h-10 w-10 shrink-0 items-center justify-center"
-        >
-          <OIcon name="sensors" size="md" />
-        </span>
-        <div class="flex min-w-0 flex-1 flex-col gap-0.5">
-          <h2 class="text-text-heading text-lg font-semibold">
-            {{ t("starterPacks.home.offerTitle") }}
-          </h2>
-          <OText variant="meta">{{ t("starterPacks.home.offerSub") }}</OText>
-        </div>
-        <OBadge variant="default-outline" size="md" data-test="home-pack-offer-undo-note">
-          <OIcon name="undo" size="xs" />
-          {{ t("starterPacks.home.undoNote") }}
-        </OBadge>
+    <section v-if="home.showSection.value" class="flex flex-col gap-2" data-test="home-pack-offer">
+      <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1" data-test="home-pack-offer-header">
+        <h2 class="text-text-heading text-base font-semibold">
+          {{ t("starterPacks.home.stripTitle") }}
+        </h2>
+        <OText variant="meta">
+          {{ raw("·") }}
+          {{
+            t(
+              "starterPacks.home.stripMeta",
+              { count: home.offered.value.length },
+              home.offered.value.length,
+            )
+          }}
+        </OText>
       </div>
 
-      <div class="grid auto-rows-fr gap-3" data-test="home-pack-offer-rows">
-        <StarterPackHomeRow
-          v-for="(item, index) in home.offered.value"
-          :key="item.pack.id"
-          :item="item"
-          :first="index === 0"
-        />
+      <div
+        class="grid grid-cols-3 gap-3 max-lg:grid-cols-2 max-md:grid-cols-1"
+        data-test="home-pack-offer-rows"
+      >
+        <StarterPackHomeRow v-for="item in home.offered.value" :key="item.pack.id" :item="item" />
+        <div
+          class="border-border-default rounded-surface flex min-w-0 flex-col items-start justify-center gap-2.5 border border-dashed p-3.5"
+          data-test="home-pack-find-other"
+        >
+          <div class="text-text-secondary flex items-center gap-2">
+            <OIcon name="manage-search" size="sm" class="shrink-0" />
+            <OText variant="body-strong" class="text-text-heading">{{
+              t("starterPacks.home.findOther")
+            }}</OText>
+          </div>
+          <OText variant="meta">{{ t("starterPacks.home.findOtherSub") }}</OText>
+          <OButton
+            variant="outline"
+            size="sm"
+            data-test="home-pack-find-other-browse-btn"
+            @click="home.library"
+          >
+            {{ t("starterPacks.home.browse") }}
+          </OButton>
+        </div>
       </div>
     </section>
 
-    <div v-if="!home.setUp.value.length && !home.loading.value" class="flex justify-end">
+    <div
+      v-if="
+        !home.showSection.value &&
+        !home.setUp.value.length &&
+        !home.loading.value &&
+        home.hasData.value
+      "
+      class="flex justify-end"
+    >
       <StarterPackFindMore :org="org" variant="link" />
     </div>
 

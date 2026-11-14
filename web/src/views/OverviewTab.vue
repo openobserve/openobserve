@@ -22,9 +22,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="pageState !== 'forbidden' && !errorIsForbidden"
       class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2"
     >
-      <OverviewStatusLine v-if="showStatusLine" :status="status" />
+      <OverviewStatusLine v-if="showStatusLine" :status="status" :silent="silentPacks" />
       <div class="ms-auto flex items-center gap-2">
-        <StarterPackHomeMenu v-if="homePacks?.showMenu.value" :home="homePacks" />
         <ORefreshButton
           :last-run-at="lastFetched ? lastFetched.getTime() : null"
           :loading="isLoading || overviewState.loading"
@@ -873,7 +872,6 @@ import OverviewAskAiButton from "./overview/OverviewAskAiButton.vue";
 import OverviewStatusLine from "./overview/OverviewStatusLine.vue";
 import { buildOverviewAskAi, type OverviewAskAiTarget } from "./overview/overviewAskAi";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
-import StarterPackHomeMenu from "@/components/starterPacks/StarterPackHomeMenu.vue";
 import StarterPackSilentAlerts from "@/components/starterPacks/StarterPackSilentAlerts.vue";
 import { HOME_PACKS } from "@/composables/starterPacks/useHomePacks";
 import { OVERVIEW_TOP, orgOverviewQuery } from "@/services/overview.queries";

@@ -63,13 +63,6 @@ watch(
   { immediate: true },
 );
 
-const startSetup = async () => {
-  drawerOpen.value = true;
-  if (await flow.install()) {
-    drawerOpen.value = false;
-    await flow.land();
-  }
-};
 const showCard = computed(
   () =>
     matcher.state.value !== "error" &&
@@ -94,10 +87,6 @@ const primaryLabel = computed(() => {
   if (status.value === "waiting") return t("starterPacks.partial");
   return undefined;
 });
-const onPrimary = () => {
-  if (flow.interrupted.value) drawerOpen.value = true;
-  else void startSetup();
-};
 const copyLink = () => copyToClipboard(flow.packLink(), t);
 </script>
 
@@ -122,8 +111,7 @@ const copyLink = () => copyToClipboard(flow.packLink(), t);
     test-id="first-event-status-pack-card"
     :primary-label="primaryLabel"
     :primary-test-id="primaryTestId"
-    @install="onPrimary"
-    @details="drawerOpen = true"
+    @install="drawerOpen = true"
   >
     <template v-if="status === 'forbidden'" #actions>
       <OButton

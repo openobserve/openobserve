@@ -16,6 +16,7 @@
 import config from "@/aws-exports";
 import { toStreamsByType } from "@/composables/alerts/useAlertLibrary";
 import { readQuery } from "@/composables/query/readQuery";
+import { isOwnedStream } from "@/composables/sampleData/useSampleDataPresence";
 import { streamNameListQuery, streamSchemaQuery } from "@/services/stream.queries";
 import type {
   AlertLibraryEntry,
@@ -23,6 +24,7 @@ import type {
   AlertLibraryManifest,
   StreamsByType,
 } from "@/types/alertLibrary";
+import { isSampleStreamName } from "@/utils/sampleData/catalog";
 import { loadSemanticGroups } from "@/utils/semanticGroupsCache";
 
 import {
@@ -201,7 +203,11 @@ export const readOrgStreams = async (org: string): Promise<StreamsByType> => {
   );
   return ingestTimes(
     lists.flatMap((rows, index) =>
-      rows.map((row) => ({ ...row, stream_type: STREAM_TYPES[index] })),
+      rows
+        .filter(
+          (row) => isOwnedStream(row, STREAM_TYPES[index]) && !isSampleStreamName(row.name ?? ""),
+        )
+        .map((row) => ({ ...row, stream_type: STREAM_TYPES[index] })),
     ),
   );
 };

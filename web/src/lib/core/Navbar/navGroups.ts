@@ -421,7 +421,7 @@ export const NAV_GROUPS: NavGroupDef[] = [
       },
       {
         titleKey: "menu.starterPacks",
-        icon: "inventory-2",
+        icon: "package-2",
         name: "starterPacks",
         feature: "alerts",
         activeOnRoutes: ["starterPack"],

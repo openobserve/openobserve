@@ -303,6 +303,7 @@ onMounted(async () => {
 });
 watch(setupOpen, (isOpen) => {
   if (isOpen) void flow.loadPreview();
+  else if (flow.installed.value) void refresh();
 });
 watch(turnOnOpen, (isOpen) => {
   if (!isOpen) preselect.value = undefined;
@@ -311,13 +312,6 @@ watch([turnOnOpen, editRow, removeOpen, muteRow, updateOpen, setupOpen], (opened
   if (opened.some(Boolean)) detailsOpen.value = false;
 });
 
-const setUp = async () => {
-  setupOpen.value = true;
-  if (await flow.install(folderName.value === pack.folder.name ? undefined : folderName.value)) {
-    setupOpen.value = false;
-    await refresh();
-  }
-};
 const backToPacks = () =>
   router.push({ name: "starterPacks", query: { org_identifier: org } }).catch(() => {});
 const copyLink = () => copyToClipboard(flow.packLink(), t);
@@ -572,18 +566,10 @@ const muteContext = computed(() =>
             data-test="starter-pack-page-folder-select"
           />
           <OButton
-            variant="outline"
-            size="sm-action"
-            data-test="starter-pack-page-details-btn"
-            @click="setupOpen = true"
-          >
-            {{ t("starterPacks.details") }}
-          </OButton>
-          <OButton
             variant="primary"
             size="sm-action"
             data-test="starter-pack-page-setup-btn"
-            @click="setUp"
+            @click="setupOpen = true"
           >
             {{ t("starterPacks.setUp", { title }) }}
           </OButton>
@@ -806,7 +792,12 @@ const muteContext = computed(() =>
       :preselect-ids="preselect"
       @done="refresh"
     />
-    <StarterPackDrawer v-model:open="setupOpen" :flow="flow" :clusters="matcher.clusters.value" />
+    <StarterPackDrawer
+      v-model:open="setupOpen"
+      :flow="flow"
+      :clusters="matcher.clusters.value"
+      :folder-name="folderName === pack.folder.name ? undefined : folderName"
+    />
     <StarterPackUpdateDrawer v-if="packsEnabled" v-model:open="updateOpen" :updates="updates" />
     <StarterPackUndoDialog v-model:open="removeOpen" :flow="flow" mode="remove" @done="refresh" />
     <ODialog
