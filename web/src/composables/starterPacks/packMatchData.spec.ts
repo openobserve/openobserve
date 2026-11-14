@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { flushPromises, mount } from "@vue/test-utils";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { defineComponent } from "vue";
 
 import type { AlertLibraryEntry } from "@/types/alertLibrary";
@@ -26,6 +26,7 @@ const fake = vi.hoisted(() => ({
   groups: vi.fn(async () => [] as Array<{ fields: string[] }>),
   files: {} as Record<string, unknown>,
   schemaReads: [] as Array<{ name: string; force: boolean }>,
+  failForced: false,
 }));
 
 vi.mock("@/constants/starterPacks", () => ({ STARTER_PACKS_ENABLED: true }));
@@ -42,6 +43,7 @@ vi.mock("@/composables/query/readQuery", () => ({
   readQuery: async (options: { queryKey: string[] }, force?: boolean) => {
     const [, type, name] = options.queryKey;
     if (name) fake.schemaReads.push({ name, force: !!force });
+    if (name && force && fake.failForced) throw new Error("schema read failed");
     if (name) return { schema: (fake.columns[name] ?? []).map((n) => ({ name: n })) };
     return fake.streams[type] ?? [];
   },
@@ -125,6 +127,7 @@ describe("one matcher", () => {
     fake.columns = {};
     fake.files = {};
     fake.schemaReads = [];
+    fake.failForced = false;
     KUBERNETES_PACK.alerts = ["k8s/one"];
     KUBERNETES_PACK.dashboards = [];
     fake.groups.mockClear();
@@ -186,6 +189,48 @@ describe("one matcher", () => {
       expect((await bannerState()) === "matched").toBe(expected);
     });
 
+    // The forced-read gap is module state, so each test reads at a later time.
+    const clock = { at: Date.now(), next: () => (clock.at += 60 * 60 * 1000) };
+    afterEach(() => vi.restoreAllMocks());
+
+    it("re-reads a cached schema once when a pack fails on a field", async () => {
+      vi.spyOn(Date, "now").mockReturnValue(clock.next());
+      KUBERNETES_PACK.dashboards = [dashboard([panel("sum by (late) (kube_pod)")])];
+      const result = await match();
+      expect(result.ready).toBe(false);
+      expect(fake.schemaReads).toContainEqual({ name: "kube_pod", force: true });
+    });
+
+    it("does not force the same schema again on the next poll", async () => {
+      vi.spyOn(Date, "now").mockReturnValue(clock.next());
+      KUBERNETES_PACK.dashboards = [dashboard([panel("sum by (late) (kube_pod)")])];
+      await match();
+      fake.schemaReads = [];
+      await match();
+      expect(fake.schemaReads.filter(({ force }) => force)).toEqual([]);
+    });
+
+    it("retries a forced read that failed on the next match", async () => {
+      vi.spyOn(Date, "now").mockReturnValue(clock.next());
+      KUBERNETES_PACK.dashboards = [dashboard([panel("sum by (late) (kube_pod)")])];
+      fake.failForced = true;
+      await match();
+      fake.failForced = false;
+      fake.schemaReads = [];
+      await match();
+      expect(fake.schemaReads).toContainEqual({ name: "kube_pod", force: true });
+    });
+
+    it("counts a strict rename as ready, since the installer fixes it", async () => {
+      KUBERNETES_PACK.alerts = ["k8s/one"];
+      entry.required_streams = ["KUBE_POD"];
+      fake.files = { "k8s/one": query("KUBE_POD") };
+      KUBERNETES_PACK.dashboards = [];
+      const result = await match();
+      entry.required_streams = ["kube_pod"];
+      expect(result.ready).toBe(true);
+    });
+
     it("reads each schema once and never forces it", async () => {
       KUBERNETES_PACK.alerts = ["k8s/one"];
       fake.files = { "k8s/one": query("kube_pod") };
@@ -207,6 +252,17 @@ describe("one matcher", () => {
       expect(first.dashboards.get("overview")).toBe(false);
       expect((await match()).dashboards.get("overview")).toBe(true);
     });
+  });
+
+  it("re-reads a required schema that came back empty", async () => {
+    const { readSchemaColumns } = await import("./packMatchData");
+    fake.columns = {};
+    fake.schemaReads = [];
+    await readSchemaColumns("org", "metrics", "late");
+    expect(fake.schemaReads).toEqual([
+      { name: "late", force: false },
+      { name: "late", force: true },
+    ]);
   });
 
   it("uses only pack aliases on OSS, without calling semantic groups", async () => {

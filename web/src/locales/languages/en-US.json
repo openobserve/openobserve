@@ -15035,7 +15035,17 @@
     },
     "kubernetes": {
       "title": "Kubernetes",
-      "description": "Dashboards, alerts and saved views for Kubernetes clusters."
+      "description": "Dashboards, alerts and saved views for Kubernetes clusters.",
+      "fieldCluster": "Cluster name",
+      "fieldNamespace": "Namespace",
+      "fieldPod": "Pod name",
+      "fieldNode": "Node name",
+      "fieldContainer": "Container name",
+      "fieldKind": "Event kind",
+      "fieldReason": "Event reason",
+      "fieldMessage": "Event message",
+      "roleEvents": "Kubernetes events",
+      "flavourOtel": "OpenTelemetry"
     },
     "setUp": "Set up Kubernetes monitoring",
     "checking": "Checking what fits…",
@@ -15142,7 +15152,8 @@
       "nothingToCreate": "You already have every item in this pack",
       "openKubernetes": "Open Kubernetes",
       "openDashboard": "Open dashboard",
-      "error": "Couldn't load what this pack creates"
+      "error": "Couldn't load what this pack creates",
+      "reasonNoFlavour": "{name}: not available for your metric names yet"
     },
     "progress": {
       "title": "Setting up Kubernetes monitoring",
@@ -15290,6 +15301,40 @@
         "failed": "Could not create",
         "skipped": "Left out"
       }
+    },
+    "adapted": {
+      "readsRole": "Reads {what} from {stream}",
+      "readsMetric": "Reads metric data from {stream}",
+      "readsAll": "Reads {what} from {count} streams: {streams}",
+      "readsFiltered": "Reads {what} from {stream}, only records where {field} is {value}",
+      "someData": "the metric an alert needs",
+      "fieldRead": "{what} read from {field}",
+      "someField": "A field",
+      "flavour": "Uses the {name} version",
+      "change": "Change",
+      "fieldsMore": "and {count} more field matches",
+      "show": "Show",
+      "needsChoice": "Needs a choice",
+      "severalMatch": "{count} streams look like {what}",
+      "oneMatch": "{stream} looks like {what}",
+      "sharedAsk": "Which records are {what}?",
+      "notFound": "We couldn't find your {what}",
+      "choose": "Choose",
+      "dialogFields": "{matched} of {total} fields",
+      "dialogUse": "Use {stream}",
+      "dialogUseAll": "Use all {count}",
+      "dialogUseChecked": "Use these {count}",
+      "dialogAllNote": "All: the dashboard gets a stream picker, and each alert that reads this is set up once per stream.",
+      "dialogPickFive": "Pick up to {count} streams.",
+      "dialogPickStream": "Pick the stream",
+      "dialogPickPlaceholder": "Choose a stream",
+      "dialogFiltersOn": "Reads from {stream}, only records where {field} is {value}",
+      "dialogNoValues": "No values were found for this field in the last 24 hours.",
+      "dialogSend": "Or send them to {stream}: set this header in your collector",
+      "dialogFieldTitle": "Choose the field for {what}",
+      "dialogFieldLabel": "Field in {stream}",
+      "values": "Seen: {values}",
+      "apply": "Use this"
     }
   },
   "alert_library": {

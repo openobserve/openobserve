@@ -21,6 +21,7 @@ const render = (flow = fakeFlow()) =>
             '<div data-test="stub-dialog"><span data-test="stub-dialog-title">{{ title }}</span><slot /><slot name="footer" /></div>',
         },
         OIcon: true,
+        StarterPackAdaptedRows: true,
       },
     },
   });
@@ -63,6 +64,13 @@ describe("StarterPackDrawer", () => {
     expect(wrapper.get('[data-test="starter-pack-drawer-not-included"]').text()).toContain(
       "You have itDisk full: you already have it",
     );
+  });
+
+  it("shows one Adapted to your data section holding the adapted rows", () => {
+    const wrapper = render(fakeFlow({ preview: shallowRef(PREVIEW) }));
+    expect(wrapper.text().split("Adapted to your data")).toHaveLength(2);
+    const reach = wrapper.get('[data-test="starter-pack-drawer-reach"]');
+    expect(reach.findComponent({ name: "StarterPackAdaptedRows" }).exists()).toBe(true);
   });
 
   it("lists the view under items left out on a lower plan", () => {

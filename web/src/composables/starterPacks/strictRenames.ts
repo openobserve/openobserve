@@ -15,12 +15,24 @@
 
 import type { PackRepair } from "./types";
 
-const strictKey = (name: string) => name.toLowerCase().replace(/_total$/, "");
+const EXPORTER_PREFIXES = /^(?:otel_|otelcol_|prometheus_)/;
 
-/** Names that differ only by case or a `_total` suffix (D10); two candidates means ask, so none. */
-export const strictRenames = (wanted: string[], available: Set<string>): PackRepair[] =>
+const strictKey = (name: string) =>
+  name
+    .toLowerCase()
+    .replace(EXPORTER_PREFIXES, "")
+    .replace(/_total$/, "");
+
+/** Names that differ only by case, `_total` or an exporter prefix (D10); two candidates means ask, so none. */
+export const strictRenames = (
+  wanted: string[],
+  available: Set<string>,
+  used: Set<string> = new Set(),
+): PackRepair[] =>
   wanted.flatMap((from) => {
     if (available.has(from)) return [];
-    const matches = [...available].filter((name) => strictKey(name) === strictKey(from));
+    const matches = [...available].filter(
+      (name) => strictKey(name) === strictKey(from) && !used.has(name),
+    );
     return matches.length === 1 ? [{ from, to: matches[0] }] : [];
   });

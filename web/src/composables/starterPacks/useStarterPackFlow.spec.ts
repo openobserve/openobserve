@@ -67,6 +67,55 @@ const setup = (state: Record<string, unknown> = {}) => {
   return flow;
 };
 
+describe("repair answers", () => {
+  it("keeps every answer for the next preview and the install", async () => {
+    const flow = setup();
+    await flow.chooseStream("k8s_events", { to: "edge" });
+    expect(fake.previewPack).toHaveBeenLastCalledWith(PACK, {
+      streams: { k8s_events: { to: "edge" } },
+      fields: {},
+    });
+  });
+
+  it("drops an older preview that finishes after a newer answer", async () => {
+    const flow = setup();
+    let finishOld!: (value: unknown) => void;
+    fake.previewPack.mockImplementationOnce(() => new Promise((done) => (finishOld = done)));
+    const older = flow.loadPreview();
+    const newest = { items: [], names: {}, notIncluded: [] };
+    fake.previewPack.mockResolvedValueOnce(newest);
+    await flow.loadPreview();
+    finishOld({ items: [], names: { old: "x" }, notIncluded: [] });
+    await older;
+    expect(flow.preview.value).toEqual(newest);
+    expect(flow.previewState.value).toBe("ready");
+  });
+
+  it("refuses __name__ as a field", async () => {
+    const flow = setup();
+    fake.previewPack.mockClear();
+    await flow.chooseField("x", "__name__");
+    expect(fake.previewPack).not.toHaveBeenCalled();
+  });
+
+  it("sends a field change to every stream that has the column", async () => {
+    const flow = setup();
+    fake.previewPack.mockResolvedValue({
+      items: [],
+      names: {},
+      notIncluded: [],
+      bindings: [
+        { stream: "a", from: "x", to: "y", tier: "alias" },
+        { stream: "b", from: "x", to: "y", tier: "alias" },
+      ],
+      columns: { a: ["z"], b: ["y"] },
+    });
+    await flow.loadPreview();
+    await flow.chooseField("x", "z");
+    expect(fake.previewPack.mock.lastCall?.[1].fields).toEqual({ "a/x": "z" });
+  });
+});
+
 describe("useStarterPackFlow", () => {
   beforeEach(() => {
     vi.clearAllMocks();
