@@ -240,6 +240,32 @@ describe("AssistantQueriesGroup", () => {
     );
   });
 
+  it("opens a step's query in this tab through the explorer applier, a new tab only on a modifier or where the chat cannot navigate", async () => {
+    const openRow = async (newTab: boolean) => {
+      const mounted = mountGroup([query("a", "default")], {}, (evidence) =>
+        evidence.host.prefersNewTab.mockReturnValue(newTab),
+      );
+      await mounted.wrapper.get('[data-test="assistant-queries-line"]').trigger("click");
+      await mounted.wrapper.get('[data-test="assistant-queries-row-a"] button').trigger("click");
+      return { ...mounted, open: mounted.wrapper.get('[data-test="assistant-queries-open-a"]') };
+    };
+    const { open, host, sid } = await openRow(false);
+    expect(open.attributes("target")).toBeUndefined();
+    expect(open.attributes("href")).toContain("type=ai_chat_query");
+    await open.trigger("click", { metaKey: true });
+    expect(host.dispatch).not.toHaveBeenCalled();
+    await open.trigger("click");
+    expect(host.dispatch).toHaveBeenCalledWith(
+      sid,
+      expect.objectContaining({ kind: "open_in_explorer", explorer: "logs" }),
+    );
+    const docked = await openRow(true);
+    expect(docked.open.attributes("target")).toBe("_blank");
+    expect(docked.open.attributes("aria-label")).toBe("Open in Logs (opens in a new tab)");
+    await docked.open.trigger("click");
+    expect(docked.host.dispatch).not.toHaveBeenCalled();
+  });
+
   it("offers the wider window on the line after an empty default window, and only the click sends", async () => {
     const empty: ContentBlock = {
       ...query("a", "default"),

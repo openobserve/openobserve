@@ -137,14 +137,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   size="chip"
                   as="a"
                   :href="hrefOf(row.step)"
-                  target="_blank"
-                  rel="noopener noreferrer"
+                  :target="opensInNewTab ? '_blank' : undefined"
+                  :rel="opensInNewTab ? 'noopener noreferrer' : undefined"
                   :icon-left="assistantGlyph.newTab"
+                  :aria-label="
+                    opensInNewTab
+                      ? t('assistant.evidence.opensNewTab', { label: openLabel(row.step) })
+                      : undefined
+                  "
                   :class="TOUCH_TARGET_CLASS"
                   :data-test="`assistant-queries-open-${row.step.callId}`"
-                  @click="trackOpen"
+                  @click="onOpen($event, row.step)"
                 >
-                  {{ t("assistant.query.open", { explorer: explorerName(row.step) }) }}
+                  {{ openLabel(row.step) }}
                 </OButton>
                 <span v-if="row.step.range">{{ rangeText(row.step.range) }}</span>
               </div>
@@ -360,12 +365,30 @@ function hrefOf(step: StepFacts): string | undefined {
     .href;
 }
 
-function explorerName(step: StepFacts): I18nText {
-  return explorerLabel(step.query ? explorerOf(step.query) : "logs", t);
+function openLabel(step: StepFacts): I18nText {
+  const explorer = explorerLabel(step.query ? explorerOf(step.query) : "logs", t);
+  return t("assistant.query.open", { explorer });
 }
 
-function trackOpen(): void {
-  trackAssistant("ai_evidence_action", { action: "open_explorer", block_kind: "query" });
+// A live chat opens in this tab like a query card's Open, so the chat stays with the page.
+const opensInNewTab = computed(
+  () => !evidence || !props.turn?.sid || evidence.prefersNewTab() === true,
+);
+
+// Ctrl/⌘, Shift and middle clicks keep the browser's own new-tab behaviour; the applier tracks its own opens.
+function onOpen(event: MouseEvent, step: StepFacts): void {
+  const sid = props.turn?.sid;
+  const modified = event.ctrlKey || event.metaKey || event.shiftKey || event.button === 1;
+  if (opensInNewTab.value || modified || !sid || !evidence || !step.query) {
+    trackAssistant("ai_evidence_action", { action: "open_explorer", block_kind: "query" });
+    return;
+  }
+  event.preventDefault();
+  void evidence.dispatch(sid, {
+    kind: "open_in_explorer",
+    query: step.query,
+    explorer: explorerOf(step.query),
+  });
 }
 
 function rerunWider(): void {
