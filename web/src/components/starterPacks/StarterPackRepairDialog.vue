@@ -61,7 +61,7 @@ const title = computed(() => {
   const what = raw(props.what);
   if (kind.value === "field") return t("starterPacks.adapted.dialogFieldTitle", { what });
   if (kind.value === "shared") return t("starterPacks.adapted.sharedAsk", { what });
-  if (kind.value === "none") return t("starterPacks.adapted.notFound", { what });
+  if (kind.value === "none") return t("starterPacks.adapted.noneFound", { what });
   const count = candidates.value.length;
   if (count === 1) {
     return t("starterPacks.adapted.oneMatch", { what, stream: raw(candidates.value[0].stream) });

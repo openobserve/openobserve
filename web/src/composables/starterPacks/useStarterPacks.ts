@@ -313,6 +313,7 @@ export function useStarterPacks(org: string) {
     payload: Record<string, unknown>,
     adaptation: PackAdaptation,
     flavour?: PackFlavourAlert,
+    enabled = false,
   ) => {
     const flavoured = withFlavour(payload, flavour);
     const doc = await adaptAlert(flavoured, adaptation, rewriteChecks, stream);
@@ -321,7 +322,7 @@ export function useStarterPacks(org: string) {
     return {
       ...doc,
       name: stream ? `${doc.name}_${stream}` : doc.name,
-      enabled: false,
+      enabled,
       destinations: [],
       tags: [...new Set(tags)],
     };
@@ -334,6 +335,7 @@ export function useStarterPacks(org: string) {
     entries: Map<string, AlertLibraryEntry>,
     adaptation: PackAdaptation,
     flavour?: PackFlavourAlert,
+    enabled = false,
   ): PackItemAdapter => {
     let savedId: string | undefined;
     return {
@@ -361,7 +363,8 @@ export function useStarterPacks(org: string) {
           owner: store.state.userInfo?.email ?? "",
           timezone: store.state.timezone,
           scheduledOnly: true,
-          decoratePayload: (payload) => decorateAlert(pack, item, payload, adaptation, flavour),
+          decoratePayload: (payload) =>
+            decorateAlert(pack, item, payload, adaptation, flavour, enabled),
           onSaved: (id) => {
             savedId = id;
           },
@@ -411,13 +414,14 @@ export function useStarterPacks(org: string) {
     entries: Map<string, AlertLibraryEntry>,
     adaptation: PackAdaptation = NO_ADAPTATION,
     flavours: Record<string, string> = {},
+    enableAlerts = false,
   ): PackItemAdapter => {
     if (item.kind === "folder") return folderAdapter(pack, item.itemId as PackFolderType);
     if (item.kind === "dashboard") return dashboardAdapter(pack, item.itemId, items, adaptation);
     if (item.kind === "alert") {
       const id = item.copyOf ?? item.itemId;
       const flavour = flavourAlert(pack, flavours[id], id);
-      return alertAdapter(pack, item, items, entries, adaptation, flavour);
+      return alertAdapter(pack, item, items, entries, adaptation, flavour, enableAlerts);
     }
     return savedViewAdapter(pack, item.itemId, adaptation);
   };
@@ -640,9 +644,18 @@ export function useStarterPacks(org: string) {
     items: PackRecordItem[],
     entries: Map<string, AlertLibraryEntry>,
     record: PackInstallRecord,
+    enableAlerts = false,
   ): Promise<PackRecordItem> => {
     const adaptation = { repairs: record.repairs ?? [], bindings: record.bindings ?? [] };
-    const adapter = adapterFor(pack, item, items, entries, adaptation, record.flavours);
+    const adapter = adapterFor(
+      pack,
+      item,
+      items,
+      entries,
+      adaptation,
+      record.flavours,
+      enableAlerts,
+    );
     try {
       let found = await adapter.lookup();
       // Another surface made it first, so the pack links it and never deletes it.
@@ -684,6 +697,7 @@ export function useStarterPacks(org: string) {
       flavours = {},
       copies,
       folderName,
+      enableAlerts = false,
     }: PackInstallOptions,
   ): Promise<PackInstallRecord> => {
     const { entries } = await loadEntries(sourcePack);
@@ -693,8 +707,9 @@ export function useStarterPacks(org: string) {
     );
     const pack = withFolder(sourcePack, interrupted?.folderName ?? folderName);
     // A resumed record still lists items the current plan leaves out; only made ones stay.
-    const kept = (item: PackRecordItem) =>
-      item.status === "created" || !exclude.includes(item.copyOf ?? item.itemId);
+    const excluded = (item: PackRecordItem) =>
+      exclude.includes(item.itemId) || exclude.includes(item.copyOf ?? item.itemId);
+    const kept = (item: PackRecordItem) => item.status === "created" || !excluded(item);
     const record: PackInstallRecord = interrupted
       ? {
           ...interrupted,
@@ -713,13 +728,11 @@ export function useStarterPacks(org: string) {
           ...(bindings.length ? { bindings } : {}),
           ...(Object.keys(flavours).length ? { flavours } : {}),
           ...(folderName ? { folderName } : {}),
-          items: (await planItems(pack, copies)).filter(
-            (item) => !exclude.includes(item.copyOf ?? item.itemId),
-          ),
+          items: (await planItems(pack, copies)).filter((item) => !excluded(item)),
         };
     await writeFirstRecord(record);
     onProgress?.(record);
-    return settleRecord(pack, record, entries, onProgress);
+    return settleRecord(pack, record, entries, onProgress, enableAlerts);
   };
 
   const settleRecord = async (
@@ -727,11 +740,19 @@ export function useStarterPacks(org: string) {
     record: PackInstallRecord,
     entries: Map<string, AlertLibraryEntry>,
     onProgress?: PackInstallOptions["onProgress"],
+    enableAlerts = false,
   ): Promise<PackInstallRecord> => {
     for (let index = 0; index < record.items.length; index += 1) {
       const item = record.items[index];
       if (item.status === "created" || item.status === "existing") continue;
-      record.items[index] = await settleItem(pack, item, record.items, entries, record);
+      record.items[index] = await settleItem(
+        pack,
+        item,
+        record.items,
+        entries,
+        record,
+        enableAlerts,
+      );
       await records.write(record);
       onProgress?.(record);
       // Everything after a folder needs its id.

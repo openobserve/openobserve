@@ -19,7 +19,6 @@ import { vi } from "vitest";
 import type { StarterPackFlow } from "@/composables/starterPacks/useStarterPackFlow";
 
 export const PACK = {
-  titleKey: "starterPacks.kubernetes.title",
   id: "kubernetes",
   titleKey: "starterPacks.kubernetes.title",
   dashboards: [{ id: "overview", title: "Overview" }],
@@ -41,6 +40,7 @@ export const fakeFlow = (over: Record<string, unknown> = {}) =>
     alertsTotal: ref(2),
     busy: ref(false),
     dashboardCount: ref(1),
+    enabledAlertIds: shallowRef(new Set<string>()),
     canManage: ref(true),
     canUndo: ref(true),
     failed: ref([]),
