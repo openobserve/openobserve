@@ -48,6 +48,7 @@ async function boot(path: string) {
       { path: "/users", name: "users", component: Blank, meta: { accessResource: "users" } },
       { path: "/roles", name: "roles", component: Blank, meta: { accessResource: "roles" } },
       { path: "/settings", name: "settings", component: Blank },
+      { path: "/security/events", name: "securityEvents", component: Blank },
       {
         path: "/dashboards/view",
         name: "viewDashboard",
@@ -96,6 +97,20 @@ describe("access store classification", () => {
       "re_patterns",
       "service_accounts",
     ]);
+  });
+
+  it("keeps the shell's stream list out of a Security page, which reads its sources itself", async () => {
+    await boot("/security/events");
+    forbidden("GET", "/api/acme/streams?type=logs&offset=0&limit=1");
+    expect(access.sectionEntries.value).toEqual([]);
+    forbidden("GET", "/api/acme/alerts/templates");
+    expect(access.sectionEntries.value.map((e) => e.resource.key)).toEqual(["templates"]);
+  });
+
+  it("still records a refused stream list on any other page", async () => {
+    await boot("/settings");
+    forbidden("GET", "/api/acme/streams?type=logs");
+    expect(access.sectionEntries.value.map((e) => e.resource.key)).toEqual(["streams"]);
   });
 
   it("names the collection, not the item, for a named item in the path", () => {
@@ -843,6 +858,23 @@ describe("access store classification", () => {
     ["POST", "/api/acme/security/sources/okta/attach", "create"],
     ["POST", "/api/acme/security/sources/classify", "create"],
     ["POST", "/api/acme/security/sources/okta/detach", "delete"],
+    ["POST", "/api/acme/security/detections/preview", "get"],
+    ["GET", "/api/acme/security/cases/search", "get"],
+    ["GET", "/api/acme/security/sources/okta/schema", "get"],
+    ["POST", "/api/acme/security/cases/bulk", "update"],
+    ["POST", "/api/acme/security/cases/merge", "update"],
+    ["PUT", "/api/acme/security/detections/a1", "create"],
+    ["POST", "/api/acme/security/detections/a1/exceptions", "create"],
+    ["PUT", "/api/acme/security/detections/a1/exceptions/e1", "create"],
+    ["DELETE", "/api/acme/security/detections/a1/exceptions/e1", "delete"],
+    ["GET", "/api/acme/security/allowlists", "get"],
+    ["PUT", "/api/acme/security/allowlists/scanners", "create"],
+    ["DELETE", "/api/acme/security/allowlists/scanners", "delete"],
+    ["GET", "/api/acme/security/suppressions", "get"],
+    ["POST", "/api/acme/security/suppressions", "update"],
+    ["DELETE", "/api/acme/security/suppressions/s1", "delete"],
+    ["POST", "/api/acme/security/sources/okta/include", "create"],
+    ["POST", "/api/acme/security/sources/okta/source_type", "create"],
   ])("checks Security %s %s as %s, as the server's route table does", (method, url, permission) => {
     expect(extractResourceInfo(url, method)?.key).toBe("security");
     expect(accessPermission(method, url)).toBe(permission);

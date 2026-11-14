@@ -490,6 +490,7 @@ mod tests {
             rca_off_reason: None,
             security_case: false,
             historical: false,
+            last_detection_at: None,
         }
     }
 

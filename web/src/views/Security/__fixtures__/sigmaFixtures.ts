@@ -1,5 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
 
+import { vi } from "vitest";
 // Sigma API answers for component specs, in the shapes the server returns.
 import type {
   CatalogRule,
@@ -103,7 +104,11 @@ export function compileFixture(body: SigmaCompileRequest): SigmaCompileResponse 
     applicable: [],
     parseError: null,
   };
-  const rule = sigmaCatalogFixture.rules.find((r) => r.key === body.rule_id) ?? null;
+  // A pasted rule that is a catalog rule's YAML compiles as that rule, as an edited detection does.
+  const rule =
+    sigmaCatalogFixture.rules.find(
+      (r) => r.key === body.rule_id || (!!body.rule_yaml && r.yaml === body.rule_yaml),
+    ) ?? null;
   if (!rule) {
     return body.rule_yaml
       ? { ...empty, parseError: "Rule has no detection block" }
@@ -224,5 +229,30 @@ export const mockSigmaService = () => ({
     coverage: async () => ok(coverageFixture),
     evidence: async () => ok({ stream: "", correlation: false, stored: false, groups: [] }),
     addColumns: async () => ok({}),
+    updateDetection: vi.fn(async (_org: string, id: string) => ok({ id, name: "edited" })),
+    previewDetection: vi.fn(async () => ok(previewFixture())),
   },
+});
+
+/** A day of a correlation run in the scheduler's windows, one of which fired. */
+export const previewFixture = (over: Record<string, unknown> = {}) => ({
+  range_start: 1_800_000_000_000_000,
+  range_end: 1_800_086_400_000_000,
+  requested_minutes: 1440,
+  correlation: true,
+  window_minutes: 60,
+  stride_minutes: 15,
+  windows_evaluated: 93,
+  windows_failed: 0,
+  firings: 1,
+  windows: [{ start: 1_800_000_000_000_000, end: 1_800_003_600_000_000, firings: 1 }],
+  sample: [
+    {
+      window_start: 1_800_000_000_000_000,
+      window_end: 1_800_003_600_000_000,
+      row: { actor_alternateid: "opal@acme.io", value_count: 2 },
+    },
+  ],
+  sql: "SELECT 1",
+  ...over,
 });

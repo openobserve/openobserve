@@ -42,6 +42,8 @@ defineProps<{
   sqlMode: boolean;
   /** Computed SQL results: plain cells, no severity rail, nothing to open. */
   resultTable?: boolean;
+  /** The SQL picks its own columns, so there is no normalized view to switch to. */
+  projected?: boolean;
   canShowTimeline: boolean;
   rowClass: (row: EventRow) => string;
   pivotFor: (row: EventRow, columnId: string) => { field: string; value: string } | null;
@@ -84,7 +86,7 @@ function fmtTs(ms: number | null): string {
 <template>
   <OTable
     ref="inner"
-    :key="resultTable ? 'result' : showRaw ? 'raw' : 'normalized'"
+    :key="resultTable ? 'result' : projected ? 'projected' : showRaw ? 'raw' : 'normalized'"
     :data="rows"
     :columns="columns"
     row-key="_key"
@@ -102,8 +104,8 @@ function fmtTs(ms: number | null): string {
     :sort-disabled="sqlMode"
     :sort-disabled-reason="t('siem.events.sortSqlMode')"
     :show-global-filter="false"
-    :persist-columns="!showRaw && !resultTable"
-    :table-id="showRaw || resultTable ? undefined : 'security-events-normalized'"
+    :persist-columns="!showRaw && !resultTable && !projected"
+    :table-id="showRaw || resultTable || projected ? undefined : 'security-events-normalized'"
     :enable-column-resize="true"
     :row-class="rowClass"
     :get-row-status-color="resultTable ? undefined : (r: EventRow) => severityRailColor(r._tone)"
@@ -127,7 +129,7 @@ function fmtTs(ms: number | null): string {
           {{ showTimeline ? t("siem.events.hideTimeline") : t("siem.events.showTimeline") }}
         </OButton>
         <OToggleGroup
-          v-if="!resultTable"
+          v-if="!resultTable && !projected"
           :model-value="showRaw ? 'raw' : 'normalized'"
           data-test="security-events-view"
           @update:model-value="(v: unknown) => (showRaw = v === 'raw')"

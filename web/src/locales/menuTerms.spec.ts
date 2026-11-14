@@ -3,12 +3,11 @@
 // Pins the menu wording so a translation-pipeline rewrite shows up as a failing spec.
 
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { readLocaleMessages, readLocaleText } from "@/test/unit/helpers/localeFiles";
 
-const read = (code: string): string =>
-  readFileSync(resolve(__dirname, `./languages/${code}.json`), "utf8");
-const load = (code: string): any => JSON.parse(read(code));
+// Whole-locale scans include the lazily loaded Security namespace, so a banned word cannot hide there.
+const read = (code: string): string => readLocaleText(code);
+const load = (code: string): any => readLocaleMessages(code);
 const at = (messages: any, path: string): unknown =>
   path.split(".").reduce((node, key) => node?.[key], messages);
 

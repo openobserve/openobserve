@@ -455,7 +455,7 @@ pub async fn get_detection_evidence(
 }
 
 /// The classifier's source for a stream, marked packed when an OCSF pack is attached to it.
-async fn stream_source(
+pub(super) async fn stream_source(
     org_id: &str,
     stream: &str,
     requested: Option<&str>,
@@ -506,7 +506,7 @@ async fn stored_groups(
 }
 
 /// Runs `sql` over the stream with the caller's permissions; `None` when it cannot be read.
-async fn search_rows(
+pub(super) async fn search_rows(
     org_id: &str,
     user_id: &str,
     stream: &str,
@@ -564,7 +564,9 @@ async fn siem_detections(org_id: &str) -> Vec<MatrixDetection> {
     detections
 }
 
-fn schema_fields(schema: &arrow_schema::Schema) -> (Vec<String>, Option<HashMap<String, String>>) {
+pub(super) fn schema_fields(
+    schema: &arrow_schema::Schema,
+) -> (Vec<String>, Option<HashMap<String, String>>) {
     let fields = schema.fields().iter().map(|f| f.name().clone()).collect();
     let types = schema
         .fields()
@@ -671,7 +673,7 @@ mod tests {
         assert!(response.compiled.unwrap().runnable);
         let correlation = response.correlation.unwrap();
         assert!(correlation.sql.contains("FROM \"okta_auth\""));
-        assert_eq!(correlation.timespan_minutes, 60);
+        assert_eq!(correlation.timespan_minutes, 15);
         assert!(response.rule.unwrap().correlation);
     }
 

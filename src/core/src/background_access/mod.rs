@@ -784,7 +784,8 @@ pub async fn denial_message(
 /// A body whose tables cannot be read is left to the function save, which answers it.
 #[cfg(feature = "enterprise")]
 pub async fn guard_vrl_function(org_id: &str, user_id: &str, source: &str) -> Result<(), Response> {
-    if !rbac_enforced().await {
+    // VRL reads tables only via enrichment functions, so naming none skips a compile.
+    if !reads_enrichment_tables(source) || !rbac_enforced().await {
         return Ok(());
     }
     let Ok(tables) = transform::enrichment_tables_read(source, org_id) else {
@@ -799,6 +800,12 @@ pub async fn guard_vrl_function(org_id: &str, user_id: &str, source: &str) -> Re
         })
         .collect();
     guard_write(org_id, user_id, &sources).await
+}
+
+/// Whether VRL `source` names an enrichment-table function, the only way it reads a table.
+#[cfg(feature = "enterprise")]
+fn reads_enrichment_tables(source: &str) -> bool {
+    source.contains("enrichment_table")
 }
 
 fn query_condition_sources(
@@ -1304,6 +1311,18 @@ mod tests {
 
     use super::*;
     use crate::authz::resolve_query_sources;
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_only_vrl_naming_an_enrichment_function_is_compiled_for_table_reads() {
+        assert!(reads_enrichment_tables(
+            r#".geo = get_enrichment_table_record!("geoip", {"ip": .src})"#
+        ));
+        assert!(reads_enrichment_tables(
+            r#".x = find_enrichment_table_records("t", {})"#
+        ));
+        assert!(!reads_enrichment_tables(".class_uid = 3002\n."));
+    }
 
     fn resolved_names(sources: &[QuerySource]) -> Vec<String> {
         resolve_query_sources(sources)
