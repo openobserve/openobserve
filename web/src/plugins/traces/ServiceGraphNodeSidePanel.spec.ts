@@ -1774,6 +1774,80 @@ describe("ServiceGraphNodeSidePanel", () => {
       },
     );
 
+    const podGroups = (groups: string[]) => ({
+      data: {
+        available_groups: groups.map((group_id) => ({
+          group_id,
+          display: "K8s Pod Name",
+          stream_types: ["traces"],
+          aliases: { traces: "service_k8s_pod_name" },
+          recommended: true,
+        })),
+      },
+    });
+    const podSchema = {
+      schema: ["service_name", "o2_service_version", "service_k8s_pod_name"].map((name) => ({
+        name,
+        type: "keyword",
+      })),
+    };
+
+    it("lets the user hide the active resource tab and moves to Operations", async () => {
+      getStreamMock.mockResolvedValueOnce(podSchema);
+      Object.assign(routeQuery, { panel: "service-version", panelSvc: "frontend", panelWhere: "" });
+      try {
+        wrapper = mountPanel();
+        await flushPromises();
+        await flushPromises();
+        expect((wrapper.vm as any).activeTab).toBe("service-version");
+        await wrapper
+          .get(
+            '[data-test="service-graph-node-panel-workload-field-service-version"] [role="checkbox"]',
+          )
+          .trigger("click");
+        await flushPromises();
+        expect((wrapper.vm as any).selectedWorkloadFields).not.toContain("service-version");
+        expect((wrapper.vm as any).activeTab).toBe("operations");
+      } finally {
+        for (const key of Object.keys(routeQuery)) delete routeQuery[key];
+      }
+    });
+
+    it("ignores the previous org's late tab discovery after an org switch", async () => {
+      const orgState = store.state.selectedOrganization as { identifier: string };
+      const firstOrg = orgState.identifier;
+      let settleFirst: (value: unknown) => void = () => {};
+      getStreamMock.mockResolvedValue(podSchema);
+      vi.mocked(getDimensionAnalytics).mockImplementation((() =>
+        orgState.identifier === firstOrg
+          ? new Promise((resolve) => (settleFirst = resolve))
+          : Promise.resolve(podGroups(["k8s-pod"]))) as never);
+      Object.assign(routeQuery, { panel: "k8s-pod", panelSvc: "frontend", panelWhere: "" });
+      try {
+        wrapper = mountPanel();
+        await flushPromises();
+        orgState.identifier = `${firstOrg}-other`;
+        await flushPromises();
+        await flushPromises();
+        expect((wrapper.vm as any).activeTab).toBe("k8s-pod");
+        settleFirst(podGroups([]));
+        await flushPromises();
+        await flushPromises();
+        expect((wrapper.vm as any).activeTab).toBe("k8s-pod");
+        expect((wrapper.vm as any).activeResourceTabConfigs.map((c: any) => c.id)).toContain(
+          "k8s-pod",
+        );
+      } finally {
+        orgState.identifier = firstOrg;
+        for (const key of Object.keys(routeQuery)) delete routeQuery[key];
+        getStreamMock.mockResolvedValue({ schema: [] });
+        vi.mocked(getDimensionAnalytics).mockReset();
+        vi.mocked(getDimensionAnalytics).mockResolvedValue({
+          data: { available_groups: [] },
+        } as never);
+      }
+    });
+
     it("keeps the tab the route names when the row refreshes or changes place, and resets it off the route", async () => {
       const previous = config.isEnterprise;
       config.isEnterprise = "true";
@@ -1902,12 +1976,23 @@ describe("ServiceGraphNodeSidePanel", () => {
     });
 
     it.each([
-      { row: "", scoped: "" },
-      { row: WHERE_B, scoped: `o2_service_where = '${WHERE_B}'` },
-    ])("scopes span queries by the clicked row's where ($row), never the route's", async (c) => {
+      { from: "catalog row without a place", route: "default", node: rowAt(""), scoped: "" },
+      {
+        from: "catalog row",
+        route: "default",
+        node: rowAt(WHERE_B),
+        scoped: `o2_service_where = '${WHERE_B}'`,
+      },
+      {
+        from: "graph node",
+        route: "k8s:staging/web",
+        node: baseNode,
+        scoped: "o2_service_where = 'k8s:staging/web'",
+      },
+    ])("scopes span queries of a $from by its own where, else the route's", async (c) => {
       givenSchema(["service_name", "o2_service_where"]);
-      openAt("default");
-      wrapper = mountAt({ selectedNode: rowAt(c.row) });
+      openAt(c.route);
+      wrapper = mountAt({ selectedNode: c.node });
       await flushPromises();
       await flushPromises();
       const ops = sqls().find((sql) => sql.includes("GROUP BY operation_name")) || "";

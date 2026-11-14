@@ -357,7 +357,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <template #icon-left>
                     <span @click.stop>
-                      <OCheckbox v-model="selectedWorkloadFields" :value="cfg.id" size="xs" />
+                      <OCheckbox
+                        :model-value="selectedWorkloadFields.includes(cfg.id)"
+                        size="xs"
+                        @update:model-value="toggleWorkloadField(cfg.id)"
+                      />
                     </span>
                   </template>
                   <span class="text-xs">
@@ -1398,10 +1402,15 @@ export default defineComponent({
         Object.prototype.hasOwnProperty.call(props.selectedNode ?? {}, "service_system"),
     );
 
-    // Spans follow the clicked row; the route's where only picks the registry place, which unstamped spans never match.
-    const selectedPanelWhere = computed<string>(() =>
-      props.selectedNode?.service_type ? "" : props.selectedNode?.where_key || "",
-    );
+    // A catalog row's own where (empty = unplaced) beats the route, whose registry place unstamped spans never match.
+    // Graph nodes carry no where_key, so the route's place picker scopes them.
+    const selectedPanelWhere = computed<string>(() => {
+      const node = props.selectedNode;
+      if (node?.service_type) return "";
+      if (Object.prototype.hasOwnProperty.call(node ?? {}, "where_key"))
+        return node.where_key || "";
+      return versionPanel.state.value.where;
+    });
     // null holds source queries until the schema settles; an unread schema drops the where, since an absent column 400s.
     const panelWhereKey = computed<string | null>(() => {
       const where = selectedPanelWhere.value;
@@ -2084,14 +2093,15 @@ export default defineComponent({
     // Workload Field Discovery State
     const resolvedWorkloadFields = ref<{ field: string; alias: FieldAlias }[]>([]);
 
-    // Toggle a workload field id in the selected set — invoked when the user
-    // selects the surrounding ODropdownItem (in addition to clicking the
-    // OCheckbox directly).
+    // The picker's only write path, for both the dropdown item and its checkbox, so hiding the active tab always leaves it.
     const toggleWorkloadField = (id: string) => {
       const current = selectedWorkloadFields.value;
-      selectedWorkloadFields.value = current.includes(id)
+      const hiding = current.includes(id);
+      selectedWorkloadFields.value = hiding
         ? current.filter((entry) => entry !== id)
         : [...current, id];
+      // Leaving the hidden tab active would make the route-restore watcher re-enable it.
+      if (hiding && activeTab.value === id) onTabChange("operations");
     };
 
     // Computed: Service Metrics
@@ -2629,7 +2639,9 @@ export default defineComponent({
       if (!props.visible || props.streamFilter === "all" || !props.streamFilter) return;
 
       // Ensure the stream schema is resolved (shared with inferred tab resolution)
-      if ((await resolveStreamSchema()) === false) return;
+      const generation = schemaGeneration;
+      const isCurrent = () => generation === schemaGeneration;
+      if ((await resolveStreamSchema()) === false || !isCurrent()) return;
       if (streamFieldSet.value.size === 0 || correlationLocked.value) return;
 
       try {
@@ -2637,6 +2649,7 @@ export default defineComponent({
 
         // Fetch semantic groups and build a reverse lookup map (field → alias)
         const semanticGroupsResponse = await getSemanticGroups(org);
+        if (!isCurrent()) return;
         const fieldToAliasMap = new Map<string, FieldAlias>();
         for (const alias of semanticGroupsResponse.data) {
           for (const field of alias.fields) {
@@ -2659,6 +2672,7 @@ export default defineComponent({
 
         // Fetch org-wide dimension analytics to discover all available resource groups
         const analyticsResp = await getDimensionAnalytics(org);
+        if (!isCurrent()) return;
         const allGroups: FoundGroup[] = analyticsResp.data?.available_groups ?? [];
 
         // Filter to groups whose traces (or spans) alias exists in this stream's schema
@@ -2708,6 +2722,7 @@ export default defineComponent({
           .filter((c) => c.isDefault)
           .map((c) => c.id);
       } catch (err) {
+        if (!isCurrent()) return;
         console.error("[ServiceGraphNodeSidePanel] Failed to resolve workload fields:", err);
         resolvedWorkloadFields.value = [];
         availableResourceTabConfigs.value = [];
