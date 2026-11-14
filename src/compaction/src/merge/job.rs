@@ -61,24 +61,6 @@ pub(crate) fn job_range(offset: i64, level: PartitionTimeLevel) -> (i64, i64) {
     (offset - offset % unit, job_range_end(offset, level))
 }
 
-/// A settled 00:00 metrics job covers its whole day once `has_rule(day end)` finds a rule.
-pub(super) fn job_time_level(
-    stream_type: StreamType,
-    offset: i64,
-    finalize: bool,
-    day_level: PartitionTimeLevel,
-    has_rule: impl Fn(i64) -> bool,
-) -> PartitionTimeLevel {
-    if finalize
-        && stream_type == StreamType::Metrics
-        && offset % day_micros(1) == 0
-        && has_rule(job_range_end(offset, PartitionTimeLevel::Daily))
-    {
-        return PartitionTimeLevel::Daily;
-    }
-    day_level
-}
-
 /// Generate merging job by stream
 /// 1. get offset from db
 /// 2. check if other node is processing
@@ -324,7 +306,7 @@ pub async fn generate_downsampling_job_by_stream_and_rule(
     if offset == 0 {
         return Ok(()); // no data
     }
-    // only a 00:00 job covers the whole day, see job_time_level
+    // only a 00:00 job covers the whole day, see policy::window_level
     let offset = offset - offset % day_micros(1);
 
     let cfg = get_config();
@@ -464,35 +446,5 @@ mod tests {
         // the hour of the 00:00 job is over; the day it stands for is not
         assert!(job_range_end(day, PartitionTimeLevel::Hourly) < now);
         assert!(job_range_end(day, PartitionTimeLevel::Daily) > now);
-    }
-
-    #[test]
-    fn test_job_time_level_whole_day_only_for_downsampling() {
-        let day = Utc
-            .with_ymd_and_hms(2026, 8, 18, 0, 0, 0)
-            .unwrap()
-            .timestamp_micros();
-        let day_end = day + day_micros(1) - 1;
-        let metrics = StreamType::Metrics;
-
-        // the rule is asked about the end of the day, not of hour 00
-        let hourly = PartitionTimeLevel::Hourly;
-        let level = job_time_level(metrics, day, true, hourly, |max_ts| max_ts == day_end);
-        assert_eq!(level, PartitionTimeLevel::Daily);
-
-        // no rule for the day end: the plain hour-00 merge stays hourly
-        let level = job_time_level(metrics, day, true, hourly, |_| false);
-        assert_eq!(level, PartitionTimeLevel::Hourly);
-        // other hours, open hours and other stream types never widen
-        let level = job_time_level(metrics, day + hour_micros(5), true, hourly, |_| true);
-        assert_eq!(level, PartitionTimeLevel::Hourly);
-        let level = job_time_level(metrics, day, false, hourly, |_| true);
-        assert_eq!(level, PartitionTimeLevel::Hourly);
-        let level = job_time_level(StreamType::Logs, day, true, hourly, |_| true);
-        assert_eq!(level, PartitionTimeLevel::Hourly);
-        // the level of the day holds without a rule, whatever the job
-        let daily = PartitionTimeLevel::Daily;
-        let level = job_time_level(StreamType::Logs, day, false, daily, |_| false);
-        assert_eq!(level, PartitionTimeLevel::Daily);
     }
 }

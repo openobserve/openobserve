@@ -53,39 +53,20 @@ pub async fn merge_files(
     mode: &MergeMode,
 ) -> Result<(Vec<FileKey>, Vec<FileKey>), anyhow::Error> {
     let start = std::time::Instant::now();
-    // a whole-batch mode (downsampling) merges everything it is given, even a
-    // single file; otherwise 0/1 files means nothing to do
-    let merge_whole_batch = mode.merges_whole_batch();
-    if files_with_size.len() <= 1 && !merge_whole_batch {
+    let rewrites_single_file = mode.rewrites_single_file();
+    if files_with_size.len() <= 1 && !rewrites_single_file {
         return Ok((Vec::new(), Vec::new()));
     }
 
-    let mut new_file_size = 0;
-    let mut new_compressed_file_size = 0;
-    let mut new_file_list = Vec::new();
+    let mut new_file_list = files_with_size.to_vec();
     let cfg = get_config();
-    for file in files_with_size.iter() {
-        if (new_file_size + file.meta.original_size > cfg.compact.max_file_size as i64
-            || new_compressed_file_size + file.meta.compressed_size
-                > cfg.compact.max_file_size as i64)
-            && !merge_whole_batch
-        {
-            break;
-        }
-        new_file_size += file.meta.original_size;
-        new_compressed_file_size += file.meta.compressed_size;
-        new_file_list.push(file.clone());
-        // metrics
+    for file in new_file_list.iter() {
         metrics::COMPACT_MERGED_FILES
             .with_label_values(&[org_id, stream_type.as_str()])
             .inc();
         metrics::COMPACT_MERGED_BYTES
             .with_label_values(&[org_id, stream_type.as_str()])
             .inc_by(file.meta.original_size as u64);
-    }
-    // no files need to merge
-    if new_file_list.len() <= 1 && !merge_whole_batch {
-        return Ok((Vec::new(), Vec::new()));
     }
 
     // cache parquet files
@@ -96,7 +77,7 @@ pub async fn merge_files(
         start.elapsed().as_millis()
     );
     // survivors of a merge that produced no output stay; gone rows are still deleted
-    if new_file_list.is_empty() || (new_file_list.len() <= 1 && !merge_whole_batch) {
+    if new_file_list.is_empty() || (new_file_list.len() <= 1 && !rewrites_single_file) {
         return Ok((Vec::new(), gone_files));
     }
     // only files that passed the storage check feed the output

@@ -13,9 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! What the compactor merges in a closed indexed metrics hour: nothing when
-//! every file is indexed, the late files alone while fragmentation is low,
-//! else the whole hour.
+//! Closed hour of a metrics-index stream: its hash-ordered files become indexed files. Nothing
+//! merges when every file is indexed, the late files alone while fragmentation is low, else the
+//! whole hour; an hour over the merge-group cap is pre-merged into hash-merged files first.
 
 use std::sync::Arc;
 
@@ -24,14 +24,19 @@ use config::meta::stream::FileKey;
 use metrics_index::MetricsFileLayout;
 use search::merge::{MergeMode, hash_ordered_chains};
 
-use super::plan::{PlannedBatch, mergeable_chunks};
+use super::{
+    BatchLimits, PlannedBatch, RoundPlan, legacy_batches, mergeable_chunks, split_legacy_metrics,
+};
+
+/// The indexed merge rewrites files whatever their size.
+pub(super) const READS_WHOLE_WINDOW: bool = true;
 
 /// Extra indexed files tolerated before rewriting the closed hour.
 const METRICS_INDEX_REWRITE_SLACK: usize = 4;
 
 /// What the merge of a closed indexed metrics hour covers.
 #[derive(Debug, PartialEq, Eq)]
-pub(super) enum MetricsIndexMergeScope {
+enum MetricsIndexMergeScope {
     /// Leaves the hour unchanged when indexed-file fragmentation is within the size target.
     Skip,
     /// Merge only the late, non-indexed files into one new indexed file;
@@ -45,10 +50,54 @@ pub(super) enum MetricsIndexMergeScope {
     WholeHour,
 }
 
-pub(super) fn metrics_index_merge_scope(
-    files: &[FileKey],
-    max_file_size: usize,
-) -> MetricsIndexMergeScope {
+pub(super) async fn plan(
+    files: Vec<FileKey>,
+    limits: &BatchLimits<'_>,
+    schema: &Arc<Schema>,
+    stream: &str,
+) -> RoundPlan {
+    let (files, legacy_files) = split_legacy_metrics(files);
+    let mut batches = legacy_batches(legacy_files, limits);
+    let mut plan = indexed_plan(files, limits, schema, stream).await;
+    batches.append(&mut plan.batches);
+    plan.batches = batches;
+    plan
+}
+
+/// The hash-ordered files: a pre-merge while over the merge-group cap, else the indexed merge.
+async fn indexed_plan(
+    mut files: Vec<FileKey>,
+    limits: &BatchLimits<'_>,
+    schema: &Arc<Schema>,
+    stream: &str,
+) -> RoundPlan {
+    let files = match metrics_index_merge_scope(&files, limits.max_file_size) {
+        MetricsIndexMergeScope::Skip => Vec::new(),
+        MetricsIndexMergeScope::LateFilesOnly => {
+            files.retain(|f| MetricsFileLayout::of(&f.key) != Some(MetricsFileLayout::Indexed));
+            log::debug!(
+                "[COMPACTOR] merge_by_stream [{stream}] metrics_indexed late merge of {} files, indexed files untouched",
+                files.len()
+            );
+            files
+        }
+        MetricsIndexMergeScope::WholeHour => {
+            log::debug!(
+                "[COMPACTOR] merge_by_stream [{stream}] metrics_indexed fragmentation cap hit, full rewrite of {} files",
+                files.len()
+            );
+            files
+        }
+    };
+
+    let pre_merge = pre_merge_batches(&files, limits.max_merge_groups, schema, stream).await;
+    if pre_merge.is_empty() {
+        return RoundPlan::new(vec![(files, MergeMode::MetricsIndexed)]);
+    }
+    RoundPlan::new(pre_merge).with_another_round()
+}
+
+fn metrics_index_merge_scope(files: &[FileKey], max_file_size: usize) -> MetricsIndexMergeScope {
     let indexed_files = files
         .iter()
         .filter(|f| MetricsFileLayout::of(&f.key) == Some(MetricsFileLayout::Indexed))
@@ -65,7 +114,7 @@ pub(super) fn metrics_index_merge_scope(
 }
 
 /// Hash-merged batches a closed hour runs before its indexed merge while it exceeds the cap.
-pub(super) async fn pre_merge_batches(
+async fn pre_merge_batches(
     files: &[FileKey],
     max_groups: usize,
     schema: &Arc<Schema>,
@@ -138,9 +187,12 @@ fn split_into_pre_merge_groups(
 
 #[cfg(test)]
 mod tests {
-    use config::meta::stream::FileMeta;
+    use config::meta::stream::{FileMeta, MergeStrategy};
 
-    use super::*;
+    use super::{
+        super::{MergeRule, tests::*},
+        *,
+    };
 
     fn file_key(name: &str, original_size: i64) -> FileKey {
         let mut key = FileKey::from_file_name(&format!("files/o/metrics/m/2026/08/18/10/{name}"));
@@ -152,6 +204,45 @@ mod tests {
             ..Default::default()
         };
         key
+    }
+
+    async fn closed_hour_batches(
+        files: Vec<FileKey>,
+        strategy: MergeStrategy,
+    ) -> Vec<PlannedBatch> {
+        test_policy(MergeRule::MetricsClosedHour)
+            .plan(files, &limits(&strategy, 0, false), &schema())
+            .await
+            .batches
+    }
+
+    #[tokio::test]
+    async fn test_legacy_batches_preserve_the_pre_merge_followup() {
+        let mut files: Vec<FileKey> = (1..=5)
+            .map(|id| hash_file(&format!("hash-sorted-v1-{id}.parquet"), 30))
+            .collect();
+        files.extend([
+            metrics_file("legacy-1.parquet", 300),
+            metrics_file("legacy-2.parquet", 300),
+        ]);
+        let strategy = MergeStrategy::FileTime;
+        let mut limits = limits(&strategy, 0, false);
+        limits.max_merge_groups = 2;
+        let plan = test_policy(MergeRule::MetricsClosedHour)
+            .plan(files, &limits, &schema())
+            .await;
+        assert!(plan.needs_another_round);
+        assert_eq!(plan.batches.len(), 3);
+        assert!(matches!(plan.batches[0].1, MergeMode::Classic));
+        assert_eq!(
+            names(&plan.batches[0].0),
+            ["legacy-1.parquet", "legacy-2.parquet"]
+        );
+        assert!(
+            plan.batches[1..]
+                .iter()
+                .all(|(_, mode)| matches!(mode, MergeMode::MetricsHashMerged))
+        );
     }
 
     #[test]
@@ -241,5 +332,93 @@ mod tests {
             .map(|batch| batch.iter().map(|f| f.meta.compressed_size).collect())
             .collect();
         assert_eq!(sizes, [[10, 30, 30]], "the largest group waits alone");
+    }
+
+    /// A closed hour with legacy and hash-ordered files: the legacy files get
+    /// their classic size-bounded merge, the hash files one indexed batch, and
+    /// no batch mixes the layouts (that would sort the whole hour).
+    #[tokio::test]
+    async fn test_plan_batches_keeps_legacy_metrics_out_of_the_indexed_merge() {
+        let files = vec![
+            metrics_file("1.parquet", 300),
+            metrics_file("hash-sorted-v1-2.parquet", 300),
+            metrics_file("3.parquet", 300),
+            metrics_file("hash-sorted-v1-4.parquet", 300),
+        ];
+        let batches = closed_hour_batches(files, MergeStrategy::FileSize).await;
+        assert_eq!(batches.len(), 2, "{batches:?}");
+        let (legacy, mode) = &batches[0];
+        assert!(matches!(mode, MergeMode::Classic), "{mode}");
+        assert_eq!(names(legacy), ["1.parquet", "3.parquet"]);
+        let (hash, mode) = &batches[1];
+        assert!(matches!(mode, MergeMode::MetricsIndexed), "{mode}");
+        assert_eq!(
+            names(hash),
+            ["hash-sorted-v1-2.parquet", "hash-sorted-v1-4.parquet"]
+        );
+    }
+
+    /// The whole-hour listing includes legacy files the classic query caps
+    /// away; they stay untouched instead of being rewritten with a small file.
+    #[tokio::test]
+    async fn test_plan_batches_legacy_files_at_target_size_are_left_alone() {
+        let files = vec![
+            metrics_file("1.parquet", 960),
+            metrics_file("2.parquet", 10),
+            metrics_file("hash-sorted-v1-3.parquet", 300),
+        ];
+        let batches = closed_hour_batches(files, MergeStrategy::FileTime).await;
+        assert_eq!(batches.len(), 1, "{batches:?}");
+        assert!(matches!(batches[0].1, MergeMode::MetricsIndexed));
+        assert_eq!(names(&batches[0].0), ["hash-sorted-v1-3.parquet"]);
+    }
+
+    #[tokio::test]
+    async fn test_plan_batches_all_indexed_hour_is_skipped() {
+        let files = vec![
+            metrics_file("indexed-v1-1.parquet", 300),
+            metrics_file("indexed-v1-2.parquet", 300),
+            metrics_file("indexed-v1-3.parquet", 300),
+            metrics_file("7.parquet", 300),
+            metrics_file("8.parquet", 300),
+        ];
+        let batches = closed_hour_batches(files, MergeStrategy::FileSize).await;
+        // the indexed files are left alone; the legacy pair still merges classic
+        assert_eq!(batches.len(), 1, "{batches:?}");
+        assert!(matches!(batches[0].1, MergeMode::Classic));
+        assert_eq!(names(&batches[0].0), ["7.parquet", "8.parquet"]);
+    }
+
+    #[tokio::test]
+    async fn test_plan_batches_indexed_file_is_not_rewritten() {
+        let files = vec![
+            metrics_file("indexed-v1-1.parquet", 300),
+            metrics_file("hash-sorted-v1-2.parquet", 300),
+        ];
+        let batches = closed_hour_batches(files, MergeStrategy::FileSize).await;
+        assert_eq!(batches.len(), 1);
+        assert!(matches!(batches[0].1, MergeMode::MetricsIndexed));
+        assert_eq!(names(&batches[0].0), ["hash-sorted-v1-2.parquet"]);
+    }
+
+    /// At hour end the round outputs and the tail merge together, once, into indexed files.
+    #[tokio::test]
+    async fn test_plan_batches_hour_end_takes_round_outputs_and_tail() {
+        let files = vec![
+            hash_file("hash-merged-v1-round1.parquet", 400),
+            hash_file("hash-merged-v1-round2.parquet", 420),
+            hash_file("hash-sorted-v1-late.parquet", 30),
+        ];
+        let batches = closed_hour_batches(files, MergeStrategy::FileTime).await;
+        assert_eq!(batches.len(), 1, "{batches:?}");
+        assert!(matches!(batches[0].1, MergeMode::MetricsIndexed));
+        assert_eq!(
+            names(&batches[0].0),
+            [
+                "hash-merged-v1-round1.parquet",
+                "hash-merged-v1-round2.parquet",
+                "hash-sorted-v1-late.parquet"
+            ]
+        );
     }
 }
