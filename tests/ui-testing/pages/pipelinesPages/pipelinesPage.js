@@ -163,6 +163,8 @@ export class PipelinesPage {
         this.functionNameLabel = page.locator('[data-test="add-function-node-routing-section"]').getByLabel('Name');
         this.associateFunctionSaveButton = page.locator('[data-test="associate-function-drawer"] [data-test="o-drawer-primary-btn"]');
         this.associateNewFunctionSaveButton = page.locator('[data-test="add-function-save-btn"]');
+        this.associateFunctionDrawer = page.locator('[data-test="associate-function-drawer"]');
+        this.associateFunctionDefinitionSection = page.locator('[data-test="associate-function-definition-section"]');
         // AddFunction's name field is an OInput — when the form is submitted
         // empty, OInput renders the "Field is required!" message inside the
         // auto-derived `${parent}-error` element with `data-test-error-text`.
@@ -984,6 +986,13 @@ export class PipelinesPage {
 
     async saveNewFunction() {
         await this.associateNewFunctionSaveButton.click();
+    }
+
+    async saveCreatedFunction() {
+        // The picker selects a just-created function only after re-fetching the list; Save before that is a silent no-op.
+        await this.associateFunctionDefinitionSection.waitFor({ state: 'visible', timeout: 30000 });
+        await this.associateFunctionSaveButton.click();
+        await expect(this.associateFunctionDrawer).toBeHidden({ timeout: 15000 });
     }
 
     async enterFunctionName(name) {
