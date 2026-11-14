@@ -65,7 +65,7 @@ const ctx: ReducerCtx = {
 let clock = 0;
 let frames: (() => void)[] = [];
 
-function setup() {
+function setup(raf: ((cb: () => void) => void) | null = (cb) => void frames.push(cb)) {
   let n = 0;
   const deps = inertAssistantDeps({
     getOrg: () => ({ identifier: "org1", name: "Org 1" }),
@@ -102,7 +102,7 @@ function setup() {
     store: () => store,
     history: () => ({ save }),
     now: () => clock,
-    raf: (cb) => void frames.push(cb),
+    raf: raf ?? undefined,
     commit: (id, write) => {
       commits.push(id);
       const session = store.state.sessions[id] as AssistantSession | undefined;
@@ -152,6 +152,7 @@ afterEach(() => {
   resetPrefsForTests();
   vi.clearAllMocks();
   vi.useRealTimers();
+  vi.unstubAllGlobals();
 });
 
 describe("effects: one commit per animation frame (HT-08 AC 2)", () => {
@@ -179,6 +180,36 @@ describe("effects: one commit per animation frame (HT-08 AC 2)", () => {
     expect(commits).toEqual([sid]);
     expect(String(session.messages[0].content)).toBe("ab");
     runFrame();
+    expect(commits).toEqual([sid]);
+  });
+
+  it("applies frames in a hidden tab, where the browser holds animation frames back", () => {
+    vi.useFakeTimers();
+    vi.stubGlobal("requestAnimationFrame", vi.fn());
+    const { store, sid, runner, commits } = setup(null);
+    const session = store.state.sessions[sid] as AssistantSession;
+    let state: StreamState | null = null;
+    const get = () => (state ??= stream(session));
+    runner.schedule(sid, delta(get, "a"));
+    runner.schedule(sid, delta(get, "b"));
+    vi.advanceTimersByTime(1_000);
+    expect(commits).toEqual([sid]);
+    expect(String(session.messages[0].content)).toBe("ab");
+  });
+
+  it("still batches on the animation frame in a visible tab, once", () => {
+    vi.useFakeTimers();
+    const pending: (() => void)[] = [];
+    vi.stubGlobal("requestAnimationFrame", (cb: () => void) => pending.push(cb));
+    const { store, sid, runner, commits } = setup(null);
+    const session = store.state.sessions[sid] as AssistantSession;
+    let state: StreamState | null = null;
+    const get = () => (state ??= stream(session));
+    runner.schedule(sid, delta(get, "a"));
+    runner.schedule(sid, delta(get, "b"));
+    expect(commits).toHaveLength(0);
+    pending.forEach((cb) => cb());
+    vi.advanceTimersByTime(1_000);
     expect(commits).toEqual([sid]);
   });
 

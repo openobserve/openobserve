@@ -42,6 +42,7 @@ export const SAVE_INTERVAL_MS = 3_000;
 const ENDED_MEMORY = 200;
 // A server-generated title is untrusted text; the history and the header both cap a title here.
 const GENERATED_TITLE_MAX = 200;
+const HIDDEN_TAB_FLUSH_MS = 100;
 
 /** The reducer and state-machine output of one commit; animate, segment, dashboard, navigate and confirm effects are dropped (`00` §5.6). */
 export interface Effects {
@@ -273,8 +274,16 @@ export function createEffectsRunner(deps: EffectsDeps): EffectsRunner {
 }
 
 function defaultRaf(cb: () => void): void {
-  if (typeof requestAnimationFrame === "function") requestAnimationFrame(() => cb());
-  else setTimeout(cb, 16);
+  if (typeof requestAnimationFrame !== "function") return void setTimeout(cb, 16);
+  let pending = true;
+  const once = () => {
+    if (!pending) return;
+    pending = false;
+    cb();
+  };
+  requestAnimationFrame(once);
+  // Browsers hold animation frames back in a hidden tab, so a timer applies its frames, and the cards they raise, there.
+  setTimeout(once, HIDDEN_TAB_FLUSH_MS);
 }
 
 // True when the effect was a `turnMeta` write and is now applied.
