@@ -256,8 +256,14 @@ const rangeLabel = computed((): string | null => {
 function handleRangeChange(value: DateRange | undefined) {
   if (!value) return;
   stagedRange.value = value as DateRange;
-  if (props.autoApply && value.start && value.end) emitAbsolute();
 }
+
+const absoluteComplete = computed(
+  () =>
+    !!stagedRange.value.start &&
+    !!stagedRange.value.end &&
+    (props.hideTime || (!!stagedStartTime.value && !!stagedEndTime.value)),
+);
 
 // ── Apply actions ──────────────────────────────────────────────
 function selectRelative(unit: RelativeUnit, amount: number) {
@@ -282,10 +288,26 @@ function commitRelative() {
   _popoverOpen.value = false;
 }
 
+// Auto-apply never closes on a half entry: the custom row applies on Enter, a unit pick after a typed amount, or leaving the amount after a unit pick; absolute keeps Apply, as a time being typed already looks complete.
+const amountTyped = ref(false);
+const unitPicked = ref(false);
+const unitSelect = ref<HTMLSelectElement | null>(null);
+
 function applyCustomRelative() {
   const amount = parseInt(customAmount.value, 10);
   if (isNaN(amount) || amount <= 0) return;
+  amountTyped.value = unitPicked.value = false;
   selectRelative(customUnit.value, amount);
+}
+
+function onCustomUnit() {
+  unitPicked.value = true;
+  if (props.autoApply && amountTyped.value) applyCustomRelative();
+}
+
+function onCustomAmountBlur(event: FocusEvent) {
+  if (props.autoApply && unitPicked.value && event.relatedTarget !== unitSelect.value)
+    applyCustomRelative();
 }
 
 function emitAbsolute() {
@@ -489,22 +511,25 @@ const triggerClasses = computed(() => [
               :disabled="isDisabled"
               class="rounded-default border-datepicker-border bg-datepicker-bg text-datepicker-text focus:border-datepicker-focus-border h-7 w-16 border px-2 text-xs tabular-nums outline-none disabled:opacity-50"
               data-test="datetimerange-custom-amount"
+              @input="amountTyped = true"
+              @blur="onCustomAmountBlur"
               @keydown.enter="applyCustomRelative"
             />
             <select
+              ref="unitSelect"
               v-model="customUnit"
               :disabled="isDisabled"
               class="rounded-default border-datepicker-border bg-datepicker-bg text-datepicker-text focus:border-datepicker-focus-border h-7 flex-1 border px-2 text-xs outline-none disabled:opacity-50"
               data-test="datetimerange-custom-unit"
-              @change="autoApply && applyCustomRelative()"
+              @change="onCustomUnit"
             >
               <option v-for="u in RELATIVE_UNITS" :key="u" :value="u">{{ UNIT_LABELS[u] }}</option>
             </select>
           </div>
 
-          <!-- Timezone row -->
+          <!-- Timezone row: an auto-applied relative range is the same in every zone, so it has none -->
           <div
-            v-if="showTimezone"
+            v-if="showTimezone && !autoApply"
             class="border-datepicker-popup-border flex flex-col gap-1 border-t pt-2"
           >
             <span class="text-datepicker-relative-label text-xs">{{ t("common.timezone") }}</span>
@@ -701,7 +726,6 @@ const triggerClasses = computed(() => [
               :with-seconds="withSeconds"
               :disabled="isDisabled"
               data-test="datetimerange-start-time"
-              @change="autoApply && emitAbsolute()"
             />
             <OTime
               v-model="stagedEndTime"
@@ -709,7 +733,6 @@ const triggerClasses = computed(() => [
               :with-seconds="withSeconds"
               :disabled="isDisabled"
               data-test="datetimerange-end-time"
-              @change="autoApply && emitAbsolute()"
             />
           </div>
 
@@ -777,10 +800,10 @@ const triggerClasses = computed(() => [
           </div>
 
           <!-- Apply -->
-          <div v-if="!autoApply" :class="['flex justify-end', inline && STICKY_APPLY_CLASS]">
+          <div :class="['flex justify-end', inline && STICKY_APPLY_CLASS]">
             <button
               type="button"
-              :disabled="isDisabled"
+              :disabled="isDisabled || (autoApply && !absoluteComplete)"
               class="rounded-default ring-offset-surface-base bg-datepicker-day-selected-bg text-datepicker-day-selected-text focus-visible:ring-datepicker-focus-ring px-4 py-1.5 text-sm font-medium ring-offset-1 transition-[color,background-color,border-color,box-shadow] duration-150 outline-none hover:opacity-90 focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-50"
               data-test="datetimerange-apply"
               @click="handleApply"

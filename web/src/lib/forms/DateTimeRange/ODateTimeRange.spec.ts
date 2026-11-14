@@ -2,6 +2,9 @@
 
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { flushPromises, mount, VueWrapper } from "@vue/test-utils";
+import { parseDate } from "@internationalized/date";
+import { RangeCalendarRoot } from "reka-ui";
+import OTime from "@/lib/forms/Time/OTime.vue";
 import ODateTimeRange from "./ODateTimeRange.vue";
 import { O_DROPDOWN_NESTED_KEY } from "@/lib/overlay/Dropdown/ODropdown.context";
 
@@ -33,6 +36,85 @@ describe("ODateTimeRange", () => {
       type: "relative",
       unit: "hours",
       amount: 7,
+    });
+  });
+
+  describe("auto-apply never applies a half entry", () => {
+    const mountAuto = (props: Record<string, unknown>) =>
+      mount(ODateTimeRange, {
+        attachTo: document.body,
+        props: { inline: true, autoApply: true, showTimezone: true, ...props },
+      });
+
+    it("keeps an absolute range staged until both dates and both times are set, then applies it on Apply", async () => {
+      wrapper = mountAuto({ mode: "absolute" });
+      const [start, end] = wrapper.findAllComponents(OTime);
+      const apply = () => wrapper.get('[data-test="datetimerange-apply"]');
+      start.vm.$emit("update:modelValue", "09:00");
+      start.vm.$emit("change", "09:00");
+      wrapper.findComponent(RangeCalendarRoot).vm.$emit("update:modelValue", {
+        start: parseDate("2026-11-10"),
+        end: parseDate("2026-11-12"),
+      });
+      await flushPromises();
+      expect(wrapper.emitted("change")).toBeUndefined();
+      expect(apply().attributes("disabled")).toBeDefined();
+      end.vm.$emit("update:modelValue", "17:30");
+      end.vm.$emit("change", "17:30");
+      await flushPromises();
+      expect(wrapper.emitted("change")).toBeUndefined();
+      expect(apply().attributes("disabled")).toBeUndefined();
+      await apply().trigger("click");
+      expect(wrapper.emitted("change")).toEqual([
+        [
+          {
+            type: "absolute",
+            startDate: "2026-11-10",
+            startTime: "09:00",
+            endDate: "2026-11-12",
+            endTime: "17:30",
+            timezone: "",
+          },
+        ],
+      ]);
+    });
+
+    it("stages a unit picked before the amount, then applies the custom row when the amount is left", async () => {
+      wrapper = mountAuto({ mode: "relative", relativeUnit: "minutes", relativeAmount: 15 });
+      await wrapper.get('[data-test="datetimerange-custom-unit"]').setValue("hours");
+      expect(wrapper.emitted("change")).toBeUndefined();
+      const amount = wrapper.get('[data-test="datetimerange-custom-amount"]');
+      await amount.setValue("7");
+      await amount.trigger("blur");
+      expect(wrapper.emitted("change")).toEqual([
+        [{ type: "relative", unit: "hours", amount: 7, timezone: "" }],
+      ]);
+    });
+
+    it("applies a typed amount on Enter, and not when focus moves on to the unit list", async () => {
+      wrapper = mountAuto({ mode: "relative", relativeUnit: "minutes", relativeAmount: 15 });
+      const unit = wrapper.get('[data-test="datetimerange-custom-unit"]');
+      const amount = wrapper.get('[data-test="datetimerange-custom-amount"]');
+      await amount.setValue("7");
+      await amount.trigger("blur");
+      expect(wrapper.emitted("change")).toBeUndefined();
+      await unit.setValue("hours");
+      wrapper.emitted("change")!.length = 0;
+      await amount.setValue("9");
+      await amount.trigger("blur", { relatedTarget: unit.element });
+      expect(wrapper.emitted("change")).toHaveLength(0);
+      await amount.trigger("keydown", { key: "Enter" });
+      expect(wrapper.emitted("change")).toEqual([
+        [{ type: "relative", unit: "hours", amount: 9, timezone: "" }],
+      ]);
+    });
+
+    it("shows no time zone on the relative tab, where a range is the same in every zone", () => {
+      wrapper = mountAuto({ mode: "relative" });
+      expect(wrapper.find('[data-test="datetimerange-timezone-trigger"]').exists()).toBe(false);
+      wrapper.unmount();
+      wrapper = mountAuto({ mode: "absolute" });
+      expect(wrapper.find('[data-test="datetimerange-timezone-trigger"]').exists()).toBe(true);
     });
   });
 
