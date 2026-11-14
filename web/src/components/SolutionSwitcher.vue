@@ -73,7 +73,7 @@ function switchTo(solution: (typeof SOLUTIONS)[0]) {
         class="font-semibold tracking-tight md:max-xl:max-w-full md:max-xl:min-w-0"
         data-test="solution-switcher"
       >
-        <span class="md:max-xl:truncate">{{ t(current.labelKey) }}</span>
+        <span class="max-md:sr-only md:max-xl:truncate">{{ t(current.labelKey) }}</span>
         <OTooltip :content="t(current.labelKey)" />
       </OButton>
     </template>

@@ -495,6 +495,20 @@ pub fn build_safe_destination_client(
     build_scoped_client(builder, Scope::Destination, &ALLOWLIST)
 }
 
+/// [`build_safe_destination_client`] that follows no redirect at all.
+pub fn build_destination_client_without_redirects(
+    builder: reqwest::ClientBuilder,
+) -> reqwest::Result<reqwest::Client> {
+    let resolver = SsrfDnsResolver {
+        allowlist: Scope::Destination.allowlist(&ALLOWLIST),
+        proxy_hosts: &PROXY_HOSTS,
+    };
+    builder
+        .redirect(reqwest::redirect::Policy::none())
+        .dns_resolver(Arc::new(resolver))
+        .build()
+}
+
 /// Parses the allowlist now so invalid entries are reported at startup, not on first request.
 pub fn init_allowlist() {
     LazyLock::force(&ALLOWLIST);

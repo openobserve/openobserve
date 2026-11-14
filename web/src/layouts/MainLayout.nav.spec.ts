@@ -25,6 +25,7 @@ import { groupNavLinks, NAV_GROUPS } from "@/lib/core/Navbar/navGroups";
 import type { NavItem, RailEntry } from "@/lib/core/Navbar/ONavbar.types";
 import { toastRecords, dismissAll } from "@/lib/feedback/Toast/useToast";
 import { addLicenseDeniedError, clearLicenseDenials } from "@/composables/useLicenseDenials";
+import { resetAssistantV2ForTests } from "@/composables/assistant/flags";
 import { readLocaleMessages } from "@/test/unit/helpers/localeFiles";
 
 vi.mock("@/services/config", () => ({
@@ -198,10 +199,15 @@ describe("MainLayout — Product Analytics menu entry", () => {
   describe("license-gated entries", () => {
     // The license map only applies on an enterprise or cloud build, and CI runs with neither set.
     const edition = config.isEnterprise;
+    // The lock boundary wraps the legacy layout's page; a local `.env` may turn v2 on for the whole run.
     beforeEach(() => {
       config.isEnterprise = "true";
+      window.__O2_ASSISTANT_V2__ = false;
+      resetAssistantV2ForTests();
     });
     afterEach(() => {
+      delete window.__O2_ASSISTANT_V2__;
+      resetAssistantV2ForTests();
       config.isEnterprise = edition;
       delete store.state.zoConfig.features;
       dismissAll();

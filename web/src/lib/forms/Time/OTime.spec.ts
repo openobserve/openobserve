@@ -35,6 +35,20 @@ describe("OTime", () => {
     date.unmount();
   });
 
+  it("names the time input by its label", () => {
+    wrapper = mount(OTime, {
+      attachTo: document.body,
+      props: { label: "Start time", format24: true },
+    });
+    const id = wrapper.get("input").attributes("aria-labelledby");
+    expect(document.getElementById(id!)?.textContent).toContain("Start time");
+  });
+
+  it("leaves an unlabelled time input without a dangling reference", () => {
+    wrapper = mount(OTime, { attachTo: document.body });
+    expect(wrapper.get("input").attributes("aria-labelledby")).toBeUndefined();
+  });
+
   it("should render label slot content", () => {
     wrapper = mount(OTime, {
       attachTo: document.body,

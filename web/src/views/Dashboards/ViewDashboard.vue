@@ -800,6 +800,7 @@ import {
 } from "@/utils/dashboard/panelTimeUtils";
 import { useAiDashboardEvents } from "@/composables/useAiDashboardEvents";
 import type { AiDashboardEvent } from "@/composables/useAiDashboardEvents";
+import { useAssistantDashboardWrites } from "./assistantDashboardWrites";
 import {
   getManager,
   getShortcutDef,
@@ -1244,6 +1245,7 @@ export default defineComponent({
         undefined,
         false,
         currentDashboardData,
+        getAppliedGlobalTime,
       );
       contextRegistry.register("dashboards", dashboardProvider);
       contextRegistry.setActive("dashboards");
@@ -2770,6 +2772,14 @@ export default defineComponent({
     onMounted(() => {
       onDashboardEvent(handleAiDashboardEvent);
     });
+    useAssistantDashboardWrites(
+      () => String(route.query.dashboard ?? ""),
+      () =>
+        handleAiDashboardEvent({
+          type: "dashboard_updated",
+          dashboardId: String(route.query.dashboard ?? ""),
+        }),
+    );
 
     onUnmounted(() => {
       document.removeEventListener("fullscreenchange", onFullscreenChange);

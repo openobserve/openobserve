@@ -1,0 +1,15 @@
+{
+  "_source": "o2-ai src/opencode/events.py usage frame",
+  "_item": "today",
+  "frame": {
+    "type": "usage",
+    "usage": {
+      "input_tokens": 18342,
+      "output_tokens": 612,
+      "total_tokens": 18954,
+      "cached_tokens": 12288,
+      "llm_calls": 3,
+      "cost": 0.0213
+    }
+  }
+}

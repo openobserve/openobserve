@@ -2374,8 +2374,13 @@ export default defineComponent({
         isDark.value ? "images/common/ai_icon_dark.svg" : "images/common/ai_icon_gradient.svg",
       ),
     );
-    const openAiFromBuilder = () =>
-      (queryEditorRef.value as { openAiMode?: () => void } | null)?.openAiMode?.();
+    // The query editor loads async, so a click that beats it opens AI mode through the flag the editor reads.
+    const openAiFromBuilder = () => {
+      const editor = queryEditorRef.value as { openAiMode?: () => void } | null;
+      if (editor?.openAiMode) editor.openAiMode();
+      else if (!aiAccess.value.allowed) openUpgradeDialog();
+      else searchObj.meta.nlpMode = true;
+    };
     const filterBuilderFields = computed(() =>
       toFilterFields(searchObj.data.stream.selectedStreamFields ?? []),
     );

@@ -198,7 +198,10 @@ function handleClick(e: MouseEvent) {
         <template v-else>{{ ageLabel }}</template>
       </span>
     </template>
-    <OTooltip v-if="!ownsTooltip" :content="exactTime" :shortcut-id="shortcutId" />
+    <!-- With no previous sibling the child-mode tooltip climbs past display:contents to the button, so hover and focus anywhere on it open the tooltip. -->
+    <span v-if="!ownsTooltip" style="display: contents"
+      ><OTooltip :content="exactTime" :shortcut-id="shortcutId"
+    /></span>
   </OButton>
 
   <div v-else :class="['inline-flex items-center gap-1.5', failedText && 'sm:min-w-0']">

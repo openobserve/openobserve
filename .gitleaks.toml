@@ -1,0 +1,9 @@
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Test fixtures holding fake keys and tokens on purpose"
+paths = [
+  '''^src/mcp/src/testdata/approval_assertion_vector\.json$''',
+  '''^web/src/utils/assistant/prompts/redact\.spec\.ts$''',
+]

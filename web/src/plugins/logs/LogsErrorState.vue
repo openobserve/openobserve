@@ -39,7 +39,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @widen-range="emit('widen-range')"
     @search-text="(text: string) => emit('search-text', text)"
     @run-suggestion="(text: string) => emit('run-suggestion', text)"
-  />
+  >
+    <template v-if="$slots['ai-door']" #ai-door><slot name="ai-door" /></template>
+  </QueryErrorState>
 </template>
 
 <script setup lang="ts">

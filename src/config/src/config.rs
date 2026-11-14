@@ -155,7 +155,15 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 //      status_page_notices.false_alarm_recovered_at.
 // 155: create the service version, identity, alias, deploy and verdict tables.
 // 156: add alert_incidents.last_detection_at, when a new detection joined a worked case.
-pub const DB_SCHEMA_VERSION: u64 = 156;
+// 157: add first_event_at to ai_chat_turns.
+// 158: org_ai_toolsets health; create ai_grants, ai_actions, ai_access_requests, ai_turn_marks.
+// 159: chat pins, seeds, turn versions, decisions, hide_attachments, ai_chat_feedback/imports.
+// 160: create paid_overage_attribution.
+// 161: create ai_approvals.
+// 162: add agent to ai_chat_turns.
+// 163: add branched_from to ai_chat_sessions.
+// 164: add approval_scope to ai_actions.
+pub const DB_SCHEMA_VERSION: u64 = 164;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -3044,6 +3052,12 @@ pub struct Limit {
         help = "How long unstarred query history entries are kept, in days. Starred entries are kept until deleted. 0 or less removes the age limit; each user still keeps at most 500 unstarred entries per source (logs, traces, metrics, dbm, profiles), the oldest of that source pruned first. It does not stop collection, ZO_QUERY_HISTORY_ENABLED=false does."
     )]
     pub query_history_retention_days: i64,
+    #[env_config(
+        name = "ZO_AI_ACTIONS_RETENTION_DAYS",
+        default = 90,
+        help = "How long rows of the assistant's action ledger (Activity) are kept, in days. Their before/after snapshots are always cleared once the 24 h undo window passes. 0 or less keeps every row."
+    )]
+    pub ai_actions_retention_days: i64,
     #[env_config(name = "ZO_ALERT_SCHEDULE_TIMEOUT", default = 90)] // seconds
     pub alert_schedule_timeout: i64,
     #[env_config(

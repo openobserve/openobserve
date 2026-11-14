@@ -9,6 +9,7 @@ import {
 import type { DropdownSubProps, DropdownSubEmits, DropdownSubSlots } from "./ODropdownSub.types";
 import { O_DROPDOWN_NESTED_KEY, type DropdownNestedRegistry } from "./ODropdown.context";
 import OText from "../../core/Typography/OText.vue";
+import { movingIntoSubmenu } from "./submenuSafeArea";
 
 defineOptions({ inheritAttrs: false });
 const props = defineProps<DropdownSubProps>();
@@ -23,6 +24,8 @@ const descriptionDomId = computed(
 
 const internalOpen = ref(props.open ?? false);
 const trigger = ref<{ $el: HTMLElement } | null>(null);
+const content = ref<{ $el: HTMLElement } | null>(null);
+let safeApex: { x: number; y: number } | null = null;
 const drawerDepth = inject<number>("o2DrawerDepth", 0);
 const dialogDepth = inject<number>("o2DialogDepth", 0);
 const contentZIndex = computed(() => 6000 + Math.max(drawerDepth, dialogDepth) * 1000);
@@ -34,10 +37,17 @@ watch(
   (open) => {
     if (open && parentRegistry && !closeRegistration) closeRegistration = parentRegistry.open();
     if (!open) closeNestedOverlay();
+    safeApex = null;
+    if (typeof document === "undefined") return;
+    if (open) document.addEventListener("pointermove", onSafeAreaPointerMove, true);
+    else document.removeEventListener("pointermove", onSafeAreaPointerMove, true);
   },
   { flush: "sync", immediate: true },
 );
-onBeforeUnmount(() => closeNestedOverlay());
+onBeforeUnmount(() => {
+  closeNestedOverlay();
+  document.removeEventListener("pointermove", onSafeAreaPointerMove, true);
+});
 
 watch(
   () => props.open,
@@ -65,6 +75,34 @@ function onPointerDownOutside(event: Event) {
   closeNestedOverlay(true);
 }
 
+// Reka unwraps the open submenu's trigger ref, so re-highlighting its own trigger reads as another item and closes it.
+function onTriggerPointerMove(event: PointerEvent) {
+  if (!internalOpen.value || event.pointerType !== "mouse") return;
+  event.preventDefault();
+  const el = trigger.value?.$el;
+  if (el && !el.contains(document.activeElement)) el.focus({ preventScroll: true });
+}
+
+function onTriggerPointerLeave(event: PointerEvent) {
+  if (internalOpen.value && event.pointerType === "mouse")
+    safeApex = { x: event.clientX, y: event.clientY };
+}
+
+// Reka's own safe area expires after 300 ms, so a slow diagonal over a sibling item (a flipped submenu in a narrow panel) closed it.
+function onSafeAreaPointerMove(event: PointerEvent) {
+  const panel = (content.value?.$el as HTMLElement | undefined)?.querySelector?.("[role=menu]");
+  const target = event.target instanceof Node ? event.target : null;
+  if (!safeApex || event.pointerType !== "mouse" || !panel?.getBoundingClientRect) return;
+  if (target && (panel.contains(target) || trigger.value?.$el.contains(target))) return;
+  const point = { x: event.clientX, y: event.clientY };
+  if (!movingIntoSubmenu(safeApex, point, panel.getBoundingClientRect())) {
+    safeApex = null;
+    return;
+  }
+  event.preventDefault();
+  safeApex = point;
+}
+
 function onKeydown(event: KeyboardEvent) {
   if (event.key !== "Escape") return;
   event.preventDefault();
@@ -83,6 +121,8 @@ function onKeydown(event: KeyboardEvent) {
       type="button"
       :text-value="textValue"
       :aria-describedby="description ? descriptionDomId : undefined"
+      @pointermove.capture="onTriggerPointerMove"
+      @pointerleave="onTriggerPointerLeave"
       class="group/sub rounded-default text-dropdown-item-text data-[highlighted]:bg-dropdown-item-hover-bg relative flex w-full cursor-pointer items-center gap-2 px-3 py-1.5 text-start transition-colors duration-(--duration-control) ease-(--ease-control) outline-none select-none"
     >
       <slot name="icon-left" />
@@ -102,6 +142,7 @@ function onKeydown(event: KeyboardEvent) {
     </DropdownMenuSubTrigger>
     <DropdownMenuPortal>
       <DropdownMenuSubContent
+        ref="content"
         :side-offset="4"
         :collision-padding="8"
         :hide-when-detached="true"

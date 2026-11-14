@@ -304,6 +304,7 @@
           <OTabPanel v-if="isMultiAlert" name="groups" stretch>
             <AlertGroupsTable
               :groups="groupData?.list || []"
+              :alert="alert ?? undefined"
               :loading="loadingGroups"
               :load-error="groupsLoadError"
               :alert-id="alertId"
@@ -409,7 +410,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { useQuery } from "@tanstack/vue-query";
 import { raw, useI18nTyped, type I18nKey } from "@/types/i18n";
 import { useRoute, useRouter } from "vue-router";
@@ -468,6 +469,11 @@ import {
   sloIdOf,
 } from "@/utils/alerts/sloAlertRouting";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { contextRegistry } from "@/composables/contextProviders/registry";
+import {
+  ALERT_DETAIL_CONTEXT_KEY,
+  createAlertDetailContextProvider,
+} from "@/composables/contextProviders/alertDetailContextProvider";
 import type {
   AckView,
   AlertGroup,
@@ -990,6 +996,30 @@ const editAlert = () => {
     },
   });
 };
+
+const assistantAlertState = computed(() => {
+  if (!listRow.value) return "";
+  if (listRow.value.enabled === false) return "disabled";
+  return isFiringNow.value ? "firing" : "ok";
+});
+
+contextRegistry.register(
+  ALERT_DETAIL_CONTEXT_KEY,
+  createAlertDetailContextProvider(
+    () => ({
+      alertId: alertId.value,
+      alert: notFound.value ? null : alert.value,
+      state: assistantAlertState.value,
+    }),
+    store,
+  ),
+);
+contextRegistry.setActive(ALERT_DETAIL_CONTEXT_KEY);
+
+onBeforeUnmount(() => {
+  contextRegistry.unregister(ALERT_DETAIL_CONTEXT_KEY);
+  contextRegistry.setActive("");
+});
 
 onMounted(async () => {
   await fetchAlert();

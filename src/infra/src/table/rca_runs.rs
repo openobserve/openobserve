@@ -28,7 +28,7 @@ use config::meta::alerts::{
 };
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, Condition, ConnectionTrait, DatabaseTransaction, DbErr,
-    EntityTrait, FromQueryResult, QueryFilter, QueryOrder, QuerySelect, Select, Set,
+    EntityTrait, FromQueryResult, QueryFilter, QueryOrder, QuerySelect, QueryTrait, Select, Set,
     TransactionTrait,
     sea_query::{Expr, LockType},
 };
@@ -36,6 +36,7 @@ use svix_ksuid::KsuidLike;
 
 pub use super::entity::rca_runs::Model;
 use super::{
+    alert_incidents::CaseFilter,
     entity::{alert_incidents, rca_runs},
     incident_events, rca_steering,
 };
@@ -48,6 +49,10 @@ pub const STALE_ERROR_REASON: &str = "The analysis stopped responding";
 
 /// Steering users kept in the run summary, newest first.
 const STEERED_BY_MAX: usize = 3;
+/// Rows [list_for_org] reads per query.
+const ORG_SCAN_BATCH: u64 = 200;
+/// Rows [list_for_org] reads per page at most, however few `keep` admits.
+const ORG_SCAN_MAX: usize = 5_000;
 
 /// A new run id: a KSUID, so ids sort by time.
 pub fn new_run_id() -> String {
@@ -150,6 +155,29 @@ pub struct RunSummaryPatch {
     pub cancelled_by: Option<String>,
     pub unblocked_by: Option<String>,
     pub deadline_at: Option<Option<i64>>,
+}
+
+/// Narrows [list_for_org]; an empty list admits every state or trigger.
+#[derive(Debug, Clone, Default)]
+pub struct OrgRunsFilter<'a> {
+    pub states: Vec<&'static str>,
+    pub triggers: Vec<&'static str>,
+    /// Only runs started at or after this time (µs).
+    pub since: Option<i64>,
+    /// Only runs older than this one: the previous page's `next_before`.
+    pub before: Option<&'a str>,
+    pub limit: u64,
+    /// Which incidents' runs the caller may see; anything but `All` drops runs of deleted
+    /// incidents.
+    pub cases: CaseFilter,
+}
+
+/// A run of [list_for_org] with its incident's title and severity, when the incident exists.
+#[derive(Debug, Clone)]
+pub struct OrgRun {
+    pub run: Model,
+    pub incident_title: Option<String>,
+    pub severity: Option<String>,
 }
 
 /// The run summary columns that [start_run] reads.
@@ -1005,6 +1033,150 @@ pub async fn list_for_incident(
     let has_more = runs.len() as u64 > limit;
     runs.truncate(limit as usize);
     Ok((runs, has_more))
+}
+
+/// The org's incident runs, newest first, that `filter` and then `keep` admit, with the cursor
+/// to read on from while more may.
+pub async fn list_for_org(
+    org_id: &str,
+    filter: &OrgRunsFilter<'_>,
+    keep: impl Fn(&Model) -> bool,
+) -> Result<(Vec<OrgRun>, Option<String>), DbErr> {
+    list_for_org_with(get_orm_client_ro().await, org_id, filter, keep).await
+}
+
+/// [list_for_org] on a given connection.
+pub async fn list_for_org_with<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    filter: &OrgRunsFilter<'_>,
+    keep: impl Fn(&Model) -> bool,
+) -> Result<(Vec<OrgRun>, Option<String>), DbErr> {
+    let mut cursor = match filter.before {
+        Some(before) => match get_with(conn, org_id, before).await? {
+            Some(run) => Some((run.started_at, run.run_id)),
+            None => return Ok((Vec::new(), None)),
+        },
+        None => None,
+    };
+    let limit = usize::try_from(filter.limit.max(1)).unwrap_or(usize::MAX);
+    let mut kept: Vec<Model> = Vec::new();
+    let mut scanned = 0;
+    let next_before = loop {
+        let batch = org_runs_query(org_id, filter, cursor.as_ref())
+            .limit(ORG_SCAN_BATCH)
+            .all(conn)
+            .await?;
+        let exhausted = (batch.len() as u64) < ORG_SCAN_BATCH;
+        scanned += batch.len();
+        cursor = batch.last().map(|run| (run.started_at, run.run_id.clone()));
+        let mut admitted = batch.into_iter().filter(|run| keep(run));
+        kept.extend(admitted.by_ref().take(limit - kept.len()));
+        if admitted.next().is_some() {
+            break kept.last().map(|run| run.run_id.clone());
+        }
+        if exhausted {
+            break None;
+        }
+        if scanned >= ORG_SCAN_MAX {
+            // Resuming past the last scanned row, not the last kept one, reaches older matches.
+            log::warn!("[RCA_RUNS] org {org_id}: run list page stopped after {scanned} rows");
+            break cursor.as_ref().map(|(_, run_id)| run_id.clone());
+        }
+    };
+    let details = incident_details(conn, org_id, &kept).await?;
+    let runs = kept
+        .into_iter()
+        .map(|run| {
+            let (incident_title, severity) = run
+                .incident_id
+                .as_ref()
+                .and_then(|id| details.get(id).cloned())
+                .unwrap_or_default();
+            OrgRun {
+                run,
+                incident_title,
+                severity,
+            }
+        })
+        .collect();
+    Ok((runs, next_before))
+}
+
+/// [list_for_org]'s SQL part, ordered (started_at, run_id) descending, past `cursor`.
+fn org_runs_query(
+    org_id: &str,
+    filter: &OrgRunsFilter<'_>,
+    cursor: Option<&(i64, String)>,
+) -> Select<rca_runs::Entity> {
+    let mut query = rca_runs::Entity::find()
+        .filter(rca_runs::Column::OrgId.eq(org_id))
+        .filter(rca_runs::Column::IncidentId.is_not_null());
+    if !filter.states.is_empty() {
+        query = query.filter(rca_runs::Column::State.is_in(filter.states.iter().copied()));
+    }
+    if !filter.triggers.is_empty() {
+        query = query.filter(rca_runs::Column::Trigger.is_in(filter.triggers.iter().copied()));
+    }
+    if let Some(since) = filter.since {
+        query = query.filter(rca_runs::Column::StartedAt.gte(since));
+    }
+    let is_case = match filter.cases {
+        CaseFilter::All => None,
+        CaseFilter::OnlyCases => Some(true),
+        CaseFilter::NoCases => Some(false),
+    };
+    if let Some(is_case) = is_case {
+        let incidents = alert_incidents::Entity::find()
+            .select_only()
+            .column(alert_incidents::Column::Id)
+            .filter(alert_incidents::Column::OrgId.eq(org_id))
+            .filter(alert_incidents::Column::SecurityCase.eq(is_case))
+            .into_query();
+        query = query.filter(rca_runs::Column::IncidentId.in_subquery(incidents));
+    }
+    if let Some((started_at, run_id)) = cursor {
+        query = query.filter(
+            Condition::any()
+                .add(rca_runs::Column::StartedAt.lt(*started_at))
+                .add(
+                    Condition::all()
+                        .add(rca_runs::Column::StartedAt.eq(*started_at))
+                        .add(rca_runs::Column::RunId.lt(run_id.as_str())),
+                ),
+        );
+    }
+    query
+        .order_by_desc(rca_runs::Column::StartedAt)
+        .order_by_desc(rca_runs::Column::RunId)
+}
+
+/// `(title, severity)` per incident of `runs`, in one read.
+async fn incident_details<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    runs: &[Model],
+) -> Result<std::collections::HashMap<String, (Option<String>, Option<String>)>, DbErr> {
+    let mut ids: Vec<String> = runs.iter().filter_map(|r| r.incident_id.clone()).collect();
+    ids.sort_unstable();
+    ids.dedup();
+    if ids.is_empty() {
+        return Ok(Default::default());
+    }
+    let rows = alert_incidents::Entity::find()
+        .select_only()
+        .column(alert_incidents::Column::Id)
+        .column(alert_incidents::Column::Title)
+        .column(alert_incidents::Column::Severity)
+        .filter(alert_incidents::Column::OrgId.eq(org_id))
+        .filter(alert_incidents::Column::Id.is_in(ids))
+        .into_tuple::<(String, Option<String>, String)>()
+        .all(conn)
+        .await?;
+    Ok(rows
+        .into_iter()
+        .map(|(id, title, severity)| (id, (title, Some(severity))))
+        .collect())
 }
 
 /// The newest `completed` run whose `incident_id` is the incident.
@@ -3115,5 +3287,238 @@ mod tests {
                 println!("postgres arm ran");
             }
         }
+    }
+
+    /// A finished or live run row exactly as given, for the org-wide list.
+    async fn org_row(
+        db: &DatabaseConnection,
+        run_id: &str,
+        incident_id: Option<&str>,
+        (state, trigger, code): (RunState, RunTrigger, Option<&str>),
+        started_at: i64,
+    ) {
+        let error = code.map(|code| {
+            serde_json::json!({"code": code, "reason": "r", "details": null, "trigger_type": null})
+                .to_string()
+        });
+        rca_runs::ActiveModel::from(Model {
+            run_id: run_id.to_string(),
+            org_id: ORG.to_string(),
+            subject_type: if incident_id.is_some() {
+                "incident"
+            } else {
+                "alert"
+            }
+            .to_string(),
+            subject_id: incident_id.unwrap_or("alert-1").to_string(),
+            incident_id: incident_id.map(str::to_string),
+            trigger: trigger.as_str().to_string(),
+            mode: RunMode::Fresh.as_str().to_string(),
+            started_by: "system".to_string(),
+            guidance: None,
+            state: state.as_str().to_string(),
+            started_at,
+            updated_at: started_at,
+            ended_at: state.is_terminal().then_some(started_at + SEC),
+            cancelled_by: None,
+            outcome: None,
+            confidence: None,
+            report: None,
+            result: None,
+            error,
+            session_id: None,
+            stats: None,
+            stage: None,
+            stage_index: None,
+            context_used: None,
+            continuations: 0,
+            oncall_subjects: None,
+            input_deadline_at: None,
+            pending_question_id: None,
+            questions_asked: 0,
+            deadline_closed_at: None,
+        })
+        .insert(db)
+        .await
+        .unwrap();
+    }
+
+    fn ids(runs: &[OrgRun]) -> Vec<&str> {
+        runs.iter().map(|r| r.run.run_id.as_str()).collect()
+    }
+
+    #[tokio::test]
+    async fn list_for_org_filters_by_state_trigger_and_since_newest_first() {
+        let db = db().await;
+        incident(&db, "inc-1").await;
+        let failed = (
+            RunState::Failed,
+            RunTrigger::AutoNewIncident,
+            Some("agent_error"),
+        );
+        org_row(&db, "r1", Some("inc-1"), failed, T0).await;
+        org_row(
+            &db,
+            "r2",
+            Some("inc-1"),
+            (RunState::Running, RunTrigger::AutoReopen, None),
+            T0 + SEC,
+        )
+        .await;
+        org_row(
+            &db,
+            "r3",
+            Some("inc-1"),
+            (RunState::Failed, RunTrigger::Manual, Some("x")),
+            T0 + 2 * SEC,
+        )
+        .await;
+        org_row(&db, "r4", Some("gone"), failed, T0 + 3 * SEC).await;
+        org_row(&db, "r5", None, failed, T0 + 4 * SEC).await;
+        let all = OrgRunsFilter {
+            limit: 10,
+            ..Default::default()
+        };
+        let (runs, more) = list_for_org_with(&db, ORG, &all, |_| true).await.unwrap();
+        assert_eq!(
+            ids(&runs),
+            ["r4", "r3", "r2", "r1"],
+            "alert runs have no incident to open"
+        );
+        assert_eq!(more, None);
+        assert_eq!(runs[1].incident_title, None);
+        assert_eq!(runs[1].severity.as_deref(), Some("P2"));
+        assert_eq!(runs[0].severity, None, "a deleted incident has no details");
+
+        let auto_failed = OrgRunsFilter {
+            states: vec!["failed"],
+            triggers: vec!["auto_new_incident", "auto_reopen"],
+            since: Some(T0),
+            limit: 10,
+            ..Default::default()
+        };
+        let (runs, _) = list_for_org_with(&db, ORG, &auto_failed, |_| true)
+            .await
+            .unwrap();
+        assert_eq!(ids(&runs), ["r4", "r1"]);
+        let recent = OrgRunsFilter {
+            since: Some(T0 + SEC),
+            ..auto_failed.clone()
+        };
+        let (runs, _) = list_for_org_with(&db, ORG, &recent, |_| true)
+            .await
+            .unwrap();
+        assert_eq!(ids(&runs), ["r4"]);
+        let (runs, _) = list_for_org_with(&db, "other", &all, |_| true)
+            .await
+            .unwrap();
+        assert!(runs.is_empty());
+    }
+
+    #[tokio::test]
+    async fn list_for_org_pages_by_run_cursor_after_keep() {
+        let db = db().await;
+        let row = (RunState::Failed, RunTrigger::Manual, Some("x"));
+        for i in 0..5 {
+            org_row(&db, &format!("r{i}"), Some("inc-1"), row, T0 + i * SEC).await;
+        }
+        let odd = |run: &Model| run.run_id != "r2";
+        let mut page = OrgRunsFilter {
+            limit: 2,
+            ..Default::default()
+        };
+        let (runs, more) = list_for_org_with(&db, ORG, &page, odd).await.unwrap();
+        assert_eq!(ids(&runs), ["r4", "r3"]);
+        assert_eq!(more.as_deref(), Some("r3"));
+        page.before = more.as_deref();
+        let (runs, more) = list_for_org_with(&db, ORG, &page, odd).await.unwrap();
+        assert_eq!(
+            ids(&runs),
+            ["r1", "r0"],
+            "keep skips r2 without ending the page"
+        );
+        assert_eq!(more, None);
+        page.before = Some("unknown");
+        let (runs, more) = list_for_org_with(&db, ORG, &page, odd).await.unwrap();
+        assert!(runs.is_empty() && more.is_none());
+    }
+
+    #[tokio::test]
+    async fn list_for_org_keeps_reading_past_a_batch_keep_rejects() {
+        let db = db().await;
+        let row = (RunState::Failed, RunTrigger::Manual, Some("x"));
+        let total = ORG_SCAN_BATCH as i64 + 5;
+        for i in 0..total {
+            org_row(&db, &format!("r{i:04}"), Some("inc-1"), row, T0 + i * SEC).await;
+        }
+        let page = OrgRunsFilter {
+            limit: 10,
+            ..Default::default()
+        };
+        let oldest = |run: &Model| run.run_id == "r0000";
+        let (runs, more) = list_for_org_with(&db, ORG, &page, oldest).await.unwrap();
+        assert_eq!(ids(&runs), ["r0000"]);
+        assert_eq!(more, None);
+    }
+
+    #[tokio::test]
+    async fn list_for_org_resumes_past_a_scan_cap_that_kept_nothing() {
+        let db = db().await;
+        let row = (RunState::Failed, RunTrigger::Manual, Some("x"));
+        let total = ORG_SCAN_MAX as i64 + 3;
+        for i in 0..total {
+            org_row(&db, &format!("r{i:05}"), Some("inc-1"), row, T0 + i * SEC).await;
+        }
+        let mut page = OrgRunsFilter {
+            limit: 10,
+            ..Default::default()
+        };
+        let oldest = |run: &Model| run.run_id == "r00000";
+        let (runs, more) = list_for_org_with(&db, ORG, &page, oldest).await.unwrap();
+        assert!(runs.is_empty());
+        let cursor = more.expect("an older match remains, so the page says so");
+        page.before = Some(&cursor);
+        let (runs, more) = list_for_org_with(&db, ORG, &page, oldest).await.unwrap();
+        assert_eq!(ids(&runs), ["r00000"]);
+        assert_eq!(more, None);
+    }
+
+    #[tokio::test]
+    async fn list_for_org_hides_security_case_runs_from_a_member_without_the_grant() {
+        let db = db().await;
+        incident(&db, "inc-ops").await;
+        incident(&db, "inc-case").await;
+        alert_incidents::Entity::update_many()
+            .col_expr(alert_incidents::Column::SecurityCase, Expr::value(true))
+            .filter(alert_incidents::Column::Id.eq("inc-case"))
+            .exec(&db)
+            .await
+            .unwrap();
+        let row = (RunState::Completed, RunTrigger::Manual, None);
+        org_row(&db, "r-ops", Some("inc-ops"), row, T0).await;
+        org_row(&db, "r-case", Some("inc-case"), row, T0 + SEC).await;
+        org_row(&db, "r-gone", Some("gone"), row, T0 + 2 * SEC).await;
+        let page = |cases| OrgRunsFilter {
+            limit: 10,
+            cases,
+            ..Default::default()
+        };
+        let list = |cases| {
+            let filter = page(cases);
+            let db = &db;
+            async move {
+                let (runs, _) = list_for_org_with(db, ORG, &filter, |_| true).await.unwrap();
+                runs.iter()
+                    .map(|r| r.run.run_id.clone())
+                    .collect::<Vec<_>>()
+            }
+        };
+        assert_eq!(list(CaseFilter::All).await, ["r-gone", "r-case", "r-ops"]);
+        assert_eq!(
+            list(CaseFilter::NoCases).await,
+            ["r-ops"],
+            "a case's run, and a run whose incident is gone, stay hidden"
+        );
+        assert_eq!(list(CaseFilter::OnlyCases).await, ["r-case"]);
     }
 }

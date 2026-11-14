@@ -15,6 +15,8 @@
 
 import { describe, expect, it } from "vitest";
 import {
+  RCA_HYPOTHESIS_TONE,
+  RCA_PILL_TONE_CLASS,
   filterRcaEvidence,
   groupRcaHypotheses,
   rcaBandLabel,
@@ -108,14 +110,14 @@ describe("rcaSummary helpers", () => {
     });
   });
 
-  describe("rcaHypothesisStatusLabel (VE18)", () => {
+  describe("rcaHypothesisStatusLabel (FIX-R7B I1: 'Root cause' is the callout's words only)", () => {
     it.each([
-      ["root_cause_identified", "Root cause"],
-      ["multiple_root_causes", "Root cause"],
-      ["contributing_factor", "Root cause · not confirmed"],
-      ["inconclusive", "Root cause · not confirmed"],
-      ["blocked", "Root cause · not confirmed"],
-      [null, "Root cause · not confirmed"],
+      ["root_cause_identified", "Confirmed"],
+      ["multiple_root_causes", "Confirmed"],
+      ["contributing_factor", "Likely"],
+      ["inconclusive", "Likely"],
+      ["blocked", "Likely"],
+      [null, "Likely"],
     ] as const)("root_cause under %s reads %s", (outcome, label) => {
       expect(rcaHypothesisStatusLabel("root_cause", outcome)).toBe(label);
     });
@@ -241,6 +243,15 @@ describe("rcaVerdictDetails (stored verdict on the card)", () => {
   it("is null for a record with no verdict (a cancelled or failed run) and for no record", () => {
     expect(rcaVerdictDetails({ schema_version: 1, ledger: { hypotheses: [] } })).toBeNull();
     expect(rcaVerdictDetails(undefined)).toBeNull();
+  });
+});
+
+describe("RCA_HYPOTHESIS_TONE", () => {
+  it("draws a confirmed root cause as a green tag", () => {
+    expect(RCA_HYPOTHESIS_TONE.root_cause).toBe("ok");
+    expect(RCA_PILL_TONE_CLASS[RCA_HYPOTHESIS_TONE.root_cause]).toContain(
+      "text-status-success-text",
+    );
   });
 });
 

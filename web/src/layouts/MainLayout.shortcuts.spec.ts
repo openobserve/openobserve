@@ -21,6 +21,7 @@ import i18n from "@/locales";
 import router from "@/test/unit/helpers/router";
 import { getManager, resetManager } from "@/lib/vue-shortcut-manager";
 import config from "@/aws-exports";
+import { resetAssistantV2ForTests } from "@/composables/assistant/flags";
 
 vi.mock("@/services/config", () => ({
   default: { get_config_full: vi.fn(() => new Promise(() => {})) },
@@ -55,6 +56,10 @@ function mountMainLayout() {
         ManagementIcon: StubDiv,
         ODialog: StubDiv,
         "router-view": StubDiv,
+        HomeReturnBar: StubDiv,
+        AssistantSidebarHost: StubDiv,
+        AssistantWindowLayer: StubDiv,
+        AssistantSkipLink: StubDiv,
       },
     },
   });
@@ -64,11 +69,16 @@ describe("MainLayout — AI chat shortcut gate", () => {
   let wrapper: VueWrapper | undefined;
   const originalIsEnterprise = config.isEnterprise;
 
+  // Ctrl+B is the legacy chat's binding; a local `.env` may turn v2 on for the whole run.
   beforeEach(() => {
+    window.__O2_ASSISTANT_V2__ = false;
+    resetAssistantV2ForTests();
     resetManager();
   });
 
   afterEach(() => {
+    delete window.__O2_ASSISTANT_V2__;
+    resetAssistantV2ForTests();
     wrapper?.unmount();
     wrapper = undefined;
     config.isEnterprise = originalIsEnterprise;

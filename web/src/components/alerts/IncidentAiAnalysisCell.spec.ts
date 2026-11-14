@@ -17,7 +17,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
 import type * as ConsentModule from "@/composables/usePaidOverageConsent";
 
-const { toastMock, awsConfig, promptForConsent } = vi.hoisted(() => ({
+const { toastMock, awsConfig, promptForConsent, follow } = vi.hoisted(() => ({
+  follow: vi.fn(),
   toastMock: vi.fn(),
   awsConfig: { isCloud: "false", isEnterprise: "true" },
   promptForConsent: vi.fn(),
@@ -30,6 +31,7 @@ vi.mock("@/composables/usePaidOverageConsent", async (importOriginal) => ({
 }));
 vi.mock("@/services/incidents", () => ({ default: { triggerRca: vi.fn() } }));
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: toastMock }));
+vi.mock("@/components/ai-assistant/shell/rcaFollow", () => ({ useRcaFollow: () => ({ follow }) }));
 
 import incidentsService, { type Incident } from "@/services/incidents";
 import store from "@/test/unit/helpers/store";
@@ -37,6 +39,8 @@ import i18n from "@/locales";
 import { aiCreditsNotice } from "@/utils/aiCredits";
 import type { TranslateFn } from "@/types/i18n";
 import IncidentAiAnalysisCell from "./IncidentAiAnalysisCell.vue";
+import { rcaSummary } from "@/test/unit/fixtures/rcaThread";
+import { resetAssistantV2ForTests } from "@/composables/assistant/flags";
 
 const triggerRca = vi.mocked(incidentsService.triggerRca);
 
@@ -268,5 +272,176 @@ describe("IncidentAiAnalysisCell (RR-33)", () => {
     const detail = wrapper.get('[data-test="incident-ai-analysis-detail"]');
     expect(badge.attributes("aria-describedby")).toBe(detail.attributes("id"));
     expect(detail.text()).toContain("re-run failed");
+  });
+
+  describe("v7: Follow in thread", () => {
+    const setAssistantFlag = (on: boolean | undefined) => {
+      window.__O2_ASSISTANT_V2__ = on;
+      resetAssistantV2ForTests();
+    };
+    beforeEach(() => setAssistantFlag(true));
+    afterEach(() => setAssistantFlag(undefined));
+
+    const mountWith = (rca: Incident["rca"]) =>
+      mount(IncidentAiAnalysisCell, {
+        props: { incident: { ...incident, rca }, rcaEnabled: true, now: Date.now() },
+        global: { plugins: [store, i18n] },
+      });
+
+    it.each(["running", "completed"] as const)(
+      "a %s run offers Follow in thread, which follows that run in the assistant",
+      async (state) => {
+        const wrapper = mountWith(rcaSummary({ run_id: "run-7", state }));
+        const button = wrapper.get('[data-test="incident-ai-analysis-follow-btn"]');
+
+        expect(button.attributes("aria-label")).toBe("Follow in thread");
+        await button.trigger("click");
+        expect(follow).toHaveBeenCalledWith(
+          { org: "default", incidentId: "inc-1", runId: "run-7" },
+          button.element,
+        );
+        expect(triggerRca).not.toHaveBeenCalled();
+        expect(wrapper.emitted("open")).toBeUndefined();
+      },
+    );
+
+    it("Follow in thread is a named icon button on the chip's line, and reachable by keyboard", () => {
+      const wrapper = mountWith(rcaSummary({ run_id: "run-7", state: "completed" }));
+      const button = wrapper.get('[data-test="incident-ai-analysis-follow-btn"]');
+
+      expect(button.element.tagName).toBe("BUTTON");
+      expect(button.attributes("aria-label")).toBe("Follow in thread");
+      expect(button.attributes("tabindex")).not.toBe("-1");
+    });
+
+    it("keeps the cell on one line: one chip carries the state and its detail, and the table's run-together tooltip stays off", () => {
+      const wrapper = mountWith(
+        rcaSummary({
+          state: "failed",
+          summary: {
+            previous: {
+              run_id: "run-1",
+              outcome: "root_cause_identified",
+              confidence: "high",
+              ended_at: 0,
+            },
+          },
+        }),
+      );
+      const cell = wrapper.get('[data-test="incident-ai-analysis-cell"]');
+      const chip = wrapper.get('[data-test="incident-ai-analysis-label"]');
+
+      expect(cell.classes()).toContain("flex-nowrap");
+      expect(cell.classes()).not.toContain("flex-wrap");
+      expect(cell.attributes()).toHaveProperty("data-o-tooltip-off");
+      expect(chip.find('[data-test="incident-ai-analysis-detail"]').exists()).toBe(true);
+      expect(chip.find('[data-test="incident-ai-analysis-rerun-note"]').exists()).toBe(true);
+      expect(chip.text().replace(/\s+/g, " ")).toBe(
+        "Root cause identified · High confidence · re-run failed",
+      );
+      expect(chip.get(".truncate").exists()).toBe(true);
+    });
+
+    it.each([
+      [
+        "completed",
+        rcaSummary({ state: "completed", outcome: "root_cause_identified", confidence: "medium" }),
+        "ok",
+        "Root cause identified · Medium confidence",
+      ],
+      [
+        "running",
+        rcaSummary({ state: "running", summary: { stage_index: 4, stage_count: 7 } }),
+        "muted",
+        "Investigating · Stage 4/7",
+      ],
+      [
+        "failed",
+        rcaSummary({ state: "failed", summary: { detail: "Agent unavailable" } }),
+        "err",
+        "Failed · Agent unavailable",
+      ],
+      [
+        "cancelled",
+        rcaSummary({ state: "cancelled", summary: { steps: 3 } }),
+        "err",
+        "Cancelled · Cancelled after 2 checks",
+      ],
+    ] as const)("a %s run reads as one chip in its tone", (_state, rca, tone, text) => {
+      const wrapper = mountWith(rca);
+      const chip = wrapper.get('[data-test="incident-ai-analysis-label"]');
+
+      expect(chip.attributes("data-tone")).toBe(tone);
+      expect(chip.text().replace(/\s+/g, " ")).toBe(text);
+      expect(wrapper.find('[data-test="incident-ai-analysis-spinner"]').exists()).toBe(
+        _state === "running",
+      );
+    });
+
+    describe("elapsed time of a stage-less run", () => {
+      beforeEach(() => vi.useFakeTimers());
+      afterEach(() => vi.useRealTimers());
+
+      const runningRerun = (startedMsAgo: number) =>
+        rcaSummary({
+          state: "running",
+          started_at: (Date.now() - startedMsAgo) * 1000,
+          summary: {
+            previous: { run_id: "run-1", outcome: null, confidence: null, ended_at: 0 },
+          },
+        });
+
+      it("advances every second from the run's start, though the list clock is frozen", async () => {
+        const wrapper = mount(IncidentAiAnalysisCell, {
+          props: {
+            incident: { ...incident, rca: runningRerun(5_000) },
+            rcaEnabled: true,
+            now: Date.now(),
+          },
+          global: { plugins: [store, i18n] },
+        });
+        const chip = () => wrapper.get('[data-test="incident-ai-analysis-label"]').text();
+
+        expect(chip()).toContain("re-run · 5s");
+        await vi.advanceTimersByTimeAsync(3_000);
+        expect(chip()).toContain("re-run · 8s");
+        wrapper.unmount();
+      });
+
+      it("with the flag off, follows only the list's clock, as before", async () => {
+        setAssistantFlag(false);
+        const wrapper = mount(IncidentAiAnalysisCell, {
+          props: {
+            incident: { ...incident, rca: runningRerun(5_000) },
+            rcaEnabled: true,
+            now: Date.now(),
+          },
+          global: { plugins: [store, i18n] },
+        });
+        const detail = () => wrapper.get('[data-test="incident-ai-analysis-detail"]').text();
+
+        expect(detail()).toBe("re-run · 5s");
+        await vi.advanceTimersByTimeAsync(3_000);
+        expect(detail()).toBe("re-run · 5s");
+      });
+    });
+
+    it.each(["running", "completed"] as const)(
+      "with the assistant flag off, a %s run has no Follow in thread, since no assistant host is mounted to follow it",
+      (state) => {
+        setAssistantFlag(false);
+        const wrapper = mountWith(rcaSummary({ run_id: "run-7", state }));
+
+        expect(wrapper.find('[data-test="incident-ai-analysis-follow-btn"]').exists()).toBe(false);
+        expect(wrapper.find('[data-test="incident-ai-analysis-label"]').exists()).toBe(true);
+      },
+    );
+
+    it("an incident with no run keeps Analyze and has no Follow in thread", () => {
+      const wrapper = mountWith(null);
+
+      expect(wrapper.find('[data-test="incident-ai-analysis-follow-btn"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="incident-ai-analysis-analyze-btn"]').exists()).toBe(true);
+    });
   });
 });

@@ -33,6 +33,18 @@ describe("OShortcut", () => {
     });
   });
 
+  describe("registry ids (K1)", () => {
+    it("shows a Mac binding that is not the Ctrl→⌘ swap as bound, with ⌃ for Control", () => {
+      wrapper = mount(OShortcut, { props: { id: "editorTabFocusMode" } });
+      expect(wrapper.find("kbd").text()).toBe("⌃⇧M");
+    });
+
+    it("keeps the plain Ctrl→⌘ swap for an ordinary pair", () => {
+      wrapper = mount(OShortcut, { props: { id: "assistantOpen" } });
+      expect(wrapper.find("kbd").text()).toBe("⌘I");
+    });
+  });
+
   describe("array rendering", () => {
     it("should render one keycap per array element, symbolised", () => {
       wrapper = mount(OShortcut, { props: { keys: ["ctrl", "k"] } });
@@ -92,5 +104,16 @@ describe("OShortcut", () => {
     expect(cls).toContain("bg-kbd-bg");
     expect(cls).toContain("border-kbd-border");
     expect(cls).toContain("text-kbd-text");
+  });
+
+  it("uses body text on the keycap with tone strong, and the kbd token by default", () => {
+    const strong = mount(OShortcut, { props: { keys: "shift+enter", tone: "strong" } });
+    expect(strong.get("kbd").classes()).toContain("text-text-body");
+    expect(strong.get("kbd").classes()).not.toContain("text-kbd-text");
+    expect(
+      mount(OShortcut, { props: { keys: "enter" } })
+        .get("kbd")
+        .classes(),
+    ).toContain("text-kbd-text");
   });
 });

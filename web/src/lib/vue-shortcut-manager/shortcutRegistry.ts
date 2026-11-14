@@ -1,5 +1,9 @@
 // Copyright 2026 OpenObserve Inc.
 
+import { shallowRef } from "vue";
+
+import { isAssistantV2 } from "@/composables/assistant/flags";
+import { isMacOS } from "@/utils/keyboardShortcuts";
 import type { I18nKey } from "@/types/i18n";
 /**
  * Single source of truth for every keyboard shortcut in the app.
@@ -71,6 +75,8 @@ export interface ShortcutCapabilities {
   rbacEnabled: boolean;
   aiEnabled: boolean;
   downtimesEnabled: boolean;
+  /** `useAssistantCapability().assistantCanChat` with the v2 flag on, else false. */
+  assistantCanChat: boolean;
 }
 
 export interface ShortcutModule {
@@ -94,18 +100,35 @@ const incidents = (c: ShortcutCapabilities) => enterpriseOrCloud(c) && c.inciden
 const onlineEvals = (c: ShortcutCapabilities) => enterpriseOrCloud(c) && c.onlineEvalsEnabled;
 const modelPricing = (c: ShortcutCapabilities) => enterpriseOrCloud(c) && c.modelPricingEnabled;
 const rbac = (c: ShortcutCapabilities) => enterpriseOrCloud(c) && c.rbacEnabled;
-const aiChat = (c: ShortcutCapabilities) => c.isEnterprise && c.aiEnabled;
+// The legacy chat binding is registered only while the v2 assistant is off.
+const aiChat = (c: ShortcutCapabilities) => !isAssistantV2() && c.isEnterprise && c.aiEnabled;
 const downtimes = (c: ShortcutCapabilities) => enterpriseOrCloud(c) && c.downtimesEnabled;
+// Every assistant row is gated on the flag too, so the cheatsheet is unchanged with it off.
+const assistantChat = (c: ShortcutCapabilities) =>
+  isAssistantV2() && c.aiEnabled && c.assistantCanChat;
+const dictationReady = shallowRef(false);
 // Cluster-scoped admin surfaces only render inside the _meta org.
 const metaAdmin = (c: ShortcutCapabilities) => c.isEnterprise && c.isMetaOrg;
 const cloudMetaAdmin = (c: ShortcutCapabilities) => c.isCloud && c.isMetaOrg;
+const assistantV2Only = () => isAssistantV2();
 
 /**
  * Groups the flat SHORTCUT_REGISTRY into modules for the cheatsheet. Each module
  * is one chip + one block in the listing; its `pages` render as sub-sections.
  */
 export const SHORTCUT_MODULES: ShortcutModule[] = [
-  { titleKey: "shortcuts.modules.global", pages: ["shortcuts.pages.global"] },
+  {
+    titleKey: "shortcuts.modules.global",
+    pages: ["shortcuts.pages.global", "shortcuts.pages.home"],
+  },
+  {
+    titleKey: "shortcuts.modules.assistant",
+    pages: [
+      "shortcuts.pages.assistant",
+      "shortcuts.pages.assistantComposer",
+      "shortcuts.pages.queryEditor",
+    ],
+  },
   {
     titleKey: "shortcuts.modules.logs",
     pages: [
@@ -245,6 +268,119 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
         keyForMac: "meta+b",
         descriptionKey: "shortcuts.actions.aiChatToggle",
         visible: aiChat,
+      },
+      {
+        id: "assistantOpen",
+        keyForWindows: "ctrl+i",
+        keyForMac: "meta+i",
+        descriptionKey: "shortcuts.actions.assistantOpen",
+        // Deliberate: it opens or focuses the assistant from any field (constraint 37).
+        skipInInput: false,
+        visible: assistantChat,
+      },
+      {
+        // Global like assistantOpen: a scope here would outrank, and silence, every page scope.
+        id: "assistantHistory",
+        keyForWindows: "ctrl+shift+h",
+        keyForMac: "meta+shift+h",
+        descriptionKey: "shortcuts.actions.assistantHistory",
+        allowInInput: true,
+        visible: assistantChat,
+      },
+      {
+        id: "threadsBarOpen",
+        // Shift turns the period into ">" in the key the browser reports.
+        keyForWindows: "ctrl+shift+>",
+        keyForMac: "meta+shift+>",
+        descriptionKey: "shortcuts.actions.threadsBarOpen",
+        allowInInput: true,
+        visible: assistantChat,
+      },
+    ],
+  },
+
+  // ── Home ────────────────────────────────────────────────────────────────
+  // No scope: acquiring one would hide the assistant scope's chords on Home; HomeView binds it only while the AI tab shows.
+  {
+    pageKey: "shortcuts.pages.home",
+    shortcuts: [
+      {
+        id: "homeFocusAsk",
+        key: "/",
+        descriptionKey: "shortcuts.actions.homeFocusAsk",
+        visible: assistantV2Only,
+      },
+    ],
+  },
+
+  // ── O2 Assistant ────────────────────────────────────────────────────────
+  {
+    pageKey: "shortcuts.pages.assistant",
+    scope: "assistant",
+    visible: assistantChat,
+    shortcuts: [
+      {
+        id: "assistantClose",
+        key: "escape",
+        descriptionKey: "shortcuts.actions.assistantClose",
+        allowInInput: true,
+        visible: () => false,
+      },
+    ],
+  },
+
+  // ── O2 Assistant — composer (the composer's own keydown acts first, so IME is seen) ──
+  {
+    pageKey: "shortcuts.pages.assistantComposer",
+    scope: "assistantComposer",
+    visible: assistantChat,
+    shortcuts: [
+      {
+        id: "assistantComposerSend",
+        display: "enter",
+        descriptionKey: "shortcuts.actions.assistantComposerSend",
+        visible: assistantChat,
+      },
+      {
+        id: "assistantComposerNewline",
+        display: "shift+enter",
+        descriptionKey: "shortcuts.actions.assistantComposerNewline",
+        visible: assistantChat,
+      },
+      {
+        id: "assistantComposerRecall",
+        display: "up",
+        descriptionKey: "shortcuts.actions.assistantComposerRecall",
+        visible: assistantChat,
+      },
+      {
+        id: "assistantComposerDictate",
+        display: "ctrl+i",
+        descriptionKey: "shortcuts.actions.assistantComposerDictate",
+        visible: (caps) => assistantChat(caps) && dictationReady.value,
+      },
+      {
+        id: "assistantGoToAnswer",
+        keyForWindows: "ctrl+up",
+        keyForMac: "meta+up",
+        descriptionKey: "shortcuts.actions.assistantGoToAnswer",
+        visible: assistantChat,
+      },
+    ],
+  },
+
+  // ── Query editor (Monaco binds these itself, so the editor wins while typing) ──
+  {
+    pageKey: "shortcuts.pages.queryEditor",
+    scope: "editor",
+    visible: assistantChat,
+    shortcuts: [
+      {
+        id: "editorTabFocusMode",
+        keyForWindows: "ctrl+m",
+        keyForMac: "ctrl+shift+m",
+        descriptionKey: "shortcuts.actions.editorTabFocusMode",
+        visible: assistantChat,
       },
     ],
   },
@@ -1190,7 +1326,18 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
     scope: "ai-toolsets",
     visible: enterprise,
     shortcuts: [
-      { id: "aiToolsetsRefresh", key: "r", descriptionKey: "shortcuts.actions.aiToolsetsRefresh" },
+      {
+        id: "aiToolsetsRefresh",
+        key: "r",
+        descriptionKey: "shortcuts.actions.aiToolsetsRefresh",
+        visible: () => !isAssistantV2(),
+      },
+      {
+        id: "assistantToolsetsRefresh",
+        key: "r",
+        descriptionKey: "shortcuts.actions.assistantToolsetsRefresh",
+        visible: () => isAssistantV2(),
+      },
     ],
   },
 
@@ -1344,20 +1491,44 @@ const ENTRIES: Map<string, ShortcutEntry> = (() => {
   return map;
 })();
 
+/** Lists the assistant's dictation chord in the cheatsheet; a ref, so an open cheatsheet follows it. */
+export function setDictationReady(ready: boolean): void {
+  dictationReady.value = ready;
+}
+
 /**
  * Resolve a shortcut's display key(s) by id — for tooltips / `OShortcut`. Works
  * for any id, including display-only ones. Returns the Windows/common combo
  * (OShortcut renders `ctrl`→`⌘` on Mac), the bare key, the list of bindings, or
  * the leading token of a multi-binding label (e.g. "del / ⌫" → "del").
  */
-export function getShortcutDisplay(id: string): string | string[] | undefined {
+export function getShortcutDisplay(
+  id: string,
+  mac: boolean = isMacOS(),
+): string | string[] | undefined {
   const e = ENTRIES.get(id);
   if (!e) return undefined;
-  if (e.keyForWindows) return e.keyForWindows;
+  if (e.keyForWindows) return platformDisplay(e, mac);
   if (e.key) return e.key;
   if (e.keys?.length) return e.keys;
   if (e.display) return e.display.split(" / ")[0].trim();
   return undefined;
+}
+
+/**
+ * The combo to show for a platform pair. Renderers turn `ctrl` into ⌘ on Mac, so a
+ * Mac binding that is not that plain swap is shown as bound, with `control` for ⌃.
+ */
+export function platformDisplay(e: ShortcutEntry, mac: boolean): string {
+  const win = e.keyForWindows ?? "";
+  if (!mac || !e.keyForMac || chordOf(e.keyForMac) === chordOf(win.replace(/\bctrl\b/g, "meta")))
+    return win;
+  const tokens = e.keyForMac.split("+");
+  return tokens.map((k) => (k === "ctrl" ? "control" : k === "meta" ? "ctrl" : k)).join("+");
+}
+
+function chordOf(combo: string): string {
+  return combo.split("+").sort().join("+");
 }
 
 /**

@@ -56,6 +56,7 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import alertsService from "@/services/alerts";
 import { queryClient } from "@/composables/query/queryClient";
+import { contextRegistry } from "@/composables/contextProviders/registry";
 import type { AlertGroupTransition } from "@/ts/interfaces/alert";
 
 // ---------------------------------------------------------------------------
@@ -967,5 +968,23 @@ describe("AlertDetail — first paint", () => {
     expect(
       tabs().element.compareDocumentPosition(banner().element) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
+  });
+});
+
+describe("AlertDetail — assistant context", () => {
+  afterEach(() => contextRegistry.cleanup());
+
+  it("tells the assistant which alert is open, and stops when the page closes", async () => {
+    const wrapper = await mountView();
+    const context = await contextRegistry.getActiveContext();
+    expect(context).toMatchObject({
+      currentPage: "Alerts",
+      alertId: "alert-1",
+      alertName: makeSimpleAlert().name,
+      selectedStreams: [makeSimpleAlert().stream_name],
+    });
+
+    wrapper.unmount();
+    expect((await contextRegistry.getActiveContext())?.alertId).toBeUndefined();
   });
 });

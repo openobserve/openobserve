@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { resetAssistantV2ForTests } from "@/composables/assistant/flags";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { defineComponent, h, KeepAlive, nextTick, reactive, ref } from "vue";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
@@ -32,6 +33,7 @@ import queryHistory from "@/services/query_history";
 import type { QueryHistoryEntry } from "@/services/query_history";
 import { openRecentOnItsPage, takeRecentLanding } from "@/utils/queryHistory/routes";
 import { landingRouter, landWithoutRestore } from "@/test/unit/helpers/recentLanding";
+import { explorerTarget } from "@/utils/assistant/explorerRoutes";
 import {
   announceTracesRowNav,
   tracesRowNavAnnouncement,
@@ -896,6 +898,206 @@ describe("Index.vue (Main Traces Page)", () => {
       wrapper = mountTraces();
       await vi.waitFor(() => expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalled(), {
         timeout: 3000,
+      });
+    });
+  });
+
+  describe("assistant links", () => {
+    afterEach(() => {
+      delete window.__O2_ASSISTANT_V2__;
+      resetAssistantV2ForTests();
+      delete store.state.zoConfig.auto_query_enabled;
+    });
+
+    const mountAssistantLink = (query: Record<string, string>) => {
+      window.__O2_ASSISTANT_V2__ = true;
+      resetAssistantV2ForTests();
+      mockSearchObj.meta.liveMode = false;
+      routerCurrentRouteSpy.mockReturnValue({
+        value: { query, name: "traces", path: "/traces" },
+      } as any);
+      wrapper = mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            "services-catalog": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+    };
+
+    const tracesLink = (text: string) =>
+      explorerTarget(
+        { language: "sql", text, stream: "default", streamType: "traces", org: "default" },
+        "traces",
+        "1",
+      ).query as Record<string, string>;
+
+    it("shows exactly a bare-filter link's filter in the editor, not the last visit's text", async () => {
+      const filter = "service_name='payment' AND span_status='ERROR'";
+      mockSearchObj.data.editorValue = "duration > 999";
+      mountAssistantLink(tracesLink(filter));
+      await vi.waitFor(() => expect(mockSearchObj.loadingStream).toBe(false));
+      await flushPromises();
+      expect(mockSearchObj.data.editorValue).toBe(filter);
+    });
+
+    it("clears the last visit's text when the link carries no filter", async () => {
+      mockSearchObj.data.editorValue = "duration > 999";
+      mountAssistantLink(tracesLink('SELECT * FROM "default"'));
+      await vi.waitFor(() => expect(mockSearchObj.loadingStream).toBe(false));
+      await flushPromises();
+      expect(mockSearchObj.data.editorValue).toBe("");
+    });
+
+    it("applies an assistant link's stream and window without running it", async () => {
+      window.__O2_ASSISTANT_V2__ = true;
+      resetAssistantV2ForTests();
+      store.state.zoConfig.auto_query_enabled = true;
+      mockSearchObj.meta.liveMode = false;
+      routerCurrentRouteSpy.mockReturnValue({
+        value: {
+          query: { stream: "default", type: "ai_chat_query", t: "1", from: "1", to: "2" },
+          name: "traces",
+          path: "/traces",
+        },
+      } as any);
+      wrapper = mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            "services-catalog": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+      await vi.waitFor(() => expect(mockSearchObj.loadingStream).toBe(false));
+      await flushPromises();
+      expect(mockSearchObj.data.stream.selectedStream.value).toBe("default");
+      expect(mockFetchQueryDataWithHttpStream).not.toHaveBeenCalled();
+    });
+
+    it("re-applies a second assistant link on the open page from its nonce, still without running", async () => {
+      window.__O2_ASSISTANT_V2__ = true;
+      resetAssistantV2ForTests();
+      mockSearchObj.meta.liveMode = false;
+      const current = ref({
+        query: { stream: "default", type: "ai_chat_query", t: "1", from: "1", to: "2" } as Record<
+          string,
+          string
+        >,
+        name: "traces",
+        path: "/traces",
+      });
+      routerCurrentRouteSpy.mockReturnValue(current as any);
+      wrapper = mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            "services-catalog": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+      await vi.waitFor(() => expect(mockSearchObj.loadingStream).toBe(false));
+      await flushPromises();
+      current.value = {
+        ...current.value,
+        query: { ...current.value.query, t: "2", from: "5", to: "9", query: btoa("duration > 10") },
+      };
+      await vi.waitFor(() => expect(mockSearchObj.data.editorValue).toBe("duration > 10"));
+      expect(mockSearchObj.data.datetime).toMatchObject({ startTime: 5, endTime: 9 });
+      expect(mockFetchQueryDataWithHttpStream).not.toHaveBeenCalled();
+    });
+
+    describe("with the page kept alive", () => {
+      const assistantRoute = (name: string, t: string) => ({
+        query: { stream: "default", type: "ai_chat_query", t } as Record<string, string>,
+        name,
+        path: `/${name}`,
+      });
+
+      async function mountCached() {
+        window.__O2_ASSISTANT_V2__ = true;
+        resetAssistantV2ForTests();
+        mockSearchObj.meta.liveMode = false;
+        const current = ref(assistantRoute("traces", "1"));
+        routerCurrentRouteSpy.mockReturnValue(current as any);
+        const show = ref(true);
+        const Parent = defineComponent({
+          setup: () => () =>
+            h(KeepAlive, null, {
+              default: () => (show.value ? h(Index) : h("div", { key: "placeholder" })),
+            }),
+        });
+        wrapper = mount(Parent, {
+          attachTo: node,
+          global: {
+            plugins: [i18n, router],
+            provide: { store: store },
+            stubs: {
+              "search-bar": true,
+              "index-list": true,
+              "search-result": true,
+              "service-graph": true,
+              "services-catalog": true,
+              SanitizedHtmlRenderer: true,
+            },
+          },
+        });
+        await vi.waitFor(() => expect(mockSearchObj.loadingStream).toBe(false));
+        await flushPromises();
+        return { current, show };
+      }
+
+      it("leaves the hidden page alone on a link to another page", async () => {
+        const { current, show } = await mountCached();
+        show.value = false;
+        await flushPromises();
+        mockGetStreams.mockClear();
+        current.value = assistantRoute("logs", "2");
+        await flushPromises();
+        expect(mockGetStreams).not.toHaveBeenCalled();
+      });
+
+      it("leaves the page alone on a link away that lands before it deactivates", async () => {
+        const { current } = await mountCached();
+        mockGetStreams.mockClear();
+        current.value = assistantRoute("logs", "2");
+        await flushPromises();
+        expect(mockGetStreams).not.toHaveBeenCalled();
+      });
+
+      it("loads a link to the hidden page once, on activation", async () => {
+        const { current, show } = await mountCached();
+        show.value = false;
+        await flushPromises();
+        mockGetStreams.mockClear();
+        current.value = assistantRoute("traces", "2");
+        await flushPromises();
+        expect(mockGetStreams).not.toHaveBeenCalled();
+        show.value = true;
+        await flushPromises();
+        expect(mockGetStreams).toHaveBeenCalledTimes(1);
       });
     });
   });
@@ -4206,6 +4408,29 @@ describe("Index.vue (Main Traces Page)", () => {
       expect(mockUpdatedLocalLogFilterField).toHaveBeenCalledWith("spans");
     });
 
+    it("drops every assistant label, since the view replaces stream, query and window", async () => {
+      routerCurrentRouteSpy.mockReturnValue({
+        value: {
+          query: { stream: "default", assistant_set: "query,stream,time", home_return: "row=x" },
+          name: "traces",
+          path: "/traces",
+        },
+      } as any);
+      try {
+        await mountPage();
+        expect([...wrapper.vm.assistantSet]).toEqual(["query", "stream", "time"]);
+        await applyView(savedView());
+        expect(wrapper.vm.assistantSet.size).toBe(0);
+        const query = routerReplaceSpy.mock.calls.at(-1)?.[0].query;
+        expect(query).not.toHaveProperty("assistant_set");
+        expect(query.home_return).toBe("row=x");
+      } finally {
+        routerCurrentRouteSpy.mockReturnValue({
+          value: { query: {}, name: "traces", path: "/traces" },
+        } as any);
+      }
+    });
+
     describe("restores the picker's date type", () => {
       const ABSOLUTE = {
         type: "absolute",
@@ -4841,6 +5066,192 @@ describe("Index.vue (Main Traces Page)", () => {
       await leaving;
       await flushPromises();
       expect(appRouter.currentRoute.value.fullPath).toBe("/logs");
+    });
+  });
+
+  describe("Set by assistant and service preselect from the URL", () => {
+    const RETURN = "row=service%3Acheckout&period=1h";
+    const mountAt = async (query: Record<string, string>) => {
+      routerCurrentRouteSpy.mockReturnValue({
+        value: { query, name: "traces", path: "/traces" },
+      } as any);
+      wrapper = mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            "services-catalog": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+      await flushPromises();
+      routerReplaceSpy.mockClear();
+      routerPushSpy.mockClear();
+    };
+    const cleared = async (field: string) => {
+      await wrapper.findComponent({ name: "search-bar" }).vm.$emit("assistant-set-cleared", field);
+      await flushPromises();
+    };
+
+    it("reads assistant_set and service from the URL", async () => {
+      await mountAt({
+        tab: "services-catalog",
+        assistant_set: "query,stream,bogus",
+        service: "checkout",
+      });
+      expect([...wrapper.vm.assistantSet]).toEqual(["query", "stream"]);
+      expect(wrapper.vm.initialService).toBe("checkout");
+    });
+
+    it("drops a field the user changed and replaces the URL, keeping home_return", async () => {
+      await mountAt({
+        assistant_set: "query,time",
+        home_return: RETURN,
+        org_identifier: "default",
+      });
+      await cleared("time");
+      expect([...wrapper.vm.assistantSet]).toEqual(["query"]);
+      expect(routerReplaceSpy).toHaveBeenLastCalledWith({
+        query: { assistant_set: "query", home_return: RETURN, org_identifier: "default" },
+      });
+      await cleared("query");
+      expect(routerReplaceSpy.mock.calls.at(-1)?.[0].query).not.toHaveProperty("assistant_set");
+      expect(routerReplaceSpy.mock.calls.at(-1)?.[0].query.home_return).toBe(RETURN);
+    });
+
+    it("takes the query label with the stream, since a stream change empties the editor", async () => {
+      await mountAt({ assistant_set: "query,stream,time" });
+      await cleared("stream");
+      expect([...wrapper.vm.assistantSet]).toEqual(["time"]);
+    });
+
+    it.each(["onMetricsEditorFilterSet", "onMetricsEditorFilterRun"])(
+      "drops the query label when %s replaces the editor text",
+      async (handler) => {
+        await mountAt({ assistant_set: "query,time" });
+        wrapper.vm[handler]("duration < '1ms'");
+        await flushPromises();
+        expect([...wrapper.vm.assistantSet]).toEqual(["time"]);
+      },
+    );
+
+    it("ignores a field the assistant did not set", async () => {
+      await mountAt({ assistant_set: "time" });
+      await cleared("query");
+      expect(routerReplaceSpy).not.toHaveBeenCalled();
+    });
+
+    it("keeps home_return and the remaining labels when a search rewrites the URL", async () => {
+      await mountAt({ assistant_set: "time", home_return: RETURN, stream: "default" });
+      wrapper.vm.buildSearch();
+      const query = routerPushSpy.mock.calls.at(-1)?.[0].query;
+      expect(query.home_return).toBe(RETURN);
+      expect(query.assistant_set).toBe("time");
+    });
+
+    it("hands a second service link to the kept-alive catalog, and the same name again", async () => {
+      const route = (query: Record<string, string>) =>
+        routerCurrentRouteSpy.mockReturnValue({
+          value: { query, name: "traces", path: "/traces" },
+        } as any);
+      route({ tab: "services-catalog", service: "checkout" });
+      mockSearchObj.organizationIdentifier = "default";
+      const show = ref(true);
+      const Parent = defineComponent({
+        setup: () => () =>
+          h(KeepAlive, null, {
+            default: () => (show.value ? h(Index) : h("div", { key: "placeholder" })),
+          }),
+      });
+      const parent = mount(Parent, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            "services-catalog": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+      await vi.waitFor(() => expect(mockSearchObj.loadingStream).toBe(false));
+      await flushPromises();
+      const catalog = () => parent.findComponent({ name: "services-catalog" });
+      const handoff = () => Number(catalog().attributes("service-handoff"));
+      expect(catalog().attributes("initial-service")).toBe("checkout");
+      const first = handoff();
+      const revisit = async (query: Record<string, string>) => {
+        show.value = false;
+        await flushPromises();
+        route(query);
+        show.value = true;
+        await flushPromises();
+      };
+      await revisit({ tab: "services-catalog", service: "payments" });
+      expect(catalog().attributes("initial-service")).toBe("payments");
+      const second = handoff();
+      expect(second).toBeGreaterThan(first);
+      await revisit({ tab: "services-catalog", service: "payments", t: "2" });
+      expect(handoff()).toBeGreaterThan(second);
+      parent.unmount();
+    });
+
+    it("applies a service link's service and stream on the open page from its nonce", async () => {
+      const current = ref({
+        query: { tab: "services-catalog", service: "checkout", t: "1" } as Record<string, string>,
+        name: "traces",
+        path: "/traces",
+      });
+      routerCurrentRouteSpy.mockReturnValue(current as any);
+      wrapper = mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            "services-catalog": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+      await vi.waitFor(() => expect(mockSearchObj.loadingStream).toBe(false));
+      await flushPromises();
+      const handoff = () =>
+        Number(wrapper.findComponent({ name: "services-catalog" }).attributes("service-handoff"));
+      const first = handoff();
+      current.value = {
+        ...current.value,
+        query: { tab: "services-catalog", service: "payments", stream: "other", t: "2" },
+      };
+      await flushPromises();
+      expect(wrapper.vm.initialService).toBe("payments");
+      expect(mockSearchObj.data.stream.selectedStream.value).toBe("other");
+      const second = handoff();
+      expect(second).toBeGreaterThan(first);
+      current.value = { ...current.value, query: { ...current.value.query, t: "3" } };
+      await flushPromises();
+      expect(handoff()).toBeGreaterThan(second);
+    });
+
+    it("drops the preselect once the user leaves the catalog tab", async () => {
+      await mountAt({ tab: "services-catalog", service: "checkout" });
+      mockSearchObj.meta.searchMode = "spans";
+      await flushPromises();
+      expect(wrapper.vm.initialService).toBeNull();
     });
   });
 });

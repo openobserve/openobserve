@@ -1,0 +1,36 @@
+[
+  {
+    "role": "user",
+    "content": "Find slow checkout traces",
+    "sentAt": 1772417940000,
+    "turnId": "t-stop-1"
+  },
+  {
+    "role": "assistant",
+    "content": "42 traces are slower than 900 ms; the slowest",
+    "contentBlocks": [
+      {
+        "type": "tool_call",
+        "tool": "SearchSQL",
+        "message": "Querying traces",
+        "context": {},
+        "call_id": "call_s1",
+        "stepState": "done",
+        "success": true,
+        "resultMessage": "",
+        "summary": {
+          "count": 42,
+          "took": 12
+        }
+      },
+      {
+        "type": "text",
+        "text": "42 traces are slower than 900 ms; the slowest"
+      },
+      {
+        "type": "status",
+        "turnStatus": "stopped"
+      }
+    ]
+  }
+]

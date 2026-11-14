@@ -151,6 +151,27 @@ describe("OTag removable", () => {
     expect(w.find("button").attributes("data-test")).toBe("o2-badge-remove");
   });
 
+  it("with labelButton, makes the label a button beside the ✕ and moves the name onto it", async () => {
+    const w = mount(OTag, {
+      props: { value: "prod", removable: true, clickable: true, labelButton: true },
+      attrs: { "aria-label": "Prod chip", "data-test": "chip", class: "extra" },
+    });
+    const [label, remove] = w.findAll("button");
+    expect(label.attributes()).toMatchObject({ "aria-label": "Prod chip", "data-test": "chip" });
+    expect(label.element.contains(remove.element)).toBe(false);
+    const root = label.element.parentElement!;
+    expect(root).toBe(remove.element.parentElement);
+    expect(root.tagName).toBe("SPAN");
+    expect(root.classList).toContain("extra");
+    expect(root.hasAttribute("tabindex")).toBe(false);
+    expect(root.hasAttribute("aria-label")).toBe(false);
+    await label.trigger("click");
+    await label.trigger("keydown", { key: "Enter" });
+    await remove.trigger("click");
+    expect(w.emitted("click")).toHaveLength(2);
+    expect(w.emitted("remove")).toHaveLength(1);
+  });
+
   it("suppresses remove when disabled", async () => {
     const w = mount(OTag, { props: { value: "prod", removable: true, disabled: true } });
     await w.find("[data-test='o2-badge-remove']").trigger("click");
@@ -162,5 +183,12 @@ describe("OTag removable", () => {
       props: { value: "prod", removable: true, removeLabel: raw("Remove prod") },
     });
     expect(w.find("[data-test='o2-badge-remove']").attributes("aria-label")).toBe("Remove prod");
+  });
+
+  it("takes a caller-supplied data-test for the remove button", () => {
+    const w = mount(OTag, {
+      props: { value: "prod", removable: true, removeDataTest: "chip-remove" },
+    });
+    expect(w.find("button").attributes("data-test")).toBe("chip-remove");
   });
 });

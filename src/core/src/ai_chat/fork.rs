@@ -1345,6 +1345,11 @@ pub(crate) mod tests {
             forked_from_share: None,
             fork_seed_seq: None,
             replica_purged_at: None,
+            pinned: false,
+            pinned_at: None,
+            seed: None,
+            search_text: None,
+            branched_from: None,
         }
     }
 

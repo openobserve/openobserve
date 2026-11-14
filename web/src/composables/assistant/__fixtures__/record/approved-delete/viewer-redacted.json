@@ -1,0 +1,67 @@
+[
+  {
+    "role": "user",
+    "content": "Delete the stale alert",
+    "sentAt": 1772417580000,
+    "turnId": "t-approve-1"
+  },
+  {
+    "role": "assistant",
+    "content": "I found **checkout-latency-old**. Deleting it needs your approval.Done — the alert was deleted.",
+    "contentBlocks": [
+      {
+        "type": "tool_call",
+        "tool": "SearchAlerts",
+        "message": "Listing alerts",
+        "context": {},
+        "call_id": "call_a1",
+        "stepState": "done",
+        "success": true,
+        "resultMessage": "",
+        "summary": {
+          "count": 1
+        }
+      },
+      {
+        "type": "text",
+        "text": "I found **checkout-latency-old**. Deleting it needs your approval."
+      },
+      {
+        "type": "approval",
+        "approval": {
+          "id": "apr_1",
+          "kind": "delete",
+          "total": 1
+        }
+      },
+      {
+        "type": "approval_result",
+        "resolved": {
+          "id": "apr_1",
+          "approved": true,
+          "at": 1772417640000
+        }
+      },
+      {
+        "type": "tool_call",
+        "success": true,
+        "resultMessage": "",
+        "summary": {
+          "deleted": 1
+        },
+        "stepState": "done",
+        "tool": "o2_delete",
+        "context": {},
+        "call_id": "call_a2"
+      },
+      {
+        "type": "text",
+        "text": "Done — the alert was deleted."
+      },
+      {
+        "type": "footer",
+        "footer": {}
+      }
+    ]
+  }
+]

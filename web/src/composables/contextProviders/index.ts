@@ -23,7 +23,7 @@
  */
 
 // Export types
-export type { PageContext, ContextProvider } from "./types";
+export type { PageContext, ContextProvider, OverviewNowSnapshot } from "./types";
 
 // Export registry
 export { contextRegistry, default as registry } from "./registry";
@@ -37,3 +37,9 @@ export { createDashboardsContextProvider } from "./dashboardsContextProvider";
 export { createIncidentsContextProvider } from "./incidentsContextProvider";
 export { createTracesContextProvider } from "./tracesContextProvider";
 export { createDbmContextProvider, DBM_CONTEXT_KEY } from "./dbmContextProvider";
+export {
+  createHomeContextProvider,
+  HOME_CONTEXT_KEY,
+  homeContextOf,
+  useHomeContextProvider,
+} from "./homeContextProvider";

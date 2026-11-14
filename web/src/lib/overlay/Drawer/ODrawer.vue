@@ -16,19 +16,27 @@ import {
   watchEffect,
   useSlots,
   computed,
-  inject,
   provide,
   nextTick,
   useAttrs,
   onActivated,
+  onBeforeUnmount,
   onDeactivated,
 } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { useScrollShadow } from "@/lib/overlay/useScrollShadow";
+import { overlayLayerZIndex, useOverlayLayer } from "@/lib/overlay/Dialog/dialogStacking";
 import { FORM_SUBMIT_STATE_KEY } from "@/lib/forms/Form/OForm.types";
 import { useI18nTyped } from "@/types/i18n";
 import useBreakpoint from "@/composables/useBreakpoint";
+import {
+  DRAWER_INSET_ATTR,
+  LAYER_ROOT_ATTR,
+  drawerInsetColumn,
+  drawerInsetEnd,
+  hideAllBut,
+} from "./drawerInset";
 
 const { t } = useI18nTyped();
 
@@ -136,6 +144,11 @@ function setOpen(v: boolean) {
 
 function handleEscapeKeyDown(e: KeyboardEvent) {
   const target = e.target instanceof Element ? e.target : null;
+  // Escape inside the pinned column belongs to the column, never to the drawer beside it.
+  if (insetHost.value && target?.closest(`[${DRAWER_INSET_ATTR}]`)) {
+    e.preventDefault();
+    return;
+  }
   // A non-modal drawer sits beside live controls, so Escape there belongs to the field or open listbox.
   const keepsOpen = !props.modal && target?.closest(ESCAPE_KEEPS_OPEN);
   // A vetoed Escape must also cancel the library's own dismiss, or it closes on a second guard call.
@@ -147,6 +160,22 @@ function handleEscapeKeyDown(e: KeyboardEvent) {
 }
 
 function handleInteractOutside(e: Event) {
+  const outside = (e as CustomEvent & { detail?: { originalEvent?: Event } }).detail?.originalEvent
+    ?.target as Element | null;
+  // Working in the pinned column beside the drawer never closes it.
+  if (insetHost.value && outside?.closest?.(`[${DRAWER_INSET_ATTR}]`)) {
+    e.preventDefault();
+    return;
+  }
+  // Focus leaving for the page (a closing panel hands it back there) stays with the open drawer, as a modal one would keep it.
+  const originalType = (e as CustomEvent & { detail?: { originalEvent?: Event } }).detail
+    ?.originalEvent?.type;
+  if (insetModal.value && originalType === "focusin") {
+    e.preventDefault();
+    const content = bodyRef.value?.closest<HTMLElement>("[data-o2-drawer]");
+    if (content && outside?.closest?.('[inert], [aria-hidden="true"]')) content.focus();
+    return;
+  }
   if (props.persistent || !props.modal) {
     e.preventDefault();
     return;
@@ -169,9 +198,8 @@ function handleInteractOutside(e: Event) {
   }
 }
 
-// Stacking support: each nested ODrawer gets a higher z-index layer
-const drawerDepth = inject<number>("o2DrawerDepth", 0);
-provide("o2DrawerDepth", drawerDepth + 1);
+const { overlayZIndex: drawerScrimZ, contentZIndex: drawerContentZ } =
+  overlayLayerZIndex(useOverlayLayer());
 
 // Auto loading: an OForm nested in the body (linked via `form-id`) mirrors its
 // `isSubmitting` into this ref, so the footer Save button shows its spinner
@@ -179,8 +207,8 @@ provide("o2DrawerDepth", drawerDepth + 1);
 const formSubmitting = ref(false);
 provide(FORM_SUBMIT_STATE_KEY, formSubmitting);
 
-const overlayZIndex = computed(() => 5999 + drawerDepth * 1000);
-const contentZIndex = computed(() => 6000 + drawerDepth * 1000);
+const overlayZIndex = computed(() => drawerScrimZ);
+const contentZIndex = computed(() => drawerContentZ);
 
 // Header renders when there is a header slot, a title, any sub-slot, OR a visible close button.
 const subtitleInHeader = computed(() => hasHeader.value && !slots.header);
@@ -201,6 +229,31 @@ const hasFooter = computed(
 );
 const hasTrigger = computed(() => !!slots.trigger);
 const isRight = computed(() => props.side !== "left");
+// Only an opted-in drawer stops at a pinned column at the viewport end; every other drawer covers it as before.
+const insetHost = computed(
+  () => !!props.insetBeside && isRight.value && !props.portalTarget && !props.inline,
+);
+const insetEnd = computed(() => (insetHost.value ? drawerInsetEnd.value : 0));
+// Fixed for the drawer's life: reka swaps its content component when modality flips, which would remount the body.
+const effectiveModal = computed(() => props.modal && !insetHost.value);
+// Reka drops the scrim, the focus trap and aria-hidden for a non-modal dialog, so an opted-in modal drawer brings its own.
+const insetModal = computed(() => props.modal && insetHost.value);
+const TABBABLE =
+  'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+function trapInsetTab(e: KeyboardEvent) {
+  if (!insetModal.value || e.key !== "Tab") return;
+  const root = e.currentTarget as HTMLElement;
+  const items = Array.from(root.querySelectorAll<HTMLElement>(TABBABLE)).filter(
+    (el) => el.getClientRects().length > 0,
+  );
+  if (items.length === 0) return;
+  const active = document.activeElement;
+  const edge = e.shiftKey ? items[0] : items[items.length - 1];
+  if (active !== edge && !(e.shiftKey && active === root)) return;
+  e.preventDefault();
+  (e.shiftKey ? items[items.length - 1] : items[0]).focus();
+}
 
 // Fixed body inset (same token as ODialog's body) unless `bleed` is set. One
 // value app-wide → every drawer's content aligns identically. See the `bleed` prop.
@@ -285,7 +338,11 @@ const anchorStyle = computed(() => {
   }
   return style;
 });
-const overlayStyle = computed(() => ({ zIndex: overlayZIndex.value, ...anchorStyle.value }));
+const overlayStyle = computed(() => ({
+  zIndex: overlayZIndex.value,
+  ...anchorStyle.value,
+  ...(insetEnd.value > 0 && { right: `${insetEnd.value}px` }),
+}));
 
 const contentStyle = computed(() => {
   const style: Record<string, string | number> = {
@@ -296,11 +353,36 @@ const contentStyle = computed(() => {
     const w = isMobile.value ? Math.min(100, Math.max(88, props.width)) : props.width;
     style.width = isContained.value ? `${w}%` : `${w}vw`;
   }
+  if (insetEnd.value > 0) {
+    style.right = `${insetEnd.value}px`;
+    style.maxWidth = `calc(100vw - ${insetEnd.value}px)`;
+  }
   return style;
 });
 
 // ── Auto-focus logic ─────────────────────────────────────────────────────────
 const bodyRef = ref<HTMLElement | null>(null);
+
+let undoHide: (() => void) | null = null;
+watch(
+  [shown, insetModal, bodyRef, drawerInsetColumn],
+  ([open, inset, , column]) => {
+    undoHide?.();
+    undoHide = null;
+    const content = bodyRef.value?.closest("[data-o2-drawer]");
+    if (open && inset && content) undoHide = hideAllBut(column ? [content, column] : [content]);
+  },
+  { immediate: true, flush: "post" },
+);
+onBeforeUnmount(() => undoHide?.());
+// A panel that closes beside the drawer drops the focus it held, so the open drawer takes it, as a modal one keeps it.
+watch(drawerInsetColumn, (column, previous) => {
+  if (!insetModal.value || !shown.value || column || !previous) return;
+  void nextTick(() => {
+    const content = bodyRef.value?.closest<HTMLElement>("[data-o2-drawer]");
+    if (content && !content.contains(document.activeElement)) content.focus();
+  });
+});
 const primaryBtnRef = ref<InstanceType<typeof OButton> | null>(null);
 const AUTOFOCUS_TEXT_FIELDS = [
   'input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="range"]):not([type="color"]):not([disabled])',
@@ -412,7 +494,7 @@ watch(shown, (open) => {
 </script>
 
 <template>
-  <DialogRoot :open="shown" :modal="modal" @update:open="handleOpenChange">
+  <DialogRoot :open="shown" :modal="effectiveModal" @update:open="handleOpenChange">
     <!-- Trigger slot — omit when controlling via v-model:open -->
     <DialogTrigger v-if="hasTrigger" as-child>
       <slot name="trigger" />
@@ -433,6 +515,19 @@ watch(shown, (open) => {
           'data-[state=open]:animate-in data-[state=open]:fade-in-0',
           'data-[state=closed]:animate-out data-[state=closed]:fade-out-0',
           'data-[state=closed]:duration-(--duration-dialog-out) data-[state=open]:duration-(--duration-dialog-in)',
+        ]"
+        :style="overlayStyle"
+      />
+
+      <div
+        v-if="insetModal && shown"
+        data-test="o-drawer-overlay"
+        :[LAYER_ROOT_ATTR]="''"
+        aria-hidden="true"
+        :class="[
+          'fixed inset-0',
+          seamless ? 'pointer-events-none bg-transparent' : 'bg-dialog-overlay',
+          'animate-in fade-in-0 duration-120',
         ]"
         :style="overlayStyle"
       />
@@ -473,6 +568,7 @@ watch(shown, (open) => {
           'data-[state=open]:duration-(--duration-dialog-in) data-[state=open]:ease-(--ease-out-expo)',
           'data-[state=closed]:duration-(--duration-dialog-out) data-[state=closed]:ease-(--ease-overlay-out)',
         ]"
+        @keydown="trapInsetTab"
         @escape-key-down="handleEscapeKeyDown"
         @interact-outside="handleInteractOutside"
         @open-auto-focus="handleOpenAutoFocus"

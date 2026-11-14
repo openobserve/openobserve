@@ -442,6 +442,15 @@ pub async fn get_edge_history(
     service_graph::get_edge_history(&org_id, &user_email.user_id, query).await
 }
 
+/// Documented on [`service_graph::api::get_services_trend`]; the trend is scoped to the user.
+pub async fn get_services_trend(
+    Path(org_id): Path<String>,
+    axum::extract::Query(query): axum::extract::Query<service_graph::api::ServicesTrendQuery>,
+    Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    service_graph::get_services_trend(&org_id, &user_email.user_id, query).await
+}
+
 fn record_latest_traces_metrics(org_id: &str, status: &str, elapsed: f64) {
     let labels = [
         "/api/org/traces/latest",

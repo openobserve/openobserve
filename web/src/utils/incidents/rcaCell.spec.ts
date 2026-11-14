@@ -16,7 +16,15 @@
 import { describe, expect, it } from "vitest";
 import type { Incident, RcaSummary } from "@/services/incidents";
 import { gt, raw } from "@/types/i18n";
-import { RCA_BADGE_VARIANT, isLiveRca, rcaCellModel, type RcaCellModel } from "./rcaCell";
+import {
+  RCA_BADGE_VARIANT,
+  alertRcaRuns,
+  isLiveRca,
+  rcaCellModel,
+  rcaFollowTarget,
+  rcaIncidentNumber,
+  type RcaCellModel,
+} from "./rcaCell";
 
 const NOW = Date.UTC(2026, 9, 16, 12, 0, 0);
 const minutesAgoMicros = (m: number) => (NOW - m * 60_000) * 1000;
@@ -435,6 +443,27 @@ describe("rcaCellModel (01 §12.1, RR-42, 03 VE14/VE44)", () => {
     });
   });
 
+  it("names the band when asked, on a finished run and on the earlier result a failed re-run keeps", () => {
+    const done = {
+      rca: rca({ state: "completed", outcome: "root_cause_identified", confidence: "medium" }),
+      severity: "P2",
+    } as Row;
+    const failedRerun = {
+      rca: rca({
+        state: "failed",
+        summary: {
+          previous: { run_id: "r1", outcome: "inconclusive", confidence: "low", ended_at: 0 },
+        },
+      }),
+      severity: "P2",
+    } as Row;
+    const opts = { rcaEnabled: true, now: NOW, namedBand: true };
+
+    expect(rcaCellModel(done, opts).detail).toBe("Medium confidence");
+    expect(rcaCellModel(failedRerun, opts).detail).toBe("Low confidence");
+    expect(rcaCellModel(done, { rcaEnabled: true, now: NOW }).detail).toBe("Medium");
+  });
+
   it("shows persisted progress instead of elapsed time once the stage is known", () => {
     const row = {
       rca: rca({ summary: { stage: "log_patterns", stage_index: 5, stage_count: 7 } }),
@@ -555,5 +584,44 @@ describe("RCA_BADGE_VARIANT (D9-web)", () => {
       ok: "success",
       err: "error",
     });
+  });
+});
+
+describe("rcaIncidentNumber", () => {
+  it("names an incident by the first 8 characters of its id", () => {
+    expect(rcaIncidentNumber("2abcdef0123456789")).toBe("2abcdef0");
+    expect(rcaIncidentNumber("i6")).toBe("i6");
+  });
+});
+
+describe("rcaFollowTarget", () => {
+  it("follows the incident's latest run, and nothing when none ran", () => {
+    expect(rcaFollowTarget({ id: "inc-1", rca: rca({ state: "running" }) }, "default")).toEqual({
+      org: "default",
+      incidentId: "inc-1",
+      runId: rca({}).run_id,
+    });
+    expect(rcaFollowTarget({ id: "inc-1", rca: null }, "default")).toBeNull();
+  });
+});
+
+describe("alertRcaRuns", () => {
+  const group = (alert_id: string) => ({ alert_id, alert_name: alert_id, count: 1 });
+
+  it("maps each alert to the newest open incident with a run that it fired into", () => {
+    const runs = alertRcaRuns([
+      {
+        id: "old",
+        created_at: 1,
+        rca: rca({ run_id: "r-old" }),
+        alert_groups: [group("a1"), group("a2")],
+      },
+      { id: "new", created_at: 2, rca: rca({ run_id: "r-new" }), alert_groups: [group("a1")] },
+      { id: "none", created_at: 3, rca: null, alert_groups: [group("a3")] },
+    ]);
+
+    expect(runs.get("a1")).toEqual({ incidentId: "new", runId: "r-new" });
+    expect(runs.get("a2")).toEqual({ incidentId: "old", runId: "r-old" });
+    expect(runs.has("a3")).toBe(false);
   });
 });

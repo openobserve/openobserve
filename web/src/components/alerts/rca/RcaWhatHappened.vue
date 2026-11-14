@@ -75,7 +75,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </template>
           <span
-            class="font-normal"
+            class="min-w-0 font-normal wrap-anywhere"
+            data-test="rca-timeline-text"
             :class="entry.status === 'refuted' ? 'text-text-secondary line-through' : ''"
           >
             <RcaInlineText :text="entry.text" />

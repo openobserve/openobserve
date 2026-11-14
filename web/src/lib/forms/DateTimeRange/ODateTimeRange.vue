@@ -10,7 +10,7 @@ import type {
   RelativeUnit,
   DateTimeMode,
 } from "./ODateTimeRange.types";
-import { computed, ref, useAttrs, watch, type Ref } from "vue";
+import { computed, inject, onBeforeUnmount, ref, useAttrs, watch, type Ref } from "vue";
 import { useLockedDisabled } from "@/composables/useFeatureLock";
 import {
   PopoverRoot,
@@ -34,9 +34,16 @@ import OTime from "@/lib/forms/Time/OTime.vue";
 import { parseDate } from "@internationalized/date";
 import type { DateValue } from "@internationalized/date";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import {
+  O_DROPDOWN_NESTED_KEY,
+  type DropdownNestedRegistry,
+} from "@/lib/overlay/Dropdown/ODropdown.context";
 import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 
 const { t } = useI18nTyped();
+
+// Inline, the host popover scrolls the panel, so Apply stays pinned to its bottom edge.
+const STICKY_APPLY_CLASS = "bg-datepicker-popup-bg sticky bottom-0 py-2";
 
 const props = withDefaults(defineProps<DateTimeRangeProps>(), {
   startDate: "",
@@ -51,6 +58,7 @@ const props = withDefaults(defineProps<DateTimeRangeProps>(), {
   disableRelative: false,
   hideTime: false,
   showTimezone: false,
+  inline: false,
   disabled: false,
   // No default here: t() cannot run at module scope, so the English fallback is
   // resolved reactively below (see `placeholderText`).
@@ -77,6 +85,23 @@ const popoverOpen = computed({
     if (!isDisabled.value) _popoverOpen.value = val;
   },
 });
+
+// The trigger is a `div role="button"` and reka binds only click, so Enter and Space open it here (CT-01 AC 11).
+function toggleFromKeyboard() {
+  popoverOpen.value = !popoverOpen.value;
+}
+
+// Inside an OPopover the picker's own popup is a nested overlay, so a click in the calendar never dismisses the parent.
+const parentOverlay = inject<DropdownNestedRegistry | null>(O_DROPDOWN_NESTED_KEY, null);
+let closeNested: (() => void) | null = null;
+watch(_popoverOpen, (open) => {
+  if (open && parentOverlay && !closeNested) closeNested = parentOverlay.open();
+  else if (!open && closeNested) {
+    closeNested();
+    closeNested = null;
+  }
+});
+onBeforeUnmount(() => closeNested?.());
 
 // ── Staged state ───────────────────────────────────────────────
 const activeTab = ref<DateTimeMode>(props.disableRelative ? "absolute" : props.mode);
@@ -324,7 +349,7 @@ const triggerClasses = computed(() => [
 
     <!-- Trigger + Popover -->
     <PopoverRoot v-model:open="popoverOpen">
-      <PopoverTrigger as-child>
+      <PopoverTrigger v-if="!inline" as-child>
         <div
           :class="triggerClasses"
           role="button"
@@ -333,6 +358,8 @@ const triggerClasses = computed(() => [
           :aria-disabled="isDisabled || undefined"
           :tabindex="inputTabindex"
           data-test="datetimerange-trigger"
+          @keydown.enter.prevent="toggleFromKeyboard"
+          @keydown.space.prevent="toggleFromKeyboard"
         >
           <!-- Clock icon -->
           <svg
@@ -371,11 +398,16 @@ const triggerClasses = computed(() => [
         </div>
       </PopoverTrigger>
 
-      <PopoverContent
-        :side-offset="4"
-        align="start"
-        class="rounded-default bg-datepicker-popup-bg border-datepicker-popup-border z-50 w-80 border shadow-lg outline-none max-lg:max-h-[var(--reka-popper-available-height,75vh)] max-lg:overflow-y-auto"
-        data-test="datetimerange-popup"
+      <!-- Inline, the same panel renders in place so a host popover stays the one surface. -->
+      <component
+        :is="inline ? 'div' : PopoverContent"
+        v-bind="inline ? {} : { sideOffset: 4, align: 'start' }"
+        :class="
+          inline
+            ? 'flex flex-col'
+            : 'rounded-default bg-datepicker-popup-bg border-datepicker-popup-border z-50 w-80 border shadow-lg outline-none max-lg:max-h-[var(--reka-popper-available-height,75vh)] max-lg:overflow-y-auto'
+        "
+        :data-test="inline ? 'datetimerange-inline' : 'datetimerange-popup'"
       >
         <!-- Tab bar -->
         <div
@@ -538,7 +570,10 @@ const triggerClasses = computed(() => [
           <!-- Apply -->
           <div
             v-if="!autoApply"
-            class="border-datepicker-popup-border flex justify-end border-t pt-2"
+            :class="[
+              'border-datepicker-popup-border flex justify-end border-t pt-2',
+              inline && STICKY_APPLY_CLASS,
+            ]"
           >
             <button
               type="button"
@@ -555,7 +590,10 @@ const triggerClasses = computed(() => [
         <!-- ── ABSOLUTE TAB ──────────────────────────────────── -->
         <div
           v-if="activeTab === 'absolute'"
-          class="flex max-h-[70vh] flex-col gap-3 overflow-y-auto p-3 max-lg:max-h-none max-lg:overflow-visible"
+          :class="[
+            'flex flex-col gap-3 p-3',
+            !inline && 'max-h-[70vh] overflow-y-auto max-lg:max-h-none max-lg:overflow-visible',
+          ]"
           data-test="datetimerange-absolute-panel"
         >
           <!-- Range calendar -->
@@ -738,7 +776,7 @@ const triggerClasses = computed(() => [
           </div>
 
           <!-- Apply -->
-          <div v-if="!autoApply" class="flex justify-end">
+          <div v-if="!autoApply" :class="['flex justify-end', inline && STICKY_APPLY_CLASS]">
             <button
               type="button"
               :disabled="isDisabled"
@@ -750,7 +788,7 @@ const triggerClasses = computed(() => [
             </button>
           </div>
         </div>
-      </PopoverContent>
+      </component>
     </PopoverRoot>
 
     <!-- Error / help text -->

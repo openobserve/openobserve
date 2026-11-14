@@ -43,6 +43,9 @@ const dashboards = {
     }
     return http().get(`/api/${organization}/dashboards`, { params });
   },
+  /** Every folder's dashboards: with no folder, a title param, even empty, lifts the default-folder limit. */
+  listAcrossFolders: (organization: string) =>
+    http().get(`/api/${organization}/dashboards`, { params: { title: "" } }),
   create: (organization: string, data: any, folderId?: string) => {
     return http().post(`/api/${organization}/dashboards?folder=${folderId ?? "default"}`, data, {
       headers: { "Content-Type": "application/json; charset=UTF-8" },

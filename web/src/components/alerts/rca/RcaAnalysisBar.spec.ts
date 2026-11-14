@@ -41,6 +41,12 @@ const stubs = {
     template:
       "<div role='menuitem' :data-disabled='disabled' @click=\"!disabled && $emit('select')\"><slot /><small>{{ description }}</small></div>",
   },
+  ODialog: {
+    props: ["open", "title", "primaryButtonLabel", "secondaryButtonLabel"],
+    emits: ["click:primary", "click:secondary", "update:open"],
+    template:
+      "<div v-if='open' data-test='rca-cancel-dialog'><h2>{{ title }}</h2><slot /><button data-test='dialog-secondary' @click=\"$emit('click:secondary')\">{{ secondaryButtonLabel }}</button><button data-test='dialog-primary' @click=\"$emit('click:primary')\">{{ primaryButtonLabel }}</button></div>",
+  },
 };
 
 // Newest first: a live re-run, a failed run with no record, a cancelled run with a
@@ -186,35 +192,48 @@ describe("RcaAnalysisBar (contract E5)", () => {
     );
   });
 
-  it("while live offers Cancel run instead of Re-analyze", async () => {
+  it("while live, Cancel run sits in ⋯ and hands the confirm to the page's one dialog", async () => {
     const wrapper = mountBar();
 
-    expect(byTest(wrapper, "rca-reanalyze-btn").exists()).toBe(false);
     expect(byTest(wrapper, "rca-cancel-btn").text()).toBe("Cancel run");
     await byTest(wrapper, "rca-cancel-btn").trigger("click");
     expect(wrapper.emitted("cancel")).toHaveLength(1);
+    expect(byTest(wrapper, "rca-cancel-dialog").exists()).toBe(false);
   });
 
-  it("when not live, Re-analyze is one button that emits reanalyze (the dialog picks the mode)", async () => {
-    const wrapper = mountBar({ live: false, latestRunId: "run-1", selectedRunId: "run-1" });
+  it("W4: legacy keeps Cancel run and Re-analyze as visible bar buttons", async () => {
+    const live = mountBar({ legacy: true });
+    const cancel = byTest(live, "rca-cancel-btn");
+    expect(cancel.element.tagName).toBe("BUTTON");
+    expect(cancel.text()).toBe("Cancel run");
+    await cancel.trigger("click");
+    expect(live.emitted("cancel")).toHaveLength(1);
 
-    expect(byTest(wrapper, "rca-cancel-btn").exists()).toBe(false);
-    expect(byTest(wrapper, "rca-reanalyze-btn").text()).toBe("Re-analyze");
-    expect(byTest(wrapper, "rca-reanalyze-fresh").exists()).toBe(false);
-    await byTest(wrapper, "rca-reanalyze-btn").trigger("click");
-    expect(wrapper.emitted("reanalyze")).toEqual([[]]);
+    const done = mountBar({
+      legacy: true,
+      live: false,
+      latestRunId: "run-1",
+      selectedRunId: "run-1",
+    });
+    await byTest(done, "rca-reanalyze-btn").trigger("click");
+    expect(done.emitted("reanalyze")).toHaveLength(1);
+  });
+
+  it("has no plain Cancel or Re-analyze button: a finished run offers Re-analyze in its closed line", () => {
+    const live = mountBar();
+    const done = mountBar({ live: false, latestRunId: "run-1", selectedRunId: "run-1" });
+
+    expect(live.findAll("button").some((b) => b.text() === "Cancel run")).toBe(false);
+    expect(byTest(done, "rca-cancel-btn").exists()).toBe(false);
+    expect(byTest(done, "rca-reanalyze-btn").exists()).toBe(false);
   });
 
   describe("J5: Ask about this analysis", () => {
-    it("not live with canAsk: shown before Re-analyze and emits ask", async () => {
+    it("not live with canAsk: shown and emits ask", async () => {
       const wrapper = mountBar({ live: false, canAsk: true });
       const ask = byTest(wrapper, "rca-ask-btn");
 
       expect(ask.text()).toBe("Ask about this analysis");
-      const html = wrapper.html();
-      expect(html.indexOf('data-test="rca-ask-btn"')).toBeLessThan(
-        html.indexOf('data-test="rca-reanalyze-btn"'),
-      );
       await ask.trigger("click");
       expect(wrapper.emitted("ask")).toHaveLength(1);
     });
@@ -226,18 +245,9 @@ describe("RcaAnalysisBar (contract E5)", () => {
       expect(byTest(wrapper, "rca-cancel-btn").exists()).toBe(true);
     });
 
-    it("hidden without canAsk; Re-analyze stays", () => {
-      const wrapper = mountBar({ live: false });
-
-      expect(byTest(wrapper, "rca-ask-btn").exists()).toBe(false);
-      expect(byTest(wrapper, "rca-reanalyze-btn").exists()).toBe(true);
+    it("hidden without canAsk", () => {
+      expect(byTest(mountBar({ live: false }), "rca-ask-btn").exists()).toBe(false);
     });
-  });
-
-  it("J9: Re-analyze is disabled while a resume is in flight", () => {
-    const wrapper = mountBar({ live: false, resuming: true });
-
-    expect(byTest(wrapper, "rca-reanalyze-btn").attributes("disabled")).toBeDefined();
   });
 
   describe("⋯ menu", () => {

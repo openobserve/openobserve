@@ -131,6 +131,12 @@ export interface BadgeProps {
   removable?: boolean;
   /** Accessible name for the remove button. Defaults to `common.remove`. */
   removeLabel?: I18nText;
+  /** `data-test` for the remove button. Defaults to `o2-badge-remove`. */
+  removeDataTest?: string;
+  /**
+   * With `clickable` and `removable`, renders the label as its own button beside the ✕; `aria-*`, `role`, `tabindex` and `data-test` move onto it.
+   */
+  labelButton?: boolean;
 }
 
 export interface BadgeEmits {

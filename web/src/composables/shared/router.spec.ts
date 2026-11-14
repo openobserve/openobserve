@@ -25,6 +25,15 @@ import { PA_ROUTES } from "@/utils/rum/productAnalyticsRoutes";
 import config from "@/aws-exports";
 import enLocale from "@/locales/languages/en-US.json";
 import i18n from "@/locales";
+import { resetAssistantV2ForTests } from "@/composables/assistant/flags";
+import { ref } from "vue";
+
+const assistantGate = ref("available");
+
+vi.mock("@/composables/assistant", () => ({
+  useAssistantCapability: () => ({ gate: assistantGate }),
+}));
+vi.mock("@/views/AssistantView.vue", () => ({ default: { name: "AssistantView" } }));
 
 // Routes store an i18n KEY in `meta.titleKey` (src/router/index.ts translates it
 // per navigation), so assert the English copy the key still resolves to — a typo'd
@@ -1938,6 +1947,107 @@ describe("useRoutes (router.ts)", () => {
       expect(route.path).toBe("/ai/public/:token");
       expect(route.meta.public).toBe(true);
       expect(route.props({ params: { token: "t2" } })).toEqual({ token: "t2", isPublic: true });
+    });
+  });
+
+  describe("assistant full view route", () => {
+    const flagged = (on: boolean) => {
+      window.__O2_ASSISTANT_V2__ = on;
+      resetAssistantV2ForTests();
+      return useRoutes();
+    };
+    const resolveIn = (homeChildRoutes: any[], path: string) => {
+      const catchAll = homeChildRoutes.find((r: any) => r.path === "/:catchAll(.*)*");
+      const router = createRouter({
+        history: createMemoryHistory(),
+        routes: [
+          {
+            path: "/",
+            component: { name: "Layout" },
+            children: homeChildRoutes.filter((r: any) => r !== catchAll),
+          },
+          catchAll,
+        ],
+      });
+      return router.resolve(path);
+    };
+
+    afterEach(() => {
+      delete window.__O2_ASSISTANT_V2__;
+      resetAssistantV2ForTests();
+      assistantGate.value = "available";
+    });
+
+    it("is not registered with the flag off, so /assistant stays not found", () => {
+      const { homeChildRoutes } = flagged(false);
+      expect(findRoute(homeChildRoutes, "assistant")).toBeUndefined();
+      expect(resolveIn(homeChildRoutes, "/assistant").name).toBeUndefined();
+    });
+
+    it("redirects /assistant/:chatId? to the thread in Home's AI tab, keeping the query, with the flag on", () => {
+      const { homeChildRoutes } = flagged(true);
+      const route = findRoute(homeChildRoutes, "assistant");
+      expect(route.path).toBe("assistant/:chatId?");
+      expect(route.component).toBeUndefined();
+      expect(
+        route.redirect({
+          params: { chatId: "0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b" },
+          query: { org_identifier: "acme" },
+        }),
+      ).toEqual({
+        name: "home",
+        params: {},
+        query: {
+          org_identifier: "acme",
+          tab: "ai",
+          thread: "0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b",
+        },
+      });
+      expect(route.redirect({ params: {}, query: {} })).toEqual({
+        name: "home",
+        params: {},
+        query: { tab: "ai", thread: "" },
+      });
+    });
+
+    it("lands a pushed /assistant/:id on Home with ?tab=ai&thread=", async () => {
+      const { homeChildRoutes } = flagged(true);
+      const catchAll = homeChildRoutes.find((r: any) => r.path === "/:catchAll(.*)*");
+      const router = createRouter({
+        history: createMemoryHistory(),
+        routes: [
+          {
+            path: "/",
+            component: { name: "Layout", render: () => null },
+            children: homeChildRoutes
+              .filter((r: any) => r !== catchAll)
+              .map((r: any) => ({ ...r, beforeEnter: undefined })),
+          },
+        ],
+      });
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+      await router.push({ name: "assistant", params: { chatId: "abc" }, query: { a: "1" } });
+      expect(warn).not.toHaveBeenCalledWith(expect.stringContaining("Discarded invalid param"));
+      warn.mockRestore();
+      expect(router.currentRoute.value.name).toBe("home");
+      expect(router.currentRoute.value.query).toEqual({ a: "1", tab: "ai", thread: "abc" });
+    });
+
+    it("leaves the /ai namespace and the share routes untouched", () => {
+      const { homeChildRoutes } = flagged(true);
+      expect(resolveIn(homeChildRoutes, "/ai/shared/t1").name).toBe("sharedChat");
+      const others = homeChildRoutes.filter(
+        (r: any) => r.name !== "assistant" && /^\/?assistant/.test(r.path ?? ""),
+      );
+      expect(others).toEqual([]);
+    });
+
+    it("registers /close-tab outside the layout, authenticated, only with the flag on", () => {
+      expect(flagged(false).parentRoutes.find((r: any) => r.name === "closeTab")).toBeUndefined();
+      const route = flagged(true).parentRoutes.find((r: any) => r.name === "closeTab");
+      expect(route.path).toBe("/close-tab");
+      expect(route.meta.public).toBeUndefined();
+      expect(enTitle(route.meta.titleKey)).toBe("You're signed in");
     });
   });
 

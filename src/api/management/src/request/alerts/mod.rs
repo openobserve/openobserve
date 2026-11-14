@@ -90,6 +90,7 @@ pub mod history_summary;
 pub mod incident_integrations;
 pub mod incidents;
 pub mod mute;
+pub mod rca_runs_org;
 #[cfg(feature = "cloud")]
 pub mod slack_oauth;
 pub mod templates;
@@ -393,7 +394,7 @@ fn strip_anomaly_runtime_state(obj: &mut serde_json::Map<String, serde_json::Val
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "create"})),
-        ("x-o2-mcp" = json!({"description": "Create a new alert rule with flexible query options. IMPORTANT: Alert name must use snake_case (no spaces/special chars like :,#,?,&,%,/,quotes), destinations must name existing destinations and may be empty. QueryCondition supports 3 query types: (1) Custom - uses conditions, aggregation, vrl_function, search_event_type, multi_time_range; (2) SQL - uses sql, vrl_function, search_event_type; (3) PromQL - uses promql, promql_condition, multi_time_range", "category": "alerts"}))
+        ("x-o2-mcp" = json!({"description": "Create a new alert rule with flexible query options. IMPORTANT: Keep a name the user gave exactly as written (it may not contain spaces, /, :, #, ?, &, % or quotes); use snake_case only for a name you pick yourself. Destinations must name existing destinations and may be empty. QueryCondition supports 3 query types: (1) Custom - uses conditions, aggregation, vrl_function, search_event_type, multi_time_range; (2) SQL - uses sql, vrl_function, search_event_type; (3) PromQL - uses promql, promql_condition, multi_time_range", "category": "alerts"}))
     )
 )]
 pub async fn create_alert(
@@ -5203,6 +5204,14 @@ mod tests {
     fn test_promql_missing_query_is_bad_request() {
         assert_eq!(
             status(AlertError::PromqlMissingQuery),
+            StatusCode::BAD_REQUEST
+        );
+    }
+
+    #[test]
+    fn test_promql_missing_condition_is_bad_request() {
+        assert_eq!(
+            status(AlertError::PromqlMissingCondition),
             StatusCode::BAD_REQUEST
         );
     }

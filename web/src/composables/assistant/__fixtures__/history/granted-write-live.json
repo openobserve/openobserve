@@ -1,0 +1,267 @@
+{
+  "frames": [
+    {
+      "type": "turn_started",
+      "turn_id": "01a1c0ed-b920-722e-9574-4379bcc26716",
+      "agent_type": "o2-ai",
+      "trace_id": "00000000000000000000000000000000"
+    },
+    {
+      "type": "status",
+      "message": "processing"
+    },
+    {
+      "type": "title",
+      "title": "Pause the alert ta_approvals_rca_update_target for 5\u2026"
+    },
+    {
+      "type": "usage",
+      "usage": {
+        "input_tokens": 434,
+        "output_tokens": 141,
+        "prompt_tokens": 434,
+        "completion_tokens": 141,
+        "tokens_in": 434,
+        "tokens_out": 141,
+        "total_tokens": 575,
+        "cached_tokens": 29184,
+        "cache_creation_tokens": 0,
+        "llm_calls": 1,
+        "cost": 0.000237252
+      }
+    },
+    {
+      "type": "tool_call",
+      "tool": "MuteAlert",
+      "message": "Executing MuteAlert",
+      "context": {
+        "alert_id": "3LrpP3S4OgYZjmWhBm5Isxoi8vI",
+        "request_body": {
+          "minutes": 5,
+          "all_groups": true,
+          "until_clear": false
+        }
+      },
+      "call_id": "call_00_ET_dacCzOzrpoZ5r1lCtYii2602"
+    },
+    {
+      "type": "step",
+      "id": "call_00_ET_dacCzOzrpoZ5r1lCtYii2602",
+      "call_id": "call_00_ET_dacCzOzrpoZ5r1lCtYii2602",
+      "kind": "other",
+      "label": "Executing MuteAlert",
+      "params": {
+        "call_id": "call_00_ET_dacCzOzrpoZ5r1lCtYii2602"
+      },
+      "state": "running"
+    },
+    {
+      "type": "confirmation_resolved",
+      "id": "grant_3LsLc2L6f9nvoIltQCcQQmqBYpd~7e7c90c2",
+      "approved": true,
+      "by": "grant",
+      "at": 1794238170622,
+      "scope": "always",
+      "grant_id": "3LsLc2L6f9nvoIltQCcQQmqBYpd",
+      "tool": "MuteAlert",
+      "operation": "update",
+      "targets": [
+        {
+          "type": "alert",
+          "name": "ta_approvals_rca_update_target",
+          "id": "3LrpP3S4OgYZjmWhBm5Isxoi8vI"
+        }
+      ]
+    },
+    {
+      "type": "step",
+      "id": "call_00_ET_dacCzOzrpoZ5r1lCtYii2602",
+      "call_id": "call_00_ET_dacCzOzrpoZ5r1lCtYii2602",
+      "kind": "other",
+      "label": "Executing MuteAlert",
+      "params": {
+        "call_id": "call_00_ET_dacCzOzrpoZ5r1lCtYii2602"
+      },
+      "state": "done"
+    },
+    {
+      "type": "resource_changed",
+      "resource_type": "alert",
+      "op": "create",
+      "id": "3LrpP3S4OgYZjmWhBm5Isxoi8vI"
+    },
+    {
+      "type": "tool_result",
+      "tool": "MuteAlert",
+      "success": true,
+      "message": "MuteAlert completed successfully",
+      "call_args": {
+        "tool": "MuteAlert",
+        "args": {
+          "alert_id": "3LrpP3S4OgYZjmWhBm5Isxoi8vI",
+          "request_body": {
+            "minutes": 5,
+            "all_groups": true,
+            "until_clear": false
+          }
+        }
+      },
+      "call_id": "call_00_ET_dacCzOzrpoZ5r1lCtYii2602"
+    },
+    {
+      "type": "usage",
+      "usage": {
+        "input_tokens": 1279,
+        "output_tokens": 248,
+        "prompt_tokens": 1279,
+        "completion_tokens": 248,
+        "tokens_in": 1279,
+        "tokens_out": 248,
+        "total_tokens": 1527,
+        "cached_tokens": 58880,
+        "cache_creation_tokens": 0,
+        "llm_calls": 2,
+        "cost": 0.00051729
+      }
+    },
+    {
+      "type": "usage",
+      "usage": {
+        "input_tokens": 1529,
+        "output_tokens": 379,
+        "prompt_tokens": 1529,
+        "completion_tokens": 379,
+        "tokens_in": 1529,
+        "tokens_out": 379,
+        "total_tokens": 1908,
+        "cached_tokens": 89344,
+        "cache_creation_tokens": 0,
+        "llm_calls": 3,
+        "cost": 0.000724782
+      }
+    },
+    {
+      "type": "message_delta",
+      "content": "Muted [ta_approvals_rca_update_target](/web/alerts/detail/3LrpP3S4OgYZjmWhBm5Isxoi8vI?org_identifier=default) for 5 minutes, "
+    },
+    {
+      "type": "usage",
+      "usage": {
+        "input_tokens": 1739,
+        "output_tokens": 481,
+        "prompt_tokens": 1739,
+        "completion_tokens": 481,
+        "tokens_in": 1739,
+        "tokens_out": 481,
+        "total_tokens": 2220,
+        "cached_tokens": 120064,
+        "cache_creation_tokens": 0,
+        "llm_calls": 4,
+        "cost": 0.000909642
+      }
+    },
+    {
+      "type": "message_delta",
+      "content": "until 21:04 [^call_00_ET_dacCzOzrpoZ5r1lCtYii2602].\n\n"
+    },
+    {
+      "type": "follow_ups",
+      "items": [
+        "What triggered ta_approvals_rca_update_target?",
+        "Extend the mute to 30 minutes",
+        "Show the other alerts that fired in the last 24 hours"
+      ]
+    },
+    {
+      "type": "complete",
+      "history": [
+        {
+          "role": "user",
+          "content": "Pause the alert ta_approvals_rca_update_target for 5 minutes."
+        },
+        {
+          "role": "assistant",
+          "content": "Muted [ta_approvals_rca_update_target](/web/alerts/detail/3LrpP3S4OgYZjmWhBm5Isxoi8vI?org_identifier=default) for 5 minutes, until 21:04 [^call_00_ET_dacCzOzrpoZ5r1lCtYii2602].\n\n"
+        }
+      ],
+      "compacted": false,
+      "empty": false,
+      "usage": {
+        "input_tokens": 1739,
+        "output_tokens": 481,
+        "prompt_tokens": 1739,
+        "completion_tokens": 481,
+        "tokens_in": 1739,
+        "tokens_out": 481,
+        "total_tokens": 2220,
+        "cached_tokens": 120064,
+        "cache_creation_tokens": 0,
+        "llm_calls": 4,
+        "cost": 0.000909642,
+        "credits": 0
+      },
+      "chart_series": null,
+      "is_partial": null,
+      "searched_range": null,
+      "confidence": null,
+      "trace_id": "00000000000000000000000000000000",
+      "context_used": [
+        {
+          "key": "page",
+          "used": true
+        },
+        {
+          "key": "timeRange",
+          "used": true
+        },
+        {
+          "key": "overviewServicesMeta",
+          "used": true
+        },
+        {
+          "key": "overviewAlerts",
+          "used": true
+        },
+        {
+          "key": "locale",
+          "used": true
+        }
+      ],
+      "turn_id": "01a1c0ed-b920-722e-9574-4379bcc26716",
+      "opencode_session_id": "ses_e3f1246c6ffe1cNCCdZvw7ojUf",
+      "last_seq": 50,
+      "session_title": "Pause the alert ta_approvals_rca_update_target for 5\u00e2\u20ac\u00a6",
+      "persisted": true,
+      "last_committed_seq": 50
+    }
+  ],
+  "rows": [
+    {
+      "id": "3LsM9VSOQSh163QTrpfF074OBA4",
+      "at": 1794238170668269,
+      "action": "Paused alert",
+      "tool": "MuteAlert",
+      "target": {
+        "type": "alert",
+        "id": "3LrpP3S4OgYZjmWhBm5Isxoi8vI",
+        "name": "ta_approvals_rca_update_target",
+        "deleted": false
+      },
+      "on_behalf_of": "ta_rca2@example.com",
+      "approval": {
+        "kind": "standing",
+        "id": "grant_3LsLc2L6f9nvoIltQCcQQmqBYpd~7e7c90c2",
+        "scope": "always",
+        "grant_id": "3LsLc2L6f9nvoIltQCcQQmqBYpd"
+      },
+      "result": {
+        "state": "done"
+      },
+      "undo": {
+        "available": true,
+        "until": 1794324570668269
+      },
+      "chat_id": "01a1c0ed-aeec-74c6-9a1f-6d99b0c0de06"
+    }
+  ]
+}

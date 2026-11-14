@@ -67,11 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       {{ unblockedText }}
     </p>
 
-    <h2
-      v-if="!graded"
-      data-test="rca-verdict-headline"
-      class="text-text-heading m-0 max-w-215 text-base leading-normal font-bold [text-wrap:pretty]"
-    >
+    <h2 v-if="!graded" data-test="rca-verdict-headline" :class="headlineClass">
       <RcaInlineText :text="headline" />
     </h2>
 
@@ -287,7 +283,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <p data-test="rca-reanalyzing-message" class="text-banner-info-text m-0 text-sm font-medium">
         {{ reanalyzingText }}
       </p>
-      <template #actions>
+      <!-- Cancel stops the run for everyone, so with the assistant it lives only behind ⋯ with its confirm -->
+      <template v-if="!inThread" #actions>
         <OButton
           data-test="rca-follow-thread-btn"
           variant="outline"
@@ -297,6 +294,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("alerts.incidents.rcaRun.followInThread") }}
         </OButton>
         <OButton
+          v-if="legacy"
           data-test="rca-banner-cancel-btn"
           variant="outline"
           size="sm"
@@ -525,6 +523,10 @@ const props = withDefaults(
     timezone?: string;
     /** Why no new run can start: Retry stays visible, disabled, with this reason. */
     startLockedReason?: I18nText;
+    /** Shown inside the assistant's thread, which is already the thread to follow. */
+    inThread?: boolean;
+    /** Assistant flag off: the live banner keeps its own Cancel, with no confirm. */
+    legacy?: boolean;
   }>(),
   {
     waitingInput: false,
@@ -557,6 +559,8 @@ const props = withDefaults(
     alertsNow: null,
     timezone: "UTC",
     startLockedReason: undefined,
+    inThread: false,
+    legacy: false,
   },
 );
 
@@ -578,6 +582,15 @@ defineEmits<{
 
 const { t } = useI18nTyped();
 const router = useRouter();
+
+// A narrow thread panel reads the verdict as body text; the page keeps its bold heading.
+const headlineClass = computed(() => {
+  if (!props.inThread) {
+    return "text-text-heading m-0 max-w-215 text-base leading-normal font-bold [text-wrap:pretty]";
+  }
+  const box = props.cardState === "analyzed" ? "rounded-surface bg-status-info-bg px-3 py-2.5" : "";
+  return `text-text-heading m-0 text-sm leading-normal font-semibold [text-wrap:pretty] ${box}`;
+});
 
 /** "Connect AI Toolset" when a blind spot of the run asks for one. */
 const connectToolsetRoute = computed(() =>

@@ -1,0 +1,644 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+import { flushPromises, mount } from "@vue/test-utils";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { computed } from "vue";
+
+import type { LocalRecord } from "@/composables/assistant/historyDb";
+import aiChatShare from "@/services/ai_chat_share";
+import assistant from "@/services/assistant";
+import { raw } from "@/types/i18n";
+import { setOrgTimeZoneSource } from "@/utils/formatters";
+
+import { fakeAssistant, fakeRouter, fakeVuex } from "../__tests__/fakeAssistant";
+import { historyStubs } from "../__tests__/historyStubs";
+import { followedRcaRun, stopFollowingRca } from "../shell/rcaFollow";
+
+import AssistantHistoryConfirm from "./AssistantHistoryConfirm.vue";
+import AssistantHistoryList, {
+  type AssistantHistoryListProps,
+  SEARCH_DEBOUNCE_MS,
+  VIRTUAL_FROM,
+} from "./AssistantHistoryList.vue";
+
+const { fake, exporter, listOrgRcaRuns } = vi.hoisted(() => ({
+  fake: { current: null as any },
+  listOrgRcaRuns: vi.fn(),
+  exporter: {
+    exportChat: vi.fn(),
+    exportAll: vi.fn(),
+    busy: { value: new Set<string>() },
+  },
+}));
+
+vi.mock("@/composables/assistant", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/composables/assistant")>()),
+  useAssistantStore: () => fake.current.store,
+  useAssistantCapability: () => fake.current.handle,
+  useAssistantHistory: () => fake.current.history,
+  useChatExport: () => exporter,
+}));
+vi.mock("@/services/rca_runs_org", () => ({ listOrgRcaRuns }));
+vi.mock("@/services/ai_chat_share", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/services/ai_chat_share")>();
+  return {
+    ...actual,
+    default: {
+      ...actual.default,
+      listForChat: vi.fn(async () => ({ data: { shares: [{ id: "a" }, { id: "b" }] } })),
+      listMine: vi.fn(async () => ({ data: { shares: [] } })),
+    },
+  };
+});
+
+// 00:10 on 22 Oct in Kolkata; 23:50 the evening before is Yesterday there, not Today.
+const NOW = Date.UTC(2026, 9, 21, 18, 40);
+const ZONE = "Asia/Kolkata";
+
+function record(id: number, at: number, over: Partial<LocalRecord> = {}): LocalRecord {
+  return {
+    id,
+    timestamp: new Date(at).toISOString(),
+    title: `Chat ${id}`,
+    messages: [{ role: "user", content: raw(`question ${id}`) }],
+    sessionId: `0190ffff-c3d4-7e5f-8a9b-${String(id).padStart(12, "0")}`,
+    userOrgKey: "k1",
+    ...over,
+  };
+}
+
+const SEED = [
+  record(1, NOW - 5 * 60_000, { title: "Alpha today" }),
+  record(2, Date.UTC(2026, 9, 21, 18, 20), { title: "Beta late last night" }),
+  record(3, NOW - 3 * 86_400_000, { title: "Gamma this week" }),
+  record(4, NOW - 30 * 86_400_000, { title: "Delta older", pinned: true }),
+  record(5, NOW - 40 * 86_400_000, { title: "Epsilon older" }),
+];
+
+async function setup(
+  props: Partial<AssistantHistoryListProps> = {},
+  {
+    seed = SEED,
+    canChat = "yes" as const,
+    persistence = false,
+    historySearch = false,
+    patchHistory = (history: any) => history,
+  } = {},
+) {
+  fake.current = fakeAssistant("available", { persistence, canChat, historySearch }, {}, 80, true);
+  for (const row of seed) fake.current.db.rows.set(row.id, structuredClone(row));
+  fake.current.history = patchHistory(fake.current.history);
+  const router = fakeRouter();
+  const wrapper = mount(AssistantHistoryList, {
+    props: { mode: "panel", currentSid: null, container: "sidebar", ...props },
+    global: { plugins: [router, fakeVuex()], stubs: historyStubs },
+    attachTo: document.body,
+  });
+  await flushPromises();
+  return { wrapper, router, ...fake.current };
+}
+
+const rowButtons = (wrapper: Awaited<ReturnType<typeof setup>>["wrapper"]) =>
+  wrapper.findAll('[data-test="assistant-history-row"]');
+
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(NOW);
+  setOrgTimeZoneSource(() => ZONE);
+  localStorage.clear();
+  sessionStorage.clear();
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+  setOrgTimeZoneSource(() => undefined);
+  document.body.innerHTML = "";
+});
+
+async function pickMenuView(wrapper: any, id: string): Promise<void> {
+  await wrapper.get('[data-test="assistant-history-list-menu"]').trigger("click");
+  await flushPromises();
+  const item = document.body.querySelector<HTMLElement>(
+    `[data-test="assistant-history-view-menu-${id}"]`,
+  );
+  expect(item).not.toBeNull();
+  item!.click();
+  await flushPromises();
+}
+
+describe("AssistantHistoryList", () => {
+  it("groups by calendar day in the org zone, pinned first and only there", async () => {
+    const { wrapper } = await setup();
+    const groups = wrapper.findAll('[data-test="assistant-history-group"]');
+    expect(groups.map((g) => g.attributes("data-group"))).toEqual([
+      "pinned",
+      "today",
+      "yesterday",
+      "week",
+      "older",
+    ]);
+    expect(groups.map((g) => g.get("h3").text())).toEqual([
+      "Pinned",
+      "Today",
+      "Yesterday",
+      "Previous 7 days",
+      "Older",
+    ]);
+    expect(groups[2].text()).toContain("Beta late last night");
+    expect(groups[0].text()).toContain("Delta older");
+    expect(groups[4].text()).not.toContain("Delta older");
+  });
+
+  it("is an APG list with actions: no listbox, groups named by their headings, no control inside a row button", async () => {
+    const { wrapper } = await setup();
+    const list = wrapper.get('[data-test="assistant-history-list"]');
+    expect(list.element.tagName).toBe("UL");
+    expect(list.attributes("aria-label")).toBe("Chats");
+    expect(wrapper.find('[role="listbox"], [role="option"]').exists()).toBe(false);
+    for (const group of wrapper.findAll('[data-test="assistant-history-group"]')) {
+      expect(group.attributes("role")).toBe("group");
+      const heading = wrapper.get(`#${group.attributes("aria-labelledby")}`);
+      expect(heading.element.tagName).toBe("H3");
+    }
+    for (const button of rowButtons(wrapper))
+      expect(button.find("button, a, input, [tabindex]").exists()).toBe(false);
+    expect(wrapper.get('[data-test="assistant-history"]').attributes("data-dd-privacy")).toBe(
+      "mask",
+    );
+  });
+
+  it("describes itself by the mode line in local mode", async () => {
+    const { wrapper } = await setup();
+    const list = wrapper.get('[data-test="assistant-history-list"]');
+    const line = wrapper.get(`#${list.attributes("aria-describedby")}`);
+    expect(line.text()).toBe("Saved in this browser only");
+  });
+
+  it("roves one tab stop over the row buttons with arrows, Home, End and type-ahead", async () => {
+    const { wrapper } = await setup();
+    const buttons = () => rowButtons(wrapper).map((b) => b.element as HTMLElement);
+    expect(buttons().filter((b) => b.tabIndex === 0)).toHaveLength(1);
+    await wrapper
+      .get('[data-test="assistant-history-search"] input')
+      .trigger("keydown", { key: "ArrowDown" });
+    expect(document.activeElement).toBe(buttons()[0]);
+    await rowButtons(wrapper)[0].trigger("keydown", { key: "ArrowDown" });
+    expect(document.activeElement).toBe(buttons()[1]);
+    await rowButtons(wrapper)[1].trigger("keydown", { key: "End" });
+    expect(document.activeElement).toBe(buttons().at(-1));
+    await rowButtons(wrapper).at(-1)!.trigger("keydown", { key: "Home" });
+    expect(document.activeElement).toBe(buttons()[0]);
+    await rowButtons(wrapper)[0].trigger("keydown", { key: "g" });
+    expect(document.activeElement?.textContent).toContain("Gamma this week");
+    expect(buttons().filter((b) => b.tabIndex === 0)).toEqual([document.activeElement]);
+  });
+
+  it("marks the current chat on exactly one row", async () => {
+    const { wrapper } = await setup({ currentSid: SEED[2].sessionId! });
+    const current = wrapper.findAll('[aria-current="true"]');
+    expect(current).toHaveLength(1);
+    expect(current[0].text()).toContain("Gamma this week");
+  });
+
+  it("searches on the client and offers Clear search when nothing matches", async () => {
+    const { wrapper, history } = await setup();
+    history.setFilter({ q: "gamma" });
+    await flushPromises();
+    expect(rowButtons(wrapper)).toHaveLength(1);
+    expect(wrapper.get('[data-test="assistant-history-search-line"]').text()).toBe(
+      "1 chat matches",
+    );
+    history.setFilter({ q: "zzz" });
+    await flushPromises();
+    expect(wrapper.get('[data-test="assistant-history-no-match"]').text()).toContain(
+      "No chats match “zzz”",
+    );
+  });
+
+  it("says nothing matches, not No chats yet, when the server search finds nothing", async () => {
+    vi.spyOn(assistant, "listChats").mockImplementation(async (_org, params = {}) => ({
+      chats: params.q
+        ? []
+        : [
+            {
+              session_id: "0190a1b2-c3d4-7e5f-8a9b-00000000aaaa",
+              title: "Saved",
+              created_at: 1,
+              updated_at: 2,
+            },
+          ],
+    }));
+    const { wrapper, history } = await setup(
+      {},
+      { seed: [], persistence: true, historySearch: true },
+    );
+    await vi.waitFor(() => expect(rowButtons(wrapper)).toHaveLength(1));
+    history.setFilter({ q: "zzz" });
+    await vi.waitFor(() =>
+      expect(wrapper.find('[data-test="assistant-history-no-match"]').exists()).toBe(true),
+    );
+    expect(wrapper.find('[data-test="assistant-history-empty"]').exists()).toBe(false);
+  });
+
+  it("shows the skeleton, not No chats match, while a server search is still loading", async () => {
+    vi.spyOn(assistant, "listChats").mockImplementation((_org, params = {}) =>
+      params.q ? new Promise(() => {}) : Promise.resolve({ chats: [] }),
+    );
+    const { wrapper, history } = await setup(
+      {},
+      {
+        seed: [record(9, NOW - 60_000, { title: "Browser only" })],
+        persistence: true,
+        historySearch: true,
+      },
+    );
+    await vi.waitFor(() => expect(rowButtons(wrapper)).toHaveLength(1));
+    history.setFilter({ q: "zzz" });
+    await flushPromises();
+    expect(wrapper.find('[data-test="assistant-history-no-match"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="assistant-history-skeleton"]').exists()).toBe(true);
+  });
+
+  it("shows the empty state without Delete all chats", async () => {
+    const { wrapper } = await setup({}, { seed: [] });
+    expect(wrapper.find('[data-test="assistant-history-empty"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="assistant-history-clear-all"]').exists()).toBe(false);
+  });
+
+  it("leaves speaking to the shell, so two lists never say one outcome twice", async () => {
+    const { wrapper, history } = await setup();
+    await history.rename(SEED[0].sessionId!, "Renamed");
+    await flushPromises();
+    expect(wrapper.find('[role="status"]').exists()).toBe(false);
+    expect(String(history.announcement.value?.text)).toBe("Renamed");
+    expect(fake.current.toast).not.toHaveBeenCalled();
+  });
+
+  it("confirms a delete in a dialog that starts on Cancel, then removes the row", async () => {
+    const { wrapper, db, history } = await setup();
+    await wrapper.findAll('[data-test="assistant-history-item"]')[1].trigger("pointerenter");
+    await wrapper.get('[data-test="assistant-history-row-delete"]').trigger("click");
+    const dialog = wrapper.get('[data-test="assistant-history-delete-dialog"]');
+    expect(dialog.get("h2").text()).toBe("Delete “Alpha today”?");
+    expect(dialog.text()).toContain("This removes the chat from this browser.");
+    await dialog.get('[data-stub="primary"]').trigger("click");
+    await flushPromises();
+    expect(db.rows.has(1)).toBe(false);
+    expect(String(history.announcement.value?.text)).toBe("Chat deleted");
+  });
+
+  it("asks to type the word before clearing 25 chats or more", async () => {
+    const many = Array.from({ length: 25 }, (_, i) => record(i + 1, NOW - i * 60_000));
+    const { wrapper, db } = await setup({}, { seed: many });
+    await wrapper.get('[data-test="assistant-history-clear-all"]').trigger("click");
+    const dialog = wrapper.get('[data-test="assistant-history-clear-all-dialog"]');
+    expect(dialog.get("h2").text()).toBe("Delete all 25 chats?");
+    const confirm = dialog.get('[data-stub="primary"]');
+    expect(confirm.attributes("disabled")).toBeDefined();
+    await dialog.get('[data-test="assistant-history-clear-all-confirm"] input').setValue("delete");
+    expect(confirm.attributes("disabled")).toBeUndefined();
+    expect(confirm.text()).toBe("Delete 25 chats");
+    await confirm.trigger("click");
+    await flushPromises();
+    expect(db.rows.size).toBe(0);
+  });
+
+  it("hands focus back to the chat once everything is cleared", async () => {
+    const { wrapper, db } = await setup();
+    await wrapper.get('[data-test="assistant-history-clear-all"]').trigger("click");
+    await wrapper
+      .get('[data-test="assistant-history-clear-all-dialog"] [data-stub="primary"]')
+      .trigger("click");
+    await flushPromises();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(db.rows.size).toBe(0);
+    expect(wrapper.emitted("close")).toHaveLength(1);
+  });
+
+  it("says the filters match nothing and offers Clear filters", async () => {
+    const { wrapper, history } = await setup({}, { seed: SEED.filter((row) => !row.pinned) });
+    history.setFilter({ kind: "pinned" });
+    await flushPromises();
+    const empty = wrapper.get('[data-test="assistant-history-filter-empty"]');
+    expect(empty.text()).toContain("No chats match these filters");
+    expect(wrapper.find('[data-test="assistant-history-no-match"]').exists()).toBe(false);
+    await empty.get("button").trigger("click");
+    expect(history.filter.value.kind).toBe("all");
+  });
+
+  it("takes a window's width from its geometry, not its measured 382 px, and still measures elsewhere", async () => {
+    const rect = vi
+      .spyOn(HTMLElement.prototype, "getBoundingClientRect")
+      .mockReturnValue({ width: 382 } as DOMRect);
+    const inWindow = await setup({ container: "window" });
+    const list = (w: typeof inWindow.wrapper) => w.get('[data-test="assistant-history"]');
+    expect(list(inWindow.wrapper).attributes("data-narrow")).toBeUndefined();
+    inWindow.wrapper.unmount();
+    const inSidebar = await setup({ container: "sidebar" });
+    expect(list(inSidebar.wrapper).attributes("data-narrow")).toBe("");
+    rect.mockRestore();
+  });
+
+  it("unmounts the menu button's tooltip while its menu is open and just after", async () => {
+    const { wrapper } = await setup();
+    const btn = () => wrapper.get('[data-test="assistant-history-list-menu"]');
+    await btn().trigger("click");
+    await flushPromises();
+    expect(document.body.textContent).not.toContain("Chat list actions");
+  });
+
+  it("has no chip row; the filters live in the menu and only an active one shows", async () => {
+    const { wrapper } = await setup();
+    expect(
+      wrapper.find('[data-test^="assistant-history-view-"]:not([data-test*="menu"])').exists(),
+    ).toBe(false);
+    expect(wrapper.find('[data-test="assistant-history-views"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="assistant-history-filter-active"]').exists()).toBe(false);
+  });
+
+  it("clears a stored filter the row cannot show, so no chat stays hidden behind it", async () => {
+    const { wrapper, history } = await setup(
+      {},
+      {
+        patchHistory: (h: any) => {
+          h.setFilter({ kind: "pinned" });
+          return h;
+        },
+      },
+    );
+    expect(history.filter.value.kind).toBe("all");
+    expect(rowButtons(wrapper)).toHaveLength(SEED.length);
+  });
+
+  it("offers Auto-runs and Shared only where the server keeps them", async () => {
+    const ids = (wrapper: Awaited<ReturnType<typeof setup>>["wrapper"]) =>
+      wrapper.findAll('[data-test^="assistant-history-view-"]').map((el) => el.text());
+    vi.mocked(aiChatShare.listMine).mockClear();
+    const local = await setup();
+    expect(ids(local.wrapper)).not.toContain("Shared");
+    expect(ids(local.wrapper)).not.toContain("Auto-runs");
+    local.wrapper.unmount();
+    expect(aiChatShare.listMine).not.toHaveBeenCalled();
+    vi.mocked(aiChatShare.listMine).mockResolvedValue({
+      data: { shares: [{ session_id: SEED[0].sessionId, visibility: "org" }] },
+    } as never);
+    const server = await setup({}, { persistence: true });
+    expect(server.history.mode.value).toBe("server");
+    expect(ids(server.wrapper)).toEqual(expect.arrayContaining(["Auto-runs", "Shared"]));
+    // Every row shows whether it is shared, so the owner's links are read with the list.
+    expect(aiChatShare.listMine).toHaveBeenCalled();
+    const shared = server.wrapper.get(
+      `[data-sid="${SEED[0].sessionId}"] [data-test="assistant-history-row-shared"]`,
+    );
+    expect(shared.attributes("data-visibility")).toBe("org");
+    await pickMenuView(server.wrapper, "shared");
+    expect(server.history.filter.value.kind).toBe("shared");
+    expect(server.wrapper.findAll("[data-sid]").map((el) => el.attributes("data-sid"))).toEqual([
+      SEED[0].sessionId,
+    ]);
+    const chip = server.wrapper.get('[data-test="assistant-history-filter-active"]');
+    await chip.trigger("click");
+    await flushPromises();
+    expect(server.history.filter.value.kind).toBe("all");
+    expect(server.wrapper.find('[data-test="assistant-history-filter-active"]').exists()).toBe(
+      false,
+    );
+    server.history.setFilter({ kind: "all" });
+    vi.mocked(aiChatShare.listMine).mockReset();
+  });
+
+  it("lists the org's auto-runs from the server and follows one in the side panel", async () => {
+    listOrgRcaRuns.mockResolvedValue({
+      data: {
+        runs: [
+          {
+            run_id: "r2",
+            incident_id: "inc-481",
+            incident_title: "Checkout errors",
+            severity: "P1",
+            state: "refused",
+            trigger: "auto",
+            started_at: (NOW - 60_000) * 1000,
+            ended_at: (NOW - 59_000) * 1000,
+            error_code: "turn_limit",
+          },
+          {
+            run_id: "r1",
+            incident_id: "inc-482",
+            incident_title: null,
+            severity: null,
+            state: "running",
+            trigger: "auto",
+            started_at: (NOW - 120_000) * 1000,
+            ended_at: null,
+            error_code: null,
+          },
+        ],
+        has_more: false,
+      },
+    });
+    const { wrapper } = await setup({}, { persistence: true });
+    expect(listOrgRcaRuns).not.toHaveBeenCalled();
+    await pickMenuView(wrapper, "auto_runs");
+    expect(listOrgRcaRuns).toHaveBeenCalledWith("default", { trigger: "auto", limit: 50 });
+    const runs = wrapper.findAll('[data-test="assistant-auto-run"]');
+    expect(runs.map((run) => run.attributes("data-mark"))).toEqual(["failed", "working"]);
+    expect(runs[0].text()).toContain("Checkout errors");
+    expect(runs[0].text()).toContain("Failed");
+    expect(runs[1].text()).toContain("inc-482");
+    await runs[0].get('[data-test="assistant-auto-run-open"]').trigger("click");
+    expect(followedRcaRun().value).toEqual({
+      org: "default",
+      incidentId: "inc-481",
+      runId: "r2",
+    });
+    expect(wrapper.emitted("close")).toHaveLength(1);
+    stopFollowingRca();
+  });
+
+  it("lists as shared only chats whose link has not expired", async () => {
+    const micros = Date.now() * 1_000;
+    vi.mocked(aiChatShare.listMine).mockResolvedValue({
+      data: {
+        shares: [
+          { session_id: SEED[0].sessionId, expires_at: micros - 1_000_000 },
+          { session_id: SEED[1].sessionId, expires_at: micros + 3_600_000_000 },
+          { session_id: SEED[2].sessionId, expires_at: null },
+        ],
+      },
+    } as never);
+    const server = await setup({}, { persistence: true });
+    server.history.setFilter({ kind: "shared" });
+    await flushPromises();
+    const sids = server.wrapper.findAll("[data-sid]").map((el) => el.attributes("data-sid"));
+    expect(sids).toEqual(expect.arrayContaining([SEED[1].sessionId, SEED[2].sessionId]));
+    expect(sids).not.toContain(SEED[0].sessionId);
+    server.history.setFilter({ kind: "all" });
+    vi.mocked(aiChatShare.listMine).mockReset();
+  });
+
+  it("windows the rows past the virtual threshold and keeps them a list", async () => {
+    const many = Array.from({ length: VIRTUAL_FROM + 10 }, (_, i) =>
+      record(i + 1, NOW - i * 60_000),
+    );
+    const { wrapper } = await setup({}, { seed: many });
+    const list = wrapper.get('[data-test="assistant-history-list"]');
+    expect(list.attributes("data-virtual")).toBe("");
+    expect(list.attributes("role")).toBe("list");
+    expect(wrapper.findAll('[data-test="assistant-history-row"]').length).toBeLessThan(many.length);
+  });
+
+  it("keeps the rows a plain list at the threshold", async () => {
+    const many = Array.from({ length: VIRTUAL_FROM }, (_, i) => record(i + 1, NOW - i * 60_000));
+    const { wrapper } = await setup({}, { seed: many });
+    const list = wrapper.get('[data-test="assistant-history-list"]');
+    expect(list.attributes("data-virtual")).toBeUndefined();
+    expect(wrapper.findAll('[data-test="assistant-history-row"]')).toHaveLength(VIRTUAL_FROM);
+  });
+
+  it("renders read-only for a role that can list but not chat", async () => {
+    const { wrapper } = await setup({}, { canChat: "no" });
+    expect(wrapper.get('[data-test="assistant-history"]').attributes("data-readonly")).toBe("");
+    expect(wrapper.find('[data-test="assistant-history-new"]').exists()).toBe(false);
+    await wrapper.findAll('[data-test="assistant-history-item"]')[1].trigger("pointerenter");
+    expect(wrapper.find('[data-test="assistant-history-row-rename"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="assistant-history-row-delete"]').exists()).toBe(false);
+  });
+
+  it("opens a row in its container and tells the host to close", async () => {
+    const { wrapper, store } = await setup();
+    await rowButtons(wrapper)[1].trigger("click");
+    await flushPromises();
+    expect(wrapper.emitted("opened")?.[0]).toEqual([SEED[0].sessionId]);
+    expect(store.state.shell.activeSid).toBe(SEED[0].sessionId);
+  });
+
+  it("is a region named Chats in a panel, with no New of its own, and Escape asks to close", async () => {
+    const { wrapper } = await setup();
+    const root = wrapper.get('[data-test="assistant-history"]');
+    expect(root.attributes("role")).toBe("region");
+    expect(root.attributes("aria-label")).toBe("All chats");
+    expect(wrapper.find('[data-test="assistant-history-new"]').exists()).toBe(false);
+    const search = wrapper.get('[data-test="assistant-history-search"] input');
+    await search.setValue("alpha");
+    await new Promise((resolve) => setTimeout(resolve, SEARCH_DEBOUNCE_MS + 50));
+    await flushPromises();
+    await search.trigger("keydown", { key: "Escape" });
+    expect(wrapper.emitted("close")).toBeUndefined();
+    await root.trigger("keydown", { key: "Escape" });
+    expect(wrapper.emitted("close")).toHaveLength(1);
+  });
+
+  it("leads with Needs You for chats that answer or wait, out of their day group", async () => {
+    const { wrapper, store } = await setup();
+    const sid = SEED[2].sessionId;
+    await store.openSession({ sid });
+    store.state.sessions[sid].pendingApproval = { id: "a1" } as never;
+    await flushPromises();
+    const groups = wrapper.findAll('[data-test="assistant-history-group"]');
+    expect(groups[0].attributes("data-group")).toBe("needs_you");
+    expect(groups[0].get("h3").text()).toBe("Needs You 1");
+    expect(groups[0].text()).toContain("Gamma this week");
+    expect(wrapper.find('[data-group="week"]').exists()).toBe(false);
+  });
+
+  it("puts the rail's search in a 40 px band on the panel surface", async () => {
+    const { wrapper } = await setup({ mode: "rail", container: "full_view" });
+    expect(wrapper.get('[data-test="assistant-history"]').classes()).toContain("bg-surface-panel");
+    const tools = wrapper.get('[data-test="assistant-history-tools"]').classes();
+    expect(tools).toEqual(expect.arrayContaining(["h-10", "border-b", "border-border-default"]));
+  });
+
+  it("routes the rail to the full view", async () => {
+    const { wrapper, router } = await setup({ mode: "rail", container: "full_view" });
+    await rowButtons(wrapper)[1].trigger("click");
+    await flushPromises();
+    expect(router.currentRoute.value.params.chatId).toBe(SEED[0].sessionId);
+  });
+});
+
+describe("AssistantHistoryConfirm", () => {
+  it("names every chat and asks for the word when the count is unknown", async () => {
+    const wrapper = mount(AssistantHistoryConfirm, {
+      props: {
+        kind: "clear_all",
+        open: true,
+        mode: "server",
+        org: "o1",
+        orgName: "Acme",
+        count: null,
+      },
+      global: { stubs: historyStubs },
+    });
+    await flushPromises();
+    const dialog = wrapper.get('[data-test="assistant-history-clear-all-dialog"]');
+    expect(dialog.get("h2").text()).toBe("Delete all your chats in Acme?");
+    const confirm = dialog.get('[data-stub="primary"]');
+    expect(confirm.text()).toBe("Delete all chats");
+    expect(confirm.attributes("disabled")).toBeDefined();
+    await dialog.get('[data-test="assistant-history-clear-all-confirm"] input').setValue("delete");
+    expect(confirm.attributes("disabled")).toBeUndefined();
+  });
+
+  it("uses the singular for one chat", async () => {
+    const wrapper = mount(AssistantHistoryConfirm, {
+      props: { kind: "clear_all", open: true, mode: "local", org: "o1", orgName: "Acme", count: 1 },
+      global: { stubs: historyStubs },
+    });
+    await flushPromises();
+    const dialog = wrapper.get('[data-test="assistant-history-clear-all-dialog"]');
+    expect(dialog.get('[data-stub="primary"]').text()).toBe("Delete 1 chat");
+    expect(dialog.find('[data-test="assistant-history-clear-all-confirm"]').exists()).toBe(false);
+  });
+
+  describe("list error rows", () => {
+    const failing = (offline: boolean, retry = vi.fn(async () => undefined)) => ({
+      retry,
+      patchHistory: (history: any) =>
+        Object.assign(Object.create(history), {
+          listState: computed(() => ({ status: "error", offline })),
+          retry,
+        }),
+    });
+
+    it("says a failed first load as one unframed error row with Retry, never an empty state", async () => {
+      const { retry, patchHistory } = failing(false);
+      const { wrapper } = await setup({}, { seed: [], patchHistory });
+      const row = wrapper.get('[data-test="assistant-history-error"]');
+      expect(row.attributes("data-tone")).toBe("failed");
+      expect(row.get('[data-test="assistant-history-error-title"]').text()).toBe(
+        "Couldn't load your chats",
+      );
+      expect(row.classes().join(" ")).not.toMatch(/bg-|border/);
+      expect(wrapper.find('[data-test="assistant-history-empty"]').exists()).toBe(false);
+      await wrapper.get('[data-test="assistant-history-error-retry"]').trigger("click");
+      expect(retry).toHaveBeenCalledTimes(1);
+      await flushPromises();
+      expect(wrapper.find('[data-test="assistant-history-error-tried"]').exists()).toBe(true);
+    });
+
+    it("keeps cached rows under one error row whose Retry reloads the list", async () => {
+      const { retry, patchHistory } = failing(true);
+      const { wrapper } = await setup({}, { patchHistory });
+      const row = wrapper.get('[data-test="assistant-history-error-banner"]');
+      expect(row.attributes("data-tone")).toBe("failed");
+      expect(wrapper.html()).not.toContain("bg-banner-warning");
+      expect(rowButtons(wrapper).length).toBeGreaterThan(0);
+      await wrapper.get('[data-test="assistant-history-error-banner-retry"]').trigger("click");
+      expect(retry).toHaveBeenCalledTimes(1);
+    });
+  });
+});

@@ -229,6 +229,11 @@ pub enum AlertError {
     #[error("Alert with PromQL mode should have a query")]
     PromqlMissingQuery,
 
+    #[error(
+        "Alert with PromQL mode needs query_condition.promql_condition (column, operator, value), unless promql_rule_mode is set"
+    )]
+    PromqlMissingCondition,
+
     /// SQL generation is defined only for the SQL and Custom families; the
     /// others run no SQL, so falling through would emit a bogus `SELECT *`.
     #[error("SQL generation is not supported for {query_type} alerts")]
@@ -910,7 +915,7 @@ async fn prepare_alert(
         && !alert.query_condition.promql_rule_mode
         && alert.query_condition.promql_condition.is_none()
     {
-        return Err(AlertError::PromqlMissingQuery);
+        return Err(AlertError::PromqlMissingCondition);
     }
 
     let stream_type = alert.stream_type;
@@ -8110,6 +8115,10 @@ mod tests {
             "Alert with PromQL mode should have a query"
         );
         assert_eq!(
+            AlertError::PromqlMissingCondition.to_string(),
+            "Alert with PromQL mode needs query_condition.promql_condition (column, operator, value), unless promql_rule_mode is set"
+        );
+        assert_eq!(
             AlertError::SqlContainsSelectStar.to_string(),
             "Alert with SQL can not contain SELECT * in the SQL query"
         );
@@ -10402,7 +10411,7 @@ mod rule_notification_tests {
         }
     }
     #[tokio::test]
-    async fn rule_opt_out_missing_condition_keeps_operator_fallback_error() {
+    async fn rule_opt_out_missing_condition_names_the_missing_field() {
         let mut alert = Alert::default();
         alert.name = "ordinary-promql".into();
         alert.query_condition.query_type = QueryType::PromQL;
@@ -10410,7 +10419,7 @@ mod rule_notification_tests {
         let error = prepare_alert("org", "foo", "ordinary-promql", &mut alert, true, false)
             .await
             .unwrap_err();
-        assert!(matches!(error, AlertError::PromqlMissingQuery));
+        assert!(matches!(error, AlertError::PromqlMissingCondition));
     }
 
     async fn notification_url_for_traces_alert(query_type: QueryType, sql: Option<&str>) -> String {

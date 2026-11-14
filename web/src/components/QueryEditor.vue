@@ -82,6 +82,15 @@
 
     <!-- Code Editor with relative positioning for floating button -->
     <div class="relative min-h-0 flex-1 overflow-hidden">
+      <div
+        v-if="placeholder && !query && !editorFocused"
+        class="query-editor-placeholder-overlay pointer-events-none absolute inset-0 z-1 flex items-start ps-[2.15rem] pe-2 pt-0.75 select-none"
+        :data-test="`${dataTestPrefix}-placeholder`"
+      >
+        <span class="text-text-secondary min-w-0 truncate font-mono text-sm">{{
+          placeholder
+        }}</span>
+      </div>
       <CodeQueryEditor
         :ref="(el) => (editorRef = el)"
         :key="currentLanguage"
@@ -98,6 +107,7 @@
         :field-value-resolver="fieldValueResolver ?? undefined"
         :debounce-time="debounceTime"
         :free-text-decorations="freeTextDecorations ?? null"
+        :assistant-chord="assistantChord"
         :filter-mode="filterMode"
         :values-time-range="valuesTimeRange ?? null"
         :recent-queries="recentQueries ?? []"
@@ -165,6 +175,9 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
 import { checkFeatureAccess, buildFeatureGateContext } from "@/utils/enterpriseFeatures";
+import { isAssistantV2 } from "@/composables/assistant/flags";
+import { assistantFocusCard, focusDockComposer } from "@/composables/assistant";
+import type { QueryEditorAssistant } from "@/composables/assistant/pure";
 
 type Language = "sql" | "promql" | "vrl" | "javascript";
 
@@ -210,6 +223,11 @@ interface Props {
 
   // Testing
   dataTestPrefix?: string;
+
+  /** Drawn inside the editor area while the editor is empty and unfocused. */
+  placeholder?: string;
+  /** The host's assistant adapter; its id routes Ctrl+I to that host's pending card or dock. */
+  assistant?: QueryEditorAssistant | null;
   editorId?: string; // Monaco host id; defaults to `<dataTestPrefix>-editor-<language>`
 }
 
@@ -230,6 +248,8 @@ const props = withDefaults(defineProps<Props>(), {
   disableAiReason: raw(""),
   hasExpandButton: false,
   dataTestPrefix: "query-editor",
+  placeholder: undefined,
+  assistant: null,
 });
 
 const emit = defineEmits<{
@@ -277,6 +297,16 @@ const onAiToggleClick = () => {
 const isNaturalLanguageDetected = ref(false);
 const isGenerating = ref(false);
 const editorRef = ref<any>(null);
+const editorFocused = ref(false);
+
+// Monaco keeps Ctrl+I from the global chord, so a pending card or open dock is focused here; otherwise Monaco suggests.
+const assistantChord =
+  isAssistantV2() && props.assistant
+    ? () => {
+        const id = props.assistant?.id;
+        return assistantFocusCard() || (!!id && focusDockComposer(id));
+      }
+    : undefined;
 
 // AI Input Bar state
 const aiInputText = ref("");
@@ -346,10 +376,12 @@ const handleQueryUpdate = (newQuery: string, _event?: unknown, origin?: QueryCha
 };
 
 const handleEditorFocus = () => {
+  editorFocused.value = true;
   emit("focus");
 };
 
 const handleEditorBlur = () => {
+  editorFocused.value = false;
   emit("blur");
 };
 

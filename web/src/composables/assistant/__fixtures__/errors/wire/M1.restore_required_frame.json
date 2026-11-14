@@ -1,0 +1,13 @@
+{
+  "_source": "o2-ai src/server/app.py:2151-2160",
+  "shape": "M1",
+  "body": {
+    "type": "error",
+    "message": "This conversation must be restored on this replica; retry.",
+    "recoverable": true,
+    "category": "restore_required",
+    "code": "restore_required",
+    "opencode_session_id": "ses_01",
+    "local_max_seq": -1
+  }
+}

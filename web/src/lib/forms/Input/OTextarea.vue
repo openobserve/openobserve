@@ -1,8 +1,13 @@
 <script setup lang="ts">
 // Copyright 2026 OpenObserve Inc.
 
-import type { TextareaProps, TextareaEmits, TextareaSlots } from "./OTextarea.types";
-import { computed, nextTick, onMounted, ref, useAttrs, useId, watch } from "vue";
+import type {
+  TextareaProps,
+  TextareaEmits,
+  TextareaSlots,
+  TextareaExposed,
+} from "./OTextarea.types";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, useAttrs, useId, watch } from "vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { splitControlAttrs, warnIfUnlabelled } from "@/lib/forms/controlAttrs";
 import { useLockedDisabled } from "@/composables/useFeatureLock";
@@ -40,10 +45,24 @@ const _fallbackId = useId();
 const textareaId = computed(() => props.id ?? _fallbackId);
 const textareaRef = ref<HTMLTextAreaElement | null>(null);
 
+defineExpose<TextareaExposed>({
+  focus: (options?: FocusOptions) => textareaRef.value?.focus(options),
+  get textarea() {
+    return textareaRef.value;
+  },
+});
+
 onMounted(() =>
   warnIfUnlabelled(
     "OTextarea",
-    Boolean(props.label || props.placeholder || $attrs["aria-label"] || $attrs["aria-labelledby"]),
+    Boolean(
+      props.label ||
+      props.placeholder ||
+      $attrs["aria-label"] ||
+      $attrs["aria-labelledby"] ||
+      props.inputAttrs?.["aria-label"] ||
+      props.inputAttrs?.["aria-labelledby"],
+    ),
     textareaId.value,
   ),
 );
@@ -64,7 +83,8 @@ function resizeTextarea() {
   const el = textareaRef.value;
   if (!el) return;
   el.style.height = "auto";
-  el.style.height = `${el.scrollHeight}px`;
+  // A hidden field (a `v-show` panel) measures 0; leave it to `rows` until it is shown and edited.
+  el.style.height = el.scrollHeight ? `${el.scrollHeight}px` : "";
 }
 
 // `maxRows` caps the grown height in CSS rather than in the resize handler:
@@ -81,12 +101,28 @@ const autogrowStyle = computed(() => {
   };
 });
 
+// The mount-time height is only right for the mount-time width, so a field whose container settles later (a floating window) re-measures when its width changes.
+let widthObserver: ResizeObserver | null = null;
+let observedWidth = 0;
+
 onMounted(() => {
-  if (props.autogrow) nextTick(resizeTextarea);
+  if (!props.autogrow) return;
+  nextTick(resizeTextarea);
+  const el = textareaRef.value;
+  if (!el || typeof ResizeObserver === "undefined") return;
+  observedWidth = el.clientWidth;
+  widthObserver = new ResizeObserver(() => {
+    if (el.clientWidth === observedWidth) return;
+    observedWidth = el.clientWidth;
+    resizeTextarea();
+  });
+  widthObserver.observe(el);
 });
 
+onBeforeUnmount(() => widthObserver?.disconnect());
+
 watch(
-  () => props.modelValue,
+  () => [props.modelValue, props.placeholder],
   () => {
     if (props.autogrow) nextTick(resizeTextarea);
   },
@@ -158,9 +194,15 @@ const wrapperClasses = computed(() => [
     </label>
 
     <!-- Textarea wrapper -->
-    <div :class="[wrapperClasses, fill && 'min-h-0 flex-1']">
+    <div
+      :class="[
+        wrapperClasses,
+        fill && 'min-h-0 flex-1',
+        ($slots.header || $slots.footer) && 'flex-col',
+      ]"
+    >
+      <slot name="header" />
       <textarea
-        v-bind="controlAttrs"
         :id="textareaId"
         ref="textareaRef"
         :value="modelValue ?? ''"
@@ -174,10 +216,14 @@ const wrapperClasses = computed(() => [
         :autocomplete="autocomplete"
         :tabindex="inputTabindex"
         :data-test="parentDataTest ? `${parentDataTest}-field` : undefined"
+        v-bind="{ ...controlAttrs, ...inputAttrs }"
         :style="autogrowStyle"
         :class="[
           'min-w-0 flex-1 bg-transparent outline-none',
-          'text-input-text placeholder:text-input-placeholder',
+          'text-input-text',
+          placeholderTone === 'strong'
+            ? 'placeholder:text-text-secondary'
+            : 'placeholder:text-input-placeholder',
           'disabled:cursor-not-allowed',
           'px-3 py-2 text-sm',
           fill ? 'h-full min-h-0 resize-none' : autogrow && maxRows ? 'min-h-0' : 'min-h-20',
@@ -188,6 +234,7 @@ const wrapperClasses = computed(() => [
         @focus="emit('focus', $event)"
         @keydown="emit('keydown', $event)"
       />
+      <slot name="footer" />
     </div>
 
     <!-- Bottom row: helpText / error / counter -->

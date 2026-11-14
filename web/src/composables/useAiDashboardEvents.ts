@@ -6,7 +6,8 @@ export type AiDashboardEventType =
   | "dashboard_deleted"
   | "panel_added"
   | "panel_updated"
-  | "panel_deleted";
+  | "panel_deleted"
+  | "alerts_changed";
 
 export interface AiDashboardEvent {
   type: AiDashboardEventType;

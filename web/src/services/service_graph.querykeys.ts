@@ -16,7 +16,7 @@
 import { orgKey } from "@/composables/query/keys";
 import { quantizeRange } from "@/composables/query/queryClient";
 import { OVERVIEW_BUCKET_MS } from "./service_graph";
-import type { TopologyRange } from "./service_graph";
+import type { ServicesTrendParams, TopologyRange } from "./service_graph";
 
 /**
  * Keys only, dependency-free apart from `orgKey`, so a write in another domain
@@ -34,4 +34,16 @@ export const topologyKeys = {
       "topology",
       quantizeRange(range.startTime, range.endTime, OVERVIEW_BUCKET_MS),
     ),
+  // `include` is a set; sorting keeps one cache entry whatever order the rows arrive in.
+  servicesTrend: (org: string, params: ServicesTrendParams) =>
+    orgKey(org, "traces", "topology", "servicesTrend", {
+      range:
+        params.start !== undefined && params.end !== undefined
+          ? quantizeRange(params.start, params.end, OVERVIEW_BUCKET_MS)
+          : null,
+      baselineHours: params.baselineHours ?? null,
+      stream: params.stream && params.stream !== "all" ? params.stream : null,
+      limit: params.limit ?? null,
+      include: [...(params.include ?? [])].sort(),
+    }),
 };

@@ -51,6 +51,17 @@
 @utility bg-chat-bubble-user {
   background-image: var(--color-chat-bubble-user);
 }
+/* The assistant's user bubble sits between the control and surface radius tiers. */
+@utility rounded-chat-bubble {
+  border-radius: 1.125rem;
+}
+/* The trace thread view's own fills; LLM observability never reads the assistant's tokens (constraint 51). */
+@utility bg-trace-thread-user {
+  background-image: var(--color-trace-thread-user-bg);
+}
+@utility bg-trace-thread-user-avatar {
+  background-image: var(--color-trace-thread-user-avatar-bg);
+}
 
 /* Diagonal hatch marking a span that exists but cannot be shown. Consumer: components/rum/ReplayLoadBand.vue. */
 @utility bg-hatch-unavailable {

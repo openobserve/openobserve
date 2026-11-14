@@ -175,9 +175,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     v-else
     data-test="rca-analysis-container"
-    class="flex min-h-0 flex-1 flex-col overflow-auto lg:grid lg:grid-cols-[minmax(0,1fr)_25rem] lg:overflow-hidden"
+    :data-layout="layout"
+    class="flex min-h-0 flex-1 flex-col overflow-auto"
+    :class="
+      layout === 'page' ? 'lg:grid lg:grid-cols-[minmax(0,1fr)_25rem] lg:overflow-hidden' : 'gap-4'
+    "
   >
-    <div class="flex min-w-0 flex-col gap-6 px-7 pt-4 pb-10 lg:overflow-auto">
+    <div
+      class="flex min-w-0 flex-col gap-6"
+      :class="layout === 'page' ? 'px-7 pt-4 pb-10 lg:overflow-auto' : 'px-4 pt-3'"
+    >
       <RcaAnalysisBar
         :runs="history"
         :latest-run-id="rca.run_id"
@@ -187,14 +194,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :has-report="!!ownReport"
         :has-thread="!!thread && thread.transcript === 'available'"
         :can-ask="canAsk"
+        :cancelling="cancelling"
+        :legacy="legacyControls"
         :triggering="triggering"
         :resuming="resuming"
-        :cancelling="cancelling"
         :start-locked-reason="startLockedReason"
         :timezone="timezone"
         @select-run="$emit('view-run', $event)"
+        @cancel="requestCancel"
         @reanalyze="openGuidance('')"
-        @cancel="$emit('cancel-rca')"
         @copy-report="copyReport(false)"
         @download-report="downloadReport"
         @copy-thread="copyThread"
@@ -257,7 +265,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :refusal="refusal"
         :reanalyze-credit-cost="reanalyzeCreditCost"
         :start-locked-reason="startLockedReason"
-        @cancel="$emit('cancel-rca')"
+        :in-thread="layout === 'assistant'"
+        :legacy="legacyControls"
+        @cancel="requestCancel"
         @follow-thread="followThread"
         @retry="$emit('trigger-rca', $event)"
         @show-unverified="evidenceList?.showUnverified()"
@@ -286,6 +296,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :outcome="recordSummary.card.outcome"
           :evidence="recordSummary.evidence"
           :org="orgId"
+          :live="cardState === 'investigating'"
           :can-steer="canSteer"
           :pending="pendingActions"
           :sending="steerSending"
@@ -362,6 +373,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         {{ t("alerts.incidents.rcaRun.reportAfterRun") }}
       </p>
+      <slot name="after-record" />
     </div>
 
     <RcaThreadColumn
@@ -384,11 +396,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :author-email="authorEmail"
       :sending="steerSending"
       :send="sendMessage"
+      :variant="layout === 'page' ? 'column' : 'inline'"
+      :class="layout === 'page' ? '' : 'px-4 pb-4'"
+      :start-locked-reason="startLockedReason"
+      :reanalyzing="triggering || resuming"
+      :composer-dock="composerDock"
+      :legacy="legacyControls"
       @retry="retryThread"
       @open-evidence="evidenceList?.openEntry($event)"
       @reanalyze-with="openGuidance"
     />
+    <!-- The live run's steer composer stays in view at the bottom of the panel's scroller -->
+    <div
+      v-if="layout !== 'page' && threadLive && canSteer"
+      ref="composerDock"
+      data-test="rca-steer-dock"
+      class="bg-surface-base sticky bottom-0 z-1 -mt-4 flex-none px-4"
+    />
 
+    <RcaCancelRunDialog
+      v-model:open="cancelConfirmOpen"
+      :incident-number="incidentNumber"
+      :cancelling="cancelling"
+      @confirm="$emit('cancel-rca')"
+    />
     <RcaGuidanceDialog
       v-model:open="guidanceOpen"
       :initial-guidance="guidanceText"
@@ -425,6 +456,7 @@ import type {
 import type { RcaReadStatus, RcaRefusal } from "@/composables/useIncidentRca";
 import { useLicenseLock } from "@/composables/useFeatureLock";
 import { useRcaSteering } from "@/composables/useRcaSteering";
+import { isAssistantV2 } from "@/composables/assistant/flags";
 import { useViewerTimezone } from "@/composables/downtimes/useViewerTimezone";
 import { serverNowMs } from "@/composables/useAnnouncementBanners";
 import { formatTimestampInTimezone } from "@/utils/date";
@@ -434,6 +466,7 @@ import {
   formatRcaLocalClock,
   humanizeElapsed,
   isLiveRca,
+  rcaIncidentNumber,
   userLocalPart,
 } from "@/utils/incidents/rcaCell";
 import {
@@ -470,6 +503,7 @@ import RcaEvidenceList from "./rca/RcaEvidenceList.vue";
 import RcaHypotheses from "./rca/RcaHypotheses.vue";
 import RcaProposedActions from "./rca/RcaProposedActions.vue";
 import RcaThreadColumn from "./rca/RcaThreadColumn.vue";
+import RcaCancelRunDialog from "./rca/RcaCancelRunDialog.vue";
 import RcaGuidanceDialog from "./rca/RcaGuidanceDialog.vue";
 import RcaVerdictCard from "./rca/RcaVerdictCard.vue";
 import RcaWhatHappened from "./rca/RcaWhatHappened.vue";
@@ -537,6 +571,8 @@ const props = withDefaults(
     /** AI credits an analysis and a re-analysis use; unset outside cloud, where no cost shows. */
     analyzeCreditCost?: number | null;
     reanalyzeCreditCost?: number | null;
+    /** `page` is the incident's Analysis tab; `assistant` is one column inside the assistant. */
+    layout?: "page" | "assistant";
     /** `report`: the Report tab, which shows the shown run's report alone. */
     view?: "analysis" | "report";
     /** This incident's own firings (its trigger rows). */
@@ -577,6 +613,7 @@ const props = withDefaults(
     refusal: null,
     analyzeCreditCost: null,
     reanalyzeCreditCost: null,
+    layout: "page",
   },
 );
 
@@ -631,6 +668,7 @@ const startLockedReason = computed<I18nText | undefined>(() => {
 });
 
 const live = computed(() => isLiveRca(props.rca));
+const incidentNumber = computed(() => rcaIncidentNumber(props.incidentId));
 const currentRun = computed(() => props.rca?.current_run ?? null);
 /** Step a resumed live run restarted from. */
 const liveResumeStep = computed(() =>
@@ -889,7 +927,16 @@ const threadRunStats = computed<RcaRunStats | null>(() => {
 });
 
 const threadColumn = ref<InstanceType<typeof RcaThreadColumn> | null>(null);
+const composerDock = ref<HTMLElement | null>(null);
 const followThread = () => void threadColumn.value?.scrollToLatest();
+
+const cancelConfirmOpen = ref(false);
+// Flag-off users keep the incident page's visible Cancel and Re-analyze, with no confirm.
+const legacyControls = computed(() => props.layout === "page" && !isAssistantV2());
+const requestCancel = () => {
+  if (legacyControls.value) emit("cancel-rca");
+  else cancelConfirmOpen.value = true;
+};
 
 // "Open thread" on the Report tab: the thread takes focus once the analysis shows.
 const focusThreadOnShow = ref(false);
@@ -1163,4 +1210,6 @@ const ask = () => {
     context: { currentPage: "incidents", org_id: props.orgId },
   });
 };
+
+defineExpose({ copyReport, downloadReport, copyThread, ask, canAsk });
 </script>

@@ -30,6 +30,7 @@ vi.mock("@/composables/useAnnouncementBanners", async (importOriginal) => ({
 }));
 
 import IncidentRCAAnalysis from "./IncidentRCAAnalysis.vue";
+import RcaCancelRunDialog from "./rca/RcaCancelRunDialog.vue";
 import RcaGuidanceDialog from "./rca/RcaGuidanceDialog.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import i18n from "@/locales";
@@ -40,6 +41,7 @@ import incidentsService from "@/services/incidents";
 import { formatTimestamp } from "@/utils/date";
 import { rcaThreadPlainText } from "@/utils/incidents/rcaThread";
 import type { RcaReadStatus } from "@/composables/useIncidentRca";
+import { resetAssistantV2ForTests } from "@/composables/assistant/flags";
 import {
   rcaBlindSpot,
   RCA_T0,
@@ -153,6 +155,11 @@ const completedProps = () => ({
   threadLive: false,
 });
 
+const setAssistantFlag = (on: boolean | undefined) => {
+  window.__O2_ASSISTANT_V2__ = on;
+  resetAssistantV2ForTests();
+};
+
 /** The latest run failed and the reader picked the completed run-1. */
 const pickedProps = () => ({
   rca: rcaSummary({ state: "failed", current_run: rcaRun({ state: "failed" }) }),
@@ -168,6 +175,10 @@ describe("IncidentRCAAnalysis", () => {
   let wrapper: VueWrapper;
   // The test setup installs a writable navigator.clipboard with a vi.fn writeText.
   const writeText = vi.mocked(navigator.clipboard.writeText);
+
+  // The incident page's confirm-gated controls ship behind the assistant flag.
+  beforeAll(() => setAssistantFlag(true));
+  afterAll(() => setAssistantFlag(undefined));
 
   beforeEach(() => {
     answers = {
@@ -257,11 +268,11 @@ describe("IncidentRCAAnalysis", () => {
     it("a past run stays readable while Re-analyze locks", async () => {
       wrapper = mountPanel(completedProps());
       await flushPromises();
-      const button = byTest(wrapper, "rca-reanalyze-btn");
+      const button = byTest(wrapper, "rca-thread-reanalyze");
 
       expect(button.attributes("disabled")).toBeDefined();
       expect(button.find(".lock-chip").exists()).toBe(true);
-      expect(reasonOf("rca-reanalyze-btn")).toBe(LOCK);
+      expect(reasonOf("rca-thread-reanalyze")).toBe(LOCK);
       await button.trigger("click");
       expect(byTest(wrapper, "rca-guidance-dialog").exists()).toBe(false);
       expect(byTest(wrapper, "rca-existing-container").text()).toContain("Memory leak");
@@ -508,8 +519,23 @@ describe("IncidentRCAAnalysis", () => {
       );
 
       expect(byTest(wrapper, "rca-reanalyzing-message").text()).toBe(message);
-      await byTest(wrapper, "rca-banner-cancel-btn").trigger("click");
-      expect(wrapper.emitted("cancel-rca")).toHaveLength(1);
+      expect(byTest(wrapper, "rca-banner-cancel-btn").exists()).toBe(false);
+      expect(wrapper.emitted("cancel-rca")).toBeUndefined();
+    });
+
+    it("M: inside the assistant's thread the banner offers neither Follow in thread nor Cancel", async () => {
+      await showPanel(
+        liveProps({
+          layout: "assistant",
+          rca: rcaSummary({ current_run: rcaRun({ mode: "build_on_previous" }) }),
+          reportRun: rcaRunItem(),
+          reportText: REPORT,
+        }),
+      );
+
+      expect(byTest(wrapper, "rca-reanalyzing-banner").exists()).toBe(true);
+      expect(byTest(wrapper, "rca-follow-thread-btn").exists()).toBe(false);
+      expect(byTest(wrapper, "rca-banner-cancel-btn").exists()).toBe(false);
     });
 
     it("M: Follow in thread scrolls the thread column", async () => {
@@ -556,6 +582,10 @@ describe("IncidentRCAAnalysis", () => {
         "This analysis has been running unusually long and may have stopped. No new messages since 08:55:20 UTC. Cancel it and try again.",
       );
       await byTest(wrapper, "rca-stale-cancel-btn").trigger("click");
+      expect(wrapper.emitted("cancel-rca")).toBeUndefined();
+      expect(document.body.textContent).toContain("Cancel run?");
+      (document.querySelector('[data-test="rca-cancel-confirm-btn"]') as HTMLElement).click();
+      await flushPromises();
       expect(wrapper.emitted("cancel-rca")).toHaveLength(1);
     });
 
@@ -699,7 +729,7 @@ describe("IncidentRCAAnalysis", () => {
       const dialog = wrapper.findComponent(RcaGuidanceDialog);
       expect(dialog.props("open")).toBe(false);
 
-      await byTest(wrapper, "rca-reanalyze-btn").trigger("click");
+      await byTest(wrapper, "rca-thread-reanalyze").trigger("click");
       expect(dialog.props("open")).toBe(true);
       expect(dialog.props("canBuildOnPrevious")).toBe(true);
       expect(wrapper.emitted("trigger-rca")).toBeUndefined();
@@ -709,7 +739,18 @@ describe("IncidentRCAAnalysis", () => {
       await showPanel(liveProps());
 
       await byTest(wrapper, "rca-cancel-btn").trigger("click");
+      expect(wrapper.emitted("cancel-rca")).toBeUndefined();
+      wrapper.findComponent(RcaCancelRunDialog).vm.$emit("confirm");
       expect(wrapper.emitted("cancel-rca")).toHaveLength(1);
+    });
+
+    it("a finished run shows Re-analyze once, in the thread's closed line", async () => {
+      wrapper = mountPanel(completedProps());
+      await flushPromises();
+
+      expect(byTest(wrapper, "rca-reanalyze-btn").exists()).toBe(false);
+      expect(wrapper.findAll('[data-test="rca-thread-reanalyze"]')).toHaveLength(1);
+      expect(byTest(wrapper, "rca-steer-composer").exists()).toBe(false);
     });
   });
 
@@ -1428,6 +1469,27 @@ describe("IncidentRCAAnalysis", () => {
         }),
       });
 
+    it("B-approvals-rca-P2-4: in the assistant the live composer sits in the sticky dock at the bottom of the panel's scroller", async () => {
+      await showSteerable(liveProps({ layout: "assistant" }));
+
+      const dock = byTest(wrapper, "rca-steer-dock");
+      expect(dock.classes()).toEqual(expect.arrayContaining(["sticky", "bottom-0"]));
+      expect(dock.element.parentElement).toBe(byTest(wrapper, "rca-analysis-container").element);
+      expect(dock.find('[data-test="rca-steer-composer"]').exists()).toBe(true);
+      expect(
+        byTest(wrapper, "rca-thread-column").find('[data-test="rca-steer-composer"]').exists(),
+      ).toBe(false);
+    });
+
+    it("B-approvals-rca-P2-4: the incident page keeps the composer in its own column, with no dock", async () => {
+      await showSteerable(liveProps({ layout: "page" }));
+
+      expect(byTest(wrapper, "rca-steer-dock").exists()).toBe(false);
+      expect(
+        byTest(wrapper, "rca-thread-column").find('[data-test="rca-steer-composer"]').exists(),
+      ).toBe(true);
+    });
+
     it.each([
       ["can_steer on the thread's run shows the composer", undefined, true],
       ["a reader with no steering view sees the thread and no composer", null, false],
@@ -1517,7 +1579,10 @@ describe("IncidentRCAAnalysis", () => {
       const dialog = byTest(wrapper, "rca-guidance-dialog");
       expect((dialog.find("textarea").element as HTMLTextAreaElement).value).toBe("Check PR #812");
       expect(dialog.text()).toContain("Creates a new report version. This one stays as is.");
-      await wrapper.findComponent(ODialogStub).vm.$emit("click:primary");
+      const guidance = wrapper
+        .findAllComponents(ODialogStub)
+        .find((stub) => stub.attributes("data-test") === "rca-guidance-dialog");
+      await guidance?.vm.$emit("click:primary");
       expect(wrapper.emitted("trigger-rca")).toEqual([
         [{ buildOnPrevious: false, guidance: "Check PR #812" }],
       ]);
@@ -1526,7 +1591,7 @@ describe("IncidentRCAAnalysis", () => {
     it("frame I: Re-analyze opens the dialog empty", async () => {
       await showSteerable(completedProps());
 
-      await byTest(wrapper, "rca-reanalyze-btn").trigger("click");
+      await byTest(wrapper, "rca-thread-reanalyze").trigger("click");
 
       const dialog = byTest(wrapper, "rca-guidance-dialog");
       expect((dialog.find("textarea").element as HTMLTextAreaElement).value).toBe("");
@@ -1545,7 +1610,7 @@ describe("IncidentRCAAnalysis", () => {
         "The agent waits until 09:23 UTC for an answer, then closes the run as Blocked.",
       );
       expect(byTest(wrapper, "rca-thread-question-status").text()).toBe("Waiting for an answer");
-      expect(byTest(wrapper, "rca-steer-question").text()).toContain("Agent asks:");
+      expect(byTest(wrapper, "rca-steer-composer").exists()).toBe(true);
     });
 
     it.each([
@@ -1725,13 +1790,15 @@ describe("IncidentRCAAnalysis", () => {
 
       it("the thread of a run Resume can continue is not called final; a picked earlier run's is", async () => {
         await showPanel(failedProps({ resumeRunId: "run-2" }));
-        expect(byTest(wrapper, "rca-thread-final-note").text()).toBe(
+        expect(byTest(wrapper, "rca-thread-final-text").text()).toBe(
           "This run stopped before it finished. Resume run continues from the last finished step.",
         );
 
         await wrapper.setProps({ viewedRun: rcaRunItem(), threadRunId: "run-1" });
         await flushPromises();
-        expect(byTest(wrapper, "rca-thread-final-note").text()).toContain("This report is final");
+        expect(byTest(wrapper, "rca-thread-final-text").text()).toBe(
+          "This run no longer takes messages. Re-analyze to start a new version.",
+        );
       });
 
       it("the resume_run blind spot of the latest run emits resume-rca", async () => {
@@ -1752,6 +1819,46 @@ describe("IncidentRCAAnalysis", () => {
 
         expect(byTest(wrapper, "rca-retry-btn").attributes("disabled")).toBeDefined();
       });
+    });
+  });
+
+  describe("W4: assistant flag off keeps the old incident-page controls", () => {
+    beforeAll(() => setAssistantFlag(false));
+    afterAll(() => setAssistantFlag(true));
+
+    it("a live run shows Cancel run on the bar, which cancels with no confirm", async () => {
+      wrapper = mountPanel(liveProps());
+      await flushPromises();
+
+      await byTest(wrapper, "rca-cancel-btn").trigger("click");
+      expect(wrapper.emitted("cancel-rca")).toHaveLength(1);
+      expect(document.body.textContent).not.toContain("Cancel run?");
+    });
+
+    it("the re-analyzing banner keeps its own Cancel", async () => {
+      wrapper = mountPanel(
+        liveProps({
+          rca: rcaSummary({ current_run: rcaRun({ mode: "build_on_previous" }) }),
+          reportRun: rcaRunItem(),
+          reportText: REPORT,
+        }),
+      );
+      await flushPromises();
+
+      await byTest(wrapper, "rca-banner-cancel-btn").trigger("click");
+      expect(wrapper.emitted("cancel-rca")).toHaveLength(1);
+    });
+
+    it("a finished run keeps Re-analyze on the bar and the old final note", async () => {
+      wrapper = mountPanel(completedProps());
+      await flushPromises();
+
+      expect(byTest(wrapper, "rca-thread-reanalyze").exists()).toBe(false);
+      expect(byTest(wrapper, "rca-thread-final-text").text()).toBe(
+        "This report is final and won't change. To redirect the agent, Re-analyze. It creates a new version in Report history.",
+      );
+      await byTest(wrapper, "rca-reanalyze-btn").trigger("click");
+      expect(wrapper.findComponent(RcaGuidanceDialog).props("open")).toBe(true);
     });
   });
 });

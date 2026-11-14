@@ -20,15 +20,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { watch } from "vue";
+import { computed, watch } from "vue";
+import { useStore } from "vuex";
 import AutoObserve from "@/components/autoobserve/mock/views/AutoObserve.vue";
 import AutoObserve2 from "@/components/autoobserve/mock/views/AutoObserve2.vue";
 import { useAutoObserveView } from "@/components/autoobserve/v2/useAutoObserveView";
-import { resetDecisions } from "@/components/autoobserve/mock/v2/useDecisions";
+import { resetDecisions, switchDecisionsOrg } from "@/components/autoobserve/mock/v2/useDecisions";
 import { useScenario } from "@/components/autoobserve/mock/data/useScenario";
+import { isAssistantV2 } from "@/composables/assistant/flags";
+import { useAssistantStore } from "@/composables/assistant";
 
 const { view } = useAutoObserveView();
 const { scenario } = useScenario();
 // Answers belong to one scenario's story, so switching scenario in either view starts fresh.
 watch(scenario, () => resetDecisions());
+
+if (isAssistantV2()) {
+  const vuex = useStore();
+  const assistant = useAssistantStore();
+  watch(
+    computed(() => assistant.state.userOrgKey ?? vuex.state.selectedOrganization?.identifier ?? ""),
+    (key) => switchDecisionsOrg(key),
+    { immediate: true },
+  );
+}
 </script>

@@ -3142,6 +3142,11 @@ mod tests {
             forked_from_share: None,
             fork_seed_seq: None,
             replica_purged_at: None,
+            pinned: false,
+            pinned_at: None,
+            seed: None,
+            search_text: None,
+            branched_from: None,
         };
         ai_chat_sessions::Entity::insert(ai_chat_sessions::ActiveModel::from(session).reset_all())
             .exec(conn)
@@ -3281,6 +3286,7 @@ mod tests {
             signal: signal_class("SearchSQL", &input),
             target: evidence_target("SearchSQL", &input),
             observed: None,
+            change_rows: None,
             result_summary,
         }];
         let submit = parse_submit(&json!({
@@ -3371,6 +3377,11 @@ mod tests {
             forked_from_share: None,
             fork_seed_seq: None,
             replica_purged_at: None,
+            pinned: false,
+            pinned_at: None,
+            seed: None,
+            search_text: None,
+            branched_from: None,
         };
         ai_chat_sessions::Entity::insert(ai_chat_sessions::ActiveModel::from(session).reset_all())
             .exec(conn)
@@ -3561,6 +3572,11 @@ mod tests {
             forked_from_share: None,
             fork_seed_seq: None,
             replica_purged_at: None,
+            pinned: false,
+            pinned_at: None,
+            seed: None,
+            search_text: None,
+            branched_from: None,
         };
         ai_chat_sessions::Entity::insert(ai_chat_sessions::ActiveModel::from(session).reset_all())
             .exec(conn)
@@ -4690,6 +4706,11 @@ mod tests {
             forked_from_share: None,
             fork_seed_seq: None,
             replica_purged_at: None,
+            pinned: false,
+            pinned_at: None,
+            seed: None,
+            search_text: None,
+            branched_from: None,
         }
     }
 
@@ -5487,5 +5508,82 @@ mod tests {
 
         let ops = get_incident_events(Path((org.clone(), sid(&org, "ops"))), stranger()).await;
         assert_eq!(ops.status(), StatusCode::OK);
+    }
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_the_org_run_list_hides_a_case_run_without_the_security_grant() {
+        use super::super::rca_runs_org::{OrgRcaRunsQuery, list_org_rca_runs};
+
+        const ANALYST: &str = "analyst@steering.incidents.test";
+        let conn = steering_tables().await;
+        let org = steering_org("caseruns");
+        steering_incident(conn, &org, "case", None).await;
+        steering_incident(conn, &org, "ops", None).await;
+        infra::table::alert_incidents::mark_security_case(&org, &sid(&org, "case"))
+            .await
+            .unwrap();
+        steering_run(conn, &org, "case_run", "case", "completed").await;
+        steering_run(conn, &org, "ops_run", "ops", "completed").await;
+        for member in [STEER_READER, ANALYST] {
+            common::infra::config::USERS.insert(
+                member.to_string(),
+                infra::table::users::UserRecord {
+                    email: member.to_string(),
+                    first_name: String::new(),
+                    last_name: String::new(),
+                    password: String::new(),
+                    salt: String::new(),
+                    is_root: false,
+                    password_ext: None,
+                    user_type: config::meta::user::UserType::Internal,
+                    created_at: 0,
+                    updated_at: 0,
+                    must_reset_password: false,
+                    password_reset_reason: None,
+                    flagged_at: None,
+                    password_updated_at: None,
+                },
+            );
+            common::infra::config::ORG_USERS.insert(
+                format!("{org}/{member}"),
+                infra::table::org_users::OrgUserRecord::new(
+                    &org,
+                    member,
+                    config::meta::user::UserRole::Editor,
+                    "token",
+                    None,
+                ),
+            );
+        }
+        crate::request::security::tests::grant(STEER_READER, &[]);
+        crate::request::security::tests::grant(ANALYST, &["GET"]);
+        let listed = |user: &'static str| {
+            let org = org.clone();
+            async move {
+                let response = list_org_rca_runs(
+                    Path(org),
+                    Headers(UserEmail {
+                        user_id: user.to_string(),
+                    }),
+                    Query(OrgRcaRunsQuery::default()),
+                )
+                .await;
+                assert_eq!(response.status(), axum::http::StatusCode::OK);
+                let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+                    .await
+                    .unwrap();
+                let body: serde_json::Value = serde_json::from_slice(&body).unwrap();
+                body["runs"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|run| run["incident_id"].as_str().unwrap().to_string())
+                    .collect::<Vec<_>>()
+            }
+        };
+        assert_eq!(listed(STEER_READER).await, [sid(&org, "ops")]);
+        let mut seen = listed(ANALYST).await;
+        seen.sort();
+        assert_eq!(seen, [sid(&org, "case"), sid(&org, "ops")]);
     }
 }

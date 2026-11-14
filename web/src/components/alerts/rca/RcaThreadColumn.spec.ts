@@ -275,8 +275,8 @@ describe("RcaThreadColumn", () => {
       expect(byTest(wrapper, "rca-thread-saved-pill").text()).toBe("Saved");
       expect(byTest(wrapper, "rca-thread-live-pill").exists()).toBe(false);
       expect(wrapper.text()).not.toContain("Working.");
-      expect(byTest(wrapper, "rca-thread-final-note").text()).toBe(
-        "This report is final and won't change. To redirect the agent, Re-analyze. It creates a new version in Report history.",
+      expect(byTest(wrapper, "rca-thread-final-text").text()).toBe(
+        "This run no longer takes messages. Re-analyze to start a new version.",
       );
     });
 
@@ -335,16 +335,18 @@ describe("RcaThreadColumn", () => {
     it("a run Resume can continue says so instead of calling itself final", () => {
       const wrapper = mountColumn({ ...CANCELLED, canResume: true });
 
-      expect(byTest(wrapper, "rca-thread-final-note").text()).toBe(
+      expect(byTest(wrapper, "rca-thread-final-text").text()).toBe(
         "This run stopped before it finished. Resume run continues from the last finished step.",
       );
-      expect(wrapper.text()).not.toContain("final");
+      expect(wrapper.text()).not.toContain("no longer takes messages");
     });
 
     it("a cancelled run Resume cannot continue keeps the final note", () => {
       const wrapper = mountColumn(CANCELLED);
 
-      expect(byTest(wrapper, "rca-thread-final-note").text()).toContain("This report is final");
+      expect(byTest(wrapper, "rca-thread-final-text").text()).toContain(
+        "This run no longer takes messages.",
+      );
     });
   });
 
@@ -493,6 +495,33 @@ describe("RcaThreadColumn", () => {
       expect(byTest(wrapper, "rca-thread-final-note").exists()).toBe(false);
     });
 
+    it("assistant flag off (legacy) keeps the original composer: Ctrl/Cmd+Enter sends, plain Enter does not", async () => {
+      send.mockClear();
+      const wrapper = mountColumn({ ...STEERABLE, legacy: true });
+
+      expect(byTest(wrapper, "rca-steer-sending-as").text()).toContain("a.rao@acme.io");
+      const textarea = wrapper.get('[data-test="rca-steer-composer"] textarea');
+      await textarea.setValue("check the pool");
+      await textarea.trigger("keydown", { key: "Enter" });
+      await flushPromises();
+      expect(send).not.toHaveBeenCalled();
+      await textarea.trigger("keydown", { key: "Enter", ctrlKey: true });
+      await flushPromises();
+      expect(send).toHaveBeenCalledWith("check the pool");
+    });
+
+    it("assistant flag on keeps the new composer, where plain Enter sends", async () => {
+      send.mockClear();
+      const wrapper = mountColumn(STEERABLE);
+
+      expect(byTest(wrapper, "rca-steer-sending-as").exists()).toBe(false);
+      const textarea = wrapper.get('[data-test="rca-steer-composer"] textarea');
+      await textarea.setValue("check the pool");
+      await textarea.trigger("keydown", { key: "Enter" });
+      await flushPromises();
+      expect(send).toHaveBeenCalledWith("check the pool");
+    });
+
     it("SG37: a reader without RCA permission sees the thread and no composer", () => {
       const wrapper = mountColumn({ ...STEERABLE, steering: null, canSteer: false });
 
@@ -512,20 +541,17 @@ describe("RcaThreadColumn", () => {
       expect(byTest(wrapper, "rca-steer-composer").exists()).toBe(false);
     });
 
-    it("SG37: the paused composer shows 'Agent asks …' and the answer note", () => {
+    it("SG37: a paused run keeps the composer and shows the agent's question in the thread", () => {
       const wrapper = mountColumn({
         ...STEERABLE,
+        thread: rcaThread({ questions: [rcaThreadQuestion()] }),
         runState: "waiting_input",
         steering: rcaSteeringPaused(),
       });
 
-      expect(byTest(wrapper, "rca-steer-question").text()).toContain("Agent asks:");
-      expect(byTest(wrapper, "rca-steer-question").text()).toContain(
-        "Which change went out to checkout-api around 14:02?",
-      );
-      expect(byTest(wrapper, "rca-steer-answer-note").text()).toBe(
-        "Your answer is a lead, not evidence. It can move the hypothesis to Likely. Root cause needs a tool result.",
-      );
+      expect(byTest(wrapper, "rca-steer-composer").exists()).toBe(true);
+      expect(byTest(wrapper, "rca-thread-question").text()).toContain("Needs input");
+      expect(byTest(wrapper, "rca-thread-final-note").exists()).toBe(false);
     });
 
     it("SG38: each status renders its exact pill label", () => {
@@ -679,7 +705,9 @@ describe("RcaThreadColumn", () => {
       );
       expect(byTest(wrapper, "rca-thread-refusal-text").text()).toBe("PR #812 went out at 14:02");
 
-      await byTest(wrapper, "rca-thread-refusal-reanalyze").trigger("click");
+      // Re-analyze shows once on a finished run: in the closed line, seeded with the refused text.
+      expect(byTest(wrapper, "rca-thread-refusal-reanalyze").exists()).toBe(false);
+      await byTest(wrapper, "rca-thread-reanalyze").trigger("click");
       expect(wrapper.emitted("reanalyze-with")).toEqual([["PR #812 went out at 14:02"]]);
       expect(byTest(wrapper, "rca-thread-refusal").exists()).toBe(false);
     });
@@ -705,6 +733,94 @@ describe("RcaThreadColumn", () => {
 
       expect(byTest(wrapper, "rca-thread-refusal").text()).toContain("The run is closing.");
       expect(byTest(wrapper, "rca-thread-refusal-text").text()).toBe("PR #812 went out at 14:02");
+    });
+  });
+
+  describe("v7: a finished run takes no messages", () => {
+    const send = vi.fn(async () => ({ ok: true as const, runState: "running" as const }));
+    const finishedSteerable = {
+      ...SAVED,
+      steering: rcaSteeringLive({ can_steer: true }),
+      canSteer: true,
+      authorEmail: "a.rao@acme.io",
+      send,
+    };
+
+    it.each(["completed", "failed", "cancelled"] as const)(
+      "a %s run shows no composer even when the view still says it can steer",
+      (runState) => {
+        const wrapper = mountColumn({ ...finishedSteerable, runState });
+
+        expect(byTest(wrapper, "rca-steer-composer").exists()).toBe(false);
+        expect(wrapper.find("textarea").exists()).toBe(false);
+        expect(byTest(wrapper, "rca-thread-final-note").exists()).toBe(true);
+      },
+    );
+
+    it("ends with the closed line and exactly one Re-analyze", () => {
+      const wrapper = mountColumn({
+        ...SAVED,
+        steering: rcaSteering({
+          items: [rcaSteerRecord({ text: "Check PR #812", status: "not_read" })],
+        }),
+      });
+
+      const reanalyze = wrapper
+        .findAll("button")
+        .filter((button) => button.text().startsWith("Re-analyze"));
+      expect(reanalyze).toHaveLength(1);
+      expect(reanalyze[0].attributes("data-test")).toBe("rca-thread-reanalyze");
+      expect(byTest(wrapper, "rca-thread-steer-reanalyze").exists()).toBe(false);
+    });
+
+    it("Re-analyze starts from the newest message the run never read", async () => {
+      const wrapper = mountColumn({
+        ...SAVED,
+        steering: rcaSteering({
+          items: [
+            rcaSteerRecord({ steer_id: "a", text: "Old", status: "applied" }),
+            rcaSteerRecord({ steer_id: "b", text: "Check PR #812", status: "not_read" }),
+          ],
+        }),
+      });
+
+      await byTest(wrapper, "rca-thread-reanalyze").trigger("click");
+      expect(wrapper.emitted("reanalyze-with")).toEqual([["Check PR #812"]]);
+    });
+
+    it("a locked start keeps Re-analyze visible and disabled", () => {
+      const wrapper = mountColumn({ ...SAVED, startLockedReason: raw("Needs a license") });
+
+      expect(byTest(wrapper, "rca-thread-reanalyze").attributes("disabled")).toBeDefined();
+    });
+
+    it("inline, a finished run's activity is one line that opens the steps", async () => {
+      const wrapper = mountColumn({ ...SAVED, variant: "inline" });
+
+      expect(wrapper.find("header").exists()).toBe(false);
+      expect(byTest(wrapper, "rca-thread-entries").exists()).toBe(false);
+      const toggle = byTest(wrapper, "rca-thread-activity-toggle");
+      expect(toggle.attributes("aria-expanded")).toBe("false");
+      await toggle.trigger("click");
+      expect(byTest(wrapper, "rca-thread-entries").exists()).toBe(true);
+    });
+
+    it("inline, it takes its content's height inside the panel's scroller, so the closed line never covers it", () => {
+      const wrapper = mountColumn({ ...SAVED, variant: "inline" });
+
+      const column = byTest(wrapper, "rca-thread-column");
+      const area = byTest(wrapper, "rca-thread-activity-toggle").element.parentElement!;
+      for (const el of [column.element, area])
+        expect(el.className.split(/\s+/)).not.toEqual(
+          expect.arrayContaining([expect.stringMatching(/^(flex-1|min-h-0)$/)]),
+        );
+    });
+
+    it("inline, a live run keeps its steps open", () => {
+      const wrapper = mountColumn({ variant: "inline" });
+
+      expect(byTest(wrapper, "rca-thread-activity-toggle").exists()).toBe(false);
+      expect(byTest(wrapper, "rca-thread-entries").exists()).toBe(true);
     });
   });
 });

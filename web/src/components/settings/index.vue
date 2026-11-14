@@ -77,6 +77,8 @@ import useIsMetaOrg from "@/composables/useIsMetaOrg";
 import { checkFeatureAccess, buildFeatureGateContext } from "@/utils/enterpriseFeatures";
 import { featureState, menuState } from "@/utils/featureGate";
 import { isSlackSettingsVisible, readSlackOrgConfig } from "@/utils/slackSettings";
+import { isAssistantV2 } from "@/composables/assistant/flags";
+import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
 import { PAGE_ACTIONS_SLOT_ID } from "./pageActionsSlot";
 import { SAVE_BAR_SLOT_ID } from "./saveBarSlot";
 
@@ -93,6 +95,7 @@ export default defineComponent({
     const store = useStore();
     const router: any = useRouter();
     const route = useRoute();
+    const assistantV2 = isAssistantV2();
 
     // Maps a route name → the section key used by the hub/switcher.
     const routeToSettingsTab: Record<string, string> = {
@@ -116,6 +119,7 @@ export default defineComponent({
       syntheticsLocations: "synthetics_locations",
       correlationSettings: "correlation_settings",
       slack: "slack",
+      ...(assistantV2 ? { assistantSettings: "assistant" } : {}),
     };
 
     const settingsTab = ref(
@@ -207,6 +211,7 @@ export default defineComponent({
       "Access & Security",
       "Destinations",
       "Integrations",
+      ...(assistantV2 ? ["Assistant"] : []),
       "Data",
       "Operations",
       "Synthetics",
@@ -237,6 +242,27 @@ export default defineComponent({
       const queryManagementAccess = checkFeatureAccess("queryManagement", featureGateCtx);
       const nodesAccess = checkFeatureAccess("nodes", featureGateCtx);
       const licenseAccess = checkFeatureAccess("license", featureGateCtx);
+      const assistantAccess = checkFeatureAccess("aiAssistant", featureGateCtx);
+      const assistantItems: (SectionHubItem & { group: string })[] = assistantV2
+        ? [
+            {
+              key: "assistant",
+              label: t("assistant.settings.title"),
+              description: t("assistant.settings.railDesc"),
+              icon: assistantGlyph.assistant,
+              to: {
+                name: "assistantSettings",
+                params: { tab: "status" },
+                query: { org_identifier: org },
+              },
+              visible: assistantAccess.visible,
+              locked: !assistantAccess.allowed,
+              lockedMessage: assistantAccess.message,
+              dataTest: "settings-assistant-tab",
+              group: "Assistant",
+            },
+          ]
+        : [];
       // A locked license keeps the entry even where its runtime flag is off, so the lock stays discoverable.
       const syntheticsLicense = menuState(
         z?.features,
@@ -493,6 +519,7 @@ export default defineComponent({
           dataTest: "organization-management-tab",
           group: "Account",
         },
+        ...assistantItems,
       ];
       return items;
     });
@@ -532,6 +559,7 @@ export default defineComponent({
         "Access & Security": t("settings.groupAccessSecurity"),
         Destinations: t("settings.groupDestinations"),
         Integrations: t("settings.groupIntegrations"),
+        Assistant: t("settings.groupAssistant"),
         Data: t("settings.groupData"),
         Operations: t("settings.groupOperations"),
         Synthetics: t("settings.groupSynthetics"),
