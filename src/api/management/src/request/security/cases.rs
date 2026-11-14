@@ -40,6 +40,8 @@ const MAX_LOOKUP_IDS: usize = 500;
 const MAX_PROMOTED_FIRINGS: usize = 100;
 const MAX_CASE_TITLE_CHARS: usize = 255;
 const MAX_EVENT_FIELDS: usize = 500;
+const MAX_CASE_ENTITIES: usize = 10;
+const MAX_CASE_NOTE_CHARS: usize = 4000;
 
 #[derive(Debug, Deserialize, IntoParams, ToSchema)]
 pub struct CaseLookupQuery {
@@ -94,6 +96,23 @@ pub struct PromoteRequest {
     /// Title of a new case; defaults to the first detection's title.
     #[serde(default)]
     pub title: Option<String>,
+    /// A new event case's priority; defaults to P3.
+    #[serde(default)]
+    pub priority: Option<IncidentSeverity>,
+    /// A new event case's entities, instead of the one its fields name; the first keys the case.
+    #[serde(default)]
+    pub entities: Vec<CaseEntityRequest>,
+    /// Recorded on the case timeline as the caller's comment.
+    #[serde(default)]
+    pub note: Option<String>,
+}
+
+/// One entity an analyst confirms when opening a case from an event.
+#[derive(Debug, Clone, Deserialize, ToSchema)]
+pub struct CaseEntityRequest {
+    /// `user`, `host` or `ip`.
+    pub kind: String,
+    pub value: String,
 }
 
 /// GetCaseSettings
@@ -269,7 +288,19 @@ pub async fn promote_to_case(
         ));
     }
     if let Some(event) = req.event {
-        return promote_event(&org_id, &user_id, req.case_id.as_deref(), title, event).await;
+        let opening = match event_opening(req.priority, &req.entities, req.note) {
+            Ok(opening) => opening,
+            Err(message) => return MetaHttpResponse::bad_request(message),
+        };
+        return promote_event(
+            &org_id,
+            &user_id,
+            req.case_id.as_deref(),
+            title,
+            event,
+            opening,
+        )
+        .await;
     }
     if req.firings.is_empty() || req.firings.len() > MAX_PROMOTED_FIRINGS {
         return MetaHttpResponse::bad_request(format!(
@@ -356,6 +387,7 @@ async fn promote_event(
     case_id: Option<&str>,
     title: &str,
     event: PromoteEvent,
+    opening: openobserve_core::alerts::incidents::EventCaseOpening,
 ) -> Response {
     let stream = event.stream.trim();
     if stream.is_empty() || event.timestamp <= 0 {
@@ -378,6 +410,7 @@ async fn promote_event(
         stream: stream.to_string(),
         at: event.timestamp,
         fields: event.fields,
+        opening,
     };
     audit::mark();
     match openobserve_core::alerts::incidents::attach_event_to_case(
@@ -395,6 +428,58 @@ async fn promote_event(
         }
         Err(e) => MetaHttpResponse::internal_error(e),
     }
+}
+
+/// The priority, entities and note an analyst set on an event case, or why they are refused.
+fn event_opening(
+    priority: Option<IncidentSeverity>,
+    entities: &[CaseEntityRequest],
+    note: Option<String>,
+) -> Result<openobserve_core::alerts::incidents::EventCaseOpening, String> {
+    if entities.len() > MAX_CASE_ENTITIES {
+        return Err(format!(
+            "A case can name at most {MAX_CASE_ENTITIES} entities"
+        ));
+    }
+    let note = note.map(|n| n.trim().to_string()).filter(|n| !n.is_empty());
+    if note
+        .as_ref()
+        .is_some_and(|n| n.chars().count() > MAX_CASE_NOTE_CHARS)
+    {
+        return Err(format!(
+            "A note cannot exceed {MAX_CASE_NOTE_CHARS} characters"
+        ));
+    }
+    use o2_enterprise::enterprise::security::cases;
+    let mut named: Vec<cases::Entity> = Vec::new();
+    for e in entities {
+        // An array field (k8s `sourceIPs`) names one entity per element.
+        let values = cases::entity_values(&e.value);
+        if values.is_empty() {
+            return Err(format!("{} is not a {} entity", e.value.trim(), e.kind));
+        }
+        for value in values {
+            let entity = cases::entity_from(&e.kind, &value)
+                .ok_or_else(|| format!("{value} is not a {} entity", e.kind))?;
+            if !named
+                .iter()
+                .any(|n| n.key == entity.key && n.value == entity.value)
+            {
+                named.push(entity);
+            }
+        }
+    }
+    if named.len() > MAX_CASE_ENTITIES {
+        return Err(format!(
+            "A case can name at most {MAX_CASE_ENTITIES} entities"
+        ));
+    }
+    let entities = named;
+    Ok(openobserve_core::alerts::incidents::EventCaseOpening {
+        severity: priority,
+        entities,
+        note,
+    })
 }
 
 /// `Ok` when `case_id` is an unresolved security case of the org.
@@ -431,6 +516,50 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_an_event_case_takes_the_analysts_priority_entities_and_note() {
+        let entity = |kind: &str, value: &str| CaseEntityRequest {
+            kind: kind.to_string(),
+            value: value.to_string(),
+        };
+        let opening = event_opening(
+            Some(IncidentSeverity::P1),
+            &[entity("host", "WS-01"), entity("ip", "10.0.0.5")],
+            Some("  beacon seen  ".to_string()),
+        )
+        .unwrap();
+        assert_eq!(opening.severity, Some(IncidentSeverity::P1));
+        assert_eq!(opening.entities.len(), 2);
+        assert_eq!(opening.note.as_deref(), Some("beacon seen"));
+        assert!(
+            event_opening(None, &[], Some(" ".to_string()))
+                .unwrap()
+                .note
+                .is_none()
+        );
+        assert!(event_opening(None, &[entity("ip", "nope")], None).is_err());
+        let many: Vec<_> = (0..11).map(|i| entity("host", &format!("h{i}"))).collect();
+        assert!(event_opening(None, &many, None).is_err());
+        assert!(event_opening(None, &[], Some("x".repeat(4001))).is_err());
+        let k8s = event_opening(
+            None,
+            &[entity(
+                "ip",
+                r#"["45.137.21.9","45.137.21.10","45.137.21.9"]"#,
+            )],
+            None,
+        )
+        .unwrap();
+        let ips: Vec<&str> = k8s.entities.iter().map(|e| e.value.as_str()).collect();
+        assert_eq!(
+            ips,
+            ["45.137.21.9", "45.137.21.10"],
+            "one entity per element"
+        );
+        assert_eq!(k8s.entities[0].display, "45.137.21.9");
+        assert!(event_opening(None, &[entity("ip", "[]")], None).is_err());
+    }
+
+    #[test]
     fn test_parse_ids_drops_blanks_and_repeats() {
         assert_eq!(parse_ids(" a,b,,a , c"), ["a", "b", "c"]);
         assert!(parse_ids("").is_empty());
@@ -446,6 +575,7 @@ mod tests {
             Json(CaseSettings {
                 auto_close_days: 400,
                 group_window_minutes: 60,
+                ..Default::default()
             }),
         )
         .await;

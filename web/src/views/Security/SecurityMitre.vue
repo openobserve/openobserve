@@ -2,6 +2,7 @@
 SPDX-License-Identifier: AGPL-3.0-or-later -->
 
 <script setup lang="ts">
+import { securityTime } from "@/utils/security/time";
 import { computed, onMounted, ref, watch } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import analytics from "@/services/product_analytics";
@@ -133,7 +134,7 @@ const notices = computed<SecurityNotice[]>(() => {
       key: "history-narrowed",
       tone: "warning",
       text: t("siem.mitrePage.historyNarrowed", {
-        from: new Date(history.effectiveStartMs.value).toLocaleString(),
+        from: securityTime(history.effectiveStartMs.value),
       }),
       dataTest: "security-mitre-history-narrowed",
     });

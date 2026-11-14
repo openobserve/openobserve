@@ -18,6 +18,8 @@ pub mod audit;
 #[cfg(feature = "enterprise")]
 pub mod cases;
 #[cfg(feature = "enterprise")]
+pub mod detections;
+#[cfg(feature = "enterprise")]
 pub mod intel;
 #[cfg(feature = "enterprise")]
 pub mod investigate;
@@ -27,6 +29,10 @@ pub mod sigma;
 pub mod sources;
 #[cfg(feature = "enterprise")]
 pub mod streams;
+#[cfg(feature = "enterprise")]
+pub mod triage;
+#[cfg(feature = "enterprise")]
+pub mod tuning;
 
 use std::collections::HashSet;
 
@@ -202,7 +208,7 @@ pub async fn guard_case_or_incidents(
 }
 
 /// Refuses unless the caller may read every named logs stream, since the search service checks
-/// none.
+/// none; Security read covers the org's Security sources.
 #[cfg(feature = "enterprise")]
 pub async fn guard_stream_reads<'a>(
     org_id: &str,
@@ -219,7 +225,28 @@ pub async fn guard_stream_reads<'a>(
             name: name.to_string(),
         })
         .collect();
-    authorize_query_sources(user_id, &sources)
+    let admitted = match authorize_query_sources(user_id, &sources).await {
+        Ok(()) => Ok(()),
+        Err(denied) => openobserve_core::security::admit_security_sources(user_id, denied).await,
+    };
+    admitted.map_err(|denied| stream_access_forbidden(org_id, &denied))
+}
+
+/// Refuses unless stream RBAC alone, without Security-source admission, lets the caller read it.
+#[cfg(feature = "enterprise")]
+pub async fn guard_own_stream_read(
+    org_id: &str,
+    user_id: &str,
+    stream: &str,
+) -> Result<(), Response> {
+    use openobserve_core::authz::{QuerySource, authorize_query_sources, stream_access_forbidden};
+
+    let source = QuerySource::Stream {
+        org_id: org_id.to_string(),
+        stream_type: config::meta::stream::StreamType::Logs,
+        name: stream.to_string(),
+    };
+    authorize_query_sources(user_id, std::slice::from_ref(&source))
         .await
         .map_err(|denied| stream_access_forbidden(org_id, &denied))
 }
@@ -241,7 +268,11 @@ pub async fn unreadable_streams<'a>(
             name: name.to_string(),
         })
         .collect();
-    match authorize_query_sources(user_id, &sources).await {
+    let admitted = match authorize_query_sources(user_id, &sources).await {
+        Ok(()) => Ok(()),
+        Err(denied) => openobserve_core::security::admit_security_sources(user_id, denied).await,
+    };
+    match admitted {
         Ok(()) => HashSet::new(),
         Err(denied) => denied
             .denials
@@ -338,6 +369,45 @@ pub async fn validate_detection(
     openobserve_core::alerts::alert::plan_sql(org_id, alert.stream_type, sql)
         .await
         .map_err(|e| MetaHttpResponse::bad_request(format!("The detection's SQL cannot run: {e}")))
+}
+
+/// Refuses a core alerts edit to what a detection runs, so its SQL never drifts from its Sigma.
+#[cfg(feature = "enterprise")]
+pub async fn guard_detection_definition(
+    org_id: &str,
+    user_id: &str,
+    alert_id: svix_ksuid::Ksuid,
+    edited: &config::meta::alerts::alert::Alert,
+) -> Result<(), Response> {
+    let conn = infra::db::get_orm_client_ro().await;
+    let Ok(Some((folder, stored))) = db::alerts::alert::get_by_id(conn, org_id, alert_id).await
+    else {
+        return Ok(());
+    };
+    // The edit right is checked first, so a refusal never reveals that the alert is a detection.
+    if !openobserve_core::auth::check_permissions(
+        &alert_id.to_string(),
+        org_id,
+        user_id,
+        "alerts",
+        "PUT",
+        Some(&folder.folder_id),
+        false,
+        true,
+        false,
+    )
+    .await
+    {
+        return Err(MetaHttpResponse::forbidden("Unauthorized Access"));
+    }
+    if marks_siem(stored.context_attributes.as_ref())
+        && o2_enterprise::enterprise::security::authoring::edits_definition(&stored, edited)
+    {
+        return Err(MetaHttpResponse::conflict(
+            "This alert is a Security detection: its query is compiled from its Sigma rule. Edit the rule, stream or schedule in Security > Detections.",
+        ));
+    }
+    Ok(())
 }
 
 /// SIEM detection ids a user may not see, so alert lists and histories can drop them.
@@ -783,6 +853,30 @@ pub(crate) mod tests {
             Headers(UserEmail {
                 user_id: user.to_string(),
             })
+        }
+
+        #[tokio::test]
+        async fn test_a_definition_refusal_names_no_detection_to_a_stranger() {
+            let org = format!("gate_{}", config::ider::uuid());
+            let (id, root) = stored_siem_detection(&org).await;
+            let ksuid: Ksuid = id.parse().unwrap();
+            let conn = infra::db::get_orm_client_ro().await;
+            let (_, mut edited) = db::alerts::alert::get_by_id(conn, &org, ksuid)
+                .await
+                .unwrap()
+                .unwrap();
+            edited.query_condition.sql = Some("SELECT * FROM \"web\"".to_string());
+
+            let refused = guard_detection_definition(&org, &root, ksuid, &edited)
+                .await
+                .unwrap_err();
+            assert_eq!(refused.status(), StatusCode::CONFLICT);
+            let stranger = stranger();
+            let refused = guard_detection_definition(&org, &stranger.0.user_id, ksuid, &edited)
+                .await
+                .unwrap_err();
+            assert_eq!(refused.status(), StatusCode::FORBIDDEN);
+            assert!(!refusal_message(refused).await.contains("Security"));
         }
 
         #[tokio::test]

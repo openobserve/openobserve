@@ -626,6 +626,7 @@ const getRoleDetails = () => {
           // Offered presets only: one needing a module this org lacks would stage tuples FGA rejects.
           await applyPreset(String(preset));
         }
+        if (preset && router.currentRoute.value.query.created === "1") await savePresetOfNewRole();
       }
     })
     .catch((error) => {
@@ -1098,6 +1099,15 @@ const saveRoleAndMark = (): Promise<boolean> =>
     if (saved) roleDraft.markSaved();
     return saved;
   });
+
+// "New role from a preset" is one action, so its staged grants are saved with it; on failure they stay staged for a retry.
+const savePresetOfNewRole = async () => {
+  if (pendingChanges.value.length && !(await saveRoleAndMark())) {
+    toast({ variant: "warning", message: t("iam.editRole.presetSaveFailed") });
+  }
+  const { preset: _preset, created: _created, ...query } = router.currentRoute.value.query;
+  await router.replace({ query });
+};
 
 const toggleHelpSection = async () => {
   isHelpOpen.value = !isHelpOpen.value;
