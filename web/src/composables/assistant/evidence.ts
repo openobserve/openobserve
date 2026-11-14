@@ -175,6 +175,7 @@ const NUMERIC_TIME = /^\d+(\.\d+)?$/;
 
 export const MAX_CHART_SERIES = 10;
 
+// The card is a glance at an untrusted wire; the explorer one click away draws every point.
 export const MAX_CHART_POINTS = 120;
 
 const MAX_SERIES_NAME_CHARS = 200;
@@ -289,22 +290,27 @@ export function boundedChartSeries(value: unknown): ChartSeries | null {
   const series = raw.series.flatMap((entry): ChartLine[] => {
     const line = entry as { name?: unknown; points?: unknown } | null;
     if (!line || !Array.isArray(line.points)) return [];
-    const points = line.points
-      .slice(-MAX_CHART_POINTS)
-      .filter(
-        (point): point is [number, number] =>
-          Array.isArray(point) &&
-          point.length === 2 &&
-          Number.isFinite(point[0]) &&
-          Number.isFinite(point[1]),
-      )
-      .map(([x, y]) => [x, y] as [number, number]);
+    const valid = line.points.filter(
+      (point): point is [number, number] =>
+        Array.isArray(point) &&
+        point.length === 2 &&
+        Number.isFinite(point[0]) &&
+        Number.isFinite(point[1]),
+    );
+    const points = evenly(valid, MAX_CHART_POINTS).map(([x, y]) => [x, y] as [number, number]);
     if (!points.length) return [];
     const name = typeof line.name === "string" && line.name ? line.name : "value";
     if (isNonMeasure(name, points)) return [];
     return [{ name: name.slice(0, MAX_SERIES_NAME_CHARS), points }];
   });
   return series.some((line) => line.points.length >= 2) ? { xUnit: "us", series } : null;
+}
+
+// Even picks keep the first and the last point, so a capped series still spans its whole range.
+function evenly<T>(items: T[], cap: number): T[] {
+  if (items.length <= cap) return items;
+  const step = (items.length - 1) / (cap - 1);
+  return Array.from({ length: cap }, (_, i) => items[Math.round(i * step)]);
 }
 
 /** A findings frame as the card reads it; `null` when it is not a usable payload. */

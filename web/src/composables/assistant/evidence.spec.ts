@@ -31,6 +31,7 @@ import {
   fenceQuery,
   footerUsage,
   manualRouteOf,
+  MAX_CHART_POINTS,
   promptRange,
   queryCount,
   stepsOf,
@@ -520,6 +521,16 @@ describe("boundedChartSeries: non-measure columns", () => {
     });
     expect(chart?.series.map((s) => s.name)).toEqual(["duration"]);
     expect(Math.max(...chart!.series.flatMap((s) => s.points.map((p) => p[1])))).toBeLessThan(1e9);
+  });
+
+  it("keeps a long series' whole range under the point cap, its first burst included", () => {
+    const ys = Array.from({ length: 270 }, (_, i) => (i >= 10 && i < 25 ? 950 : 420));
+    const points = boundedChartSeries({ x_unit: "us", series: [line("mem", ys)] })!.series[0]
+      .points;
+    expect(points).toHaveLength(MAX_CHART_POINTS);
+    expect(points[0][0]).toBe(us);
+    expect(points.at(-1)![0]).toBe(us + 269 * 60_000_000);
+    expect(points.some(([, y]) => y === 950)).toBe(true);
   });
 
   it("drops epoch values under a neutral name, and the whole chart when nothing is left", () => {
