@@ -17,6 +17,7 @@ feel like one product.
   - [Denied: the third empty state (`:forbidden`)](#denied-the-third-empty-state-forbidden)
   - [States, actions, shortcuts, data](#states-actions-shortcuts-data)
 - [Recipe: detail / editor page](#recipe-detail--editor-page)
+- [Recipe: settings form page](#recipe-settings-form-page)
 - [Listing-page checklist](#listing-page-checklist)
 
 ---
@@ -438,10 +439,14 @@ visible data.
   `OEmptyState` (above) and, if fetch can fail, an `#error` slot. Never leave a
   blank table.
 - **Primary action** (New) is in the header `#actions`; **row actions**
-  (edit/delete/…) are in the `isAction` column as O2 buttons; **destructive
-  delete** goes through `ConfirmDialog` + `useConfirmDialog`. On phones the inline
-  row buttons are `max-md:hidden` and one `md:hidden` kebab mirrors them — see
+  (edit/delete/…) go through `OTable` `row-actions` in the `isAction` column (three
+  buttons at most, fixed order Edit, own actions, Delete, one kebab below md);
+  **destructive delete** goes through `ConfirmDialog` + `useConfirmDialog`. A
+  hand-written `#cell-actions` keeps the `max-md:hidden` buttons plus one
+  `md:hidden` kebab mirror — see
   [responsive § Tables and row actions](responsive.md#tables-and-row-actions).
+- **The name cell is a link that opens the item** (`meta.link`), wherever an open
+  or edit target exists; elsewhere it stays text.
 - **Keyboard shortcuts** (register + bind — see
   [keyboard-shortcuts.md](keyboard-shortcuts.md)): `n` → create, `/` → focus
   search, `r` → refresh. Advertise `r` via the refresh button's `OTooltip
@@ -466,6 +471,63 @@ form — those go in an `ODialog`/`ODrawer`; see SKILL.md § Forms):
   pair (cancel `outline` / save `primary`, `size="sm-action"`).
 - Sub-sections use `OCard` (+ `OCardSection`); tabs within the editor use the
   `OTabs` family or the header's `#tabs` slot.
+
+---
+
+## Recipe: settings form page
+
+An always-editable page of saved values (Settings › General, Organization
+parameters, Password policy): no edit mode, no dialog, one Save for the page.
+
+- The shell supplies the header (`OPageHeader`, title + one-line subtitle); the
+  page adds no second title.
+- `OForm validate-on="leave"` with a colocated schema; list fields that are
+  checked together in `coupled`.
+- One `OFormSection variant="plain"` per group, with
+  `OSettingRow control-at="end" name="<field>"` rows inside. The row prints the
+  field's error in place of its description, so nothing moves.
+- Rows pass `loading` until the saved values arrive, and the bar gets
+  `:loaded="false"` for the same time.
+- One `OSaveBar` as the last child of the form, teleported to the shell's
+  `SAVE_BAR_SLOT` with `form-id` = the form's id, and `useLeaveGuard` once in
+  setup. No other Save or Cancel button on the page.
+- After a successful save call `rebaseSavedValues(form, savedValues, submitted)`
+  (`@/lib/forms/SaveBar/formCounts`), not `form.reset`: the fields stay editable
+  during the request, and an edit made meanwhile must remain an unsaved change
+  that still shows its error if it is invalid.
+  Show the page's success or error toast. Server field errors go through
+  `setServerFieldErrors`.
+- Note the organization before the request and skip the store write, the form
+  rebase and the toast when the selected organization changed while it ran.
+- Uploads, "Add …" and delete actions act at once with their own buttons and are
+  not counted by the bar.
+
+```vue
+<OForm id="settings-general-form" :form="form">
+  <OFormSection variant="plain" :title="t('settings.limits')">
+    <OSettingRow
+      control-at="end"
+      name="max_series"
+      :label="t('settings.maxSeries')"
+      :description="t('settings.maxSeriesDesc')"
+      :loading="isLoading"
+    >
+      <OFormInput name="max_series" type="number" width="xs" />
+    </OSettingRow>
+  </OFormSection>
+  <Teleport defer :to="SAVE_BAR_SLOT">
+    <OSaveBar
+      class="px-4"
+      form-id="settings-general-form"
+      :loaded="!isLoading"
+      data-test="settings-general-save-bar"
+    />
+  </Teleport>
+</OForm>
+```
+
+Components: [forms-specialized.md](forms-specialized.md) § OSaveBar + useLeaveGuard,
+[core-display.md](core-display.md) § OSettingRow.
 
 ---
 

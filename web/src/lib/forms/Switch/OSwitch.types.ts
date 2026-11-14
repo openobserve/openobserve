@@ -29,6 +29,10 @@ export interface SwitchProps {
   disabled?: boolean;
   /** Marks the field required — renders a `*` after the label (no manual ` *`). */
   required?: boolean;
+  /** `"neutral"` draws Off in grey, for rows where a brand-coloured Off reads as On. */
+  offTone?: "brand" | "neutral";
+  /** Prints On / Off after the track. */
+  stateText?: boolean;
   /** HTML id */
   id?: string;
   /** HTML name */

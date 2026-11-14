@@ -9,7 +9,7 @@
 import { inject, ref } from "vue";
 import OInlineEdit from "./OInlineEdit.vue";
 import { FORM_CONTEXT_KEY } from "../Form/OForm.types";
-import { firstFieldError } from "../Form/fieldError";
+import { useVisibleFieldError } from "../Form/fieldError";
 import { raw } from "@/types/i18n";
 import type { FormInlineEditProps, FormInlineEditEmits } from "./OFormInlineEdit.types";
 
@@ -19,6 +19,7 @@ const props = withDefaults(defineProps<FormInlineEditProps>(), { submitOnEnter: 
 const emit = defineEmits<FormInlineEditEmits>();
 
 const form = inject(FORM_CONTEXT_KEY, null);
+const shown = useVisibleFieldError(form);
 
 if (import.meta.env.DEV && !form) {
   console.warn("[OFormInlineEdit] must be rendered inside <OForm>. No form context found.");
@@ -48,12 +49,8 @@ defineExpose({ focus: () => inlineEditRef.value?.focus() });
         :submit-on-enter="props.submitOnEnter"
         :suggestions="props.suggestions"
         :delimiter="props.delimiter"
-        :error="field.state.meta.errors.length > 0"
-        :error-message="
-          field.state.meta.errors.length > 0
-            ? raw(firstFieldError(field.state.meta.errors))
-            : undefined
-        "
+        :error="shown(field).invalid"
+        :error-message="shown(field).message !== undefined ? raw(shown(field).message) : undefined"
         @update:model-value="
           (val: string) => {
             field.handleChange(val);

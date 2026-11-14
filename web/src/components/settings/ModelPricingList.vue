@@ -111,6 +111,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="model-pricing-list-table"
           :data="filteredModels"
           :columns="columns"
+          :row-actions="rowActions"
+          row-actions-more-data-test="model-pricing-row-more-actions"
           row-key="id"
           :loading="loading"
           :forbidden="forbidden"
@@ -208,7 +210,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OTooltip side="top" align="center" :content="t('modelPricing.sourceCustom')" />
               </span>
               <div class="flex min-w-0 items-center gap-2">
-                <OTruncatedText as="div">{{ row.name }}</OTruncatedText>
+                <ONameLinkCell
+                  :to="() => openPricingDialog(row)"
+                  data-test="model-pricing-list-table-name-link"
+                >
+                  {{ row.name }}
+                </ONameLinkCell>
                 <EditorDraftDot
                   v-if="pricingDrafts.ids.has(row.id)"
                   :saved-at="pricingDrafts.savedAt(row.id)"
@@ -381,131 +388,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span v-else class="text-text-muted">&mdash;</span>
             </div>
           </template>
-          <template #cell-actions="{ row }">
-            <div class="flex items-center justify-end gap-1">
-              <template v-if="!isReadOnly(row)">
-                <OButton
-                  :variant="row.enabled ? 'ghost-destructive' : 'ghost-success'"
-                  size="icon-xs-sq"
-                  class="max-md:hidden"
-                  :title="
-                    row.enabled ? t('modelPricing.actionDisable') : t('modelPricing.actionEnable')
-                  "
-                  @click.stop="toggleEnabled(row, !row.enabled)"
-                  data-test="model-pricing-toggle-btn"
-                  :data-row-action="row.enabled ? 'pause' : 'resume'"
-                  :icon-left="row.enabled ? 'pause' : 'play-arrow'"
-                />
-                <OButton
-                  variant="ghost"
-                  size="icon-xs-sq"
-                  class="max-md:hidden"
-                  :title="t('modelPricing.actionEdit')"
-                  @click.stop="openEditor(row)"
-                  data-test="model-pricing-edit-btn"
-                  data-row-action="edit"
-                  icon-left="edit"
-                />
-                <!-- The menu teleports out of the row, so row shortcuts need in-row proxies. -->
-                <button
-                  type="button"
-                  data-row-action="duplicate"
-                  class="hidden"
-                  tabindex="-1"
-                  aria-hidden="true"
-                  @click.stop="duplicateModel(row)"
-                />
-                <button
-                  type="button"
-                  data-row-action="delete"
-                  class="hidden"
-                  tabindex="-1"
-                  aria-hidden="true"
-                  @click.stop="confirmDelete(row)"
-                />
-                <ODropdown side="bottom" align="end">
-                  <template #trigger>
-                    <OButton
-                      icon-left="more-vert"
-                      variant="ghost"
-                      size="icon-xs-sq"
-                      :aria-label="duplicateActionLabel(row, t('modelPricing.moreActions'))"
-                      data-test="model-pricing-row-more-actions"
-                      @click.stop
-                    >
-                      <EditorDraftDot
-                        v-if="hasDuplicateDraft(row)"
-                        corner
-                        :data-test="`model-pricing-${row.id}-more-actions-draft-dot`"
-                      />
-                    </OButton>
-                  </template>
-                  <ODropdownItem
-                    :icon-left="row.enabled ? 'pause' : 'play-arrow'"
-                    :variant="row.enabled ? 'destructive' : 'default'"
-                    class="md:hidden"
-                    data-test="model-pricing-toggle-btn-menu"
-                    @select="toggleEnabled(row, !row.enabled)"
-                  >
-                    <span>{{
-                      row.enabled ? t("modelPricing.actionDisable") : t("modelPricing.actionEnable")
-                    }}</span>
-                  </ODropdownItem>
-                  <ODropdownItem
-                    icon-left="edit"
-                    class="md:hidden"
-                    data-test="model-pricing-edit-btn-menu"
-                    @select="openEditor(row)"
-                  >
-                    <span>{{ t("modelPricing.actionEdit") }}</span>
-                  </ODropdownItem>
-                  <ODropdownItem
-                    icon-left="content-copy"
-                    data-test="model-pricing-duplicate-btn-menu"
-                    @select="duplicateModel(row)"
-                  >
-                    <span>{{ t("modelPricing.actionDuplicate") }}</span>
-                    <EditorDraftDot
-                      v-if="hasDuplicateDraft(row)"
-                      :saved-at="duplicateDraftSavedAt(row)"
-                      :data-test="`model-pricing-${row.id}-duplicate-menu-draft-dot`"
-                    />
-                  </ODropdownItem>
-                  <ODropdownItem
-                    icon-left="delete"
-                    variant="destructive"
-                    data-test="model-pricing-delete-btn-menu"
-                    @select="confirmDelete(row)"
-                  >
-                    <span>{{ t("modelPricing.actionDelete") }}</span>
-                  </ODropdownItem>
-                </ODropdown>
-              </template>
-              <template v-else>
-                <OButton
-                  variant="ghost"
-                  size="icon-xs-sq"
-                  :aria-label="duplicateActionLabel(row, t('modelPricing.actionClone'))"
-                  @click.stop="duplicateModel(row)"
-                  data-test="model-pricing-clone-btn"
-                  data-row-action="duplicate"
-                  icon-left="content-copy"
-                >
-                  <OTooltip
-                    side="bottom"
-                    :content="duplicateActionLabel(row, t('modelPricing.actionClone'))"
-                  />
-                  <EditorDraftDot
-                    v-if="hasDuplicateDraft(row)"
-                    corner
-                    :tooltip="false"
-                    :data-test="`model-pricing-${row.id}-clone-draft-dot`"
-                  />
-                </OButton>
-              </template>
-            </div>
-          </template>
-
           <template #empty>
             <OEmptyState
               size="hero"
@@ -547,7 +429,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ODrawer
       data-test="model-pricing-list-pricing-drawer"
       v-model:open="showPricingDialog"
-      :width="30"
+      size="md"
       :title="pricingDialogRow?.name"
       :title-data-test="'model-pricing-drawer-title'"
       :sub-title="t('modelPricing.modelDetails')"
@@ -732,8 +614,6 @@ import AppTabs from "@/components/common/AppTabs.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import TestModelMatchDialog from "@/components/settings/TestModelMatchDialog.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
-import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -743,12 +623,12 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
-import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import { ONameLinkCell } from "@/lib/core/Table/cells";
+import type { OTableColumnDef, OTableRowAction } from "@/lib/core/Table/OTable.types";
 import UtcHoursBar from "@/components/settings/UtcHoursBar.vue";
 import { timestampToTimezoneDate } from "@/utils/timezone";
 import OCode from "@/lib/core/Code/OCode.vue";
 import OText from "@/lib/core/Typography/OText.vue";
-import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import FitItems from "@/components/common/FitItems.vue";
 import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
 import { useDraftLabel } from "@/components/common/drafts/useDraftLabel";
@@ -991,9 +871,69 @@ const columns: OTableColumnDef[] = [
     header: t("modelPricing.colActions"),
     isAction: true,
     pinned: "right",
-    size: 128,
-    minSize: 44,
-    meta: { align: "center", actionCount: 3 },
+  },
+];
+
+const draftMark = (row: any, dataTest: string, label: I18nText) =>
+  hasDuplicateDraft(row) && { label: duplicateActionLabel(row, label), dataTest };
+const rowActions: OTableRowAction[] = [
+  {
+    id: "edit",
+    label: t("modelPricing.actionEdit"),
+    icon: "edit",
+    visible: (row) => !isReadOnly(row),
+    onSelect: (row) => openEditor(row),
+    dataTest: () => "model-pricing-edit-btn",
+  },
+  {
+    id: "toggle",
+    label: (row) =>
+      row.enabled ? t("modelPricing.actionDisable") : t("modelPricing.actionEnable"),
+    icon: (row) => (row.enabled ? "pause" : "play-arrow"),
+    tone: (row) => (row.enabled ? "destructive" : "success"),
+    shortcut: (row) => (row.enabled ? "pause" : "resume"),
+    visible: (row) => !isReadOnly(row),
+    onSelect: (row) => toggleEnabled(row, !row.enabled),
+    dataTest: () => "model-pricing-toggle-btn",
+  },
+  {
+    id: "duplicate",
+    label: t("modelPricing.actionDuplicate"),
+    icon: "content-copy",
+    visible: (row) => !isReadOnly(row),
+    onSelect: (row) => duplicateModel(row),
+    badge: (row, placement) =>
+      placement === "more"
+        ? draftMark(
+            row,
+            `model-pricing-${row.id}-more-actions-draft-dot`,
+            t("modelPricing.moreActions"),
+          )
+        : draftMark(
+            row,
+            `model-pricing-${row.id}-duplicate-menu-draft-dot`,
+            t("modelPricing.actionDuplicate"),
+          ),
+    dataTest: () => "model-pricing-duplicate-btn",
+  },
+  {
+    id: "clone",
+    label: (row) => duplicateActionLabel(row, t("modelPricing.actionClone")),
+    icon: "content-copy",
+    shortcut: "duplicate",
+    visible: isReadOnly,
+    onSelect: (row) => duplicateModel(row),
+    badge: (row) =>
+      draftMark(row, `model-pricing-${row.id}-clone-draft-dot`, t("modelPricing.actionClone")),
+    dataTest: () => "model-pricing-clone-btn",
+  },
+  {
+    id: "delete",
+    label: t("modelPricing.actionDelete"),
+    icon: "delete",
+    visible: (row) => !isReadOnly(row),
+    onSelect: (row) => confirmDelete(row),
+    dataTest: () => "model-pricing-delete-btn",
   },
 ];
 
@@ -1023,10 +963,8 @@ function isDisabled(model: any): boolean {
   return !model.enabled;
 }
 
-// True when the search box or a non-"all" tab is narrowing the list. Drives
-// OEmptyState's `:filtered` so an empty result reads as "No model pricing found"
-// (with Clear filters) rather than the first-run "create your first" card.
-const isFiltered = computed(() => !!filterQuery.value.trim() || selectedTab.value !== "all");
+// Custom is the first-run surface: empty, it offers the create card rather than "Clear filters".
+const isFiltered = computed(() => !!filterQuery.value.trim() || selectedTab.value === "inherited");
 
 function clearFilters() {
   filterQuery.value = "";

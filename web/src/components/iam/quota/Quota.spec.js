@@ -124,6 +124,15 @@ const mountQuota = async (routeQuery = {}) => {
   });
 };
 
+describe("Quota API limits table", () => {
+  it("declares its columns before an organization is chosen", async () => {
+    const wrapper = await mountQuota();
+    wrapper.vm.selectedOrganization = null;
+    expect(wrapper.vm.generateColumns().length).toBeGreaterThan(0);
+    wrapper.unmount();
+  });
+});
+
 describe("Quota role limits tab under a locked rbac license", () => {
   it("keeps the tab, shows the denied state and skips the roles fetch", async () => {
     const saved = store.state.zoConfig;

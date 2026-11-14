@@ -381,10 +381,64 @@ interface OTableColumnDef<TData = any> {
     isName?: boolean; // primary name column (weight 500)
     format?: (value: any, row: any) => any;
     cellOverflowTooltip?: boolean; // false = this column never shows the cut-cell tooltip (secret columns)
+    actionCount?: number; // buttons a hand-written actions cell draws; ignored when the table has rowActions
+    link?: (row: any) => RouteLocationRaw | (() => void) | undefined; // name cell opens the item
     [key: string]: any;
   };
 }
 ```
+
+**Row actions (`rowActions`).** Pass the list once on the table; the `isAction`
+column draws it and sizes itself to the declared list, three buttons at most (so
+no `meta.actionCount`), the same while loading and loaded. Declare a two-state
+action as one entry, or the column reserves a button no row draws. A
+`#cell-<actions column id>` slot, when present, wins.
+
+```ts
+interface OTableRowAction<TData = any> {
+  id: string; // "edit" is placed first, "delete" last and destructive; any other id keeps array order
+  label: I18nText | ((row: TData) => I18nText); // tooltip, aria-label and menu text
+  icon: IconName | ((row: TData) => IconName);
+  onSelect: (row: TData) => void;
+  visible?: (row: TData) => boolean;
+  disabled?: (row: TData) => boolean | I18nText; // true, or the reason shown in the tooltip
+  inline?: boolean; // stays inline when more than three exist; at most two are honoured
+  tone?: "destructive" | "success" | ((row: TData) => "destructive" | "success" | undefined);
+  shortcut?: string | ((row: TData) => string); // data-row-action it answers; defaults to id
+  loading?: (row: TData) => boolean | { label?: I18nText; dataTest?: string }; // spinner replaces the button
+  badge?: (row: TData, placement: "inline" | "menu" | "more") => boolean | { label?: I18nText; dataTest?: string };
+  dataTest?: (row: TData, index: number) => string; // inline button; the menu item appends "-menu"
+}
+```
+
+- md and up: up to three visible actions are inline, end-aligned. More than three:
+  two inline (those marked `inline`, else the first two) plus a "More actions" menu.
+- Below md: one kebab holds every visible action in the same order.
+- **A two-state action is one entry** (Enable/Disable, Block/Unblock): `label`, `icon`,
+  `tone` and `shortcut` read the row. `tone: "destructive"` is for a non-delete action
+  that destroys or stops something (Cancel query, Disable); `"success"` for its
+  opposite (Enable). In the menu only destructive is coloured.
+- **Shortcuts.** Each inline button carries `data-row-action="<shortcut>"`; an action
+  inside the menu keeps a hidden in-row proxy, so the row shortcuts reach it too.
+- **`loading(row)`** swaps the button for a spinner (data-test `<dataTest>-spinner`
+  unless the mark names one). **`badge(row, placement)`** draws a dot on the inline
+  button, on the menu item, and (`"more"`) on the menu trigger; its `label` names the
+  marked part. Use it for a kept unsaved copy.
+- **Table props.** `row-actions-more-data-test` (string or `(row, index) => string`)
+  names the menu trigger; a page that had `<x>-row-more-actions` passes it.
+  `#row-actions="{ row, index }"` replaces the buttons on the rows
+  `:row-actions-slot="(row) => boolean"` names (every row without the prop), for
+  example a "managed" tag on system rows.
+- **Overflow.** The actions column stays pinned. When the columns cannot fit even
+  at their `minSize` the table scrolls sideways under it, so nothing is out of
+  reach. The scrollbar and the table's minimum width share one threshold, which
+  counts an `autoWidth` filler at its `minSize`.
+
+**Name link (`meta.link`).** The column renders `ONameLinkCell`
+(`@/lib/core/Table/cells`): a `RouterLink` for a route, a button for a callback,
+plain text when `link` returns `undefined`. Its data-test is
+`<table data-test>-name-link`. A page that keeps a custom `#cell-name` slot puts
+`<ONameLinkCell :to="…">{{ row.name }}</ONameLinkCell>` inside it.
 
 **Server mode — check the backend BEFORE you write the column.** In
 `sorting="server"` the table does not sort anything: it emits the column **id** as

@@ -2,15 +2,16 @@
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
+import { useStore } from "vuex";
 import OTable from "@/lib/core/Table/OTable.vue";
-import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import { COL, type OTableColumnDef, type OTableRowAction } from "@/lib/core/Table/OTable.types";
+import ONameLinkCell from "@/lib/core/Table/cells/ONameLinkCell.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
-import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
-import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import { useI18nTyped } from "@/types/i18n";
 import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
 import { useEditorDraftIds } from "@/composables/useEditorDraft";
@@ -25,6 +26,10 @@ const props = defineProps<{
   loading?: boolean;
   forbidden?: ForbiddenState;
   actionLoading?: boolean;
+  /** Member counts are still being fetched; unknown counts draw a placeholder instead of a dash. */
+  countsLoading?: boolean;
+  /** The build cannot load member counts, so their columns are left out. */
+  countsUnavailable?: boolean;
   selectedIds?: string[];
   globalFilter?: string;
   pageSize?: number;
@@ -66,15 +71,30 @@ const onEmptyStateAction = (id?: string) => {
   if (id === "create") emit("create");
 };
 
-// The Users column only exists when the caller could resolve member counts (the
-// batched user→roles map is enterprise-only) — an all-dash column would be noise.
-const hasUserCounts = computed(() =>
-  (props.data ?? []).some((row: any) => typeof row?.user_count === "number"),
-);
-
-const hasServiceAccountCounts = computed(() =>
-  (props.data ?? []).some((row: any) => typeof row?.service_account_count === "number"),
-);
+const store = useStore();
+// Known before the counts load, so hiding the column for a disabled feature moves nothing later.
+const serviceAccountsEnabled = computed(() => !!store.state.zoConfig?.service_account_enabled);
+const userCountColumn: OTableColumnDef = {
+  id: "user_count",
+  header: t("iam.roleUsers"),
+  accessorKey: "user_count",
+  sortable: true,
+  resizable: true,
+  hideable: true,
+  size: COL.count,
+  meta: { align: "right" },
+};
+const serviceAccountColumn: OTableColumnDef = {
+  id: "service_account_count",
+  header: t("iam.serviceAccounts"),
+  accessorKey: "service_account_count",
+  sortable: true,
+  resizable: true,
+  hideable: true,
+  size: 150,
+  minSize: 150,
+  meta: { align: "right" },
+};
 
 const columns = computed<OTableColumnDef[]>(() => {
   const cols: OTableColumnDef[] = [
@@ -85,34 +105,10 @@ const columns = computed<OTableColumnDef[]>(() => {
       sortable: true,
       meta: { align: "left", autoWidth: true, isName: true },
     },
+    // Declared before the counts load, so their arrival moves no column.
+    ...(props.countsUnavailable ? [] : [userCountColumn]),
+    ...(serviceAccountsEnabled.value && !props.countsUnavailable ? [serviceAccountColumn] : []),
   ];
-
-  if (hasUserCounts.value) {
-    cols.push({
-      id: "user_count",
-      header: t("iam.roleUsers"),
-      accessorKey: "user_count",
-      sortable: true,
-      resizable: true,
-      hideable: true,
-      size: COL.count,
-      meta: { align: "right" },
-    });
-  }
-
-  if (hasServiceAccountCounts.value) {
-    cols.push({
-      id: "service_account_count",
-      header: t("iam.serviceAccounts"),
-      accessorKey: "service_account_count",
-      sortable: true,
-      resizable: true,
-      hideable: true,
-      size: 150,
-      minSize: 150,
-      meta: { align: "right" },
-    });
-  }
 
   if (props.assignTarget) {
     cols.push({
@@ -130,14 +126,27 @@ const columns = computed<OTableColumnDef[]>(() => {
     header: t("common.actions"),
     isAction: true,
     pinned: "right",
-    size: 80,
-    minSize: 64,
-    maxSize: 100,
-    meta: { align: "center", actionCount: 2 },
   });
 
   return cols;
 });
+
+const rowActions: OTableRowAction[] = [
+  {
+    id: "edit",
+    label: t("common.edit"),
+    icon: "edit",
+    onSelect: (row) => emit("edit", row),
+    dataTest: (row) => `iam-roles-edit-${row.role_name}-role-icon`,
+  },
+  {
+    id: "delete",
+    label: t("common.delete"),
+    icon: "delete",
+    onSelect: (row) => emit("delete", row),
+    dataTest: (row) => `iam-roles-delete-${row.role_name}-role-icon`,
+  },
+];
 
 const isAssigned = (row: any): boolean => (props.assignedRoleNames ?? []).includes(row?.role_name);
 </script>
@@ -162,6 +171,8 @@ const isAssigned = (row: any): boolean => (props.assignedRoleNames ?? []).includ
     sorting="client"
     selection="multiple"
     row-key="role_name"
+    :row-actions="rowActions"
+    row-actions-more-data-test="iam-roles-row-more-actions"
     filter-mode="client"
     :default-columns="false"
     show-index
@@ -185,8 +196,10 @@ const isAssigned = (row: any): boolean => (props.assignedRoleNames ?? []).includ
     </template>
 
     <template #cell-role_name="{ row, value }">
-      <span class="inline-flex items-center gap-2">
-        <span class="text-text-body">{{ value }}</span>
+      <span class="inline-flex max-w-full min-w-0 items-center gap-2">
+        <ONameLinkCell :to="() => emit('edit', row)" data-test="iam-roles-table-name-link">{{
+          value
+        }}</ONameLinkCell>
         <EditorDraftDot
           v-if="roleDrafts.ids.has(row?.role_name)"
           :saved-at="roleDrafts.savedAt(row?.role_name)"
@@ -207,6 +220,12 @@ const isAssigned = (row: any): boolean => (props.assignedRoleNames ?? []).includ
       >
         {{ row.user_count }}
       </OButton>
+      <OSkeleton
+        v-else-if="countsLoading"
+        type="text"
+        class="ms-auto h-3 w-8"
+        :data-test="`iam-roles-${row.role_name}-users-loading`"
+      />
       <span v-else class="text-text-muted tabular-nums">—</span>
     </template>
     <template #cell-service_account_count="{ row }">
@@ -221,6 +240,12 @@ const isAssigned = (row: any): boolean => (props.assignedRoleNames ?? []).includ
       >
         {{ row.service_account_count }}
       </OButton>
+      <OSkeleton
+        v-else-if="countsLoading"
+        type="text"
+        class="ms-auto h-3 w-8"
+        :data-test="`iam-roles-${row.role_name}-service-accounts-loading`"
+      />
       <span v-else class="text-text-muted tabular-nums">—</span>
     </template>
     <template #toolbar-trailing>
@@ -243,64 +268,6 @@ const isAssigned = (row: any): boolean => (props.assignedRoleNames ?? []).includ
         >
           {{ t("iam.rolesPage.assignBtn") }}
         </OButton>
-      </div>
-    </template>
-
-    <!-- Row actions: edit + delete -->
-    <template #cell-actions="{ row }">
-      <div class="flex items-center justify-center">
-        <OButton
-          :data-test="`iam-roles-edit-${row.role_name}-role-icon`"
-          data-row-action="edit"
-          variant="ghost"
-          size="icon-sm"
-          class="max-md:hidden"
-          :title="t('common.edit')"
-          @click="emit('edit', row)"
-        >
-          <OIcon name="edit" size="sm" />
-        </OButton>
-        <OButton
-          :data-test="`iam-roles-delete-${row.role_name}-role-icon`"
-          data-row-action="delete"
-          variant="ghost"
-          size="icon-sm"
-          class="max-md:hidden"
-          :title="t('common.delete')"
-          @click="emit('delete', row)"
-        >
-          <OIcon name="delete" size="sm" />
-        </OButton>
-        <ODropdown side="bottom" align="end">
-          <template #trigger>
-            <OButton
-              :aria-label="t('common.moreActions')"
-              icon-left="more-vert"
-              variant="ghost"
-              size="icon-xs-sq"
-              class="md:hidden"
-              data-test="iam-roles-row-more-actions"
-              @click.stop
-            />
-          </template>
-          <ODropdownItem
-            icon-left="edit"
-            class="md:hidden"
-            :data-test="`iam-roles-edit-${row.role_name}-role-icon-menu`"
-            @select="emit('edit', row)"
-          >
-            <span>{{ t("common.edit") }}</span>
-          </ODropdownItem>
-          <ODropdownItem
-            icon-left="delete"
-            variant="destructive"
-            class="md:hidden"
-            :data-test="`iam-roles-delete-${row.role_name}-role-icon-menu`"
-            @select="emit('delete', row)"
-          >
-            <span>{{ t("common.delete") }}</span>
-          </ODropdownItem>
-        </ODropdown>
       </div>
     </template>
 

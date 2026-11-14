@@ -146,6 +146,12 @@ export class SettingsFormValidationPage {
         await input.fill(value);
     }
 
+    async getTraceIdValue() {
+        const input = this.page.locator(this.traceIdInputField);
+        await input.waitFor({ state: 'visible' });
+        return input.inputValue();
+    }
+
     async fillSpanIdField(value) {
         const input = this.page.locator(this.spanIdInputField);
         await input.waitFor({ state: 'visible' });

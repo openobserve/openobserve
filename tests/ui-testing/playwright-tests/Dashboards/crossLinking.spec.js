@@ -1562,7 +1562,7 @@ test.describe("Cross-Linking testcases", () => {
         }
 
         await pm.crossLinkPage.deleteAllCrossLinks();
-        await pm.crossLinkPage.clickOrgSettingsSave();
+        await pm.crossLinkPage.saveOrgSettingsIfChanged();
 
         testLogger.info('Org-level cross-links cleaned up');
     });

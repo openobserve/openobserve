@@ -27,41 +27,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ isUpdatingCipherKey ? t("cipherKey.update") : t("cipherKey.add") }}
       </span>
     </template>
-    <div class="create-cipher-form">
-      <!-- One OForm owns every field across the stepper (the children render
-           OForm* controls connected by name); a single Zod schema gates the
-           whole form. Inline form → the footer Save is type="submit" (Enter
-           works natively) and its spinner is form-driven via v-slot. -->
-      <OForm :form="form" v-slot="{ isSubmitting }">
-        <!-- eslint-disable-next-line local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
-        <div class="overflow-auto" style="height: calc(100vh - var(--navbar-height) - 155px)">
-          <!-- Constrain the whole form to a sensible reading width on wide screens
-               while staying fluid below the breakpoint. -->
-          <div class="w-full max-w-3xl">
-            <div class="flex">
-              <div class="o2-input mx-3 mt-3 mb-4 flex w-1/3">
-                <OFormInput
-                  data-test="add-cipher-key-name-input"
-                  name="name"
-                  :label="t('cipherKey.name')"
-                  required
-                  class="w-full"
-                  :readonly="isUpdatingCipherKey"
-                  :disabled="isUpdatingCipherKey"
-                  tabindex="0"
-                />
-              </div>
-            </div>
+    <div class="create-cipher-form flex min-h-0 flex-1 flex-col">
+      <!-- One OForm owns every field across the stepper; the pinned bar's Save submits it. -->
+      <OForm :form="form" v-slot="{ isSubmitting }" class="flex min-h-0 flex-1 flex-col">
+        <div class="min-h-0 flex-1 overflow-auto px-4 py-3">
+          <div class="flex w-full max-w-5xl flex-col gap-4">
+            <OFormSection variant="plain" :title="t('cipherKey.sectionKey')">
+              <OFormInput
+                data-test="add-cipher-key-name-input"
+                name="name"
+                :label="t('cipherKey.name')"
+                required
+                class="w-full max-w-md"
+                :readonly="isUpdatingCipherKey"
+                :disabled="isUpdatingCipherKey"
+                tabindex="0"
+              />
+            </OFormSection>
 
-            <!-- eslint-disable-next-line local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
-            <div style="height: calc(100vh - var(--navbar-height) - 300px)">
-              <OStepper
-                v-model="step"
-                orientation="vertical"
-                animated
-                navigable
-                class="mx-3 h-full p-0"
-              >
+            <OFormSection variant="plain" :title="t('cipherKey.sectionSetup')">
+              <OStepper v-model="step" orientation="vertical" animated navigable class="p-0">
                 <OStep
                   data-test="cipher-key-key-store-detils-step"
                   :name="1"
@@ -96,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div class="mt-4 flex gap-2">
                       <OButton
                         data-test="add-report-step1-continue-btn"
-                        variant="primary"
+                        variant="outline"
                         size="sm-action"
                         :disabled="isSubmitting"
                         @click="continueToStep2"
@@ -128,40 +113,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </OStep>
               </OStepper>
-            </div>
+            </OFormSection>
           </div>
         </div>
-        <div class="mx-2">
-          <div
-            class="border-border-default sticky bottom-0 z-2 flex w-full justify-end gap-2 border-t px-2 py-4"
-          >
-            <OButton
-              data-test="add-cipher-key-cancel-btn"
-              variant="outline"
-              size="sm-action"
-              :disabled="isSubmitting"
-              @click="closeEditor"
-            >
-              {{ t("common.cancel") }}
-            </OButton>
-            <OButton
-              data-test="add-cipher-key-save-btn"
-              variant="primary"
-              size="sm-action"
-              type="submit"
-              :loading="isSubmitting"
-            >
-              {{ t("common.save") }}
-            </OButton>
-          </div>
-        </div>
+        <OSaveBar
+          mode="create"
+          class="shrink-0 px-4"
+          data-test="add-cipher-key-footer"
+          save-data-test="add-cipher-key-save-btn"
+          cancel-data-test="add-cipher-key-cancel-btn"
+          @cancel="closeEditor"
+        />
       </OForm>
     </div>
     <EditorDraftDialogs :draft="cipherKeyDraft" />
   </OPageLayout>
 </template>
 <script lang="ts" setup>
-import { ref, computed, nextTick, onMounted, onActivated } from "vue";
+import { computed, ref, nextTick, onMounted, onActivated } from "vue";
 import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
@@ -176,10 +145,12 @@ import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm, type FormFieldPath } from "@/lib/forms/Form/useOForm";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
+import OSaveBar from "@/lib/forms/SaveBar/OSaveBar.vue";
 import OStepper from "@/lib/navigation/Stepper/OStepper.vue";
 import OStep from "@/lib/navigation/Stepper/OStep.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
+import OFormSection from "@/lib/core/FormSection/OFormSection.vue";
 import {
   makeAddCipherKeySchema,
   addCipherKeyDefaults,
@@ -225,9 +196,7 @@ const form = useOForm<AddCipherKeyForm>({
 });
 
 const storeType = form.useStore((s: any) => s?.values?.key?.store?.type ?? "local");
-
-// Whole sentence in the message: "(Type: …)" was an untranslated English
-// fragment appended to a translated title.
+// Step 1 folds away once done, and its title is then the only place the chosen type shows.
 const step1Title = computed(() =>
   t("cipherKey.step1WithType", { type: getTypeLabel(storeType.value) }),
 );

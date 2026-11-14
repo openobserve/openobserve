@@ -1,66 +1,14 @@
 <template>
-  <OCard class="border-card-glass-border mb-4 border border-solid" data-test="license-online-card">
-    <OCardSection role="body">
-      <div class="mb-3 text-xl font-semibold">{{ t("about.online_title") }}</div>
-      <ODescriptionList>
-        <ODescriptionItem :stacked="isMobile" :label="t('about.status_lbl')">
-          <OTag :variant="badgeVariant">{{ statusLabel(registrationStatus, t) }}</OTag>
-          <span class="text-text-secondary ms-1">{{ statusHint }}</span>
-        </ODescriptionItem>
-        <ODescriptionItem
-          :stacked="isMobile"
-          v-if="showKey || (refresh.mode === 'disabled' && refresh.last_success_at)"
-          :label="t('about.online_last_refreshed')"
-        >
-          <span>{{ lastRefreshed }}</span>
-          <span v-if="lastOutcome" class="text-text-secondary">
-            {{
-              t("about.online_last_outcome", {
-                outcome: lastOutcome,
-              })
-            }}
-          </span>
-        </ODescriptionItem>
-        <ODescriptionItem
-          :stacked="isMobile"
-          v-if="refresh.last_error"
-          :label="t('about.online_last_error')"
-        >
-          <div class="text-status-negative" data-test="license-online-last-error">
-            {{ lastError }}
-          </div>
-          <div v-if="isNetworkError" class="text-text-secondary mt-1 text-xs">
-            {{ t("about.online_proxy_hint") }}
-          </div>
-        </ODescriptionItem>
-        <ODescriptionItem
-          :stacked="isMobile"
-          v-if="showKey"
-          :label="t('about.online_installation_key')"
-        >
-          <template v-if="isRoot && refresh.key_id">
-            <code class="bg-surface-subtle rounded-default px-1">{{ shortKey }}</code>
-            <span class="text-text-secondary">{{
-              t("about.online_key_storage", { storage: keyStorage })
-            }}</span>
-            <div
-              v-if="refresh.key_at_rest === 'plaintext'"
-              class="text-text-secondary mt-1 text-xs"
-            >
-              {{ t("about.online_plaintext_hint") }}
-            </div>
-          </template>
-          <span v-else-if="!refresh.key_created" class="text-text-secondary">{{
-            t("about.online_no_key")
-          }}</span>
-          <span v-else class="text-text-secondary">{{ t("about.online_key_root_only") }}</span>
-        </ODescriptionItem>
-      </ODescriptionList>
-    </OCardSection>
-    <OCardActions v-if="canUpdate" align="left" class="-mt-3">
+  <OFormSection
+    variant="plain"
+    class="mb-4"
+    :title="t('about.online_title')"
+    data-test="license-online-card"
+  >
+    <template v-if="canUpdate" #actions>
       <OButton
         v-if="canCopy && refresh.successor_available"
-        variant="primary"
+        variant="outline"
         size="sm-action"
         icon-left="content-copy"
         data-test="license-online-copy"
@@ -68,7 +16,7 @@
         >{{ t("about.online_copy_renewed") }}</OButton
       >
       <OButton
-        :variant="canCopy && refresh.successor_available ? 'outline' : 'primary'"
+        variant="outline"
         size="sm-action"
         icon-left="refresh"
         :loading="busy"
@@ -104,11 +52,60 @@
         @click="emit('add-license-key')"
         >{{ t("about.add_new_license_key") }}</OButton
       >
-    </OCardActions>
-    <OCardSection
+    </template>
+    <OSettingRow control-at="end" :label="t('about.status_lbl')">
+      <div class="text-sm">
+        <OTag :variant="badgeVariant">{{ statusLabel(registrationStatus, t) }}</OTag>
+        <span class="text-text-secondary ms-1">{{ statusHint }}</span>
+      </div>
+    </OSettingRow>
+    <OSettingRow
+      v-if="showKey || (refresh.mode === 'disabled' && refresh.last_success_at)"
+      control-at="end"
+      :label="t('about.online_last_refreshed')"
+    >
+      <div class="text-sm">
+        <span>{{ lastRefreshed }}</span>
+        <!-- The saved outcome already prints below the rows; only a different one is repeated here. -->
+        <span v-if="lastOutcome && lastOutcome !== outcome?.text" class="text-text-secondary">
+          {{
+            t("about.online_last_outcome", {
+              outcome: lastOutcome,
+            })
+          }}
+        </span>
+      </div>
+    </OSettingRow>
+    <OSettingRow v-if="refresh.last_error" control-at="end" :label="t('about.online_last_error')">
+      <div class="text-sm">
+        <div class="text-status-negative" data-test="license-online-last-error">
+          {{ lastError }}
+        </div>
+        <div v-if="isNetworkError" class="text-text-secondary mt-1 text-xs">
+          {{ t("about.online_proxy_hint") }}
+        </div>
+      </div>
+    </OSettingRow>
+    <OSettingRow v-if="showKey" control-at="end" :label="t('about.online_installation_key')">
+      <div class="text-sm">
+        <template v-if="isRoot && refresh.key_id">
+          <code class="bg-surface-subtle rounded-default px-1">{{ shortKey }}</code>
+          <span class="text-text-secondary">{{
+            t("about.online_key_storage", { storage: keyStorage })
+          }}</span>
+          <div v-if="refresh.key_at_rest === 'plaintext'" class="text-text-secondary mt-1 text-xs">
+            {{ t("about.online_plaintext_hint") }}
+          </div>
+        </template>
+        <span v-else-if="!refresh.key_created" class="text-text-secondary">{{
+          t("about.online_no_key")
+        }}</span>
+        <span v-else class="text-text-secondary">{{ t("about.online_key_root_only") }}</span>
+      </div>
+    </OSettingRow>
+    <div
       v-if="!canUpdate || outcome || neverRefreshed || refresh.rotate_recommended"
-      role="footer"
-      class="-mt-3"
+      class="px-4 py-3"
     >
       <div v-if="!canUpdate" class="text-text-secondary text-sm">
         {{ t("about.online_ask_admin") }}
@@ -138,22 +135,18 @@
           {{ outcome.hint }}
         </div>
       </template>
-    </OCardSection>
-  </OCard>
+    </div>
+  </OFormSection>
 </template>
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import useBreakpoint from "@/composables/useBreakpoint";
 import { useLicenseRefresh } from "@/composables/useLicenseRefresh";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OCard from "@/lib/core/Card/OCard.vue";
-import OCardActions from "@/lib/core/Card/OCardActions.vue";
-import OCardSection from "@/lib/core/Card/OCardSection.vue";
+import OFormSection from "@/lib/core/FormSection/OFormSection.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import ODescriptionList from "@/lib/lists/DescriptionList/ODescriptionList.vue";
-import ODescriptionItem from "@/lib/lists/DescriptionList/ODescriptionItem.vue";
+import OSettingRow from "@/lib/core/SettingRow/OSettingRow.vue";
 import { useI18nTyped } from "@/types/i18n";
 import type { RefreshResult } from "@/ts/interfaces/licenseRefresh";
 import { refreshMessage, statusLabel, type RefreshStatus } from "@/utils/licenseRefresh";
@@ -169,7 +162,6 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{ "add-license-key": []; refreshed: [] }>();
 const { t, locale } = useI18nTyped();
-const { isMobile } = useBreakpoint();
 const { refreshLicenseLimits, rotateInstanceKey } = useLicenseRefresh();
 const busy = ref(false);
 const result = ref<RefreshResult>();

@@ -17,9 +17,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OCard from "@/lib/core/Card/OCard.vue";
+import OFormSection from "@/lib/core/FormSection/OFormSection.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
-import { useI18nTyped, type I18nText } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import type { SlackInstallConfirmation } from "@/types/slack";
 
 const props = defineProps<{ confirmation: SlackInstallConfirmation }>();
@@ -51,20 +51,12 @@ const channel = computed(() => props.confirmation.destination?.channel.replace(/
 </script>
 
 <template>
-  <OCard variant="outlined" class="gap-3 p-5" data-test="slack-install-confirmation">
-    <OBanner variant="success" icon="check-circle" data-test="slack-install-connected">
-      {{ t("slackApp.connect.connectedTitle", { team: confirmation.team }) }}
-    </OBanner>
-    <p v-if="linkingLine" class="text-text-body m-0 text-sm">{{ linkingLine }}</p>
-    <p v-if="linkAllLine" class="text-text-body m-0 text-sm">{{ linkAllLine }}</p>
-    <p
-      v-if="confirmation.destination"
-      class="text-text-secondary m-0 text-sm"
-      data-test="slack-install-destination"
-    >
-      {{ t("slackApp.connect.connectedDestination", { channel }) }}
-    </p>
-    <div class="flex justify-end">
+  <OFormSection
+    variant="plain"
+    :title="raw(confirmation.team)"
+    data-test="slack-install-confirmation"
+  >
+    <template #actions>
       <OButton
         variant="primary"
         size="sm-action"
@@ -73,6 +65,20 @@ const channel = computed(() => props.confirmation.destination?.channel.replace(/
       >
         {{ t("slackApp.connect.continue") }}
       </OButton>
+    </template>
+    <div class="flex flex-col gap-3">
+      <OBanner variant="success" icon="check-circle" data-test="slack-install-connected">
+        {{ t("slackApp.connect.connectedTitle", { team: confirmation.team }) }}
+      </OBanner>
+      <p v-if="linkingLine" class="text-text-body m-0 text-sm">{{ linkingLine }}</p>
+      <p v-if="linkAllLine" class="text-text-body m-0 text-sm">{{ linkAllLine }}</p>
+      <p
+        v-if="confirmation.destination"
+        class="text-text-secondary m-0 text-sm"
+        data-test="slack-install-destination"
+      >
+        {{ t("slackApp.connect.connectedDestination", { channel }) }}
+      </p>
     </div>
-  </OCard>
+  </OFormSection>
 </template>

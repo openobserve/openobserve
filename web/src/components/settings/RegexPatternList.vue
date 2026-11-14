@@ -19,12 +19,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template v-if="!showImportRegexPatternDialog">
       <!-- Standard section header: title + actions only. Search moved to toolbar. -->
       <OPageLayout
+        overflow-first
         :title="t('regex_patterns.title')"
         icon="pattern"
         :subtitle="t('settings.regexPatternList.subtitle')"
         bleed
       >
-        <template #actions>
+        <template #actions-overflow>
           <OButton
             variant="outline"
             size="sm"
@@ -32,6 +33,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="regex-pattern-list-import"
             >{{ t("regex_patterns.import") }}</OButton
           >
+        </template>
+        <template #actions>
           <OButton
             data-test="regex-pattern-list-add-pattern-btn"
             variant="primary"
@@ -57,6 +60,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="regex-pattern-list-table"
             :data="visibleRows"
             :columns="columns"
+            :row-actions="rowActions"
+            row-actions-more-data-test="regex-pattern-list-row-more-actions"
             row-key="id"
             :selected-ids="selectedPatternIds"
             selection="multiple"
@@ -118,7 +123,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
             <template #cell-name="{ row }">
               <div class="flex min-w-0 items-center gap-2">
-                <OTruncatedText>{{ row.name }}</OTruncatedText>
+                <ONameLinkCell
+                  :to="() => editRegexPattern(row)"
+                  data-test="regex-pattern-list-table-name-link"
+                  >{{ row.name }}</ONameLinkCell
+                >
                 <EditorDraftDot
                   v-if="regexDrafts.ids.has(row.id)"
                   :saved-at="regexDrafts.savedAt(row.id)"
@@ -134,78 +143,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
             <template #cell-updated_at="{ row }">
               <OTimeCell :value="row.updated_at" unit="iso" :timezone="store.state.timezone" />
-            </template>
-            <template #cell-actions="{ row }">
-              <div class="flex items-center justify-center gap-1">
-                <OButton
-                  :data-test="`regex-pattern-list-${row.id}-export-regex-pattern`"
-                  data-row-action="export"
-                  variant="ghost"
-                  size="icon-xs-sq"
-                  class="max-md:hidden"
-                  :title="t('settings.regexPatternList.exportTitle')"
-                  @click.stop="exportRegexPattern(row)"
-                  icon-left="download"
-                />
-                <OButton
-                  :data-test="`regex-pattern-list-${row.id}-update-regex-pattern`"
-                  data-row-action="edit"
-                  variant="ghost"
-                  size="icon-xs-sq"
-                  class="max-md:hidden"
-                  :title="t('regex_patterns.edit')"
-                  @click.stop="editRegexPattern(row)"
-                  icon-left="edit"
-                />
-                <OButton
-                  :data-test="`regex-pattern-list-${row.id}-delete-regex-pattern`"
-                  data-row-action="delete"
-                  variant="ghost-destructive"
-                  size="icon-xs-sq"
-                  class="max-md:hidden"
-                  :title="t('regex_patterns.delete')"
-                  @click.stop="confirmDeleteRegexPattern(row)"
-                  icon-left="delete"
-                />
-                <ODropdown side="bottom" align="end">
-                  <template #trigger>
-                    <OButton
-                      :aria-label="t('common.moreActions')"
-                      icon-left="more-vert"
-                      variant="ghost"
-                      size="icon-xs-sq"
-                      class="md:hidden"
-                      data-test="regex-pattern-list-row-more-actions"
-                      @click.stop
-                    />
-                  </template>
-                  <ODropdownItem
-                    icon-left="download"
-                    class="md:hidden"
-                    :data-test="`regex-pattern-list-${row.id}-export-regex-pattern-menu`"
-                    @select="exportRegexPattern(row)"
-                  >
-                    <span>{{ t("settings.regexPatternList.exportTitle") }}</span>
-                  </ODropdownItem>
-                  <ODropdownItem
-                    icon-left="edit"
-                    class="md:hidden"
-                    :data-test="`regex-pattern-list-${row.id}-update-regex-pattern-menu`"
-                    @select="editRegexPattern(row)"
-                  >
-                    <span>{{ t("regex_patterns.edit") }}</span>
-                  </ODropdownItem>
-                  <ODropdownItem
-                    icon-left="delete"
-                    variant="destructive"
-                    class="md:hidden"
-                    :data-test="`regex-pattern-list-${row.id}-delete-regex-pattern-menu`"
-                    @select="confirmDeleteRegexPattern(row)"
-                  >
-                    <span>{{ t("regex_patterns.delete") }}</span>
-                  </ODropdownItem>
-                </ODropdown>
-              </div>
             </template>
             <template #selection-actions>
               <OButton
@@ -277,14 +214,13 @@ import ImportRegexPattern from "./ImportRegexPattern.vue";
 import config from "@/aws-exports";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
-import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OCodeCell from "@/lib/core/Table/cells/OCodeCell.vue";
+import ONameLinkCell from "@/lib/core/Table/cells/ONameLinkCell.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
-import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import type { OTableColumnDef, OTableRowAction } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { COL } from "@/lib/core/Table/OTable.types";
@@ -292,7 +228,6 @@ import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 import { forbiddenState } from "@/utils/featureGate";
 import { useListViewState } from "@/composables/useListViewState";
-import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
 import { useEditorDraftIds } from "@/composables/useEditorDraft";
 import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
@@ -306,14 +241,12 @@ export default defineComponent({
     ImportRegexPattern,
     OEmptyState,
     OButton,
-    ODropdown,
-    ODropdownItem,
+    ONameLinkCell,
     ORefreshButton,
     OSearchInput,
     OTable,
     OCodeCell,
     OTimeCell,
-    OTruncatedText,
     EditorDraftDot,
   },
   setup() {
@@ -353,7 +286,7 @@ export default defineComponent({
         resizable: true,
         hideable: true,
         size: COL.name,
-        minSize: 270,
+        minSize: 180,
         meta: { align: "left", flex: true },
       },
       {
@@ -362,9 +295,9 @@ export default defineComponent({
         accessorKey: "pattern",
         resizable: true,
         hideable: true,
-        size: 400,
-        minSize: 200,
-        meta: { align: "left" },
+        size: 280,
+        minSize: 140,
+        meta: { align: "left", flex: true },
       },
       {
         id: "created_at",
@@ -390,7 +323,29 @@ export default defineComponent({
         header: t("regex_patterns.actions"),
         isAction: true,
         pinned: "right",
-        meta: { align: "center", actionCount: 3 },
+      },
+    ];
+    const rowActions: OTableRowAction[] = [
+      {
+        id: "edit",
+        label: t("regex_patterns.edit"),
+        icon: "edit",
+        onSelect: (row) => editRegexPattern(row),
+        dataTest: (row) => `regex-pattern-list-${row.id}-update-regex-pattern`,
+      },
+      {
+        id: "export",
+        label: t("settings.regexPatternList.exportTitle"),
+        icon: "download",
+        onSelect: (row) => exportRegexPattern(row),
+        dataTest: (row) => `regex-pattern-list-${row.id}-export-regex-pattern`,
+      },
+      {
+        id: "delete",
+        label: t("regex_patterns.delete"),
+        icon: "delete",
+        onSelect: (row) => confirmDeleteRegexPattern(row),
+        dataTest: (row) => `regex-pattern-list-${row.id}-delete-regex-pattern`,
       },
     ];
 
@@ -704,6 +659,7 @@ export default defineComponent({
       sortOrder,
       oTableRef,
       columns,
+      rowActions,
       regexPatterns,
       filterData,
       createRegexPattern,

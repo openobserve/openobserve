@@ -60,14 +60,10 @@ describe("SemanticGroupItem - rendering", () => {
     expect(w.find('[data-test="tag-input-stub"]').exists()).toBe(true);
   });
 
-  it("shows ID as read-only caption when id is non-empty", async () => {
+  // The id is internal: it is derived from the name and never shown.
+  it("does not show the group's id", async () => {
     const w = await mountComp({ group: makeGroup({ id: "my-id" }) });
-    expect(w.text()).toContain("my-id");
-  });
-
-  it("does not show ID caption when id is empty", async () => {
-    const w = await mountComp({ group: makeGroup({ id: "" }) });
-    expect(w.text()).not.toContain("ID:");
+    expect(w.text()).not.toContain("my-id");
   });
 });
 
@@ -151,7 +147,7 @@ describe("SemanticGroupItem - required cue on blur (real user path)", () => {
     await flushPromises();
 
     expect(w.text()).not.toContain("Name is required");
-    expect(w.text()).toContain("my-group");
+    expect(w.emitted("update")?.at(-1)?.[0]).toMatchObject({ id: "my-group" });
   });
 });
 

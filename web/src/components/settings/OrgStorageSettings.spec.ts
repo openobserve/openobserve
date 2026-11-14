@@ -145,7 +145,7 @@ describe("OrgStorageSettings", () => {
     await nextTick();
     await nextTick();
 
-    expect(wrapper.text()).toContain("AWS Credentials");
+    expect(wrapper.text()).toContain("AWS credentials");
     expect(wrapper.text()).toContain("my-bucket");
     expect(wrapper.text()).toContain("us-west-1");
     expect(wrapper.text()).toContain("AKI123456789");
@@ -197,7 +197,7 @@ describe("OrgStorageSettings", () => {
     await nextTick();
     await nextTick();
 
-    expect(wrapper.text()).toContain("AWS Role ARN");
+    expect(wrapper.text()).toContain("AWS role ARN");
     expect(wrapper.text()).toContain("role-bucket");
     expect(wrapper.text()).toContain("us-east-1");
     expect(wrapper.text()).toContain("arn:aws:iam::123456789:role/test-role");

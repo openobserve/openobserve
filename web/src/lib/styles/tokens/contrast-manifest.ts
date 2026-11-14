@@ -175,6 +175,11 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
     why: "SC 1.4.3 exempts text and boundaries that belong to a disabled, inactive control",
   },
   {
+    fg: "--color-switch-border-off-neutral",
+    category: "non-text",
+    why: "SC 1.4.11: the solid grey outline is what identifies an Off switch on the page surface",
+  },
+  {
     fg: "--color-switch-disabled-border",
     category: "exempt",
     why: "SC 1.4.3 exempts text and boundaries that belong to a disabled, inactive control",

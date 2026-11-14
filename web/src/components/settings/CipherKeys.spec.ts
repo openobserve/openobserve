@@ -602,8 +602,6 @@ describe("CipherKeys", () => {
       expect(wrapper.vm.columns[3].id).toBe("actions");
       expect(wrapper.vm.columns[3].isAction).toBe(true);
       expect(wrapper.vm.columns[3].pinned).toBe("right");
-      expect(wrapper.vm.columns[3].size).toBe(100);
-      expect(wrapper.vm.columns[3].meta.align).toBe("center");
     });
   });
 

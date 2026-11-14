@@ -133,6 +133,14 @@ describe("OrgStorageEditor", () => {
     const wrapper = createWrapper("add");
     await selectProvider(wrapper, "AwsCredentials");
     expect(getForm(wrapper).state.values.selectedProvider).toBe("AwsCredentials");
+
+    await selectProvider(wrapper, "AzureCredentials");
+    expect(getForm(wrapper).state.values.selectedProvider).toBe("AzureCredentials");
+    expect(
+      wrapper
+        .find('[data-test="storage-settings-provider-card-AzureCredentials"]')
+        .attributes("aria-checked"),
+    ).toBe("true");
   });
 
   describe("Provider-discriminated validation (real OForm)", () => {

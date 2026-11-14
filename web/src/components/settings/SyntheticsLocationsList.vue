@@ -18,12 +18,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="flex h-full flex-col p-0">
     <template v-if="!showImportDialog">
       <OPageLayout
+        overflow-first
         :title="t('synthetics.locations.title')"
         icon="location-on"
         :subtitle="t('synthetics.locations.description')"
         bleed
       >
-        <template #actions>
+        <template #actions-overflow>
           <OButton
             variant="outline"
             size="sm"
@@ -38,6 +39,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="synthetics-locations-export-btn"
             >{{ t("synthetics.locations.exportTitle") }}</OButton
           >
+        </template>
+        <template #actions>
           <OButton
             data-test="synthetics-locations-add-btn"
             variant="primary"
@@ -76,6 +79,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             table-id="settings-synthetics-locations"
             :show-global-filter="false"
             :loading="listLoading"
+            :row-actions="rowActions"
+            row-actions-more-data-test="synthetics-locations-row-more-actions"
             @update:selected-ids="handleSelectedIdsUpdate"
           >
             <template #toolbar>
@@ -99,122 +104,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
             <template #empty>
               <OEmptyState
-                v-if="!listLoading"
+                v-if="!listLoading && filterQuery !== ''"
                 size="hero"
-                :preset="filterQuery !== '' ? 'no-search-results' : 'no-data'"
-                :filtered="filterQuery !== ''"
+                preset="no-search-results"
+                :filtered="true"
                 @action="(id?: string) => (id === 'clear-filters' ? (filterQuery = '') : undefined)"
               />
-            </template>
-            <template #cell-actions="{ row }">
-              <div class="flex items-center gap-0.5" @click.stop>
-                <!-- Enable / Disable toggle with per-row spinner -->
-                <div
-                  v-if="toggleLoadingMap[row.id]"
-                  class="flex h-8 w-7 items-center justify-center"
-                  :data-test="`synthetics-locations-${row.id}-toggle-spinner`"
-                >
-                  <OSpinner size="xs" />
-                  <OTooltip
-                    side="bottom"
-                    :content="
-                      row.enabled
-                        ? t('synthetics.locations.disabling')
-                        : t('synthetics.locations.enabling')
-                    "
-                  />
-                </div>
-                <OButton
-                  v-else
-                  :variant="row.enabled ? 'ghost-destructive' : 'ghost'"
-                  size="icon-xs-sq"
-                  class="max-md:hidden"
-                  :icon-left="row.enabled ? 'pause' : 'play-arrow'"
-                  :data-test="`synthetics-locations-${row.id}-${row.enabled ? 'disable' : 'enable'}-btn`"
-                  @click.stop="toggleLocationEnabled(row)"
-                >
-                  <OTooltip
-                    side="bottom"
-                    :content="
-                      row.enabled
-                        ? t('synthetics.locations.disable')
-                        : t('synthetics.locations.enable')
-                    "
-                  />
-                </OButton>
-
-                <!-- Edit -->
-                <OButton
-                  :data-test="`synthetics-locations-${row.id}-edit-btn`"
-                  data-row-action="edit"
-                  variant="ghost"
-                  size="icon-xs-sq"
-                  class="max-md:hidden"
-                  :title="t('common.edit')"
-                  @click.stop="openEditDialog(row)"
-                  icon-left="edit"
-                >
-                  <OTooltip side="bottom" :content="t('common.edit')" />
-                </OButton>
-
-                <!-- Delete -->
-                <OButton
-                  :data-test="`synthetics-locations-${row.id}-delete-btn`"
-                  data-row-action="delete"
-                  variant="ghost-destructive"
-                  size="icon-xs-sq"
-                  class="max-md:hidden"
-                  :title="t('common.delete')"
-                  @click.stop="confirmDelete(row)"
-                  icon-left="delete"
-                >
-                  <OTooltip side="bottom" :content="t('common.delete')" />
-                </OButton>
-                <ODropdown side="bottom" align="end">
-                  <template #trigger>
-                    <OButton
-                      :aria-label="t('common.moreActions')"
-                      icon-left="more-vert"
-                      variant="ghost"
-                      size="icon-xs-sq"
-                      class="md:hidden"
-                      data-test="synthetics-locations-row-more-actions"
-                      @click.stop
-                    />
-                  </template>
-                  <ODropdownItem
-                    v-if="!toggleLoadingMap[row.id]"
-                    :icon-left="row.enabled ? 'pause' : 'play-arrow'"
-                    :variant="row.enabled ? 'destructive' : 'default'"
-                    class="md:hidden"
-                    :data-test="`synthetics-locations-${row.id}-${row.enabled ? 'disable' : 'enable'}-btn-menu`"
-                    @select="toggleLocationEnabled(row)"
-                  >
-                    <span>{{
-                      row.enabled
-                        ? t("synthetics.locations.disable")
-                        : t("synthetics.locations.enable")
-                    }}</span>
-                  </ODropdownItem>
-                  <ODropdownItem
-                    icon-left="edit"
-                    class="md:hidden"
-                    :data-test="`synthetics-locations-${row.id}-edit-btn-menu`"
-                    @select="openEditDialog(row)"
-                  >
-                    <span>{{ t("common.edit") }}</span>
-                  </ODropdownItem>
-                  <ODropdownItem
-                    icon-left="delete"
-                    variant="destructive"
-                    class="md:hidden"
-                    :data-test="`synthetics-locations-${row.id}-delete-btn-menu`"
-                    @select="confirmDelete(row)"
-                  >
-                    <span>{{ t("common.delete") }}</span>
-                  </ODropdownItem>
-                </ODropdown>
-              </div>
+              <OEmptyState
+                v-else-if="!listLoading"
+                size="hero"
+                variant="create"
+                illustration="box"
+                :title="t('synthetics.locations.emptyState.title')"
+                :description="t('synthetics.locations.emptyState.description')"
+                :actions="emptyActions"
+                @action="(id?: string) => (id === 'create' ? openCreateDialog() : undefined)"
+              />
             </template>
             <template #selection-actions>
               <OButton
@@ -270,18 +175,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { ref, onMounted, defineComponent, computed, watch } from "vue";
 import type { Ref } from "vue";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
-import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
-import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import type { EmptyStateAction } from "@/lib/core/EmptyState/presets";
+import type { OTableColumnDef, OTableRowAction } from "@/lib/core/Table/OTable.types";
 import { COL } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
@@ -297,13 +200,10 @@ export default defineComponent({
   components: {
     OPageLayout,
     OButton,
-    ODropdown,
-    ODropdownItem,
     OTooltip,
     OSearchInput,
     OTable,
     OEmptyState,
-    OSpinner,
     SyntheticsLocationForm,
     ImportSyntheticsLocations,
   },
@@ -345,7 +245,11 @@ export default defineComponent({
         hideable: true,
         size: COL.name,
         minSize: 200,
-        meta: { align: "left", flex: true },
+        meta: {
+          align: "left",
+          flex: true,
+          link: (row: SyntheticsLocationRecord) => () => openEditDialog(row),
+        },
       },
       {
         id: "id",
@@ -382,13 +286,21 @@ export default defineComponent({
       },
       {
         id: "actions",
-        header: raw(""),
+        header: t("common.actions"),
         isAction: true,
         pinned: "right",
         size: 130,
         minSize: 130,
         sortable: false,
-        meta: { align: "center" },
+      },
+    ];
+
+    const emptyActions: EmptyStateAction[] = [
+      {
+        id: "create",
+        icon: "add",
+        titleKey: "synthetics.locations.addLocation",
+        descriptionKey: "synthetics.locations.emptyState.actionDesc",
       },
     ];
 
@@ -701,6 +613,39 @@ export default defineComponent({
       }
     };
 
+    const rowActions: OTableRowAction<SyntheticsLocationRecord>[] = [
+      {
+        id: "edit",
+        label: t("common.edit"),
+        icon: "edit",
+        onSelect: (row) => openEditDialog(row),
+        dataTest: (row) => `synthetics-locations-${row.id}-edit-btn`,
+      },
+      {
+        id: "toggle",
+        label: (row) =>
+          row.enabled ? t("synthetics.locations.disable") : t("synthetics.locations.enable"),
+        icon: (row) => (row.enabled ? "pause" : "play-arrow"),
+        loading: (row) =>
+          !!toggleLoadingMap.value[row.id] && {
+            label: row.enabled
+              ? t("synthetics.locations.disabling")
+              : t("synthetics.locations.enabling"),
+            dataTest: `synthetics-locations-${row.id}-toggle-spinner`,
+          },
+        onSelect: (row) => toggleLocationEnabled(row),
+        dataTest: (row) =>
+          `synthetics-locations-${row.id}-${row.enabled ? "disable" : "enable"}-btn`,
+      },
+      {
+        id: "delete",
+        label: t("common.delete"),
+        icon: "delete",
+        onSelect: (row) => confirmDelete(row),
+        dataTest: (row) => `synthetics-locations-${row.id}-delete-btn`,
+      },
+    ];
+
     return {
       t,
       store,
@@ -711,6 +656,8 @@ export default defineComponent({
       sortOrder,
       oTableRef,
       columns,
+      rowActions,
+      emptyActions,
       locations,
       listLoading,
       visibleRows,
@@ -722,7 +669,6 @@ export default defineComponent({
       openEditDialog,
       closeFormDialog,
       toggleLocationEnabled,
-      toggleLoadingMap,
       bulkToggleEnabled,
       bulkActionLoading,
       confirmDelete,

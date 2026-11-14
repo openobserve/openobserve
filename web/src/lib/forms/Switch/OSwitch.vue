@@ -6,6 +6,7 @@ import { computed, onMounted, ref, useAttrs, useId, useSlots, watch } from "vue"
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { splitControlAttrs, warnIfUnlabelled } from "@/lib/forms/controlAttrs";
 import { useLockedDisabled } from "@/composables/useFeatureLock";
+import { useI18nTyped } from "@/types/i18n";
 
 defineOptions({ inheritAttrs: false });
 const $attrs = useAttrs();
@@ -21,7 +22,11 @@ const props = withDefaults(defineProps<SwitchProps>(), {
   size: "md",
   disabled: false,
   labelPosition: "right",
+  offTone: "brand",
+  stateText: false,
 });
+
+const { t } = useI18nTyped();
 
 const emit = defineEmits<SwitchEmits>();
 
@@ -93,6 +98,12 @@ const trackSizes: Record<NonNullable<SwitchProps["size"]>, TrackSize> = {
 
 const currentSizes = computed(() => trackSizes[props.size ?? "md"]);
 
+const offClasses = computed(() =>
+  props.offTone === "neutral"
+    ? { border: "border-switch-border-off-neutral", thumb: "bg-switch-thumb-off-neutral" }
+    : { border: "border-switch-border-off", thumb: "bg-switch-thumb-off" },
+);
+
 const slots = useSlots();
 const autoId = useId();
 const buttonId = computed(() => props.id ?? autoId);
@@ -143,7 +154,7 @@ onMounted(() =>
           ? 'border-switch-disabled-border border-dashed bg-transparent'
           : isChecked
             ? 'bg-switch-track-on border-switch-border'
-            : 'border-switch-border-off bg-transparent',
+            : [offClasses.border, 'bg-transparent'],
         isDisabled ? 'cursor-not-allowed' : 'cursor-pointer',
         'outline-none',
         'focus-visible:ring-focus-ring-accent focus-visible:ring-4',
@@ -155,11 +166,26 @@ onMounted(() =>
           'block rounded-full',
           'transition-transform duration-200',
           currentSizes.thumb,
-          isDisabled ? 'bg-switch-disabled-thumb' : isChecked ? 'bg-white' : 'bg-switch-thumb-off',
+          isDisabled ? 'bg-switch-disabled-thumb' : isChecked ? 'bg-white' : offClasses.thumb,
           isChecked ? currentSizes.thumbTranslate : 'translate-x-0',
         ]"
       />
     </button>
+
+    <span
+      v-if="stateText"
+      aria-hidden="true"
+      :data-test="parentDataTest ? `${parentDataTest}-state` : undefined"
+      :class="[
+        'text-compact min-w-6 select-none',
+        isDisabled
+          ? 'text-input-label-text-disabled'
+          : isChecked
+            ? 'text-text-heading'
+            : 'text-text-secondary',
+      ]"
+      >{{ isChecked ? t("common.switchOn") : t("common.switchOff") }}</span
+    >
 
     <span
       v-if="hasLabel || $slots.tooltip"

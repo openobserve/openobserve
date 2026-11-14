@@ -20,7 +20,8 @@ import { mount, flushPromises } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import General from "./General.vue";
 import i18n, { loadLocaleMessages } from "@/locales";
-import { createRouter, createWebHistory } from "vue-router";
+import { createMemoryHistory, createRouter, createWebHistory } from "vue-router";
+import { useConfirmDialog } from "@/composables/useConfirmDialog";
 
 vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: vi.fn(() => vi.fn()),
@@ -380,6 +381,43 @@ describe("General settings Danger Zone", () => {
 
       expect((wrapper.vm as any).confirmDeleteOrg).toBe(true);
       expect((wrapper.vm as any).deleting).toBe(false);
+    });
+
+    it("leaves without asking about unsaved edits once the delete succeeded, and still asks after a failed one", async () => {
+      const dialog = useConfirmDialog();
+      const Blank = { template: "<div />" };
+      const router = createRouter({
+        history: createMemoryHistory(),
+        routes: [
+          { path: "/", component: Blank },
+          { path: "/settings", component: General },
+          { path: "/elsewhere", component: Blank },
+        ],
+      });
+      await router.push("/settings");
+      const app = mount(
+        { template: "<router-view />" },
+        { global: { plugins: [i18n, router], mocks: { $store: mockStore } } },
+      );
+      await flushPromises();
+      const page = app.findComponent(General);
+      page.findComponent({ name: "OForm" }).vm.form.setFieldValue("scrape_interval", "45");
+      await flushPromises();
+
+      deleteOrgSpy.mockRejectedValueOnce(new Error("refused"));
+      await (page.vm as any).deleteOrg();
+      void router.push("/elsewhere");
+      await flushPromises();
+      expect(dialog.currentDialog.value).not.toBeNull();
+      dialog.handleCancel();
+      await flushPromises();
+      expect(router.currentRoute.value.path).toBe("/settings");
+
+      await (page.vm as any).deleteOrg();
+      await flushPromises();
+      expect(dialog.currentDialog.value).toBeNull();
+      expect(router.currentRoute.value.path).toBe("/");
+      app.unmount();
     });
 
     it("does not call the API when no org is selected", async () => {

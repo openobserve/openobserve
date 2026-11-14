@@ -56,8 +56,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data="rows"
           :loading="loading"
           :forbidden="forbidden"
+          :counts-unavailable="!countsAvailable"
           forbidden-resource="roles"
           :action-loading="bulkDeleteLoading"
+          :counts-loading="countsLoading"
           v-model:global-filter="filterQuery"
           v-model:page-size="pageSize"
           v-model:current-page="currentPage"
@@ -359,6 +361,9 @@ const forbidden = computed(() => {
 // we simply render no member counts.
 const roleUserCounts = ref<Record<string, number> | null>(null);
 const roleServiceAccountCounts = ref<Record<string, number> | null>(null);
+const countsLoading = ref(false);
+// Member counts come from RBAC data that only enterprise and cloud builds serve.
+const countsAvailable = config.isEnterprise === "true" || config.isCloud === "true";
 
 // Members of a service-account list we cannot read stay counted as users, so the Users column survives a 403.
 const loadServiceAccounts = async (): Promise<any[] | null> => {
@@ -377,7 +382,8 @@ const loadServiceAccounts = async (): Promise<any[] | null> => {
 };
 
 const loadRoleUserCounts = async (force = false) => {
-  if (config.isEnterprise !== "true" && config.isCloud !== "true") return;
+  if (!countsAvailable) return;
+  countsLoading.value = true;
   try {
     const options = allUserRolesQuery(store.state.selectedOrganization.identifier);
     if (force) {
@@ -423,6 +429,7 @@ const loadRoleUserCounts = async (force = false) => {
 // Patch the counts onto rows already on screen. null (not 0) while the map is
 // unavailable, so "unknown" and "nobody holds this role" stay distinguishable.
 const applyRoleUserCounts = () => {
+  countsLoading.value = false;
   const counts = roleUserCounts.value;
   const saCounts = roleServiceAccountCounts.value;
   rolesState.roles = rolesState.roles.map((role: any) => ({

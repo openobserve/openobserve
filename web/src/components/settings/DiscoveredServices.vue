@@ -21,23 +21,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OSpinner size="sm" data-test="discovered-services-loading-indicator" />
     </div>
 
-    <!-- Error State -->
-    <div v-else-if="error" class="flex flex-1 flex-col items-center justify-center gap-3">
-      <OIcon
-        name="error-outline"
-        class="text-status-error-text"
-        style="width: 3rem; height: 3rem"
-      />
-      <div class="text-status-error-text text-base">{{ error }}</div>
-      <OButton
-        data-test="retry-discovered-services-btn"
-        variant="outline"
-        size="sm-action"
-        @click="() => loadServices()"
-        icon-left="refresh"
-      >
-        {{ t("settings.correlation.retry") }}
-      </OButton>
+    <div v-else-if="error" class="flex flex-1 items-center justify-center">
+      <OEmptyState size="hero" preset="load-error" :description="raw(error)" hide-action>
+        <template #actions>
+          <OButton
+            data-test="retry-discovered-services-btn"
+            variant="outline"
+            size="sm-action"
+            icon-left="refresh"
+            @click="() => loadServices()"
+          >
+            {{ t("settings.correlation.retry") }}
+          </OButton>
+        </template>
+      </OEmptyState>
     </div>
 
     <div v-else-if="forbidden" class="flex flex-1 items-center justify-center">
@@ -54,10 +51,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </div>
 
-    <div v-else class="flex min-h-0 flex-1 flex-col pt-3">
+    <div v-else class="flex min-h-0 flex-1 flex-col">
       <div
         v-if="versionsEnabled"
-        class="px-page-edge mb-3 grid shrink-0 grid-cols-5 gap-2"
+        class="mx-page-edge mt-3 grid shrink-0 grid-cols-5 gap-2"
         data-test="svcver-discovered-tiles"
       >
         <div
@@ -97,11 +94,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <div
-        class="services-header-bar px-page-edge mb-2.5 flex w-full shrink-0 flex-wrap items-center gap-3 py-1"
+        v-if="versionsEnabled || !tableShown"
+        class="mx-page-edge mt-3 flex shrink-0 flex-wrap items-center gap-3"
       >
-        <div class="text-xl font-[600] tracking-[0.005em]" data-test="services-list-title">
-          {{ t("settings.correlation.discoveredServicesTitle") }}
-        </div>
         <OToggleGroup
           v-if="versionsEnabled"
           :model-value="activeView"
@@ -125,7 +120,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             }}</span></OToggleGroupItem
           >
         </OToggleGroup>
-        <div class="ms-auto flex items-center gap-2">
+        <!-- The table toolbar owns these while the table is on screen. -->
+        <div v-if="!tableShown" class="ms-auto flex items-center gap-2">
           <OButton
             v-if="activeView === 'services'"
             data-test="reset-discovered-services-btn"
@@ -137,21 +133,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("settings.correlation.resetServices") }}
             <OTooltip :content="t('settings.correlation.resetServicesTooltip')" side="top" />
           </OButton>
-          <OButton
+          <ORefreshButton
+            layout="inline"
             variant="outline"
-            size="sm-action"
+            :last-run-at="lastLoadedAt"
             :loading="refreshing"
-            icon-left="refresh"
-            @click="refreshAll"
             data-test="refresh-discovered-services-btn"
-          >
-            {{ t("common.refresh") }}
-          </OButton>
+            @click="refreshAll"
+          />
         </div>
       </div>
 
       <ServiceNameReview
         v-if="activeView === 'name-review'"
+        class="mt-3"
         :services="services"
         :scopes="scopes"
         :trace-names="traceNames"
@@ -170,289 +165,318 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template v-else>
         <InfoNotice
           v-if="versionsEnabled"
-          class="mx-page-edge mb-3 shrink-0"
+          class="mx-page-edge mt-3 shrink-0"
           data-test="svcver-discovered-banner"
           >{{ t("serviceVersions.discovered.banner") }}</InfoNotice
         >
-        <div
+        <OBanner
           v-else
-          class="info-banner mx-page-edge rounded-default bg-banner-info-bg border-banner-info-border mb-3 flex shrink-0 items-center gap-3 border px-4 py-3"
+          variant="info"
+          icon="info"
+          inline-actions
+          class="mx-page-edge mt-3 shrink-0"
+          :content="t('settings.correlation.discoveredServicesDescription')"
         >
-          <OIcon name="info" size="md" class="info-banner-icon text-status-info-text shrink-0" />
-          <div class="info-banner-text text-text-body text-sm leading-relaxed">
-            {{ t("settings.correlation.discoveredServicesDescription") }}
-            <a
-              class="rounded-default border-text-link text-text-link bg-badge-blue-soft-bg hover:bg-badge-blue-ol-border/18 mx-1 inline-block cursor-pointer border px-2 py-0.5 align-middle text-xs font-semibold no-underline transition-[background] duration-150"
-              @click.prevent="$emit('navigate-to-configuration')"
-              >{{ t("settings.correlation.goToConfiguration") }}</a
+          <template #actions>
+            <OButton
+              variant="outline"
+              size="sm-action"
+              data-test="discovered-services-go-to-configuration"
+              @click="$emit('navigate-to-configuration')"
             >
-            <span>{{ t("settings.correlation.configureServicesHint") }}</span>
-          </div>
-        </div>
-
-        <div class="px-page-edge mb-2.5 flex shrink-0 flex-wrap items-center gap-2">
-          <OSearchInput
-            v-model="searchQuery"
-            :placeholder="
-              versionsEnabled
-                ? t('serviceVersions.discovered.search')
-                : t('settings.correlation.searchServiceName')
-            "
-            data-test="service-search-input"
-            clearable
-            class="o2-search-input min-w-80"
-          />
-          <span class="text-md text-text-muted whitespace-nowrap">{{
-            t("settings.correlation.filterBy")
-          }}</span>
-          <OSelect
-            v-model="filterKey"
-            :options="allKeys"
-            labelKey="label"
-            valueKey="value"
-            clearable
-            searchable
-            :placeholder="t('settings.correlation.selectFieldPlaceholder')"
-            data-test="service-filter-key"
-            class="o2-search-input filter-select min-w-40"
-            @update:model-value="filterValue = null"
-          />
-          <span>
-            <OSelect
-              v-model="filterValue"
-              :options="allValues"
-              clearable
-              searchable
-              :disabled="!filterKey"
-              :placeholder="t('settings.correlation.selectValuePlaceholder')"
-              data-test="service-filter-value"
-              class="o2-search-input filter-select min-w-40"
-            />
-            <OTooltip
-              v-if="!filterKey"
-              :content="t('settings.correlation.selectFieldFirst')"
-              side="top"
-            />
-          </span>
-        </div>
-
-        <div class="px-page-edge min-h-0 flex-1">
-          <div class="h-full">
-            <OTable
-              :data="refreshing ? [] : flatRows"
-              :columns="columns"
-              :loading="refreshing"
-              :forbidden="forbidden"
-              row-key="id"
-              pagination="client"
-              :page-size="pageSize"
-              :page-size-options="[20, 50, 100, 250, 500]"
-              sorting="server"
-              :sort-by="sortColumn"
-              :sort-order="sortOrder"
-              filter-mode="client"
-              :default-columns="false"
-              :enable-column-resize="true"
-              :persist-columns="true"
-              table-id="settings-discovered-services-v2"
-              :show-global-filter="false"
-              :pivot-row-columns="[{ name: 'service_name' }]"
-              :keep-page-on-data-change="true"
-              :current-page="currentPage"
-              wrap
-              class="o2-table o2-row-md o2-table-header-sticky services-table w-full"
-              :class="
-                filteredGroupCount > 0 ? 'services-table-full-height h-[calc(100vh-21.25rem)]' : ''
-              "
-              data-test="services-list-table"
-              @sort-change="onSortChange"
-              @row-click="handleRowClick"
-              @pagination-change="({ page }: { page: number }) => (currentPage = page)"
-            >
-              <template #empty>
-                <OEmptyState
-                  size="hero"
-                  preset="no-discovered-services"
-                  :filtered="!!searchQuery"
-                  :hide-action="!searchQuery"
-                  @action="(id) => id === 'clear-filters' && (searchQuery = '')"
+              {{ t("settings.correlation.goToConfiguration") }}
+            </OButton>
+          </template>
+        </OBanner>
+        <div class="min-h-0 flex-1 overflow-hidden">
+          <OTable
+            :frame="false"
+            :data="refreshing ? [] : flatRows"
+            :columns="columns"
+            :loading="refreshing"
+            :forbidden="forbidden"
+            row-key="id"
+            pagination="client"
+            :page-size="pageSize"
+            :page-size-options="[20, 50, 100, 250, 500]"
+            sorting="server"
+            :sort-by="sortColumn"
+            :sort-order="sortOrder"
+            filter-mode="client"
+            :default-columns="false"
+            :enable-column-resize="true"
+            :persist-columns="true"
+            table-id="settings-discovered-services-v2"
+            :show-global-filter="false"
+            :pivot-row-columns="[{ name: 'service_name' }]"
+            :keep-page-on-data-change="true"
+            :current-page="currentPage"
+            wrap
+            data-test="services-list-table"
+            @sort-change="onSortChange"
+            @row-click="handleRowClick"
+            @pagination-change="({ page }: { page: number }) => (currentPage = page)"
+          >
+            <template #toolbar>
+              <OSearchInput
+                v-model="searchQuery"
+                class="min-w-60 flex-1"
+                :placeholder="
+                  versionsEnabled
+                    ? t('serviceVersions.discovered.search')
+                    : t('settings.correlation.searchServiceName')
+                "
+                data-test="service-search-input"
+                clearable
+              />
+              <div class="w-44 shrink-0">
+                <OSelect
+                  v-model="filterKey"
+                  :options="allKeys"
+                  labelKey="label"
+                  valueKey="value"
+                  clearable
+                  searchable
+                  :placeholder="t('settings.correlation.selectFieldPlaceholder')"
+                  :aria-label="t('settings.correlation.filterBy')"
+                  data-test="service-filter-key"
+                  @update:model-value="filterValue = null"
                 />
-              </template>
-              <template #cell-service_name="{ row }">
-                <div class="flex min-w-0 items-center gap-1.5">
-                  <button
-                    v-if="row.__type === 'summary' || row.__groupSize > 1"
-                    type="button"
-                    data-test="service-collapse-toggle"
-                    class="rounded-default text-text-secondary hover:bg-table-row-hover-bg hover:text-text-body inline-flex h-4.5 w-4.5 shrink-0 cursor-pointer items-center justify-center border-0 bg-transparent p-0"
-                    :aria-expanded="row.__type === 'summary' ? 'false' : 'true'"
-                    @click.stop="toggleServiceCollapse(row.service_name)"
-                  >
-                    <OIcon
-                      :name="row.__type === 'summary' ? 'chevron-right' : 'expand-more'"
-                      size="sm"
-                    />
-                  </button>
-                  <ServiceNameLabel
-                    :service-key="row.service_name"
-                    :display-name="row.display_name"
-                    :display-source="row.display_source"
-                    :candidates="row.display_candidates"
-                    :qualifier="row.display_qualifier"
-                    layout="stacked"
-                    primary-class="font-semibold"
-                    secondary-class="text-xs"
-                    wrap-detected
-                    :can-review="versionsEnabled"
-                  />
-                </div>
-              </template>
-              <template #cell-workload="{ row }">
-                <OTag v-if="row.__type === 'summary'" type="countChip" value="neutral">
-                  {{ row.instanceCount }}
-                  {{
-                    row.instanceCount === 1
-                      ? t("settings.correlation.instanceSingular")
-                      : t("settings.correlation.instancePlural")
-                  }}
-                </OTag>
-                <OTruncatedText
-                  v-else-if="workloadOf(row)"
-                  class="font-mono text-xs"
-                  data-test="svcver-discovered-workload"
-                  >{{ workloadOf(row) }}</OTruncatedText
-                >
-                <span
-                  v-else-if="proposedWorkloadText(row)"
-                  class="text-text-muted text-xs"
-                  data-test="svcver-discovered-workload-proposed"
-                  >{{ proposedWorkloadText(row) }}</span
-                >
-                <span
-                  v-else
-                  class="text-text-muted text-xs"
-                  data-test="svcver-discovered-no-workload"
-                  >{{ raw("—") }}<OTooltip :content="t('serviceVersions.discovered.noWorkload')"
-                /></span>
-              </template>
-              <template #cell-identity="{ row }">
-                <span v-if="row.__type === 'summary'" class="text-text-muted text-xs">&mdash;</span>
-                <div
-                  v-else
-                  class="flex flex-wrap items-center gap-2 py-1"
-                  data-test="svcver-discovered-identity"
-                >
-                  <ODimensionChip
-                    v-for="[key, value] in Object.entries(row.disambiguation).sort(([a], [b]) =>
-                      a.localeCompare(b),
-                    )"
-                    :key="`${key}=${value}`"
-                    :dim-key="key"
-                    :key-label="dimensionLabel(key, t)"
-                    :value="String(value)"
-                  />
-                  <span
-                    v-if="Object.keys(row.disambiguation).length === 0"
-                    class="no-dimensions-text text-text-muted text-xs"
-                    >{{ raw("—") }}<OTooltip :content="t('settings.correlation.noDimensions')"
-                  /></span>
-                </div>
-              </template>
-              <template #cell-telemetry="{ row }">
-                <div
-                  v-if="row.__type === 'summary'"
-                  class="instance-telemetry-row flex items-center gap-1 whitespace-nowrap"
-                >
-                  <OTag v-if="row.totalLogs > 0" type="streamType" :value="'logs'">
-                    {{ t("settings.correlation.logsWithCount", { count: row.totalLogs }) }}
-                  </OTag>
-                  <OTag v-if="row.totalTraces > 0" type="streamType" :value="'traces'">
-                    {{ t("settings.correlation.tracesWithCount", { count: row.totalTraces }) }}
-                  </OTag>
-                  <OTag v-if="row.totalMetrics > 0" type="streamType" :value="'metrics'">
-                    {{ t("settings.correlation.metricsWithCount", { count: row.totalMetrics }) }}
-                  </OTag>
-                </div>
-                <div
-                  v-else
-                  class="instance-telemetry-row flex items-center gap-1 whitespace-nowrap"
-                >
-                  <span v-if="row.logs_streams.length > 0" class="inline-flex min-w-0">
-                    <OTag type="streamType" :value="'logs'">
-                      {{
-                        t("settings.correlation.logsWithCount", {
-                          count: row.logs_streams.length,
-                        })
-                      }}
-                    </OTag>
-                    <OTooltip :content="row.logs_streams.join(', ')" content-class="text-xs" />
-                  </span>
-                  <span v-if="row.traces_streams.length > 0" class="inline-flex min-w-0">
-                    <OTag type="streamType" :value="'traces'">
-                      {{
-                        t("settings.correlation.tracesWithCount", {
-                          count: row.traces_streams.length,
-                        })
-                      }}
-                    </OTag>
-                    <OTooltip :content="row.traces_streams.join(', ')" content-class="text-xs" />
-                  </span>
-                  <span v-if="row.metrics_streams.length > 0" class="inline-flex min-w-0">
-                    <OTag type="streamType" :value="'metrics'">
-                      {{
-                        t("settings.correlation.metricsWithCount", {
-                          count: row.metrics_streams.length,
-                        })
-                      }}
-                    </OTag>
-                    <OTooltip :content="row.metrics_streams.join(', ')" content-class="text-xs" />
-                  </span>
-                </div>
-              </template>
-              <template #cell-env="{ row }"
-                ><ServiceEnvChip
-                  v-if="row.__type !== 'summary' && scopeFor(row)"
-                  :identity="scopeFor(row)!"
-                  :service="scopeFor(row)!.service"
-              /></template>
-              <template #cell-version="{ row }"
-                ><span
-                  v-if="row.__type !== 'summary' && scopeFor(row)?.newest_version"
-                  class="font-mono text-xs"
-                  >{{ scopeFor(row)!.newest_version }}</span
-                ><span
-                  v-else-if="row.__type !== 'summary'"
-                  class="text-text-muted text-xs"
-                  data-test="svcver-discovered-no-version"
-                  >{{ raw("—")
-                  }}<OTooltip :content="t('serviceVersions.discovered.noVersion')" /></span
-              ></template>
-              <template #cell-last_seen="{ row }">
-                <OTimeCell
-                  :value="row.lastSeen"
-                  unit="us"
-                  :timezone="store.state.timezone"
-                  class="text-xs"
+              </div>
+              <div class="w-44 shrink-0">
+                <OSelect
+                  v-model="filterValue"
+                  :options="allValues"
+                  clearable
+                  searchable
+                  :disabled="!filterKey"
+                  :placeholder="t('settings.correlation.selectValuePlaceholder')"
+                  data-test="service-filter-value"
                 />
-              </template>
-
-              <!-- Bottom -->
-              <template v-if="filteredGroupCount > 0" #footer-note>
-                <span class="max-md:hidden">
-                  {{
-                    t("settings.correlation.serviceCountSingular", {
-                      count: shownServiceCount,
-                    })
-                  }}
-                  {{
-                    t("settings.correlation.instancesCount", {
-                      count: totalInstances,
-                    })
-                  }}
+                <OTooltip
+                  v-if="!filterKey"
+                  :content="t('settings.correlation.selectFieldFirst')"
+                  side="top"
+                />
+              </div>
+            </template>
+            <template #toolbar-trailing>
+              <OButton
+                v-if="activeView === 'services'"
+                data-test="reset-discovered-services-btn"
+                variant="outline"
+                size="sm"
+                :loading="resetting"
+                @click="confirmResetServices"
+              >
+                {{ t("settings.correlation.resetServices") }}
+                <OTooltip :content="t('settings.correlation.resetServicesTooltip')" side="top" />
+              </OButton>
+              <ORefreshButton
+                layout="inline"
+                variant="outline"
+                :last-run-at="lastLoadedAt"
+                :loading="refreshing"
+                data-test="refresh-discovered-services-btn"
+                @click="refreshAll"
+              />
+            </template>
+            <template #empty>
+              <OEmptyState
+                size="hero"
+                preset="no-discovered-services"
+                :filtered="!!searchQuery"
+                :hide-action="!searchQuery"
+                @action="(id) => id === 'clear-filters' && (searchQuery = '')"
+              />
+            </template>
+            <template #cell-service_name="{ row }">
+              <div class="flex min-w-0 items-center gap-1.5">
+                <button
+                  v-if="row.__type === 'summary' || row.__groupSize > 1"
+                  type="button"
+                  data-test="service-collapse-toggle"
+                  class="rounded-default text-text-secondary hover:bg-table-row-hover-bg hover:text-text-body inline-flex h-4.5 w-4.5 shrink-0 cursor-pointer items-center justify-center border-0 bg-transparent p-0"
+                  :aria-expanded="row.__type === 'summary' ? 'false' : 'true'"
+                  @click.stop="toggleServiceCollapse(row.service_name)"
+                >
+                  <OIcon
+                    :name="row.__type === 'summary' ? 'chevron-right' : 'expand-more'"
+                    size="sm"
+                  />
+                </button>
+                <ServiceNameLabel
+                  :service-key="row.service_name"
+                  :display-name="row.display_name"
+                  :display-source="row.display_source"
+                  :candidates="row.display_candidates"
+                  :qualifier="row.display_qualifier"
+                  layout="stacked"
+                  primary-class="font-semibold"
+                  secondary-class="text-xs"
+                  wrap-detected
+                  :can-review="versionsEnabled"
+                />
+              </div>
+            </template>
+            <template #cell-workload="{ row }">
+              <OTag v-if="row.__type === 'summary'" type="countChip" value="neutral">
+                {{ row.instanceCount }}
+                {{
+                  row.instanceCount === 1
+                    ? t("settings.correlation.instanceSingular")
+                    : t("settings.correlation.instancePlural")
+                }}
+              </OTag>
+              <OTruncatedText
+                v-else-if="workloadOf(row)"
+                class="font-mono text-xs"
+                data-test="svcver-discovered-workload"
+                >{{ workloadOf(row) }}</OTruncatedText
+              >
+              <span
+                v-else-if="proposedWorkloadText(row)"
+                class="text-text-muted text-xs"
+                data-test="svcver-discovered-workload-proposed"
+                >{{ proposedWorkloadText(row) }}</span
+              >
+              <span v-else class="text-text-muted text-xs" data-test="svcver-discovered-no-workload"
+                >{{ raw("—") }}<OTooltip :content="t('serviceVersions.discovered.noWorkload')"
+              /></span>
+            </template>
+            <template #cell-identity="{ row }">
+              <span v-if="row.__type === 'summary'" class="text-text-muted text-xs">&mdash;</span>
+              <!-- One line per row: the first chips, then a count whose tooltip names the rest. -->
+              <div
+                v-else
+                class="flex min-w-0 flex-nowrap items-center gap-1.5 overflow-hidden py-1"
+                data-test="svcver-discovered-identity"
+              >
+                <ODimensionChip
+                  v-for="[key, value] in identityChips(row.disambiguation).shown"
+                  :key="`${key}=${value}`"
+                  :dim-key="key"
+                  :key-label="dimensionLabel(key, t)"
+                  :value="String(value)"
+                  tooltip
+                />
+                <span v-if="identityChips(row.disambiguation).rest.length" class="shrink-0">
+                  <OTag variant="default-outline" size="sm">{{
+                    raw(`+${identityChips(row.disambiguation).rest.length}`)
+                  }}</OTag>
+                  <OTooltip
+                    :content="
+                      raw(
+                        identityChips(row.disambiguation)
+                          .rest.map(([k, v]) => `${dimensionLabel(k, t)}: ${v}`)
+                          .join(', '),
+                      )
+                    "
+                    content-class="text-xs"
+                  />
                 </span>
-              </template>
-            </OTable>
-          </div>
+                <span
+                  v-if="Object.keys(row.disambiguation).length === 0"
+                  class="no-dimensions-text text-text-muted text-xs"
+                  >{{ raw("—") }}<OTooltip :content="t('settings.correlation.noDimensions')"
+                /></span>
+              </div>
+            </template>
+            <template #cell-telemetry="{ row }">
+              <div
+                v-if="row.__type === 'summary'"
+                class="instance-telemetry-row flex flex-wrap items-center gap-1 py-1"
+              >
+                <OTag v-if="row.totalLogs > 0" type="streamType" :value="'logs'">
+                  {{ t("settings.correlation.logsWithCount", { count: row.totalLogs }) }}
+                </OTag>
+                <OTag v-if="row.totalTraces > 0" type="streamType" :value="'traces'">
+                  {{ t("settings.correlation.tracesWithCount", { count: row.totalTraces }) }}
+                </OTag>
+                <OTag v-if="row.totalMetrics > 0" type="streamType" :value="'metrics'">
+                  {{ t("settings.correlation.metricsWithCount", { count: row.totalMetrics }) }}
+                </OTag>
+              </div>
+              <div v-else class="instance-telemetry-row flex flex-wrap items-center gap-1 py-1">
+                <span v-if="row.logs_streams.length > 0" class="inline-flex shrink-0">
+                  <OTag type="streamType" :value="'logs'">
+                    {{
+                      t("settings.correlation.logsWithCount", {
+                        count: row.logs_streams.length,
+                      })
+                    }}
+                  </OTag>
+                  <OTooltip :content="row.logs_streams.join(', ')" content-class="text-xs" />
+                </span>
+                <span v-if="row.traces_streams.length > 0" class="inline-flex shrink-0">
+                  <OTag type="streamType" :value="'traces'">
+                    {{
+                      t("settings.correlation.tracesWithCount", {
+                        count: row.traces_streams.length,
+                      })
+                    }}
+                  </OTag>
+                  <OTooltip :content="row.traces_streams.join(', ')" content-class="text-xs" />
+                </span>
+                <span v-if="row.metrics_streams.length > 0" class="inline-flex shrink-0">
+                  <OTag type="streamType" :value="'metrics'">
+                    {{
+                      t("settings.correlation.metricsWithCount", {
+                        count: row.metrics_streams.length,
+                      })
+                    }}
+                  </OTag>
+                  <OTooltip :content="row.metrics_streams.join(', ')" content-class="text-xs" />
+                </span>
+              </div>
+            </template>
+            <template #cell-env="{ row }"
+              ><ServiceEnvChip
+                v-if="row.__type !== 'summary' && scopeFor(row)"
+                :identity="scopeFor(row)!"
+                :service="scopeFor(row)!.service"
+            /></template>
+            <template #cell-version="{ row }"
+              ><span
+                v-if="row.__type !== 'summary' && scopeFor(row)?.newest_version"
+                class="font-mono text-xs"
+                >{{ scopeFor(row)!.newest_version }}</span
+              ><span
+                v-else-if="row.__type !== 'summary'"
+                class="text-text-muted text-xs"
+                data-test="svcver-discovered-no-version"
+                >{{ raw("—")
+                }}<OTooltip :content="t('serviceVersions.discovered.noVersion')" /></span
+            ></template>
+            <template #cell-last_seen="{ row }">
+              <OTimeCell
+                :value="row.lastSeen"
+                unit="us"
+                :timezone="store.state.timezone"
+                class="text-xs"
+              />
+            </template>
+
+            <!-- Bottom -->
+            <template v-if="filteredGroupCount > 0" #footer-note>
+              <span class="max-md:hidden">
+                {{
+                  t(
+                    "settings.correlation.serviceCountSingular",
+                    { count: shownServiceCount.toLocaleString(locale) },
+                    shownServiceCount,
+                  )
+                }}
+                {{
+                  t(
+                    "settings.correlation.instancesCount",
+                    { count: totalInstances.toLocaleString(locale) },
+                    totalInstances,
+                  )
+                }}
+              </span>
+            </template>
+          </OTable>
         </div>
       </template>
     </div>
@@ -471,10 +495,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="service-side-panel"
     >
       <template #header-right>
-        <span
-          class="set-id-badge rounded-default text-2xs bg-badge-purple-soft-bg text-badge-purple-soft-text border-badge-purple-ol-border inline-flex shrink-0 items-center border px-2 py-[0.0625rem] font-semibold whitespace-nowrap"
-          >{{ selectedService?.set_id }}</span
-        >
+        <OTag variant="default-outline" size="sm">{{ selectedService?.set_id }}</OTag>
       </template>
 
       <!-- Default set warning banner -->
@@ -639,12 +660,12 @@ export interface ServiceRecord extends ServiceDisplayFields {
 
 const WORKLOAD_KEYS = ["k8s-deployment", "k8s-statefulset", "k8s-daemonset", "k8s-workload"];
 export const DISCOVERED_COLUMN_SIZES = {
-  service_name: 300,
-  workload: 150,
-  identity: 200,
-  telemetry: 210,
-  env: 110,
-  version: 100,
+  service_name: 196,
+  workload: 136,
+  identity: 280,
+  telemetry: 212,
+  env: 70,
+  version: 80,
   last_seen: 130,
 } as const;
 
@@ -723,6 +744,8 @@ import ServiceNameReview from "@/components/settings/ServiceNameReview.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -821,6 +844,7 @@ const traceNames = computed(() => [...new Set(scopes.value.map((scope) => scope.
 // Unknown edit rights stay read-only; a write that comes back 403 would latch it anyway.
 const canEdit = computed(() => envList.data.value?.can_edit === true);
 const namesTotal = computed(() => proposed.data.value?.total);
+const tableShown = computed(() => activeView.value === "services" && services.value.length > 0);
 const DASH = "–";
 
 const loading = ref(true);
@@ -834,6 +858,13 @@ const filterKey = ref<string | null>(null);
 const filterValue = ref<string | null>(null);
 const selectedService = ref<ServiceRecord | null>(null);
 const pageSize = ref(20);
+const lastLoadedAt = ref<number | null>(null);
+const IDENTITY_CHIPS_SHOWN = 2;
+
+const identityChips = (dims: Record<string, string>) => {
+  const all = Object.entries(dims).sort(([a], [b]) => a.localeCompare(b));
+  return { shown: all.slice(0, IDENTITY_CHIPS_SHOWN), rest: all.slice(IDENTITY_CHIPS_SHOWN) };
+};
 const currentPage = ref(1);
 
 watch([filterKey, filterValue, searchQuery], () => {
@@ -934,7 +965,7 @@ const columns: OTableColumnDef[] = [
     hideable: true,
     size: DISCOVERED_COLUMN_SIZES.telemetry,
     minSize: DISCOVERED_COLUMN_SIZES.telemetry,
-    meta: { align: "left", flex: true },
+    meta: { align: "left" },
   },
   ...(versionsEnabled
     ? [
@@ -1207,6 +1238,7 @@ const loadServices = async (isRefresh = false) => {
       traces_streams: unique(s.traces_streams),
       metrics_streams: unique(s.metrics_streams),
     }));
+    lastLoadedAt.value = Date.now();
   } catch (err: any) {
     console.error("Failed to load services:", err);
     forbidden.value = forbiddenState(err);
