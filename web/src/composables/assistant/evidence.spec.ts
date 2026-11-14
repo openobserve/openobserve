@@ -18,6 +18,7 @@ import { describe, expect, it } from "vitest";
 import type { ChatMessage, ContentBlock } from "@/ts/interfaces/chat";
 import { parseChatDetail } from "@/services/assistant";
 import { raw } from "@/types/i18n";
+import { explorerOf } from "@/utils/assistant/explorerRoutes";
 
 import {
   boundedChartSeries,
@@ -281,6 +282,22 @@ describe("manualRouteOf", () => {
       from: 5,
       to: 9,
     });
+  });
+
+  it("opens a SQL query over a traces stream in Traces, by the stream type its call names", () => {
+    const traced = answer([
+      {
+        type: "tool_call",
+        tool: "SearchSQL",
+        call_id: "t",
+        stepState: "done",
+        context: { type: "traces", sql: SQL },
+      },
+    ]);
+    const [step] = stepsOf(traced, "acme");
+    expect(step.query?.streamType).toBe("traces");
+    const fence = fenceQuery(SQL, "sql", [step], "acme", null);
+    expect(explorerOf(fence!.query)).toBe("traces");
   });
 
   it("reads the prompt's time chip, then the window it was sent with, then the stored one", () => {

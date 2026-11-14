@@ -628,8 +628,10 @@ function stepQuery(
     (kind === "promql" ? undefined : sqlStreamOf(sql));
   const from = timeArg(args.start_time ?? args.start);
   const to = timeArg(args.end_time ?? args.end);
+  // SearchSQL names its stream type `type`.
   const streamType =
     streamTypeOf(args.stream_type) ??
+    streamTypeOf(args.type) ??
     (kind === "promql" ? "metrics" : kind === "traces" ? "traces" : undefined);
   return {
     language: kind === "promql" ? "promql" : "sql",

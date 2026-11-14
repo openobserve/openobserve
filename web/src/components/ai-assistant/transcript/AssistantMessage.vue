@@ -839,18 +839,23 @@ function fenceBlock(key: string, part: MarkdownPart): QueryBlock | null {
   return block;
 }
 
-// The stored query frame names no window, so it takes the one its fence would: the step that ran it, else the turn's.
+// The stored query frame names no window or stream type, so it takes the ones its fence would: the step that ran it, else the turn's.
 function typedQueryBlock(blockId: string, typed: QueryBlockData): QueryBlock {
   const own = { ...typed, org: org.value };
+  const ranged = !!(own.from && own.to);
   const fence =
-    own.from && own.to
+    ranged && own.streamType
       ? null
       : fenceQuery(own.text, own.language, steps.value, org.value, pageRange.value);
-  const { from, to } = fence?.query ?? {};
+  const { from, to, streamType } = fence?.query ?? {};
   return {
     blockId,
-    query: from && to ? { ...own, from, to } : own,
-    rangeSource: fence?.rangeSource ?? "turn",
+    query: {
+      ...own,
+      ...(!ranged && from && to && { from, to }),
+      ...(!own.streamType && streamType && { streamType }),
+    },
+    rangeSource: ranged ? "turn" : (fence?.rangeSource ?? "turn"),
     ...(typed.callId && { sourceCallId: typed.callId }),
   };
 }

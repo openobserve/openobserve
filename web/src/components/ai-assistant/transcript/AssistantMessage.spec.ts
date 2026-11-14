@@ -461,6 +461,22 @@ describe("AssistantMessage", () => {
     expect(wrapper.find('[data-test="assistant-link-card"]').exists()).toBe(false);
   });
 
+  it("opens a SQL card over a traces stream in Traces, from the stream type its step ran on", () => {
+    const sql = 'SELECT service_name, duration FROM "default"';
+    const step = {
+      type: "tool_call",
+      tool: "SearchSQL",
+      call_id: "c1",
+      stepState: "done",
+      context: { type: "traces", sql },
+    };
+    const open = (blocks: unknown[]) =>
+      mountMessage(answer(blocks as never)).get('[data-test="assistant-query-open"]');
+    expect(open([step, { type: "text", text: `\`\`\`sql\n${sql}\n\`\`\`` }]).text()).toBe("Traces");
+    const typed = { language: "sql", text: sql, from: 1, to: 2 };
+    expect(open([step, { type: "query", query: typed }]).text()).toBe("Traces");
+  });
+
   it("shows a query once when the server's query frame repeats the fence in the answer", () => {
     const sql = 'SELECT service FROM "default"\nGROUP BY service';
     const promql = 'sum by (pod) (container_memory_working_set_bytes{pod=~"payments-.*"})';
