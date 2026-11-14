@@ -1415,6 +1415,16 @@ mod tests {
         );
     }
 
+    #[test]
+    fn test_invalid_calendar_period_is_bad_request() {
+        assert_eq!(
+            status(ReportError::InvalidCalendarPeriod(
+                "calendar:month:1".to_string()
+            )),
+            StatusCode::BAD_REQUEST
+        );
+    }
+
     // 404 Not Found
     #[test]
     fn test_report_not_found_is_not_found() {

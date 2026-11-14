@@ -133,15 +133,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div class="flex shrink-0 items-center gap-2 max-md:ms-auto max-md:gap-1">
         <OPageHeaderStatus />
-        <!-- Explore keeps Apply: a date change there re-queries the whole card grid. -->
         <DateTimePickerDashboard
+          preset="explorer-manual"
+          :host-name="t('menu.metrics')"
           ref="dateTimePickerRef"
           v-model="selectedDate"
           shortcuts
           data-test="metrics-date-picker"
           class="h-8.5!"
-          :auto-apply-dashboard="mode === 'visualize'"
-          calendar-presets
           @on:date-change="onDateChange"
         />
         <AutoRefreshInterval
@@ -151,6 +150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :is-compact="isMobile"
           :range-end-us="refreshRangeEndUs"
           :range-start-us="refreshRangeStartUs"
+          :range-span-us="refreshRangeSpanUs"
           @trigger="onRefreshTick"
           @live="goLiveRange"
         />
@@ -247,6 +247,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
     </div>
+
+    <StaleRangeStrip
+      v-if="staleRangeText"
+      :text="staleRangeText"
+      data-test="metrics-explorer-stale-range-strip"
+      shortcut-id="metricsRefresh"
+      @run="() => onRefresh()"
+    />
 
     <!--
       The filter row. Its own line, not a slot in the toolbar: a matcher's width
@@ -910,6 +918,10 @@ import { useAutoRunToggle } from "@/composables/dashboard/useAutoRunToggle";
 import useBreakpoint from "@/composables/useBreakpoint";
 
 import ShareButton from "@/components/common/ShareButton.vue";
+import StaleRangeStrip from "@/components/StaleRangeStrip.vue";
+import useTimeRangeContext from "@/composables/useTimeRangeContext";
+import { formatTimeRange } from "@/utils/timeRangeFormat";
+import { rangeFromLegacy } from "@/utils/timeRangeModel";
 import MetricCard from "./MetricCard.vue";
 import MetricsVisualize from "./MetricsVisualize.vue";
 import AddToDashboard from "../AddToDashboard.vue";
@@ -1010,6 +1022,7 @@ export default defineComponent({
     ODropdownSeparator,
     OButtonGroup,
     ShareButton,
+    StaleRangeStrip,
     MetricCard,
     MetricsVisualize,
     AddToDashboard,
@@ -2339,6 +2352,7 @@ export default defineComponent({
       dateTimePickerRef.value?.setSavedDate?.(pickerSavedDate(date));
     };
 
+    let syncedDate: SelectedDate | null = null;
     const syncTimeRange = (opts?: {
       keepPreviews?: boolean;
       keepPage?: boolean;
@@ -2346,11 +2360,34 @@ export default defineComponent({
     }) => {
       const consumable = dateTimePickerRef.value?.getConsumableDateTime?.();
       if (!consumable) return;
+      syncedDate = { ...selectedDate.value };
       grid.setTimeRange({ start_time: consumable.startTime, end_time: consumable.endTime }, opts);
     };
 
     // True only around a zoom's picker refresh, which emits synchronously: the zoomed card must stay on the page.
     let zooming = false;
+    // The range the cards on screen were drawn for, while a newer applied range waits for Refresh.
+    const queriedDate = ref<SelectedDate | null>(null);
+    const timeRangeContext = useTimeRangeContext();
+    const staleRangeText = computed(() => {
+      if (!isGridMode.value || !queriedDate.value) return null;
+      const queried = queriedDate.value;
+      const range = rangeFromLegacy({
+        valueType: queried.valueType,
+        relativeTimePeriod: queried.relativeTimePeriod,
+        startTime: Number(queried.startTime),
+        endTime: Number(queried.endTime),
+      });
+      if (!range) return null;
+      return t("search.resultsAreForRange", {
+        range: formatTimeRange(range, timeRangeContext.now(), "summary"),
+      });
+    });
+
+    const chartsDrawn = () =>
+      detailOpen.value
+        ? detailChartStatus.value.drawn
+        : visibleCards.value.some((card) => grid.previews.value[card.name]?.results?.length);
 
     const onDateChange = async () => {
       // `dateTimePickerRef.refresh()` re-emits a date change, so a manual
@@ -2359,10 +2396,18 @@ export default defineComponent({
       // to a skeleton on each refresh.
       if (refreshing.value) return;
 
+      const drawn = chartsDrawn();
+      // explorer-manual: charts on screen wait for Refresh, unless refresh runs or a chart was zoomed.
+      if (isGridMode.value && drawn && !zooming && !(Number(refreshInterval.value) > 0)) {
+        if (!queriedDate.value && syncedDate) queriedDate.value = syncedDate;
+        return;
+      }
+      await runRangeChange(drawn);
+    };
+
+    const runRangeChange = async (drawn: boolean) => {
       const from = grid.rangeSeconds.value;
-      const drawn = detailOpen.value
-        ? detailChartStatus.value.drawn
-        : visibleCards.value.some((card) => grid.previews.value[card.name]?.results?.length);
+      queriedDate.value = null;
       syncTimeRange({
         keepPreviews: true,
         windowChanged: true,
@@ -2461,6 +2506,9 @@ export default defineComponent({
         return;
       }
 
+      // Refresh is the Run query of the grid: a range that waited runs as a range change.
+      if (queriedDate.value) return runRangeChange(chartsDrawn());
+
       refreshing.value = true;
       const manual = opts?.manual !== false;
       try {
@@ -2500,6 +2548,10 @@ export default defineComponent({
     const refreshRangeStartUs = computed(() =>
       refreshRangeEndUs.value === null ? null : Number(selectedDate.value?.startTime) || null,
     );
+    const refreshRangeSpanUs = computed(() => {
+      const span = Number(selectedDate.value?.endTime) - Number(selectedDate.value?.startTime);
+      return Number.isFinite(span) && span > 0 ? span : null;
+    });
     const goLiveRange = () => dateTimePickerRef.value?.dateTimePicker?.goLive?.();
 
     /** An explicit Run in Visualize — the only Visualize run that writes history. */
@@ -2683,6 +2735,9 @@ export default defineComponent({
       refreshInterval,
       refreshRangeEndUs,
       refreshRangeStartUs,
+      refreshRangeSpanUs,
+      staleRangeText,
+      runRangeChange,
       goLiveRange,
       isGrid,
       columns,

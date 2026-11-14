@@ -77,6 +77,13 @@ describe("searchTimeZones [fresh#6]", () => {
     expect(searchTimeZones(zones, query, undefined, AT)[0]).toBe(zone);
   });
 
+  it.each(["New_York", "new_york", "america/new york", "America/New_York", "america new york"])(
+    "treats underscore, slash and space alike in %s [#69]",
+    (query) => {
+      expect(search(query)[0]).toBe("America/New_York");
+    },
+  );
+
   it("keeps every option, in order, for an empty query", () => {
     expect(search("  ")).toEqual(ZONES);
   });

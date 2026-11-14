@@ -24,8 +24,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <template #actions>
       <DateTime
+        preset="explorer-auto"
+        :capabilities="{ kinds: ['rolling', 'fixed'] }"
+        :host-name="t('alerts.history')"
         ref="dateTimeRef"
-        auto-apply
         :default-type="dateTimeType"
         :default-absolute-time="{
           startTime: absoluteTime.startTime,

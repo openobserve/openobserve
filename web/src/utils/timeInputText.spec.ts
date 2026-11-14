@@ -18,9 +18,10 @@ import { parseTimeInput, type ParsedTimeInput, type TimeInputOptions } from "./d
 import { formatTimeInputText } from "./timeInputText";
 
 const NOW = new Date(Date.UTC(2026, 10, 11, 12, 41, 53));
-const OPTS: TimeInputOptions = { now: NOW, locale: "en-US", timeZone: "UTC" };
+const OPTS: TimeInputOptions = { now: NOW, locale: "en-US", timeZone: "UTC", weekStart: 1 };
 
-const roundTrip = (reading: ParsedTimeInput) => parseTimeInput(formatTimeInputText(reading), OPTS);
+const roundTrip = (reading: ParsedTimeInput) =>
+  parseTimeInput(formatTimeInputText(reading, NOW.getTime()), OPTS);
 
 describe("formatTimeInputText", () => {
   it("writes whole days with an inclusive last day [#4]", () => {
@@ -56,10 +57,19 @@ describe("formatTimeInputText", () => {
 });
 
 describe("calendar periods further back [#10]", () => {
-  it.each(["calendar:day:-3", "calendar:week:-3", "calendar:month:-3", "calendar:quarter:-3"])(
-    "writes %s as text that reads back",
-    (period) => {
-      expect(roundTrip({ type: "relative", period })).toEqual({ type: "relative", period });
-    },
-  );
+  // Only old links carry these; the text reads back as the same dates, fixed.
+  it.each([
+    ["calendar:day:-3", "2026/11/08", "2026/11/09"],
+    ["calendar:week:-3", "2026/10/19", "2026/10/26"],
+    ["calendar:month:-3", "2026/08/01", "2026/09/01"],
+    ["calendar:quarter:-3", "2026/01/01", "2026/04/01"],
+  ])("writes %s as text that reads back as its dates", (period, startDate, endDate) => {
+    expect(roundTrip({ type: "relative", period })).toMatchObject({
+      type: "absolute",
+      startDate,
+      startTime: "00:00:00",
+      endDate,
+      endTime: "00:00:00",
+    });
+  });
 });

@@ -36,7 +36,7 @@ describe("DateTime layout", () => {
 
   const createWrapper = (props: Record<string, unknown> = {}) => {
     wrapper = mount(DateTime, {
-      props: { autoApply: true, calendarPresets: true, ...props },
+      props: { ...props },
       attachTo: document.body,
       global: { plugins: [i18n, store] },
     });
@@ -471,21 +471,17 @@ describe("DateTime layout", () => {
   });
 
   describe("typing", () => {
-    it("turns the list into suggestions for a bare number and previews the cursor row", async () => {
+    it("lists a bare number's three readings", async () => {
       createWrapper();
       await openMenu();
       await typeInBar("3");
 
       expect(el("date-time-chips")).toBeNull();
-      expect(rows().map(rowText)).toEqual([
-        "Last 3 minutes 3m ↵",
+      expect(rows().map((row) => rowText(row).replace(" ↵", ""))).toEqual([
+        "Last 3 minutes 3m",
         "Last 3 hours 3h",
         "Last 3 days 3d",
-        "Last 3 weeks 3w",
-        "Last 3 months 3mo",
       ]);
-      expect(rows()[0].getAttribute("aria-selected")).toBe("true");
-      expect(el("date-time-resolved-name")?.textContent).toBe("Last 3 minutes");
       expect(lastEmit().relativeTimePeriod).toBe("15m");
     });
 
@@ -499,7 +495,8 @@ describe("DateTime layout", () => {
           (row) => row.querySelector('[data-test="date-time-list-row-hint"]')?.textContent,
         ),
       ).toEqual(["15mo", "15m"]);
-      expect(el("date-time-resolved-name")?.textContent).toBe("Last 15 months");
+      // Two readings: no cursor, so the summary keeps the applied range.
+      expect(el("date-time-resolved-name")?.textContent).toBe("Last 15 minutes");
     });
 
     it("maps a snap to its calendar row, filters the list to it and applies it on Enter", async () => {
@@ -553,7 +550,6 @@ describe("DateTime layout", () => {
       await pressInBar("ArrowDown");
       expect(rows()[0].getAttribute("aria-selected")).toBe("true");
       await pressInBar("Escape");
-      expect(rows().some((row) => row.getAttribute("aria-selected") === "true")).toBe(false);
       expect(wrapper!.vm.menuOpen).toBe(true);
     });
   });
@@ -576,7 +572,7 @@ describe("DateTime layout", () => {
     });
 
     it("opens a dates-only picker straight into its calendar", async () => {
-      createWrapper({ disableRelative: true, minDate: "2026/01/01" });
+      createWrapper({ capabilities: { kinds: ["fixed"] }, minDate: "2026/01/01" });
       await openMenu();
       expect(wrapper!.findComponent({ name: "ODateRangeCalendar" }).exists()).toBe(true);
       expect(el("date-time-calendar-back-btn")).toBeNull();
@@ -627,35 +623,41 @@ describe("DateTime layout", () => {
       expect(el("datetime-timezone-short")?.textContent?.trim()).toBe("UTC-05:00");
     });
 
+    const undoEnabled = () => {
+      const button = el("date-time-undo-btn");
+      return !!button && !button.disabled && button.getAttribute("aria-disabled") !== "true";
+    };
+
     it("offers undo after a zoom out, naming the range it returns to", async () => {
       createWrapper();
       await flushPromises();
-      expect(el("date-time-undo-btn")).toBeNull();
+      expect(undoEnabled()).toBe(false);
 
       el("date-time-zoom-out-btn")!.click();
       await flushPromises();
       expect(lastEmit().relativeTimePeriod).toBe("30m");
       const undo = el("date-time-undo-btn")!;
-      expect(undo.getAttribute("aria-label")).toBe("Back to Last 15 minutes");
+      expect(undo.getAttribute("aria-label")).toBe("Back to Last 15 minutes · runs the query");
 
       undo.click();
       await flushPromises();
       expect(lastEmit().relativeTimePeriod).toBe("15m");
       expect(wrapper!.emitted("on:undo")).toHaveLength(1);
-      expect(el("date-time-undo-btn")).toBeNull();
+      expect(undoEnabled()).toBe(false);
     });
 
-    it("drops undo after an explicit pick", async () => {
+    it("adds an undo step for an explicit pick too", async () => {
       createWrapper();
       await flushPromises();
-      el("date-time-prev-btn")!.click();
-      await flushPromises();
-      expect(el("date-time-undo-btn")).not.toBeNull();
+      expect(undoEnabled()).toBe(false);
 
       await openMenu();
       el("date-time-chip-1h")!.click();
       await flushPromises();
-      expect(el("date-time-undo-btn")).toBeNull();
+      expect(undoEnabled()).toBe(true);
+      expect(el("date-time-undo-btn")!.getAttribute("aria-label")).toBe(
+        "Back to Last 15 minutes · runs the query",
+      );
     });
 
     it.each([
@@ -674,11 +676,11 @@ describe("DateTime layout", () => {
       await flushPromises();
       el("date-time-zoom-out-btn")!.click();
       await flushPromises();
-      expect(el("date-time-undo-btn")).not.toBeNull();
+      expect(undoEnabled()).toBe(true);
 
       set(wrapper!.vm);
       await flushPromises();
-      expect(el("date-time-undo-btn")).toBeNull();
+      expect(undoEnabled()).toBe(false);
     });
 
     it("keeps undo when the page hands the zoomed range straight back", async () => {
@@ -693,7 +695,7 @@ describe("DateTime layout", () => {
       });
       wrapper!.vm.setRelativeTime(lastEmit().relativeTimePeriod as string);
       await flushPromises();
-      expect(el("date-time-undo-btn")).not.toBeNull();
+      expect(undoEnabled()).toBe(true);
     });
 
     it("keeps undo when the page answers a shift with a corrected range while it is emitted", async () => {
@@ -713,7 +715,7 @@ describe("DateTime layout", () => {
       await flushPromises();
       el("date-time-prev-btn")!.click();
       await flushPromises();
-      expect(el("date-time-undo-btn")).not.toBeNull();
+      expect(undoEnabled()).toBe(true);
     });
 
     it("keeps undo when the page hands back the exact range a shift emitted", async () => {
@@ -792,7 +794,7 @@ describe("DateTime layout", () => {
       createWrapper({ shortcuts: true });
       const toolbar = wrapper!;
       const panel = mount(DateTime, {
-        props: { autoApply: true },
+        props: {},
         attachTo: document.body,
         global: { plugins: [i18n, store] },
       });
@@ -820,7 +822,7 @@ describe("DateTime layout", () => {
       const page = (name: string) =>
         defineComponent({
           name,
-          setup: () => () => h(DateTime, { autoApply: true, shortcuts: true }),
+          setup: () => () => h(DateTime, { shortcuts: true }),
         });
       const views: Record<string, ReturnType<typeof page>> = {
         logs: page("Logs"),

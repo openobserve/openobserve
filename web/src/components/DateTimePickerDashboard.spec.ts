@@ -35,7 +35,6 @@ describe("DateTimePickerDashboard", () => {
     },
     initialTimezone: "UTC",
     disable: false,
-    autoApplyDashboard: false,
   };
 
   beforeEach(() => {
@@ -59,13 +58,13 @@ describe("DateTimePickerDashboard", () => {
           DateTime: {
             template: '<div data-test="datetime-component"></div>',
             props: {
-              "auto-apply": Boolean,
               "default-type": String,
               "default-absolute-time": Object,
               "default-relative-time": String,
               initialTimezone: [String, null],
               disable: Boolean,
-              calendarPresets: Boolean,
+              preset: String,
+              capabilities: Object,
             },
             methods: {
               refresh: vi.fn(),
@@ -161,14 +160,21 @@ describe("DateTimePickerDashboard", () => {
       expect(wrapper.vm.disable).toBe(true);
     });
 
-    it("should pass autoApplyDashboard prop correctly", () => {
-      wrapper = createWrapper({
-        autoApplyDashboard: true,
-      });
+    it("defaults the picker to the dashboard preset", () => {
+      wrapper = createWrapper();
 
       const dateTimeComponent = wrapper.findComponent('[data-test="datetime-component"]');
-      expect(dateTimeComponent.exists()).toBe(true);
-      expect(wrapper.vm.autoApplyDashboard).toBe(true);
+      expect(dateTimeComponent.props("preset")).toBe("dashboard");
+    });
+
+    it("forwards apply with its range and meta", async () => {
+      wrapper = createWrapper();
+      const range = { kind: "rolling", span: "7d" };
+      const meta = { source: "panel", run: false };
+      await wrapper
+        .findComponent('[data-test="datetime-component"]')
+        .vm.$emit("apply", range, meta);
+      expect(wrapper.emitted("apply")).toEqual([[range, meta]]);
     });
 
     it("should handle null initialTimezone", () => {
@@ -182,21 +188,15 @@ describe("DateTimePickerDashboard", () => {
     });
   });
 
-  describe("Calendar presets", () => {
-    it("keeps calendar presets off by default so non-dashboard pickers are unchanged", () => {
-      wrapper = createWrapper();
+  describe("Capabilities", () => {
+    it("passes the host's capabilities through to DateTime", () => {
+      wrapper = createWrapper({ capabilities: { kinds: ["rolling", "fixed"] } });
       const dateTimeComponent = wrapper.findComponent('[data-test="datetime-component"]');
-      expect(dateTimeComponent.props("calendarPresets")).toBe(false);
-    });
-
-    it("passes calendarPresets through to DateTime", () => {
-      wrapper = createWrapper({ calendarPresets: true });
-      const dateTimeComponent = wrapper.findComponent('[data-test="datetime-component"]');
-      expect(dateTimeComponent.props("calendarPresets")).toBe(true);
+      expect(dateTimeComponent.props("capabilities")).toEqual({ kinds: ["rolling", "fixed"] });
     });
 
     it("forwards a calendar token as a relative period", async () => {
-      wrapper = createWrapper({ calendarPresets: true });
+      wrapper = createWrapper();
       const dateTimeComponent = wrapper.findComponent('[data-test="datetime-component"]');
       await dateTimeComponent.vm.$emit("on:date-change", {
         startTime: 1,
@@ -459,7 +459,6 @@ describe("DateTimePickerDashboard", () => {
         modelValue: {},
         initialTimezone: "",
         disable: null,
-        autoApplyDashboard: null,
       });
 
       expect(wrapper.exists()).toBe(true);
@@ -506,7 +505,6 @@ describe("DateTimePickerDashboard", () => {
         },
         initialTimezone: "Europe/London",
         disable: true,
-        autoApplyDashboard: true,
       });
 
       const dateTimeComponent = wrapper.findComponent('[data-test="datetime-component"]');
@@ -517,7 +515,6 @@ describe("DateTimePickerDashboard", () => {
       expect(wrapper.vm.modelValue.relativeTimePeriod).toBe("1d");
       expect(wrapper.vm.initialTimezone).toBe("Europe/London");
       expect(wrapper.vm.disable).toBe(true);
-      expect(wrapper.vm.autoApplyDashboard).toBe(true);
     });
 
     it("should have correct ref attribute", () => {
@@ -539,7 +536,6 @@ describe("DateTimePickerDashboard", () => {
     const Host = defineComponent({
       components: { DateTimePickerDashboard },
       props: {
-        autoApply: { type: Boolean, default: true },
         initial: {
           type: Object,
           default: () => ({ valueType: "relative", relativeTimePeriod: "15m" }),
@@ -556,7 +552,6 @@ describe("DateTimePickerDashboard", () => {
       template: `<DateTimePickerDashboard
         ref="pickerRef"
         :model-value="gate.picked.value ?? initial"
-        :auto-apply-dashboard="autoApply"
         @update:model-value="gate.onPick"
         @show="gate.onShow"
         @hide="gate.onHide"
@@ -582,16 +577,16 @@ describe("DateTimePickerDashboard", () => {
 
       await openPicker(wrapper);
       expect(inMenu("date-time-apply-btn")).toBeNull();
-      inMenu("date-time-chip-1h")!.click();
+      inMenu("date-time-chip-7d")!.click();
       await flushPromises();
 
-      expect(gate.picked.value.relativeTimePeriod).toBe("1h");
+      expect(gate.picked.value.relativeTimePeriod).toBe("7d");
       expect(gate.applied.value.relativeTimePeriod).toBe("15m");
       expect(gate.needsRefresh.value).toBe(true);
-      expect(wrapper.find('[data-test="date-time-btn"]').text()).toContain("Last 1 hour");
+      expect(wrapper.find('[data-test="date-time-btn"]').text()).toContain("Last 7 days");
     });
 
-    it("shows the applied range again after closing on a range that ends before it starts", async () => {
+    it("keeps the applied range on the trigger while a draft ends before it starts", async () => {
       const start = Date.UTC(2026, 9, 13, 10, 0, 0) * 1000;
       wrapper = mount(Host, {
         props: { initial: { valueType: "absolute", startTime: start, endTime: start + 30 * 60e6 } },
@@ -601,23 +596,24 @@ describe("DateTimePickerDashboard", () => {
       await flushPromises();
       const label = () => wrapper.find('[data-test="date-time-btn"]').text();
       const realPicker = wrapper.findComponent(DateTime);
-      expect(label()).toContain("Oct 13, 10:00 – 10:30");
+      expect(label()).toContain("Oct 13, 2026, 10:00 – 10:30");
 
       realPicker.vm.onMenuOpenChange(true);
+      realPicker.vm.menuOpen = true;
       realPicker.vm.selectedTime = { startTime: "18:50:30", endTime: "18:25:22" };
       await flushPromises();
-      expect(label()).toContain("Oct 13, 18:50:30");
+      expect(label()).toContain("Oct 13, 2026, 10:00 – 10:30");
 
+      realPicker.vm.menuOpen = false;
       realPicker.vm.onMenuOpenChange(false);
       await flushPromises();
 
-      expect(label()).toContain("Oct 13, 10:00 – 10:30");
+      expect(label()).toContain("Oct 13, 2026, 10:00 – 10:30");
       expect((wrapper.vm as any).gate.needsRefresh.value).toBe(false);
     });
 
-    it("keeps the Apply button on a page that does not opt in", async () => {
+    it("keeps the Apply button in the calendar view", async () => {
       wrapper = mount(Host, {
-        props: { autoApply: false },
         attachTo: document.body,
         global: { plugins: [i18n, store] },
       });

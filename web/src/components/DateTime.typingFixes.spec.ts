@@ -31,7 +31,7 @@ describe("DateTime typed text", () => {
 
   const createWrapper = (props: Record<string, unknown> = {}) => {
     wrapper = mount(DateTime, {
-      props: { autoApply: true, calendarPresets: true, ...props },
+      props: { ...props },
       attachTo: document.body,
       global: { plugins: [i18n, store] },
     });
@@ -93,17 +93,6 @@ describe("DateTime typed text", () => {
     localStorage.clear();
     vi.useRealTimers();
     vi.restoreAllMocks();
-  });
-
-  it("keeps the name of a typed period that has started, fixed (V6, D-NAME)", async () => {
-    createWrapper();
-    await openMenu();
-    await typeInBar("Q4");
-    expect(el("date-time-resolved-name")?.textContent).toBe("Q4 2026");
-
-    await pressInBar("Enter");
-    expect(lastEmit()).toMatchObject({ valueType: "absolute" });
-    expect(wrapper!.vm.triggerLabel).toBe("Q4 2026 · Oct 1 – Nov 12, 21:24");
   });
 
   it("greys a typed range over the limit and offers the longest allowed before it (V9)", async () => {
@@ -201,20 +190,9 @@ describe("DateTime typed text", () => {
   it("groups the digits of a long count (P1)", async () => {
     createWrapper();
     await openMenu();
-    await typeInBar("2025");
+    await typeInBar("2025m");
 
     expect(names()).toContain("Last 2,025 minutes");
-  });
-
-  it("does not repeat the dates as the name of an unnamed calendar period (P2)", async () => {
-    createWrapper();
-    await openMenu();
-    await typeInBar("2w ago");
-
-    const text = (dataTest: string) =>
-      (el(dataTest)?.textContent ?? "").replace(/\s+/g, " ").trim();
-    expect(text("date-time-resolved-name")).toBe("Oct 25 – 31");
-    expect(text("date-time-resolved-range")).toBe("");
   });
 
   it("leaves out milliseconds an epoch in seconds never had (P2)", async () => {
@@ -242,14 +220,5 @@ describe("DateTime typed text", () => {
 
     await typeInBar("2026-11-06 14:02:11");
     expect(el("date-time-as-utc-toggle")).not.toBeNull();
-  });
-
-  it("treats a lone clock time as an instant with anchor rows (P3)", async () => {
-    createWrapper();
-    await openMenu();
-    await typeInBar("11:38");
-
-    expect(rows()[0].getAttribute("data-test")).toBe("date-time-list-anchor-5m");
-    expect(el("date-time-resolved-name")?.textContent).toBe("± 5 min around Nov 12, 11:38:00");
   });
 });

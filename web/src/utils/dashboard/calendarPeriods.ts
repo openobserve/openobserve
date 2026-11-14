@@ -94,6 +94,24 @@ export const resolveCalendarPeriod = (
   return { startTime: startMs * 1000, endTime: endMs * 1000 };
 };
 
+/** The whole period a token names, end exclusive, even while it runs: `calendar:day:0` ends at the next midnight. */
+export const resolveCalendarPeriodBounds = (
+  token: unknown,
+  timezone?: string | null,
+  nowMs: number = Date.now(),
+  weekStart: WeekDay = weekStartsOn(),
+): CalendarRange | null => {
+  const period = parseCalendarToken(token);
+  if (!period) return null;
+  const zone = safeTimezone(timezone);
+  const bounds = civilBounds(period, zone, nowMs, weekStart);
+  if (!bounds) return null;
+  const startMs = zonedMidnight(bounds.start, zone);
+  const endMs = zonedMidnight(bounds.next, zone);
+  if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) return null;
+  return { startTime: startMs * 1000, endTime: endMs * 1000 };
+};
+
 /** Trigger-button label for a calendar token, e.g. "This month", "Oct 6", "Q2 2026". */
 export const formatCalendarLabel = (
   token: unknown,

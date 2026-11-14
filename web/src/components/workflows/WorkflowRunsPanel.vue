@@ -44,8 +44,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div class="flex shrink-0 items-center gap-2">
         <DateTime
+          preset="explorer-auto"
+          :capabilities="{ kinds: ['rolling', 'fixed'] }"
           ref="dateTimeRef"
-          auto-apply
           :default-type="dateTimeType"
           :default-absolute-time="{
             startTime: absoluteTime.startTime,

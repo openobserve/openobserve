@@ -179,6 +179,11 @@ export class LogsPage {
         this.expandCodeFieldBtn = '[data-test="log-search-expand-code-field-btn"]';
         this.logsDetailTableSearchAroundBtn = '[data-test="logs-detail-table-search-around-btn"]';
         this.logsDetailTableSearchAroundWindow = '[data-test="logs-detail-table-search-around-window"]';
+        this.logsDetailTableSearchAroundKeepFilters = '[data-test="logs-detail-table-search-around-keep-filters"]';
+        this.searchAroundContextStrip = '[data-test="logs-search-around-context-strip"]';
+        this.searchAroundApplyFilterBtn = '[data-test="logs-search-around-context-strip-run"]';
+        this.searchAroundBackToResultsBtn = '[data-test="logs-search-around-context-strip-back"]';
+        this.contextViewFilterOffChip = '[data-test="logs-search-bar-context-view-chip"]';
         this.logTableColumn3Source = '[data-test="o2-table-row-3"] [data-test="o2-table-cell-source"]';
         this.histogramToggleDiv = '[data-test="logs-search-bar-show-histogram-toggle-btn"] div';
 
@@ -4888,6 +4893,22 @@ export class LogsPage {
 
     async clickSearchAroundButton() {
         return await this.page.locator(this.searchAroundBtn).click();
+    }
+
+    // Search around opens a context view: the filter is off until Apply filter or Back to results.
+    async expectSearchAroundContextView() {
+        await expect(this.page.locator(this.searchAroundContextStrip)).toBeVisible({ timeout: 30000 });
+        await expect(this.page.locator(this.contextViewFilterOffChip)).toBeVisible();
+    }
+
+    async clickSearchAroundApplyFilter() {
+        await this.page.locator(this.searchAroundApplyFilterBtn).click();
+        await expect(this.page.locator(this.searchAroundContextStrip)).toHaveCount(0);
+    }
+
+    async clickSearchAroundBackToResults() {
+        await this.page.locator(this.searchAroundBackToResultsBtn).click();
+        await expect(this.page.locator(this.searchAroundContextStrip)).toHaveCount(0);
     }
 
     async expectPaginationNotVisible() {

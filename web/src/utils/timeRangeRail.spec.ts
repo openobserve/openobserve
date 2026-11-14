@@ -218,7 +218,7 @@ describe("timeRangeRail", () => {
     const t = ((key: string, named?: { count: number }) =>
       `${key}:${named?.count ?? ""}`) as unknown as TranslateFn;
     expect(formatKnownPeriod("60M", "UTC", t)).toBe("common.pastYear:5");
-    expect(formatKnownPeriod("12M", "UTC", t)).toBe("common.pastYear:1");
+    expect(formatKnownPeriod("12M", "UTC", t)).toBe("common.pastMonth:12");
     expect(formatKnownPeriod("18M", "UTC", t)).toBe("common.pastMonth:18");
     expect(formatKnownPeriod("1w", "UTC", t)).toBe("common.pastWeek:1");
   });

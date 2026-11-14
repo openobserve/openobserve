@@ -43,13 +43,12 @@
         />
 
         <DateTimePickerDashboard
+          preset="dashboard"
           :model-value="pickedDate ?? selectedDate"
-          :auto-apply-dashboard="true"
           ref="dateTimePickerRef"
           class="hover:bg-interactive-hover-bg h-7.5 min-h-7.5 transition-all duration-200"
           data-test="dashboard-viewpanel-date-time-picker"
           :disable="disable"
-          calendar-presets
           @update:model-value="timeGate.onApply"
           @show="timeGate.onShow"
           @hide="onTimePickerHide"

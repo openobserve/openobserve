@@ -34,7 +34,7 @@ describe("DateTime v2", () => {
 
   const createWrapper = (props: Record<string, unknown> = {}) => {
     wrapper = mount(DateTime, {
-      props: { autoApply: true, calendarPresets: true, ...props },
+      props: { ...props },
       attachTo: document.body,
       global: { plugins: [i18n, store] },
     });
@@ -138,7 +138,6 @@ describe("DateTime v2", () => {
     it("names a live range with its dates and an always-on zone badge on a dashboard", async () => {
       createWrapper({
         preset: "dashboard",
-        zoneBadge: "always",
         defaultRelativeTime: "calendar:quarter:0",
       });
       await flushPromises();
@@ -150,7 +149,7 @@ describe("DateTime v2", () => {
     it("gives the zone badge the offset at the range's start, not at now", async () => {
       store.state.timezone = "America/New_York";
       createWrapper({
-        zoneBadge: "always",
+        preset: "dashboard",
         defaultType: "absolute",
         defaultAbsoluteTime: {
           startTime: micros("2026-07-01T04:00:00Z"),
@@ -394,7 +393,6 @@ describe("DateTime v2", () => {
 
     it("keeps an applied fixed range at its instants when a pending live pick is dropped", async () => {
       createWrapper({
-        autoApply: false,
         defaultType: "absolute",
         defaultAbsoluteTime: {
           startTime: micros("2026-11-12T10:12:10Z"),
@@ -425,7 +423,6 @@ describe("DateTime v2", () => {
   describe("Start and End fields", () => {
     const openFixedCalendar = async () => {
       createWrapper({
-        autoApply: false,
         defaultType: "absolute",
         defaultAbsoluteTime: {
           startTime: micros("2026-11-12T04:30:00Z"),
@@ -487,7 +484,6 @@ describe("DateTime v2", () => {
   describe("go live", () => {
     it("applies the live range at once on a picker that otherwise waits for Apply", async () => {
       createWrapper({
-        autoApply: false,
         defaultType: "absolute",
         defaultAbsoluteTime: {
           startTime: micros("2026-11-12T10:00:00Z"),
@@ -509,7 +505,6 @@ describe("DateTime v2", () => {
   describe("in-panel go live", () => {
     it("keeps the live range after the panel closes on a picker that waits for Apply", async () => {
       createWrapper({
-        autoApply: false,
         defaultType: "absolute",
         defaultAbsoluteTime: {
           startTime: micros("2026-11-12T10:00:00Z"),

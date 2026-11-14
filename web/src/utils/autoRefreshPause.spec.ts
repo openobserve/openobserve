@@ -16,6 +16,9 @@
 import { describe, expect, it } from "vitest";
 import {
   autoRefreshState,
+  rangeEndedAt,
+  rangeRefreshFloorSeconds,
+  refreshFloorSeconds,
   fixedRangeEnd,
   fixedRangeEnded,
   fixedRangeRefreshDone,
@@ -71,5 +74,43 @@ describe("auto-refresh pause predicates", () => {
     const base = { intervalSeconds: 30, nowMs: NOW_MS, rangeEndUs: (NOW_MS - 5_000) * 1000 };
     expect(owesCatchUp({ ...base, lastTickMs: NOW_MS - 10_000 })).toBe(true);
     expect(owesCatchUp({ ...base, lastTickMs: NOW_MS - 1_000 })).toBe(false);
+  });
+});
+
+describe("refresh floor", () => {
+  const MIN_US = 60_000_000;
+  const ctx = {
+    nowUs: Date.UTC(2026, 10, 12, 15, 54, 10) * 1000,
+    zone: "UTC",
+    weekStart: 1 as const,
+    locale: "en-US",
+    fiscalYearStartMonth: null,
+  };
+
+  it("rounds span ÷ 1000 up to the next menu step", () => {
+    expect(refreshFloorSeconds(15 * MIN_US)).toBe(5);
+    expect(refreshFloorSeconds(7 * 1440 * MIN_US)).toBe(900);
+    expect(refreshFloorSeconds(30 * 1440 * MIN_US)).toBe(3600);
+    expect(refreshFloorSeconds(24 * 60 * MIN_US)).toBe(300);
+  });
+
+  it("caps at the slowest step", () => {
+    expect(refreshFloorSeconds(1e15)).toBe(86400);
+  });
+
+  it("reads the floor of a range as it resolves", () => {
+    expect(rangeRefreshFloorSeconds({ kind: "rolling", span: "30d" }, ctx)).toBe(3600);
+  });
+
+  it("pauses ended ranges of every kind, not in-progress ones", () => {
+    expect(rangeEndedAt({ kind: "calendar", unit: "day", offset: -1 }, ctx)).toBe(true);
+    expect(rangeEndedAt({ kind: "calendar", unit: "day", offset: 0 }, ctx)).toBe(false);
+    expect(rangeEndedAt({ kind: "rolling", span: "1h" }, ctx)).toBe(false);
+    expect(
+      rangeEndedAt({ kind: "fixed", startUs: ctx.nowUs - MIN_US, endUs: ctx.nowUs + MIN_US }, ctx),
+    ).toBe(false);
+    expect(
+      rangeEndedAt({ kind: "fixed", startUs: ctx.nowUs - MIN_US, endUs: ctx.nowUs }, ctx),
+    ).toBe(true);
   });
 });

@@ -57,6 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </template>
         <DateTimePickerDashboard
+          preset="explorer-auto"
           class="rum-date-time-picker"
           ref="dateTimePicker"
           v-model="selectedDate"
@@ -71,6 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :is-compact="isMobile"
           :range-end-us="refreshRangeEndUs"
           :range-start-us="refreshRangeStartUs"
+          :range-span-us="refreshRangeSpanUs"
           class="app-performance-auto-refresh-interval"
           @trigger="refreshData"
           @live="goLiveRange"
@@ -462,6 +464,10 @@ export default defineComponent({
     const refreshRangeStartUs = computed(() =>
       refreshRangeEndUs.value === null ? null : Number(selectedDate.value?.startTime) || null,
     );
+    const refreshRangeSpanUs = computed(() => {
+      const span = Number(selectedDate.value?.endTime) - Number(selectedDate.value?.startTime);
+      return Number.isFinite(span) && span > 0 ? span : null;
+    });
     const goLiveRange = () =>
       (
         dateTimePicker.value as { dateTimePicker?: { goLive?: () => void } } | null
@@ -579,6 +585,7 @@ export default defineComponent({
       rumStreamLimits,
       refreshRangeEndUs,
       refreshRangeStartUs,
+      refreshRangeSpanUs,
       goLiveRange,
       selectedDate,
       currentTimeObj,

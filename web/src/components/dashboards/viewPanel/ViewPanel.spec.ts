@@ -228,7 +228,7 @@ describe("ViewPanel", () => {
           DateTimePickerDashboard: {
             name: "DateTimePickerDashboard",
             template: '<div data-test="date-time-picker-dashboard"><slot /></div>',
-            props: ["modelValue", "autoApplyDashboard", "disable"],
+            props: ["modelValue", "preset", "disable"],
             emits: ["update:modelValue", "show", "hide", "timezone-change"],
             methods: {
               refresh: vi.fn(),
@@ -789,10 +789,10 @@ describe("ViewPanel", () => {
       mockStore.state.zoConfig = { ...mockStore.state.zoConfig, auto_query_enabled: false };
     });
 
-    it("uses the picker without an Apply button", async () => {
+    it("uses the dashboard picker preset", async () => {
       await mountOnRange();
 
-      expect(picker().props("autoApplyDashboard")).toBe(true);
+      expect(picker().props("preset")).toBe("dashboard");
       expect(chartSpan()).toBe(15 * MINUTE);
     });
 
@@ -807,16 +807,14 @@ describe("ViewPanel", () => {
       expect(wrapper.vm.showApplyHint).toBe(false);
     });
 
-    it("holds an open-panel field edit until the picker closes, then runs it", async () => {
+    // Start/End edits are drafts inside the picker, so an emit while it is open is an Apply.
+    it("runs a fixed range applied while the picker is open at once", async () => {
       setAutoRun(false);
       await mountOnRange();
       picker().vm.$emit("show");
 
       await applyInPicker({ valueType: "absolute", startTime: 0, endTime: 30 * MINUTE });
-      expect(chartSpan()).toBe(15 * MINUTE);
-
-      picker().vm.$emit("hide");
-      await flushPromises();
+      expect(chartSpan()).toBe(30 * MINUTE);
       expect(wrapper.vm.selectedDate.valueType).toBe("absolute");
     });
 

@@ -1134,13 +1134,21 @@ describe("useSearchQuery › getQueryReq › search-around window query", () => 
     expect(getQueryReq(false)?.query.sql).toBe(windowSql);
   });
 
-  it("drops the window query for good once the range changes", () => {
+  // Steps and zooms keep the context view; a panel apply leaves it in the host, not here.
+  it("keeps the window query, on the new bounds, when the context view's range moves", () => {
     const getQueryReq = arm();
     getQueryReq(false);
 
     mockState.searchObj.data.datetime.endTime = 4_000_000;
-    expect(getQueryReq(false)?.query.sql).toBe(userQuery);
-    mockState.searchObj.data.datetime.endTime = 5_000_000;
+    expect(getQueryReq(false)?.query.sql).toBe(windowSql);
+    expect((mockState.searchObj.data as any).searchAround.windowQuery.endUs).toBe(4_000_000);
+  });
+
+  it("drops the window query once the range is empty", () => {
+    const getQueryReq = arm();
+    getQueryReq(false);
+
+    mockState.searchObj.data.datetime.endTime = 1_000_000;
     expect(getQueryReq(false)?.query.sql).toBe(userQuery);
   });
 

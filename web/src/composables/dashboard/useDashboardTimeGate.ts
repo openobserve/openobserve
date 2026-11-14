@@ -15,6 +15,7 @@
 
 import { computed, getCurrentScope, onScopeDispose, ref, watch, type Ref } from "vue";
 import { arePickerValuesEqual, isUsablePickerValue } from "@/utils/dashboard/panelTimeUtils";
+import { rangeExceedsGuard } from "@/utils/orgTimeRangeSettings";
 
 // Same pause Logs gives an absolute edit before it runs (debouncedAutoRunAbsolute).
 export const ABSOLUTE_APPLY_DEBOUNCE_MS = 2500;
@@ -27,16 +28,23 @@ export interface DashboardTimeGateOptions {
   onAutoApply?: (value: any) => void;
   /** Moves the picker to a range, since a mounted picker reads its v-model only once. */
   showInPicker?: (value: any) => void;
+  /** The org's "ask before ranges longer than N days"; null when the org has none. */
+  guardDays?: () => number | null;
+}
+
+export interface DashboardTimeApplyMeta {
+  userChanged?: boolean;
+  source?: string;
 }
 
 /** Keeps what a dashboard time picker shows apart from the range its panels load with. */
 export const useDashboardTimeGate = (options: DashboardTimeGateOptions) => {
   const applied = options.applied ?? ref<any>(null);
   const picked = ref<any>(null);
+  const held = ref<{ from: any; to: any } | null>(null);
 
   let hasStartingRange = false;
   let isPickerOpen = false;
-  let heldUntilClose = false;
   let pendingApply: ReturnType<typeof setTimeout> | null = null;
 
   const isWaiting = computed(
@@ -95,15 +103,39 @@ export const useDashboardTimeGate = (options: DashboardTimeGateOptions) => {
     else autoApply();
   };
 
-  /** A range the user applied in the picker runs at once, Auto Run or not, so the label never sits over old data. */
-  // Start/End edits in the open panel and the picker's own corrections are picks; the edits run on close.
-  const onApply = (value: any, meta?: { userChanged?: boolean }) => {
+  const overGuard = (value: any) =>
+    rangeExceedsGuard(
+      Number(value?.startTime),
+      Number(value?.endTime),
+      options.guardDays?.() ?? null,
+    );
+
+  /** A range the user applied runs at once, Auto Run or not, unless it is over the org's guard. */
+  const onApply = (value: any, meta?: DashboardTimeApplyMeta) => {
     if (meta?.userChanged === false) return onPick(value);
-    const isFieldEdit = isPickerOpen && value?.valueType !== "relative";
-    heldUntilClose = isFieldEdit;
+    held.value = null;
+    if (!isUsablePickerValue(value)) return onPick(value);
+    if (meta?.source !== "undo" && overGuard(value)) {
+      held.value = { from: applied.value, to: value };
+      return;
+    }
     onPick(value);
-    if (isFieldEdit || !isUsablePickerValue(value)) return;
     apply();
+  };
+
+  const confirmGuard = () => {
+    const next = held.value?.to;
+    held.value = null;
+    if (!next) return;
+    onPick(next);
+    apply();
+  };
+
+  const dismissGuard = () => {
+    if (!held.value) return;
+    held.value = null;
+    adopt();
+    if (applied.value) options.showInPicker?.(applied.value);
   };
 
   const onShow = () => {
@@ -112,8 +144,6 @@ export const useDashboardTimeGate = (options: DashboardTimeGateOptions) => {
 
   const onHide = () => {
     isPickerOpen = false;
-    const runHeldEdit = heldUntilClose;
-    heldUntilClose = false;
 
     // A broken range never applies, so closing on one puts the picker back on the range panels show.
     if (picked.value && !isUsablePickerValue(picked.value) && applied.value) {
@@ -121,8 +151,7 @@ export const useDashboardTimeGate = (options: DashboardTimeGateOptions) => {
       options.showInPicker?.(applied.value);
       return;
     }
-    if (runHeldEdit) apply();
-    else flush();
+    flush();
   };
 
   watch(options.isAutoRunOn, (isOn) => {
@@ -135,6 +164,7 @@ export const useDashboardTimeGate = (options: DashboardTimeGateOptions) => {
   return {
     picked,
     applied,
+    held,
     isWaiting,
     needsRefresh,
     onPick,
@@ -145,6 +175,8 @@ export const useDashboardTimeGate = (options: DashboardTimeGateOptions) => {
     apply,
     refresh,
     adopt,
+    confirmGuard,
+    dismissGuard,
   };
 };
 

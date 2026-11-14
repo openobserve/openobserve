@@ -41,9 +41,10 @@
       <div class="[&_#date-time-button]:h-9!">
         <!-- Without its shift arrows on phones the picker fits beside the title. -->
         <DateTime
+          preset="explorer-auto"
+          :capabilities="{ kinds: ['rolling', 'fixed'] }"
           data-test-name="search-history-date-time"
           ref="searchDateTimeRef"
-          auto-apply
           menu-align="end"
           :hide-range-shift="isMobile"
           :default-type="restoredDate.valueType || searchObj.data.datetime.type"

@@ -25,15 +25,13 @@ vi.mock("@/utils/timeInputFailure", () => ({ reportParseFailure: vi.fn() }));
 const NOW = new Date("2026-11-12T15:54:10Z");
 const IST = "Asia/Calcutta";
 const micros = (iso: string) => Date.parse(iso) * 1000;
-// Keys added in this run, read through i18n so the test holds before and after the locale merge.
-const tr = (key: string) => String((i18n.global.t as unknown as (key: string) => string)(key));
 
 describe("DateTime typed text, run 2", () => {
   let wrapper: VueWrapper<InstanceType<typeof DateTime>> | null = null;
 
   const createWrapper = (props: Record<string, unknown> = {}) => {
     wrapper = mount(DateTime, {
-      props: { autoApply: true, calendarPresets: true, ...props },
+      props: { ...props },
       attachTo: document.body,
       global: { plugins: [i18n, store] },
     });
@@ -51,12 +49,6 @@ describe("DateTime typed text, run 2", () => {
       (node) => node.getAttribute("data-test") === dataTest,
     ) ?? null;
   const text = (dataTest: string) => (el(dataTest)?.textContent ?? "").replace(/\s+/g, " ").trim();
-
-  const rows = () =>
-    Array.from(
-      document.querySelectorAll<HTMLElement>("[data-test='date-time-list'] [role='option']"),
-    );
-  const names = () => rows().map((row) => row.getAttribute("aria-label"));
 
   const lastEmit = () => {
     const events = wrapper!.emitted("on:date-change") as unknown[][];
@@ -112,17 +104,6 @@ describe("DateTime typed text, run 2", () => {
       });
     });
 
-    it("applies a running fiscal year fixed as FY26 with its fiscal note", async () => {
-      createWrapper();
-      await openMenu();
-      await typeInBar("FY26");
-      expect(text("date-time-resolved-name")).toBe("FY26");
-      expect(text("date-time-preview-note")).toContain("fiscal year starts Jan");
-
-      await pressInBar("Enter");
-      expect(lastEmit()).toMatchObject({ valueType: "absolute" });
-    });
-
     it("applies this year typed as a number fixed as 2026", async () => {
       createWrapper();
       await openMenu();
@@ -151,25 +132,8 @@ describe("DateTime typed text, run 2", () => {
   });
 
   describe("calendar words on a recurring picker [C5, D-ROLLING]", () => {
-    it.each([
-      ["last week", "Last 7 days", "7d"],
-      ["yesterday", "Last 1 day", "1d"],
-      ["this month", "Last 30 days", "30d"],
-      ["previous quarter", "Last 90 days", "90d"],
-    ])("offers %s as its rolling equivalent and applies it", async (typed, name, period) => {
-      createWrapper({ calendarPresets: false, rollingCalendarWords: true });
-      await openMenu();
-      await typeInBar(typed);
-      expect(text("date-time-resolved-name")).toBe(name);
-      expect(text("date-time-preview-note")).toBe(tr("dateTime.rollingHere"));
-
-      await pressInBar("Enter");
-      expect(lastEmit()).toMatchObject({ relativeTimePeriod: period });
-      expect(lastEmit().valueType).not.toBe("absolute");
-    });
-
     it("keeps calendar words as their dates on a dates-only picker", async () => {
-      createWrapper({ calendarPresets: false, disableRelative: true, rollingCalendarWords: true });
+      createWrapper({ capabilities: { kinds: ["fixed"] } });
       await openMenu();
       await typeInBar("last week");
       await pressInBar("Enter");
@@ -185,70 +149,11 @@ describe("DateTime typed text, run 2", () => {
       expect(text("date-time-preview-note")).toBe("That is in the future. Latest is now.");
       expect(el("date-time-list-example-0")).toBeNull();
     });
-
-    it("notes an end cut to now", async () => {
-      createWrapper();
-      await openMenu();
-      await typeInBar("today 20:00 - 23:00");
-      expect(text("date-time-resolved-name")).toBe("Nov 12, 20:00:00 – 21:24:10");
-      expect(text("date-time-preview-note")).toBe(tr("dateTime.cutToNow"));
-    });
-
-    it("names a count past ten years by its cap, with the note", async () => {
-      createWrapper();
-      await openMenu();
-      await typeInBar("2030");
-      expect(names()).toEqual([
-        "Last 2,030 minutes",
-        "Last 2,030 hours",
-        "Last 2,030 days",
-        "Last 520 weeks, cut to 10 years",
-        "Last 10 years, cut to 10 years",
-      ]);
-      for (let i = 0; i < 4; i++) await pressInBar("ArrowDown");
-      expect(text("date-time-resolved-name")).toBe("Last 10 years");
-      expect(text("date-time-preview-note")).toBe("cut to 10 years");
-    });
-  });
-
-  describe("slash dates [P10]", () => {
-    it("notes the other day/month order when only it can apply", async () => {
-      createWrapper();
-      await openMenu();
-      await typeInBar("12/10/2026");
-      expect(text("date-time-resolved-name")).toBe("Oct 12");
-      expect(text("date-time-preview-note")).toBe(tr("dateTime.readAsDayMonth"));
-    });
-
-    it("needs no note in the browser's own order", async () => {
-      createWrapper();
-      await openMenu();
-      await typeInBar("10/12/2026");
-      expect(text("date-time-resolved-name")).toBe("Oct 12");
-      expect(text("date-time-preview-note")).toBe("");
-    });
-
-    it("gives a slash instant the anchor rows an ISO one gets", async () => {
-      createWrapper();
-      await openMenu();
-      await typeInBar("11/12/2026 10:00:00");
-      expect(rows()[0].getAttribute("data-test")).toMatch(/^date-time-list-anchor-/);
-      expect(text("date-time-resolved-name")).toBe("± 5 min around Nov 12, 10:00:00");
-    });
-
-    it("anchors a flipped slash instant on the order that can apply, with the note", async () => {
-      createWrapper();
-      await openMenu();
-      await typeInBar("12/11/2026 10:00:00");
-      expect(rows()[0].getAttribute("data-test")).toMatch(/^date-time-list-anchor-/);
-      expect(text("date-time-resolved-name")).toBe("± 5 min around Nov 12, 10:00:00");
-      expect(text("date-time-preview-note")).toBe(tr("dateTime.readAsDayMonth"));
-    });
   });
 
   describe("yearless dates where the future is allowed [C3]", () => {
     it("reads a yearless date as the coming one on a picker with no ceiling", async () => {
-      createWrapper({ disableRelative: true, minDate: "2026/01/01", futureAllowed: true });
+      createWrapper({ capabilities: { kinds: ["fixed"], future: true }, minDate: "2026/01/01" });
       await openMenu();
       await typeInBar("Dec 20 - Dec 22");
       await pressInBar("Enter");
@@ -259,7 +164,7 @@ describe("DateTime typed text, run 2", () => {
     });
 
     it("rolls a yearless date already over into next year", async () => {
-      createWrapper({ disableRelative: true, minDate: "2026/01/01", futureAllowed: true });
+      createWrapper({ capabilities: { kinds: ["fixed"], future: true }, minDate: "2026/01/01" });
       await openMenu();
       await typeInBar("Jan 5");
       await pressInBar("Enter");

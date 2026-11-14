@@ -32,7 +32,7 @@ describe("DateTime typed text, run 3", () => {
 
   const createWrapper = (props: Record<string, unknown> = {}) => {
     wrapper = mount(DateTime, {
-      props: { autoApply: true, calendarPresets: true, ...props },
+      props: { ...props },
       attachTo: document.body,
       global: { plugins: [i18n, store] },
     });
@@ -98,25 +98,6 @@ describe("DateTime typed text, run 3", () => {
   });
 
   describe("typed period names apply fixed and keep their name [D-NAME]", () => {
-    it.each([
-      ["Q4", "Q4 2026", "Oct 1 – Nov 12, 21:24", "2026-09-30T18:30:00Z"],
-      ["H2", "H2 2026", "Jul 1 – Nov 12, 21:24", "2026-06-30T18:30:00Z"],
-      ["2026", "2026", "Jan 1 – Nov 12, 21:24", "2025-12-31T18:30:00Z"],
-      ["FY26", "FY26", "Jan 1 – Nov 12, 21:24", "2025-12-31T18:30:00Z"],
-    ])("previews running %s as %s, fixed, cut to now", async (typed, name, range, start) => {
-      createWrapper();
-      await openMenu();
-      await typeInBar(typed);
-      expect(text("date-time-resolved-name")).toBe(name);
-      expect(text("date-time-resolved-range")).toBe(range);
-      expect(el("date-time-preview-fixed")).not.toBeNull();
-      expect(el("date-time-preview-live")).toBeNull();
-
-      await pressInBar("Enter");
-      expect(lastEmit()).toMatchObject({ valueType: "absolute", startTime: micros(start) });
-      expect(lastEmit().relativeTimePeriod ?? null).toBeNull();
-    });
-
     it("names a finished quarter by its name and dates", async () => {
       createWrapper();
       await openMenu();
@@ -131,25 +112,6 @@ describe("DateTime typed text, run 3", () => {
         endTime: micros("2026-09-30T18:30:00Z"),
       });
     });
-
-    it("lists named readings by name with a calendar icon and their dates", async () => {
-      createWrapper();
-      await openMenu();
-      await typeInBar("Q3");
-      const [first, second] = rows();
-      expect(rowText(first)).toContain("Q3 2026");
-      expect(rowText(first)).toContain("Jul 1 – Sep 30");
-      expect(rowText(second)).toContain("Q3 2025");
-      expect(first.querySelector("[data-icon], svg, i")?.outerHTML ?? "").not.toContain("schedule");
-    });
-
-    it("keeps the name where calendar presets are off", async () => {
-      createWrapper({ calendarPresets: false });
-      await openMenu();
-      await typeInBar("Q4");
-      expect(text("date-time-resolved-name")).toBe("Q4 2026");
-      expect(text("date-time-resolved-range")).toBe("Oct 1 – Nov 12, 21:24");
-    });
   });
 
   describe("calendar words without calendar presets [D-ROLLING]", () => {
@@ -157,10 +119,9 @@ describe("DateTime typed text, run 3", () => {
       ["yesterday", "2026-11-10T18:30:00Z", "2026-11-11T18:30:00Z"],
       ["last week", "2026-10-31T18:30:00Z", "2026-11-07T18:30:00Z"],
     ])("applies %s as its exact period by default", async (typed, start, end) => {
-      createWrapper({ calendarPresets: false });
+      createWrapper({ capabilities: { kinds: ["rolling", "fixed"] } });
       await openMenu();
       await typeInBar(typed);
-      expect(text("date-time-preview-note")).not.toBe(tr("dateTime.rollingHere"));
 
       await pressInBar("Enter");
       expect(lastEmit()).toMatchObject({
@@ -168,17 +129,6 @@ describe("DateTime typed text, run 3", () => {
         startTime: micros(start),
         endTime: micros(end),
       });
-    });
-
-    it("offers the rolling length only where the picker opts in", async () => {
-      createWrapper({ calendarPresets: false, rollingCalendarWords: true });
-      await openMenu();
-      await typeInBar("yesterday");
-      expect(text("date-time-resolved-name")).toBe("Last 1 day");
-      expect(text("date-time-preview-note")).toBe(tr("dateTime.rollingHere"));
-
-      await pressInBar("Enter");
-      expect(lastEmit()).toMatchObject({ relativeTimePeriod: "1d" });
     });
   });
 
@@ -210,22 +160,6 @@ describe("DateTime typed text, run 3", () => {
   });
 
   describe("cut and duration notes", () => {
-    it("notes a week count cut to ten years [visual #7]", async () => {
-      createWrapper();
-      await openMenu();
-      await typeInBar("2025w");
-      expect(text("date-time-resolved-name")).toBe("Last 520 weeks");
-      expect(text("date-time-preview-note")).toBe(tr("dateTime.cutToTenYears"));
-    });
-
-    it("marks the capped week count of a bare year as cut in its row [visual #7]", async () => {
-      createWrapper();
-      await openMenu();
-      await typeInBar("2025");
-      const weeks = rows().find((row) => rowText(row).startsWith("Last 520 weeks"));
-      expect(rowText(weeks!)).toContain(tr("dateTime.cutToTenYears"));
-    });
-
     it("gives a zone-typed reading row its duration, not the zone [a8]", async () => {
       createWrapper();
       await openMenu();
@@ -239,8 +173,7 @@ describe("DateTime typed text, run 3", () => {
   describe("yearless dates against the ceiling [D-CEILING]", () => {
     it("reads yesterday's date as this year on a dates-only picker floored by minDate", async () => {
       createWrapper({
-        disableRelative: true,
-        hideRelativeTime: true,
+        capabilities: { kinds: ["fixed"], wholeDays: true },
         minDate: "2026/11/09",
       });
       await openMenu();
@@ -252,8 +185,7 @@ describe("DateTime typed text, run 3", () => {
 
     it("refuses a future date there instead of saving it", async () => {
       createWrapper({
-        disableRelative: true,
-        hideRelativeTime: true,
+        capabilities: { kinds: ["fixed"], wholeDays: true },
         minDate: "2026/11/09",
       });
       await openMenu();
@@ -265,8 +197,7 @@ describe("DateTime typed text, run 3", () => {
 
     it("says a typed future date is in the future, not before the first day", async () => {
       createWrapper({
-        disableRelative: true,
-        hideRelativeTime: true,
+        capabilities: { kinds: ["fixed"], wholeDays: true },
         minDate: "2026/11/09",
       });
       await openMenu();

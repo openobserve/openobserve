@@ -13,6 +13,17 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { AUTO_REFRESH_INTERVALS } from "@/utils/dashboard/autoRefresh";
+import {
+  rangeState,
+  resolveRange,
+  type TimeRange,
+  type TimeRangeContext,
+} from "@/utils/timeRangeModel";
+
+// A range of N seconds refreshes no faster than every N / 1000 seconds.
+export const REFRESH_FLOOR_DIVISOR = 1000;
+
 export type AutoRefreshState = "off" | "running" | "paused-hidden" | "paused-ended";
 
 /** Whether a fixed range has already ended; a rolling range (null end) never does. */
@@ -65,4 +76,29 @@ export const owesCatchUp = (options: {
     return options.lastTickMs * 1000 < (options.rangeEndUs as number);
   }
   return options.nowMs - options.lastTickMs >= options.intervalSeconds * 1000;
+};
+
+/** Fastest refresh for a span: span ÷ 1000, rounded up to the next menu step (seconds, ascending). */
+export const refreshFloorSeconds = (
+  spanUs: number,
+  steps: readonly number[] = AUTO_REFRESH_INTERVALS,
+): number => {
+  const floor = spanUs / 1e6 / REFRESH_FLOOR_DIVISOR;
+  return steps.find((step) => step >= floor) ?? steps[steps.length - 1] ?? 0;
+};
+
+/** The refresh floor of a range as it resolves now. */
+export const rangeRefreshFloorSeconds = (
+  range: TimeRange,
+  ctx: TimeRangeContext,
+  steps: readonly number[] = AUTO_REFRESH_INTERVALS,
+): number => {
+  const { startUs, endUs } = resolveRange(range, ctx);
+  return refreshFloorSeconds(endUs - startUs, steps);
+};
+
+/** Refresh pauses on an ended range of any kind; an in-progress one still runs. */
+export const rangeEndedAt = (range: TimeRange, ctx: TimeRangeContext): boolean => {
+  const state = rangeState(range, ctx);
+  return state === "calendar-ended" || state === "fixed-ended";
 };

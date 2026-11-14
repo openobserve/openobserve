@@ -315,8 +315,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <OPageHeaderStatus />
           <DateTime
+            preset="explorer-manual"
+            :host-name="t('menu.traces')"
             ref="dateTimeRef"
-            auto-apply
             menu-align="end"
             shortcuts
             :default-type="searchObj.data.datetime.type"
@@ -326,7 +327,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             }"
             :default-relative-time="searchObj.data.datetime.relativeTimePeriod"
             data-test="logs-search-bar-date-time-dropdown"
-            calendar-presets
             :queryRangeRestrictionInHour="searchObj.data.datetime.queryRangeRestrictionInHour"
             :queryRangeRestrictionMsg="searchObj.data.datetime.queryRangeRestrictionMsg"
             :retention-days="tracesStreamLimits.retentionDays"
@@ -544,8 +544,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="flex items-center gap-2 max-lg:w-full max-lg:justify-end max-lg:gap-1.5">
             <OPageHeaderStatus />
             <DateTime
+              preset="explorer-manual"
+              :host-name="t('menu.traces')"
               ref="dateTimeRef"
-              auto-apply
               :default-type="searchObj.data.datetime.type"
               :default-absolute-time="{
                 startTime: searchObj.data.datetime.startTime,
@@ -553,7 +554,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               }"
               :default-relative-time="searchObj.data.datetime.relativeTimePeriod"
               data-test="service-graph-date-time-picker"
-              calendar-presets
               class="h-8.5!"
               @on:date-change="updateDateTime"
             />
@@ -597,8 +597,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="flex items-center gap-2">
             <OPageHeaderStatus />
             <DateTime
+              preset="explorer-manual"
+              :host-name="t('menu.traces')"
               ref="dateTimeRef"
-              auto-apply
               menu-align="end"
               :default-type="searchObj.data.datetime.type"
               :default-absolute-time="{
@@ -607,7 +608,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               }"
               :default-relative-time="searchObj.data.datetime.relativeTimePeriod"
               data-test="services-catalog-date-time-picker"
-              calendar-presets
               class="h-8.5!"
               @on:date-change="updateDateTime"
             />

@@ -954,8 +954,7 @@ describe("OnCallMembers", () => {
       const attr = (k: string) =>
         attrs[k] ?? attrs[k.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)];
       expect(attr("pickerTimezone")).toBe("Asia/Kolkata");
-      expect(attr("autoApply")).toBe("");
-      expect(attr("disableRelative")).toBe("");
+      expect(attr("capabilities")).toEqual({ kinds: ["fixed"], future: true });
       expect(picker.attributes("hide-clipboard")).toBeDefined();
       expect(String(picker.props("label"))).toBe("When");
       expect(

@@ -74,8 +74,8 @@
 
           <div class="flex items-center gap-3">
             <DateTime
+              preset="explorer-manual"
               :label="t('alerts.startTime')"
-              auto-apply
               :default-type="dateTime.type"
               :default-absolute-time="{
                 startTime: dateTime.startTime,

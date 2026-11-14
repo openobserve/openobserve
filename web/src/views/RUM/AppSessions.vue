@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
               <SyntaxGuide />
               <DateTime
-                auto-apply
+                preset="explorer-auto"
                 menu-align="end"
                 :default-type="sessionState.data.datetime.valueType"
                 :default-absolute-time="{

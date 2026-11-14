@@ -246,17 +246,10 @@ describe("ViewDashboard time range gate", () => {
     localStorage.removeItem(AUTO_RUN_STORAGE_KEY);
   });
 
-  it("shows the main picker without an Apply button", async () => {
-    await mountDashboard();
-
-    expect(picker().props("autoApplyDashboard")).toBe(true);
-  });
-
-  it("gives the main picker the dashboard chips and an always-on zone badge", async () => {
+  it("runs the main picker as a dashboard host, which always shows dates and zone", async () => {
     await mountDashboard();
 
     expect(picker().props("preset")).toBe("dashboard");
-    expect(picker().props("zoneBadge")).toBe("always");
   });
 
   it("binds the picker's keyboard shortcuts on every width", async () => {
@@ -339,16 +332,13 @@ describe("ViewDashboard time range gate", () => {
       expect(route.query.period).toBe("1h");
     });
 
-    it("runs a calendar range applied in the open panel once the panel closes (V3)", async () => {
+    it("runs a calendar range applied in the open panel at once, since drafts never reach the page", async () => {
       await mountDashboard();
       const end = Date.parse("2026-11-12T00:00:00Z") * 1000;
       const range = absolute(end - 2 * 24 * 60 * MINUTE, end);
 
       picker().vm.$emit("show");
       await pick(range);
-      expect(wrapper.vm.selectedDate.relativeTimePeriod).toBe("15m");
-
-      picker().vm.$emit("hide");
       await flushPromises();
       expect(wrapper.vm.selectedDate).toMatchObject({ startTime: range.startTime });
       expect(globalSpan()).toBe(2 * 24 * 60 * MINUTE);
@@ -457,6 +447,64 @@ describe("ViewDashboard time range gate", () => {
     expect(wrapper.vm.selectedDate.relativeTimePeriod).toBe("1h");
     expect(refreshButton().props("variant")).toBe("outline");
     expect(wrapper.vm.isEditingLayout).toBe(true);
+  });
+
+  describe("org range guard (O2)", () => {
+    const DAY = 24 * 60 * MINUTE;
+    const strip = () => wrapper.findComponent({ name: "StaleRangeStrip" });
+
+    beforeEach(() => {
+      mockState.organizationData.organizationSettings = { range_guard_days: 30 };
+    });
+    afterEach(() => {
+      delete mockState.organizationData.organizationSettings;
+    });
+
+    it("keeps the old range and asks before a range over the guard runs", async () => {
+      await mountDashboard();
+      const end = 1_700_000_000_000_000;
+
+      await pick(absolute(end - 90 * DAY, end));
+
+      expect(wrapper.vm.selectedDate.relativeTimePeriod).toBe("15m");
+      expect(strip().exists()).toBe(true);
+      expect(String(strip().props("runLabel"))).toMatch(/timeRangeHost\.guardRun|Run on/);
+    });
+
+    it("runs the held range from the strip", async () => {
+      await mountDashboard();
+      const end = 1_700_000_000_000_000;
+      await pick(absolute(end - 90 * DAY, end));
+
+      strip().vm.$emit("run");
+      await flushPromises();
+
+      expect(wrapper.vm.selectedDate).toEqual(absolute(end - 90 * DAY, end));
+      expect(strip().exists()).toBe(false);
+    });
+
+    it("goes back to the old range from the strip", async () => {
+      await mountDashboard();
+      const end = 1_700_000_000_000_000;
+      await pick(absolute(end - 90 * DAY, end));
+
+      strip().vm.$emit("back");
+      await flushPromises();
+
+      expect(wrapper.vm.selectedDate.relativeTimePeriod).toBe("15m");
+      expect(strip().exists()).toBe(false);
+    });
+
+    it("never asks when the org has no guard", async () => {
+      delete mockState.organizationData.organizationSettings;
+      await mountDashboard();
+      const end = 1_700_000_000_000_000;
+
+      await pick(absolute(end - 90 * DAY, end));
+
+      expect(wrapper.vm.selectedDate).toEqual(absolute(end - 90 * DAY, end));
+      expect(strip().exists()).toBe(false);
+    });
   });
 
   it("names both the time range and variables when both wait", async () => {
@@ -608,18 +656,12 @@ describe("ViewDashboard time range gate", () => {
       expect(refreshTooltip()).toBe("Runs queries on open and on filter/time changes");
     });
 
-    it("runs Start/End edits made in the open picker once, when it closes", async () => {
+    it("runs a range applied in the open picker at once", async () => {
       await mountDashboard();
       const end = 1_700_000_000_000_000;
 
       picker().vm.$emit("show");
-      await pick(absolute(end - 40 * MINUTE, end));
       await pick(absolute(end - 30 * MINUTE, end));
-
-      expect(wrapper.vm.selectedDate.relativeTimePeriod).toBe("15m");
-      expect(route.query.from).toBeUndefined();
-
-      picker().vm.$emit("hide");
       await flushPromises();
 
       expect(wrapper.vm.selectedDate).toEqual(absolute(end - 30 * MINUTE, end));

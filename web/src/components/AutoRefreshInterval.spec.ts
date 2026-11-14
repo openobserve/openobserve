@@ -666,4 +666,41 @@ describe("AutoRefreshInterval", () => {
       wrapper = null;
     });
   });
+
+  describe("refresh floor (range ÷ 1000)", () => {
+    const DAY_US = 86_400_000_000;
+
+    it("greys steps faster than the floor for the range", () => {
+      wrapper = createWrapper({ rangeSpanUs: 30 * DAY_US });
+      const items = wrapper.vm.refreshTimes.flat();
+      expect(items.find((it: any) => it.value === 1800).disabled).toBe(true);
+      expect(items.find((it: any) => it.value === 3600).disabled).toBe(false);
+    });
+
+    it("keeps every step for a short range", () => {
+      wrapper = createWrapper({ rangeSpanUs: 15 * 60 * 1_000_000 });
+      expect(wrapper.vm.refreshTimes.flat().every((it: any) => !it.disabled)).toBe(true);
+    });
+
+    it("raises a running interval to the floor when a wider range arrives, and says so once", async () => {
+      wrapper = createWrapper({ modelValue: 5, rangeSpanUs: 15 * 60 * 1_000_000 });
+      await wrapper.setProps({ rangeSpanUs: 30 * DAY_US });
+      expect(wrapper.emitted("update:modelValue")?.at(-1)).toEqual([3600]);
+      expect(wrapper.vm.floorRaisedText).toBe("5s → 1h");
+      vi.advanceTimersByTime(10_000);
+      expect(wrapper.vm.floorRaisedText).toBe("");
+    });
+
+    it("leaves an interval that is off alone", async () => {
+      wrapper = createWrapper({ modelValue: 0, rangeSpanUs: 15 * 60 * 1_000_000 });
+      await wrapper.setProps({ rangeSpanUs: 30 * DAY_US });
+      expect(wrapper.emitted("update:modelValue")).toBeUndefined();
+    });
+
+    it("resumes at the floor, never faster", async () => {
+      wrapper = createWrapper({ modelValue: 0, rangeSpanUs: 30 * DAY_US });
+      await wrapper.get('[data-test="logs-search-off-refresh-interval"]').trigger("click");
+      expect(wrapper.emitted("update:modelValue")?.at(-1)).toEqual([3600]);
+    });
+  });
 });

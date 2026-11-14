@@ -177,9 +177,9 @@ export const formatKnownPeriod = (
   const rolling = String(period ?? "").match(/^(\d+)([smhdwM])$/);
   const count = Number(rolling?.[1]);
   if (!rolling || !(count >= 1)) return null;
-  // Years are stored as months, so whole years read back in the unit they were typed in.
+  // Years are stored as months; one year reads "Last 12 months" so it is never taken for a calendar year.
   const digits = new Intl.NumberFormat(locale);
-  if (rolling[2] === "M" && count % 12 === 0) {
+  if (rolling[2] === "M" && count % 12 === 0 && count > 12) {
     return t("common.pastYear", { count: digits.format(count / 12) }, count / 12);
   }
   return t(PAST_PERIOD_KEYS[rolling[2]], { count: digits.format(count) }, count);

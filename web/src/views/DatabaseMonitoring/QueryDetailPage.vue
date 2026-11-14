@@ -49,7 +49,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          not there. The empty state below carries the only action that applies. -->
     <template v-if="hasQuery" #actions>
       <DateTime
-        auto-apply
+        preset="explorer-auto"
+        :capabilities="{ kinds: ['rolling', 'fixed'] }"
         menu-align="end"
         :default-type="range.type"
         :default-absolute-time="{ startTime: range.startTime, endTime: range.endTime }"

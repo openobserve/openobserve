@@ -65,9 +65,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :variant="variant"
           :size="fieldAppearance ? 'sm' : 'sm-toolbar'"
           :class="{
-            [selectedType + 'type']: !disableRelative,
-            hideRelative: disableRelative,
-            'w-fit': disableRelative,
+            [selectedType + 'type']: !fixedOnly,
+            hideRelative: fixedOnly,
+            'w-fit': fixedOnly,
             'h-auto! rounded-none! border-0!': !hideRangeShift,
             'enabled:hover:bg-interactive-hover-bg! data-[state=open]:bg-surface-accent-active!':
               !fieldAppearance,
@@ -232,9 +232,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span
                 v-if="shownLine.name"
                 class="text-compact shrink-0 font-semibold"
-                :class="previewLine ? 'text-toggle-item-active-text' : 'text-text-heading'"
+                :class="
+                  isDraft
+                    ? 'text-text-link'
+                    : previewLine
+                      ? 'text-toggle-item-active-text'
+                      : 'text-text-heading'
+                "
                 data-test="date-time-resolved-name"
                 >{{ shownLine.name }}</span
+              >
+              <OBadge
+                v-if="isDraft"
+                variant="primary-soft"
+                size="sm"
+                class="shrink-0"
+                data-test="date-time-draft-tag"
+                >{{ t("dateTime.draft") }}</OBadge
               >
               <OBadge
                 v-if="shownLine.live"
@@ -296,8 +310,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div class="flex shrink-0 items-center gap-1">
               <!-- Copy takes the selection, not a preview, so it steps aside and the preview's note shows in full. -->
+              <OButton
+                v-if="isDraft && !calendarMode"
+                data-test="date-time-summary-apply-btn"
+                variant="primary"
+                size="xs"
+                class="h-6! shrink-0 gap-1.5! px-2!"
+                :disabled="applyDisabled"
+                @click="onApplyClick"
+                >{{ t("common.apply") }}<span aria-hidden="true">{{ raw("↵") }}</span></OButton
+              >
               <OTooltip
-                v-if="!hideClipboard && !previewLine"
+                v-if="!hideClipboard && !previewLine && !isDraft"
                 :content="copyDisabled ? t('dateTime.nothingToCopy') : t('common.copyRange')"
                 :shortcut="copyShortcut"
                 side="bottom"
@@ -315,7 +339,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </OTooltip>
               <OTooltip
-                v-if="showLiveButton"
+                v-if="showFreezeButton"
+                :content="t('dateTime.freezeAt', { range: freezeLabel })"
+                side="bottom"
+                align="end"
+              >
+                <OButton
+                  data-test="date-time-freeze-btn"
+                  variant="outline"
+                  size="xs"
+                  class="h-6! shrink-0 px-2!"
+                  :aria-label="t('dateTime.freezeAt', { range: freezeLabel })"
+                  @click="freezeRange"
+                  >{{ t("dateTime.freeze") }}</OButton
+                >
+              </OTooltip>
+              <OTooltip
+                v-if="showLiveButton && !isDraft"
                 :content="t('dateTime.goLiveHint', { duration: liveDurationLabel })"
                 side="bottom"
                 align="end"
@@ -426,7 +466,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div class="flex h-9 shrink-0 items-center gap-1 ps-1 pe-2" data-test="date-time-footer">
           <template v-if="calendarMode">
-            <OTooltip v-if="!disableRelative" :content="t('dateTime.backToList')">
+            <OTooltip v-if="!fixedOnly" :content="t('dateTime.backToList')">
               <OButton
                 data-test="date-time-calendar-back-btn"
                 variant="ghost"
@@ -438,7 +478,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </OTooltip>
             <div
-              v-if="!hideRelativeTime"
+              v-if="!wholeDaysOnly"
               class="startEndTime grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_1rem_minmax(0,1fr)] items-center gap-0.5 max-md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]"
               data-test="date-time-start-end"
               @keydown.enter="onTimeFieldEnter"
@@ -564,7 +604,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </OTooltip>
               <OTooltip
-                v-if="!hideRelativeTime"
+                v-if="!wholeDaysOnly"
                 :content="stepTooltip.zoom"
                 shortcut-id="timeRangeZoomOut"
               >
@@ -621,7 +661,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </OTooltip>
     <OTooltip
-      v-if="!hideRangeShift && !hideRelativeTime"
+      v-if="!hideRangeShift && !wholeDaysOnly && !isForm"
       :content="stepTooltip.zoom"
       shortcut-id="timeRangeZoomOut"
       side="bottom"
@@ -646,7 +686,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="border-button-outline-border enabled:hover:bg-interactive-hover-bg! h-auto! rounded-s-none! border-s!"
         icon-left="undo"
         :aria-label="undoTooltip"
-        :disabled="disable"
+        :disabled="disable || !undoAvailable"
         @click.prevent.stop="undoRange"
       />
     </OTooltip>
@@ -681,6 +721,8 @@ import {
   useId,
   watch,
   nextTick,
+  reactive,
+  toRefs,
   type PropType,
 } from "vue";
 import type { ButtonVariant } from "@/lib/core/Button/OButton.types";
@@ -702,6 +744,18 @@ import {
   type TimeRangePreset,
 } from "@/utils/timeRangeList";
 import { instantFromShiftedMs } from "@/utils/timeRangeZoom";
+import {
+  ALL_KINDS,
+  rangeFromLegacy,
+  rangeToken,
+  sameRange,
+  type TimeRange,
+  type TimeRangeApplyMeta,
+  type TimeRangeCapabilities,
+  type TimeRangeHostPreset,
+  type TimeRangeKind,
+} from "@/utils/timeRangeModel";
+import { readOrgTimeRangeSettings } from "@/utils/orgTimeRangeSettings";
 import {
   formatRangeCopyText,
   formatRangeDates,
@@ -787,14 +841,6 @@ export default defineComponent({
       type: String,
       default: "15m",
     },
-    autoApply: {
-      type: Boolean,
-      default: false,
-    },
-    applyPresets: {
-      type: Boolean,
-      default: false,
-    },
     initialTimezone: {
       type: String as PropType<string | null>,
       required: false,
@@ -815,14 +861,6 @@ export default defineComponent({
     dataTestName: {
       type: String,
       default: "date-time-btn",
-    },
-    disableRelative: {
-      type: Boolean,
-      default: false,
-    },
-    hideRelativeTime: {
-      type: Boolean,
-      default: false,
     },
     hideRelativeTimezone: {
       type: Boolean,
@@ -864,21 +902,6 @@ export default defineComponent({
       type: String as PropType<ButtonVariant>,
       default: "outline",
     },
-    /** Offers Today … Last year; off where the backend only parses rolling `<n><unit>` periods. */
-    calendarPresets: {
-      type: Boolean,
-      default: false,
-    },
-    /** The calendar offers days after today, so typed yearless dates may read as upcoming ones. */
-    futureAllowed: {
-      type: Boolean,
-      default: false,
-    },
-    /** Reads calendar words (yesterday, last week) as rolling periods; only for recurring forms with no calendar presets. */
-    rollingCalendarWords: {
-      type: Boolean,
-      default: false,
-    },
     /** Sizes the trigger like a form field (full width, field height and border) instead of a toolbar button. */
     fieldAppearance: {
       type: Boolean,
@@ -909,25 +932,30 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
-    /** Offers undo after a zoom, shift, brush or zoom-out; pickers without range shift never show it. */
-    undoable: {
-      type: Boolean,
-      default: true,
-    },
-    /** Chip set and calendar row order; dashboards lead with long ranges and show dates on the trigger. */
+    /** The page's apply contract (§4): chips, steppers, undo and hotkeys follow it; the picker never runs a query. */
     preset: {
-      type: String as PropType<TimeRangePreset>,
-      default: "ops",
+      type: String as PropType<TimeRangeHostPreset>,
+      default: "explorer-auto",
     },
-    /** Live ranges show their dates after the name on the trigger; null follows the preset. */
-    showDates: {
-      type: Boolean as PropType<boolean | null>,
+    /** What the host can store; readings of other kinds are greyed, never substituted. */
+    capabilities: {
+      type: Object as PropType<TimeRangeCapabilities>,
+      default: () => ({}),
+    },
+    /** The applied range (v-model:range); wins over the default* props and moves the picker without an apply. */
+    range: {
+      type: Object as PropType<TimeRange | null>,
       default: null,
     },
-    /** "always" shows the zone offset on the trigger even when it is the browser's. */
-    zoneBadge: {
-      type: String as PropType<"auto" | "always">,
-      default: "auto",
+    /** What the results on screen are for (explorer-manual), so undo can say when it runs the query. */
+    queriedRange: {
+      type: Object as PropType<TimeRange | null>,
+      default: null,
+    },
+    /** Page name for `Not available in {host}` and Recent's `from {page}`. */
+    hostName: {
+      type: String,
+      default: "",
     },
     /** The window a query's own `_timestamp` filter keeps inside the picked range, if any. */
     narrowedByQuery: {
@@ -936,7 +964,15 @@ export default defineComponent({
     },
   },
 
-  emits: ["on:date-change", "on:timezone-change", "hide", "show", "on:undo"],
+  emits: [
+    "on:date-change",
+    "on:timezone-change",
+    "hide",
+    "show",
+    "on:undo",
+    "apply",
+    "update:range",
+  ],
 
   setup(props, { emit }) {
     const store = useStore();
@@ -958,7 +994,44 @@ export default defineComponent({
       resolveRelativePeriod,
       calendarTooltip,
     } = clock;
-    const limits = useTimeRangeLimits(props, clock);
+    const kinds = computed<TimeRangeKind[]>(() => props.capabilities?.kinds ?? [...ALL_KINDS]);
+    // A host that stores no token has no list, chips or live steps: its calendar is the panel.
+    const fixedOnly = computed(
+      () => !kinds.value.includes("rolling") && !kinds.value.includes("calendar"),
+    );
+    const wholeDaysOnly = computed(() => fixedOnly.value && props.capabilities?.wholeDays === true);
+    const calendarAllowed = computed(() => kinds.value.includes("calendar"));
+    const isForm = computed(() => props.preset === "form");
+    const fiscalYearStartMonth = computed(
+      () =>
+        readOrgTimeRangeSettings(store.state.organizationData?.organizationSettings)
+          .fiscalYearStartMonth,
+    );
+    // The composables read the host contract through the flag names they were written against.
+    const flags = {
+      disableRelative: fixedOnly,
+      hideRelativeTime: wholeDaysOnly,
+      calendarPresets: calendarAllowed,
+      futureAllowed: computed(() => props.capabilities?.future === true),
+      undoable: computed(() => !isForm.value),
+    };
+    const view = reactive({ ...toRefs(props), ...flags });
+    const railView = reactive({
+      ...toRefs(props),
+      ...flags,
+      preset: computed(
+        () => (props.preset === "dashboard" ? "dashboard" : "ops") as TimeRangePreset,
+      ),
+    });
+    const typingView = reactive({
+      ...toRefs(props),
+      ...flags,
+      kinds,
+      future: flags.futureAllowed,
+      wholeDays: computed(() => props.capabilities?.wholeDays === true),
+      fiscalYearStartMonth,
+    });
+    const limits = useTimeRangeLimits(view, clock);
     const { calendarMinDate, calendarMaxDate, trustedRange, calendarExceedsRestriction } = limits;
     const selectedType = ref("relative");
     const relativePeriod = ref("m");
@@ -1045,7 +1118,7 @@ export default defineComponent({
       calendarToken.value ?? `${normalizedCount()}${relativePeriod.value}`;
 
     // A day-only or zone-hidden picker never shows a zone, so its line and the as-UTC chip must not either.
-    const showsZone = computed(() => !props.hideRelativeTimezone && !props.hideRelativeTime);
+    const showsZone = computed(() => !props.hideRelativeTimezone && !wholeDaysOnly.value);
 
     // The applied range is already the summary, so Recent never repeats it.
     const currentEntry = computed<TimeRangeHistoryEntry | null>(() => {
@@ -1054,7 +1127,7 @@ export default defineComponent({
       return range ? { startUs: range.startTime, endUs: range.endTime } : null;
     });
 
-    const rail = useTimeRangeRail(props, {
+    const rail = useTimeRangeRail(railView, {
       clock,
       limits,
       currentEntry,
@@ -1079,7 +1152,7 @@ export default defineComponent({
       cancelPinName,
     } = rail;
 
-    const typingBar = useTimeRangeTyping(props, {
+    const typingBar = useTimeRangeTyping(typingView, {
       clock,
       limits,
       relativePeriods,
@@ -1157,6 +1230,8 @@ export default defineComponent({
     const cursorRow = computed(() => {
       if (emptyExamples.value.length > 0) return -1;
       if (activeRow.value >= 0 || !typing.value) return activeRow.value;
+      // Text with two readings has no default row; Enter waits for the user's pick.
+      if (typingBar.waitsForPick.value) return -1;
       const rows = shownRows.value;
       if (rows[0]?.id.startsWith("reading-")) return rows[0].disabled ? -1 : 0;
       if (typingBar.inputReading.value) return -1;
@@ -1209,7 +1284,7 @@ export default defineComponent({
 
     // The pending selection as microseconds, including a clicked day still waiting for its end.
     const pendingRange = computed<{ startTime: number; endTime: number } | null>(() => {
-      if (selectedType.value === "relative" && !props.disableRelative) {
+      if (selectedType.value === "relative" && !fixedOnly.value) {
         return resolveRelativePeriod(currentRelativePeriod(), tooltipNow.value);
       }
       const pending = menuOpen.value ? pendingDay.value : null;
@@ -1224,7 +1299,7 @@ export default defineComponent({
     });
 
     const { zoneRedrawn, kindText, resolvedLine, previewLine, shownLine } = useTimeRangeSummary(
-      props,
+      typingView,
       {
         clock,
         fields,
@@ -1274,8 +1349,10 @@ export default defineComponent({
         holdUnshownInstants(fixed.startUTC, fixed.endUTC);
         // After the flush in which the redrawn fields settle, or the selection watcher clears it.
         nextTick(() => (zoneRedrawn.value = true));
-      } else if (props.autoApply) {
+      } else if (!isForm.value && !menuOpen.value) {
         // Read after the await: a linked fixed range is only set once the picker mounts.
+        // A zone change is an app setting, not an apply: no undo step, no run.
+        markProgrammaticDateChange();
         saveDate(selectedType.value);
       }
 
@@ -1338,39 +1415,50 @@ export default defineComponent({
     onMounted(() => {
       try {
         resetTime("", "");
+        const seed = props.range;
+        const seedType = seed
+          ? seed.kind === "fixed"
+            ? "absolute"
+            : "relative"
+          : props.defaultType;
+        const seedAbsolute =
+          seed?.kind === "fixed"
+            ? { startTime: seed.startUs, endTime: seed.endUs }
+            : props.defaultAbsoluteTime;
+        const seedRelative =
+          seed && seed.kind !== "fixed" ? rangeToken(seed) : props.defaultRelativeTime;
 
         let startTime = (new Date().getTime() - 900000) * 1000;
         let endTime = new Date().getTime() * 1000;
 
-        if (props.defaultAbsoluteTime?.startTime) {
+        if (seedAbsolute?.startTime) {
           startTime =
-            props.defaultAbsoluteTime?.startTime.toString().length > 13
-              ? props.defaultAbsoluteTime?.startTime
-              : props.defaultAbsoluteTime?.startTime * 1000;
+            seedAbsolute?.startTime.toString().length > 13
+              ? seedAbsolute?.startTime
+              : seedAbsolute?.startTime * 1000;
         }
 
-        if (props.defaultAbsoluteTime?.endTime) {
+        if (seedAbsolute?.endTime) {
           endTime =
-            props.defaultAbsoluteTime?.endTime.toString().length > 13
-              ? props.defaultAbsoluteTime?.endTime
-              : props.defaultAbsoluteTime?.endTime * 1000;
+            seedAbsolute?.endTime.toString().length > 13
+              ? seedAbsolute?.endTime
+              : seedAbsolute?.endTime * 1000;
         }
 
         // A link with an empty period and no readable from/to means the default live range, not a frozen one.
         const given = (value: unknown) => Number.isFinite(Number(value)) && Number(value) !== 0;
         const unreadableAbsolute =
-          props.defaultAbsoluteTime != null &&
-          !(given(props.defaultAbsoluteTime.startTime) && given(props.defaultAbsoluteTime.endTime));
-        const initialType = props.disableRelative
+          seedAbsolute != null && !(given(seedAbsolute.startTime) && given(seedAbsolute.endTime));
+        const initialType = fixedOnly.value
           ? "absolute"
-          : props.defaultType === "absolute" && unreadableAbsolute
+          : seedType === "absolute" && unreadableAbsolute
             ? "relative"
-            : props.defaultType;
+            : seedType;
         selectedType.value = initialType;
 
         markProgrammaticDateChange();
         const rangeOutcome = writeOutsideRange(startTime, endTime);
-        const periodKept = readRelativeTime(props.defaultRelativeTime) !== "refused";
+        const periodKept = readRelativeTime(seedRelative) !== "refused";
         if (initialType === "absolute" ? rangeOutcome === "refused" : !periodKept) {
           fallBackToDefaultPeriod();
         } else if (initialType === "absolute" && rangeOutcome === "corrected") {
@@ -1398,7 +1486,7 @@ export default defineComponent({
         if (menuOpen.value && isUserInitiated) return;
         if (absoluteFieldsKey() === savedFieldsKey) return;
         if (
-          props.autoApply &&
+          !isForm.value &&
           selectedType.value === "absolute" &&
           !fields.isSeeding() &&
           pendingDay.value === null &&
@@ -1422,7 +1510,8 @@ export default defineComponent({
     const setRelativeDate = (
       period: string,
       value: number,
-      commit: boolean = props.autoApply || props.applyPresets,
+      commit: boolean = !isForm.value && !menuOpen.value,
+      source: TimeRangeApplyMeta["source"] = "panel",
     ) => {
       refreshTooltipNow();
       selectedType.value = "relative";
@@ -1430,7 +1519,7 @@ export default defineComponent({
       pendingDay.value = null;
       relativePeriod.value = period;
       relativeValue.value = value;
-      if (commit) saveDate("relative");
+      if (commit) saveDate("relative", false, source);
     };
 
     // A period from outside the picker, capped as Custom is and to the calendar's first day; null when it is not a whole-count period.
@@ -1458,7 +1547,7 @@ export default defineComponent({
       const bounded = boundedPeriod(text);
       if (bounded === null) return "refused";
       const calendarRange = resolveCalendarPeriod(bounded, zone.value);
-      if (calendarRange && props.calendarPresets) {
+      if (calendarRange && calendarAllowed.value) {
         calendarToken.value = bounded;
         return "kept";
       }
@@ -1493,7 +1582,7 @@ export default defineComponent({
       if (outcome === "kept") return;
       markProgrammaticDateChange();
       if (outcome === "refused") fallBackToDefaultPeriod();
-      else if (!props.disableRelative) selectedType.value = "relative";
+      else if (!fixedOnly.value) selectedType.value = "relative";
       emitCorrectionLater();
     };
 
@@ -1506,7 +1595,7 @@ export default defineComponent({
       relativePeriod.value = "m";
       relativeValue.value = 15;
       lastValidCustomValue.value = 15;
-      selectedType.value = props.disableRelative ? "absolute" : "relative";
+      selectedType.value = fixedOnly.value ? "absolute" : "relative";
     };
 
     // A silently cut range would read as the one the link asked for.
@@ -1534,6 +1623,28 @@ export default defineComponent({
       if (menuOpen.value && absoluteAtOpen !== null) absoluteAtOpen = fields.snapshotFields();
       if (outcome !== "kept") emitCorrectionLater();
     };
+
+    const getRange = (): TimeRange | null => appliedModel();
+
+    // A range from the page (v-model:range or a ref call) moves the picker without an apply or an undo step.
+    const setRange = (next: TimeRange | null) => {
+      if (!next || sameRange(appliedModel(), next)) return;
+      markProgrammaticDateChange();
+      if (next.kind === "fixed") {
+        selectedType.value = "absolute";
+        setAbsoluteTime(next.startUs, next.endUs);
+      } else {
+        setRelativeTime(rangeToken(next));
+        if (!fixedOnly.value) selectedType.value = "relative";
+      }
+      saveDate(selectedType.value);
+    };
+
+    watch(
+      () => props.range,
+      (next) => setRange(next),
+      { deep: true },
+    );
 
     const refresh = () => {
       // Parent-invoked (e.g. on tab re-activation / auto-refresh) — programmatic.
@@ -1637,8 +1748,36 @@ export default defineComponent({
       writeSeededFields({ ...atOpen.date, ...atOpen.time }, atOpen.seededEnd);
     };
 
-    // `rerun` asks the page to run the range at once, even unchanged: a lit chip again, or the undo of a run zoom.
-    const saveDate = (dateType?: string | null, rerun = false) => {
+    function appliedModel(): TimeRange | null {
+      const entry = appliedHistoryEntry();
+      if (!entry) return null;
+      return isRelativeHistoryEntry(entry)
+        ? rangeFromLegacy({ valueType: "relative", relativeTimePeriod: entry.relative })
+        : { kind: "fixed", startUs: entry.startUs, endUs: entry.endUs };
+    }
+
+    function currentModel(): TimeRange | null {
+      return rangeFromLegacy({ ...getConsumableDateTime(), valueType: selectedType.value });
+    }
+
+    // On explorer-manual only a range whose results were on screen counts as run; elsewhere every apply runs.
+    function appliedRangeRan(): boolean {
+      if (props.preset !== "explorer-manual") return true;
+      return props.queriedRange !== null && sameRange(appliedModel(), props.queriedRange);
+    }
+
+    // `rerun` asks the page to run the range at once, even unchanged: ⌘↵, a drag-zoom, or the undo of a run range.
+    const saveDate = (
+      dateType?: string | null,
+      rerun = false,
+      source: TimeRangeApplyMeta["source"] = "panel",
+    ) => {
+      const userApply = isUserInitiated;
+      const outgoing = appliedModel();
+      const incoming = currentModel();
+      const changed = !sameRange(outgoing, incoming);
+      // Every applied change is one undo step; undo itself and the panel re-applying the same range add none.
+      if (userApply && changed && source !== "undo" && !isForm.value) captureUndo();
       saveCount += 1;
       savedFieldsKey = selectedType.value === "absolute" ? absoluteFieldsKey() : null;
       // The resolved line and the seeded Start/End read this clock, so they match the range emitted now.
@@ -1649,10 +1788,18 @@ export default defineComponent({
       date["valueType"] = dateType || selectedType.value;
       date["userChangedValue"] = isUserInitiated;
       if (rerun) date["rerun"] = true;
+      // Re-applying the range in force closes the panel and nothing else: no run, no undo, no Recent.
+      if (userApply && !changed && !rerun) return;
       if (isUserInitiated) nextTick(() => (appliedSpeech.value = String(triggerLabel.value)));
       if (store.state.savedViewFlag == false) {
         emittingOwnChange = true;
         try {
+          if (incoming && userApply) {
+            const meta: TimeRangeApplyMeta =
+              source === "undo" ? { source, run: false, undoRuns: rerun } : { source, run: rerun };
+            emit("apply", incoming, meta);
+          }
+          if (incoming) emit("update:range", incoming);
           emit("on:date-change", date);
         } finally {
           emittingOwnChange = false;
@@ -1668,7 +1815,7 @@ export default defineComponent({
       markApplied();
     };
 
-    // Parent-invoked setter for a chart drag-zoom — programmatic, but a range the user picked.
+    // Parent-invoked for a chart drag-zoom: a range the user picked, so it applies and asks for a run.
     const setCustomDate = (dateType: string, dateobj: { start: number; end: number }): boolean => {
       // Charts hand over `toZonedTime(instant, appZone)` values, so they become instants once, before any bound.
       const appZone = store.state.timezone || zone.value;
@@ -1678,13 +1825,12 @@ export default defineComponent({
       );
       // A refused zoom (zero width, or past maxDate) keeps the range the user is looking at.
       if (!range) return false;
-      const shownBefore = JSON.stringify([selectedType.value, absoluteFieldsKey()]);
-      captureUndo(true);
-      applyInstants(dateType, range.start, range.end);
+      captureUndo(appliedRangeRan());
+      fields.writeInstants(range.start, range.end);
+      selectedType.value = dateType;
+      // An unchanged window still runs, as the parent's search (e.g. Search around) expects it.
+      saveDate(dateType, true, "drag-zoom");
       recordSelection();
-      // Unchanged fields fire no watcher, yet the parent's search (e.g. Search around) still expects its run.
-      const unchanged = shownBefore === JSON.stringify([selectedType.value, absoluteFieldsKey()]);
-      if (unchanged && props.autoApply && store.state.savedViewFlag == false) saveDate(dateType);
       return true;
     };
 
@@ -1785,10 +1931,10 @@ export default defineComponent({
     const { isMobile } = useBreakpoint();
 
     const labelSurface = computed(() => (props.preset === "dashboard" ? "dashboard" : "toolbar"));
-    const datesShown = computed(() => props.showDates ?? props.preset === "dashboard");
+    const datesShown = computed(() => props.preset === "dashboard");
 
-    // Panel edits are not in force until applied, so the open panel's trigger names the applied range.
-    const showsApplied = computed(() => menuOpen.value || !props.autoApply);
+    // Panel edits are drafts until applied, so the trigger always names the applied range.
+    const showsApplied = computed(() => true);
 
     const triggerRange = computed<RangeLabelInput | null>(() => {
       const shownApplied = showsApplied.value;
@@ -1833,8 +1979,8 @@ export default defineComponent({
           ? appliedDisplayValue.value || getDisplayValue.value
           : getDisplayValue.value;
       }
-      if (props.disableRelative) {
-        return formatRangeDates(props.hideRelativeTime ? wholeDaysOf(range) : range, {
+      if (fixedOnly.value) {
+        return formatRangeDates(wholeDaysOnly.value ? wholeDaysOf(range) : range, {
           ...labelOptions(),
           surface: labelSurface.value,
         });
@@ -1850,7 +1996,7 @@ export default defineComponent({
     const triggerParts = computed<{ name: string; dates: string }>(() => {
       const label = String(triggerLabel.value);
       const range = triggerRange.value;
-      const name = range?.name && !props.disableRelative && !props.triggerText ? range.name : "";
+      const name = range?.name && !fixedOnly.value && !props.triggerText ? range.name : "";
       if (name && label.startsWith(`${name} · `)) {
         return { name, dates: label.slice(name.length + 3) };
       }
@@ -1862,7 +2008,7 @@ export default defineComponent({
     // Line 1 the full stamps, line 2 zone, kind and length; the label alone can round them.
     const triggerTooltip = computed(() => {
       const range = triggerRange.value;
-      if (!range || props.disableRelative || props.triggerText) return null;
+      if (!range || fixedOnly.value || props.triggerText) return null;
       const detail = [
         formatZoneOffset(zone.value, range.startUs / 1000),
         kindText(range.live),
@@ -1900,7 +2046,7 @@ export default defineComponent({
 
     const getDisplayValue = computed(() => {
       const calendarLabel =
-        !props.disableRelative && selectedType.value === "relative" && calendarToken.value !== null
+        !fixedOnly.value && selectedType.value === "relative" && calendarToken.value !== null
           ? formatCalendarLabel(
               calendarToken.value,
               zone.value,
@@ -1910,18 +2056,18 @@ export default defineComponent({
             )
           : null;
       if (calendarLabel) return calendarLabel;
-      if (!props.disableRelative && selectedType.value === "relative") {
+      if (!fixedOnly.value && selectedType.value === "relative") {
         return t(pastPeriodKey.value, { count: normalizedCount() });
       } else {
         if (selectedDate.value != null) {
           // A range selection has from and to keys; a single picked date arrives as a plain string.
-          if (selectedDate.value?.from && selectedDate.value?.to && !props.disableRelative) {
+          if (selectedDate.value?.from && selectedDate.value?.to && !fixedOnly.value) {
             // A pending single clicked day is what Apply will use, so the label shows it already.
             const pending = menuOpen.value ? pendingDay.value : null;
             const from = pending ?? selectedDate.value.from;
             const to = pending ?? selectedDate.value.to;
             return `${from} ${selectedTime.value.startTime} - ${to} ${selectedTime.value.endTime}`;
-          } else if (selectedDate.value?.from && selectedDate.value?.to && props.disableRelative) {
+          } else if (selectedDate.value?.from && selectedDate.value?.to && fixedOnly.value) {
             return `${selectedDate.value.from} - ${selectedDate.value.to}`;
           } else {
             return `${selectedDate.value} ${selectedTime.value.startTime} - ${selectedDate.value} ${selectedTime.value.endTime}`;
@@ -1948,7 +2094,6 @@ export default defineComponent({
     });
 
     function applyPlan(plan: InputPlan) {
-      clearUndo();
       if (plan.kind === "absolute") {
         applyAbsoluteRange(plan.start, plan.end, plan.calendarPeriod);
         const range = pendingRange.value;
@@ -1965,19 +2110,16 @@ export default defineComponent({
       if (plan.kind === "calendar") {
         calendarToken.value = plan.token;
         calendarName.value = plan.name ?? null;
-        if (props.autoApply) saveDate("relative");
         return;
       }
       calendarToken.value = null;
       relativePeriod.value = plan.unit;
       relativeValue.value = plan.value;
       lastValidCustomValue.value = plan.value;
-      if (props.autoApply) saveDate("relative-custom");
     }
 
     function finishInput() {
-      if (props.autoApply) closeMenu();
-      else applyAndClose();
+      applyAndClose();
     }
 
     // The selection as the label formatter reads it, for the copied text.
@@ -1986,7 +2128,7 @@ export default defineComponent({
       if (!range || !Number.isFinite(range.startTime) || !(range.endTime > range.startTime)) {
         return null;
       }
-      if (selectedType.value !== "relative" || props.disableRelative) {
+      if (selectedType.value !== "relative" || fixedOnly.value) {
         return absoluteLabelInput(range.startTime, range.endTime);
       }
       const period = currentRelativePeriod();
@@ -2028,10 +2170,6 @@ export default defineComponent({
       );
       if (calendarPeriod !== null && !midnightEnd) rememberSeededEnd(calendarPeriod, endMicros);
       holdUnshownInstants(startMicros, endMicros);
-      if (props.autoApply) {
-        saveDate(null);
-        recordSelection();
-      }
     };
 
     // A stamp pasted into Start or End fills them; any other paste goes to the bar.
@@ -2061,7 +2199,7 @@ export default defineComponent({
 
     const optionsFn = (date: string) => {
       const formattedDate = calendarMaxDate.value;
-      if (props.disableRelative) {
+      if (fixedOnly.value) {
         return date >= props.minDate && date <= formattedDate;
       }
       return date >= "1999/01/01" && date <= formattedDate;
@@ -2086,7 +2224,10 @@ export default defineComponent({
 
     const setDateType = (type: string) => {
       selectedType.value = type;
-      if (props.autoApply) saveDate(type === "absolute" ? "absolute" : "relative-custom");
+      if (isForm.value || menuOpen.value) return;
+      // A ref method, never a user's pick, so pages do not take it for one.
+      markProgrammaticDateChange();
+      saveDate(type === "absolute" ? "absolute" : "relative-custom");
     };
 
     // Ctrl+Shift+C opens DevTools off macOS, so there the combo is Alt+Shift+C; the key code survives layouts.
@@ -2127,7 +2268,7 @@ export default defineComponent({
         calendarPreviewDay.value = null;
         return;
       }
-      if (calendarMode.value && !props.disableRelative) {
+      if (calendarMode.value && !fixedOnly.value) {
         event.preventDefault();
         event.stopPropagation();
         closeCalendar();
@@ -2188,7 +2329,7 @@ export default defineComponent({
             setRelativeDate(unit, relativePeriodsMaxValue.value[unit]);
           } else {
             calendarToken.value = null;
-            if (props.autoApply) saveDate("relative");
+            if (!isForm.value) saveDate("relative");
           }
         }
 
@@ -2216,7 +2357,7 @@ export default defineComponent({
     };
 
     const showOnlyAbsolute = () => {
-      if (props.disableRelative) {
+      if (fixedOnly.value) {
         setDateType("absolute");
       }
     };
@@ -2238,9 +2379,6 @@ export default defineComponent({
       const { startUTC, endUTC } = getUTCTimeStamp();
       recordEntry({ startUs: startUTC, endUs: endUTC });
     };
-
-    // An auto-applied selection is final only when the panel closes, not after every edit.
-    let rangeKeyAtOpen: string | null = null;
 
     // While the open panel holds a relative selection, Start/End show the range it resolves to.
     watch(
@@ -2265,7 +2403,7 @@ export default defineComponent({
       () =>
         menuOpen.value ||
         (datesShown.value && appliedType.value === "relative") ||
-        (props.calendarPresets &&
+        (calendarAllowed.value &&
           (calendarToken.value !== null || appliedCalendarToken.value !== null)),
     );
     let clockTick: ReturnType<typeof setTimeout> | null = null;
@@ -2303,10 +2441,9 @@ export default defineComponent({
         calendarPreviewDay.value = null;
         zoneRedrawn.value = false;
         // A dates-only picker has no list, so its calendar is the panel.
-        calendarMode.value = props.disableRelative;
+        calendarMode.value = fixedOnly.value;
         appliedSinceOpen = false;
         absoluteAtOpen = fields.snapshotFields();
-        rangeKeyAtOpen = selectionKey.value;
         entryAtOpen = appliedHistoryEntry();
         onBeforeShow();
         onShow();
@@ -2316,10 +2453,6 @@ export default defineComponent({
         listCursor.value = -1;
         editingPinRowId.value = null;
         restoreAppliedSelection();
-        // A typed period applied by Enter is recorded here, once the panel it was typed in closes.
-        if (props.autoApply && appliedSinceOpen && selectionKey.value !== rangeKeyAtOpen) {
-          recordSelection();
-        }
         onBeforeHide();
         onHide();
       }
@@ -2358,11 +2491,9 @@ export default defineComponent({
     };
 
     const applyAndClose = () => {
-      clearUndo();
       commitPendingDay();
       saveDate(null);
       recordSelection();
-      rangeKeyAtOpen = selectionKey.value;
       closeMenu();
     };
 
@@ -2385,14 +2516,12 @@ export default defineComponent({
     const applyCalendarItem = (id: string) => {
       const preset = CALENDAR_RAIL_ITEMS.find((item) => item.id === id);
       if (!preset) return;
-      clearUndo();
       selectedType.value = "relative";
       calendarToken.value = preset.token;
       calendarName.value = null;
       pendingDay.value = null;
       saveDate("relative");
       recordSelection();
-      rangeKeyAtOpen = selectionKey.value;
       closeMenu();
     };
 
@@ -2400,7 +2529,6 @@ export default defineComponent({
     const pickChip = (value: string, rerun = false) => {
       const rolling = parseRollingPeriod(value);
       if (!rolling) return;
-      clearUndo();
       selectedType.value = "relative";
       calendarToken.value = null;
       pendingDay.value = null;
@@ -2409,7 +2537,6 @@ export default defineComponent({
       lastValidCustomValue.value = rolling.value;
       saveDate("relative", rerun);
       recordSelection();
-      rangeKeyAtOpen = selectionKey.value;
       closeMenu();
     };
 
@@ -2434,12 +2561,10 @@ export default defineComponent({
       }
       saveDate("relative");
       recordEntry({ relative: period });
-      rangeKeyAtOpen = selectionKey.value;
       closeMenu();
     };
 
     const applyHistoryEntry = (entry: TimeRangeHistoryEntry) => {
-      clearUndo();
       if (isRelativeHistoryEntry(entry)) {
         applyRecentPeriod(entry.relative);
         return;
@@ -2465,7 +2590,6 @@ export default defineComponent({
       calendarToken.value = null;
       saveDate("absolute");
       recordEntry(entry);
-      rangeKeyAtOpen = selectionKey.value;
       closeMenu();
     };
 
@@ -2486,7 +2610,6 @@ export default defineComponent({
     }
 
     const {
-      clearUndo,
       clearUndoForPageRange,
       captureUndo,
       undoRange,
@@ -2496,10 +2619,11 @@ export default defineComponent({
       zoomOut,
       zoomOutBlocked,
       showUndo,
+      undoAvailable,
       undoTooltip,
       liveDurationLabel,
       stepTooltip,
-    } = useTimeRangeStepping(props, {
+    } = useTimeRangeStepping(view, {
       clock,
       limits,
       fields,
@@ -2511,6 +2635,8 @@ export default defineComponent({
       pendingRange,
       triggerLabel,
       appliedSelection: () => appliedSelection,
+      appliedRan: appliedRangeRan,
+      appliedBounds: () => appliedRange.value,
       emittingOwnChange: () => emittingOwnChange,
       lastPayload: () => datePayload.value as Partial<ConsumableDateTime>,
       normalizedCount,
@@ -2529,7 +2655,7 @@ export default defineComponent({
       if (!zone.value || props.hideRelativeTimezone) return "";
       const startUs = triggerRange.value?.startUs;
       const atMs = startUs !== undefined ? Math.floor(startUs / 1000) : tooltipNow.value;
-      if (props.zoneBadge === "always") return formatZoneOffset(zone.value, atMs);
+      if (props.preset === "dashboard") return formatZoneOffset(zone.value, atMs);
       return zone.value !== browserTz ? formatZoneBadge(zone.value, atMs) : "";
     });
 
@@ -2547,7 +2673,7 @@ export default defineComponent({
     const needsStartDate = computed(
       () =>
         calendarMode.value &&
-        !props.disableRelative &&
+        !fixedOnly.value &&
         selectedType.value === "relative" &&
         pendingDay.value === null,
     );
@@ -2636,9 +2762,41 @@ export default defineComponent({
       return limit ? { message: raw(limit) } : null;
     });
 
+    // The panel holds a draft while its selection or typed text differs from the applied range.
+    const isDraft = computed(
+      () =>
+        menuOpen.value &&
+        (previewLine.value !== null ||
+          pendingDay.value !== null ||
+          !sameRange(currentModel(), appliedModel())),
+    );
+
+    const showFreezeButton = computed(() => {
+      const applied = appliedModel();
+      return !isDraft.value && !isForm.value && applied !== null && applied.kind !== "fixed";
+    });
+
+    const freezeLabel = computed(() => {
+      const range = triggerRange.value;
+      return range ? formatRangeDates(range, labelOptions()) : "";
+    });
+
+    // Freeze keeps the window the live range resolves to now, as fixed instants.
+    const freezeRange = () => {
+      const range = triggerRange.value;
+      if (!range || !(range.endUs > range.startUs)) return;
+      fields.writeInstants(range.startUs, range.endUs);
+      selectedType.value = "absolute";
+      calendarToken.value = null;
+      pendingDay.value = null;
+      saveDate("absolute", false, "freeze");
+      recordSelection();
+      closeMenu();
+    };
+
     const showLiveButton = computed(
       () =>
-        !props.disableRelative &&
+        !fixedOnly.value &&
         selectedType.value === "absolute" &&
         previewLine.value === null &&
         resolvedLine.value.fixed === true,
@@ -2783,6 +2941,8 @@ export default defineComponent({
       isNextShiftDisabled,
       onPickerKeydown,
       getConsumableDateTime,
+      getRange,
+      setRange,
       setAbsoluteTime,
       setRelativeTime,
       getDisplayValue,
@@ -2824,8 +2984,12 @@ export default defineComponent({
       pickChip,
       undoRange,
       showUndo,
+      undoAvailable,
       undoTooltip,
       zoneBadgeText,
+      fixedOnly,
+      wholeDaysOnly,
+      isForm,
       zoneShortLabel,
       openMenu,
       isMobile,
@@ -2845,6 +3009,10 @@ export default defineComponent({
       onApplyClick,
       summaryError,
       showLiveButton,
+      isDraft,
+      showFreezeButton,
+      freezeLabel,
+      freezeRange,
       liveDurationLabel,
       stepTooltip,
       panelSpeech,

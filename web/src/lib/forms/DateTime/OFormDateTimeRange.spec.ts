@@ -22,7 +22,8 @@ const DateTimeStub = defineComponent({
     defaultType: String,
     defaultAbsoluteTime: Object,
     defaultRelativeTime: String,
-    calendarPresets: { type: Boolean, default: false },
+    preset: String,
+    capabilities: Object,
   },
   emits: ["on:date-change"],
   setup(props, { emit }) {
@@ -36,9 +37,16 @@ const DateTimeStub = defineComponent({
         endTime: 200,
         relativeTimePeriod: null,
       });
-    return { capturedType, capturedPeriod, fire };
+    const fireCalendar = () =>
+      emit("on:date-change", {
+        valueType: "relative",
+        startTime: 100,
+        endTime: 200,
+        relativeTimePeriod: "calendar:month:-1",
+      });
+    return { capturedType, capturedPeriod, fire, fireCalendar };
   },
-  template: `<button data-test="dt-stub" @click="fire">{{ capturedType }}|{{ capturedPeriod }}</button>`,
+  template: `<div><button data-test="dt-stub" @click="fire">{{ capturedType }}|{{ capturedPeriod }}</button><button data-test="dt-stub-calendar" @click="fireCalendar" /></div>`,
 });
 
 function mountForm(defaultValues: Record<string, unknown>) {
@@ -66,11 +74,38 @@ describe("OFormDateTimeRange", () => {
     expect(wrapper.find('[data-test="dt-stub"]').text()).toBe("relative|1h");
   });
 
-  it("keeps the report picker free of calendar presets", () => {
+  it("runs the picker as a form field unless the caller says otherwise", () => {
     wrapper = mountForm({
       timerange: { type: "relative", period: "1h", from: 0, to: 0 },
     });
-    expect(wrapper.findComponent(DateTimeStub).props("calendarPresets")).toBe(false);
+    expect(wrapper.findComponent(DateTimeStub).props("preset")).toBe("form");
+  });
+
+  it("passes the caller's capabilities through to the picker", () => {
+    wrapper = mount(OForm, {
+      props: { defaultValues: { timerange: { type: "absolute", from: 1, to: 2 } } },
+      slots: {
+        default: `<OFormDateTimeRange name="timerange" :capabilities="{ kinds: ['fixed'], future: true }" />`,
+      },
+      global: { components: { OFormDateTimeRange }, stubs: { DateTime: DateTimeStub } },
+    });
+    expect(wrapper.findComponent(DateTimeStub).props("capabilities")).toEqual({
+      kinds: ["fixed"],
+      future: true,
+    });
+  });
+
+  // O3: reports store a calendar period as a relative range whose period is the token.
+  it("stores a calendar period as a relative range with its token", async () => {
+    wrapper = mountForm({
+      timerange: { type: "relative", period: "30m", from: 0, to: 0 },
+    });
+    await wrapper.find('[data-test="dt-stub-calendar"]').trigger("click");
+    await flushPromises();
+    expect((wrapper.vm as any).form.state.values.timerange).toMatchObject({
+      type: "relative",
+      period: "calendar:month:-1",
+    });
   });
 
   it("translates on:date-change into the form's timerange object", async () => {

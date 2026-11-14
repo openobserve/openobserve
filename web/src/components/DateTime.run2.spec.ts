@@ -36,7 +36,7 @@ describe("DateTime QA run 2", () => {
 
   const createWrapper = (props: Record<string, unknown> = {}) => {
     wrapper = mount(DateTime, {
-      props: { autoApply: true, calendarPresets: true, ...props },
+      props: { ...props },
       attachTo: document.body,
       global: { plugins: [i18n, store] },
     });
@@ -109,9 +109,8 @@ describe("DateTime QA run 2", () => {
     it("cuts a year-9999 end to the last instant every zone can show on a picker that books ahead", async () => {
       createWrapper({
         ...fixedProps("2026-11-12T10:00:00Z", "9999-12-31T23:00:00Z"),
-        disableRelative: true,
+        capabilities: { kinds: ["fixed"], future: true },
         minDate: "2026/11/01",
-        futureAllowed: true,
       });
       await flushPromises();
 
@@ -129,7 +128,7 @@ describe("DateTime QA run 2", () => {
 
   describe("S5 return to live", () => {
     it("goes back to live after more steps back than the undo stack holds", async () => {
-      createWrapper({ defaultRelativeTime: "1h", undoable: true });
+      createWrapper({ defaultRelativeTime: "1h" });
       await flushPromises();
 
       for (let i = 0; i < 20; i += 1) wrapper!.vm.shiftTimeRange("prev");
@@ -144,7 +143,7 @@ describe("DateTime QA run 2", () => {
   });
 
   it("goes back to the live range it last left, after a zoom out", async () => {
-    createWrapper({ defaultRelativeTime: "1h", undoable: true });
+    createWrapper({ defaultRelativeTime: "1h" });
     await flushPromises();
 
     wrapper!.vm.zoomOut();
@@ -188,7 +187,7 @@ describe("DateTime QA run 2", () => {
   });
 
   describe("C7 lit chip", () => {
-    it("applies the lit chip again and closes when it is clicked", async () => {
+    it("closes on the lit chip without applying it again (#46)", async () => {
       createWrapper({ defaultRelativeTime: "15m" });
       await flushPromises();
       await openMenu();
@@ -198,8 +197,7 @@ describe("DateTime QA run 2", () => {
       wrapper!.vm.onChipToggle(undefined);
       await flushPromises();
 
-      expect(emits()).toBe(before + 1);
-      expect(lastEmit()).toMatchObject({ relativeTimePeriod: "15m", userChangedValue: true });
+      expect(emits()).toBe(before);
       expect(wrapper!.vm.menuOpen).toBe(false);
     });
   });
@@ -208,7 +206,7 @@ describe("DateTime QA run 2", () => {
     it("labels a dates-only picker with the v2 dates, not the legacy yyyy/MM/dd pair", async () => {
       createWrapper({
         ...fixedProps("2026-11-03T18:30:00Z", "2026-11-04T18:29:59Z"),
-        disableRelative: true,
+        capabilities: { kinds: ["fixed"] },
       });
       await flushPromises();
 

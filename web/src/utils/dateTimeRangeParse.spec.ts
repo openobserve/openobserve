@@ -846,7 +846,6 @@ describe("calendar words", () => {
     ["Last Month", "calendar:month:-1"],
     ["this  quarter", "calendar:quarter:0"],
     ["last quarter", "calendar:quarter:-1"],
-    ["last day", "calendar:day:-1"],
   ])("reads %s as the rail's %s token", (text, token) => {
     expect(parseTimeInput(text)).toEqual({ type: "relative", period: token });
   });
@@ -861,6 +860,7 @@ describe("calendar words", () => {
     ["past hour", "1h"],
     ["last hour", "1h"],
     ["last minute", "1m"],
+    ["last day", "1d"],
   ])("keeps %s rolling", (text, period) => {
     expect(parseTimeInput(text)).toEqual({ type: "relative", period });
   });

@@ -182,7 +182,7 @@ describe("ConfigPanel panel-specific time range (real picker)", { timeout: 30_00
       type: "relative",
       relativeTimePeriod: "calendar:week:-1",
     });
-    expect(pickerLabel()).toBe("Previous week");
+    expect(pickerLabel()).toBe("Previous week · Sep 27 – Oct 3, 2026");
   });
 
   it("shows a saved calendar range in the panel picker when the panel is edited again", async () => {
@@ -192,6 +192,6 @@ describe("ConfigPanel panel-specific time range (real picker)", { timeout: 30_00
     });
     await flushPromises();
 
-    expect(pickerLabel()).toBe("Previous week");
+    expect(pickerLabel()).toBe("Previous week · Sep 27 – Oct 3, 2026");
   });
 });

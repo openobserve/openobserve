@@ -29,7 +29,7 @@ describe("DateTime picker fixes (run 1)", () => {
 
   const createWrapper = (props: Record<string, unknown> = {}) => {
     wrapper = mount(DateTime, {
-      props: { autoApply: true, calendarPresets: true, ...props },
+      props: { ...props },
       attachTo: document.body,
       global: { plugins: [i18n, store] },
     });
@@ -260,7 +260,7 @@ describe("DateTime picker fixes (run 1)", () => {
   });
 
   it("V12 flags a time no typing can complete as it is typed, and only that", async () => {
-    createWrapper({ ...absoluteProps, autoApply: false });
+    createWrapper({ ...absoluteProps });
     await flushPromises();
     await openCalendar();
     const field = document.querySelector<HTMLInputElement>(

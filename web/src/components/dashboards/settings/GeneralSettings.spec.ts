@@ -146,8 +146,8 @@ describe("GeneralSettings", () => {
             props: {
               modelValue: Object,
               initialTimezone: String,
-              autoApplyDashboard: Boolean,
-              calendarPresets: Boolean,
+              preset: String,
+              capabilities: Object,
             },
             emits: ["update:modelValue"],
           },
@@ -432,10 +432,11 @@ describe("GeneralSettings", () => {
   });
 
   describe("Calendar default duration", () => {
-    it("offers the calendar presets in the default-duration picker", async () => {
+    it("offers every range kind, calendar included, in the default-duration form picker", async () => {
       wrapper = await createWrapper();
       const dateTimePicker = wrapper.findComponent('[data-test="datetime-picker"]');
-      expect(dateTimePicker.props("calendarPresets")).toBe(true);
+      expect(dateTimePicker.props("preset")).toBe("form");
+      expect(dateTimePicker.props("capabilities")).toBeUndefined();
     });
 
     it("loads a saved calendar token and saves it back unchanged", async () => {
@@ -495,7 +496,7 @@ describe("GeneralSettings", () => {
 
       const dateTimePicker = wrapper.findComponent('[data-test="datetime-picker"]');
       expect(dateTimePicker.props("initialTimezone")).toBe("UTC");
-      expect(dateTimePicker.props("autoApplyDashboard")).toBe(true);
+      expect(dateTimePicker.props("preset")).toBe("form");
     });
 
     it("should hide datetime picker in print mode", async () => {

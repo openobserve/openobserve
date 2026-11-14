@@ -2119,16 +2119,13 @@ describe("MetricsExplorer wiring", () => {
       shortcuts.handlers = {};
     });
 
-    it("applies a picked range at once in Visualize and keeps the picker's Apply in Explore", async () => {
+    it("runs the picker as an explorer-manual host in Explore and Visualize", async () => {
       const wrapper = mountExplorer();
       const picker = () => wrapper.findComponent({ name: "DateTimePickerDashboard" });
-      expect(picker().props("autoApplyDashboard")).toBe(false);
+      expect(picker().attributes("preset") ?? picker().props("preset")).toBe("explorer-manual");
       (wrapper.vm as any).setMode("visualize");
       await flushPromises();
-      expect(picker().props("autoApplyDashboard")).toBe(true);
-      (wrapper.vm as any).setMode("explore");
-      await flushPromises();
-      expect(picker().props("autoApplyDashboard")).toBe(false);
+      expect(picker().attributes("preset") ?? picker().props("preset")).toBe("explorer-manual");
     });
 
     describe("the Run query split button", () => {
@@ -2502,6 +2499,60 @@ describe("MetricsExplorer wiring", () => {
       expect(grid.sweepSlice).toHaveBeenCalledWith({ skipCache: true });
     });
 
+    describe("explorer-manual: a range applied over drawn charts", () => {
+      const drawnGrid = () => {
+        swap("cards", { value: CARDS });
+        swap("pageSlice", ref(CARDS));
+        swap("pagedCards", ref(CARDS));
+        swap("previews", { value: { a_total: { status: "done", results: [{}] } } });
+      };
+
+      it("waits for Refresh and says which range the charts are for", async () => {
+        drawnGrid();
+        const wrapper = mountExplorer(picker);
+        await flushPromises();
+        grid.setTimeRange.mockClear();
+
+        await (wrapper.vm as any).onDateChange();
+
+        expect(grid.setTimeRange).not.toHaveBeenCalled();
+        expect(wrapper.find('[data-test="metrics-explorer-stale-range-strip"]').exists()).toBe(
+          true,
+        );
+      });
+
+      it("runs the waiting range as a range change on Refresh", async () => {
+        drawnGrid();
+        const wrapper = mountExplorer(picker);
+        await flushPromises();
+        await (wrapper.vm as any).onDateChange();
+        grid.setTimeRange.mockClear();
+
+        await (wrapper.vm as any).onRefresh();
+        await flushPromises();
+
+        expect(grid.setTimeRange).toHaveBeenCalledWith(
+          { start_time: 1, end_time: 2 },
+          { keepPreviews: true, windowChanged: true },
+        );
+        expect(wrapper.find('[data-test="metrics-explorer-stale-range-strip"]').exists()).toBe(
+          false,
+        );
+      });
+
+      it("runs at once while auto-refresh is on", async () => {
+        drawnGrid();
+        const wrapper = mountExplorer(picker);
+        await flushPromises();
+        (wrapper.vm as any).refreshInterval = 60;
+        grid.setTimeRange.mockClear();
+
+        await (wrapper.vm as any).onDateChange();
+
+        expect(grid.setTimeRange).toHaveBeenCalled();
+      });
+    });
+
     it("names both windows once in the toolbar after 150 ms, and announces the settle", async () => {
       vi.useFakeTimers();
       onTestFinished(() => vi.useRealTimers());
@@ -2521,7 +2572,7 @@ describe("MetricsExplorer wiring", () => {
         holding.value = true;
       });
 
-      void (wrapper.vm as any).onDateChange();
+      void (wrapper.vm as any).runRangeChange(true);
       await wrapper.vm.$nextTick();
       const status = () => wrapper.find('[data-test="metrics-explorer-range-status"]');
       expect(status().exists()).toBe(false);
@@ -2571,7 +2622,7 @@ describe("MetricsExplorer wiring", () => {
         };
       });
 
-      void (wrapper.vm as any).onDateChange();
+      void (wrapper.vm as any).runRangeChange(true);
       await wrapper.vm.$nextTick();
       vi.advanceTimersByTime(150);
       await wrapper.vm.$nextTick();
@@ -2620,7 +2671,7 @@ describe("MetricsExplorer wiring", () => {
           holding.value = true;
         });
 
-        void (wrapper.vm as any).onDateChange();
+        void (wrapper.vm as any).runRangeChange(true);
         (wrapper.vm as any).onDetailOverviewStatus({ loading: true, drawn: true });
         await wrapper.vm.$nextTick();
         vi.advanceTimersByTime(150);
@@ -2646,7 +2697,7 @@ describe("MetricsExplorer wiring", () => {
         grid.setTimeRange.mockImplementationOnce(() => {
           rangeSeconds.value = 6 * 3600;
         });
-        void (wrapper.vm as any).onDateChange();
+        void (wrapper.vm as any).runRangeChange(true);
         (wrapper.vm as any).onDetailOverviewStatus({ ...settled, loading: true });
         await wrapper.vm.$nextTick();
         vi.advanceTimersByTime(400);
@@ -2693,7 +2744,7 @@ describe("MetricsExplorer wiring", () => {
           rangeSeconds.value = 6 * 3600;
           holding.value = true;
         });
-        void (wrapper.vm as any).onDateChange();
+        void (wrapper.vm as any).runRangeChange(true);
         await wrapper.vm.$nextTick();
         vi.advanceTimersByTime(150);
         await wrapper.vm.$nextTick();

@@ -24,8 +24,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          mounts on initial page load. -->
     <Teleport to="#o2-page-actions" defer>
       <DateTime
+        preset="explorer-auto"
+        :capabilities="{ kinds: ['rolling', 'fixed'] }"
+        :host-name="t('pipeline.history')"
         ref="dateTimeRef"
-        auto-apply
         :default-type="dateTimeType"
         :default-absolute-time="{
           startTime: absoluteTime.startTime,

@@ -22,8 +22,7 @@ import store from "@/test/unit/helpers/store";
 const START = Date.parse("2026-11-04T00:00:00Z") * 1000;
 const END = Date.parse("2026-11-05T00:00:00Z") * 1000;
 const ABSOLUTE = {
-  disableRelative: true,
-  autoApply: true,
+  capabilities: { kinds: ["fixed"] },
   defaultAbsoluteTime: { startTime: START, endTime: END },
 };
 
@@ -88,7 +87,7 @@ describe("DateTime pickerTimezone and hideClipboard", () => {
   });
 
   it("keeps the applied range when the zone changes and the panel closes without Apply", async () => {
-    createWrapper({ pickerTimezone: "Asia/Calcutta", autoApply: false });
+    createWrapper({ pickerTimezone: "Asia/Calcutta" });
     await flushPromises();
     wrapper!.vm.onMenuOpenChange(true);
     wrapper!.vm.menuOpen = true;
@@ -108,7 +107,6 @@ describe("DateTime pickerTimezone and hideClipboard", () => {
 
   it("re-emits a linked fixed range as fixed when the link also names a zone", async () => {
     createWrapper({
-      disableRelative: false,
       defaultType: "absolute",
       initialTimezone: "Asia/Calcutta",
     });

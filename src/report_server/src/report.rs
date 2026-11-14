@@ -8,7 +8,14 @@ use chromiumoxide::{
     fetcher::{BrowserFetcher, BrowserFetcherOptions},
     handler::viewport::Viewport,
 };
-use config::{get_config, meta::dashboards::reports::format_dashb_var, utils::time::now_micros};
+use config::{
+    get_config,
+    meta::dashboards::reports::format_dashb_var,
+    utils::{
+        report_period::{ReportZone, relative_range_params},
+        time::now_micros,
+    },
+};
 use futures::StreamExt;
 use lettre::{
     AsyncSmtpTransport, AsyncTransport, Message, Tokio1Executor,
@@ -144,12 +151,13 @@ pub async fn generate_report(
     user_id: &str,
     user_pass: &str,
     web_url: &str,
-    timezone: &str,
+    zone: ReportZone<'_>,
     report_type: ReportType,
     report_name: &str,
 ) -> Result<(Vec<u8>, String, bool), anyhow::Error> {
     let dashboard_id = &dashboard.dashboard;
     let folder_id = &dashboard.folder;
+    let timezone = zone.name;
 
     let user_tmp_dir = tempfile::tempdir()
         .map_err(|e| anyhow::anyhow!("Error creating temporary directory: {e}"))?;
@@ -243,54 +251,16 @@ pub async fn generate_report(
     let (dashb_url, email_dashb_url) = match timerange.range_type {
         models::ReportTimerangeType::Relative => {
             let period = &timerange.period;
-            let (time_duration, time_unit) = period.split_at(period.len() - 1);
+            let (range_params, window) = relative_range_params(period, zone, now_micros())
+                .ok_or_else(|| {
+                    anyhow::anyhow!("Report time range period '{period}' cannot be read")
+                })?;
             let dashb_url = format!(
-                "{web_url}/dashboards/view?org_identifier={org_id}&dashboard={dashboard_id}&folder={folder_id}&tab={tab_id}&refresh=Off&{search_type_params}&period={period}&timezone={timezone}&var-Dynamic+filters=%255B%255D&print=true{dashb_vars}",
+                "{web_url}/dashboards/view?org_identifier={org_id}&dashboard={dashboard_id}&folder={folder_id}&tab={tab_id}&refresh=Off&{search_type_params}&{range_params}&timezone={timezone}&var-Dynamic+filters=%255B%255D&print=true{dashb_vars}",
             );
             log::debug!("dashb_url for dashboard {folder_id}/{dashboard_id}: {dashb_url}");
-
-            let time_duration: i64 = time_duration.parse()?;
-            let end_time = now_micros();
-            let start_time = match time_unit {
-                "m" => {
-                    end_time
-                        - chrono::Duration::try_minutes(time_duration)
-                            .unwrap()
-                            .num_microseconds()
-                            .unwrap()
-                }
-                "h" => {
-                    end_time
-                        - chrono::Duration::try_hours(time_duration)
-                            .unwrap()
-                            .num_microseconds()
-                            .unwrap()
-                }
-                "d" => {
-                    end_time
-                        - chrono::Duration::try_days(time_duration)
-                            .unwrap()
-                            .num_microseconds()
-                            .unwrap()
-                }
-                "w" => {
-                    end_time
-                        - chrono::Duration::try_weeks(time_duration)
-                            .unwrap()
-                            .num_microseconds()
-                            .unwrap()
-                }
-                _ => {
-                    end_time
-                        - chrono::Duration::try_days(30 * time_duration)
-                            .unwrap()
-                            .num_microseconds()
-                            .unwrap()
-                }
-            };
-
             let email_dashb_url = format!(
-                "{web_url}/dashboards/view?org_identifier={org_id}&dashboard={dashboard_id}&folder={folder_id}&tab={tab_id}&refresh=Off&from={start_time}&to={end_time}&timezone={timezone}&var-Dynamic+filters=%255B%255D&print=true{dashb_vars}",
+                "{web_url}/dashboards/view?org_identifier={org_id}&dashboard={dashboard_id}&folder={folder_id}&tab={tab_id}&refresh=Off&{window}&timezone={timezone}&var-Dynamic+filters=%255B%255D&print=true{dashb_vars}",
             );
             (dashb_url, email_dashb_url)
         }

@@ -883,8 +883,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div class="order-1 min-w-0 max-md:me-auto max-md:shrink-0">
           <DateTime
+            preset="explorer-manual"
+            :host-name="t('menu.search')"
             ref="dateTimeRef"
-            auto-apply
             menu-align="end"
             shortcuts
             :default-type="searchObj.data.datetime.type"
@@ -894,10 +895,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             }"
             :default-relative-time="searchObj.data.datetime.relativeTimePeriod"
             data-test="logs-search-bar-date-time-dropdown"
-            calendar-presets
             :queryRangeRestrictionMsg="searchObj.data.datetime.queryRangeRestrictionMsg"
             :queryRangeRestrictionInHour="searchObj.data.datetime.queryRangeRestrictionInHour"
             @on:date-change="updateDateTime"
+            @apply="onRangeApply"
             @on:timezone-change="updateTimezone"
             :retention-days="retentionDays"
             :narrowed-by-query="narrowedByQuery"
@@ -1261,6 +1262,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :min-refresh-interval="store.state?.zoConfig?.min_auto_refresh_interval ?? 0"
                 :range-end-us="refreshRangeEndUs"
                 :range-start-us="refreshRangeStartUs"
+                :range-span-us="refreshRangeSpanUs"
                 @update:model-value="onRefreshIntervalUpdate"
                 @trigger="$emit('onAutoIntervalTrigger')"
                 @live="goLiveRange"
@@ -1390,11 +1392,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   "
                 />
               </OButton>
+              <OBadge
+                v-if="contextViewOn"
+                variant="default-soft"
+                size="sm"
+                class="absolute end-2 top-1 z-10"
+                data-test="logs-search-bar-context-view-chip"
+                >{{ t("timeRangeHost.filterOff") }}</OBadge
+              >
               <!-- Unified Query Editor (with built-in AI bar) -->
               <UnifiedQueryEditor
                 v-if="router.currentRoute.value.name === 'logs'"
                 v-show="!showFilterBuilder"
                 ref="queryEditorRef"
+                :class="{ 'opacity-60': contextViewOn }"
                 :query="searchObj.data.query"
                 :keywords="effectiveKeywords"
                 :suggestions="effectiveSuggestions"
@@ -1952,6 +1963,9 @@ import { applySearchSnapshot, prepareSearchForSave } from "@/utils/logs/transien
 import { useSearchStream } from "@/composables/useLogs/useSearchStream";
 import useStreamFields from "@/composables/useLogs/useStreamFields";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
+import { contextViewKeeps } from "@/utils/searchAroundWindow";
+import type { TimeRangeApplyMeta } from "@/utils/timeRangeModel";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -2064,6 +2078,7 @@ export default defineComponent({
     UnifiedQueryEditor,
     QueryPlanDialog,
     OIcon,
+    OBadge,
     OToggleGroup,
     OToggleGroupItem,
     OFormToggleGroup,
@@ -3270,6 +3285,19 @@ export default defineComponent({
         toSecond(current.startTime) === Number(value.startTime) &&
         toSecond(current.endTime) === Number(value.endTime)
       );
+    };
+
+    const contextViewOn = computed(() => {
+      const around = searchObj.data.searchAround.windowQuery;
+      return (
+        !!around &&
+        searchObj.meta.logsVisualizeToggle === "logs" &&
+        String(searchObj.data.query ?? "").trim() === around.typedQuery.trim()
+      );
+    });
+    // A range picked in the panel leaves the context view; moves of its own window keep it.
+    const onRangeApply = (_range: unknown, meta: TimeRangeApplyMeta) => {
+      if (!contextViewKeeps(meta.source)) searchObj.data.searchAround.windowQuery = null;
     };
 
     const updateDateTime = async (value: object) => {
@@ -4551,6 +4579,11 @@ export default defineComponent({
     const refreshRangeStartUs = computed(() =>
       refreshRangeEndUs.value === null ? null : Number(searchObj.data.datetime.startTime) || null,
     );
+    const refreshRangeSpanUs = computed(() => {
+      const span =
+        Number(searchObj.data.datetime?.endTime) - Number(searchObj.data.datetime?.startTime);
+      return Number.isFinite(span) && span > 0 ? span : null;
+    });
     const goLiveRange = () => {
       (dateTimeRef.value as { goLive?: () => void } | null)?.goLive?.();
     };
@@ -4860,6 +4893,8 @@ export default defineComponent({
 
     const handleRunQueryFn = (clear_cache = false) => {
       flushEditorValue();
+      // Run query always sends what the query bar shows, so it leaves the context view.
+      searchObj.data.searchAround.windowQuery = null;
 
       if (
         searchObj.meta.logsVisualizeToggle == "visualize" ||
@@ -5503,6 +5538,9 @@ export default defineComponent({
       shareFixedCopyLabel,
       shareRangeContext,
       refreshRangeStartUs,
+      refreshRangeSpanUs,
+      contextViewOn,
+      onRangeApply,
       narrowedByQuery,
       shareRollingLabel,
       refreshRangeEndUs,

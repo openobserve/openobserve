@@ -23,8 +23,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <template #actions>
       <date-time
+        preset="explorer-auto"
+        :capabilities="{ kinds: ['rolling', 'fixed'] }"
         ref="dateTimeRef"
-        auto-apply
         :default-type="dateTimeType"
         :default-absolute-time="{
           startTime: timeRange.__global.start_time.getTime(),

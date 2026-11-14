@@ -51,6 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #actions>
       <span id="rum-analytics-filters-host" class="contents" />
       <DateTimePickerDashboard
+        preset="explorer-auto"
         ref="dateTimePickerRef"
         :model-value="state.datetime"
         menu-align="end"

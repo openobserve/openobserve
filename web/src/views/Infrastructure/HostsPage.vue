@@ -505,8 +505,9 @@ const osToggleLabel = (slug: string) =>
           }}
         </OText>
         <DateTime
+          preset="explorer-auto"
+          :capabilities="{ kinds: ['rolling', 'fixed'] }"
           ref="dateTimePickerRef"
-          auto-apply
           menu-align="end"
           default-type="relative"
           :default-relative-time="HOSTS_DEFAULT_RELATIVE_PERIOD"

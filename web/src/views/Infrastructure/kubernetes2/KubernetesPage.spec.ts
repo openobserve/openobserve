@@ -645,11 +645,12 @@ describe("KubernetesPage", () => {
       expect(select.props("placeholder")).toBe("Loading clusters…");
     });
 
-    it("passes apply-presets, not auto-apply, to the date picker", async () => {
+    it("uses the explorer-auto picker, with no Run query step", async () => {
       await mountPage({ view: "events" });
       const picker = wrapper.findComponent('[data-test-name="k8s2-date-time"]');
-      expect(picker.attributes()).toHaveProperty("apply-presets");
+      expect(picker.attributes("preset")).toBe("explorer-auto");
       expect(picker.attributes()).not.toHaveProperty("auto-apply");
+      expect(picker.attributes()).not.toHaveProperty("apply-presets");
     });
 
     it("hides the selector when no cluster can be listed", async () => {

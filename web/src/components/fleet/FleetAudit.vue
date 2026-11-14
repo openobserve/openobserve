@@ -93,8 +93,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OToggleGroupItem>
           </OToggleGroup>
           <DateTime
+            preset="explorer-auto"
+            :capabilities="{ kinds: ['rolling', 'fixed'] }"
             v-if="filters.range === 'custom'"
-            auto-apply
             default-type="absolute"
             :default-absolute-time="{
               startTime: customRange.from * 1000,

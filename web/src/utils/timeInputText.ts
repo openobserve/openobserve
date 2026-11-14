@@ -27,21 +27,27 @@ const previousDate = (date: string): string => {
   return new Date(Date.UTC(year, month - 1, day - 1)).toISOString().slice(0, 10).replace(/-/g, "/");
 };
 
-const calendarText = (token: string): string | null => {
+// Older offsets come only from old links; their snap reads back as the same dates, fixed.
+const SNAP_UNITS: Record<string, string> = { day: "d", week: "w", month: "M", year: "y" };
+
+const calendarText = (token: string, nowMs: number): string | null => {
   const period = parseCalendarToken(token);
   if (!period) return null;
   const { unit, offset } = period;
-  if (unit === "day")
-    return offset === 0 ? "today" : offset === -1 ? "yesterday" : `now${offset}d/d`;
+  if (unit === "day" && offset >= -1) return offset === 0 ? "today" : "yesterday";
   if (offset === 0) return `this ${unit}`;
   if (offset === -1) return `previous ${unit}`;
-  return `${-offset} ${unit}s ago`;
+  const snap = SNAP_UNITS[unit];
+  if (snap) return `now${offset}${snap}/${snap}`;
+  // Months back to the quarter's first month, as the snap grammar has no quarter unit.
+  const back = (new Date(nowMs).getMonth() % 3) - offset * 3;
+  return `now-${back}M/M to now-${back - 2}M/M`;
 };
 
 /** Text that reads back as this reading, so a suggestion accepted with Tab stays what it showed. */
-export const formatTimeInputText = (reading: ParsedTimeInput): string => {
+export const formatTimeInputText = (reading: ParsedTimeInput, nowMs = Date.now()): string => {
   if (reading.type === "relative") {
-    const calendar = calendarText(reading.period);
+    const calendar = calendarText(reading.period, nowMs);
     if (calendar) return calendar;
     // A bare uppercase M is months only by case, so the bar spells it out.
     return reading.period.replace(/^(\d+)M$/, "$1mo");

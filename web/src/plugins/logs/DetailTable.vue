@@ -624,6 +624,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :label="option.label"
             />
           </OSelect>
+          <OCheckbox
+            v-if="searchAroundIsTime"
+            size="sm"
+            :model-value="searchAroundKeepFilters"
+            :label="t('timeRangeHost.keepFilters')"
+            data-test="logs-detail-table-search-around-keep-filters"
+            @update:model-value="setSearchAroundKeepFilters"
+          />
           <OButton
             data-test="logs-detail-table-search-around-btn"
             variant="outline"
@@ -698,6 +706,7 @@ import { crossLinkQueryText } from "@/composables/useLogs/freeTextSearch";
 import useViewTraceAction from "@/composables/useLogs/useViewTraceAction";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OSelectItem from "@/lib/forms/Select/OSelectItem.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
@@ -731,6 +740,8 @@ import {
   currentSearchAroundUser,
   parseSearchAroundChoice,
   readSearchAroundChoice,
+  readSearchAroundKeepFilters,
+  writeSearchAroundKeepFilters,
   searchAroundWindow,
   SEARCH_AROUND_RECORDS,
   searchAroundTimeOptions as searchAroundTimeOptionsFor,
@@ -778,6 +789,7 @@ export default defineComponent({
     OButton,
     OSelect,
     OSelectItem,
+    OCheckbox,
     ODropdown,
     ODropdownItem,
     ODropdownSeparator,
@@ -907,7 +919,12 @@ export default defineComponent({
       if (choice?.kind === "time") {
         const timestampUs = Number(key);
         if (!Number.isFinite(timestampUs)) return;
-        this.$emit("search:aroundwindow", searchAroundWindow(timestampUs, choice.seconds));
+        this.$emit("search:aroundwindow", {
+          ...searchAroundWindow(timestampUs, choice.seconds),
+          anchorUs: timestampUs,
+          seconds: choice.seconds,
+          keepFilters: this.searchAroundKeepFilters,
+        });
         return;
       }
       this.$emit("search:timeboxed", {
@@ -986,6 +1003,14 @@ export default defineComponent({
       ...searchAroundTimeOptions.value,
       ...searchAroundRecordOptions.value,
     ]);
+    const searchAroundKeepFilters = ref(readSearchAroundKeepFilters(searchAroundUser()));
+    const setSearchAroundKeepFilters = (value: unknown) => {
+      searchAroundKeepFilters.value = value === true;
+      writeSearchAroundKeepFilters(searchAroundUser(), searchAroundKeepFilters.value);
+    };
+    const searchAroundIsTime = computed(
+      () => parseSearchAroundChoice(searchAroundChoice.value)?.kind === "time",
+    );
     const setSearchAroundChoice = (value: unknown) => {
       if (!parseSearchAroundChoice(value)) return;
       searchAroundChoice.value = value as SearchAroundChoice;
@@ -1545,6 +1570,9 @@ export default defineComponent({
       nextTooltip,
       flattenJSONObject,
       searchAroundChoice,
+      searchAroundKeepFilters,
+      setSearchAroundKeepFilters,
+      searchAroundIsTime,
       searchAroundTimeOptions,
       searchAroundRecordOptions,
       searchAroundOptions,

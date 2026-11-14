@@ -790,6 +790,8 @@ function openInLogs() {
         <div class="flex min-w-0 items-center gap-2 px-2 pt-3 pb-2">
           <div class="flex-1" />
           <DateTime
+            preset="explorer-manual"
+            :capabilities="{ kinds: ['rolling', 'fixed'] }"
             default-type="absolute"
             :default-absolute-time="{ startTime: rangeStart, endTime: rangeEnd }"
             data-test-name="dashboard-log-drawer-date-time"

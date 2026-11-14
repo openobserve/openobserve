@@ -31,7 +31,7 @@ describe("DateTime calendar", () => {
 
   const createWrapper = (props: Record<string, unknown> = {}) => {
     wrapper = mount(DateTime, {
-      props: { calendarPresets: true, ...props },
+      props: { ...props },
       attachTo: document.body,
       global: { plugins: [i18n, store] },
     });
@@ -85,7 +85,7 @@ describe("DateTime calendar", () => {
 
   describe("calendar token behaviour", () => {
     it("returns to the applied period when the panel closes without Apply", async () => {
-      createWrapper({ autoApply: false, defaultRelativeTime: "calendar:month:0" });
+      createWrapper({ defaultRelativeTime: "calendar:month:0" });
       await flushPromises();
       await openMenu();
 
@@ -101,7 +101,7 @@ describe("DateTime calendar", () => {
     });
 
     it("drops the calendar token when a rolling period or chip is chosen", async () => {
-      createWrapper({ autoApply: true, defaultRelativeTime: "calendar:day:0" });
+      createWrapper({ defaultRelativeTime: "calendar:day:0" });
       await flushPromises();
 
       wrapper!.vm.setRelativeDate("h", 3);
@@ -129,7 +129,10 @@ describe("DateTime calendar", () => {
     });
 
     it("keeps a calendar token as its absolute dates when the picker has no calendar presets", async () => {
-      createWrapper({ calendarPresets: false, defaultRelativeTime: "calendar:month:0" });
+      createWrapper({
+        capabilities: { kinds: ["rolling", "fixed"] },
+        defaultRelativeTime: "calendar:month:0",
+      });
       await flushPromises();
 
       expect(wrapper!.vm.calendarToken).toBeNull();
@@ -144,7 +147,7 @@ describe("DateTime calendar", () => {
     });
 
     it("converts a calendar token restored through setSavedDate on a picker without presets", async () => {
-      createWrapper({ calendarPresets: false });
+      createWrapper({ capabilities: { kinds: ["rolling", "fixed"] } });
       await flushPromises();
 
       wrapper!.vm.setSavedDate({ type: "relative", relativeTimePeriod: "calendar:day:-1" });
@@ -157,7 +160,7 @@ describe("DateTime calendar", () => {
 
     it("leaves an applied absolute range alone when a stale calendar token rides along", async () => {
       createWrapper({
-        calendarPresets: false,
+        capabilities: { kinds: ["rolling", "fixed"] },
         defaultType: "absolute",
         defaultAbsoluteTime: {
           startTime: micros("2026-10-01T00:00:00Z"),
@@ -176,7 +179,6 @@ describe("DateTime calendar", () => {
 
     it("refuses a shift into a period longer than the query-range limit", async () => {
       createWrapper({
-        autoApply: true,
         defaultRelativeTime: "calendar:day:0",
         queryRangeRestrictionInHour: 12,
         queryRangeRestrictionMsg: "Max 12 hours",
@@ -192,7 +194,7 @@ describe("DateTime calendar", () => {
     });
 
     it("clamps a calendar range to the largest allowed window when a limit arrives", async () => {
-      createWrapper({ autoApply: true, defaultRelativeTime: "calendar:month:-1" });
+      createWrapper({ defaultRelativeTime: "calendar:month:-1" });
       await flushPromises();
 
       await wrapper!.setProps({ queryRangeRestrictionInHour: 72 });
@@ -209,7 +211,7 @@ describe("DateTime calendar", () => {
       const setTimeoutSpy = vi.spyOn(globalThis, "setTimeout");
       const clearIntervalSpy = vi.spyOn(globalThis, "clearTimeout");
 
-      createWrapper({ calendarPresets: false });
+      createWrapper({ capabilities: { kinds: ["rolling", "fixed"] } });
       await flushPromises();
       expect(minuteTimers()).toBe(0);
       wrapper!.unmount();
@@ -232,7 +234,7 @@ describe("DateTime calendar", () => {
     });
 
     it("moves an older period's label to the right day once the clock passes midnight", async () => {
-      createWrapper({ autoApply: false, defaultRelativeTime: "calendar:day:-2" });
+      createWrapper({ defaultRelativeTime: "calendar:day:-2" });
       await flushPromises();
       expect(wrapper!.vm.triggerLabel).toBe("Oct 6");
 
@@ -243,7 +245,7 @@ describe("DateTime calendar", () => {
     });
 
     it("steps a calendar period by its own unit with the shift arrows", async () => {
-      createWrapper({ autoApply: false, defaultRelativeTime: "calendar:month:0" });
+      createWrapper({ defaultRelativeTime: "calendar:month:0" });
       await flushPromises();
       expect(el("date-time-next-btn")?.disabled).toBe(true);
 
@@ -269,7 +271,7 @@ describe("DateTime calendar", () => {
     });
 
     it("re-resolves the same token in a new timezone", async () => {
-      createWrapper({ autoApply: true, defaultRelativeTime: "calendar:day:0" });
+      createWrapper({ defaultRelativeTime: "calendar:day:0" });
       await flushPromises();
       expect(lastEmit().startTime).toBe(micros("2026-10-07T18:30:00Z"));
 
@@ -285,7 +287,7 @@ describe("DateTime calendar", () => {
     });
 
     it("moves an offset-0 tooltip's end to the hover time", async () => {
-      createWrapper({ autoApply: true, defaultRelativeTime: "calendar:week:0" });
+      createWrapper({ defaultRelativeTime: "calendar:week:0" });
       await flushPromises();
       expect(wrapper!.vm.triggerTooltip?.stamps).toMatch(/Oct 4, 2026.*00:00.*Oct 8, 2026.*08:30/);
 
@@ -297,7 +299,6 @@ describe("DateTime calendar", () => {
 
     it("drops a restored calendar period that exceeds the query-range limit", async () => {
       createWrapper({
-        autoApply: true,
         defaultRelativeTime: "calendar:year:0",
         queryRangeRestrictionInHour: 24,
       });
@@ -312,7 +313,7 @@ describe("DateTime calendar", () => {
     const calendar = () => wrapper!.findComponent({ name: "ODateRangeCalendar" });
 
     it("applies the clicked day, not the old dates, when Apply is pressed", async () => {
-      createWrapper({ autoApply: false });
+      createWrapper({});
       await flushPromises();
       await openMenu();
 
@@ -333,7 +334,7 @@ describe("DateTime calendar", () => {
     });
 
     it("drops an unapplied pending day from the label when the panel closes without Apply", async () => {
-      createWrapper({ autoApply: false });
+      createWrapper({});
       await flushPromises();
       const applied = wrapper!.vm.triggerLabel;
       await openMenu();
@@ -349,7 +350,7 @@ describe("DateTime calendar", () => {
     });
 
     it("applies nothing on an auto-apply picker that closes on a pending day without Apply (V1)", async () => {
-      createWrapper({ autoApply: true });
+      createWrapper({});
       await flushPromises();
       await openMenu();
       const emitsBefore = (wrapper!.emitted("on:date-change") ?? []).length;
@@ -369,7 +370,7 @@ describe("DateTime calendar", () => {
     });
 
     it("applies a range completed by the second click only on Apply (V1)", async () => {
-      createWrapper({ autoApply: true });
+      createWrapper({});
       await flushPromises();
       await openMenu();
       const emitsBefore = (wrapper!.emitted("on:date-change") ?? []).length;
@@ -391,7 +392,6 @@ describe("DateTime calendar", () => {
 
     it("shows Start/End as HH:MM and previews a time while it is typed, before the field commits it", async () => {
       createWrapper({
-        autoApply: true,
         defaultType: "absolute",
         defaultAbsoluteTime: {
           startTime: micros("2026-10-07T03:30:00Z"),
@@ -432,7 +432,7 @@ describe("DateTime calendar", () => {
     });
 
     it("previews a clicked day with the same next-midnight end it applies", async () => {
-      createWrapper({ autoApply: true });
+      createWrapper({});
       await flushPromises();
       await openMenu();
 
@@ -451,7 +451,7 @@ describe("DateTime calendar", () => {
     });
 
     it("drops a half-picked day on Escape and stays in the calendar, then returns to the list", async () => {
-      createWrapper({ autoApply: true });
+      createWrapper({});
       await flushPromises();
       await openMenu();
       wrapper!.vm.openCalendar();
@@ -477,7 +477,7 @@ describe("DateTime calendar", () => {
     });
 
     it("turns a single day clicked from a relative range into that whole day", async () => {
-      createWrapper({ autoApply: true });
+      createWrapper({});
       await flushPromises();
       await openMenu();
 
@@ -495,7 +495,7 @@ describe("DateTime calendar", () => {
     });
 
     it("spans whole days for a two-click range picked from a relative range", async () => {
-      createWrapper({ autoApply: true });
+      createWrapper({});
       await flushPromises();
       await openMenu();
 
@@ -517,7 +517,6 @@ describe("DateTime calendar", () => {
 
     it("starts a clicked day at 00:00 even when the absolute range had other times (V2)", async () => {
       createWrapper({
-        autoApply: true,
         defaultType: "absolute",
         defaultAbsoluteTime: {
           startTime: micros("2026-10-06T03:45:00Z"),
@@ -540,7 +539,7 @@ describe("DateTime calendar", () => {
     });
 
     it("shows a picked day's end as 23:59 in the End field, like the label, and applies the whole day", async () => {
-      createWrapper({ autoApply: false });
+      createWrapper({});
       await flushPromises();
       await openMenu();
 
@@ -567,7 +566,7 @@ describe("DateTime calendar", () => {
     };
 
     it("takes a click on today from a relative range as today so far", async () => {
-      createWrapper({ autoApply: true });
+      createWrapper({});
       await flushPromises();
       await openMenu();
 
@@ -585,7 +584,6 @@ describe("DateTime calendar", () => {
 
     it("starts a range from a click on the applied single day", async () => {
       createWrapper({
-        autoApply: true,
         defaultType: "absolute",
         defaultAbsoluteTime: {
           startTime: micros("2026-10-03T18:30:00Z"),
@@ -615,7 +613,6 @@ describe("DateTime calendar", () => {
 
     it("stages the whole clicked day when the kept times would run backwards on it", async () => {
       createWrapper({
-        autoApply: true,
         defaultType: "absolute",
         defaultAbsoluteTime: {
           startTime: micros("2026-10-06T14:30:00Z"),
@@ -643,7 +640,6 @@ describe("DateTime calendar", () => {
 
     it("restores the kept times when a staged whole day closes without Apply", async () => {
       createWrapper({
-        autoApply: false,
         defaultType: "absolute",
         defaultAbsoluteTime: {
           startTime: micros("2026-10-06T14:30:00Z"),
@@ -673,8 +669,7 @@ describe("DateTime calendar", () => {
       input.dispatchEvent(new Event("change", { bubbles: true }));
       await flushPromises();
     };
-    const absoluteProps = (autoApply: boolean) => ({
-      autoApply,
+    const absoluteProps = (_autoApply?: boolean) => ({
       defaultType: "absolute",
       defaultAbsoluteTime: {
         startTime: micros("2026-10-06T07:00:00Z"),
@@ -733,7 +728,6 @@ describe("DateTime calendar", () => {
 
     it("stops a moved End at now", async () => {
       createWrapper({
-        autoApply: true,
         defaultType: "absolute",
         defaultAbsoluteTime: {
           startTime: micros("2026-10-08T00:30:00Z"),
@@ -755,7 +749,6 @@ describe("DateTime calendar", () => {
 
     it("refuses a Start in the future and says so", async () => {
       createWrapper({
-        autoApply: true,
         defaultType: "absolute",
         defaultAbsoluteTime: {
           startTime: micros("2026-10-08T00:30:00Z"),
@@ -841,7 +834,7 @@ describe("DateTime calendar", () => {
     });
 
     it("keeps the fields on the resolved range when the clock moves on", async () => {
-      createWrapper({ autoApply: true });
+      createWrapper({});
       await flushPromises();
       await openMenu();
       expect(wrapper!.vm.selectedTime).toMatchObject({
@@ -863,7 +856,7 @@ describe("DateTime calendar", () => {
 
   describe("one selection", () => {
     it("shows the applied calendar range in the Absolute column on open and applies nothing", async () => {
-      createWrapper({ autoApply: true, defaultRelativeTime: "calendar:day:0" });
+      createWrapper({ defaultRelativeTime: "calendar:day:0" });
       await flushPromises();
       const emitsBefore = (wrapper!.emitted("on:date-change") ?? []).length;
       await openMenu();
@@ -881,7 +874,7 @@ describe("DateTime calendar", () => {
     });
 
     it("keeps typed times while the clock ticks", async () => {
-      createWrapper({ autoApply: true, defaultRelativeTime: "calendar:day:0" });
+      createWrapper({ defaultRelativeTime: "calendar:day:0" });
       await flushPromises();
       await openMenu();
 
@@ -896,7 +889,7 @@ describe("DateTime calendar", () => {
     });
 
     it("keeps the exact period end when the zone changes while the seeded fields are shown", async () => {
-      createWrapper({ autoApply: false, defaultRelativeTime: "calendar:month:-1" });
+      createWrapper({ defaultRelativeTime: "calendar:month:-1" });
       await flushPromises();
       await openMenu();
 
@@ -908,7 +901,7 @@ describe("DateTime calendar", () => {
     });
 
     it("applies the edited seeded range on Apply, not while it is edited (V1)", async () => {
-      createWrapper({ autoApply: true, defaultRelativeTime: "calendar:month:-1" });
+      createWrapper({ defaultRelativeTime: "calendar:month:-1" });
       await flushPromises();
       await openMenu();
       expect(wrapper!.vm.selectedDate).toEqual({ from: "2026/09/01", to: "2026/09/30" });
@@ -932,7 +925,7 @@ describe("DateTime calendar", () => {
 
   describe("shift arrows on an auto-applied picker", () => {
     it("steps a calendar period back and forward, › off only at the current period", async () => {
-      createWrapper({ autoApply: true, defaultRelativeTime: "calendar:month:-1" });
+      createWrapper({ defaultRelativeTime: "calendar:month:-1" });
       await flushPromises();
       expect(el("date-time-prev-btn")?.disabled).toBe(false);
       expect(el("date-time-next-btn")?.disabled).toBe(false);
@@ -954,7 +947,6 @@ describe("DateTime calendar", () => {
       ["next", "2026-10-04T18:30:00Z", "2026-10-05T18:30:00Z"],
     ])("steps a whole day by a whole day with %s", async (direction, start, end) => {
       createWrapper({
-        autoApply: true,
         defaultType: "absolute",
         defaultAbsoluteTime: {
           startTime: micros("2026-10-03T18:30:00Z"),
@@ -975,7 +967,6 @@ describe("DateTime calendar", () => {
 
     it("steps a two-day range back by two whole days", async () => {
       createWrapper({
-        autoApply: true,
         defaultType: "absolute",
         defaultAbsoluteTime: {
           startTime: micros("2026-10-02T18:30:00Z"),
@@ -999,7 +990,6 @@ describe("DateTime calendar", () => {
 
     it("shifts a short window that starts at midnight today by its own length, not a whole day", async () => {
       createWrapper({
-        autoApply: true,
         defaultType: "absolute",
         defaultAbsoluteTime: {
           startTime: micros("2026-10-07T18:30:00Z"),
@@ -1020,7 +1010,6 @@ describe("DateTime calendar", () => {
 
     it("refuses a whole-day step longer than the page's query-range limit", async () => {
       createWrapper({
-        autoApply: true,
         queryRangeRestrictionInHour: 24,
         queryRangeRestrictionMsg: "Max 24 hours",
         defaultType: "absolute",
@@ -1063,7 +1052,6 @@ describe("DateTime calendar", () => {
 
     it("steps Next from yesterday to today so far, and Prev back to yesterday", async () => {
       createWrapper({
-        autoApply: true,
         defaultType: "absolute",
         defaultAbsoluteTime: {
           startTime: micros("2026-10-06T18:30:00Z"),
@@ -1092,7 +1080,7 @@ describe("DateTime calendar", () => {
     });
 
     it("ends a click on today at now, as the Today row does", async () => {
-      createWrapper({ autoApply: false });
+      createWrapper({});
       await flushPromises();
       await openMenu();
 
@@ -1115,7 +1103,7 @@ describe("DateTime calendar", () => {
     });
 
     it("ends a two-click range that reaches today at now", async () => {
-      createWrapper({ autoApply: true });
+      createWrapper({});
       await flushPromises();
       await openMenu();
 

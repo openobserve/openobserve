@@ -1483,10 +1483,10 @@ describe("ViewDashboard", () => {
       vi.useRealTimers();
     });
 
-    it("turns the calendar presets on for the header picker", async () => {
+    it("runs the header picker as a dashboard host, which offers calendar periods", async () => {
       await mountWithPicker();
       const picker = wrapper.findComponent({ name: "DateTimePickerDashboard" });
-      expect(picker.props("calendarPresets")).toBe(true);
+      expect(picker.props("preset")).toBe("dashboard");
     });
 
     it("reads a calendar token from the URL period and writes it back", async () => {

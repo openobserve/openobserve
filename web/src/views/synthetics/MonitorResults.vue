@@ -42,8 +42,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @update:model-value="onEnvScopeChange(String($event))"
       />
       <DateTime
+        preset="explorer-auto"
+        :capabilities="{ kinds: ['rolling', 'fixed'] }"
         ref="dateTimeRef"
-        auto-apply
         menu-align="end"
         :default-type="timeState.valueType"
         :default-absolute-time="{

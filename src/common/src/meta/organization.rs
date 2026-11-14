@@ -542,6 +542,12 @@ pub struct OrganizationSettingPayload {
     pub red_insights_enabled: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ai_rca_thread_tool_output: Option<bool>,
+    /// `0` clears it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fiscal_year_start_month: Option<u32>,
+    /// `0` turns the guard off.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub range_guard_days: Option<u32>,
     #[cfg(feature = "enterprise")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub claim_parser_function: Option<String>,
@@ -604,6 +610,12 @@ pub struct OrganizationSetting {
     /// Show raw tool input and output in incident investigation threads.
     #[serde(default)]
     pub ai_rca_thread_tool_output: bool,
+    /// Month the fiscal year starts in, 1 to 12; `0` until an admin sets it, and `FY` is not read.
+    #[serde(default)]
+    pub fiscal_year_start_month: u32,
+    /// Ask before running time ranges longer than this many days; `0` is off.
+    #[serde(default)]
+    pub range_guard_days: u32,
     /// Set through the Security case settings route, which checks the Security grant.
     #[cfg(feature = "enterprise")]
     #[serde(default)]
@@ -666,6 +678,8 @@ impl Default for OrganizationSetting {
             usage_stream_enabled: default_usage_stream_enabled(),
             red_insights_enabled: false,
             ai_rca_thread_tool_output: false,
+            fiscal_year_start_month: 0,
+            range_guard_days: 0,
             #[cfg(feature = "enterprise")]
             security_cases: Default::default(),
             #[cfg(feature = "enterprise")]
@@ -1526,6 +1540,8 @@ mod tests {
             usage_stream_enabled: None,
             red_insights_enabled: None,
             ai_rca_thread_tool_output: None,
+            fiscal_year_start_month: None,
+            range_guard_days: None,
             #[cfg(feature = "enterprise")]
             claim_parser_function: None,
             #[cfg(feature = "enterprise")]
@@ -1614,6 +1630,8 @@ mod tests {
             usage_stream_enabled: false,
             red_insights_enabled: false,
             ai_rca_thread_tool_output: false,
+            fiscal_year_start_month: 0,
+            range_guard_days: 0,
             #[cfg(feature = "enterprise")]
             security_cases: Default::default(),
             #[cfg(feature = "enterprise")]
@@ -1658,6 +1676,8 @@ mod tests {
             usage_stream_enabled: false,
             red_insights_enabled: false,
             ai_rca_thread_tool_output: false,
+            fiscal_year_start_month: 0,
+            range_guard_days: 0,
             #[cfg(feature = "enterprise")]
             security_cases: Default::default(),
             #[cfg(feature = "enterprise")]

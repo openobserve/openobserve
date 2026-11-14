@@ -119,7 +119,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #toolbar-trailing>
           <div class="flex items-center gap-1.5">
             <DateTime
-              auto-apply
+              preset="explorer-auto"
+              :capabilities="{ kinds: ['rolling', 'fixed'] }"
               menu-align="end"
               :default-type="range.type"
               :default-absolute-time="{ startTime: range.startTime, endTime: range.endTime }"

@@ -18,6 +18,7 @@ import { gt } from "@/types/i18n";
 import {
   buildCalendarToken,
   describePeriod,
+  resolveCalendarPeriodBounds,
   formatCalendarLabel,
   formatCalendarTooltip,
   parseCalendarToken,
@@ -432,6 +433,28 @@ describe("calendarPeriods", () => {
       const r = resolveCalendarPeriod("calendar:day:0", "UTC");
       expect(r).not.toBeNull();
       expect(Math.abs((r?.endTime ?? 0) / 1000 - Date.now())).toBeLessThan(1000);
+    });
+  });
+
+  describe("resolveCalendarPeriodBounds", () => {
+    const iso = (token: string, zone = IST) => {
+      const range = resolveCalendarPeriodBounds(token, zone, NOW, 1);
+      return (
+        range && [range.startTime, range.endTime].map((us) => new Date(us / 1000).toISOString())
+      );
+    };
+
+    it.each([
+      ["calendar:day:0", "2026-10-07T18:30:00.000Z", "2026-10-08T18:30:00.000Z"],
+      ["calendar:quarter:0", "2026-09-30T18:30:00.000Z", "2026-12-31T18:30:00.000Z"],
+      ["calendar:year:0", "2025-12-31T18:30:00.000Z", "2026-12-31T18:30:00.000Z"],
+      ["calendar:month:-1", "2026-08-31T18:30:00.000Z", "2026-09-30T18:30:00.000Z"],
+    ])("resolves %s to the whole period, even while it runs", (token, start, end) => {
+      expect(iso(token)).toEqual([start, end]);
+    });
+
+    it("refuses a token it cannot read", () => {
+      expect(resolveCalendarPeriodBounds("calendar:hour:0", IST, NOW)).toBeNull();
     });
   });
 

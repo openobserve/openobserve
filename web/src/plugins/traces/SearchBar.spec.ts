@@ -351,13 +351,13 @@ const sharedStubs = {
   DateTime: {
     template: '<div data-test="logs-search-bar-date-time-dropdown" />',
     props: {
-      autoApply: null,
+      preset: null,
+      capabilities: null,
       defaultType: null,
       defaultAbsoluteTime: null,
       defaultRelativeTime: null,
       queryRangeRestrictionInHour: null,
       queryRangeRestrictionMsg: null,
-      calendarPresets: Boolean,
     },
     emits: ["on:date-change", "on:timezone-change"],
     setup() {
@@ -707,14 +707,15 @@ describe("SearchBar", () => {
     );
 
     it.each(["service-graph", "services-catalog"])(
-      "keeps a shared calendar range on the %s picker by offering calendar presets",
+      "keeps a shared calendar range on the %s picker by allowing calendar ranges",
       async (mode) => {
         searchObjInstance.meta.searchMode = mode;
         wrapper = mountSearchBar();
         await flushPromises();
 
         const picker = wrapper.findComponent(`[data-test="${mode}-date-time-picker"]`);
-        expect(picker.props("calendarPresets")).toBe(true);
+        expect(picker.props("preset")).toBe("explorer-manual");
+        expect(picker.props("capabilities")?.kinds ?? ["calendar"]).toContain("calendar");
       },
     );
 

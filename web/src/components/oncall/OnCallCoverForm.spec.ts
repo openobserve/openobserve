@@ -737,7 +737,10 @@ describe("OnCallCoverForm — taking a cover", () => {
     expect(field.attributes("data-test-type")).toBe("absolute");
     // And the reader cannot choose one either: there is no forward-looking
     // reading of "Past 30 Minutes" to offer here.
-    expect(field.attributes("disable-relative")).toBeDefined();
+    expect(wrapper.findComponent({ name: "OFormDateTimeRange" }).vm.$attrs.capabilities).toEqual({
+      kinds: ["fixed"],
+      future: true,
+    });
   });
 
   /// Measured on a real save: window 15:56 → 16:26, created at 16:27 — expired

@@ -1301,11 +1301,12 @@ function widenTo(period: string) {
     <template #actions>
       <div class="flex items-center gap-2">
         <DateTime
+          preset="explorer-auto"
+          :capabilities="{ kinds: ['rolling', 'fixed'] }"
           :key="dateKey"
           :default-type="dateState.type"
           :default-relative-time="dateState.period || '15m'"
           :default-absolute-time="dateState.absolute ?? undefined"
-          :auto-apply="true"
           data-test="security-events-datetime"
           @on:date-change="onDateChange"
         />

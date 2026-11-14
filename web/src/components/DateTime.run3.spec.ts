@@ -33,7 +33,7 @@ describe("DateTime QA run 3", () => {
 
   const createWrapper = (props: Record<string, unknown> = {}) => {
     wrapper = mount(DateTime, {
-      props: { autoApply: true, calendarPresets: true, ...props },
+      props: { ...props },
       attachTo: document.body,
       global: { plugins: [i18n, store] },
     });
@@ -218,7 +218,7 @@ describe("DateTime QA run 3", () => {
 
   describe("D-EMPTY", () => {
     it("shows the examples when there are no calendar rows and nothing recent", async () => {
-      createWrapper({ calendarPresets: false });
+      createWrapper({ capabilities: { kinds: ["rolling", "fixed"] } });
       await openMenu();
 
       expect(el("date-time-list-heading")!.textContent).toContain("No match yet");
@@ -230,7 +230,7 @@ describe("DateTime QA run 3", () => {
 
   describe("D-UNDO", () => {
     it("marks the undo of a drag-zoom so the page runs the range it returns to", async () => {
-      createWrapper({ defaultRelativeTime: "1h", undoable: true });
+      createWrapper({ defaultRelativeTime: "1h" });
       await flushPromises();
       wrapper!.vm.setCustomDate("absolute", {
         start: Date.parse("2026-11-12T15:00:00Z"),
@@ -244,8 +244,8 @@ describe("DateTime QA run 3", () => {
       expect(lastEmit()).toMatchObject({ relativeTimePeriod: "1h", rerun: true });
     });
 
-    it("leaves a plain step undo unmarked", async () => {
-      createWrapper({ defaultRelativeTime: "1h", undoable: true });
+    it("leaves the undo of a step unmarked on explorer-manual when nothing had run", async () => {
+      createWrapper({ defaultRelativeTime: "1h", preset: "explorer-manual" });
       await flushPromises();
       wrapper!.vm.shiftTimeRange("prev");
       await flushPromises();

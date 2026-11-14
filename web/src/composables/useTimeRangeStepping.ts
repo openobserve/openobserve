@@ -33,6 +33,7 @@ import { convertToUtcTimestamp } from "@/utils/zincutils";
 import { exceedsRangeRestriction } from "@/utils/timeRangeRail";
 import { formatRangeDuration, formatRangeLabel } from "@/utils/timeRangeLabel";
 import { popUndoStep, pushUndoStep, type TimeRangeUndoStep } from "@/utils/timeRangeUndo";
+import type { TimeRangeApplyMeta } from "@/utils/timeRangeModel";
 import { registerShortcuts } from "@/lib/vue-shortcut-manager/composables";
 import { getManager } from "@/lib/vue-shortcut-manager/manager";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -53,7 +54,6 @@ let shortcutPickers: { token: symbol; act: Record<string, () => void> }[] = [];
 let boundShortcuts: { manager: unknown; release: () => void } | null = null;
 
 export interface TimeRangeSteppingProps {
-  autoApply: boolean;
   disable: boolean;
   disableRelative: boolean;
   disablePrevShift: boolean;
@@ -98,8 +98,21 @@ export interface TimeRangeSteppingDeps {
   >;
   normalizedCount: () => number;
   largestExactUnit: (unit: string, value: number) => [string, number];
-  setRelativeDate: (period: string, value: number, commit?: boolean) => void;
-  saveDate: (dateType?: string | null, rerun?: boolean) => void;
+  setRelativeDate: (
+    period: string,
+    value: number,
+    commit?: boolean,
+    source?: TimeRangeApplyMeta["source"],
+  ) => void;
+  saveDate: (
+    dateType?: string | null,
+    rerun?: boolean,
+    source?: TimeRangeApplyMeta["source"],
+  ) => void;
+  // Whether the applied range had been run, so undoing back to it runs it again.
+  appliedRan: () => boolean;
+  // The applied fixed range's instants; the selection may already hold a newer pick.
+  appliedBounds: () => PickerRange | null;
   getConsumableDateTime: () => PickerRange;
   openMenu: () => void;
   // Closes the open panel as a user dismissal does, so listeners waiting on hide still run.
@@ -170,10 +183,12 @@ export default function useTimeRangeStepping(
   };
 
   // The step names what the trigger showed, so the undo tooltip reads the range it returns to.
-  const captureUndo = (ran = false) => {
+  const captureUndo = (ran: boolean = deps.appliedRan()) => {
     if (!props.undoable || props.hideRangeShift) return;
-    const { startTime, endTime } = getConsumableDateTime();
     const applied = deps.appliedSelection();
+    const { startTime, endTime } =
+      (applied.selectedType === "absolute" ? deps.appliedBounds() : null) ??
+      getConsumableDateTime();
     const step = {
       label: String(deps.triggerLabel.value),
       selectedType: applied.selectedType,
@@ -204,7 +219,7 @@ export default function useTimeRangeStepping(
       fields.writeAbsoluteFields(step.startUs, step.endUs);
       fields.holdUnshownInstants(step.startUs, step.endUs);
     }
-    saveDate(step.selectedType, step.ran === true);
+    saveDate(step.selectedType, step.ran === true, "undo");
     closeMenu();
     deps.onUndo(step);
   };
@@ -245,7 +260,7 @@ export default function useTimeRangeStepping(
     selectedDate.value.to = end.date;
     selectedTime.value.endTime = end.time;
     fields.forgetSeededEnd();
-    saveDate("absolute");
+    saveDate("absolute", false, "step");
     closeMenu();
     return true;
   };
@@ -261,7 +276,7 @@ export default function useTimeRangeStepping(
     calendarToken.value = null;
     relativePeriod.value = origin.relativePeriod;
     relativeValue.value = origin.relativeValue;
-    saveDate("relative");
+    saveDate("relative", false, "step");
     closeMenu();
     return true;
   };
@@ -280,7 +295,7 @@ export default function useTimeRangeStepping(
     }
     captureUndo();
     calendarToken.value = shifted;
-    saveDate("relative");
+    saveDate("relative", false, "step");
     closeMenu();
   };
 
@@ -306,7 +321,7 @@ export default function useTimeRangeStepping(
     // Written as instants, so the sub-second bounds the fields cannot show move with the range.
     fields.writeInstants(startTime + delta, endTime + delta);
     selectedType.value = "absolute";
-    saveDate("absolute");
+    saveDate("absolute", false, "step");
     closeMenu();
   };
 
@@ -338,10 +353,10 @@ export default function useTimeRangeStepping(
       span = restrictionLimitMicros();
     }
     const [unit, value] = toRelativeUnit(span);
-    clearUndo();
     pendingDay.value = null;
     // Live has no Apply step on any picker, and an uncommitted pick would be undone when the panel closes.
-    deps.setRelativeDate(unit, Math.min(value, MAX_CUSTOM_RELATIVE_VALUE[unit]), true);
+    deps.setRelativeDate(unit, Math.min(value, MAX_CUSTOM_RELATIVE_VALUE[unit]), true, "live");
+    closeMenu();
   };
 
   const zoomOutRelative = () => {
@@ -362,7 +377,7 @@ export default function useTimeRangeStepping(
     calendarToken.value = null;
     relativePeriod.value = next[0];
     relativeValue.value = next[1];
-    saveDate("relative");
+    saveDate("relative", false, "zoom-out");
     closeMenu();
   };
 
@@ -388,7 +403,7 @@ export default function useTimeRangeStepping(
     fields.writeInstants(start, end);
     selectedType.value = "absolute";
     calendarToken.value = null;
-    saveDate("absolute");
+    saveDate("absolute", false, "zoom-out");
     closeMenu();
   };
 
@@ -408,13 +423,16 @@ export default function useTimeRangeStepping(
     else zoomOutAbsolute();
   };
 
-  const showUndo = computed(
-    () => props.undoable && !props.hideRangeShift && undoStack.value.length > 0,
-  );
+  // Undo keeps a fixed slot in the group, so the group never shifts when it becomes available.
+  const showUndo = computed(() => props.undoable && !props.hideRangeShift);
+  const undoAvailable = computed(() => undoStack.value.length > 0);
 
   const undoTooltip = computed(() => {
     const top = undoStack.value[undoStack.value.length - 1];
-    return top ? t("dateTime.backTo", { range: top.label }) : t("dateTime.undo");
+    if (!top) return t("dateTime.nothingToUndo");
+    return top.ran
+      ? t("dateTime.backToRuns", { range: top.label })
+      : t("dateTime.backTo", { range: top.label });
   });
 
   const liveDurationLabel = computed(() => {
@@ -458,7 +476,7 @@ export default function useTimeRangeStepping(
 
   const shortcutToken = Symbol("date-time");
   const takesShortcuts = computed(
-    () => props.shortcuts && !props.hideRangeShift && !props.disableRelative,
+    () => props.shortcuts && props.undoable && !props.hideRangeShift && !props.disableRelative,
   );
   const shortcutActions: Record<string, () => void> = {
     open: () => deps.openMenu(),
@@ -503,6 +521,7 @@ export default function useTimeRangeStepping(
     zoomOut,
     zoomOutBlocked,
     showUndo,
+    undoAvailable,
     undoTooltip,
     liveDurationLabel,
     stepTooltip,

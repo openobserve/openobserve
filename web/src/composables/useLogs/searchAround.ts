@@ -25,7 +25,7 @@ import useStreamFields from "@/composables/useLogs/useStreamFields";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { STREAM_NAME_FIELD } from "@/utils/logs/streamNameColumn";
 import { useLogsAutoRun } from "@/composables/useLogs/logsAutoRun";
-import { WINDOW_QUERY_VIEWS } from "@/utils/searchAroundWindow";
+import { WINDOW_QUERY_VIEWS, type WindowQuery } from "@/utils/searchAroundWindow";
 import {
   bindSeverityRequest,
   type SeverityRequestSnapshot,
@@ -340,7 +340,10 @@ export const useSearchAround = () => {
 
   // Like the records path, only the request drops the filter; unparsable SQL runs as typed.
   // A dirty editor's next Run must send what it shows, and other views never read the query.
-  const armWindowQuery = (range: { startUs: number; endUs: number }): void => {
+  const armWindowQuery = (
+    range: { startUs: number; endUs: number },
+    context: Pick<WindowQuery, "anchorUs" | "seconds" | "previous"> = {},
+  ): void => {
     const view = String(searchObj.meta.logsVisualizeToggle ?? "");
     const query =
       searchObj.meta.editorDirty || !WINDOW_QUERY_VIEWS.includes(view)
@@ -358,6 +361,7 @@ export const useSearchAround = () => {
             startUs: range.startUs,
             endUs: range.endUs,
             pinned: false,
+            ...context,
           };
   };
 

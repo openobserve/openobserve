@@ -39,6 +39,8 @@ export interface AbsoluteRangeResult {
   fiscalStartMonth?: number;
   /** The day/month order of a reading offered against the locale's own order. */
   readAs?: "monthDay" | "dayMonth";
+  /** A listed reading that starts after now, shown greyed. */
+  future?: boolean;
 }
 
 export interface TimestampRangeResult {
@@ -63,6 +65,16 @@ export type ParsedDateRange = AbsoluteRangeResult | TimestampRangeResult;
 export type EpochUnit = "s" | "ms" | "µs" | "ns";
 
 export type ParseFailureReason = "unreadable" | "future" | "reversed";
+
+/** Text answered without a range: future, reversed, a comparison, or `FY` before the org sets its start. */
+export type TimeTextAnswer = "future" | "reversed" | "compare" | "fiscalUnset";
+
+/** Every reading of typed text, preferred first; `ambiguous` text has no cursor and Enter waits for a pick. */
+export interface TimeTextReading {
+  readings: ParsedTimeInput[];
+  ambiguous: boolean;
+  answer?: TimeTextAnswer;
+}
 
 /** A civil time in a zone: a skipped time moves forward by the gap; a repeated time has two instants, the earlier first. */
 export type ZonedCivil =
@@ -100,6 +112,8 @@ export interface TimeInputOptions {
   weekStart?: WeekDay;
   /** Latest instant (ms) the picker accepts; past now, a yearless date may read as the coming one. */
   ceilingMs?: number;
+  /** The org's fiscal year start (1 = January); unset, `FY` is not read (O4). */
+  fiscalStartMonth?: number | null;
 }
 
 // `implied` marks the UTC frame a pasted instant is read in, which the text never wrote as a zone.
@@ -118,6 +132,7 @@ interface ParseContext {
   zoneOverride?: Zone;
   weekStart: WeekDay;
   keepFuture: boolean;
+  fiscalStartMonth: number | null;
   seen: {
     dayMonth: boolean;
     meridiem: boolean;
@@ -141,9 +156,7 @@ interface Clock {
 }
 
 type DaySpec =
-  | { kind: "date"; year?: number; month: number; day?: number }
-  | { kind: "shift"; days: number }
-  | { kind: "weekday"; weekday: number; strict: boolean };
+  { kind: "date"; year?: number; month: number; day?: number } | { kind: "shift"; days: number };
 
 interface PointSpec {
   day?: DaySpec;
@@ -214,8 +227,6 @@ const SPACED_DASH = /\s+-\s+/;
 const RANGE_SEPARATORS = [/\s+to\s+/i, /\s*[–—]\s*/, SPACED_DASH, /\s*\/\s*/, BARE_DASH];
 // After a dash, a bare HH:MM reads as much as a negative UTC offset as an end time.
 const OFFSET_LIKE_END_RE = /^\d{2}:\d{2}$/;
-// "last day" names yesterday, as "last week" names the previous week.
-const CALENDAR_WORD_ALIASES: Record<string, string> = { "last-day": "yesterday" };
 const MONTH_INDEX: Record<string, string> = {
   jan: "01",
   feb: "02",
@@ -278,7 +289,6 @@ const EXTRA_CALENDAR_WORDS: Record<string, string> = {
   "this year": "calendar:year:0",
   "last year": "calendar:year:-1",
   "previous year": "calendar:year:-1",
-  "previous day": "calendar:day:-1",
   "previous week": "calendar:week:-1",
   "previous month": "calendar:month:-1",
   "previous quarter": "calendar:quarter:-1",
@@ -298,10 +308,10 @@ const EXTRA_CALENDAR_WORDS: Record<string, string> = {
 };
 // Snap grammar: `now-1d/d` names a whole unit, `-1d@d+9h` a start that runs to now; `M` is months.
 const SNAP_POINT_RE =
-  /^(now)?((?:\s*[+-]\s*\d{1,6}\s*[smhdwMy])*)(?:\s*([/@])\s*([smhdwMy]))?((?:\s*[+-]\s*\d{1,6}\s*[smhdwMy])*)$/;
+  /^(now)?((?:\s*[+-]\s*\d{1,6}\s*[smhdwMy])?)(?:\s*([/@])\s*([smhdwMy]))?((?:\s*[+-]\s*\d{1,6}\s*[smhdwMy])?)$/;
 const SNAP_OFFSET_RE = /([+-])\s*(\d{1,6})\s*([smhdwMy])/g;
 const SNAP_CALENDAR_UNITS: Record<string, string> = { d: "day", w: "week", M: "month", y: "year" };
-const BARE_COUNT_UNITS = ["m", "h", "d", "w", "M"];
+const BARE_COUNT_UNITS = ["m", "h", "d"];
 const DAY_CLOCK_TEXT = String.raw`\d{1,2}(?::\d{2})?(?:\s*[ap]m)?`;
 const DAY_CLOCK_ZONE_TEXT = String.raw`(?:utc|gmt)(?:\s*[+-]\d{1,2}(?::?\d{2})?)?|z|[a-z]{2,5}|[a-z]+(?:/[\w+-]+)+`;
 const DAY_CLOCK_RANGE_RE = new RegExp(
@@ -310,11 +320,6 @@ const DAY_CLOCK_RANGE_RE = new RegExp(
 );
 // A capital M is months by case only, so `15M` always asks with months first.
 const CAPITAL_MONTHS_RE = /^(\d{1,6})\s*M$/;
-const AGO_CALENDAR_UNITS: Partial<Record<Duration["unit"], string>> = {
-  w: "week",
-  M: "month",
-  y: "year",
-};
 const WEEKDAYS = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
 const MONTH_NAMES = [
   ...["january", "february", "march", "april", "may", "june", "july", "august"],
@@ -332,10 +337,18 @@ export const MAX_ROLLING_VALUE: Readonly<Record<"s" | "m" | "h" | "d" | "w" | "M
 const QUARTER_RE = /^q([1-4])(?:\s*(\d{4}))?$|^(\d{4})\s*q([1-4])$/i;
 const HALF_RE = /^h([12])(?:\s*(\d{4}))?$|^(\d{4})\s*h([12])$/i;
 const FISCAL_RE = /^fy\s*(\d{2}|\d{4})$/i;
+const FISCAL_WORDS_RE = /^(this|last|previous)\s+fiscal\s+year$/i;
+const MONTH_PERIOD_RE = /^([a-z]+)\.?(?:\s+(\d{4}))?$/i;
+// `X vs Y` and `compare X with Y` are answered with both periods as rows (O5).
+const COMPARE_RE =
+  /^(.+?)\s+(?:vs\.?|versus|compared\s+(?:to|with))\s+(.+)$|^compare\s+(.+?)\s+(?:with|to|and|vs\.?)\s+(.+)$/i;
+const COMPARE_WORD_RE = /^compare\b/i;
+const NEXT_PERIOD_RE = /^next\s+(?:\d+\s*)?[a-z]+$/i;
+// `9-17` with no day: hours of today or yesterday, never a guess between them.
+const BARE_HOURS_RE = /^(\d{1,2})\s*(?:-|–|—|to)\s*(\d{1,2})$/i;
+const ALONE_WORDS_RE = /^(?:now|live)$/i;
 const BARE_YEAR_RE = /^\d{4}$/;
 const FIRST_BARE_YEAR = 1999;
-// Until an org setting exists the fiscal year is the calendar year.
-const FISCAL_START_MONTH = 1;
 // Copied live text is `<name> (<dates zone>)`; the name is what moves with now.
 const NAMED_COPY_RE = /^(.+?)\s*\((.+)\)$/;
 // Zero code points of the decimal digit sets people type in; each set runs zero to nine.
@@ -416,9 +429,9 @@ const TYPO_VOCABULARY: Record<string, string> = Object.fromEntries(
   [
     ...["second", "seconds", "secs", "minute", "minutes", "mins", "hour", "hours", "days"],
     ...["week", "weeks", "month", "months", "year", "years", "fortnight", "half"],
-    ...["today", "yesterday", "since", "between", "from", "last", "past", "previous", "this"],
+    ...["today", "yesterday", "since", "from", "last", "past", "previous", "this"],
     ...["noon", "midnight", "morning", "afternoon", "evening", "night", "tonight", "until"],
-    ...["till", "through", "before", "date", "quarter", ...WEEKDAYS, "tues", "thur", "thurs"],
+    ...["till", "through", "before", "date", "quarter", "fiscal"],
     ...["january", "february", "march", "april", "june", "july", "august", "september"],
     ...["sept", "october", "november", "december"],
   ].map((word) => [word, word]),
@@ -436,48 +449,32 @@ export function parseTimeInput(raw: string, opts?: TimeInputOptions): ParsedTime
   return readTimeInput(raw, createContext(opts));
 }
 
-/** The alternative readings of ambiguous text (bare number, day/month order, 12-hour time, letter zone), preferred first; [] when unambiguous. */
+/** The alternative readings of text with more than one, preferred first; [] when it has one or none. */
 export function suggestTimeInput(raw: string, opts?: TimeInputOptions): ParsedTimeInput[] {
+  const { readings } = suggestReadings(raw, opts);
+  return readings.length > 1 ? readings : [];
+}
+
+/** The grammar's whole answer for typed text: its readings, whether it must ask, or why it is not a range. */
+export function readTimeText(raw: string, opts?: TimeInputOptions): TimeTextReading {
   const text = cleanInput(raw);
-  if (/^\d{1,6}$/.test(text) && Number(text) >= 1) {
-    const counts: ParsedTimeInput[] = BARE_COUNT_UNITS.map((unit) => ({
-      type: "relative",
-      period: `${Number(text)}${unit}`,
-    }));
-    const year = readBusinessPeriod(text, createContext(opts));
-    return year ? [year, ...counts] : counts;
+  const none: TimeTextReading = { readings: [], ambiguous: false };
+  if (!text) return none;
+  const compared = readComparison(text, opts);
+  if (compared) return compared;
+  if (validMonth(opts?.fiscalStartMonth) === null && isFiscalText(text)) {
+    return { ...none, answer: "fiscalUnset" };
   }
-  const months = text.match(CAPITAL_MONTHS_RE);
-  if (months && Number(months[1]) >= 1) {
-    const count = Number(months[1]);
-    return [
-      { type: "relative", period: `${count}M` },
-      { type: "relative", period: `${count}m` },
-    ];
-  }
-  const ctx = createContext(opts);
-  const preferred = readTimeInput(raw, ctx);
-  if (ctx.seen.abbreviation) return zoneReadings(raw, opts, ctx.seen.abbreviation);
-  if (!preferred) return [];
-  const asked = askedReadings(text, preferred, opts);
-  if (asked.length) return asked;
-  const { dayMonth, meridiem } = ctx.seen;
-  const readings = [preferred];
-  if (dayMonth) {
-    const order = ctx.dayFirst ? "monthDay" : "dayMonth";
-    const flipped = readFlipped(raw, opts, { flipDayMonth: true });
-    readings.push(...flipped.map((reading) => withDayOrder(reading, order)));
-  }
-  if (meridiem) readings.push(...readFlipped(raw, opts, { flipMeridiem: true }));
-  const unique = uniqueReadings(readings);
-  return unique.length > 1 ? unique.slice(0, 4) : [];
+  const result = suggestReadings(raw, opts);
+  if (result.readings.length) return result;
+  const reason = explainTimeInputFailure(raw, opts);
+  return reason === "unreadable" ? none : { ...none, answer: reason };
 }
 
 /** `today`, `yesterday`, `last day`, `this|last week|month|quarter` → the calendar token of the rail row with that name. */
 export function parseCalendarWords(raw: string): string | null {
   const words = raw.trim().toLowerCase().replace(/\s+/g, "-");
-  const id = CALENDAR_WORD_ALIASES[words] ?? words;
-  return CALENDAR_RAIL_ITEMS.find((item) => item.id === id)?.token ?? null;
+  return CALENDAR_RAIL_ITEMS.find((item) => item.id === words)?.token ?? null;
 }
 
 /** `15m`, `15 min`, `last 2 hours`, `past week` → a rolling `<n><unit>`; `last <unit>` with no count is calendar where parseCalendarWords has that unit. */
@@ -488,7 +485,7 @@ export function parseRelativeText(raw: string): string | null {
   if (!count && !/^(last|past)\s/i.test(raw.trim())) return null;
   const unit = unitText === "M" ? "M" : RELATIVE_UNITS[unitText.toLowerCase()];
   const value = count ? Number(count.replace(/\D/g, "")) : 1;
-  if (!unit || !(value >= 1)) return null;
+  if (!unit || !(value >= 1) || !withinTenYears(value, unit)) return null;
   return `${value}${unit}`;
 }
 
@@ -506,6 +503,7 @@ export function parseSingleDateTime(raw: string): ParsedSingleDateTime | null {
 
 /** Why text did not read: only future readings, an end not after its start, or nothing at all. */
 export function explainTimeInputFailure(raw: string, opts?: TimeInputOptions): ParseFailureReason {
+  if (NEXT_PERIOD_RE.test(cleanInput(raw))) return "future";
   const ctx = createContext(opts, { keepFuture: true });
   const reading = readTimeInput(raw, ctx);
   if (reading && isWhollyFuture(reading, ctx)) return "future";
@@ -547,6 +545,99 @@ export function resolveZonedCivil(date: string, time: string, zone: string): Zon
     micros: at * 1000,
     usedTime: civilTime(new Date(wallClockOf(new Date(at), zone))),
   };
+}
+
+function suggestReadings(
+  raw: string,
+  opts?: TimeInputOptions,
+): { readings: ParsedTimeInput[]; ambiguous: boolean } {
+  const text = cleanInput(raw);
+  const asked = (readings: ParsedTimeInput[]) => ({ readings, ambiguous: readings.length > 1 });
+  if (BARE_HOURS_RE.test(text)) return asked(bareHourReadings(text, createContext(opts)));
+  if (/^\d{1,6}$/.test(text) && Number(text) >= 1) {
+    const year = readBusinessPeriod(text, createContext(opts));
+    return year ? { readings: [year], ambiguous: false } : asked(bareCounts(Number(text)));
+  }
+  const months = text.match(CAPITAL_MONTHS_RE);
+  if (months && Number(months[1]) >= 1) {
+    const count = Number(months[1]);
+    return asked([
+      { type: "relative", period: `${count}M` },
+      { type: "relative", period: `${count}m` },
+    ]);
+  }
+  const ctx = createContext(opts);
+  const preferred = readTimeInput(raw, ctx);
+  if (ctx.seen.abbreviation) return asked(zoneReadings(raw, opts, ctx.seen.abbreviation));
+  if (!preferred) return { readings: [], ambiguous: false };
+  const yearless = yearlessReadings(text, preferred, opts);
+  if (yearless) return { readings: yearless, ambiguous: false };
+  const folds = foldReadings(preferred, opts);
+  if (folds.length) return asked(folds);
+  const { dayMonth, meridiem } = ctx.seen;
+  const readings = [preferred];
+  if (dayMonth) {
+    const order = ctx.dayFirst ? "monthDay" : "dayMonth";
+    const flipped = readFlipped(raw, opts, { flipDayMonth: true });
+    readings.push(...flipped.map((reading) => withDayOrder(reading, order)));
+  }
+  // Only a day/month order asks; the other half of a 12-hour clock is listed after the most recent one.
+  const asksOrder = uniqueReadings(readings).length > 1;
+  if (meridiem) readings.push(...readFlipped(raw, opts, { flipMeridiem: true }));
+  return { readings: uniqueReadings(readings).slice(0, 4), ambiguous: asksOrder };
+}
+
+// A count that would ask for more than about ten years is not a reading.
+function bareCounts(count: number): ParsedTimeInput[] {
+  return BARE_COUNT_UNITS.filter((unit) => withinTenYears(count, unit)).map((unit) => ({
+    type: "relative",
+    period: `${count}${unit}`,
+  }));
+}
+
+function withinTenYears(value: number, unit: string): boolean {
+  const max = MAX_ROLLING_VALUE[unit as keyof typeof MAX_ROLLING_VALUE];
+  return max !== undefined && value <= max;
+}
+
+// Today's hours first, then yesterday's; one still ahead stays listed, marked future.
+function bareHourReadings(text: string, ctx: ParseContext): ParsedTimeInput[] {
+  const [, fromText, toText] = text.match(BARE_HOURS_RE) ?? [];
+  const from = Number(fromText);
+  // `9-5` is a working day: a smaller second hour is the afternoon.
+  const to =
+    from >= 1 && from <= 12 && Number(toText) < from ? Number(toText) + 12 : Number(toText);
+  const hours = `${String(from).padStart(2, "0")}:00 to ${String(to).padStart(2, "0")}:00`;
+  return ["today", "yesterday"].flatMap((day) => {
+    const dayCtx: ParseContext = {
+      ...ctx,
+      keepFuture: true,
+      seen: { dayMonth: false, meridiem: false, year: false },
+    };
+    const reading = readTimeInput(`${day} ${hours}`, dayCtx);
+    if (!reading) return [];
+    return isWhollyFuture(reading, ctx) ? [markFuture(reading)] : [reading];
+  });
+}
+
+function readComparison(text: string, opts?: TimeInputOptions): TimeTextReading | null {
+  const match = text.match(COMPARE_RE);
+  if (!match && !COMPARE_WORD_RE.test(text)) return null;
+  const sides = match ? [match[1] ?? match[3], match[2] ?? match[4]] : [];
+  const readings = sides
+    .map((side) => parseTimeInput(side, opts))
+    .filter((reading): reading is ParsedTimeInput => reading !== null);
+  return { readings, ambiguous: false, answer: "compare" };
+}
+
+function isFiscalText(text: string): boolean {
+  return FISCAL_RE.test(text) || FISCAL_WORDS_RE.test(text);
+}
+
+function validMonth(month: number | null | undefined): number | null {
+  return typeof month === "number" && Number.isInteger(month) && month >= 1 && month <= 12
+    ? month
+    : null;
 }
 
 function readRangeStamp(raw: string, seen?: ParseContext["seen"]): ParsedDateRange | null {
@@ -988,6 +1079,7 @@ function createContext(opts?: TimeInputOptions, flips: Partial<ParseContext> = {
     flipMeridiem: false,
     weekStart: opts?.weekStart ?? weekStartsOn(),
     keepFuture: false,
+    fiscalStartMonth: validMonth(opts?.fiscalStartMonth),
     ...flips,
     seen: { dayMonth: false, meridiem: false, year: false },
   };
@@ -1059,7 +1151,11 @@ function uniqueReadings(readings: ParsedTimeInput[]): ParsedTimeInput[] {
 // Text that gives a year or an instant is read as written even when it is in the future, so the caller can say so.
 function readTimeInput(raw: string, ctx: ParseContext): ParsedTimeInput | null {
   const text = cleanInput(raw);
-  if (!text) return null;
+  if (!text || ALONE_WORDS_RE.test(text)) return null;
+  if (BARE_HOURS_RE.test(text)) {
+    const hours = bareHourReadings(text, ctx);
+    return hours.find((reading) => !isWhollyFuture(reading, ctx)) ?? null;
+  }
   const pasted = normalizePasted(text);
   if (pasted.length > MAX_NATURAL_TEXT) {
     const long = readQueryString(pasted) ?? readLogPrefix(pasted);
@@ -1119,6 +1215,8 @@ function parseSnapPoint(raw: string, ctx: ParseContext): SnapPoint | null {
       amount: Number(part[2]),
       unit: part[3],
     }));
+  const counts = [...offsets(before), ...offsets(after)];
+  if (!counts.every((part) => snapWithinTenYears(part.amount, part.unit))) return null;
   let civil = ctx.nowCivil;
   for (const offset of offsets(before)) civil = shiftSnap(civil, offset);
   const snap = kind ? { kind: kind as "/" | "@", unit } : null;
@@ -1126,6 +1224,11 @@ function parseSnapPoint(raw: string, ctx: ParseContext): SnapPoint | null {
   const tail = offsets(after);
   for (const offset of tail) civil = shiftSnap(civil, offset);
   return Number.isFinite(civil) ? { civil, snap, offsets: tail } : null;
+}
+
+function snapWithinTenYears(amount: number, unit: string): boolean {
+  if (unit === "y") return withinTenYears(amount * 12, "M");
+  return withinTenYears(amount, unit);
 }
 
 function shiftSnap(civil: number, offset: SnapPoint["offsets"][number]): number {
@@ -1171,7 +1274,8 @@ function snapToken(start: SnapPoint, endCivil: number, ctx: ParseContext): strin
   if (!unit || !calendar || !Number.isFinite(start.civil)) return null;
   const current = floorCivil(ctx.nowCivil, unit, ctx.weekStart);
   const back = periodsBetween(start.civil, current, unit);
-  if (back < 0 || back > MAX_COUNT) return null;
+  // The UI makes calendar tokens of offset 0 and -1 only; older periods read as fixed.
+  if (back < 0 || back > 1) return null;
   const periodStart =
     back === 0
       ? current
@@ -1204,7 +1308,7 @@ function markYear(reading: ParsedTimeInput): ParsedTimeInput {
 }
 
 function markFuture(reading: ParsedTimeInput): ParsedTimeInput {
-  return reading.type === "timestamp" ? { ...reading, future: true } : reading;
+  return reading.type === "relative" ? reading : { ...reading, future: true };
 }
 
 // Copied live text names its range first; any other `text (…)` is read by what is inside.
@@ -1219,7 +1323,7 @@ function readNamedCopy(text: string, ctx: ParseContext): ParsedTimeInput | null 
   return readTimeInput(match[2], ctx);
 }
 
-// `Q3`, `H1 2025`, `2025`, `FY26`: whole periods, fixed, ending at the next period's start; `back` steps a yearless one back a year.
+// `Q3`, `H1 2025`, `2025`, `October`, `FY26`: whole periods, fixed, ending at the next period's start; `back` steps a yearless one back a year.
 function readBusinessPeriod(text: string, ctx: ParseContext, back = 0): AbsoluteRangeResult | null {
   const thisYear = new Date(ctx.nowCivil).getUTCFullYear();
   const quarter = text.match(QUARTER_RE);
@@ -1230,28 +1334,68 @@ function readBusinessPeriod(text: string, ctx: ParseContext, back = 0): Absolute
     const index = Number(match[1] ?? match[4]);
     const yearText = match[2] ?? match[3];
     const firstMonth = (index - 1) * months;
-    const started = Date.UTC(thisYear, firstMonth, 1) <= ctx.nowCivil ? thisYear : thisYear - 1;
-    const year = yearText ? Number(yearText) : started - back;
+    const year = yearText ? Number(yearText) : yearlessYear(firstMonth, months, ctx) - back;
     const name = `${quarter ? "Q" : "H"}${index} ${year}`;
     return wholeMonths(year, firstMonth, months, name);
   }
-  const fiscal = text.match(FISCAL_RE);
-  if (fiscal) {
-    // A two-digit fiscal year is the nearest one, as the next is often named ahead (FY27 in 2026).
-    const past = fullYear(fiscal[1], ctx);
-    const year =
-      fiscal[1].length === 2 && past + 100 - thisYear < thisYear - past ? past + 100 : past;
-    const period = wholeMonths(
-      year,
-      FISCAL_START_MONTH - 1,
-      12,
-      fiscal[0].toUpperCase().replace(/\s+/g, ""),
-    );
-    return { ...period, fiscalStartMonth: FISCAL_START_MONTH };
-  }
+  const fiscal = readFiscalYear(text, ctx);
+  if (fiscal) return fiscal;
+  const month = readMonthPeriod(text, ctx, back);
+  if (month) return month;
   const year = BARE_YEAR_RE.test(text) ? Number(text) : NaN;
   if (year >= FIRST_BARE_YEAR && year <= thisYear) return wholeMonths(year, 0, 12, String(year));
   return null;
+}
+
+// A yearless period is the latest that has started, or where the future is allowed the nearest not yet over.
+function yearlessYear(firstMonth: number, months: number, ctx: ParseContext): number {
+  const thisYear = new Date(ctx.nowCivil).getUTCFullYear();
+  if (ctx.ceilingCivil > ctx.nowCivil) {
+    const year =
+      Date.UTC(thisYear, firstMonth + months, 1) > ctx.nowCivil ? thisYear : thisYear + 1;
+    if (Date.UTC(year, firstMonth, 1) < ctx.ceilingCivil) return year;
+  }
+  return Date.UTC(thisYear, firstMonth, 1) <= ctx.nowCivil ? thisYear : thisYear - 1;
+}
+
+function readMonthPeriod(
+  text: string,
+  ctx: ParseContext,
+  back: number,
+): AbsoluteRangeResult | null {
+  const match = text.match(MONTH_PERIOD_RE);
+  const month = match ? monthIndex(match[1].toLowerCase()) : 0;
+  if (!match || !month) return null;
+  const year = match[2] ? Number(match[2]) : yearlessYear(month - 1, 1, ctx) - back;
+  const name = `${MONTH_NAMES[month - 1].slice(0, 1).toUpperCase()}${MONTH_NAMES[month - 1].slice(1, 3)} ${year}`;
+  return wholeMonths(year, month - 1, 1, name);
+}
+
+// Read only once the org sets its start (O4); a fiscal year is named by the year it ends in.
+function readFiscalYear(text: string, ctx: ParseContext): AbsoluteRangeResult | null {
+  const startMonth = ctx.fiscalStartMonth;
+  if (startMonth === null) return null;
+  const thisYear = new Date(ctx.nowCivil).getUTCFullYear();
+  const spanOf = (endYear: number) =>
+    wholeMonths(
+      startMonth === 1 ? endYear : endYear - 1,
+      startMonth - 1,
+      12,
+      `FY${String(endYear).slice(-2)}`,
+    );
+  const words = text.match(FISCAL_WORDS_RE);
+  if (words) {
+    const started = Date.UTC(thisYear, startMonth - 1, 1) <= ctx.nowCivil;
+    const current = startMonth === 1 ? thisYear : started ? thisYear + 1 : thisYear;
+    return spanOf(words[1].toLowerCase() === "this" ? current : current - 1);
+  }
+  const fiscal = text.match(FISCAL_RE);
+  if (!fiscal) return null;
+  // A two-digit fiscal year is the nearest one, as the next is often named ahead (FY27 in 2026).
+  const past = fullYear(fiscal[1], ctx);
+  const year =
+    fiscal[1].length === 2 && past + 100 - thisYear < thisYear - past ? past + 100 : past;
+  return spanOf(year);
 }
 
 function wholeMonths(
@@ -1270,36 +1414,15 @@ function wholeMonths(
   };
 }
 
-// Readings that must ask rather than guess: a yearless period, `N weeks ago`, a DST repeated hour.
-function askedReadings(
-  text: string,
-  preferred: ParsedTimeInput,
-  opts?: TimeInputOptions,
-): ParsedTimeInput[] {
-  const previous = readBusinessPeriod(text, createContext(opts), 1);
-  if (
-    preferred.type === "absolute" &&
-    preferred.name &&
-    previous &&
-    previous.name !== preferred.name
-  ) {
-    return [preferred, previous];
-  }
-  return agoReadings(text, preferred, opts) ?? foldReadings(preferred, opts);
-}
-
-// `2w ago` is the calendar week or the moment two weeks back; both are offered.
-function agoReadings(
+// A yearless period also lists the one a year before, as a second row under the first.
+function yearlessReadings(
   text: string,
   preferred: ParsedTimeInput,
   opts?: TimeInputOptions,
 ): ParsedTimeInput[] | null {
-  if (preferred.type !== "relative" || !parseCalendarToken(preferred.period)) return null;
-  const natural = normalizeNatural(text);
-  if (!/\sago$/i.test(natural)) return null;
-  const ctx = createContext(opts);
-  const moment = readSinglePoint(natural, ctx);
-  return moment ? [preferred, civilRangeToResult(moment, ctx)] : null;
+  if (preferred.type !== "absolute" || !preferred.name) return null;
+  const previous = readBusinessPeriod(text, createContext(opts), 1);
+  return previous && previous.name !== preferred.name ? [preferred, previous] : null;
 }
 
 function foldReadings(preferred: ParsedTimeInput, opts?: TimeInputOptions): ParsedTimeInput[] {
@@ -1438,7 +1561,7 @@ function readNaturalText(raw: string, ctx: ParseContext): ParsedTimeInput | null
   if (period) return { type: "relative", period };
   const range =
     readSince(text, ctx) ??
-    readBetween(text, ctx) ??
+    readFrom(text, ctx) ??
     readDurationAround(text, ctx) ??
     readSinglePoint(text, ctx) ??
     readSplitRange(text, ctx);
@@ -1486,17 +1609,9 @@ function spellDayClockRange(text: string): string | null {
   return `${match[1]} ${clock(match[2])} to ${match[1]} ${clock(match[3])}`;
 }
 
-// `N weeks|months|quarters|years ago` names that calendar period, as the rail's Last row does.
 function readCalendarNatural(text: string): string | null {
   const lower = text.toLowerCase();
-  const word = EXTRA_CALENDAR_WORDS[lower] ?? parseCalendarWords(lower);
-  if (word) return word;
-  const quarters = lower.match(/^([1-9]\d{0,5})\s*quarters?\s+ago$/);
-  if (quarters) return `calendar:quarter:-${quarters[1]}`;
-  const ago = text.match(/^(.+?)\s*ago$/i);
-  const duration = ago ? parseDuration(ago[1]) : null;
-  const unit = duration?.counted ? AGO_CALENDAR_UNITS[duration.unit] : undefined;
-  return duration && unit ? `calendar:${unit}:-${duration.amount}` : null;
+  return EXTRA_CALENDAR_WORDS[lower] ?? parseCalendarWords(lower);
 }
 
 function readRelativeNatural(text: string): string | null {
@@ -1506,8 +1621,12 @@ function readRelativeNatural(text: string): string | null {
     const start = toNow[1].match(/^now\s*-\s*(.+)$|^(.+?)\s*ago$/i);
     return start ? durationPeriod(parseDuration(start[1] ?? start[2])) : null;
   }
-  const nowMinus = body.match(/^now\s*-\s*(.+)$/i);
-  if (nowMinus) return durationPeriod(parseDuration(nowMinus[1]));
+  // `N ago` and a leading `-` are `Last N`, never an instant.
+  const back = body.match(/^(?:now\s*)?-\s*(.+)$|^(.+?)\s*ago$/i);
+  if (back) {
+    const duration = parseDuration(back[1] ?? back[2]);
+    return duration?.counted ? durationPeriod(duration) : null;
+  }
   const prefixed = body.match(/^(?:last|past|previous)\s+(.+)$/i);
   const duration = parseDuration(prefixed ? prefixed[1] : body);
   return duration && (prefixed || duration.counted) ? durationPeriod(duration) : null;
@@ -1515,9 +1634,10 @@ function readRelativeNatural(text: string): string | null {
 
 // Years are stored as months, since the picker's rolling units stop at `M`.
 function durationPeriod(duration: Duration | null): string | null {
-  if (!duration?.counted && duration?.unit !== undefined && duration.amount < 1) return null;
   if (!duration) return null;
-  return duration.unit === "y" ? `${duration.amount * 12}M` : `${duration.amount}${duration.unit}`;
+  const [amount, unit] =
+    duration.unit === "y" ? [duration.amount * 12, "M"] : [duration.amount, duration.unit];
+  return withinTenYears(amount, unit) ? `${amount}${unit}` : null;
 }
 
 function parseDuration(text: string): Duration | null {
@@ -1532,7 +1652,8 @@ function parseDuration(text: string): Duration | null {
     if (!part) return null;
     parts.push(part);
   }
-  return combineDurations(parts);
+  // Up to two parts (`1h30m`); a third adds nothing a pick cannot.
+  return parts.length > 2 ? null : combineDurations(parts);
 }
 
 function durationPart(count: string | undefined, unitText: string): Duration | null {
@@ -1592,19 +1713,18 @@ function readSince(text: string, ctx: ParseContext): CivilRange | null {
   const spec = parsed?.bareNumber !== undefined ? bareClockSpec(parsed) : parsed;
   const point = spec ? resolvePoint(spec, ctx) : null;
   if (!spec || !point) return null;
+  // `since` runs to the end of today in the text's zone, so refresh keeps filling it until midnight (O1).
+  const today = startOfDay(spec.zone ? civilIn(spec.zone, ctx.now.getTime()) : ctx.nowCivil);
   return {
     start: point.start,
-    end: ctx.nowCivil,
+    end: Math.max(today, startOfDay(point.start)) + DAY_MS,
     startZone: spec.zone,
-    endIsNow: true,
-    startExact: spec.exact,
+    endZone: spec.zone,
   };
 }
 
-function readBetween(text: string, ctx: ParseContext): CivilRange | null {
-  const match =
-    text.match(/^between\s+(.+?)\s+and\s+(.+)$/i) ??
-    text.match(/^from\s+(.+?)\s+(?:to|until|till|through|thru|-|–|—)\s+(.+)$/i);
+function readFrom(text: string, ctx: ParseContext): CivilRange | null {
+  const match = text.match(/^from\s+(.+?)\s+(?:to|until|till|through|thru|-|–|—)\s+(.+)$/i);
   return match ? resolveRange(match[1], match[2], ctx) : null;
 }
 
@@ -1781,12 +1901,8 @@ function startOfDay(civil: number): number {
 }
 
 function resolveDay(day: DaySpec, ctx: ParseContext): { start: number; end: number } | null {
-  const today = startOfDay(ctx.nowCivil);
   if (day.kind === "date") return resolveDate(day, ctx);
-  if (day.kind === "shift") return daySpanAt(today + day.days * DAY_MS);
-  const weekday = new Date(today).getUTCDay();
-  const back = (weekday - day.weekday + 7) % 7 || (day.strict ? 7 : 0);
-  return daySpanAt(today - back * DAY_MS);
+  return daySpanAt(startOfDay(ctx.nowCivil) + day.days * DAY_MS);
 }
 
 // The end is the next midnight, exclusive, so the day's last second is searched.
@@ -2015,11 +2131,6 @@ function parseDaySpec(text: string, ctx: ParseContext): DaySpec | null {
     tomorrow: 1,
   };
   if (shifts[lower] !== undefined) return { kind: "shift", days: shifts[lower] };
-  const named = lower.match(/^(?:(last|previous|this)\s+)?([a-z]+)$/);
-  const weekday = named ? weekdayIndex(named[2]) : -1;
-  if (named && weekday >= 0) {
-    return { kind: "weekday", weekday, strict: named[1] === "last" || named[1] === "previous" };
-  }
   const legacy = parseLegacyPoint(text);
   // RFC 2822 stamps lead with the weekday name, which the date itself already fixes.
   const dated = lower.replace(/^([a-z]+)\.?\s+(?=\d)/, (all, word) =>

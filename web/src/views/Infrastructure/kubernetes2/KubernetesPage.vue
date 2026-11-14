@@ -536,8 +536,9 @@ k8s.loadStreams();
           @update:model-value="onCluster"
         />
         <DateTime
+          preset="explorer-auto"
+          :capabilities="{ kinds: ['rolling', 'fixed'] }"
           ref="dateTimePickerRef"
-          apply-presets
           menu-align="end"
           default-type="relative"
           :default-relative-time="DEFAULT_RELATIVE_PERIOD"

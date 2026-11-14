@@ -921,7 +921,6 @@
     "timeRangeBeforeMin": "Before {date}",
     "timeRangeAfterMax": "After {date}",
     "timeRangeStartInFuture": "That is in the future. Latest is now.",
-    "timeRangeDatesOnly": "Enter dates, not a period",
     "timeRangeNoSeconds": "Use minutes or longer",
     "timeRangeOutOfBounds": "This time range can't be shown, so the last 15 minutes are shown instead",
     "timeRangeShortened": "This time range was shortened to {label}",
@@ -16888,7 +16887,15 @@
       "requestApproved": "{domain} linked",
       "requestRejected": "Request for {domain} rejected",
       "decisionFailed": "Failed to update the request"
-    }
+    },
+    "timeRangesHeading": "Time ranges",
+    "fiscalYearStartLabel": "Fiscal year starts in",
+    "fiscalYearStartHelp": "Lets people type FY26 or this fiscal year in the time picker.",
+    "fiscalYearNotSet": "Not set",
+    "rangeGuardDaysLabel": "Ask before running ranges longer than (days)",
+    "rangeGuardDaysOff": "Off",
+    "rangeGuardDaysHelp": "Dashboards and pages that run on apply keep the current results and ask once before a longer range runs. Leave empty to turn it off.",
+    "rangeGuardDaysValidation": "Enter a whole number of days from 1 to 3650, or leave it empty"
   },
   "reports": {
     "history": {
@@ -23751,9 +23758,7 @@
     "readAsEpoch": "read as epoch {unit}",
     "readAsUtc": "read as UTC",
     "typedInZone": "typed in {zone}",
-    "fiscalYearStarts": "fiscal year starts {month}",
     "dstGap": "{typed} does not exist on {date} · using {used}",
-    "cutToTenYears": "cut to 10 years",
     "inTheFuture": "in the future",
     "aroundSeconds": "± {n} s",
     "fromHereToNow": "From here to now",
@@ -23773,8 +23778,29 @@
     "groupSuggestions": "Suggestions",
     "readAsMonthDay": "read as month/day",
     "readAsDayMonth": "read as day/month",
-    "cutToNow": "cut to now",
-    "rollingHere": "no calendar periods here"
+    "backToRuns": "Back to {range} · runs the query",
+    "nothingToUndo": "Nothing to undo",
+    "changesWhen": "changes {when}",
+    "changesAtMidnight": "changes at midnight",
+    "endsWhen": "ends {when}",
+    "linkUnreadable": "This link’s time range could not be read. Showing {range}.",
+    "draft": "draft",
+    "freeze": "Freeze",
+    "freezeAt": "Freeze at {range}",
+    "notAvailableIn": "Not available in {host}",
+    "notAvailableHere": "Not available here",
+    "closestMatch": "Closest match",
+    "twoReadings": "{text} has two readings. Pick one:",
+    "readAsEpochPick": "Read as epoch {unit}. Pick a window:",
+    "compareNotAvailable": "Compare is not available yet",
+    "pickOnePeriod": "Pick one period",
+    "periodInProgress": "{period} is in progress. It ends {date}.",
+    "fiscalYearUnset": "Set your fiscal year start in Settings to use FY",
+    "daysAgo": "{count} day ago | {count} days ago",
+    "weeksAgo": "{count} week ago | {count} weeks ago",
+    "monthsAgo": "{count} month ago | {count} months ago",
+    "quartersAgo": "{count} quarter ago | {count} quarters ago",
+    "yearsAgo": "{count} year ago | {count} years ago"
   },
   "shortcuts": {
     "then": "then",
@@ -34374,5 +34400,16 @@
       },
       "noHighConfidence": "No high-confidence names"
     }
+  },
+  "timeRangeHost": {
+    "guardHeld": "Showing {range}. {next} is over the {days}-day guard.",
+    "guardRun": "Run on {count} panel | Run on {count} panels",
+    "contextStrip": "All logs {window} around {instant}. Your filter is off for this view.",
+    "filterOff": "filter off for this view",
+    "applyFilter": "Apply filter",
+    "backToResults": "Back to results",
+    "keepFilters": "Keep filters",
+    "refreshTooFast": "Too fast for {span}",
+    "refreshFastest": "Fastest for {range} is {interval}"
   }
 }

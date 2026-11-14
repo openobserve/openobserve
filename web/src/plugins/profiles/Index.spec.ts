@@ -139,7 +139,7 @@ describe("Profiles page", () => {
     // The page calls these on the mounted picker.
     DateTimePickerDashboard: {
       name: "DateTimePickerDashboard",
-      props: ["modelValue", "autoApplyDashboard", "hideRangeShift"],
+      props: ["modelValue", "preset", "capabilities", "hideRangeShift"],
       methods: { setSavedDate: () => {}, setCustomDate: () => {}, refresh: () => {} },
       template: "<div />",
     },
@@ -1021,13 +1021,13 @@ describe("Profiles page", () => {
     expect(wrapper.find('[data-test="beta-badge"]').exists()).toBe(true);
   });
 
-  it("applies a picked window at once, with no Apply step in the picker", async () => {
+  it("uses the explorer-manual picker, so Run query is the apply step", async () => {
     const wrapper = mountPage();
     await settle();
 
-    expect(
-      wrapper.findComponent({ name: "DateTimePickerDashboard" }).props("autoApplyDashboard"),
-    ).toBe(true);
+    const picker = wrapper.findComponent({ name: "DateTimePickerDashboard" });
+    expect(picker.props("preset")).toBe("explorer-manual");
+    expect(picker.props("capabilities")).toEqual({ kinds: ["rolling", "fixed"] });
   });
 
   // Like the real picker with auto-apply on: setCustomDate changes the range, a watcher emits it, and

@@ -42,8 +42,8 @@ describe("readingNote", () => {
     });
   });
 
-  it("says a fiscal year starts in January [#35]", () => {
-    expect(noteOf("FY26")).toEqual({ kind: "fiscal", startMonth: 1 });
+  it("reads no fiscal year, so notes none, until the org sets its start (O4)", () => {
+    expect(noteOf("FY26")).toBeNull();
   });
 
   it("says a skipped DST time was moved forward [#10]", () => {
@@ -73,12 +73,9 @@ describe("formatReadingNote", () => {
     [{ kind: "epoch", unit: "µs" } as const, 'dateTime.readAsEpoch {"unit":"µs"}'],
     [{ kind: "utc" } as const, "dateTime.readAsUtc {}"],
     [{ kind: "typedZone", zone: "UTC" } as const, 'dateTime.typedInZone {"zone":"UTC"}'],
-    [{ kind: "fiscal", startMonth: 1 } as const, 'dateTime.fiscalYearStarts {"month":"Jan"}'],
-    [{ kind: "cut" } as const, "dateTime.cutToTenYears {}"],
     [{ kind: "future" } as const, "dateTime.inTheFuture {}"],
     [{ kind: "dayOrder", order: "dayMonth" } as const, "dateTime.readAsDayMonth {}"],
     [{ kind: "dayOrder", order: "monthDay" } as const, "dateTime.readAsMonthDay {}"],
-    [{ kind: "cutToNow" } as const, "dateTime.cutToNow {}"],
   ])("words %j", (note, expected) => {
     expect(formatReadingNote(note, echo)).toBe(expected);
   });

@@ -127,11 +127,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- A plain block: straight in the form's flex column, the picker's border stretches past its buttons. -->
       <div>
         <OFormDateTimeRange
+          :capabilities="{ kinds: ['fixed'], future: true }"
           name="window"
           :label="t('oncall.coverWhen')"
           required
-          disable-relative
-          auto-apply
           :trigger-text="windowLabel"
           :picker-timezone="pickedZone"
           hide-clipboard

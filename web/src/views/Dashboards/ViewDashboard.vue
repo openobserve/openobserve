@@ -103,11 +103,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- format: YYYY/MM/DD HH:mm - YYYY/MM/DD HH:mm (TIMEZONE) -->
           <div
             class="pt-1.25"
-            v-if="
-              store.state.printMode === true && currentTimeObj.start_time && currentTimeObj.end_time
-            "
+            v-if="store.state.printMode === true && printRangeText"
+            data-test="dashboard-print-time-range"
           >
-            {{ timeString }} ({{ store.state.timezone }})
+            {{ printRangeText }}
           </div>
           <span id="dashboard-header-time" class="contents" />
           <!-- Kiosk keeps this mounted on every width: it owns the refresh value and its URL sync. -->
@@ -118,6 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :min-refresh-interval="store.state?.zoConfig?.min_auto_refresh_interval || 5"
             :range-end-us="refreshRangeEndUs"
             :range-start-us="refreshRangeStartUs"
+            :range-span-us="refreshRangeSpanUs"
             @trigger="onAutoRefreshTick"
             @live="goLiveRange"
             class="dashboard-icons hideOnPrintMode"
@@ -308,6 +308,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :min-refresh-interval="store.state?.zoConfig?.min_auto_refresh_interval || 5"
             :range-end-us="refreshRangeEndUs"
             :range-start-us="refreshRangeStartUs"
+            :range-span-us="refreshRangeSpanUs"
             @trigger="onAutoRefreshTick"
             @live="goLiveRange"
             class="dashboard-icons hideOnPrintMode"
@@ -530,6 +531,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Both targets are always in the DOM, so a move never waits on another component's render. -->
         <Teleport defer :to="hasTimeRow ? '#dashboard-time-row' : '#dashboard-header-time'">
           <DateTimePickerDashboard
+            preset="dashboard"
             v-if="selectedDate"
             v-show="store.state.printMode === false"
             ref="dateTimePicker"
@@ -538,13 +540,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :class="{ 'min-w-0 flex-1': hasTimeRow && isMobile }"
             size="sm"
             :modelValue="timeGate.picked.value ?? selectedDate"
-            :auto-apply-dashboard="true"
             :initialTimezone="initialTimezone"
             :disable="arePanelsLoading"
             :retention-days="dashboardStreamLimits.retentionDays"
-            calendar-presets
-            preset="dashboard"
-            zone-badge="always"
             @update:modelValue="timeGate.onApply"
             @show="timeGate.onShow"
             @hide="onTimePickerHide"
@@ -552,6 +550,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="dashboard-global-date-time-picker"
           />
         </Teleport>
+        <StaleRangeStrip
+          v-if="rangeGuardText"
+          :text="rangeGuardText.text"
+          :run-label="rangeGuardText.run"
+          :back-label="rangeGuardText.back"
+          data-test="dashboard-range-guard-strip"
+          @run="timeGate.confirmGuard"
+          @back="timeGate.dismissGuard"
+        />
         <KioskStrip
           v-if="kioskMode && !playlistEmbed"
           :title="currentDashboardData.data?.title"
@@ -747,6 +754,10 @@ import { formatPeriodLabel } from "@/utils/timeRangeRail";
 import { urlTimeToMicros } from "@/utils/dashboard/urlTimeParams";
 import analytics from "@/services/product_analytics";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
+import StaleRangeStrip from "@/components/StaleRangeStrip.vue";
+import useTimeRangeContext from "@/composables/useTimeRangeContext";
+import { formatTimeRange } from "@/utils/timeRangeFormat";
+import { rangeFromLegacy } from "@/utils/timeRangeModel";
 import { useHeaderTitleRoom } from "@/composables/dashboard/useHeaderTitleRoom";
 import {
   onBeforeRouteLeave,
@@ -888,6 +899,7 @@ export default defineComponent({
     OBanner,
     OPageLayout,
     DateTimePickerDashboard,
+    StaleRangeStrip,
     ShareButton,
     PublicLinksPanel,
     AutoRefreshInterval,
@@ -1121,11 +1133,33 @@ export default defineComponent({
     const showRangeInPicker = (value: any) =>
       dateTimePicker.value?.setSavedDate(toPickerSavedDate(value, store.state.timezone));
 
+    const timeRangeContext = useTimeRangeContext();
     const timeGate = useDashboardTimeGate({
       applied: selectedDate,
       isAutoRunOn: () => isAutoRunOn.value,
       showInPicker: showRangeInPicker,
+      guardDays: () => timeRangeContext.rangeGuardDays.value,
     });
+    const legacyRangeText = (value: any, surface: "toast" | "print") => {
+      const range = value ? rangeFromLegacy(value) : null;
+      return range ? formatTimeRange(range, timeRangeContext.now(), surface) : "";
+    };
+    const visiblePanelCount = (): number =>
+      currentDashboardData.data?.tabs?.find((tab: any) => tab.tabId === selectedTabId.value)?.panels
+        ?.length ?? 0;
+    const rangeGuardText = computed(() => {
+      const held = timeGate.held.value;
+      const days = timeRangeContext.rangeGuardDays.value;
+      if (!held || days === null) return null;
+      const from = legacyRangeText(held.from, "toast");
+      const next = legacyRangeText(held.to, "toast");
+      return {
+        text: t("timeRangeHost.guardHeld", { range: from, next, days }),
+        run: t("timeRangeHost.guardRun", visiblePanelCount()),
+        back: t("dateTime.backTo", { range: from }),
+      };
+    });
+    const printRangeText = computed(() => legacyRangeText(selectedDate.value, "print"));
 
     const onTimePickerHide = () => {
       timeGate.onHide();
@@ -2655,6 +2689,12 @@ export default defineComponent({
         : (dashboardTimeUs(currentTimeObj.value as { start_time?: Date; end_time?: Date })
             ?.startUs ?? null),
     );
+    const refreshRangeSpanUs = computed(() => {
+      const window = dashboardTimeUs(
+        currentTimeObj.value as { start_time?: Date; end_time?: Date },
+      );
+      return window && window.endUs > window.startUs ? window.endUs - window.startUs : null;
+    });
     // Live may land while auto-run is off, so apply it here rather than leave it waiting.
     const goLiveRange = async () => {
       const picker = dateTimePicker.value as { dateTimePicker?: { goLive?: () => void } } | null;
@@ -3054,6 +3094,8 @@ export default defineComponent({
     ]);
 
     return {
+      rangeGuardText,
+      printRangeText,
       isMobile,
       hasTimeRow,
       dashboardTitleEl,
@@ -3120,6 +3162,7 @@ export default defineComponent({
       dashboardStreamLimits,
       refreshRangeEndUs,
       refreshRangeStartUs,
+      refreshRangeSpanUs,
       goLiveRange,
       onDashboardShared,
       exportDashboard,

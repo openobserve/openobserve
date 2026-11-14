@@ -1041,6 +1041,74 @@ describe("Logs Index", async () => {
     wrapper.vm.searchObj.meta.editorDirty = false;
   });
 
+  describe("Search around context view (§4)", () => {
+    const enter = (extra: Record<string, unknown> = {}) => {
+      wrapper.vm.searchObj.meta.sqlMode = false;
+      wrapper.vm.searchObj.meta.editorDirty = false;
+      wrapper.vm.searchObj.meta.logsVisualizeToggle = "logs";
+      wrapper.vm.searchObj.data.query = "level = 'error'";
+      wrapper.vm.searchObj.data.datetime.type = "relative";
+      wrapper.vm.searchObj.data.datetime.relativeTimePeriod = "15m";
+      const picker = {
+        setCustomDate: vi.fn(() => true),
+        setRelativeTime: vi.fn(),
+        setAbsoluteTime: vi.fn(),
+      };
+      const handleRunQueryFn = vi.fn();
+      wrapper.vm.searchBarRef = { dateTimeRef: picker, handleRunQueryFn } as any;
+      wrapper.vm.onSearchAroundWindow({
+        startUs: 1_000_000,
+        endUs: 601_000_000,
+        anchorUs: 301_000_000,
+        seconds: 300,
+        ...extra,
+      });
+      return { picker, handleRunQueryFn };
+    };
+    afterEach(() => {
+      wrapper.vm.searchObj.data.searchAround.windowQuery = null;
+      wrapper.vm.searchObj.data.query = "";
+    });
+
+    it("names the window and the row in a strip while the filter is off", () => {
+      enter();
+      expect(wrapper.vm.searchObj.data.searchAround.windowQuery).toMatchObject({
+        anchorUs: 301_000_000,
+        seconds: 300,
+        previous: { type: "relative", relativeTimePeriod: "15m" },
+      });
+      expect(String(wrapper.vm.contextViewText)).toMatch(/timeRangeHost\.contextStrip|All logs/);
+    });
+
+    it("leaves on Apply filter with the same window and runs the typed query", () => {
+      const { handleRunQueryFn, picker } = enter();
+      wrapper.vm.applyContextFilter();
+      expect(wrapper.vm.searchObj.data.searchAround.windowQuery).toBeNull();
+      expect(handleRunQueryFn).toHaveBeenCalled();
+      expect(picker.setRelativeTime).not.toHaveBeenCalled();
+    });
+
+    it("goes back to the previous range on Back to results", async () => {
+      const { handleRunQueryFn, picker } = enter();
+      await wrapper.vm.leaveContextView();
+      expect(picker.setRelativeTime).toHaveBeenCalledWith("15m");
+      expect(wrapper.vm.searchObj.data.searchAround.windowQuery).toBeNull();
+      expect(handleRunQueryFn).toHaveBeenCalled();
+    });
+
+    it("shows no context view once the typed query changes", () => {
+      enter();
+      wrapper.vm.searchObj.data.query = "level = 'warn'";
+      expect(wrapper.vm.contextViewText).toBeNull();
+    });
+
+    it("keeps the filter and opens no context view when Keep filters is on", () => {
+      const { picker } = enter({ keepFilters: true });
+      expect(picker.setCustomDate).toHaveBeenCalled();
+      expect(wrapper.vm.searchObj.data.searchAround.windowQuery).toBeNull();
+    });
+  });
+
   it("drops the window query when the view leaves the one it was armed in", async () => {
     wrapper.vm.searchObj.meta.logsVisualizeToggle = "logs";
     wrapper.vm.searchObj.data.searchAround.windowQuery = {

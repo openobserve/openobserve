@@ -269,8 +269,9 @@ const statusLabel = computed(() =>
           }}</OTag>
         </div>
         <DateTime
+          preset="explorer-auto"
+          :capabilities="{ kinds: ['rolling', 'fixed'] }"
           ref="dateTimePicker"
-          auto-apply
           menu-align="end"
           default-type="absolute"
           :default-absolute-time="{ startTime: range.from, endTime: range.to }"

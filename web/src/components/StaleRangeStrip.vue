@@ -17,20 +17,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     role="status"
-    class="bg-status-warning-bg text-status-warning-text border-status-warning-text/30 flex w-full min-w-0 items-center gap-2 border-0 border-b border-solid px-3 py-1.5 text-xs"
+    class="bg-surface-subtle text-text-body border-border-default flex w-full min-w-0 flex-wrap items-center gap-x-2 gap-y-1 border-0 border-b border-solid px-3 py-1.5 text-xs"
     :data-test="dataTest"
   >
-    <OIcon name="warning-amber" size="xs" class="shrink-0" aria-hidden="true" />
-    <OTruncatedText class="min-w-0">{{ text }}</OTruncatedText>
+    <OIcon name="info-outline" size="xs" class="shrink-0" aria-hidden="true" />
+    <span class="min-w-0">{{ text }}</span>
     <OButton
-      variant="banner-dismiss"
+      variant="ghost"
       size="xs"
-      class="shrink-0"
+      class="text-text-link min-h-6 shrink-0 pointer-coarse:min-h-8"
       :data-test="`${dataTest}-run`"
       @click="emit('run')"
-      >{{ t("search.runQuery") }}</OButton
+      >{{ runLabel ?? t("search.runQuery") }}</OButton
     >
     <OShortcut v-if="shortcutId" :id="shortcutId" class="shrink-0 max-md:hidden" />
+    <template v-if="backLabel">
+      <OButton
+        variant="ghost"
+        size="xs"
+        class="text-text-link min-h-6 shrink-0 pointer-coarse:min-h-8"
+        :data-test="`${dataTest}-back`"
+        @click="emit('back')"
+        >{{ backLabel }}</OButton
+      >
+      <OShortcut v-if="backShortcutId" :id="backShortcutId" class="shrink-0 max-md:hidden" />
+    </template>
   </div>
 </template>
 
@@ -38,10 +49,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OShortcut from "@/lib/core/Shortcut/OShortcut.vue";
 
-defineProps<{ text: I18nText; dataTest: string; shortcutId?: string }>();
-const emit = defineEmits<{ run: [] }>();
+defineProps<{
+  text: I18nText;
+  dataTest: string;
+  shortcutId?: string;
+  runLabel?: I18nText;
+  backLabel?: I18nText;
+  backShortcutId?: string;
+}>();
+const emit = defineEmits<{ run: []; back: [] }>();
 const { t } = useI18nTyped();
 </script>

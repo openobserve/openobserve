@@ -44,4 +44,23 @@ describe("StaleRangeStrip", () => {
     await wrapper.get('[data-test="strip-run"]').trigger("click");
     expect(wrapper.emitted("run")).toHaveLength(1);
   });
+
+  it("names its actions when a host gives labels, and emits back", async () => {
+    const wrapper = mount(StaleRangeStrip, {
+      props: {
+        text: raw("Showing Last 7 days. Last 90 days is over the 30-day guard."),
+        dataTest: "strip",
+        runLabel: raw("Run on 6 panels"),
+        backLabel: raw("Back to Last 7 days"),
+      },
+      global: { plugins: [i18n], stubs: { OShortcut: true } },
+    });
+    expect(wrapper.get('[data-test="strip-run"]').text()).toBe("Run on 6 panels");
+    await wrapper.get('[data-test="strip-back"]').trigger("click");
+    expect(wrapper.emitted("back")).toHaveLength(1);
+  });
+
+  it("has no back action unless a host asks for one", () => {
+    expect(mountStrip().find('[data-test="strip-back"]').exists()).toBe(false);
+  });
 });

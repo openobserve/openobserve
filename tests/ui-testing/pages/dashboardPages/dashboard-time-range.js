@@ -6,6 +6,24 @@ export default class DashboardTimeRange {
     this.page = page;
     this.dateTimeApplyBtn = page.locator('[data-test="date-time-apply-btn"]');
     this.panelRefreshBtn = page.locator('[data-test="dashboard-panel-refresh-panel-btn"]');
+    this.rangeGuardStrip = page.locator('[data-test="dashboard-range-guard-strip"]');
+    this.rangeGuardRunBtn = page.locator('[data-test="dashboard-range-guard-strip-run"]');
+    this.rangeGuardBackBtn = page.locator('[data-test="dashboard-range-guard-strip-back"]');
+  }
+
+  // O2: an org guard holds a longer range until Run on N panels; off unless the org sets it.
+  async expectRangeGuardStrip(visible = true) {
+    await expect(this.rangeGuardStrip).toHaveCount(visible ? 1 : 0, { timeout: 15000 });
+  }
+
+  async confirmRangeGuard() {
+    await this.rangeGuardRunBtn.click();
+    await expect(this.rangeGuardStrip).toHaveCount(0);
+  }
+
+  async dismissRangeGuard() {
+    await this.rangeGuardBackBtn.click();
+    await expect(this.rangeGuardStrip).toHaveCount(0);
   }
 
   // The headline change: dashboard pickers render no Apply button (autoApply=true).

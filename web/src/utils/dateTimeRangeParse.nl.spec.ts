@@ -40,7 +40,6 @@ function show(result: ParsedTimeInput | null): string {
 const read = (text: string, opts: TimeInputOptions = US) => show(parseTimeInput(text, opts));
 const suggest = (text: string, opts: TimeInputOptions = US) =>
   suggestTimeInput(text, opts).map(show);
-const NOW_CIVIL = "2026/11/11 12:41:53";
 
 describe("parseTimeInput relative forms", () => {
   it.each([
@@ -75,6 +74,13 @@ describe("parseTimeInput relative forms", () => {
     ["an hour ago to now", "1h"],
     ["from 2 hours ago to now", "2h"],
     ["last 24h", "24h"],
+    ["2 weeks ago", "2w"],
+    ["a month ago", "1M"],
+    ["1 year ago", "12M"],
+    ["5 minutes ago", "5m"],
+    ["an hour ago", "1h"],
+    ["2 days ago", "2d"],
+    ["-30m", "30m"],
   ])("reads %s as rolling %s", (text, period) => {
     expect(read(text)).toBe(period);
   });
@@ -100,9 +106,6 @@ describe("parseTimeInput calendar words", () => {
     ["mtd", "calendar:month:0"],
     ["QTD", "calendar:quarter:0"],
     ["ytd", "calendar:year:0"],
-    ["2 weeks ago", "calendar:week:-2"],
-    ["a month ago", "calendar:month:-1"],
-    ["1 year ago", "calendar:year:-1"],
     ["yesterdy", "calendar:day:-1"],
   ])("reads %s as %s", (text, token) => {
     expect(read(text)).toBe(token);
@@ -114,27 +117,11 @@ describe("parseTimeInput calendar words", () => {
 });
 
 describe("parseTimeInput ago and now arithmetic", () => {
-  it("reads minutes or hours ago as that instant ±5 minutes", () => {
-    expect(read("5 minutes ago")).toBe("A 2026/11/11 12:31:53..2026/11/11 12:41:53");
-    expect(read("5m ago")).toBe("A 2026/11/11 12:31:53..2026/11/11 12:41:53");
-    expect(read("an hour ago")).toBe("A 2026/11/11 11:36:53..2026/11/11 11:46:53");
-  });
-
-  it("reads days ago as that whole calendar day", () => {
-    expect(read("2 days ago")).toBe("A 2026/11/09 00:00:00..2026/11/10 00:00:00");
-  });
-
   it("fixes now-relative ranges at the moment of reading", () => {
     expect(read("now-2h to now-1h")).toBe("A 2026/11/11 10:41:53..2026/11/11 11:41:53");
     expect(read("from 2 hours ago to 1 hour ago")).toBe(
       "A 2026/11/11 10:41:53..2026/11/11 11:41:53",
     );
-  });
-
-  it("keeps the centre of a widened instant for zoned readers", () => {
-    expect(parseTimeInput("5 minutes ago", US)).toMatchObject({
-      centre: { date: "2026/11/11", time: "12:36:53" },
-    });
   });
 });
 
@@ -181,23 +168,18 @@ describe("parseTimeInput times of day", () => {
 });
 
 describe("parseTimeInput weekdays and day words", () => {
-  it.each([
-    ["monday", "A 2026/11/09 00:00:00..2026/11/10 00:00:00"],
-    ["Mon", "A 2026/11/09 00:00:00..2026/11/10 00:00:00"],
-    ["last friday", "A 2026/11/06 00:00:00..2026/11/07 00:00:00"],
-    ["tuesdy", "A 2026/11/10 00:00:00..2026/11/11 00:00:00"],
-    ["wednesday", "A 2026/11/11 00:00:00..2026/11/12 00:00:00"],
-    ["last wednesday", "A 2026/11/04 00:00:00..2026/11/05 00:00:00"],
-  ])("reads %s as that whole day", (text, expected) => {
-    expect(read(text)).toBe(expected);
-  });
+  it.each(["monday", "Mon", "last friday", "tuesdy", "wednesday", "monday 9am", "since monday"])(
+    "does not read the weekday word %s",
+    (text) => {
+      expect(read(text)).toBe("null");
+    },
+  );
 
   it.each([
     ["yesterday 15:00", "A 2026/11/10 14:55:00..2026/11/10 15:05:00"],
     ["yesterday 3pm", "A 2026/11/10 14:55:00..2026/11/10 15:05:00"],
     ["yesterday at 3pm", "A 2026/11/10 14:55:00..2026/11/10 15:05:00"],
     ["3pm yesterday", "A 2026/11/10 14:55:00..2026/11/10 15:05:00"],
-    ["monday 9am", "A 2026/11/09 08:55:00..2026/11/09 09:05:00"],
   ])("reads %s as an instant on that day", (text, expected) => {
     expect(read(text)).toBe(expected);
   });
@@ -207,13 +189,12 @@ describe("parseTimeInput since", () => {
   it.each([
     ["since 9am", "A 2026/11/11 09:00:00"],
     ["since 9", "A 2026/11/11 09:00:00"],
-    ["since monday", "A 2026/11/09 00:00:00"],
     ["since nov 4", "A 2026/11/04 00:00:00"],
     ["since yesterday", "A 2026/11/10 00:00:00"],
     ["since midnight", "A 2026/11/11 00:00:00"],
     ["since 2 hours ago", "A 2026/11/11 10:41:53"],
-  ])("reads %s up to now", (text, start) => {
-    expect(read(text)).toBe(`${start}..${NOW_CIVIL}`);
+  ])("reads %s up to the end of today", (text, start) => {
+    expect(read(text)).toBe(`${start}..2026/11/12 00:00:00`);
   });
 });
 
@@ -228,8 +209,8 @@ describe("parseTimeInput day and time ranges", () => {
     ["9 to 5", "A 2026/11/11 09:00:00..2026/11/11 17:00:00"],
     ["15:00 to 17:00", "A 2026/11/10 15:00:00..2026/11/10 17:00:00"],
     ["from 3pm to 5pm", "A 2026/11/10 15:00:00..2026/11/10 17:00:00"],
-    ["between 10am and 11am", "A 2026/11/11 10:00:00..2026/11/11 11:00:00"],
-    ["between 2026-11-04 and 2026-11-06", "A 2026/11/04 00:00:00..2026/11/07 00:00:00"],
+    ["between 10am and 11am", "null"],
+    ["between 2026-11-04 and 2026-11-06", "null"],
     ["from nov 4 to nov 6", "A 2026/11/04 00:00:00..2026/11/07 00:00:00"],
     ["2026-11-04 10:00 for 2 hours", "A 2026/11/04 10:00:00..2026/11/04 12:00:00"],
     ["2026-11-04 10:00 +/- 15m", "A 2026/11/04 09:45:00..2026/11/04 10:15:00"],
@@ -428,7 +409,7 @@ describe("parseTimeInput future input", () => {
     ["[01/Jan/2027:10:00:00 +0000]", "T 2027-01-01T09:55:00.000Z..2027-01-01T10:05:00.000Z"],
     ["Dec 4 2026 - Dec 6 2026", "A 2026/12/04 00:00:00..2026/12/07 00:00:00"],
     ["12/04/2026", "A 2026/12/04 00:00:00..2026/12/05 00:00:00"],
-    ["since Dec 4 2026", `A 2026/12/04 00:00:00..${NOW_CIVIL}`],
+    ["since Dec 4 2026", "A 2026/12/04 00:00:00..2026/12/05 00:00:00"],
   ])("reads %s as written, as it gives a year or an instant", (text, expected) => {
     expect(read(text)).toBe(expected);
   });
@@ -486,9 +467,9 @@ describe("suggestTimeInput", () => {
     expect(suggest("15mo")).toEqual([]);
   });
 
-  it("offers minutes, hours, days, weeks and months for a bare number", () => {
-    expect(suggest("2")).toEqual(["2m", "2h", "2d", "2w", "2M"]);
-    expect(suggest(" 45 ")).toEqual(["45m", "45h", "45d", "45w", "45M"]);
+  it("offers minutes, hours and days for a bare number", () => {
+    expect(suggest("2")).toEqual(["2m", "2h", "2d"]);
+    expect(suggest(" 45 ")).toEqual(["45m", "45h", "45d"]);
   });
 
   it("offers both day/month orders, locale order first", () => {
@@ -511,11 +492,11 @@ describe("suggestTimeInput", () => {
   it("offers both 12-hour readings, most recent past first", () => {
     expect(suggest("3 to 5")).toEqual([
       "A 2026/11/11 03:00:00..2026/11/11 05:00:00",
-      "A 2026/11/10 15:00:00..2026/11/10 17:00:00",
+      "A 2026/11/10 03:00:00..2026/11/10 05:00:00",
     ]);
     expect(suggest("since 9")).toEqual([
-      `A 2026/11/11 09:00:00..${NOW_CIVIL}`,
-      `A 2026/11/10 21:00:00..${NOW_CIVIL}`,
+      "A 2026/11/11 09:00:00..2026/11/12 00:00:00",
+      "A 2026/11/10 21:00:00..2026/11/12 00:00:00",
     ]);
     expect(suggest("2026-11-04 9:05")).toEqual([
       "A 2026/11/04 09:00:00..2026/11/04 09:10:00",
@@ -554,8 +535,8 @@ describe("timeZone option", () => {
   const BROWSER: TimeInputOptions = { now: LATE, locale: "en-US" };
 
   it("reads today and since in the picker zone, not the browser's", () => {
-    expect(read("since today", KOLKATA)).toBe("A 2026/11/12 00:00:00..2026/11/12 01:30:00");
-    expect(read("since today", BROWSER)).toBe("A 2026/11/11 00:00:00..2026/11/11 20:00:00");
+    expect(read("since today", KOLKATA)).toBe("A 2026/11/12 00:00:00..2026/11/13 00:00:00");
+    expect(read("since today", BROWSER)).toBe("A 2026/11/11 00:00:00..2026/11/12 00:00:00");
     expect(read("yesterday 3pm", KOLKATA)).toBe("A 2026/11/11 14:55:00..2026/11/11 15:05:00");
   });
 
@@ -565,9 +546,7 @@ describe("timeZone option", () => {
     expect(read("1:00", BROWSER)).toBe("A 2026/11/11 12:55:00..2026/11/11 13:05:00");
   });
 
-  it("reads weekdays and noon on the picker's date", () => {
-    expect(read("thursday", KOLKATA)).toBe("A 2026/11/12 00:00:00..2026/11/13 00:00:00");
-    expect(read("thursday", BROWSER)).toBe("A 2026/11/05 00:00:00..2026/11/06 00:00:00");
+  it("reads noon on the picker's date", () => {
     expect(read("noon", KOLKATA)).toBe("A 2026/11/11 11:55:00..2026/11/11 12:05:00");
   });
 
@@ -580,25 +559,25 @@ describe("timeZone option", () => {
     );
   });
 
-  it("ends a zoned since at the real instant of now", () => {
+  it("ends a zoned since at the end of today in that zone", () => {
     expect(parseTimeInput("since 2026-11-11T10:00:00Z", KOLKATA)).toEqual({
       type: "timestamp",
       startMicros: Date.UTC(2026, 10, 11, 10) * 1000,
-      endMicros: LATE.getTime() * 1000,
+      endMicros: Date.UTC(2026, 10, 12) * 1000,
       sourceZone: "UTC",
     });
   });
 
   it("falls back to the browser clock for an unknown zone", () => {
     expect(read("since today", { ...BROWSER, timeZone: "Mars/Olympus" })).toBe(
-      "A 2026/11/11 00:00:00..2026/11/11 20:00:00",
+      "A 2026/11/11 00:00:00..2026/11/12 00:00:00",
     );
   });
 
   it("passes the zone to suggestions", () => {
     expect(suggestTimeInput("since 1", KOLKATA).map(show)).toEqual([
-      "A 2026/11/12 01:00:00..2026/11/12 01:30:00",
-      "A 2026/11/11 13:00:00..2026/11/12 01:30:00",
+      "A 2026/11/12 01:00:00..2026/11/13 00:00:00",
+      "A 2026/11/11 13:00:00..2026/11/13 00:00:00",
     ]);
   });
 });
@@ -606,16 +585,16 @@ describe("timeZone option", () => {
 describe("suggestion round-trip", () => {
   // Accepting a suggestion with Tab writes its shorthand into the bar; reading that text back must give the same reading.
   it.each([
-    ["2", ["2m", "2h", "2d", "2w", "2mo"]],
+    ["2", ["2m", "2h", "2d"]],
     ["15M", ["15mo", "15m"]],
     ["4/5", ["2026-04-05", "2026-05-04"]],
     [
       "since 9",
-      ["2026-11-11 09:00:00 to 2026-11-11 12:41:53", "2026-11-10 21:00:00 to 2026-11-11 12:41:53"],
+      ["2026-11-11 09:00:00 to 2026-11-12 00:00:00", "2026-11-10 21:00:00 to 2026-11-12 00:00:00"],
     ],
     [
       "3 to 5",
-      ["2026-11-11T03:00:00 to 2026-11-11T05:00:00", "2026-11-10T15:00:00 to 2026-11-10T17:00:00"],
+      ["2026-11-11T03:00:00 to 2026-11-11T05:00:00", "2026-11-10T03:00:00 to 2026-11-10T05:00:00"],
     ],
     ["2026-11-04 9:05", ["2026-11-04T09:05:00", "2026-11-04T21:05:00"]],
     [
@@ -629,8 +608,8 @@ describe("suggestion round-trip", () => {
 
   it.each([
     ["this week", "calendar:week:0"],
-    ["2 weeks ago", "calendar:week:-2"],
-    ["1 weeks ago", "calendar:week:-1"],
+    ["2 weeks ago", "2w"],
+    ["1 weeks ago", "1w"],
     ["15m", "15m"],
     ["2026-11-04T10:00:00Z", "T 2026-11-04T09:55:00.000Z..2026-11-04T10:05:00.000Z"],
   ])("reads %s back unchanged", (text, expected) => {
@@ -659,7 +638,7 @@ describe("clocks with a zone suffix", () => {
 
   it("starts since a zoned clock at its most recent past in that zone", () => {
     expect(read("since 9am UTC", at("2026-11-11T07:11:00Z", "Asia/Kolkata"))).toBe(
-      "T 2026-11-10T09:00:00.000Z..2026-11-11T07:11:00.000Z",
+      "T 2026-11-10T09:00:00.000Z..2026-11-12T00:00:00.000Z",
     );
   });
 
@@ -685,11 +664,9 @@ describe("elapsed time across a DST change", () => {
         endMicros: Date.parse("2026-11-01T05:30:00Z") * 1000,
       },
     });
-    expect(parseTimeInput("30 minutes ago", FALL_BACK)).toMatchObject({
-      exact: {
-        startMicros: Date.parse("2026-11-01T05:55:00Z") * 1000,
-        endMicros: Date.parse("2026-11-01T06:05:00Z") * 1000,
-      },
+    expect(parseTimeInput("30 minutes ago", FALL_BACK)).toEqual({
+      type: "relative",
+      period: "30m",
     });
   });
 });
@@ -738,7 +715,6 @@ describe("parseTimeInput snap grammar", () => {
     ["today so far", "calendar:day:0"],
     ["this month so far", "calendar:month:0"],
     ["now-1w/w", "calendar:week:-1"],
-    ["now-2M/M", "calendar:month:-2"],
     ["now-36h/d", "calendar:day:-1"],
     ["now-1d/d to now-1d/d", "calendar:day:-1"],
     ["now-1y/y", "calendar:year:-1"],
@@ -751,6 +727,7 @@ describe("parseTimeInput snap grammar", () => {
     ["now-1d@d", "A 2026/11/10 00:00:00..2026/11/11 12:41:53"],
     ["now-2d/d to now/d", "A 2026/11/09 00:00:00..2026/11/11 12:41:53"],
     ["now-3h/h", "A 2026/11/11 09:00:00..2026/11/11 10:00:00"],
+    ["now-2M/M", "A 2026/09/01 00:00:00..2026/10/01 00:00:00"],
     ["now/h", "A 2026/11/11 12:00:00..2026/11/11 12:41:53"],
     ["now-1d/d+9h", "A 2026/11/10 09:00:00..2026/11/11 12:41:53"],
   ])("fixes %s when read, as %s", (text, shown) => {
@@ -762,9 +739,9 @@ describe("parseTimeInput snap grammar", () => {
     expect(read("11/4")).toBe("A 2026/11/04 00:00:00..2026/11/05 00:00:00");
   });
 
-  it("resolves a far-back snap without walking every period, and refuses one past the calendar", () => {
+  it("refuses a snap offset over ten years without walking every period", () => {
     const started = performance.now();
-    expect(read("now-999999d/d")).toBe("calendar:day:-999999");
+    expect(read("now-999999d/d")).toBe("null");
     expect(read("now-999999y/y")).toBe("null");
     expect(performance.now() - started).toBeLessThan(50);
   });

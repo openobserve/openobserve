@@ -1604,6 +1604,8 @@ export default defineComponent({
         domain_org_mappings: [],
         red_insights_enabled: false,
         ai_rca_thread_tool_output: false,
+        fiscal_year_start_month: 0,
+        range_guard_days: 0,
       };
 
       const org = store.state?.selectedOrganization?.identifier;
@@ -1656,6 +1658,11 @@ export default defineComponent({
           ai_rca_thread_tool_output:
             orgSettings?.data?.data?.ai_rca_thread_tool_output ??
             defaultSettings.ai_rca_thread_tool_output,
+          fiscal_year_start_month:
+            orgSettings?.data?.data?.fiscal_year_start_month ??
+            defaultSettings.fiscal_year_start_month,
+          range_guard_days:
+            orgSettings?.data?.data?.range_guard_days ?? defaultSettings.range_guard_days,
           data_retention: orgSettings?.data?.data?.data_retention,
           resolved_data_retention: orgSettings?.data?.resolved_data_retention,
         });

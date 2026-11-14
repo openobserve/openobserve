@@ -336,7 +336,7 @@ describe("rolling labels read back as the same rolling period [#32]", () => {
   it.each([
     ["1w", "Last 1 week"],
     ["1M", "Last 1 month"],
-    ["12M", "Last 1 year"],
+    ["12M", "Last 12 months"],
     ["7d", "Last 7 days"],
   ])("%s is named %s, never a bare calendar word, and its copy pastes back", (period, name) => {
     const label = String(formatKnownPeriod(period, IST, t, "en-US", NOW_MS));

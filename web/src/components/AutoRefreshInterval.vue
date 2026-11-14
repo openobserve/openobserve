@@ -50,6 +50,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="auto-refresh-trigger-label"
             >{{ t("dateTime.refreshPausedRangeEnded") }}</span
           >
+          <span
+            v-else-if="floorRaisedText"
+            class="text-compact ms-1 leading-4 whitespace-nowrap"
+            data-test="auto-refresh-floor-raised"
+            >{{ floorRaisedText }}</span
+          >
           <OTooltip :content="compactTooltip" side="bottom" />
         </OButton>
         <OButton
@@ -70,7 +76,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{
                 isPausedEnded
                   ? t("dateTime.refreshPausedRangeEnded")
-                  : t("search.autoRefreshTrigger", { interval: triggerLabel })
+                  : floorRaisedText
+                    ? raw(floorRaisedText)
+                    : t("search.autoRefreshTrigger", { interval: triggerLabel })
               }}
             </div>
             <OIcon name="arrow-drop-down" size="sm" class="ms-0.5" />
@@ -103,6 +111,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
         <hr class="border-border-default my-0 border-0 border-t border-solid" />
+        <p
+          v-if="floorNote"
+          class="text-text-secondary px-4 pt-3 text-xs"
+          data-test="auto-refresh-floor-note"
+        >
+          {{ floorNote }}
+        </p>
         <div class="flex flex-col gap-3 px-4 py-3">
           <section v-for="section in refreshSections" :key="section.key">
             <h5 class="text-text-secondary mb-2 text-xs font-semibold tracking-wider uppercase">
@@ -126,7 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   side="right"
                   align="center"
                   max-width="18.75rem"
-                  :content="raw(minRangeRestrictionMessageVal)"
+                  :content="item.reason"
                 />
                 {{ item.shortLabel }}
               </OButton>
@@ -172,7 +187,12 @@ import {
   onUnmounted,
   type PropType,
 } from "vue";
-import { autoRefreshState, fixedRangeEnded, owesCatchUp } from "@/utils/autoRefreshPause";
+import {
+  autoRefreshState,
+  fixedRangeEnded,
+  owesCatchUp,
+  refreshFloorSeconds,
+} from "@/utils/autoRefreshPause";
 import { formatRangeDuration } from "@/utils/timeRangeLabel";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
@@ -231,6 +251,11 @@ export default defineComponent({
       type: Number as PropType<number | null>,
       default: null,
     },
+    /** Length (µs) of the page's range; steps faster than a thousandth of it are greyed. */
+    rangeSpanUs: {
+      type: Number as PropType<number | null>,
+      default: null,
+    },
   },
   emits: ["update:modelValue", "trigger", "live"],
   setup(props: any, { emit }) {
@@ -240,9 +265,23 @@ export default defineComponent({
     const btnRefreshInterval = ref(false);
     let intervalInstance = 0;
 
+    const minRangeRestrictionMessageVal = computed(() =>
+      t("common.minRefreshIntervalMessage", { interval: props.minRefreshInterval }),
+    );
+    const floorSeconds = computed(() =>
+      props.rangeSpanUs && props.rangeSpanUs > 0 ? refreshFloorSeconds(props.rangeSpanUs) : 0,
+    );
+    const isBelowFloor = (value: number) => value < floorSeconds.value;
     const isDisabled = (value: number) => {
-      return value < props.minRefreshInterval;
+      return value < props.minRefreshInterval || isBelowFloor(value);
     };
+    const spanText = computed(() =>
+      props.rangeSpanUs ? formatRangeDuration(0, props.rangeSpanUs) : "",
+    );
+    const itemTooltip = (value: number) =>
+      isBelowFloor(value)
+        ? t("timeRangeHost.refreshTooFast", { span: spanText.value })
+        : minRangeRestrictionMessageVal.value;
 
     const refreshTimes = computed(() =>
       [
@@ -255,6 +294,7 @@ export default defineComponent({
           shortLabel: autoRefreshShortLabel(value, t),
           value: value as number,
           disabled: isDisabled(value),
+          reason: isDisabled(value) ? itemTooltip(value) : undefined,
         })),
       ),
     );
@@ -431,6 +471,27 @@ export default defineComponent({
       resetTimers();
     };
 
+    const FLOOR_NOTICE_MS = 8000;
+    const floorRaisedText = ref("");
+    let floorNoticeTimer: ReturnType<typeof setTimeout> | undefined;
+    // A wider range must not keep a refresh faster than its floor; the change is named once.
+    watch(floorSeconds, (floor) => {
+      const current = Number(selectedValue.value);
+      if (!(current > 0) || current >= floor) return;
+      floorRaisedText.value = `${autoRefreshShortLabel(current, t)} → ${autoRefreshShortLabel(floor, t)}`;
+      clearTimeout(floorNoticeTimer);
+      floorNoticeTimer = setTimeout(() => (floorRaisedText.value = ""), FLOOR_NOTICE_MS);
+      emit("update:modelValue", floor);
+    });
+    const floorNote = computed(() =>
+      floorSeconds.value > AUTO_REFRESH_INTERVALS[0]
+        ? t("timeRangeHost.refreshFastest", {
+            range: spanText.value,
+            interval: autoRefreshShortLabel(floorSeconds.value, t),
+          })
+        : "",
+    );
+
     watch(selectedValue, () => {
       caughtUp.value = false;
       resetTimers();
@@ -442,10 +503,6 @@ export default defineComponent({
     );
 
     onMounted(() => document.addEventListener("visibilitychange", onVisibilityChange));
-
-    const minRangeRestrictionMessageVal = computed(() =>
-      t("common.minRefreshIntervalMessage", { interval: props.minRefreshInterval }),
-    );
 
     // on component mount and unmount, update the intervals
     onActivated(() => {
@@ -460,6 +517,7 @@ export default defineComponent({
 
     onUnmounted(() => {
       clearInterval(intervalInstance);
+      clearTimeout(floorNoticeTimer);
       document.removeEventListener("visibilitychange", onVisibilityChange);
     });
 
@@ -486,6 +544,8 @@ export default defineComponent({
       compactTooltip,
       goLiveTooltip,
       onCloseAutoFocus,
+      floorRaisedText,
+      floorNote,
     };
   },
 });

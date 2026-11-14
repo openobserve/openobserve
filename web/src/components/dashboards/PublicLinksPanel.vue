@@ -169,10 +169,11 @@
                 >
                   <div class="relative">
                     <DateTime
+                      preset="form"
+                      :capabilities="{ kinds: ['rolling', 'fixed'] }"
                       class="min-w-0"
                       field-appearance
                       menu-align="start"
-                      auto-apply
                       hide-range-shift
                       hide-seconds
                       :default-open="row.id === addedRowId"

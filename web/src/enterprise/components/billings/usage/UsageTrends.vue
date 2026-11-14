@@ -60,9 +60,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <!-- The logs search bar's picker, absolute only, so `min-date` keeps it from reaching before the data; ‹ stops there too. -->
         <DateTime
+          preset="explorer-auto"
+          :capabilities="{ kinds: ['fixed'] }"
           ref="picker"
-          auto-apply
-          disable-relative
           :disable-prev-shift="range.start <= oldest"
           menu-align="end"
           class="ms-auto"

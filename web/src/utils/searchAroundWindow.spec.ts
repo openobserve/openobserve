@@ -28,6 +28,10 @@ import {
   searchAroundSecondsLabel,
   searchAroundTimeOptions,
   windowQueryForRun,
+  contextViewKeeps,
+  contextViewText,
+  readSearchAroundKeepFilters,
+  writeSearchAroundKeepFilters,
   type WindowQuery,
 } from "./searchAroundWindow";
 
@@ -131,10 +135,14 @@ describe("window query bound to its window", () => {
     });
   });
 
-  it("keeps a pinned window only for that exact range, view and typed query", () => {
+  // §4 context view: steps and zooms keep it; a panel apply leaves it through contextViewKeeps.
+  it("keeps a pinned window across range moves, for the same view and typed query", () => {
     const pinned = windowQueryForRun(armed, run);
     expect(windowQueryForRun(pinned, run)).toEqual(pinned);
-    expect(windowQueryForRun(pinned, { ...run, endUs: 5_000_001 })).toBeNull();
+    expect(windowQueryForRun(pinned, { ...run, endUs: 5_000_001 })).toEqual({
+      ...pinned,
+      endUs: 5_000_001,
+    });
     expect(windowQueryForRun(pinned, { ...run, view: "patterns" })).toBeNull();
     expect(windowQueryForRun(pinned, { ...run, query: "level = 'warn'" })).toBeNull();
     expect(windowQueryForRun(pinned, { ...run, startUs: null, endUs: null })).toBeNull();
@@ -144,5 +152,56 @@ describe("window query bound to its window", () => {
     expect(windowQueryForRun(armed, { ...run, startUs: 2_000_000 })).toBeNull();
     expect(windowQueryForRun(armed, { ...run, endUs: 9_002_000 })).toBeNull();
     expect(windowQueryForRun(null, run)).toBeNull();
+  });
+});
+
+describe("context view", () => {
+  it("stays on for steps, zoom-out and drag-zoom, and leaves on any other apply", () => {
+    expect(contextViewKeeps("step")).toBe(true);
+    expect(contextViewKeeps("zoom-out")).toBe(true);
+    expect(contextViewKeeps("drag-zoom")).toBe(true);
+    expect(contextViewKeeps("panel")).toBe(false);
+    expect(contextViewKeeps("undo")).toBe(false);
+    expect(contextViewKeeps("live")).toBe(false);
+  });
+});
+
+describe("Keep filters choice", () => {
+  beforeEach(() => window.localStorage.clear());
+
+  it("is off until the user turns it on, and remembered per user", () => {
+    expect(readSearchAroundKeepFilters("a@x")).toBe(false);
+    writeSearchAroundKeepFilters("a@x", true);
+    expect(readSearchAroundKeepFilters("a@x")).toBe(true);
+    expect(readSearchAroundKeepFilters("b@x")).toBe(false);
+    writeSearchAroundKeepFilters("a@x", false);
+    expect(readSearchAroundKeepFilters("a@x")).toBe(false);
+  });
+});
+
+describe("contextViewText", () => {
+  const t = ((key: string, params?: Record<string, unknown>) =>
+    `${key}:${JSON.stringify(params ?? {})}`) as unknown as Parameters<typeof contextViewText>[2];
+  const window = {
+    query: "",
+    typedQuery: "level = 'error'",
+    view: "logs",
+    startUs: 0,
+    endUs: 1,
+    pinned: true,
+    anchorUs: Date.UTC(2026, 10, 12, 15, 43, 49, 948) * 1000,
+    seconds: 300,
+  };
+
+  it("names the window and the row's instant in the app zone", () => {
+    const text = String(contextViewText(window, "Asia/Calcutta", t));
+    expect(text).toContain("timeRangeHost.contextStrip");
+    expect(text).toContain('"instant":"21:13:49.948"');
+    expect(text).toContain("dateTime.aroundMinutes");
+  });
+
+  it("is null without a context view or without its row", () => {
+    expect(contextViewText(null, "UTC", t)).toBeNull();
+    expect(contextViewText({ ...window, anchorUs: undefined }, "UTC", t)).toBeNull();
   });
 });

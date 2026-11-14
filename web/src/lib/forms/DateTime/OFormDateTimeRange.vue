@@ -108,6 +108,7 @@ const onDateChange = (field: any, dt: any) => {
       <div v-if="$slots.above" class="mb-2"><slot name="above" /></div>
       <DateTime
         :key="renderKey"
+        preset="form"
         v-bind="$attrs"
         :default-type="field.state.value?.type ?? 'relative'"
         :default-absolute-time="{

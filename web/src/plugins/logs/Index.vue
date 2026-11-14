@@ -316,6 +316,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         shortcut-id="logsRunQuery"
                         @run="() => searchBarRef?.handleRunQueryFn?.()"
                       />
+                      <StaleRangeStrip
+                        v-if="contextViewText"
+                        :text="contextViewText"
+                        :run-label="t('timeRangeHost.applyFilter')"
+                        :back-label="t('timeRangeHost.backToResults')"
+                        data-test="logs-search-around-context-strip"
+                        @run="applyContextFilter"
+                        @back="leaveContextView"
+                      />
                       <LogsPermalinkBanner
                         @retry="onPermalinkRetry"
                         @show-lines="onPermalinkShowLines"
@@ -416,6 +425,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         data-test="logs-search-bar-stale-range-strip"
                         shortcut-id="logsRunQuery"
                         @run="() => searchBarRef?.handleRunQueryFn?.()"
+                      />
+                      <StaleRangeStrip
+                        v-if="contextViewText"
+                        :text="contextViewText"
+                        :run-label="t('timeRangeHost.applyFilter')"
+                        :back-label="t('timeRangeHost.backToResults')"
+                        data-test="logs-search-around-context-strip"
+                        @run="applyContextFilter"
+                        @back="leaveContextView"
                       />
                       <div v-if="showSearchCancelledNotice" class="flex items-center px-2.5 pt-2">
                         <OBadge
@@ -810,6 +828,10 @@ import {
 } from "@/composables/useLogs/useLogsUrl";
 import { useLogsUrlSync } from "@/composables/useLogs/useLogsUrlSync";
 import { useSearchAround, searchAroundPickerRange } from "@/composables/useLogs/searchAround";
+import {
+  contextViewText as contextViewTextFor,
+  type SearchAroundRequest,
+} from "@/utils/searchAroundWindow";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import StaleRangeStrip from "@/components/StaleRangeStrip.vue";
 import { liveTimeSelection, staleQueriedRange } from "@/utils/logsStaleRange";
@@ -894,8 +916,19 @@ export default defineComponent({
       return this.searchBarRef.dateTimeRef.setCustomDate("absolute", date) !== false;
     },
     // The setCustomDate behind setHistogramDate re-runs the search, so the unfiltered query is armed first.
-    onSearchAroundWindow(range: { startUs: number; endUs: number }) {
-      this.armWindowQuery(range);
+    onSearchAroundWindow(range: SearchAroundRequest) {
+      const datetime = this.searchObj.data.datetime;
+      if (!range.keepFilters)
+        this.armWindowQuery(range, {
+          anchorUs: range.anchorUs,
+          seconds: range.seconds,
+          previous: {
+            type: String(datetime.type ?? "relative"),
+            startTime: Number(datetime.startTime),
+            endTime: Number(datetime.endTime),
+            relativeTimePeriod: String(datetime.relativeTimePeriod ?? ""),
+          },
+        });
       const applied = this.setHistogramDate(
         searchAroundPickerRange(range, this.store.state.timezone),
       );
@@ -4027,8 +4060,32 @@ export default defineComponent({
     });
     const showGuardBanner = computed(() => guardBlocksGrid.value && !showGuardEmptyState.value);
     // Logs runs by hand, so a picked range sits over the old results until Run; say which range they are.
+    // §4 context view: the unfiltered window on screen while the typed query is unchanged.
+    const contextViewText = computed(() => {
+      const around = searchObj.data.searchAround.windowQuery;
+      if (!around || searchObj.meta.logsVisualizeToggle !== "logs") return null;
+      if (String(searchObj.data.query ?? "").trim() !== around.typedQuery.trim()) return null;
+      return contextViewTextFor(around, store.state.timezone, t);
+    });
+    const applyContextFilter = () => {
+      searchObj.data.searchAround.windowQuery = null;
+      (searchBarRef.value as { handleRunQueryFn?: () => void } | null)?.handleRunQueryFn?.();
+    };
+    const leaveContextView = async () => {
+      const previous = searchObj.data.searchAround.windowQuery?.previous;
+      searchObj.data.searchAround.windowQuery = null;
+      const picker = (searchBarRef.value as { dateTimeRef?: any } | null)?.dateTimeRef;
+      if (previous && picker) {
+        if (previous.type === "relative" && previous.relativeTimePeriod)
+          picker.setRelativeTime(previous.relativeTimePeriod);
+        else picker.setAbsoluteTime(previous.startTime, previous.endTime);
+        await nextTick();
+      }
+      (searchBarRef.value as { handleRunQueryFn?: () => void } | null)?.handleRunQueryFn?.();
+    };
     const staleRangeText = computed(() => {
       if (isAutoRunOn.value || searchObj.loading) return null;
+      if (contextViewText.value) return null;
       if (searchObj.meta.logsVisualizeToggle !== "logs") return null;
       const queried = staleQueriedRange(
         searchObj.meta.executed?.signature?.time,
@@ -4364,6 +4421,9 @@ export default defineComponent({
       onPermalinkAddSearchTerm,
       runSearchAround,
       armWindowQuery,
+      contextViewText,
+      applyContextFilter,
+      leaveContextView,
       onSharedPageGo,
       refreshHistogramChart,
       onChangeInterval,

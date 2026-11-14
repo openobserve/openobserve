@@ -394,7 +394,13 @@ describe("DetailTable Component", () => {
     it("emits the row's time ± 5 min by default instead of a record search", async () => {
       await click();
       expect(wrapper.emitted()["search:aroundwindow"][0]).toEqual([
-        { startUs: ts - 5 * minuteUs, endUs: ts + 5 * minuteUs },
+        {
+          startUs: ts - 5 * minuteUs,
+          endUs: ts + 5 * minuteUs,
+          anchorUs: ts,
+          seconds: 300,
+          keepFilters: false,
+        },
       ]);
       expect(wrapper.emitted()["search:timeboxed"]).toBeUndefined();
     });
@@ -406,7 +412,13 @@ describe("DetailTable Component", () => {
       await nextTick();
       await wrapper.find('[data-test="logs-detail-table-search-around-btn"]').trigger("click");
       expect(wrapper.emitted()["search:aroundwindow"][0]).toEqual([
-        { startUs: ts - minuteUs, endUs: ts + minuteUs },
+        {
+          startUs: ts - minuteUs,
+          endUs: ts + minuteUs,
+          anchorUs: ts,
+          seconds: 60,
+          keepFilters: false,
+        },
       ]);
     });
 
@@ -414,8 +426,24 @@ describe("DetailTable Component", () => {
       wrapper.vm.setSearchAroundChoice("s30");
       await click();
       expect(wrapper.emitted()["search:aroundwindow"][0]).toEqual([
-        { startUs: ts - 30_000_000, endUs: ts + 30_000_000 },
+        {
+          startUs: ts - 30_000_000,
+          endUs: ts + 30_000_000,
+          anchorUs: ts,
+          seconds: 30,
+          keepFilters: false,
+        },
       ]);
+    });
+
+    it("asks to keep the filter when Keep filters is on, and remembers it per user", async () => {
+      wrapper.vm.setSearchAroundKeepFilters(true);
+      await click();
+      expect(wrapper.emitted()["search:aroundwindow"][0][0]).toMatchObject({ keepFilters: true });
+      expect(window.localStorage.getItem("o2.searchAroundKeepFilters.example@gmail.com")).toBe(
+        "true",
+      );
+      wrapper.vm.setSearchAroundKeepFilters(false);
     });
 
     it("runs the existing record search for a records choice", async () => {

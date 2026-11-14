@@ -19,10 +19,9 @@
            filter. Refresh re-queries everything. -->
       <div class="flex items-center justify-end gap-2 px-5 pt-3">
         <DateTimePickerDashboard
+          preset="explorer-auto"
           ref="dateTimePickerRef"
           v-model="selectedDate"
-          :auto-apply-dashboard="true"
-          calendar-presets
           class="flex-none"
           data-test="scorer-detail-runs-window"
         />

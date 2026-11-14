@@ -20,7 +20,10 @@ import { formatDurationMicros } from "@/utils/timeRangeRail";
 import { formatRangeDates, formatRangeDuration } from "@/utils/timeRangeLabel";
 import { anchorWindowLabel, dropZeroMilliseconds } from "@/utils/timeRangeAnchor";
 import { formatReadingNote, readingNote } from "@/utils/timeRangeNotes";
-import type { ParsedTimeInput } from "@/utils/dateTimeRangeParse";
+import type { ParsedTimeInput, TimeTextAnswer } from "@/utils/dateTimeRangeParse";
+import { timeRangeEndsNote, timeRangeName } from "@/utils/timeRangeFormat";
+import type { TimeRangeContext, TimeRangeKind } from "@/utils/timeRangeModel";
+import { weekStartsOn } from "@/utils/weekStart";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import {
   MICROS_PER_SECOND,
@@ -42,8 +45,8 @@ export interface SummaryLine {
 }
 
 export interface TimeRangeSummaryProps {
-  disableRelative: boolean;
-  hideRelativeTime: boolean;
+  kinds: TimeRangeKind[];
+  wholeDays: boolean;
   queryRangeRestrictionInHour: number;
 }
 
@@ -60,6 +63,7 @@ export interface TimeRangeSummaryDeps {
     shownReading: ComputedRef<ParsedTimeInput | null>;
     inputPlan: ComputedRef<InputPlan | null>;
     shownTag: ComputedRef<SuggestionTag>;
+    textAnswer?: Ref<TimeTextAnswer | null>;
   };
   selectedType: Ref<string>;
   pendingDay: Ref<string | null>;
@@ -82,6 +86,19 @@ export default function useTimeRangeSummary(
 
   // A fixed range drawn in another zone after a zone change; it names the same instants.
   const zoneRedrawn = ref(false);
+
+  // A host that stores fixed ranges only shows no live/fixed tag, as there is no other kind.
+  const fixedOnly = computed(
+    () => !props.kinds.includes("rolling") && !props.kinds.includes("calendar"),
+  );
+
+  const rangeContext = (): TimeRangeContext => ({
+    nowUs: Date.now() * 1000,
+    zone: zone.value,
+    weekStart: weekStartsOn(),
+    locale: intlLocale.value,
+    fiscalYearStartMonth: null,
+  });
 
   const kindText = (live: boolean | undefined) =>
     String(live ? t("dateTime.tagLive") : t("dateTime.fixed"));
@@ -118,7 +135,7 @@ export default function useTimeRangeSummary(
       name: formatRangeDates({ startUs: start, endUs: end }, labelOptions()),
       range: "",
       duration: formatRangeDuration(start, end),
-      fixed: !props.disableRelative,
+      fixed: !fixedOnly.value,
     };
   };
 
@@ -150,8 +167,8 @@ export default function useTimeRangeSummary(
     if (!range || !Number.isFinite(range.startTime) || !Number.isFinite(range.endTime)) {
       return { name: "", range: "", duration: "" };
     }
-    if (props.hideRelativeTime) return resolvedDays(range);
-    if (selectedType.value === "relative" && !props.disableRelative) {
+    if (props.wholeDays) return resolvedDays(range);
+    if (selectedType.value === "relative" && !fixedOnly.value) {
       return liveLine(deps.currentRelativePeriod(), range.startTime, range.endTime);
     }
     const line = fixedLine(range.startTime, range.endTime);
@@ -164,26 +181,20 @@ export default function useTimeRangeSummary(
     return note ? String(formatReadingNote(note, t, intlLocale.value, zone.value)) : "";
   };
 
-  const rollingLine = (
-    period: string,
-    startTime: number,
-    cut = false,
-    fromCalendar = false,
-  ): SummaryLine => {
-    const line = liveLine(period, startTime, tooltipNow.value * 1000);
-    const note = cut ? t("dateTime.cutToTenYears") : fromCalendar ? t("dateTime.rollingHere") : "";
-    return { ...line, note: String(note), ready: true };
-  };
+  const rollingLine = (period: string, startTime: number): SummaryLine => ({
+    ...liveLine(period, startTime, tooltipNow.value * 1000),
+    note: "",
+    ready: true,
+  });
 
-  const absoluteLine = (
-    start: number,
-    end: number,
-    cutToNow = false,
-    name?: string,
-  ): SummaryLine => {
-    if (props.hideRelativeTime)
+  // A range that runs past now keeps its real end (O1) and says when it ends.
+  const absoluteLine = (start: number, end: number, typedName?: string): SummaryLine => {
+    if (props.wholeDays)
       return { ...resolvedDays({ startTime: start, endTime: end }), ready: true };
     const reading = shownReading.value;
+    const range = { kind: "fixed" as const, startUs: start, endUs: end };
+    const ctx = rangeContext();
+    const name = timeRangeName(range, ctx) ?? typedName;
     const line = name ? namedLine(start, end, name) : fixedLine(start, end);
     const tag = shownTag.value;
     if (tag && "anchor" in tag && tag.anchor !== "to-now" && reading?.type === "timestamp") {
@@ -207,23 +218,21 @@ export default function useTimeRangeSummary(
       };
     }
     const notes = [noteFor(tag ? first : reading, inputAsUtc.value)];
-    if (cutToNow) notes.push(String(t("dateTime.cutToNow")));
+    const ends = timeRangeEndsNote(range, ctx);
+    if (ends) notes.push(String(ends));
     return { ...line, note: notes.filter(Boolean).join(" · "), ready: true };
   };
 
   const calendarLine = (token: string, typedName?: string): SummaryLine | null => {
     const range = resolveCalendarPeriod(token, zone.value, tooltipNow.value);
     if (!range) return null;
-    if (props.hideRelativeTime) {
+    if (props.wholeDays) {
       return {
         ...absoluteLine(range.startTime, range.endTime),
         name: typedName ?? String(relativeLabel(token)),
       };
     }
-    const line = liveLine(token, range.startTime, range.endTime, typedName);
-    // A typed fiscal year keeps its note when it applies as this year.
-    const note = typedName ? noteFor(shownReading.value, false) : "";
-    return { ...line, note, ready: true };
+    return { ...liveLine(token, range.startTime, range.endTime, typedName), ready: true };
   };
 
   const overLimitNote = (typed: string): I18nText => {
@@ -284,30 +293,38 @@ export default function useTimeRangeSummary(
         }
       : null;
 
+  // Text answered without a range: a comparison, or FY before the org sets its start (O4, O5).
+  const answerLine = (): SummaryLine | null => {
+    const answer = typing.textAnswer?.value;
+    if (!inputText.value.trim() || typing.inputError.value) return null;
+    if (answer === "compare") {
+      const note = `${String(t("dateTime.compareNotAvailable"))} · ${String(t("dateTime.pickOnePeriod"))}`;
+      return { name: "", range: "", duration: "", note };
+    }
+    if (answer !== "fiscalUnset") return null;
+    const note = String(t("dateTime.fiscalYearUnset"));
+    return { name: "", range: "", duration: "", note, warning: true };
+  };
+
   // What Enter would apply, in the summary row; the panel's buttons and calendar keep showing the applied range.
   const previewLine = computed<SummaryLine | null>(() => {
     if (typedFieldLine.value) return typedFieldLine.value;
     if (calendarPickLine.value) return calendarPickLine.value;
     const plan = typing.inputPlan.value;
-    if (!plan) return reversedLine() ?? futureLine();
+    if (!plan) return answerLine() ?? reversedLine() ?? futureLine();
     if (plan.kind === "refused" || plan.kind === "restricted") {
-      const overLimit = plan.kind === "restricted" && !plan.retention;
+      const overLimit = plan.kind === "restricted" && !plan.retention && !plan.unavailable;
       const message = overLimit ? overLimitNote(inputText.value.trim()) : plan.message;
       return { name: "", range: "", duration: "", note: String(message), warning: true };
     }
     if (plan.kind === "rolling") {
-      const line = rollingLine(
-        `${plan.value}${plan.unit}`,
-        plan.startTime,
-        plan.cut,
-        plan.fromCalendar,
-      );
+      const line = rollingLine(`${plan.value}${plan.unit}`, plan.startTime);
       const tag = shownTag.value;
       if (!tag || !("longestAllowed" in tag)) return line;
       return { ...line, note: String(overLimitNote(inputText.value.trim())), warning: true };
     }
     if (plan.kind === "calendar") return calendarLine(plan.token, plan.name);
-    return absoluteLine(plan.start, plan.end, plan.cutToNow, plan.name);
+    return absoluteLine(plan.start, plan.end, plan.name);
   });
 
   const shownLine = computed<SummaryLine>(() => previewLine.value ?? resolvedLine.value);

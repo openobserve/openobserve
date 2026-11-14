@@ -280,9 +280,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :data-test="`dashboard-panel-${item.id}-time-picker`"
                       >
                         <DateTimePickerDashboard
+                          preset="dashboard"
                           :modelValue="getPanelPickedTime(item.id) ?? panelTimeValues[item.id]"
-                          :auto-apply-dashboard="true"
-                          calendar-presets
                           size="sm"
                           class="panel-time-picker-widget"
                           @update:modelValue="(val) => getPanelTimeGate(item.id).onPick(val)"

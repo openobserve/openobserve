@@ -16,7 +16,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <DateTime
     ref="dateTimePicker"
-    :auto-apply="autoApplyDashboard"
     :default-type="modelValue.valueType"
     :default-absolute-time="{
       startTime: modelValue.startTime,
@@ -31,9 +30,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :hide-range-shift="hideRangeShift"
     :menu-align="menuAlign"
     :variant="variant"
-    :calendar-presets="calendarPresets"
     :preset="preset"
-    :zone-badge="zoneBadge"
+    :capabilities="capabilities"
+    :host-name="hostName"
+    @apply="onApply"
     @hide="onHide"
     @show="onShow"
   >
@@ -44,7 +44,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, defineComponent, onUnmounted, type PropType } from "vue";
 import DateTime from "@/components/DateTime.vue";
 import type { ButtonVariant } from "@/lib/core/Button/OButton.types";
-import type { TimeRangePreset } from "@/utils/timeRangeList";
+import type {
+  TimeRange,
+  TimeRangeApplyMeta,
+  TimeRangeCapabilities,
+  TimeRangeHostPreset,
+} from "@/utils/timeRangeModel";
 
 export default defineComponent({
   name: "DateTimePickerDashboard",
@@ -69,10 +74,6 @@ export default defineComponent({
       required: false,
       default: false,
     },
-    autoApplyDashboard: {
-      required: false,
-      default: false,
-    },
     hideRelativeTimezone: {
       required: false,
       default: false,
@@ -93,23 +94,23 @@ export default defineComponent({
       default: "outline",
       type: String as PropType<ButtonVariant>,
     },
-    calendarPresets: {
-      required: false,
-      default: false,
-      type: Boolean,
-    },
     preset: {
       required: false,
-      default: "ops",
-      type: String as PropType<TimeRangePreset>,
+      default: "dashboard",
+      type: String as PropType<TimeRangeHostPreset>,
     },
-    zoneBadge: {
+    capabilities: {
       required: false,
-      default: "auto",
-      type: String as PropType<"auto" | "always">,
+      default: () => ({}),
+      type: Object as PropType<TimeRangeCapabilities>,
+    },
+    hostName: {
+      required: false,
+      default: "",
+      type: String,
     },
   },
-  emits: ["update:modelValue", "hide", "show", "timezone-change"],
+  emits: ["update:modelValue", "hide", "show", "timezone-change", "apply"],
 
   setup(props, { emit }) {
     const dateTimePicker: any = ref(null);
@@ -126,6 +127,10 @@ export default defineComponent({
 
       // The second argument tells a page the picker's own corrections apart from a user's pick.
       emit("update:modelValue", newValue, { userChanged: date.userChangedValue !== false });
+    };
+
+    const onApply = (range: TimeRange, meta: TimeRangeApplyMeta) => {
+      emit("apply", range, meta);
     };
 
     const refresh = () => {
@@ -158,12 +163,7 @@ export default defineComponent({
       emit("timezone-change");
     };
 
-    // Clean up resources on unmount to prevent memory leaks
     onUnmounted(() => {
-      // If you add intervals, listeners, or subscriptions, clean them up here.
-      // Example:
-      // if (someInterval) clearInterval(someInterval);
-      // if (someListener) someListener.off();
       if (dateTimePicker.value) {
         dateTimePicker.value = null;
       }
@@ -171,6 +171,7 @@ export default defineComponent({
 
     return {
       updateDateTime,
+      onApply,
       refresh,
       dateTimePicker,
       setCustomDate,

@@ -42,7 +42,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <DbmScopeFilters class="min-w-0 flex-1" :filters="dimensionFilters" @clear="clearScope" />
         <DateTime
-          auto-apply
+          preset="explorer-auto"
+          :capabilities="{ kinds: ['rolling', 'fixed'] }"
           menu-align="end"
           :default-type="range.type"
           :default-absolute-time="{ startTime: range.startTime, endTime: range.endTime }"

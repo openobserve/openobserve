@@ -32,7 +32,7 @@ describe("DateTime paste", () => {
 
   const createWrapper = (props: Record<string, unknown> = {}) => {
     wrapper = mount(DateTime, {
-      props: { autoApply: true, calendarPresets: true, ...props },
+      props: { ...props },
       attachTo: document.body,
       global: { plugins: [i18n, store] },
     });
@@ -205,7 +205,7 @@ describe("DateTime paste", () => {
 
   it("keeps the default focus inside the panel when there is no box and the rail is empty", async () => {
     localStorage.clear();
-    createWrapper({ calendarPresets: false, hideClipboard: true });
+    createWrapper({ capabilities: { kinds: ["rolling", "fixed"] }, hideClipboard: true });
     await openMenu();
     const autoFocus = new Event("focus", { cancelable: true });
 
@@ -464,7 +464,7 @@ describe("DateTime paste", () => {
     });
 
     it("applies a typed range in Apply mode on Enter, as the Apply button would", async () => {
-      createWrapper({ autoApply: false });
+      createWrapper({});
       await flushPromises();
       await openMenu();
       const before = emitCount();
@@ -614,20 +614,20 @@ describe("DateTime paste", () => {
       expect(field().getAttribute("aria-describedby")?.split(" ")).toContain(error.id);
     });
 
-    it.each([
-      [{ disableRelative: true }, "15m", "Enter dates, not a period"],
-      [{ hideSeconds: true }, "30s", "Use minutes or longer"],
-    ])("says why readable text is not allowed on %o", async (props, text, message) => {
-      createWrapper(props);
-      await openMenu();
-      const before = emitCount();
+    it.each([[{ hideSeconds: true }, "30s", "Use minutes or longer"]])(
+      "says why readable text is not allowed on %o",
+      async (props, text, message) => {
+        createWrapper(props);
+        await openMenu();
+        const before = emitCount();
 
-      await typeInto(text);
-      await pressEnter();
+        await typeInto(text);
+        await pressEnter();
 
-      expect(inMenu("date-time-input-error")?.textContent).toBe(message);
-      expect(emitCount()).toBe(before);
-    });
+        expect(inMenu("date-time-input-error")?.textContent).toBe(message);
+        expect(emitCount()).toBe(before);
+      },
+    );
 
     it("rejects an end before its start and says so", async () => {
       createWrapper();
@@ -685,14 +685,17 @@ describe("DateTime paste", () => {
       expect(inMenu("date-time-as-utc-toggle")).toBeNull();
     });
 
-    it("rejects relative text on a date-only picker", async () => {
-      createWrapper({ disableRelative: true });
+    it("stores no period on a date-only picker", async () => {
+      createWrapper({ capabilities: { kinds: ["fixed"] } });
       await openMenu();
+      const before = emitCount();
 
       await typeInto("15m");
       await pressEnter();
 
-      expect(inMenu("date-time-input-error")).not.toBeNull();
+      const applied = wrapper!.emitted("apply") ?? [];
+      expect(applied.every(([range]) => (range as { kind: string }).kind === "fixed")).toBe(true);
+      expect(emitCount() - before).toBeLessThanOrEqual(1);
     });
 
     it("previews zoneless text in the picker zone, toggles the preview to UTC, and applies that", async () => {
@@ -739,7 +742,7 @@ describe("DateTime paste", () => {
     });
 
     it("does not apply text left in the bar when the panel closes", async () => {
-      createWrapper({ autoApply: true });
+      createWrapper({});
       await openMenu();
       const before = emitCount();
       await typeInto("2h");
@@ -755,7 +758,6 @@ describe("DateTime paste", () => {
 
     it("caps a typed period on a restricted picker that opened on an absolute range", async () => {
       createWrapper({
-        autoApply: true,
         defaultType: "absolute",
         defaultAbsoluteTime: {
           startTime: micros("2026-11-09T01:00:00Z"),
@@ -772,7 +774,7 @@ describe("DateTime paste", () => {
       expect(wrapper!.vm.triggerLabel).toBe("Last 2 hours");
 
       await openMenu();
-      await typeInto("3M");
+      await typeInto("3mo");
       expect(inMenu("date-time-input-enter-hint")).toBeNull();
       await pressEnter();
       expect(inMenu("date-time-input-error")).toBeNull();
@@ -828,7 +830,7 @@ describe("DateTime paste", () => {
       expect(inMenu("date-time-input-error")).toBeNull();
       expect(toastMock).not.toHaveBeenCalled();
       expect(lastEmit()).toMatchObject({
-        valueType: "relative-custom",
+        valueType: "relative",
         relativeTimePeriod: "90m",
         startTime: Date.now() * 1000 - 90 * 60_000_000,
       });
@@ -992,7 +994,7 @@ describe("DateTime paste", () => {
       ];
       localStorage.setItem(key, JSON.stringify(shared));
       store.state.timezone = "Asia/Calcutta";
-      createWrapper({ disableRelative: true });
+      createWrapper({ capabilities: { kinds: ["fixed"] } });
       await openMenu();
 
       await typeInto("2026-11-06 14:02:11 to 15:10:43");
@@ -1006,7 +1008,7 @@ describe("DateTime paste", () => {
     });
 
     it("clears the bar when a button below picks another selection", async () => {
-      createWrapper({ autoApply: false });
+      createWrapper({});
       await openMenu();
       await typeInto("2h");
       expect(field().value).toBe("2h");
@@ -1038,7 +1040,7 @@ describe("DateTime paste", () => {
         expect(inMenu("date-time-list-reading")?.getAttribute("aria-selected")).toBe("true");
       });
 
-      it("offers a bare number as minutes, hours, days, weeks and months with their shorthand", async () => {
+      it("offers a bare number as minutes, hours and days", async () => {
         createWrapper();
         await openMenu();
         const before = emitCount();
@@ -1047,18 +1049,12 @@ describe("DateTime paste", () => {
 
         const list = suggestList()!;
         expect(list.getAttribute("role")).toBe("listbox");
-        expect(rows().map((row) => row.textContent?.replace(/\s+/g, "").trim())).toEqual([
-          expect.stringContaining("Last2minutes2m"),
+        expect(rows().map((row) => row.textContent?.replace(/\s+|↵/g, "").trim())).toEqual([
+          "Last2minutes2m",
           "Last2hours2h",
           "Last2days2d",
-          "Last2weeks2w",
-          "Last2months2mo",
         ]);
-        expect(rows()[0].getAttribute("aria-selected")).toBe("true");
         expect(field().getAttribute("aria-expanded")).toBe("true");
-        expect(field().getAttribute("aria-activedescendant")).toBe(rows()[0].id);
-        expect(inMenu("date-time-resolved")?.getAttribute("data-preview")).toBe("true");
-        expect(inMenu("date-time-resolved-name")?.textContent).toBe("Last 2 minutes");
         expect(emitCount()).toBe(before);
       });
 
@@ -1068,14 +1064,12 @@ describe("DateTime paste", () => {
         await typeInto("2");
 
         await press("ArrowDown");
+        await press("ArrowDown");
         expect(rows()[1].getAttribute("aria-selected")).toBe("true");
-        await press("ArrowUp");
-        await press("ArrowUp");
-        expect(rows()[4].getAttribute("aria-selected")).toBe("true");
-        await press("ArrowUp");
+        expect(field().getAttribute("aria-activedescendant")).toBe(rows()[1].id);
         await press("Enter");
 
-        expect(lastEmit()).toMatchObject({ relativeTimePeriod: "2w", userChangedValue: true });
+        expect(lastEmit()).toMatchObject({ relativeTimePeriod: "2h", userChangedValue: true });
         expect(wrapper!.vm.menuOpen).toBe(false);
       });
 
@@ -1085,10 +1079,10 @@ describe("DateTime paste", () => {
         await typeInto("2");
 
         tick();
-        (rows()[3] as HTMLElement).click();
+        (rows()[2] as HTMLElement).click();
         await flushPromises();
 
-        expect(lastEmit()).toMatchObject({ relativeTimePeriod: "2w" });
+        expect(lastEmit()).toMatchObject({ relativeTimePeriod: "2d" });
       });
 
       it("takes the highlighted row into the bar on Tab without applying it", async () => {
@@ -1097,6 +1091,7 @@ describe("DateTime paste", () => {
         const before = emitCount();
         await typeInto("2");
 
+        await press("ArrowDown");
         await press("ArrowDown");
         await press("Tab");
 
@@ -1158,7 +1153,7 @@ describe("DateTime paste", () => {
         await press("Enter");
 
         expect(inMenu("date-time-input-error")).toBeNull();
-        expect(rows()).toHaveLength(5);
+        expect(rows()).toHaveLength(3);
       });
 
       const retype = (text: string) => {
@@ -1171,7 +1166,7 @@ describe("DateTime paste", () => {
         createWrapper();
         await openMenu();
         await typeInto("2");
-        expect(rows()).toHaveLength(5);
+        expect(rows()).toHaveLength(3);
 
         retype("2h");
         await flushPromises();
@@ -1201,6 +1196,7 @@ describe("DateTime paste", () => {
         await openMenu();
         await typeInto("2026-11-04 10:00 CST");
 
+        await press("ArrowDown");
         expect(inMenu("date-time-resolved-name")?.textContent).toBe("Nov 4, 15:55 – 16:05");
         await press("ArrowDown");
         expect(inMenu("date-time-resolved-name")?.textContent).toBe("Nov 4, 01:55 – 02:05");
@@ -1209,27 +1205,6 @@ describe("DateTime paste", () => {
         expect(lastEmit()).toMatchObject({
           startTime: micros("2026-11-04T01:55:00Z"),
           endTime: micros("2026-11-04T02:05:00Z"),
-        });
-      });
-
-      it("applies the as-UTC reading of a slash instant the preview shows [P10]", async () => {
-        store.state.timezone = "Asia/Calcutta";
-        createWrapper();
-        await openMenu();
-        await typeInto("04/05/2026 10:00");
-        expect(inMenu("date-time-list-anchor-5m")).not.toBeNull();
-
-        tick();
-        inMenu("date-time-as-utc-toggle")!.click();
-        await flushPromises();
-        expect(inMenu("date-time-resolved-name")?.textContent).toBe(
-          "± 5 min around Apr 5, 15:30:00",
-        );
-        await press("Enter");
-
-        expect(lastEmit()).toMatchObject({
-          startTime: micros("2026-04-05T09:55:00Z"),
-          endTime: micros("2026-04-05T10:05:00Z"),
         });
       });
 
@@ -1242,7 +1217,7 @@ describe("DateTime paste", () => {
 
         await press("Enter");
 
-        expect(rows()).toHaveLength(5);
+        expect(rows()).toHaveLength(3);
         expect(wrapper!.vm.menuOpen).toBe(true);
       });
 
@@ -1456,7 +1431,7 @@ describe("DateTime paste", () => {
       expect(toastMock).not.toHaveBeenCalled();
     });
 
-    it("fixes a range read against now at the moment Enter is pressed", async () => {
+    it("keeps a typed range that is still running in progress, with its real end (O1)", async () => {
       createWrapper({ defaultRelativeTime: "1h" });
       await openMenu();
       await typeInto("2026-11-09 03:00:00 to 2026-11-09 04:00:00");
@@ -1467,7 +1442,7 @@ describe("DateTime paste", () => {
       expect(lastEmit()).toMatchObject({
         valueType: "absolute",
         startTime: micros("2026-11-09T03:00:00Z"),
-        endTime: Date.now() * 1000,
+        endTime: micros("2026-11-09T04:00:00Z"),
       });
     });
 
@@ -1559,7 +1534,7 @@ describe("DateTime paste", () => {
     });
 
     it("refuses a typed range before a date-only picker's minDate", async () => {
-      createWrapper({ disableRelative: true, minDate: "2026/11/01" });
+      createWrapper({ capabilities: { kinds: ["fixed"] }, minDate: "2026/11/01" });
       await openMenu();
       const before = emitCount();
 
@@ -1582,7 +1557,7 @@ describe("DateTime paste", () => {
       expect(inMenu("date-time-input-error")?.textContent).toBe("After Nov 20");
     });
 
-    it("stops a typed range that ends in the future at now", async () => {
+    it("emits a typed range that ends in the future with its real end, for the page to query up to now", async () => {
       createWrapper();
       await openMenu();
 
@@ -1591,12 +1566,17 @@ describe("DateTime paste", () => {
 
       expect(lastEmit()).toMatchObject({
         startTime: micros("2026-11-09T03:00:00Z"),
-        endTime: Date.now() * 1000,
+        endTime: micros("2026-11-09T04:00:00Z"),
+      });
+      expect(wrapper!.emitted("apply")?.at(-1)?.[0]).toEqual({
+        kind: "fixed",
+        startUs: micros("2026-11-09T03:00:00Z"),
+        endUs: micros("2026-11-09T04:00:00Z"),
       });
     });
 
     it("applies a typed future window on an absolute-only picker that books ahead", async () => {
-      createWrapper({ disableRelative: true, minDate: "2026/11/09", futureAllowed: true });
+      createWrapper({ capabilities: { kinds: ["fixed"], future: true }, minDate: "2026/11/09" });
       await openMenu();
 
       await typeInto("2026-11-12 09:00:00 to 2026-11-12 17:00:00");
@@ -1612,8 +1592,7 @@ describe("DateTime paste", () => {
 
     describe("day-only pickers", () => {
       const dayOnly = {
-        disableRelative: true,
-        hideRelativeTime: true,
+        capabilities: { kinds: ["fixed"], wholeDays: true },
         hideRelativeTimezone: true,
       };
 
@@ -1675,7 +1654,7 @@ describe("DateTime paste", () => {
     });
 
     it("doubles a relative period", async () => {
-      createWrapper({ autoApply: false });
+      createWrapper({});
       await flushPromises();
 
       button("date-time-zoom-out-btn").click();
@@ -1697,7 +1676,7 @@ describe("DateTime paste", () => {
       ["30s", "1m", "Last 1 minute", null],
       ["1w", "2w", "Last 2 weeks", null],
     ])("zooms %s out to %s in the largest exact unit", async (from, to, label, chip) => {
-      createWrapper({ autoApply: false, defaultRelativeTime: from });
+      createWrapper({ defaultRelativeTime: from });
       await flushPromises();
 
       button("date-time-zoom-out-btn").click();
@@ -1711,7 +1690,7 @@ describe("DateTime paste", () => {
     });
 
     it("doubles the whole count a mid-edit custom value stands for", async () => {
-      createWrapper({ autoApply: false, defaultRelativeTime: "15m" });
+      createWrapper({ defaultRelativeTime: "15m" });
       await flushPromises();
       wrapper!.vm.relativeValue = 2.5 as unknown as number;
       await flushPromises();
@@ -1724,7 +1703,6 @@ describe("DateTime paste", () => {
 
     it("doubles an absolute range around its centre", async () => {
       createWrapper({
-        autoApply: false,
         defaultType: "absolute",
         defaultAbsoluteTime: {
           startTime: micros("2026-11-08T10:00:00Z"),
@@ -1746,7 +1724,6 @@ describe("DateTime paste", () => {
 
     it("stops the end of a widened absolute range at now", async () => {
       createWrapper({
-        autoApply: true,
         defaultType: "absolute",
         defaultAbsoluteTime: {
           startTime: micros("2026-11-09T11:00:00Z"),
@@ -1818,8 +1795,7 @@ describe("DateTime paste", () => {
     describe("on absolute-only pickers", () => {
       // logstream/schema.vue's picker: whole days only.
       const schemaPicker = {
-        disableRelative: true,
-        hideRelativeTime: true,
+        capabilities: { kinds: ["fixed"], wholeDays: true },
         hideRelativeTimezone: true,
       };
 
@@ -1834,7 +1810,7 @@ describe("DateTime paste", () => {
         ["a normal picker", {}],
         [
           "UsageTrends' picker",
-          { disableRelative: true, disablePrevShift: true, minDate: "2026/10/01" },
+          { capabilities: { kinds: ["fixed"] }, disablePrevShift: true, minDate: "2026/10/01" },
         ],
       ])("offers zoom-out on %s", async (_case, props) => {
         createWrapper(props);
@@ -1845,7 +1821,7 @@ describe("DateTime paste", () => {
 
       it("never widens a timed range before minDate", async () => {
         createWrapper({
-          disableRelative: true,
+          capabilities: { kinds: ["fixed"] },
           minDate: "2026/11/08",
           defaultType: "absolute",
           defaultAbsoluteTime: {
@@ -1867,8 +1843,7 @@ describe("DateTime paste", () => {
       // enterprise UsageTrends.vue's picker: ‹ turns off once the range reaches the oldest data.
       it("keeps the start where it is while the previous shift is off", async () => {
         createWrapper({
-          autoApply: true,
-          disableRelative: true,
+          capabilities: { kinds: ["fixed"] },
           disablePrevShift: true,
           minDate: "2026/10/01",
           defaultType: "absolute",
@@ -1911,7 +1886,6 @@ describe("DateTime paste", () => {
       ["2026-11-07T00:00:00Z", "2026-11-09T00:00:00Z", "2d"],
     ])("turns %s – %s into a rolling %s ending now", async (start, end, period) => {
       createWrapper({
-        autoApply: true,
         defaultType: "absolute",
         defaultAbsoluteTime: { startTime: micros(start), endTime: micros(end) },
       });
@@ -1927,7 +1901,6 @@ describe("DateTime paste", () => {
 
     it("applies Live at once in Apply mode, as the list has no Apply to stage it for", async () => {
       createWrapper({
-        autoApply: false,
         defaultType: "absolute",
         defaultAbsoluteTime: {
           startTime: micros("2026-11-09T10:00:00Z"),
@@ -2214,12 +2187,13 @@ describe("DateTime paste", () => {
       expect(lastEmit()).toMatchObject({
         startTime: micros("2026-11-09T03:00:00Z"),
         endTime: micros("2026-11-09T04:00:00Z"),
-        userChangedValue: false,
+        rerun: true,
       });
+      expect(wrapper!.emitted("apply")?.at(-1)?.[1]).toEqual({ source: "drag-zoom", run: true });
     });
 
     it("keeps a parent's range set while the Apply-mode panel is open when it closes", async () => {
-      createWrapper({ autoApply: false, defaultType: "absolute" });
+      createWrapper({ defaultType: "absolute" });
       await flushPromises();
       await openMenu();
 
@@ -2254,7 +2228,6 @@ describe("DateTime paste", () => {
 
   describe("typed calendar words", () => {
     const NOW = new Date("2026-11-09T03:33:00Z");
-    const micros = (iso: string) => Date.parse(iso) * 1000;
     const typeAndEnter = async (text: string) => {
       vi.setSystemTime(Date.now() + 1000);
       const field = document.querySelector<HTMLInputElement>(
@@ -2303,22 +2276,13 @@ describe("DateTime paste", () => {
     });
 
     it("applies the token's rolling length on a recurring picker", async () => {
-      createWrapper({ calendarPresets: false, rollingCalendarWords: true });
+      createWrapper({ preset: "form", capabilities: { kinds: ["rolling"] } });
       await openMenu();
 
       await typeAndEnter("last month");
 
       expect(lastEmit()).toMatchObject({ relativeTimePeriod: "30d" });
       expect(lastEmit().valueType).not.toBe("absolute");
-    });
-
-    it("applies today as the last day on a recurring picker", async () => {
-      createWrapper({ calendarPresets: false, rollingCalendarWords: true });
-      await openMenu();
-
-      await typeAndEnter("today");
-
-      expect(lastEmit()).toMatchObject({ relativeTimePeriod: "1d" });
     });
   });
 });

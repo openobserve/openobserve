@@ -708,9 +708,10 @@ watch(
     <template #actions>
       <div class="flex items-center gap-2">
         <DateTime
+          preset="explorer-auto"
+          :capabilities="{ kinds: ['rolling', 'fixed'] }"
           v-if="showRangeControls"
           ref="dateTimeRef"
-          auto-apply
           menu-align="end"
           :default-type="selectedWindow.kind"
           :default-relative-time="manifest.defaultRelativePeriod"

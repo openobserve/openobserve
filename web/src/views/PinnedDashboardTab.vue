@@ -50,12 +50,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="border-border-default flex shrink-0 items-center justify-end gap-2 border-b px-4 py-2"
       >
         <DateTimePickerDashboard
+          preset="dashboard"
           v-if="selectedDate"
           ref="dateTimePicker"
           size="sm"
           v-model="selectedDate"
-          calendar-presets
-          @hide="setTime"
+          @update:model-value="setTime"
           data-test="pinned-dashboard-date-time-picker"
         />
         <AutoRefreshInterval

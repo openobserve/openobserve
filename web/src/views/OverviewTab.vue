@@ -31,8 +31,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="() => loadAll(true)"
         />
         <DateTime
+          preset="explorer-auto"
+          :capabilities="{ kinds: ['rolling', 'fixed'] }"
           ref="dateTimeRef"
-          auto-apply
           menu-align="end"
           :default-type="dateTimeType"
           :default-absolute-time="{

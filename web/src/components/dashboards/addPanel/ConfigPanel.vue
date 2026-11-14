@@ -201,12 +201,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <div class="panel-time-picker-btn min-w-0 flex-[1_1_0] overflow-visible">
                 <DateTimePickerDashboard
+                  preset="dashboard"
                   ref="panelTimePickerRef"
                   v-model="pickerValue"
-                  :auto-apply-dashboard="true"
                   :hide-relative-timezone="true"
                   :hide-range-shift="true"
-                  calendar-presets
                   menu-align="end"
                   data-test="dashboard-config-panel-time-picker"
                   class="w-fit max-w-full min-w-0 overflow-hidden"
@@ -5405,16 +5404,8 @@ export default defineComponent({
 </script>
 
 <style scoped>
-/* keep(lib-override:DateTimePicker): truncate the picker label and size the arrow
-   inside the date-time button — targets the picker's internal DOM via :deep(). */
-.panel-time-picker-btn :deep(.date-time-button .date-time-label) {
-  flex: 1 1 0;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
+/* keep(lib-override:DateTimePicker): size the arrow inside the date-time button;
+   the label picks its own form and is never cut. */
 .panel-time-picker-btn :deep(.date-time-button .date-time-arrow) {
   flex-shrink: 0;
   font-size: var(--text-lg) !important;

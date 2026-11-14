@@ -49,10 +49,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("pipeline.timeRange") }} <span class="text-status-error-text">*</span>
             </div>
             <OFormDateTimeRange
+              :capabilities="{ kinds: ['fixed'] }"
               name="timerange"
-              disable-relative
               min-date="1999/01/01"
-              auto-apply
               data-test="time-range-picker"
             />
           </div>

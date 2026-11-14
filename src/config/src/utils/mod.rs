@@ -38,6 +38,7 @@ pub mod query_select_utils;
 pub mod rand;
 pub mod record_batch_ext;
 pub mod redact;
+pub mod report_period;
 pub mod schema;
 pub mod schema_ext;
 pub mod size;

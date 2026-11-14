@@ -185,10 +185,9 @@ the Free Software Foundation, either version 3 of the License, or
             data-test="quality-last-refreshed"
           />
           <DateTimePickerDashboard
+            preset="explorer-auto"
             ref="qualityDatePickerRef"
             v-model="qualitySelectedDate"
-            :auto-apply-dashboard="true"
-            calendar-presets
             data-test="quality-time-range-picker"
           />
           <OButton

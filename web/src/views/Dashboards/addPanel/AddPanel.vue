@@ -82,12 +82,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
             </template>
             <DateTimePickerDashboard
+              preset="dashboard"
               v-if="selectedDate"
               v-model="selectedDate"
               ref="dateTimePickerRef"
               :disable="disable"
-              :auto-apply-dashboard="true"
-              calendar-presets
               @hide="setTimeForVariables"
               data-test="dashboard-global-date-time-picker"
             />

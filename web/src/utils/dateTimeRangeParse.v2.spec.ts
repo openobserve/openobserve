@@ -27,6 +27,8 @@ import {
 // Wed 2026-11-11 12:41:53; the test process runs in UTC, so this is also the wall clock.
 const NOW = new Date(Date.UTC(2026, 10, 11, 12, 41, 53));
 const US: TimeInputOptions = { now: NOW, locale: "en-US", timeZone: "UTC", weekStart: 1 };
+// An org whose fiscal year starts in January, so FY reads (O4).
+const FY_JAN: TimeInputOptions = { ...US, fiscalStartMonth: 1 };
 const NY = "America/New_York";
 
 function show(result: ParsedTimeInput | null): string {
@@ -78,8 +80,8 @@ describe("parser edges [#13]", () => {
 
   it("clamps a month shift to the month's last day", () => {
     const opts = { ...US, now: new Date(Date.UTC(2026, 2, 31, 12)) };
-    expect(read("since 1 month ago", opts)).toBe("A 2026/02/28 12:00:00..2026/03/31 12:00:00");
-    expect(read("now-1M/d", opts)).toBe("calendar:day:-31");
+    expect(read("since 1 month ago", opts)).toBe("A 2026/02/28 12:00:00..2026/04/01 00:00:00");
+    expect(read("now-1M/d", opts)).toBe("A 2026/02/28 00:00:00..2026/03/01 00:00:00");
   });
 
   it("calls a same-month end before its start reversed instead of reading next year", () => {
@@ -100,11 +102,14 @@ describe("failure reasons [#44]", () => {
   it.each([
     ["tomorrow", "future"],
     ["Q4 2027", "future"],
-    ["FY27", "future"],
     ["Nov 6 - Nov 4", "reversed"],
     ["banana", "unreadable"],
   ])("%s → %s", (text, reason) => {
     expect(explainTimeInputFailure(text, US)).toBe(reason);
+  });
+
+  it("FY27 → future once the org has a fiscal start", () => {
+    expect(explainTimeInputFailure("FY27", FY_JAN)).toBe("future");
   });
 
   it("does not read tomorrow, which is wholly in the future", () => {
@@ -124,7 +129,7 @@ describe("digits in other scripts [#63]", () => {
 });
 
 describe("business hours [#57]", () => {
-  it.each(["9 to 5", "9-5", "between 9 and 5"])("reads %s as 09:00 – 17:00", (text) => {
+  it.each(["9 to 5", "9-5"])("reads %s as 09:00 – 17:00", (text) => {
     expect(read(text)).toBe("A 2026/11/11 09:00:00..2026/11/11 17:00:00");
   });
 
@@ -167,14 +172,11 @@ describe("zone abbreviations [#11]", () => {
   });
 });
 
-describe("ambiguous ago [#14]", () => {
-  it("offers the calendar week and the moment two weeks back", () => {
-    expect(suggest("2w ago")).toEqual([
-      "calendar:week:-2",
-      "A 2026/10/28 12:36:53..2026/10/28 12:46:53",
-    ]);
-    expect(suggest("3 months ago")[0]).toBe("calendar:month:-3");
-    expect(suggest("3 months ago")).toHaveLength(2);
+describe("N ago [#14]", () => {
+  it("reads as Last N with no second reading", () => {
+    expect(read("2w ago")).toBe("2w");
+    expect(suggest("2w ago")).toEqual([]);
+    expect(read("3 months ago")).toBe("3M");
   });
 });
 
@@ -188,15 +190,15 @@ describe("business periods [#35]", () => {
     ["H2 2025", "A 2025/07/01 00:00:00..2026/01/01 00:00:00", "H2 2025"],
     ["2025", "A 2025/01/01 00:00:00..2026/01/01 00:00:00", "2025"],
     ["FY26", "A 2026/01/01 00:00:00..2027/01/01 00:00:00", "FY26"],
-    ["fy 2025", "A 2025/01/01 00:00:00..2026/01/01 00:00:00", "FY2025"],
+    ["fy 2025", "A 2025/01/01 00:00:00..2026/01/01 00:00:00", "FY25"],
   ])("reads %s", (text, expected, name) => {
-    const reading = parseTimeInput(text, US);
+    const reading = parseTimeInput(text, FY_JAN);
     expect(show(reading)).toBe(expected);
     expect(reading).toMatchObject({ name });
   });
 
-  it("marks a fiscal year with its start month", () => {
-    expect(parseTimeInput("FY26", US)).toMatchObject({ fiscalStartMonth: 1 });
+  it("does not read FY until the org sets its fiscal start", () => {
+    expect(parseTimeInput("FY26", US)).toBeNull();
   });
 
   it("does not read a year before 1999 or after this one", () => {
@@ -212,16 +214,10 @@ describe("business periods [#35]", () => {
     expect(suggest("Q3 2025")).toEqual([]);
   });
 
-  it("lists a bare year before the counts", () => {
-    expect(suggest("2025")).toEqual([
-      "A 2025/01/01 00:00:00..2026/01/01 00:00:00",
-      "2025m",
-      "2025h",
-      "2025d",
-      "2025w",
-      "2025M",
-    ]);
-    expect(suggest("15")).toEqual(["15m", "15h", "15d", "15w", "15M"]);
+  it("reads a bare year as the year alone, and counts need a unit", () => {
+    expect(read("2025")).toBe("A 2025/01/01 00:00:00..2026/01/01 00:00:00");
+    expect(suggest("2025")).toEqual([]);
+    expect(suggest("15")).toEqual(["15m", "15h", "15d"]);
   });
 });
 
@@ -377,15 +373,15 @@ describe("code review pass 1 [parser]", () => {
   });
 
   it("reads FY99 by the two-digit year rule [#8]", () => {
-    expect(read("FY99")).toBe("A 1999/01/01 00:00:00..2000/01/01 00:00:00");
+    expect(read("FY99", FY_JAN)).toBe("A 1999/01/01 00:00:00..2000/01/01 00:00:00");
   });
 
   it("reads a yearless Feb 29 as the latest leap day [#9]", () => {
     expect(read("Feb 29")).toBe("A 2024/02/29 00:00:00..2024/03/01 00:00:00");
   });
 
-  it("reads a `N quarters ago` calendar period [#10]", () => {
-    expect(read("3 quarters ago")).toBe("calendar:quarter:-3");
+  it("does not read `N quarters ago`, as quarter is not a duration unit [#10]", () => {
+    expect(read("3 quarters ago")).toBe("null");
   });
 });
 
@@ -436,12 +432,12 @@ describe("parser review pass 2", () => {
   });
 
   it.each(["FY27", "FY50", "Q4 2027"])("does not apply the wholly future %s [#5]", (text) => {
-    expect(parseTimeInput(text, US)).toBeNull();
-    expect(explainTimeInputFailure(text, US)).toBe("future");
+    expect(parseTimeInput(text, FY_JAN)).toBeNull();
+    expect(explainTimeInputFailure(text, FY_JAN)).toBe("future");
   });
 
   it("still reads the current fiscal year [#5]", () => {
-    expect(read("FY26")).toBe("A 2026/01/01 00:00:00..2027/01/01 00:00:00");
+    expect(read("FY26", FY_JAN)).toBe("A 2026/01/01 00:00:00..2027/01/01 00:00:00");
   });
 });
 

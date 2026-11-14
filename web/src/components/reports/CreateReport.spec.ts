@@ -1014,12 +1014,11 @@ describe("CreateReport", () => {
       expect(tr).toMatchObject({ type: "relative", period: "30m" });
     });
 
-    it("turns calendar presets off and reads calendar words as rolling, as the report server reads only rolling periods", async () => {
+    it("offers rolling and calendar ranges, which the report server resolves at run time", async () => {
       ({ wrapper } = mountComponent());
       await flushPromises();
       const picker = wrapper.findComponent(OFormDateTimeRange);
-      expect(picker.vm.$attrs["calendar-presets"]).toBe(false);
-      expect(picker.vm.$attrs["rolling-calendar-words"]).toBe("");
+      expect(picker.vm.$attrs.capabilities).toEqual({ kinds: ["rolling", "calendar"] });
     });
 
     it("exposes frequencyType + selectedTimeTab from the form (OFormToggleGroup)", async () => {

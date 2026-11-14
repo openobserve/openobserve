@@ -265,7 +265,8 @@ impl From<ReportError> for Response {
             | ReportError::NoDestinations
             | ReportError::TzOffsetOutOfRange
             | ReportError::CronHasNoFutureOccurrence { .. }
-            | ReportError::NegativeInterval => MetaHttpResponse::bad_request(value),
+            | ReportError::NegativeInterval
+            | ReportError::InvalidCalendarPeriod(_) => MetaHttpResponse::bad_request(value),
             ReportError::ReportNotFound
             | ReportError::DashboardTabNotFound
             | ReportError::FolderNotFound => MetaHttpResponse::not_found(value),

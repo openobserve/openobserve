@@ -8,7 +8,10 @@ use axum::{
     response::{IntoResponse, Response},
     routing::{get, put},
 };
-use config::{meta::dashboards::reports::REPORT_SECRET_HEADER, utils::str::constant_time_eq};
+use config::{
+    meta::dashboards::reports::REPORT_SECRET_HEADER,
+    utils::{report_period::ReportZone, str::constant_time_eq},
+};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -77,6 +80,13 @@ pub async fn send_report(
         Some(v) => v.as_str(),
         None => "Europe/London",
     };
+    let zone = ReportZone {
+        name: timezone,
+        offset_minutes: query
+            .get("timezone_offset")
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(0),
+    };
 
     let cfg = config::get_config();
     let report_type = if report.email_details.recipients.is_empty() {
@@ -90,7 +100,7 @@ pub async fn send_report(
         &cfg.report_server.user_email,
         &cfg.report_server.user_password,
         &report.email_details.dashb_url,
-        timezone,
+        zone,
         report_type.clone(),
         &report_name,
     )

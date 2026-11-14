@@ -845,10 +845,10 @@ describe("RenderDashboardCharts", () => {
       io.restore();
     });
 
-    it("renders the panel's own picker without an Apply button", async () => {
+    it("renders the panel's own picker as a dashboard host", async () => {
       await mountWithPanelPicker();
 
-      expect(dateTime().props("autoApplyDashboard")).toBe(true);
+      expect(dateTime().props("preset")).toBe("dashboard");
       expect(wrapper.vm.getPanelTimeGate("P1").applied.value.relativeTimePeriod).toBe("1h");
     });
 

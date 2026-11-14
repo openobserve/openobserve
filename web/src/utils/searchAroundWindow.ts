@@ -14,10 +14,13 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import type { I18nText, TranslateFn } from "@/types/i18n";
+import { timestampToTimezoneDate } from "@/utils/timezone";
 
 const MICROS_PER_SECOND = 1_000_000;
 const MICROS_PER_MS = 1_000;
 const KEY_PREFIX = "o2.searchAroundChoice";
+const KEEP_FILTERS_PREFIX = "o2.searchAroundKeepFilters";
+const CONTEXT_VIEW_SOURCES: readonly string[] = ["step", "zoom-out", "drag-zoom"];
 
 /** Half-widths offered, in seconds; `s` choices name seconds and `t` choices minutes, as stored before. */
 export const SEARCH_AROUND_SECONDS = [5, 30, 60, 300, 900] as const;
@@ -38,6 +41,27 @@ export interface WindowQuery {
   startUs: number;
   endUs: number;
   pinned: boolean;
+  /** The row's instant and half-width, for the context strip. */
+  anchorUs?: number;
+  seconds?: number;
+  /** The range shown before the context view, for Back to results. */
+  previous?: SearchAroundPrevious | null;
+}
+
+export interface SearchAroundPrevious {
+  type: string;
+  startTime: number;
+  endTime: number;
+  relativeTimePeriod: string;
+}
+
+/** What the detail drawer asks for: the window, its row and whether the filter stays on. */
+export interface SearchAroundRequest {
+  startUs: number;
+  endUs: number;
+  anchorUs?: number;
+  seconds?: number;
+  keepFilters?: boolean;
 }
 
 /** What a grid run is about to send; null bounds for a relative range. */
@@ -112,7 +136,7 @@ export const currentSearchAroundUser = (state: { userInfo?: { email?: unknown } 
   String(state.userInfo?.email ?? "");
 
 // The picker may floor the start to ms and cut the end at now, so the first run pins what it applied.
-// Null once the run's range, view or typed query moved on; it never comes back.
+// Null once the view or typed query moved on; panel applies leave it in the host (contextViewKeeps).
 export const windowQueryForRun = (
   window: WindowQuery | null | undefined,
   run: WindowQueryRun,
@@ -120,8 +144,11 @@ export const windowQueryForRun = (
   if (!window || run.view !== window.view || run.query.trim() !== window.typedQuery.trim())
     return null;
   if (run.startUs === null || run.endUs === null) return null;
-  if (window.pinned)
-    return run.startUs === window.startUs && run.endUs === window.endUs ? window : null;
+  if (window.pinned) {
+    if (run.endUs <= run.startUs) return null;
+    if (run.startUs === window.startUs && run.endUs === window.endUs) return window;
+    return { ...window, startUs: run.startUs, endUs: run.endUs };
+  }
   const appliedHere =
     Math.abs(run.startUs - window.startUs) < MICROS_PER_MS &&
     run.endUs < window.endUs + MICROS_PER_MS &&
@@ -129,7 +156,39 @@ export const windowQueryForRun = (
   return appliedHere ? { ...window, startUs: run.startUs, endUs: run.endUs, pinned: true } : null;
 };
 
+/** The context strip's sentence, or null when no context view is on screen. */
+export const contextViewText = (
+  window: WindowQuery | null | undefined,
+  zone: string,
+  t: TranslateFn,
+): I18nText | null => {
+  if (!window || window.anchorUs === undefined || !window.seconds) return null;
+  return t("timeRangeHost.contextStrip", {
+    window: searchAroundSecondsLabel(window.seconds, t),
+    instant: timestampToTimezoneDate(window.anchorUs / 1000, zone, "HH:mm:ss.SSS"),
+  });
+};
+
 export const searchAroundKey = (user: string): string => `${KEY_PREFIX}.${user}`;
+
+/** Whether an applied range keeps the context view: only moves of its own window do. */
+export const contextViewKeeps = (source: string): boolean => CONTEXT_VIEW_SOURCES.includes(source);
+
+export const readSearchAroundKeepFilters = (user: string): boolean => {
+  try {
+    return window.localStorage.getItem(`${KEEP_FILTERS_PREFIX}.${user}`) === "true";
+  } catch {
+    return false;
+  }
+};
+
+export const writeSearchAroundKeepFilters = (user: string, on: boolean): void => {
+  try {
+    window.localStorage.setItem(`${KEEP_FILTERS_PREFIX}.${user}`, String(on));
+  } catch {
+    // A refused write only means the choice is not remembered next time.
+  }
+};
 
 /** The user's last choice, or ± 5 minutes when none was kept or it is no longer offered. */
 export const readSearchAroundChoice = (user: string): SearchAroundChoice => {

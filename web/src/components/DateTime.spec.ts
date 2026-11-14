@@ -129,6 +129,7 @@ describe("DateTime Component", () => {
       await wrapper.vm.$nextTick();
       store.state.savedViewFlag = false;
 
+      wrapper.vm.relativeValue = 30;
       wrapper.vm.saveDate("relative");
       await wrapper.vm.$nextTick();
 
@@ -171,7 +172,7 @@ describe("DateTime Component", () => {
     });
 
     it("stamps a clamp from a query limit that arrives after mount as programmatic", async () => {
-      wrapper = createWrapper({ autoApply: true, defaultRelativeTime: "7d" });
+      wrapper = createWrapper({ defaultRelativeTime: "7d" });
       await wrapper.vm.$nextTick();
       await wrapper.vm.$nextTick();
       store.state.savedViewFlag = false;
@@ -296,7 +297,7 @@ describe("DateTime Component", () => {
 
     it("should test optionsFn with disableRelative and minDate", () => {
       wrapper = createWrapper({
-        disableRelative: true,
+        capabilities: { kinds: ["fixed"] },
         minDate: "2023/01/01",
       });
 
@@ -312,16 +313,16 @@ describe("DateTime Component", () => {
     // C8: a forward-looking caller lifts the cap; every other caller keeps today.
     it("caps the calendar at today unless a later max date is passed", () => {
       // "Today" is the mocked timestampToTimezoneDate above.
-      wrapper = createWrapper({ disableRelative: true });
+      wrapper = createWrapper({ capabilities: { kinds: ["fixed"] } });
       expect(wrapper.vm.calendarMaxDate).toBe("2025/01/01");
       wrapper.unmount();
 
-      wrapper = createWrapper({ disableRelative: true, maxDate: "2099/01/01" });
+      wrapper = createWrapper({ capabilities: { kinds: ["fixed"] }, maxDate: "2099/01/01" });
       expect(wrapper.vm.calendarMaxDate).toBe("2099/01/01");
       wrapper.unmount();
 
       wrapper = createWrapper({
-        disableRelative: true,
+        capabilities: { kinds: ["fixed"] },
         minDate: "2023/01/01",
         maxDate: "2099/01/01",
       });
@@ -425,7 +426,7 @@ describe("DateTime Component", () => {
     });
 
     it("should test setRelativeDate with autoApply", async () => {
-      wrapper = createWrapper({ autoApply: true });
+      wrapper = createWrapper({});
       store.state.savedViewFlag = false;
 
       wrapper.vm.setRelativeDate("h", 2);
@@ -512,7 +513,7 @@ describe("DateTime Component", () => {
     });
 
     it("should emit a user-driven date change when shifting without autoApply", async () => {
-      wrapper = createWrapper({ autoApply: false });
+      wrapper = createWrapper({});
       // Let the mount-time programmatic flag reset back to user-initiated.
       await wrapper.vm.$nextTick();
       store.state.savedViewFlag = false;
@@ -599,7 +600,7 @@ describe("DateTime Component", () => {
 
       // F2: a caller that lifts the calendar cap lifts the › cap with it, up to the end of maxDate.
       it("should shift forward past now up to the end of maxDate", () => {
-        wrapper = createWrapper({ disableRelative: true, maxDate: "2026/09/11" });
+        wrapper = createWrapper({ capabilities: { kinds: ["fixed"] }, maxDate: "2026/09/11" });
         store.state.savedViewFlag = false;
 
         wrapper.vm.selectedType = "absolute";
