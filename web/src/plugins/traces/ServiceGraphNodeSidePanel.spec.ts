@@ -1988,6 +1988,7 @@ describe("ServiceGraphNodeSidePanel", () => {
       vi.mocked(searchService.search).mockClear();
 
       givenSchema(["service_name", "o2_service_where", "o2_service_version"]);
+      reactive(routeQuery).panelWhere = WHERE_B;
       await wrapper.setProps({ selectedNode: rowAt(WHERE_B) });
       await flushPromises();
       await flushPromises();
@@ -2003,12 +2004,18 @@ describe("ServiceGraphNodeSidePanel", () => {
     });
 
     it.each([
-      { from: "catalog row without a place", route: "default", node: rowAt(""), scoped: "" },
+      { from: "catalog row without a place", route: "", node: rowAt(""), scoped: "" },
       {
         from: "catalog row",
-        route: "default",
+        route: WHERE_B,
         node: rowAt(WHERE_B),
         scoped: `o2_service_where = '${WHERE_B}'`,
+      },
+      {
+        from: "catalog row whose place was re-picked",
+        route: "k8s:b/prod",
+        node: rowAt("k8s:a/prod"),
+        scoped: "o2_service_where = 'k8s:b/prod'",
       },
       {
         from: "graph node",
@@ -2016,7 +2023,7 @@ describe("ServiceGraphNodeSidePanel", () => {
         node: baseNode,
         scoped: "o2_service_where = 'k8s:staging/web'",
       },
-    ])("scopes span queries of a $from by its own where, else the route's", async (c) => {
+    ])("scopes span queries of a $from by the route's place", async (c) => {
       givenSchema(["service_name", "o2_service_where"]);
       openAt(c.route);
       wrapper = mountAt({ selectedNode: c.node });
@@ -2045,6 +2052,7 @@ describe("ServiceGraphNodeSidePanel", () => {
         wrapper = mountAt();
         await flushPromises();
         await flushPromises();
+        reactive(routeQuery).panelWhere = WHERE_B;
         await wrapper.setProps({ selectedNode: rowAt(WHERE_B) });
         await flushPromises();
         expect(

@@ -431,7 +431,6 @@ const org = computed(() => store.state.selectedOrganization?.identifier || ""),
   lang = computed(() => String(unref(locale) || "en"));
 const service = computed(() => props.service);
 const panel = useServicePanelRoute();
-const where = computed(() => panel.state.value.where);
 const inactive = ref(true),
   search = ref(""),
   expanded = ref<string[]>([]),
@@ -462,6 +461,20 @@ const discovery = useQuery(
     enabled: enabled && Boolean(props.service && org.value),
   })),
 );
+const places = computed(() => {
+  const seen = new Map<string, { label: string; outside: boolean }>();
+  for (const row of discovery.data.value?.versions || [])
+    if (!seen.has(row.where_key))
+      seen.set(row.where_key, {
+        label: whereText(row.where_key, row.where, t),
+        outside: isOutsideK8s(row.where_key, row.where),
+      });
+  return [...seen]
+    .map(([key, place]) => ({ key, ...place }))
+    .sort((a, b) => a.key.localeCompare(b.key));
+});
+// An auto-picked place stays local; only a user pick writes the route, whose where also scopes the panel's spans.
+const where = computed(() => panel.state.value.where || places.value[0]?.key || "");
 const query = useQuery(
   computed(() => ({
     ...versionsQuery(org.value, user.value, {
@@ -508,18 +521,6 @@ const unversioned = computed(() => scoped.value.some((row) => !row.version));
 const noCluster = computed(() =>
   scoped.value.some((row) => row.where?.kind === "k8s" && !row.where.k8s_cluster),
 );
-const places = computed(() => {
-  const seen = new Map<string, { label: string; outside: boolean }>();
-  for (const row of discovery.data.value?.versions || [])
-    if (!seen.has(row.where_key))
-      seen.set(row.where_key, {
-        label: whereText(row.where_key, row.where, t),
-        outside: isOutsideK8s(row.where_key, row.where),
-      });
-  return [...seen]
-    .map(([key, place]) => ({ key, ...place }))
-    .sort((a, b) => a.key.localeCompare(b.key));
-});
 const currentWhereLabel = computed(
   () =>
     places.value.find((place) => place.key === where.value)?.label ||
@@ -536,13 +537,6 @@ const transitionsTitle = computed(() =>
     {},
     t,
   ),
-);
-watch(
-  places,
-  (values) => {
-    if (!where.value && values.length > 0) void panel.update(values[0].key, "versions");
-  },
-  { immediate: true },
 );
 const deployVerdicts = computed(
   () =>

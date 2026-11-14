@@ -210,7 +210,7 @@ vi.mock("vue-router", async () => {
   const actual: any = await vi.importActual("vue-router");
   return {
     ...actual,
-    useRoute: () => ({ query: {} }),
+    useRoute: () => ({ query: routeQuery }),
     useRouter: () => ({
       push: mockRouterPush,
       replace: mockRouterReplace,
@@ -3567,6 +3567,22 @@ describe("ServicesCatalog Health of the version serving now", () => {
     await flushPromises();
     const panel = view.findComponent('[data-test="services-catalog-node-side-panel"]');
     expect(panel.props("selectedNode").health_status).toBe("healthy");
+  });
+
+  it("keeps the service's row in the panel without its Health when the route picks a place with no row", async () => {
+    setRouteQuery({ panel: "operations", panelSvc: "rollback-api", panelWhere: "k8s:b/prod" });
+    try {
+      view = mountServicesCatalog();
+      await flushPromises();
+      await flushPromises();
+      const panel = view.findComponent('[data-test="services-catalog-node-side-panel"]');
+      expect(panel.props("selectedNode")).toMatchObject({
+        name: "rollback-api",
+        health_withheld: true,
+      });
+    } finally {
+      setRouteQuery({});
+    }
   });
 
   it("shows no Health, and counts none, when the shown version sent no requests in the window", async () => {

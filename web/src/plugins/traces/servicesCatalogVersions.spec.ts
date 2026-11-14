@@ -545,7 +545,7 @@ describe("the catalog row a service panel route opens", () => {
     { service: "querier", where: "k8s:c1/o2", id: "b" },
     { service: "querier", where: "", id: "a" },
     { service: "querier", where: "default", id: "a" },
-    { service: "ingester", where: "default", id: undefined },
+    { service: "ingester", where: "default", id: "d" },
     { service: "router", where: "", id: undefined },
   ])("opens $service at '$where' on row $id", ({ service, where, id }) => {
     expect(catalogPanelRow(rows, service, where)?.id).toBe(id);

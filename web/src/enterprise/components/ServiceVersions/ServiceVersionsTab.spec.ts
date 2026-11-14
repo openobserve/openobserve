@@ -269,14 +269,16 @@ it("preserves registry rows on verdict failure and retries both reads", async ()
   expect(mocks.verdicts.refetch).toHaveBeenCalled();
   expect(mocks.transitions.refetch).toHaveBeenCalled();
 });
-it("chooses a stable initial where for a graph node without a location", () => {
+it("picks a stable where for a panel without one, locally, without writing the route", async () => {
   mocks.state.value.where = "";
   mocks.discovery.data.value.versions = [
     version(1, { where_key: "env:z" }),
     version(2, { where_key: "env:a" }),
   ];
-  render();
-  expect(mocks.update).toHaveBeenCalledWith("env:a", "versions");
+  const wrapper = render();
+  await flushPromises();
+  expect(mocks.update).not.toHaveBeenCalled();
+  expect(wrapper.findComponent({ name: "ServicePanelVerdictCard" }).props("where")).toBe("env:a");
 });
 it("reads a recorded deploy that has no verdict yet as Not enough data, as the catalog does", async () => {
   mocks.query.data.value.versions = [

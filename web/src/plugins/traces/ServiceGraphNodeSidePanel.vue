@@ -1408,14 +1408,10 @@ export default defineComponent({
         Object.prototype.hasOwnProperty.call(props.selectedNode ?? {}, "service_system"),
     );
 
-    // A catalog row's own where (empty = unplaced) beats the route, whose registry place unstamped spans never match.
-    // Graph nodes carry no where_key, so the route's place picker scopes them.
+    // The route's where is the opened row's or a user pick, empty meaning every place; without versions no route is written.
     const selectedPanelWhere = computed<string>(() => {
-      const node = props.selectedNode;
-      if (node?.service_type) return "";
-      if (Object.prototype.hasOwnProperty.call(node ?? {}, "where_key"))
-        return node.where_key || "";
-      return routeOwnsNode.value ? versionPanel.state.value.where : "";
+      if (routeOwnsNode.value) return versionPanel.state.value.where;
+      return props.selectedNode?.service_type ? "" : props.selectedNode?.where_key || "";
     });
     // null holds source queries until the schema settles; an unread schema drops the where, since an absent column 400s.
     const panelWhereKey = computed<string | null>(() => {

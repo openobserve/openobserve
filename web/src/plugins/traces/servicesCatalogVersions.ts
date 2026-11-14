@@ -121,12 +121,16 @@ export function mergeCatalogVersions<
     };
   });
 }
-/** The row a panel route opens; a registry place no span carries falls back to the service's unplaced row. */
+/** The row a panel route highlights; a place with no row in the window falls back to one of the service's rows. */
 export function catalogPanelRow<
   T extends { service_name: string; where_key?: string; infer_service_name?: string },
 >(rows: T[], service: string, where: string) {
   const own = rows.filter((row) => row.service_name === service && !row.infer_service_name);
-  return own.find((row) => (row.where_key || "") === where) ?? own.find((row) => !row.where_key);
+  return (
+    own.find((row) => (row.where_key || "") === where) ??
+    own.find((row) => !row.where_key) ??
+    own[0]
+  );
 }
 
 /** Why a version cell of a row with no registry scope is empty. */
