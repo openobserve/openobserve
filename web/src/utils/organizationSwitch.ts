@@ -25,6 +25,22 @@ export interface OrganizationSwitchContext {
   resetStreams: () => void;
 }
 
+/** The switcher option for an organization; `label` stays the real name, as the delete-confirm gate matches it. */
+export function toOrganizationOption(org: Record<string, any>, userEmail: string) {
+  return {
+    label: org.name,
+    id: org.id,
+    identifier: org.identifier,
+    user_email: userEmail,
+    ingest_threshold: org.ingest_threshold,
+    search_threshold: org.search_threshold,
+    subscription_type: org.CustomerBillingObj?.subscription_type ?? "",
+    status: org.status,
+    note: org.CustomerBillingObj?.note ?? "",
+    created_at: org.created_at,
+  };
+}
+
 /**
  * Selects `org` and goes to `target`, or to the list of a page whose id belongs to the organization being left.
  * Resolves false when nothing changed. Every switch control calls this, so none can keep the old organization's cached data.

@@ -148,7 +148,10 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef, OTableRowAction } from "@/lib/core/Table/OTable.types";
 import analytics from "@/services/product_analytics";
 import { convertToTitleCase } from "@/utils/zincutils";
-import { switchOrganization as selectOrganization } from "@/utils/organizationSwitch";
+import {
+  switchOrganization as selectOrganization,
+  toOrganizationOption,
+} from "@/utils/organizationSwitch";
 import useStreams from "@/composables/useStreams";
 import config from "@/aws-exports";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -458,18 +461,7 @@ export default defineComponent({
         (o: any) => o.identifier === row.identifier,
       );
       if (!org) return;
-      const option = {
-        label: org.name,
-        id: org.id,
-        identifier: org.identifier,
-        user_email: store.state.userInfo.email,
-        ingest_threshold: org.ingest_threshold,
-        search_threshold: org.search_threshold,
-        subscription_type: org.CustomerBillingObj?.subscription_type ?? "",
-        status: org.status,
-        note: org.CustomerBillingObj?.note ?? "",
-        created_at: org.created_at,
-      };
+      const option = toOrganizationOption(org, store.state.userInfo.email);
       void selectOrganization({ store, router, resetStreams }, option, {
         name: "organizations",
         query: { org_identifier: org.identifier },

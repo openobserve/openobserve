@@ -358,7 +358,7 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import { confirmLeave, releaseLeave } from "@/lib/forms/SaveBar/useLeaveGuard";
-import { switchOrganization } from "@/utils/organizationSwitch";
+import { switchOrganization, toOrganizationOption } from "@/utils/organizationSwitch";
 import useBreakpoint from "@/composables/useBreakpoint";
 import SlackIcon from "@/components/icons/SlackIcon.vue";
 import ManagementIcon from "@/components/icons/ManagementIcon.vue";
@@ -1483,26 +1483,7 @@ export default defineComponent({
                 label: string;
                 created_at?: number;
               }) => {
-                // `label` is the real name here — General.vue's delete-confirm gate matches it; disambiguation is applied only on the dropdown copy below.
-                const optiondata: any = {
-                  label: data.name,
-                  id: data.id,
-                  identifier: data.identifier,
-                  user_email: store.state.userInfo.email,
-                  ingest_threshold: data.ingest_threshold,
-                  search_threshold: data.search_threshold,
-                  subscription_type: Object.prototype.hasOwnProperty.call(
-                    data,
-                    "CustomerBillingObj",
-                  )
-                    ? data.CustomerBillingObj.subscription_type
-                    : "",
-                  status: data.status,
-                  note: Object.prototype.hasOwnProperty.call(data, "CustomerBillingObj")
-                    ? data.CustomerBillingObj.note
-                    : "",
-                  created_at: data.created_at,
-                };
+                const optiondata: any = toOrganizationOption(data, store.state.userInfo.email);
 
                 if (
                   config.isCloud == "true" &&
