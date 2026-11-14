@@ -4,6 +4,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later -->
 <!-- A rule that cannot compile against the stream is refused, never saved to silently never fire. -->
 <script setup lang="ts">
 import { computed, defineAsyncComponent, nextTick, onUnmounted, ref, watch } from "vue";
+import { securityTime } from "@/utils/security/time";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
@@ -29,7 +30,12 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
-import { useDetectionPreview } from "@/composables/security/useDetectionPreview";
+import {
+  DEFAULT_PREVIEW_RANGE,
+  PREVIEW_RANGES,
+  previewKey,
+  useDetectionPreview,
+} from "@/composables/security/useDetectionPreview";
 import alertsService from "@/services/alerts";
 import analytics from "@/services/product_analytics";
 import { detectionFolderId, detectionSaveFailure } from "@/utils/security/detectionFolder";
@@ -44,6 +50,8 @@ import { blockedReason, caveat } from "@/utils/security/compileText";
 import securitySigma, {
   type CatalogRule,
   type CompiledSigma,
+  type DetectionPreviewRequest,
+  type PreviewRangeMinutes,
   type SigmaCompileRequest,
 } from "@/services/securitySigma";
 import { sigmaCatalogQuery, sigmaCompileQuery } from "@/services/securitySigma.queries";
@@ -65,16 +73,33 @@ export interface NewDetectionPreset {
   source?: string;
 }
 
+/** An installed detection opened for editing; its name, history and cases stay as they are. */
+export interface DetectionEditTarget {
+  alertId: string;
+  name: string;
+  yaml: string;
+  stream: string;
+  sourceType: string;
+  /** Minutes. */
+  period: number;
+  frequency: number;
+  silence: number;
+  destinations: string[];
+}
+
 const props = defineProps<{
   open: boolean;
   orgId: string;
   preset?: NewDetectionPreset | null;
+  /** Edits this detection in place instead of creating one. */
+  edit?: DetectionEditTarget | null;
   /** Alert names already in the org; a detection may not reuse one. */
   existingNames?: string[];
 }>();
 const emit = defineEmits<{
   "update:open": [open: boolean];
   created: [name: string];
+  updated: [name: string];
 }>();
 
 const { t } = useI18nTyped();
@@ -82,6 +107,7 @@ const FORM_ID = "security-detections-new-form";
 // Defence in depth: the server refuses a detection write without the Security create grant too.
 const { canAuthor } = useSecurityAccess();
 const shown = computed(() => props.open && canAuthor.value);
+const editing = computed(() => !!props.edit);
 
 const STARTER_YAML = `title: My Detection
 status: experimental
@@ -310,13 +336,15 @@ const form = useOForm<NewDetectionForm>({
   defaultValues: newDetectionDefaults(),
   schema: makeNewDetectionSchema(
     t,
-    () => props.existingNames ?? [],
+    () => (props.existingNames ?? []).filter((n) => n !== props.edit?.name),
     () => draftRule.value?.timespanMinutes,
   ),
   onSubmit: save,
 });
 // The name is derived from the rule and stream, so it is fed into the form for the taken-name check.
-watch(draftName, (name) => form.setFieldValue("name", name), { immediate: true });
+watch(draftName, (name) => form.setFieldValue("name", props.edit?.name ?? name), {
+  immediate: true,
+});
 
 // The look-back stays editable, but a correlation's starts at its timespan so one run sees a whole window.
 watch(
@@ -416,6 +444,24 @@ watch(
     if (!open) return;
     void loadStreams();
     void loadDestinations();
+    const target = props.edit;
+    if (target) {
+      mode.value = "custom";
+      customYaml.value = target.yaml;
+      settledYaml.value = target.yaml;
+      pickedDestinations.value = [...target.destinations];
+      presetStream = target.stream;
+      presetSource.value = target.sourceType;
+      pickedStream.value = target.stream;
+      form.reset({
+        ...newDetectionDefaults(),
+        name: target.name,
+        period: target.period,
+        frequency: target.frequency,
+        silence: target.silence,
+      });
+      return;
+    }
     const preset = props.preset;
     if (preset?.sigmaId) {
       mode.value = "library";
@@ -454,50 +500,101 @@ watch(draftPayload, () => {
   saveFailure.value = "";
 });
 watch(draftSql, () => {
-  preview.reset();
   queryFailure.value = "";
 });
+
+const previewRange = ref<PreviewRangeMinutes>(DEFAULT_PREVIEW_RANGE);
+watch(shown, (open) => open && preview.reset());
+const formTiming = form.useStore((s: { values: NewDetectionForm }) => ({
+  period: toMinutes(s.values.period),
+  frequency: toMinutes(s.values.frequency),
+}));
+/** The draft as the server previews it: the same rule, stream and schedule a save would store. */
+const previewRequest = computed<DetectionPreviewRequest | null>(() => {
+  if (!draftSql.value || !pickedStream.value) return null;
+  const rule =
+    mode.value === "library" ? { rule_id: pickedRuleId.value } : { rule_yaml: settledYaml.value };
+  return {
+    ...rule,
+    source_type: draftSource.value?.id,
+    stream: pickedStream.value,
+    range_minutes: previewRange.value,
+    period: formTiming.value.period || undefined,
+    frequency: formTiming.value.frequency || undefined,
+    alert_id: props.edit?.alertId,
+  };
+});
 const previewCurrent = computed(
-  () => !!draftSql.value && preview.previewedSql.value === draftSql.value,
+  () => !!previewRequest.value && preview.previewedKey.value === previewKey(previewRequest.value),
 );
+const previewResult = computed(() => (previewCurrent.value ? preview.result.value : null));
 function runPreview() {
   // The query names columns the stream does not have yet, and no event can match them anyway.
-  if (!draftSql.value || unseenFields.value.length) return;
-  // A correlation counts within its own timespan, so its preview covers exactly one.
-  const minutes = draftCorrelation.value?.timespanMinutes;
-  void preview.preview(
-    props.orgId,
-    draftSql.value,
-    Date.now(),
-    minutes ? minutes * 60_000 : undefined,
-  );
+  if (!previewRequest.value || unseenFields.value.length) return;
+  void preview.preview(props.orgId, previewRequest.value);
 }
-type PreviewRow = Record<string, unknown>;
-const previewColumns = computed<OTableColumnDef<PreviewRow>[]>(() => {
-  // A correlation returns one row per group, so its columns are whatever the query projects.
-  if (draftCorrelation.value) {
-    const first = preview.rows.value[0] ?? {};
-    return Object.keys(first).map((field) => ({
-      id: field,
-      header: raw(field),
-      accessorKey: field,
-      size: 180,
-    }));
+const rangeLabel = (minutes: PreviewRangeMinutes) =>
+  minutes === 60
+    ? t("siem.detections.preview.range.hour")
+    : minutes === 1440
+      ? t("siem.detections.preview.range.day")
+      : t("siem.detections.preview.range.week");
+const fmtTime = (us: number) => securityTime(us / 1000);
+/** Exactly what was evaluated, so "nothing matched" never claims more history than was read. */
+const previewSummary = computed(() => {
+  const r = previewResult.value;
+  if (!r || preview.error.value) return "";
+  const range = { from: fmtTime(r.range_start), to: fmtTime(r.range_end) };
+  if (!r.correlation) {
+    return r.firings
+      ? t("siem.detections.preview.events", { n: r.firings, ...range }, r.firings)
+      : t("siem.detections.preview.noEvents", range);
   }
-  // The server's SQL may project columns beyond the matched fields, such as host and user.
-  const fields = draftServerSql.value
-    ? Object.keys(preview.rows.value[0] ?? {})
-    : (draftCompiled.value?.fields ?? []);
+  const windows = t(
+    "siem.detections.preview.windows",
+    { n: r.windows_evaluated, width: r.window_minutes, stride: r.stride_minutes },
+    r.windows_evaluated,
+  );
+  return r.firings
+    ? t(
+        "siem.detections.preview.firings",
+        { n: r.firings, fired: r.windows.length, windows, ...range },
+        r.firings,
+      )
+    : t("siem.detections.preview.noFirings", { windows, ...range });
+});
+/** The scheduler caps a run at a fixed number of windows, so a long range may start later. */
+const previewNarrowed = computed(() => {
+  const r = previewResult.value;
+  if (!r || r.range_end - r.range_start >= r.requested_minutes * 60_000_000 - 60_000_000) return "";
+  return t("siem.detections.preview.narrowed", { from: fmtTime(r.range_start) });
+});
+type PreviewRow = Record<string, unknown> & { zo_window: string };
+const previewRows = computed<PreviewRow[]>(() =>
+  (previewResult.value?.sample ?? []).map((f) => ({
+    ...f.row,
+    zo_window: `${fmtTime(f.window_start)} → ${fmtTime(f.window_end)}`,
+  })),
+);
+const previewColumns = computed<OTableColumnDef<PreviewRow>[]>(() => {
+  const first = previewResult.value?.sample[0]?.row ?? {};
+  const fields = Object.keys(first).filter((field) => field !== "_timestamp");
+  const correlation = !!previewResult.value?.correlation;
   return [
-    {
-      id: "_timestamp",
-      header: t("siem.detections.preview.time"),
-      accessorKey: "_timestamp",
-      size: 170,
-    },
-    ...fields
-      .filter((field) => field !== "_timestamp")
-      .map((field) => ({ id: field, header: raw(field), accessorKey: field, size: 200 })),
+    correlation
+      ? {
+          id: "zo_window",
+          header: t("siem.detections.preview.window"),
+          accessorKey: "zo_window",
+          size: 280,
+        }
+      : {
+          id: "_timestamp",
+          header: t("siem.detections.preview.time"),
+          accessorKey: "_timestamp",
+          size: 170,
+        },
+    ...fields.map((field) => ({ id: field, header: raw(field), accessorKey: field, size: 180 })),
   ];
 });
 
@@ -511,6 +608,10 @@ async function save(value: NewDetectionForm) {
   if (!payload || !canAuthor.value) return;
   queryFailure.value = "";
   saveFailure.value = "";
+  if (props.edit) {
+    await saveEdit(props.edit, value);
+    return;
+  }
   try {
     if (unseenFields.value.length) {
       await securitySigma.addColumns(props.orgId, pickedStream.value, unseenFields.value);
@@ -544,6 +645,36 @@ async function save(value: NewDetectionForm) {
   }
 }
 
+/** The server recompiles the edited rule, so the stored Sigma and the SQL it runs change together. */
+async function saveEdit(target: DetectionEditTarget, value: NewDetectionForm) {
+  try {
+    if (unseenFields.value.length) {
+      await securitySigma.addColumns(props.orgId, pickedStream.value, unseenFields.value);
+    }
+    const res = await securitySigma.updateDetection(props.orgId, target.alertId, {
+      rule_yaml: customYaml.value,
+      stream: pickedStream.value,
+      source_type: draftSource.value?.id,
+      period: toMinutes(value.period),
+      frequency: toMinutes(value.frequency),
+      silence: toMinutes(value.silence),
+      destinations: pickedDestinations.value,
+    });
+    analytics.track("security_detection_edited", {
+      source_type: draftSource.value?.id ?? "unknown",
+      stream_changed: pickedStream.value !== target.stream,
+    });
+    invalidateSiemDetections(props.orgId);
+    toast({ variant: "success", message: t("siem.detections.edit.saved", { name: target.name }) });
+    emit("updated", res.data?.name ?? target.name);
+    emit("update:open", false);
+  } catch (e: any) {
+    const message = createErrorMessage(e);
+    saveFailure.value = message;
+    toast({ variant: "error", message });
+  }
+}
+
 const streamOptions = computed(() => streams.value.map((s) => ({ label: raw(s), value: s })));
 const destinationOptions = computed(() =>
   destinations.value.map((d) => ({ label: raw(d), value: d })),
@@ -554,9 +685,13 @@ const destinationOptions = computed(() =>
   <ODialog
     :open="shown"
     size="xl"
-    :title="t('siem.detections.newTitle')"
-    :sub-title="t('siem.detections.newSubtitle')"
-    :primary-button-label="t('siem.detections.create')"
+    :title="editing ? t('siem.detections.edit.title') : t('siem.detections.newTitle')"
+    :sub-title="
+      editing
+        ? t('siem.detections.edit.subtitle', { name: edit?.name ?? '' })
+        : t('siem.detections.newSubtitle')
+    "
+    :primary-button-label="editing ? t('siem.detections.edit.save') : t('siem.detections.create')"
     :secondary-button-label="t('siem.detections.cancel')"
     :form-id="FORM_ID"
     :primary-button-disabled="!draftReady || !canAuthor"
@@ -566,6 +701,7 @@ const destinationOptions = computed(() =>
   >
     <div class="flex flex-col gap-4">
       <OToggleGroup
+        v-if="!editing"
         :model-value="mode"
         data-test="security-detections-new-mode"
         @update:model-value="(v: unknown) => (mode = v === 'custom' ? 'custom' : 'library')"
@@ -656,6 +792,7 @@ const destinationOptions = computed(() =>
             language="plaintext"
             :show-line-numbers="true"
             :show-auto-complete="false"
+            :typing-aids="false"
             :debounce-time="150"
             class="h-full"
             data-test="security-detections-new-yaml"
@@ -751,13 +888,14 @@ const destinationOptions = computed(() =>
           data-test="security-detections-new-silence"
         />
         <OFormCheckbox
+          v-if="!editing"
           name="backfill"
           :label="t('siem.detections.backfill')"
           class="md:col-span-2"
           data-test="security-detections-new-backfill"
         />
         <OFormSelect
-          v-if="backfillChosen"
+          v-if="backfillChosen && !editing"
           name="backfillHours"
           :options="backfillOptions"
           :label="t('siem.detections.backfillRange')"
@@ -828,23 +966,36 @@ const destinationOptions = computed(() =>
 
       <div v-if="draftSql" class="flex flex-col gap-2" data-test="security-detections-new-preview">
         <div class="flex flex-wrap items-center gap-3">
+          <OToggleGroup
+            :model-value="previewRange"
+            data-test="security-detections-new-preview-range"
+            @update:model-value="(v: unknown) => (previewRange = Number(v) as PreviewRangeMinutes)"
+          >
+            <OToggleGroupItem
+              v-for="range in PREVIEW_RANGES"
+              :key="range"
+              :value="range"
+              size="sm"
+              :data-test="`security-detections-new-preview-range-${range}`"
+            >
+              {{ rangeLabel(range) }}
+            </OToggleGroupItem>
+          </OToggleGroup>
           <OButton
             variant="outline"
             size="sm"
             icon-left="play-arrow"
             :loading="preview.running.value"
+            :disabled="!previewRequest"
             data-test="security-detections-new-preview-run"
             @click="runPreview"
             >{{ t("siem.detections.preview.run") }}</OButton
           >
-          <span class="text-text-secondary text-xs">{{
-            previewCurrent && !preview.error.value && preview.rows.value.length
-              ? t("siem.detections.preview.shown", {
-                  shown: preview.rows.value.length,
-                  total: preview.total.value,
-                })
-              : t("siem.detections.preview.hint")
-          }}</span>
+          <span
+            class="text-text-secondary min-w-0 flex-1 text-xs"
+            data-test="security-detections-new-preview-summary"
+            >{{ previewSummary || t("siem.detections.preview.hint") }}</span
+          >
         </div>
         <OBanner
           v-if="queryFailure || (previewCurrent && preview.error.value)"
@@ -855,19 +1006,55 @@ const destinationOptions = computed(() =>
         >
           {{ t("siem.detections.preview.failed", { reason: queryFailure || preview.error.value }) }}
         </OBanner>
-        <OEmptyState
-          v-else-if="previewCurrent && !preview.running.value && !preview.rows.value.length"
-          size="inline"
-          icon="search-off"
-          :title="t('siem.detections.preview.empty')"
-          data-test="security-detections-new-preview-empty"
-        />
+        <OBanner
+          v-if="previewResult?.windows_failed"
+          variant="warning"
+          icon="warning-amber"
+          dense
+          data-test="security-detections-new-preview-partial"
+        >
+          {{
+            t(
+              "siem.detections.preview.partial",
+              { n: previewResult.windows_failed },
+              previewResult.windows_failed,
+            )
+          }}
+        </OBanner>
+        <span
+          v-if="previewNarrowed"
+          class="text-text-secondary text-xs"
+          data-test="security-detections-new-preview-narrowed"
+          >{{ previewNarrowed }}</span
+        >
         <div
-          v-else-if="previewCurrent && preview.rows.value.length"
+          v-if="previewResult && previewResult.correlation && previewResult.windows.length"
+          class="flex flex-wrap gap-1.5"
+          data-test="security-detections-new-preview-windows"
+        >
+          <OTag
+            v-for="w in previewResult.windows.slice(0, 12)"
+            :key="w.start"
+            variant="orange-soft"
+            size="xs"
+            >{{
+              t(
+                "siem.detections.preview.windowFired",
+                { from: fmtTime(w.start), to: fmtTime(w.end), n: w.firings },
+                w.firings,
+              )
+            }}</OTag
+          >
+          <span v-if="previewResult.windows.length > 12" class="text-text-secondary text-xs">{{
+            t("siem.detections.preview.moreWindows", { n: previewResult.windows.length - 12 })
+          }}</span>
+        </div>
+        <div
+          v-if="previewRows.length"
           class="border-border-default rounded-surface h-64 overflow-hidden border"
         >
           <OTable
-            :data="preview.rows.value"
+            :data="previewRows"
             :columns="previewColumns"
             pagination="none"
             sorting="none"

@@ -37,7 +37,8 @@ use o2_enterprise::enterprise::security::{
     ocsf::severity::{SeveritySql, severity_sql},
     sources::{
         activity::{
-            ACTIVITY_LOOKBACK_US, Activity, needs_recount_for, record_recount, with_recent_count,
+            ACTIVITY_LOOKBACK_US, Activity, needs_recount_for, newest_timestamp, record_recount,
+            record_seen, with_recent_count, with_seen,
         },
         attach::{
             AttachConfig, AttachError, AttachErrorCode, AttachPlan, DetachPlan, DetachSkip,
@@ -46,12 +47,12 @@ use o2_enterprise::enterprise::security::{
             our_node, pick_winner, pipeline_id, plan_attach, plan_detach, plan_extend,
             plan_function, pre_attach_checks, realtime_pipelines_for, setting_function_name,
         },
-        catalog::{SourceType, source_types},
+        catalog::{SourceType, source_type, source_types},
         classify::{Classification, best_match, is_security_source},
         listing::{SourceListing, StreamInput, build_listing},
         selection::{
-            ClassifyCandidate, ClassifyMemo, StreamRef, StreamVerdict, classify_queue,
-            judge_stream, unmatched_verdict, verdict_update,
+            CLASSIFIER_ACTOR, ClassifyCandidate, ClassifyMemo, StreamRef, StreamVerdict,
+            classify_queue, judge_stream, manual_type_update, unmatched_verdict, verdict_update,
         },
     },
 };
@@ -134,6 +135,7 @@ pub struct AttachRequest {
 pub struct AttachResponse {
     pub setting: SecuritySourceSetting,
     pub pipeline_id: String,
+    /// True only when this call created the pipeline, so always false on a dry run.
     pub pipeline_created: bool,
     pub plan: AttachPlan,
     pub dry_run: bool,
@@ -144,6 +146,28 @@ pub struct DetachResponse {
     pub setting: Option<SecuritySourceSetting>,
     /// Set when the recorded pipeline was left alone because it no longer belongs to the stream.
     pub skipped: Option<DetachSkip>,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct InclusionRequest {
+    pub included: bool,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+pub struct InclusionResponse {
+    pub setting: SecuritySourceSetting,
+}
+
+#[derive(Debug, Default, Deserialize, ToSchema)]
+pub struct SourceTypeRequest {
+    /// A catalog source type id; empty or absent hands the stream back to the classifier.
+    #[serde(default)]
+    pub source_type: Option<String>,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+pub struct SourceTypeResponse {
+    pub setting: SecuritySourceSetting,
 }
 
 #[derive(Debug, Serialize, ToSchema)]
@@ -216,7 +240,7 @@ pub async fn list_sources(
     let inputs: Vec<StreamInput<'_>> = streams
         .iter()
         .map(|s| {
-            let stats = activity_of(s);
+            let stats = with_seen(&org_id, &s.name, activity_of(s));
             StreamInput {
                 name: &s.name,
                 setting: s.settings.security.as_ref(),
@@ -408,6 +432,10 @@ pub async fn attach_pack(
     if let Err(denied) = require(&org_id, &user_id, "POST").await {
         return denied;
     }
+    // An attached pack admits Security readers, so only someone who reads the stream may attach.
+    if let Err(denied) = super::guard_own_stream_read(&org_id, &user_id, &stream_name).await {
+        return denied;
+    }
     let req = body.map(|Json(b)| b).unwrap_or_default();
     let lock = stream_lock(&org_id, &stream_name);
     let _guard = lock.lock().await;
@@ -453,6 +481,160 @@ pub async fn detach_pack(
     let _guard = lock.lock().await;
     match detach(&org_id, &user_id, &stream_name).await {
         Ok(res) => Json(res).into_response(),
+        Err(resp) => resp,
+    }
+}
+
+/// GetSecuritySourceSchema
+#[utoipa::path(
+    get,
+    path = "/{org_id}/security/sources/{stream_name}/schema",
+    context_path = "/api",
+    tag = "Security",
+    operation_id = "GetSecuritySourceSchema",
+    summary = "Schema of a stream Security reads",
+    description = "The logs stream's schema, as the stream schema route returns it, for a caller who may read the stream or holds Security read on a Security source",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("stream_name" = String, Path, description = "Logs stream name"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 403, description = "Neither a stream read nor a Security source", content_type = "application/json", body = ()),
+        (status = 404, description = "Stream not found", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Security", "operation": "get"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    ),
+)]
+pub async fn get_source_schema(
+    Path((org_id, stream_name)): Path<(String, String)>,
+    Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    if let Err(denied) =
+        super::guard_stream_reads(&org_id, &user_email.user_id, [stream_name.as_str()]).await
+    {
+        return denied;
+    }
+    let query = axum::extract::Query(hashbrown::HashMap::from([(
+        "type".to_string(),
+        "logs".to_string(),
+    )]));
+    crate::request::stream::schema(Path((org_id, stream_name)), query).await
+}
+
+/// SetSecuritySourceInclusion
+#[utoipa::path(
+    post,
+    path = "/{org_id}/security/sources/{stream_name}/include",
+    context_path = "/api",
+    tag = "Security",
+    operation_id = "SetSecuritySourceInclusion",
+    summary = "Include or exclude a stream as a Security source",
+    description = "Records the explicit include or exclude on the stream's security setting. Needs the Security write grant, and the Security delete grant when it takes a source off the list; it does not need stream edit rights",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("stream_name" = String, Path, description = "Logs stream name"),
+    ),
+    request_body(content = InclusionRequest, content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = InclusionResponse),
+        (status = 403, description = "Missing Security write, or delete for an exclude", content_type = "application/json", body = ()),
+        (status = 404, description = "Stream not found", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Security", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    ),
+)]
+pub async fn set_inclusion(
+    Path((org_id, stream_name)): Path<(String, String)>,
+    Headers(user_email): Headers<UserEmail>,
+    Json(req): Json<InclusionRequest>,
+) -> Response {
+    let user_id = user_email.user_id;
+    if let Err(denied) = require(&org_id, &user_id, "POST").await {
+        return denied;
+    }
+    // Including opens the stream to every Security reader, so the author must read it already.
+    if req.included
+        && let Err(denied) = super::guard_own_stream_read(&org_id, &user_id, &stream_name).await
+    {
+        return denied;
+    }
+    let lock = stream_lock(&org_id, &stream_name);
+    let _guard = lock.lock().await;
+    let Some(settings) = infra::schema::get_settings(&org_id, &stream_name, StreamType::Logs).await
+    else {
+        return MetaHttpResponse::not_found("Stream not found");
+    };
+    let setting = SecuritySourceSetting {
+        included: Some(req.included),
+        ..settings.security.clone().unwrap_or_default()
+    };
+    match store_setting(&org_id, &user_id, &stream_name, setting).await {
+        Ok(setting) => Json(InclusionResponse { setting }).into_response(),
+        Err(resp) => resp,
+    }
+}
+
+/// SetSecuritySourceType
+#[utoipa::path(
+    post,
+    path = "/{org_id}/security/sources/{stream_name}/source_type",
+    context_path = "/api",
+    tag = "Security",
+    operation_id = "SetSecuritySourceType",
+    summary = "Set a stream's source type by hand",
+    description = "Records a catalog source type on the stream as a manual choice the classifier never replaces; an empty source_type hands the stream back to the classifier. Needs the Security write grant, and the Security delete grant when it takes a source off the list",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("stream_name" = String, Path, description = "Logs stream name"),
+    ),
+    request_body(content = SourceTypeRequest, content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = SourceTypeResponse),
+        (status = 400, description = "Unknown source type", content_type = "application/json", body = ()),
+        (status = 403, description = "Missing Security write, or delete when the stream stops being a source", content_type = "application/json", body = ()),
+        (status = 404, description = "Stream not found", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Security", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    ),
+)]
+pub async fn set_source_type(
+    Path((org_id, stream_name)): Path<(String, String)>,
+    Headers(user_email): Headers<UserEmail>,
+    Json(req): Json<SourceTypeRequest>,
+) -> Response {
+    let user_id = user_email.user_id;
+    if let Err(denied) = require(&org_id, &user_id, "POST").await {
+        return denied;
+    }
+    let wanted = req.source_type.unwrap_or_default();
+    if !wanted.is_empty() && !source_type(&wanted).is_some_and(|s| s.superseded_by.is_none()) {
+        return MetaHttpResponse::bad_request(format!("Unknown source type {wanted}"));
+    }
+    // A manual security type admits Security readers, so only someone who reads it may set one.
+    if !wanted.is_empty()
+        && let Err(denied) = super::guard_own_stream_read(&org_id, &user_id, &stream_name).await
+    {
+        return denied;
+    }
+    let lock = stream_lock(&org_id, &stream_name);
+    let _guard = lock.lock().await;
+    let Some(settings) = infra::schema::get_settings(&org_id, &stream_name, StreamType::Logs).await
+    else {
+        return MetaHttpResponse::not_found("Stream not found");
+    };
+    let setting = manual_type_update(settings.security.as_ref(), &wanted);
+    match store_setting(&org_id, &user_id, &stream_name, setting).await {
+        Ok(setting) => Json(SourceTypeResponse { setting }).into_response(),
         Err(resp) => resp,
     }
 }
@@ -526,31 +708,41 @@ async fn readable_streams(
             .await
             .map_or(true, |held| any_stream_readable(held.as_deref())),
     };
-    let unfiltered = permitted.is_none();
     let mut streams: Vec<common::meta::stream::Stream> =
-        stream::get_streams(org_id, Some(StreamType::Logs), false, permitted)
+        stream::get_streams(org_id, Some(StreamType::Logs), false, None)
             .await
             .into_iter()
             .filter(|s| {
                 !config::meta::self_reporting::ai_chat::is_protected_ai_chat_stream(&s.name)
             })
             .collect();
-    // An unfiltered list would hand out doc counts and verdicts of streams a search refuses.
-    if unfiltered {
-        let denied =
-            super::unreadable_streams(org_id, user_id, streams.iter().map(|s| s.name.as_str()))
-                .await;
-        let before = streams.len();
-        streams.retain(|s| !denied.contains(&s.name));
-        let readable = still_readable(readable, before, streams.len());
+    // Security read covers the sources themselves, so a source-only analyst still sees them.
+    if let Some(names) = &permitted {
+        let all = format!("{key}:_all_{org_id}");
+        streams.retain(|s| {
+            let own = format!(
+                "{key}:{}",
+                config::utils::str::into_ofga_supported_format(&s.name)
+            );
+            o2_enterprise::enterprise::security::streams::admits_security_read(
+                s.settings.security.as_ref(),
+            ) || names.iter().any(|n| *n == all || *n == own)
+        });
+        let readable = readable || !streams.is_empty();
         return Ok((streams, readable));
     }
+    // An unfiltered list would hand out doc counts and verdicts of streams a search refuses.
+    let denied =
+        super::unreadable_streams(org_id, user_id, streams.iter().map(|s| s.name.as_str())).await;
+    let before = streams.len();
+    streams.retain(|s| !denied.contains(&s.name));
+    let readable = still_readable(readable, before, streams.len());
     Ok((streams, readable))
 }
 
 /// Whether any stream survived the read check; an org without streams keeps the grant's answer.
 fn still_readable(readable: bool, before: usize, after: usize) -> bool {
-    readable && (before == 0 || after > 0)
+    after > 0 || (readable && before == 0)
 }
 
 /// `None` is an unrestricted read; a list grants only the streams it names.
@@ -699,6 +891,12 @@ async fn classify_one(
     })
     .collect();
     let sampled = !samples.is_empty();
+    record_seen(
+        org_id,
+        &stream.name,
+        samples.len() as i64,
+        newest_timestamp(&samples),
+    );
     let verdict = judge_stream(&fields, &samples).unwrap_or_else(unmatched_verdict);
     CLASSIFY_MEMO.lock().unwrap().insert(
         (org_id.to_string(), stream.name.clone()),
@@ -711,11 +909,18 @@ async fn classify_one(
     let current = infra::schema::get_settings(org_id, &stream.name, StreamType::Logs)
         .await
         .and_then(|s| s.security.clone());
+    // Security read alone lets a caller sample a source; changing its setting needs a stream read.
     let stored = match verdict_update(current.as_ref(), &verdict) {
-        Some(update) => store_setting(org_id, user_id, &stream.name, update)
-            .await
-            .is_ok(),
-        None => false,
+        Some(update)
+            if super::guard_own_stream_read(org_id, user_id, &stream.name)
+                .await
+                .is_ok() =>
+        {
+            store_setting_as(org_id, user_id, CLASSIFIER_ACTOR, &stream.name, update)
+                .await
+                .is_ok()
+        }
+        _ => false,
     };
     Some(ClassifyResult {
         stream: stream.name.clone(),
@@ -749,17 +954,29 @@ async fn store_setting(
     stream_name: &str,
     setting: SecuritySourceSetting,
 ) -> Result<SecuritySourceSetting, Response> {
+    store_setting_as(org_id, user_id, user_id, stream_name, setting).await
+}
+
+/// [`store_setting`] checked against `user_id` but recorded and audited as made by `by`.
+async fn store_setting_as(
+    org_id: &str,
+    user_id: &str,
+    by: &str,
+    stream_name: &str,
+    setting: SecuritySourceSetting,
+) -> Result<SecuritySourceSetting, Response> {
     check_setting(org_id, user_id, stream_name, &setting).await?;
     let (stored, change) = crate::request::stream::plan_security_setting(
         org_id,
         stream_name,
         StreamType::Logs,
-        user_id,
+        by,
         Some(setting),
     )
     .await?;
     let update = UpdateStreamSettings {
         security: Some(stored.clone()),
+        index_all_values: all_values_indexed(stored.as_ref()),
         ..Default::default()
     };
     let resp = stream::update_stream_settings(org_id, stream_name, StreamType::Logs, update)
@@ -769,9 +986,14 @@ async fn store_setting(
         return Err(resp);
     }
     if let Some(change) = change {
-        crate::request::stream::audit_security_change(org_id, stream_name, user_id, change).await;
+        crate::request::stream::audit_security_change(org_id, stream_name, by, change).await;
     }
     Ok(stored.unwrap_or_default())
+}
+
+/// `match_all()` needs a full-text field, which vendor logs lack until every value is indexed.
+fn all_values_indexed(setting: Option<&SecuritySourceSetting>) -> Option<bool> {
+    o2_enterprise::enterprise::security::streams::admits_security_read(setting).then_some(true)
 }
 
 fn new_id() -> String {
@@ -886,7 +1108,8 @@ async fn attach(
         return Ok(AttachResponse {
             setting: planned,
             pipeline_id: plan.pipeline_id.clone(),
-            pipeline_created: existing.is_none(),
+            // A dry run creates nothing; `plan.pipeline_action` says whether attach would.
+            pipeline_created: false,
             plan,
             dry_run: true,
         });
@@ -1149,6 +1372,30 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_an_admitted_source_indexes_every_value_for_match_all() {
+        let attached = SecuritySourceSetting {
+            pack_id: "okta_system_log".to_string(),
+            ..Default::default()
+        };
+        assert_eq!(all_values_indexed(Some(&attached)), Some(true));
+        let included = SecuritySourceSetting {
+            included: Some(true),
+            ..Default::default()
+        };
+        assert_eq!(all_values_indexed(Some(&included)), Some(true));
+        let classified_only = SecuritySourceSetting {
+            source_type: "github_audit".to_string(),
+            ..Default::default()
+        };
+        assert_eq!(
+            all_values_indexed(Some(&classified_only)),
+            None,
+            "left as the operator set it"
+        );
+        assert_eq!(all_values_indexed(None), None);
+    }
+
+    #[test]
     fn test_any_stream_readable() {
         assert!(any_stream_readable(None));
         assert!(any_stream_readable(Some(&["logs:okta".to_string()])));
@@ -1161,6 +1408,10 @@ mod tests {
         assert!(!still_readable(true, 3, 0));
         assert!(still_readable(true, 0, 0));
         assert!(!still_readable(false, 0, 0));
+        assert!(
+            still_readable(false, 3, 1),
+            "a Security source alone is readable"
+        );
     }
 
     #[test]
@@ -1352,6 +1603,7 @@ mod tests {
             let (status, body) = body_json(resp).await;
             assert_eq!(status, StatusCode::OK, "{body}");
             assert_eq!(body["dry_run"], true);
+            assert_eq!(body["pipeline_created"], false);
             assert_eq!(body["plan"]["pack_id"], "entity");
             assert_eq!(body["plan"]["function_action"], "create");
             assert_eq!(body["plan"]["pipeline_action"], "create");
@@ -1398,6 +1650,198 @@ mod tests {
         }
 
         #[tokio::test]
+        async fn test_triage_alone_cannot_include_a_source() {
+            let (org, user) = org_with_stream(&["GET", "PUT"]).await;
+            let resp = set_inclusion(
+                Path((org.clone(), "web".to_string())),
+                as_user(&user),
+                Json(InclusionRequest { included: true }),
+            )
+            .await;
+            assert_status(resp, StatusCode::FORBIDDEN).await;
+            assert!(stored(&org).await.is_none_or(|s| s.included.is_none()));
+        }
+
+        #[tokio::test]
+        async fn test_an_author_includes_but_only_an_admin_excludes() {
+            let (org, user) = org_with_stream(&["GET", "POST"]).await;
+            let include = |included| {
+                set_inclusion(
+                    Path((org.clone(), "web".to_string())),
+                    as_user(&user),
+                    Json(InclusionRequest { included }),
+                )
+            };
+            assert_status(include(true).await, StatusCode::OK).await;
+            assert_eq!(stored(&org).await.unwrap().included, Some(true));
+            assert_status(include(false).await, StatusCode::FORBIDDEN).await;
+            assert_eq!(stored(&org).await.unwrap().included, Some(true));
+            grant(&user, &["GET", "POST", "DELETE"]);
+            assert_status(include(false).await, StatusCode::OK).await;
+            assert_eq!(stored(&org).await.unwrap().included, Some(false));
+        }
+
+        /// Creates the org's logs stream `name`, which the test author holds no stream grant on.
+        async fn unread_stream(org: &str, name: &str) {
+            let created = stream::create_stream(
+                org,
+                name,
+                StreamType::Logs,
+                StreamCreate {
+                    fields: vec![StreamField {
+                        name: "message".to_string(),
+                        r#type: "Utf8".to_string(),
+                    }],
+                    settings: StreamSettings::default(),
+                },
+            )
+            .await
+            .unwrap();
+            assert_eq!(created.status(), StatusCode::OK);
+        }
+
+        /// Writes `setting` as an operator's stream settings edit would, and waits for the cache.
+        async fn write_security(org: &str, name: &str, setting: SecuritySourceSetting) {
+            let update = UpdateStreamSettings {
+                security: Some(Some(setting.clone())),
+                ..Default::default()
+            };
+            stream::update_stream_settings(org, name, StreamType::Logs, update)
+                .await
+                .unwrap();
+            for _ in 0..100 {
+                let now = infra::schema::get_settings(org, name, StreamType::Logs)
+                    .await
+                    .and_then(|s| s.security.clone());
+                if now
+                    .is_some_and(|s| s.included == setting.included && s.verdict == setting.verdict)
+                {
+                    return;
+                }
+                tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+            }
+            panic!("the settings cache never saw the write");
+        }
+
+        #[tokio::test]
+        async fn test_security_read_covers_chosen_sources_and_no_others() {
+            let (org, user) = org_with_stream(&["GET", "POST"]).await;
+            for name in ["edr", "billing", "noisy"] {
+                unread_stream(&org, name).await;
+            }
+            let refused =
+                crate::request::security::unreadable_streams(&org, &user, ["edr", "billing"]).await;
+            assert_eq!(refused.len(), 2, "no stream grant and no source yet");
+            write_security(
+                &org,
+                "edr",
+                SecuritySourceSetting {
+                    included: Some(true),
+                    ..Default::default()
+                },
+            )
+            .await;
+            assert!(
+                crate::request::security::guard_stream_reads(&org, &user, ["edr"])
+                    .await
+                    .is_ok()
+            );
+            let refused =
+                crate::request::security::guard_stream_reads(&org, &user, ["edr", "billing"])
+                    .await
+                    .unwrap_err();
+            assert_eq!(refused.status(), StatusCode::FORBIDDEN);
+            write_security(
+                &org,
+                "noisy",
+                SecuritySourceSetting {
+                    source_type: "linux_auth".to_string(),
+                    verdict: Some(config::meta::stream::SecurityVerdict::Auto),
+                    confidence: 0.9,
+                    ..Default::default()
+                },
+            )
+            .await;
+            let refused =
+                crate::request::security::unreadable_streams(&org, &user, ["noisy"]).await;
+            assert!(
+                refused.contains("noisy"),
+                "a classifier verdict alone opens no stream to Security readers"
+            );
+        }
+
+        #[tokio::test]
+        async fn test_an_author_cannot_make_a_source_of_a_stream_they_cannot_read() {
+            let (org, user) = org_with_stream(&["GET", "POST", "DELETE"]).await;
+            unread_stream(&org, "edr").await;
+            let path = || Path((org.clone(), "edr".to_string()));
+            let include = set_inclusion(
+                path(),
+                as_user(&user),
+                Json(InclusionRequest { included: true }),
+            )
+            .await;
+            assert_status(include, StatusCode::FORBIDDEN).await;
+            let typed = set_source_type(
+                path(),
+                as_user(&user),
+                Json(SourceTypeRequest {
+                    source_type: Some("windows_security".to_string()),
+                }),
+            )
+            .await;
+            assert_status(typed, StatusCode::FORBIDDEN).await;
+            let attached = attach_pack(path(), as_user(&user), Some(Json(entity_pack()))).await;
+            assert_status(attached, StatusCode::FORBIDDEN).await;
+            let setting = infra::schema::get_settings(&org, "edr", StreamType::Logs)
+                .await
+                .and_then(|s| s.security.clone());
+            assert!(setting.is_none(), "{setting:?}");
+            let excluded = set_inclusion(
+                path(),
+                as_user(&user),
+                Json(InclusionRequest { included: false }),
+            )
+            .await;
+            assert_status(excluded, StatusCode::OK).await;
+        }
+
+        #[tokio::test]
+        async fn test_classify_stores_only_on_streams_the_caller_reads() {
+            let (org, user) = org_with_stream(&["GET", "POST"]).await;
+            unread_stream(&org, "edr").await;
+            write_security(
+                &org,
+                "edr",
+                SecuritySourceSetting {
+                    included: Some(true),
+                    ..Default::default()
+                },
+            )
+            .await;
+            let resp = classify_sources(
+                Path(org.clone()),
+                as_user(&user),
+                Some(Json(ClassifyRequest {
+                    streams: vec!["edr".to_string(), "web".to_string()],
+                })),
+            )
+            .await;
+            let (status, body) = body_json(resp).await;
+            assert_eq!(status, StatusCode::OK, "{body}");
+            let stored_for = |name: &str| {
+                body["classified"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .find(|r| r["stream"] == name)
+                    .map(|r| r["stored"].as_bool().unwrap())
+            };
+            assert_eq!(stored_for("edr"), Some(false), "{body}");
+            assert_eq!(stored_for("web"), Some(true), "{body}");
+        }
+
+        #[tokio::test]
         async fn test_an_admin_without_triage_detaches() {
             let (org, user) = org_with_stream(&["GET", "POST", "DELETE"]).await;
             let attached = attach_pack(
@@ -1418,6 +1862,53 @@ mod tests {
         }
 
         #[tokio::test]
+        async fn test_an_author_sets_a_manual_source_type_and_can_hand_it_back() {
+            let (org, user) = org_with_stream(&["GET", "POST", "DELETE"]).await;
+            let set = |source_type: Option<&str>| {
+                set_source_type(
+                    Path((org.clone(), "web".to_string())),
+                    as_user(&user),
+                    Json(SourceTypeRequest {
+                        source_type: source_type.map(str::to_string),
+                    }),
+                )
+            };
+            let (status, body) = body_json(set(Some("windows_security")).await).await;
+            assert_eq!(status, StatusCode::OK, "{body}");
+            let setting = stored(&org).await.unwrap();
+            assert_eq!(setting.source_type, "windows_security");
+            assert_eq!(
+                setting.origin,
+                Some(config::meta::stream::SecurityTypeOrigin::Manual)
+            );
+            assert_eq!(setting.updated_by, user);
+            assert!(setting.changes.last().unwrap().summary.contains("manual"));
+            for refused in ["no_such_type", "windows_sysmon_process", "<b>"] {
+                assert_status(set(Some(refused)).await, StatusCode::BAD_REQUEST).await;
+            }
+            assert_status(set(None).await, StatusCode::OK).await;
+            let cleared = stored(&org).await.unwrap();
+            assert_eq!((cleared.source_type.as_str(), cleared.origin), ("", None));
+        }
+
+        #[tokio::test]
+        async fn test_a_classifier_write_is_recorded_as_the_classifier_not_the_viewer() {
+            let (org, user) = org_with_stream(&["GET", "POST"]).await;
+            let verdict = SecuritySourceSetting {
+                source_type: "linux_auth".to_string(),
+                verdict: Some(config::meta::stream::SecurityVerdict::Suggested),
+                confidence: 0.6,
+                ..Default::default()
+            };
+            store_setting_as(&org, &user, CLASSIFIER_ACTOR, "web", verdict)
+                .await
+                .unwrap();
+            let setting = stored(&org).await.unwrap();
+            assert_eq!(setting.updated_by, CLASSIFIER_ACTOR);
+            assert_eq!(setting.changes.last().unwrap().by, CLASSIFIER_ACTOR);
+        }
+
+        #[tokio::test]
         async fn test_a_refused_setting_leaves_no_function_or_pipeline() {
             let (org, user) = org_with_stream(&["GET", "POST"]).await;
             let invalid = UpdateStreamSettings {
@@ -1430,6 +1921,14 @@ mod tests {
             stream::update_stream_settings(&org, "web", StreamType::Logs, invalid)
                 .await
                 .unwrap();
+            // The settings cache follows the write asynchronously; attach must see the bad setting.
+            for _ in 0..100 {
+                if stored(&org).await.is_some_and(|s| s.confidence > 1.0) {
+                    break;
+                }
+                tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+            }
+            assert!(stored(&org).await.is_some_and(|s| s.confidence > 1.0));
             let before = functions_and_pipelines(&org).await;
             let resp = attach_pack(
                 Path((org.clone(), "web".to_string())),

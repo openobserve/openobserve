@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import {
   BACKFILL_ATTRIBUTE,
   GROUP_BY_ATTRIBUTE,
+  LEARN_ATTRIBUTE,
   SIEM_MARKER,
   TIMESPAN_ATTRIBUTE,
   buildDetectionAlert,
@@ -252,6 +253,14 @@ describe("buildDetectionAlert for a correlation", () => {
     expect(BACKFILL_ATTRIBUTE in grouped().context_attributes).toBe(false);
     expect(BACKFILL_ATTRIBUTE in build({ backfillMinutes: 0 }).context_attributes).toBe(false);
     expect(build({ backfillMinutes: 1440 }).context_attributes[BACKFILL_ATTRIBUTE]).toBe("1440");
+  });
+
+  it("asks the first run to learn a baseline only when chosen, and never with a backfill", () => {
+    expect(LEARN_ATTRIBUTE in build({}).context_attributes).toBe(false);
+    expect(build({ learnFirstRun: true }).context_attributes[LEARN_ATTRIBUTE]).toBe("true");
+    const both = build({ learnFirstRun: true, backfillMinutes: 60 }).context_attributes;
+    expect(LEARN_ATTRIBUTE in both).toBe(false);
+    expect(both[BACKFILL_ATTRIBUTE]).toBe("60");
   });
 
   it("never runs less often than once per window", () => {

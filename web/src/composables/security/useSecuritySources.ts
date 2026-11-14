@@ -4,8 +4,7 @@ import { computed, ref } from "vue";
 import { useMutation, useQuery } from "@tanstack/vue-query";
 
 import { loadSecurityAccess } from "@/composables/security/useSecurityAccess";
-import ocsfPacks from "@/services/ocsfPacks";
-import type { SecuritySetting, SourceRow } from "@/services/securitySources";
+import securitySources, { type SourceRow } from "@/services/securitySources";
 import { classifySourcesMutation, securitySourcesQuery } from "@/services/securitySources.queries";
 import {
   isLocalPrefsMigrated,
@@ -15,16 +14,6 @@ import {
   saveSourcePrefs,
 } from "@/utils/security/sourcePrefs";
 import { loadTaggedStreams, saveTaggedStreams } from "@/utils/security/streams";
-
-const EMPTY_SETTING: SecuritySetting = {
-  source_type: "",
-  pack_id: "",
-  pack_version: 0,
-  attached_at: 0,
-  pipeline_id: "",
-  pipeline_created: false,
-  included: null,
-};
 
 /** Orgs classified in this page session; the server keeps verdicts, so once per load is enough. */
 const classifiedOrgs = new Set<string>();
@@ -67,9 +56,6 @@ export function useSecuritySources() {
     return err ? (err.response?.data?.message ?? err.message ?? "") : "";
   });
 
-  const settingOf = (name: string): SecuritySetting | null =>
-    rows.value.find((row) => row.name === name)?.setting ?? null;
-
   /** Loads the list; an author also has the server classify the streams that need it. */
   async function load(org: string) {
     if (!org) return;
@@ -94,10 +80,7 @@ export function useSecuritySources() {
 
   /** Records an explicit include or exclude on the server; throws when the save is refused. */
   async function setIncluded(name: string, included: boolean) {
-    await ocsfPacks.saveSetting(orgId.value, name, {
-      ...(settingOf(name) ?? EMPTY_SETTING),
-      included,
-    });
+    await securitySources.setIncluded(orgId.value, name, included);
     await query.refetch();
   }
 
@@ -125,10 +108,7 @@ export function useSecuritySources() {
       // A local choice for a stream the loaded list does not contain can never succeed; skip it.
       if (!live.has(item.name)) continue;
       try {
-        await ocsfPacks.saveSetting(org, item.name, {
-          ...(settingOf(item.name) ?? EMPTY_SETTING),
-          included: item.included,
-        });
+        await securitySources.setIncluded(org, item.name, item.included);
       } catch (e: any) {
         // Only a permanent 400/404 is skipped; anything else aborts unmarked so the choices retry.
         const status = e?.response?.status;

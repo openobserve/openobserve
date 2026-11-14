@@ -169,7 +169,6 @@ test.describe('RUM Product Analytics on the real engine', () => {
 
       const pm = new PageManager(page);
       const iam = pm.iamFormValidation;
-      const roles = pm.rolesPage;
       const role = `pa_${preset}_${facts.appId.slice(-8)}`.replace(/-/g, '_');
       const user = `pa-${preset}-${facts.appId}@e2e.test`;
       const userPassword = 'Preset#12345678';
@@ -189,9 +188,13 @@ test.describe('RUM Product Analytics on the real engine', () => {
         await iam.getRoleStartFromOptionLocator(preset).click();
         await iam.submitRoleForm();
         await expect(page).toHaveURL(new RegExp(`preset=${preset}`), { timeout: 30000 });
-        // The preset stages after the URL changes; saving before it sends no PUT.
-        await roles.waitForPresetStaged();
-        expect((await roles.saveAndWaitForPut(role)).ok()).toBe(true);
+        // Creating from a preset saves its grants in the same action; a role that lands empty grants nothing.
+        await expect
+          .poll(async () => {
+            const res = await root.get(`${baseUrl}/api/${orgId}/roles/${role}/permissions`);
+            return res.ok() ? (await res.json()).length : 0;
+          }, { timeout: 30000 })
+          .toBeGreaterThan(0);
 
         const made = await root.post(`${baseUrl}/api/${orgId}/users`, {
           data: { email: user, password: userPassword, role: 'user', first_name: 'pa', last_name: preset },

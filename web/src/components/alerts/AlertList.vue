@@ -1119,7 +1119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :isUpdated="isUpdated"
         :destinations="destinations"
         :templates="templates"
-        :folderId="activeFolderId"
+        :folderId="isUpdated && editFolderId ? editFolderId : activeFolderId"
         @update:list="refreshList"
         @cancel:hideform="hideForm"
         @refresh:destinations="refreshDestination"
@@ -1657,6 +1657,8 @@ export default defineComponent({
       },
     ]);
     const activeFolderId = ref<any>(router.currentRoute.value.query.folder ?? "default");
+    // An alert found by a search across folders lives in its own folder, not the open tab's.
+    const editFolderId = ref("");
     const showMoveAlertDialog = ref(false);
     // Clicking a row opens the alert's own status page. It replaced a side
     // drawer: a multi-alert's per-group table, group history and cap banner
@@ -3202,6 +3204,7 @@ export default defineComponent({
       // Handle update action
       if (action === "update" && router.currentRoute.value.query.alert_id) {
         const alertId = router.currentRoute.value.query.alert_id as string;
+        editFolderId.value = String(router.currentRoute.value.query.folder ?? "");
         try {
           const alert = await getAlertById(alertId);
           if (!(await divertSloAlert(alert))) {
@@ -4171,7 +4174,7 @@ export default defineComponent({
           action: "update",
           name: row.name,
           org_identifier: store.state.selectedOrganization.identifier,
-          folder: activeFolderId.value,
+          folder: row.folder_id || activeFolderId.value,
         },
       });
     };
@@ -4776,6 +4779,7 @@ export default defineComponent({
       addAlert,
       isUpdated,
       showAddUpdateFn,
+      editFolderId,
       handleActionQuery,
       showDeleteDialogFn,
       duplicateAlert,

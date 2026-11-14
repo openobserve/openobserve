@@ -55,6 +55,10 @@ vi.mock("@/services/search", () => ({
   default: { search, delete_running_queries: vi.fn(() => Promise.resolve()) },
 }));
 vi.mock("@/services/stream", () => ({ default: { schema, fieldValues } }));
+vi.mock("@/services/securitySources", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/services/securitySources")>()),
+  default: { schema: (org: string, stream: string) => schema(org, stream, "logs") },
+}));
 vi.mock("@/composables/security/streamActivity", () => ({
   ocsfClassCounts: async () => [],
 }));
@@ -374,17 +378,18 @@ describe("SecurityEvents", () => {
 describe("SecurityEvents access", () => {
   const sel = (id: string) => `[data-test="${id}"]`;
 
-  it("lets a triage-only analyst include a source but not exclude one or create a detection", async () => {
+  it("gives a triage-only analyst no source administration and no detection authoring", async () => {
     triageOnly();
     const w = await mountView("?stream=okta_auth&period=1h");
-    expect(w.find(sel("security-events-add-source")).exists()).toBe(true);
+    expect(w.find(sel("security-events-add-source")).exists()).toBe(false);
     expect(w.find(sel("security-events-source-remove-okta_auth")).exists()).toBe(false);
     expect(w.findComponent({ name: "SecurityEventsDetected" }).props("canCreate")).toBe(false);
   });
 
-  it("lets an author create a detection from a matched rule", async () => {
+  it("lets an author include a source and create a detection from a matched rule", async () => {
     authorOnly();
     const w = await mountView("?stream=okta_auth&period=1h");
+    expect(w.find(sel("security-events-add-source")).exists()).toBe(true);
     expect(w.findComponent({ name: "SecurityEventsDetected" }).props("canCreate")).toBe(true);
     expect(w.find(sel("security-events-source-remove-okta_auth")).exists()).toBe(false);
   });
@@ -396,7 +401,7 @@ describe("SecurityEvents access", () => {
 
   it("shows the server's reason when including a source fails and keeps the current stream", async () => {
     sourceSaves.include.mockRejectedValueOnce({
-      response: { status: 403, data: { message: "Security triage permission required" } },
+      response: { status: 403, data: { message: "Security sources need the Security permission" } },
     });
     const w = await mountView("?stream=okta_auth&period=1h");
     w.findComponent({ name: "SecurityEventsSources" }).vm.$emit("add", "vpc_flow");
@@ -405,7 +410,7 @@ describe("SecurityEvents access", () => {
     expect(toastMock).toHaveBeenCalledWith(
       expect.objectContaining({
         variant: "error",
-        message: "Security triage permission required",
+        message: "Security sources need the Security permission",
       }),
     );
     expect(w.findComponent({ name: "SecurityEventsSources" }).props("selected")).toBe("okta_auth");
@@ -523,6 +528,105 @@ describe("SecurityEvents severity, SQL results and default stream", () => {
     await settle();
     const cols = (table.props("columns") as { id: string }[]).map((c) => c.id);
     expect(cols).toContain("raw:who");
+  });
+
+  it("shows exactly the columns a hand-written query selects, with no view to switch", async () => {
+    const sql = `SELECT _timestamp, actor_alternateid, client_ipaddress FROM "okta_auth"`;
+    search.mockImplementation(() =>
+      Promise.resolve(
+        okResponse({
+          hits: [{ _timestamp: 1, actor_alternateid: "u0@acme.io", client_ipaddress: "10.0.0.1" }],
+        }),
+      ),
+    );
+    const w = await mountView(`?stream=okta_auth&period=1h&sql_mode=true&query=${b64(sql)}`);
+    const table = w.findComponent({ name: "SecurityEventsTable" });
+    expect(table.props("resultTable")).toBe(false);
+    expect(table.props("projected")).toBe(true);
+    const cols = (table.props("columns") as { id: string }[]).map((c) => c.id);
+    expect(cols).toEqual(["time", "raw:actor_alternateid", "raw:client_ipaddress"]);
+    expect(w.find(sel("security-events-table")).text()).toContain("10.0.0.1");
+    expect(w.find(sel("security-events-view")).exists()).toBe(false);
+  });
+
+  it("keeps a projected query's columns when it matches no rows, and says the query found nothing", async () => {
+    const sql = `SELECT _timestamp, computername, username, targetfilename FROM "okta_auth" WHERE targetfilename IS NOT NULL ORDER BY _timestamp DESC`;
+    search.mockImplementation(() => Promise.resolve(okResponse({ hits: [] })));
+    const w = await mountView(`?stream=okta_auth&period=1h&sql_mode=true&query=${b64(sql)}`);
+    const table = w.findComponent({ name: "SecurityEventsTable" });
+    expect(table.props("loading")).toBe(false);
+    expect(table.props("projected")).toBe(true);
+    const cols = (table.props("columns") as { id: string }[]).map((c) => c.id);
+    expect(cols).toEqual(["time", "raw:computername", "raw:username", "raw:targetfilename"]);
+    expect(table.props("emptyHint")).toBe(
+      "The query matched no rows in this time range. Widen the time range or change the query.",
+    );
+  });
+
+  it("shows a column a projected query names even when the first rows lack it", async () => {
+    const sql = String.raw`SELECT _timestamp, winlog_event_data_commandline AS cmd, winlog_event_data_targetfilename AS tf FROM "okta_auth" WHERE winlog_event_data_commandline LIKE '%\\%' ORDER BY _timestamp DESC`;
+    search.mockImplementation(() =>
+      Promise.resolve(okResponse({ hits: [{ _timestamp: 1, cmd: "robocopy a b" }] })),
+    );
+    const w = await mountView(`?stream=okta_auth&period=1h&sql_mode=true&query=${b64(sql)}`);
+    const table = w.findComponent({ name: "SecurityEventsTable" });
+    expect(table.props("projected")).toBe(true);
+    const cols = (table.props("columns") as { id: string }[]).map((c) => c.id);
+    expect(cols).toEqual(["time", "raw:cmd", "raw:tf"]);
+  });
+
+  it("names an empty aggregate's columns from its SQL", async () => {
+    const sql = `SELECT client_ipaddress AS ip, count(*) AS n FROM "okta_auth" GROUP BY ip ORDER BY n DESC`;
+    search.mockImplementation(() => Promise.resolve(okResponse({ hits: [] })));
+    const w = await mountView(`?stream=okta_auth&period=1h&sql_mode=true&query=${b64(sql)}`);
+    const table = w.findComponent({ name: "SecurityEventsTable" });
+    expect(table.props("resultTable")).toBe(true);
+    const cols = (table.props("columns") as { id: string }[]).map((c) => c.id);
+    expect(cols).toEqual(["res:ip", "res:n"]);
+  });
+
+  it("shows the engine's reason when it rejects a query", async () => {
+    const sql = `SELECT * FROM "okta_auth" WHERE match_all('CreateServiceAccountKey')`;
+    search.mockImplementation((req: { query: { query: { sql: string } } }) =>
+      req.query.query.sql === sql
+        ? Promise.reject({
+            response: {
+              status: 400,
+              data: {
+                code: 400,
+                message: "Search SQL not valid",
+                error_detail: "No full text search field found",
+              },
+            },
+          })
+        : Promise.resolve(okResponse({ hits: [] })),
+    );
+    const w = await mountView(`?stream=okta_auth&period=1h&sql_mode=true&query=${b64(sql)}`);
+    expect(w.findComponent({ name: "SecurityEventsTable" }).props("error")).toBe(
+      "Search SQL not valid: No full text search field found. These sources have no full-text fields; search a column with str_match_ignore_case(field, 'value') instead.",
+    );
+  });
+
+  it("switches a SELECT * query to every returned field on Raw", async () => {
+    const sql = `SELECT * FROM "okta_auth"`;
+    search.mockImplementation(() =>
+      Promise.resolve(okResponse({ hits: [{ ...OKTA_ROWS[0], only_here: "x" }] })),
+    );
+    const w = await mountView(`?stream=okta_auth&period=1h&sql_mode=true&query=${b64(sql)}`);
+    const table = w.findComponent({ name: "SecurityEventsTable" });
+    expect(table.props("projected")).toBe(false);
+    table.vm.$emit("update:showRaw", false);
+    await settle();
+    const normalized = (table.props("columns") as { id: string }[]).map((c) => c.id);
+    table.vm.$emit("update:showRaw", true);
+    await settle();
+    const rawCols = (table.props("columns") as { id: string }[]).map((c) => c.id);
+    expect(rawCols).not.toEqual(normalized);
+    expect(rawCols).toEqual(
+      Object.keys({ ...OKTA_ROWS[0], only_here: "x" }).map((k) =>
+        k === "_timestamp" ? "time" : `raw:${k}`,
+      ),
+    );
   });
 
   it("moves the picker to the table a hand-written query reads", async () => {

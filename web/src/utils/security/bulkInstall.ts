@@ -26,6 +26,10 @@ export interface BulkSettings {
   silence: number;
   destinations: string[];
   folderId: string;
+  /** Minutes of history each new detection's first run evaluates; 0 for none, the default. */
+  backfillMinutes?: number;
+  /** Each detection's first run notes existing matches as a baseline instead of opening cases. */
+  learnFirstRun?: boolean;
 }
 
 export type BulkStatus = "installed" | "skipped" | "failed";
@@ -110,6 +114,8 @@ async function installOne(
       silence: settings.silence,
       correlation: correlation ?? undefined,
       sql: compiled.sql,
+      backfillMinutes: settings.backfillMinutes ?? 0,
+      learnFirstRun: settings.learnFirstRun ?? false,
     });
     const name = String(payload.name);
     // Claimed before the save so two targets in one batch can never race for a name.
@@ -166,4 +172,13 @@ export async function runBulkInstall(
   const lanes = Math.max(1, Math.min(deps.concurrency ?? 4, targets.length));
   await Promise.all(Array.from({ length: lanes }, worker));
   return results;
+}
+
+/** One (rule, stream) pair's identity in the plan, so a deselected row stays deselected. */
+export const targetKey = (target: Pick<BulkTarget, "rule" | "stream">) =>
+  `${target.rule.key}/${target.stream}`;
+
+/** A rule written for another log source than the stream's; it may compile on shared names, but rarely means anything. */
+export function targetMismatch(target: BulkTarget): boolean {
+  return !!target.sourceType && !target.rule.sources.includes(target.sourceType);
 }

@@ -489,6 +489,15 @@ pub async fn search_http2_stream(
         &trace_id,
     )
     .await
+        && !crate::search::security_scope_admits(
+            &req.query.sql,
+            &org_id,
+            &user_id,
+            stream_type,
+            permission_resource_type,
+            &query,
+        )
+        .await
     {
         report_to_audit(
             user_id,

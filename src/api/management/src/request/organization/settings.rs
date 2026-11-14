@@ -402,7 +402,13 @@ pub async fn delete_logo_text() -> Response {
     (StatusCode::FORBIDDEN, Json("Not Supported")).into_response()
 }
 
-fn settings_response(data: OrganizationSetting) -> Response {
+#[cfg_attr(not(feature = "enterprise"), allow(unused_mut))]
+fn settings_response(mut data: OrganizationSetting) -> Response {
+    // Security tuning has its own Security-gated routes; an org settings reader must not see it.
+    #[cfg(feature = "enterprise")]
+    {
+        data.security_tuning = Default::default();
+    }
     let resolved_data_retention = db::organization::resolved_retention_defaults(
         &db::organization::org_setting_retention_defaults(&data),
     );

@@ -139,6 +139,13 @@ pub fn get_clear_cache_from_request(query: &HashMap<String, String>) -> bool {
     get_key_as_bool(query, "clear_cache")
 }
 
+/// A Security page's search, which Security read may run on the org's Security sources.
+#[inline(always)]
+#[cfg(feature = "enterprise")]
+pub fn get_security_scope_from_request(query: &HashMap<String, String>) -> bool {
+    get_key_as_bool(query, "security_scope")
+}
+
 #[inline(always)]
 #[cfg(feature = "enterprise")]
 pub fn get_extract_patterns_from_request(query: &HashMap<String, String>) -> bool {

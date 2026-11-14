@@ -683,7 +683,7 @@ context_path = "/auth",
 pub async fn authentication(
     #[cfg(feature = "enterprise")] headers: HeaderMap,
     #[cfg(feature = "enterprise")] real_ip: Option<Extension<RealIp>>,
-    #[cfg(feature = "enterprise")] Query(query): Query<HashMap<String, String>>,
+    #[cfg(feature = "enterprise")] Query(_query): Query<HashMap<String, String>>,
     auth: Option<axum::Json<SignInUser>>,
 ) -> Response {
     #[cfg(feature = "enterprise")]

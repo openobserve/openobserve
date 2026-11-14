@@ -4,17 +4,15 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { defineComponent, h } from "vue";
 import { flushPromises, mount } from "@vue/test-utils";
 
-import ocsfPacks from "@/services/ocsfPacks";
 import securitySources from "@/services/securitySources";
 import { withQueryClient } from "@/test/unit/helpers/queryClient";
 import { sourceRow } from "@/views/Security/__fixtures__/securityFixtures";
 import { useSecuritySources } from "@/composables/security/useSecuritySources";
 import { isLocalPrefsMigrated, saveSourcePrefs } from "@/utils/security/sourcePrefs";
 
-vi.mock("@/services/ocsfPacks", () => ({ default: { saveSetting: vi.fn() } }));
 vi.mock("@/services/securitySources", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/services/securitySources")>()),
-  default: { list: vi.fn(), classify: vi.fn() },
+  default: { list: vi.fn(), classify: vi.fn(), setIncluded: vi.fn() },
 }));
 const access = vi.fn();
 vi.mock("@/composables/security/useSecurityAccess", () => ({
@@ -22,7 +20,7 @@ vi.mock("@/composables/security/useSecurityAccess", () => ({
 }));
 
 const api = securitySources as unknown as Record<string, ReturnType<typeof vi.fn>>;
-const save = vi.mocked(ocsfPacks.saveSetting);
+const save = api.setIncluded;
 
 const mapped = {
   source_type: "aws_cloudtrail",
@@ -91,17 +89,13 @@ describe("useSecuritySources", () => {
     expect(api.classify).toHaveBeenCalledWith("org-d", []);
   });
 
-  it("writes an include on top of the stored setting, keeping the pack", async () => {
+  it("records an include or exclude through the Security endpoint, not stream settings", async () => {
     const sources = setup();
     await sources.load("org-c");
     await sources.exclude("ct");
-    expect(save).toHaveBeenCalledWith("org-c", "ct", { ...mapped, included: false });
+    expect(save).toHaveBeenCalledWith("org-c", "ct", false);
     await sources.include("okta");
-    expect(save).toHaveBeenLastCalledWith(
-      "org-c",
-      "okta",
-      expect.objectContaining({ pack_id: "", included: true }),
-    );
+    expect(save).toHaveBeenLastCalledWith("org-c", "okta", true);
   });
 
   it("hides dismissed suggestions", async () => {
@@ -128,7 +122,7 @@ describe("migrateIncludes", () => {
     await sources.load("org-m");
     await sources.migrateIncludes(true);
     expect(save).toHaveBeenCalledTimes(1);
-    expect(save).toHaveBeenCalledWith("org-m", "okta", expect.objectContaining({ included: true }));
+    expect(save).toHaveBeenCalledWith("org-m", "okta", true);
     expect(isLocalPrefsMigrated("org-m")).toBe(true);
   });
 
