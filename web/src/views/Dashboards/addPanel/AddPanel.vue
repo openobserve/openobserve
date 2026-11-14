@@ -351,7 +351,18 @@ import {
   updatePanel,
   updateDashboard,
 } from "../../../utils/commons";
-import { onBeforeRouteLeave, useRoute, useRouter } from "vue-router";
+import {
+  isNavigationFailure,
+  NavigationFailureType,
+  onBeforeRouteLeave,
+  stringifyQuery,
+  useRoute,
+  useRouter,
+  type LocationQueryRaw,
+  type NavigationFailure,
+  type NavigationGuardNext,
+  type RouteLocationNormalized,
+} from "vue-router";
 import { useStore } from "vuex";
 import { useLicenseLock } from "@/composables/useFeatureLock";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
@@ -648,6 +659,23 @@ export default defineComponent({
     // this is used to again assign query params on discard or save
     let routeQueryParamsOnMount: any = {};
 
+    // Even a duplicate replace supersedes a pending leave, cancelling it with no URL rollback.
+    let leaveTarget: RouteLocationNormalized | null = null;
+    // Syncs held back during a leave stack here, so the first one after it writes them all.
+    let deferredRouteQuery: LocationQueryRaw | null = null;
+    // A refused browser Back restores its entry asynchronously; a replace before then rewrites the previous page's entry.
+    let historyRestorePending = false;
+    const routeQueryBase = () => deferredRouteQuery ?? route.query;
+    const syncRouteQuery = (query: LocationQueryRaw) => {
+      if (leaveTarget || historyRestorePending) {
+        deferredRouteQuery = query;
+        return;
+      }
+      deferredRouteQuery = null;
+      if (stringifyQuery(query) === stringifyQuery(route.query)) return;
+      router.replace({ query });
+    };
+
     const { focusInEditor } = usePanelEditorFocus();
     // A notice's "Use Top N" / "Edit function" link lands here; the param is dropped once used.
     let focusParamUsed = false;
@@ -743,12 +771,10 @@ export default defineComponent({
         });
       }
 
-      router.replace({
-        query: {
-          ...route.query,
-          ...variableObj,
-          ...getQueryParamsForDuration(selectedDate.value),
-        },
+      syncRouteQuery({
+        ...routeQueryBase(),
+        ...variableObj,
+        ...getQueryParamsForDuration(selectedDate.value),
       });
 
       // Note: updatedVariablesData is now a computed property that reads from variablesManager
@@ -1402,16 +1428,16 @@ export default defineComponent({
 
         if (!newPanelTime) {
           // Panel time removed - clear panel time params from URL
-          const query = { ...route.query };
+          const query = { ...routeQueryBase() };
           delete query[`pt-period.${panelId}`];
           delete query[`pt-from.${panelId}`];
           delete query[`pt-to.${panelId}`];
-          router.replace({ query });
+          syncRouteQuery(query);
           return;
         }
 
         // Update URL with panel time parameters
-        const query = { ...route.query };
+        const query = { ...routeQueryBase() };
 
         if (newPanelTime.type === "relative" && newPanelTime.relativeTimePeriod) {
           // Relative time: pt-period.{panelId}={relativeTimePeriod}
@@ -1431,7 +1457,7 @@ export default defineComponent({
           delete query[`pt-period.${panelId}`];
         }
 
-        router.replace({ query });
+        syncRouteQuery(query);
       },
       { deep: true },
     );
@@ -1546,11 +1572,9 @@ export default defineComponent({
           start_time: effectiveTime.start_time,
           end_time: effectiveTime.end_time,
         };
-        router.replace({
-          query: {
-            ...route.query,
-            ...getQueryParamsForDuration(selectedDate.value),
-          },
+        syncRouteQuery({
+          ...routeQueryBase(),
+          ...getQueryParamsForDuration(selectedDate.value),
         });
       }
     };
@@ -1631,17 +1655,71 @@ export default defineComponent({
       return true;
     };
 
+    // The browser percent-encodes characters such as ' that the router keeps raw, so compare parsed forms.
+    const normalizedLocation = (location: string) => {
+      const resolved = router.resolve(location);
+      return `${resolved.path}?${stringifyQuery(resolved.query)}${resolved.hash}`;
+    };
+
+    // The leave whose refused Back the hold waits on; a cancelled one is never rolled back.
+    let restoreTarget: RouteLocationNormalized | null = null;
+    const replayRouteQuery = (awaitRestore = true) => {
+      window.removeEventListener("popstate", onHistoryRestored);
+      if (editorDisposed || leaveTarget) return;
+      historyRestorePending =
+        awaitRestore &&
+        normalizedLocation(router.options.history.location) !==
+          normalizedLocation(router.currentRoute.value.fullPath);
+      if (historyRestorePending) {
+        window.addEventListener("popstate", onHistoryRestored, { once: true });
+        return;
+      }
+      restoreTarget = null;
+      if (deferredRouteQuery) syncRouteQuery(deferredRouteQuery);
+    };
+    const onHistoryRestored = () => replayRouteQuery();
+
+    // A redirect carries the original leave in redirectedFrom and never ends it through afterEach.
+    const isLeave = (target: RouteLocationNormalized, leave: RouteLocationNormalized | null) =>
+      !!leave && (target === leave || target.redirectedFrom === leave);
+
+    // A guard settling late must not end the leave a newer navigation has started.
+    const endLeave = (target: RouteLocationNormalized, failure?: NavigationFailure) => {
+      const cancelled = isNavigationFailure(failure, NavigationFailureType.cancelled);
+      if (cancelled && historyRestorePending && isLeave(target, restoreTarget)) {
+        replayRouteQuery(false);
+        return;
+      }
+      if (!isLeave(target, leaveTarget)) return;
+      restoreTarget = leaveTarget;
+      leaveTarget = null;
+      replayRouteQuery(!cancelled);
+    };
+
+    let pendingLeave: { to: RouteLocationNormalized; next: NavigationGuardNext } | null = null;
+    const takePendingLeave = (to: RouteLocationNormalized, next: NavigationGuardNext) => {
+      const latest = pendingLeave ?? { to, next };
+      pendingLeave = null;
+      return latest;
+    };
+
+    // Kept after next(): the navigation stays pending while the next view loads.
+    const allowLeave = (to: RouteLocationNormalized, next: () => void) => {
+      leaveTarget = to;
+      next();
+    };
+
     onBeforeRouteLeave(async (to, from, next) => {
       // check if it is a force navigation, then allow
       if (forceSkipBeforeUnloadListener) {
-        next();
+        allowLeave(to, next);
         return;
       }
       // The old session is already dead and its drafts stay, so the panel is kept as after an expired session.
       if (draftSignOutForced.value) {
         onLeaveChoice("stay");
         draftAutosave.flush();
-        next();
+        allowLeave(to, next);
         return;
       }
 
@@ -1649,18 +1727,50 @@ export default defineComponent({
         // Edits that were undone must not leave their earlier draft behind.
         draftAutosave.flush();
         cleanupSessionVariables();
-        next();
+        allowLeave(to, next);
         return;
       }
 
-      // A second navigation while the dialog is up must not stack another dialog.
-      if (leaveResolver) {
-        next(false);
+      // vue-router has already cancelled the older navigation, so the open dialog answers the newer one.
+      if (pendingLeave) {
+        // next(false) here would roll a superseded Back's URL back under the newer navigation.
+        pendingLeave.next();
+        pendingLeave = { to, next };
+        leaveTarget = to;
         return;
       }
 
-      if (await resolveLeave(await askLeave())) next();
-      else next(false);
+      pendingLeave = { to, next };
+      leaveTarget = to;
+      let leave: boolean;
+      try {
+        leave = await resolveLeave(await askLeave());
+      } catch (error) {
+        const latest = takePendingLeave(to, next);
+        if (latest.to === to) endLeave(to);
+        else latest.next(false);
+        throw error;
+      }
+      const latest = takePendingLeave(to, next);
+      if (leave) {
+        latest.next();
+        return;
+      }
+      latest.next(false);
+      endLeave(latest.to);
+    });
+    // Only the navigation this guard let through counts; a success off the editor unmounts it instead.
+    const stopLeaveFailureReset = router.afterEach((to, from, failure) => {
+      if (failure || to.path === from.path) endLeave(to, failure || undefined);
+    });
+    // A navigation that throws, such as a view chunk failing to load, never reaches afterEach.
+    const stopLeaveErrorReset = router.onError((_error, to) => {
+      endLeave(to);
+    });
+    onBeforeUnmount(() => {
+      stopLeaveFailureReset();
+      stopLeaveErrorReset();
+      window.removeEventListener("popstate", onHistoryRestored);
     });
     const panelTitle = computed(() => {
       return { title: dashboardPanelData.data.title };

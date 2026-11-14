@@ -33,7 +33,10 @@ use o2_openfga::{config::get_config as get_openfga_config, meta::mapping::OFGA_M
 #[cfg(feature = "enterprise")]
 use openobserve_api_common::auth::validator::list_objects_for_user;
 use openobserve_api_common::extractors::Headers;
-use openobserve_core::{auth::UserEmail, pipeline::list_user_pipelines};
+use openobserve_core::{
+    auth::UserEmail, pipeline::list_user_pipelines,
+    self_reporting::triggers_schema as trigger_stream,
+};
 use search_service as SearchService;
 use search_service::query_range::get_settings_max_query_range;
 use serde::{Deserialize, Serialize};
@@ -43,6 +46,16 @@ use utoipa::ToSchema;
 use crate::common::{
     meta::http::HttpResponse as MetaHttpResponse, utils::http::get_or_create_trace_id,
 };
+
+/// Read after the shared history columns, each only once the stream has it.
+const PIPELINE_HISTORY_COLUMNS: [&str; 6] = [
+    "delay_in_secs",
+    "evaluation_took_in_secs",
+    "source_node",
+    "query_took",
+    "error",
+    "is_partial",
+];
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PipelineHistoryQuery {
@@ -455,14 +468,22 @@ pub async fn get_pipeline_history(
         });
     }
 
+    let schema = match trigger_stream::get(&org_id).await {
+        Ok(schema) => schema,
+        Err(e) => {
+            log::error!("Failed to read the pipeline history schema: {e}");
+            return MetaHttpResponse::internal_error(format!(
+                "Failed to read the pipeline history schema: {e}"
+            ));
+        }
+    };
+    let columns = history_columns(&schema);
+    let sort_column = trigger_stream::sortable_column(sort_column, &schema);
+
     // Step 2: Get the actual paginated results
     // Build data query with LIMIT/OFFSET for pagination
     let data_sql = format!(
-        "SELECT _timestamp, org, key, status, is_realtime, is_silenced, \
-         start_time, end_time, retries, \
-         delay_in_secs, evaluation_took_in_secs, \
-         source_node, query_took, error \
-         FROM \"{TRIGGERS_STREAM}\" \
+        "SELECT {columns} FROM \"{TRIGGERS_STREAM}\" \
          WHERE {where_clause} \
          ORDER BY {sort_column} {sort_order} LIMIT {size} OFFSET {from}"
     );
@@ -566,6 +587,15 @@ pub async fn get_pipeline_history(
     };
 
     MetaHttpResponse::json(response)
+}
+
+fn history_columns(schema: &arrow_schema::Schema) -> String {
+    trigger_stream::present_columns(
+        trigger_stream::HISTORY_COLUMNS
+            .into_iter()
+            .chain(PIPELINE_HISTORY_COLUMNS),
+        schema,
+    )
 }
 
 /// Helper function to get all pipeline IDs for an organization
@@ -829,5 +859,20 @@ mod tests {
         assert_eq!(response.from, 50);
         assert_eq!(response.size, 10);
         assert_eq!(response.hits.len(), 1);
+    }
+
+    #[test]
+    fn the_history_query_reads_is_partial_once_the_stream_has_it() {
+        use arrow_schema::{DataType, Field, Schema};
+
+        let mut fields: Vec<Field> = trigger_stream::HISTORY_COLUMNS
+            .into_iter()
+            .map(|name| Field::new(name, DataType::Utf8, true))
+            .collect();
+        let bare = history_columns(&Schema::new(fields.clone()));
+        assert_eq!(bare, trigger_stream::HISTORY_COLUMNS.join(", "));
+        fields.push(Field::new("is_partial", DataType::Boolean, true));
+        let with = history_columns(&Schema::new(fields));
+        assert!(with.ends_with(", is_partial"), "{with}");
     }
 }

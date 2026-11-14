@@ -4,8 +4,11 @@ import { nextTick, reactive } from "vue";
 import AddPanel from "./AddPanel.vue";
 import { createStore } from "vuex";
 import {
+  createMemoryHistory,
   createRouter,
   createWebHistory,
+  isNavigationFailure,
+  NavigationFailureType,
   onBeforeRouteLeave,
   useRoute,
   useRouter,
@@ -151,7 +154,11 @@ vi.mock("@/composables/dashboard/useDashboardSaveConflict", () => ({
 
 // Mock vue-router hooks
 vi.mock("vue-router", async () => {
-  const actual = await vi.importActual("vue-router");
+  const actual = await vi.importActual<typeof import("vue-router")>("vue-router");
+  const parser = actual.createRouter({
+    history: actual.createMemoryHistory(),
+    routes: [{ path: "/:any(.*)", component: { render: () => null } }],
+  });
   return {
     ...actual,
     onBeforeRouteLeave: vi.fn(),
@@ -164,6 +171,11 @@ vi.mock("vue-router", async () => {
     useRouter: vi.fn(() => ({
       push: vi.fn(),
       replace: vi.fn(),
+      afterEach: vi.fn(() => vi.fn()),
+      onError: vi.fn(() => vi.fn()),
+      options: { history: { location: "/dashboards/add_panel" } },
+      currentRoute: { value: { fullPath: "/dashboards/add_panel" } },
+      resolve: (location: string) => parser.resolve(location),
     })),
   };
 });
@@ -699,6 +711,367 @@ describe("AddPanel.vue", () => {
 
       expect(confirmSpy).not.toHaveBeenCalled();
       expect(next).toHaveBeenCalledWith();
+    });
+
+    describe("URL sync from the live preview", () => {
+      const variables = { values: [] };
+      const toView = () => ({ path: "/dashboards/view" });
+      const fromEditor = { path: "/dashboards/add_panel" };
+      const editorRouter = () => vi.mocked(useRouter).mock.results.at(-1)!.value;
+      const editorRoute = () => vi.mocked(useRoute).mock.results.at(-1)!.value;
+      const lastReplacedQuery = () => editorRouter().replace.mock.calls.at(-1)![0].query;
+      const onNavigationEnd = () => editorRouter().afterEach.mock.calls.at(-1)![0];
+      const onNavigationError = () => editorRouter().onError.mock.calls.at(-1)![0];
+
+      const abortedNavigation = async () => {
+        const probe = createRouter({
+          history: createMemoryHistory(),
+          routes: [{ path: "/:any(.*)", component: { render: () => null } }],
+        });
+        await probe.push("/a");
+        probe.beforeEach(() => false);
+        const failure = await probe.push("/b");
+        expect(isNavigationFailure(failure, NavigationFailureType.aborted)).toBe(true);
+        return failure;
+      };
+
+      const cancelledNavigation = async () => {
+        const probe = createRouter({
+          history: createMemoryHistory(),
+          routes: [{ path: "/:any(.*)", component: { render: () => null } }],
+        });
+        await probe.push("/a");
+        let newer: Promise<unknown> = Promise.resolve();
+        probe.beforeEach((to) => {
+          if (to.path === "/b") newer = probe.push("/c");
+          return true;
+        });
+        const failure = await probe.push("/b");
+        await newer;
+        expect(isNavigationFailure(failure, NavigationFailureType.cancelled)).toBe(true);
+        return failure;
+      };
+
+      const editPanel = async () => {
+        window.dispatchEvent(new Event("keydown"));
+        wrapper.vm.dashboardPanelData.data.title = "edited by the user";
+        await nextTick();
+      };
+
+      const openLeaveDialog = async () => {
+        await editPanel();
+        const next = vi.fn();
+        const to = toView();
+        const done = leaveGuard(to, fromEditor, next) as unknown as Promise<void>;
+        await nextTick();
+        expect(wrapper.vm.leaveDialogOpen).toBe(true);
+        return { next, done, to };
+      };
+
+      const pickerReturns = (relativeTimePeriod: string) => {
+        wrapper.vm.selectedDate = { valueType: "relative", relativeTimePeriod };
+        wrapper.vm.dateTimePickerRef = {
+          getConsumableDateTime: vi.fn().mockReturnValue({
+            startTime: 1700000000000,
+            endTime: 1700000500000,
+            relativeTimePeriod,
+          }),
+        };
+      };
+
+      const setPanelTime = async (panelTime: any) => {
+        editorRoute().query.panelId = "p1";
+        wrapper.vm.dashboardPanelData.data.config.panel_time_range = panelTime;
+        await nextTick();
+      };
+
+      const noPrep = async () => {};
+      const syncSites = [
+        {
+          site: "variable values",
+          prepare: noPrep,
+          sync: async () => wrapper.vm.variablesDataUpdated(variables),
+        },
+        {
+          site: "applied time range",
+          prepare: noPrep,
+          sync: async () => {
+            pickerReturns("1h");
+            wrapper.vm.updateDateTime();
+          },
+        },
+        {
+          site: "panel time range",
+          prepare: noPrep,
+          sync: () => setPanelTime({ type: "relative", relativeTimePeriod: "30m" }),
+        },
+        {
+          site: "cleared panel time range",
+          prepare: async () => {
+            await setPanelTime({ type: "relative", relativeTimePeriod: "30m" });
+            editorRoute().query = { ...lastReplacedQuery() };
+          },
+          sync: () => setPanelTime(null),
+        },
+      ];
+
+      it("writes the preview time range to the URL when no leave is pending", () => {
+        editorRouter().replace.mockClear();
+
+        wrapper.vm.variablesDataUpdated(variables);
+
+        expect(editorRouter().replace).toHaveBeenCalledTimes(1);
+        expect(lastReplacedQuery()).toEqual({ dashboard: "test-dashboard", period: "15m" });
+      });
+
+      it("writes the applied time range and the panel time range to the URL", async () => {
+        editorRouter().replace.mockClear();
+        pickerReturns("1h");
+        wrapper.vm.updateDateTime();
+        expect(lastReplacedQuery()).toMatchObject({ period: "1h" });
+
+        await setPanelTime({ type: "relative", relativeTimePeriod: "30m" });
+        expect(lastReplacedQuery()).toMatchObject({ "pt-period.p1": "30m" });
+        editorRoute().query = { ...lastReplacedQuery() };
+
+        await setPanelTime(null);
+        expect(lastReplacedQuery()).not.toHaveProperty("pt-period.p1");
+      });
+
+      it("does not replace the route with a query identical to the current one", () => {
+        wrapper.vm.variablesDataUpdated(variables);
+        editorRoute().query = { ...lastReplacedQuery() };
+        editorRouter().replace.mockClear();
+
+        wrapper.vm.variablesDataUpdated(variables);
+
+        expect(editorRouter().replace).not.toHaveBeenCalled();
+      });
+
+      it.each(syncSites)(
+        "holds the $site sync while the leave dialog is open and writes it once the user stays",
+        async ({ prepare, sync }) => {
+          await prepare();
+          const { next, done } = await openLeaveDialog();
+          editorRouter().replace.mockClear();
+
+          await sync();
+          expect(editorRouter().replace).not.toHaveBeenCalled();
+
+          wrapper.vm.onLeaveChoice("stay");
+          await done;
+          expect(next).toHaveBeenCalledWith(false);
+          expect(editorRouter().replace).toHaveBeenCalledTimes(1);
+        },
+      );
+
+      it("writes every sync held during the dialog in one replace after Stay", async () => {
+        const { done } = await openLeaveDialog();
+        editorRouter().replace.mockClear();
+        pickerReturns("1h");
+        wrapper.vm.updateDateTime();
+        await setPanelTime({ type: "relative", relativeTimePeriod: "30m" });
+
+        wrapper.vm.onLeaveChoice("stay");
+        await done;
+
+        expect(editorRouter().replace).toHaveBeenCalledTimes(1);
+        expect(lastReplacedQuery()).toMatchObject({ period: "1h", "pt-period.p1": "30m" });
+      });
+
+      it("waits for a refused browser Back to restore its history entry before replaying", async () => {
+        const { done } = await openLeaveDialog();
+        wrapper.vm.variablesDataUpdated(variables);
+        editorRouter().replace.mockClear();
+        editorRouter().options.history.location = "/dashboards/view";
+
+        wrapper.vm.onLeaveChoice("stay");
+        await done;
+        expect(editorRouter().replace).not.toHaveBeenCalled();
+        pickerReturns("1h");
+        wrapper.vm.updateDateTime();
+        expect(editorRouter().replace).not.toHaveBeenCalled();
+
+        editorRouter().options.history.location = "/dashboards/add_panel";
+        window.dispatchEvent(new PopStateEvent("popstate"));
+        expect(editorRouter().replace).toHaveBeenCalledTimes(1);
+        expect(lastReplacedQuery()).toMatchObject({ period: "1h" });
+      });
+
+      it("treats a browser-encoded ' in the URL as the same location when replaying after Stay", async () => {
+        editorRouter().currentRoute.value.fullPath = "/dashboards/add_panel?var-team=o'brien";
+        editorRouter().options.history.location = "/dashboards/add_panel?var-team=o%27brien";
+        const { done } = await openLeaveDialog();
+        editorRouter().replace.mockClear();
+        wrapper.vm.variablesDataUpdated(variables);
+
+        wrapper.vm.onLeaveChoice("stay");
+        await done;
+
+        expect(editorRouter().replace).toHaveBeenCalledTimes(1);
+      });
+
+      it("does not replace the route after Discard confirms the leave", async () => {
+        const { next, done } = await openLeaveDialog();
+        wrapper.vm.onLeaveChoice("discard");
+        await done;
+        expect(next).toHaveBeenCalledWith();
+        editorRouter().replace.mockClear();
+
+        wrapper.vm.variablesDataUpdated(variables);
+
+        expect(editorRouter().replace).not.toHaveBeenCalled();
+      });
+
+      it("does not replace the route while a Back with no edits is pending", async () => {
+        const next = vi.fn();
+        const to = toView();
+        leaveGuard(to, fromEditor, next);
+        expect(next).toHaveBeenCalledWith();
+        editorRouter().replace.mockClear();
+
+        wrapper.vm.variablesDataUpdated(variables);
+        expect(editorRouter().replace).not.toHaveBeenCalled();
+
+        onNavigationEnd()(to, fromEditor, await abortedNavigation());
+        expect(editorRouter().replace).toHaveBeenCalledTimes(1);
+      });
+
+      it("resumes the URL sync only when the confirmed leave itself fails", async () => {
+        const { done, to } = await openLeaveDialog();
+        wrapper.vm.onLeaveChoice("discard");
+        await done;
+        wrapper.vm.variablesDataUpdated(variables);
+        editorRouter().replace.mockClear();
+
+        onNavigationEnd()(to, fromEditor, undefined);
+        onNavigationEnd()(toView(), fromEditor, await abortedNavigation());
+        expect(editorRouter().replace).not.toHaveBeenCalled();
+
+        onNavigationEnd()(to, fromEditor, await abortedNavigation());
+        expect(editorRouter().replace).toHaveBeenCalledTimes(1);
+      });
+
+      it("lets a second navigation take over the open leave dialog", async () => {
+        const { next, done } = await openLeaveDialog();
+        const secondNext = vi.fn();
+        const secondTo = toView();
+        await leaveGuard(secondTo, fromEditor, secondNext);
+        expect(next).toHaveBeenCalledWith();
+        expect(secondNext).not.toHaveBeenCalled();
+        expect(wrapper.vm.leaveDialogOpen).toBe(true);
+        editorRouter().replace.mockClear();
+
+        wrapper.vm.variablesDataUpdated(variables);
+        expect(editorRouter().replace).not.toHaveBeenCalled();
+
+        wrapper.vm.onLeaveChoice("discard");
+        await done;
+        expect(next).toHaveBeenCalledTimes(1);
+        expect(secondNext).toHaveBeenCalledWith();
+      });
+
+      it("refuses the newer navigation and resumes the URL sync when Stay answers a taken-over dialog", async () => {
+        const { next, done, to } = await openLeaveDialog();
+        const secondNext = vi.fn();
+        const secondTo = toView();
+        await leaveGuard(secondTo, fromEditor, secondNext);
+        wrapper.vm.variablesDataUpdated(variables);
+        editorRouter().replace.mockClear();
+
+        onNavigationEnd()(to, fromEditor, await cancelledNavigation());
+        expect(editorRouter().replace).not.toHaveBeenCalled();
+
+        wrapper.vm.onLeaveChoice("stay");
+        await done;
+        expect(next).toHaveBeenCalledWith();
+        expect(secondNext).toHaveBeenCalledWith(false);
+        expect(editorRouter().replace).toHaveBeenCalledTimes(1);
+      });
+
+      it("resumes the URL sync when a guard redirects the confirmed leave back to the editor", async () => {
+        const { done, to } = await openLeaveDialog();
+        wrapper.vm.onLeaveChoice("discard");
+        await done;
+        wrapper.vm.variablesDataUpdated(variables);
+        editorRouter().replace.mockClear();
+
+        const redirected = { path: "/dashboards/add_panel", redirectedFrom: to };
+        onNavigationEnd()(redirected, fromEditor, await abortedNavigation());
+
+        expect(editorRouter().replace).toHaveBeenCalledTimes(1);
+      });
+
+      it("stops waiting for a history restore when the refused leave turns out cancelled", async () => {
+        const { done, to } = await openLeaveDialog();
+        wrapper.vm.variablesDataUpdated(variables);
+        editorRouter().replace.mockClear();
+        editorRouter().options.history.location = "/dashboards/view";
+
+        wrapper.vm.onLeaveChoice("stay");
+        await done;
+        expect(editorRouter().replace).not.toHaveBeenCalled();
+
+        onNavigationEnd()(to, fromEditor, await cancelledNavigation());
+        expect(editorRouter().replace).toHaveBeenCalledTimes(1);
+      });
+
+      it("resumes the URL sync when the confirmed leave throws instead of failing", async () => {
+        const { done, to } = await openLeaveDialog();
+        wrapper.vm.onLeaveChoice("discard");
+        await done;
+        wrapper.vm.variablesDataUpdated(variables);
+        editorRouter().replace.mockClear();
+
+        onNavigationError()(new Error("view chunk failed to load"), to, fromEditor);
+
+        expect(editorRouter().replace).toHaveBeenCalledTimes(1);
+      });
+
+      it("resumes the URL sync when Save throws from the leave dialog", async () => {
+        const { next, done } = await openLeaveDialog();
+        vi.spyOn(wrapper.vm.form, "handleSubmit").mockRejectedValue(new Error("save exploded"));
+
+        wrapper.vm.onLeaveChoice("save");
+        await expect(done).rejects.toThrow("save exploded");
+        expect(next).not.toHaveBeenCalled();
+        editorRouter().replace.mockClear();
+
+        wrapper.vm.variablesDataUpdated(variables);
+        expect(editorRouter().replace).toHaveBeenCalledTimes(1);
+      });
+
+      it("stops listening for navigation ends and errors when the editor unmounts", () => {
+        const stopEnd = editorRouter().afterEach.mock.results.at(-1)!.value;
+        const stopError = editorRouter().onError.mock.results.at(-1)!.value;
+        expect(stopEnd).not.toHaveBeenCalled();
+        expect(stopError).not.toHaveBeenCalled();
+
+        wrapper.unmount();
+
+        expect(stopEnd).toHaveBeenCalledTimes(1);
+        expect(stopError).toHaveBeenCalledTimes(1);
+      });
+
+      it("stops waiting for the history restore when the editor unmounts", async () => {
+        const { done } = await openLeaveDialog();
+        editorRouter().options.history.location = "/dashboards/view";
+        const added = vi.spyOn(window, "addEventListener");
+        const removed = vi.spyOn(window, "removeEventListener");
+        try {
+          wrapper.vm.onLeaveChoice("stay");
+          await done;
+          const waiter = added.mock.calls.find(([type]) => type === "popstate")![1];
+          removed.mockClear();
+
+          wrapper.unmount();
+
+          expect(removed).toHaveBeenCalledWith("popstate", waiter);
+        } finally {
+          added.mockRestore();
+          removed.mockRestore();
+        }
+      });
     });
   });
 

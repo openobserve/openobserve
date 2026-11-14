@@ -16,6 +16,7 @@
 use std::sync::LazyLock as Lazy;
 
 use anyhow::Result;
+use arrow_schema::Schema;
 use config::{
     meta::{
         self_reporting::usage::{self},
@@ -25,6 +26,75 @@ use config::{
 };
 use dashmap::DashSet;
 use infra;
+
+/// Non-`Option` `TriggerData` fields, which every row of the stream carries.
+pub const REQUIRED_COLUMNS: [&str; 11] = [
+    "_timestamp",
+    "org",
+    "module",
+    "key",
+    "next_run_at",
+    "is_realtime",
+    "is_silenced",
+    "status",
+    "start_time",
+    "end_time",
+    "retries",
+];
+
+/// `Option` `TriggerData` fields, which a stream lacks until a row set one, as ingest drops nulls.
+pub const OPTIONAL_COLUMNS: [&str; 38] = [
+    "skipped_alerts_count",
+    "error",
+    "success_response",
+    "is_partial",
+    "delay_in_secs",
+    "evaluation_took_in_secs",
+    "source_node",
+    "query_took",
+    "scheduler_trace_id",
+    "time_in_queue_ms",
+    "grouped",
+    "group_size",
+    "actual_value",
+    "rule_value",
+    "threshold_value",
+    "threshold_operator",
+    "level",
+    "severity",
+    "siem",
+    "historical",
+    "siem_groups",
+    "group_label",
+    "value_is_lower_bound",
+    "synthetics_error_source",
+    "synthetics_location",
+    "downtime_id",
+    "acked_by",
+    "ack_action",
+    "ack_source",
+    "taken_over_from",
+    "delivery_attempted",
+    "repeat_suppressed",
+    "trigger_source",
+    "triggered_by",
+    "recipient_count",
+    "attachment_type",
+    "dashboard_count",
+    "scheduled_for",
+];
+
+pub const HISTORY_COLUMNS: [&str; 9] = [
+    "_timestamp",
+    "org",
+    "key",
+    "status",
+    "is_realtime",
+    "is_silenced",
+    "start_time",
+    "end_time",
+    "retries",
+];
 
 /// Tracks which organizations have had their triggers stream schema initialized.
 /// Uses a lock-free DashSet for better concurrency and bounded memory usage.
@@ -74,6 +144,40 @@ pub async fn ensure_triggers_stream_initialized(org_id: &str) -> Result<()> {
 /// Forget that the org's triggers stream was set up, so a reused org id is set up again.
 pub(crate) fn forget_org(org_id: &str) {
     INITIALIZED_ORGS.remove(org_id);
+}
+
+/// Forget the org's setup mark when its triggers stream is deleted, so the next write sets it up.
+pub fn forget_deleted_stream(org_id: &str, stream_type: StreamType, stream_name: &str) {
+    if stream_type == StreamType::Logs && stream_name == usage::TRIGGERS_STREAM {
+        forget_org(org_id);
+    }
+}
+
+/// The org's triggers stream schema, empty when the stream does not exist.
+pub async fn get(org_id: &str) -> infra::errors::Result<Schema> {
+    infra::schema::get(org_id, usage::TRIGGERS_STREAM, StreamType::Logs).await
+}
+
+/// Each of `columns` the stream can serve, leaving out an [OPTIONAL_COLUMNS] field it lacks.
+pub fn present_columns<'a>(columns: impl IntoIterator<Item = &'a str>, schema: &Schema) -> String {
+    columns
+        .into_iter()
+        .filter(|column| is_present(column, schema))
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+/// `column`, or `_timestamp` when it is an [OPTIONAL_COLUMNS] field the stream lacks.
+pub fn sortable_column<'a>(column: &'a str, schema: &Schema) -> &'a str {
+    if is_present(column, schema) {
+        column
+    } else {
+        "_timestamp"
+    }
+}
+
+fn is_present(column: &str, schema: &Schema) -> bool {
+    !OPTIONAL_COLUMNS.contains(&column) || schema.field_with_name(column).is_ok()
 }
 
 /// Internal function that performs the actual schema initialization.
@@ -234,6 +338,100 @@ mod tests {
 
         // Verify it's marked as initialized
         assert!(INITIALIZED_ORGS.contains(test_org));
+    }
+
+    #[test]
+    fn present_columns_leaves_out_only_the_optional_columns_the_stream_lacks() {
+        use arrow_schema::{DataType, Field};
+
+        let schema = Schema::new(vec![
+            Field::new("_timestamp", DataType::Int64, false),
+            Field::new("error", DataType::Utf8, true),
+        ]);
+        assert_eq!(
+            present_columns(["_timestamp", "key", "error", "source_node"], &schema),
+            "_timestamp, key, error"
+        );
+        assert_eq!(present_columns(["_timestamp"], &schema), "_timestamp");
+    }
+
+    #[test]
+    fn sortable_column_falls_back_only_for_a_missing_optional_column() {
+        use arrow_schema::{DataType, Field};
+
+        let schema = Schema::new(vec![Field::new("query_took", DataType::Int64, true)]);
+        assert_eq!(sortable_column("source_node", &schema), "_timestamp");
+        assert_eq!(sortable_column("query_took", &schema), "query_took");
+        assert_eq!(sortable_column("retries", &schema), "retries");
+        assert_eq!(
+            sortable_column("(end_time - start_time)", &schema),
+            "(end_time - start_time)"
+        );
+    }
+
+    #[test]
+    fn the_column_lists_match_the_trigger_data_fields() {
+        use config::meta::self_reporting::usage::TriggerData;
+        use serde_json::{Map, Value, json};
+
+        let defaults = config::utils::json::to_value(TriggerData::default()).unwrap();
+        let required: Map<String, Value> = REQUIRED_COLUMNS
+            .iter()
+            .map(|column| (column.to_string(), defaults[*column].clone()))
+            .collect();
+        assert!(
+            serde_json::from_value::<TriggerData>(Value::Object(required.clone())).is_ok(),
+            "a TriggerData field outside REQUIRED_COLUMNS is not an Option"
+        );
+        for column in REQUIRED_COLUMNS {
+            let mut row = required.clone();
+            row.remove(column);
+            assert!(
+                serde_json::from_value::<TriggerData>(Value::Object(row)).is_err(),
+                "{column} is an Option field, not a required one"
+            );
+        }
+
+        let reflection = config::utils::json::to_value(TriggerData::init_for_reflection()).unwrap();
+        for sample in [&defaults, &reflection] {
+            for column in sample.as_object().unwrap().keys() {
+                assert!(
+                    REQUIRED_COLUMNS.contains(&column.as_str())
+                        || OPTIONAL_COLUMNS.contains(&column.as_str()),
+                    "{column} is in neither REQUIRED_COLUMNS nor OPTIONAL_COLUMNS"
+                );
+            }
+        }
+
+        let enterprise_only = ["severity", "siem", "historical", "siem_groups"];
+        for column in OPTIONAL_COLUMNS {
+            if enterprise_only.contains(&column) && !cfg!(feature = "enterprise") {
+                continue;
+            }
+            let mut row = required.clone();
+            row.insert(column.to_string(), json!({}));
+            assert!(
+                serde_json::from_value::<TriggerData>(Value::Object(row)).is_err(),
+                "{column} is not a TriggerData field"
+            );
+        }
+
+        for column in HISTORY_COLUMNS {
+            assert!(REQUIRED_COLUMNS.contains(&column), "{column} may be absent");
+        }
+    }
+
+    #[test]
+    fn deleting_the_triggers_stream_forgets_only_that_orgs_mark() {
+        let (gone, kept) = ("deleted_triggers_org", "kept_triggers_org");
+        INITIALIZED_ORGS.insert(gone.to_string());
+        INITIALIZED_ORGS.insert(kept.to_string());
+        forget_deleted_stream(kept, StreamType::Metrics, usage::TRIGGERS_STREAM);
+        forget_deleted_stream(kept, StreamType::Logs, usage::USAGE_STREAM);
+        forget_deleted_stream(gone, StreamType::Logs, usage::TRIGGERS_STREAM);
+        assert!(!INITIALIZED_ORGS.contains(gone));
+        assert!(INITIALIZED_ORGS.contains(kept));
+        forget_org(kept);
     }
 
     #[test]

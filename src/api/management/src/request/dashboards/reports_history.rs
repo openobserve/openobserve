@@ -33,6 +33,7 @@ use openobserve_api_common::extractors::Headers;
 use openobserve_core::{
     auth::UserEmail,
     dashboards::reports::{TRIGGER_SOURCE_MANUAL, TRIGGER_SOURCE_SCHEDULED},
+    self_reporting::triggers_schema as trigger_stream,
 };
 use search_service as SearchService;
 use search_service::query_range::get_settings_max_query_range;
@@ -292,6 +293,17 @@ impl HistoryFilter {
         status_ok && module_ok
     }
 
+    /// Whether any row can match once the filter fits a stream that may lack `trigger_source`.
+    fn fit_trigger_source_to(&mut self, schema: &arrow_schema::Schema) -> bool {
+        if schema.field_with_name("trigger_source").is_ok() {
+            return true;
+        }
+        // Rows without the column are scheduled runs, so such a stream holds no manual run.
+        let any_match = self.trigger_source != Some(TRIGGER_SOURCE_MANUAL);
+        self.trigger_source = None;
+        any_match
+    }
+
     fn page_where(&self) -> String {
         let mut sql = self.base_where();
         if !self.statuses.is_empty() {
@@ -397,6 +409,15 @@ pub async fn get_report_history(
     };
     if filter.permitted.as_ref().is_some_and(|ids| ids.is_empty()) {
         return MetaHttpResponse::json(response);
+    }
+    if filter.trigger_source.is_some() {
+        let schema = match trigger_stream::get(&org_id).await {
+            Ok(schema) => schema,
+            Err(e) => return MetaHttpResponse::internal_error(e),
+        };
+        if !filter.fit_trigger_source_to(&schema) {
+            return MetaHttpResponse::json(response);
+        }
     }
 
     let trace_id = get_or_create_trace_id(req.headers(), &Span::current());
@@ -913,6 +934,34 @@ mod tests {
             ..filter()
         };
         assert!(f.base_where().contains("AND trigger_source = 'manual'"));
+    }
+
+    #[test]
+    fn a_stream_without_trigger_source_reads_every_run_as_scheduled() {
+        use arrow_schema::{DataType, Field, Schema};
+
+        let mut scheduled = HistoryFilter {
+            trigger_source: Some(TRIGGER_SOURCE_SCHEDULED),
+            ..filter()
+        };
+        assert!(scheduled.fit_trigger_source_to(&Schema::empty()));
+        assert!(!scheduled.base_where().contains("trigger_source"));
+        let mut manual = HistoryFilter {
+            trigger_source: Some(TRIGGER_SOURCE_MANUAL),
+            ..filter()
+        };
+        assert!(!manual.fit_trigger_source_to(&Schema::empty()));
+        let mut manual = HistoryFilter {
+            trigger_source: Some(TRIGGER_SOURCE_MANUAL),
+            ..filter()
+        };
+        let with_column = Schema::new(vec![Field::new("trigger_source", DataType::Utf8, true)]);
+        assert!(manual.fit_trigger_source_to(&with_column));
+        assert!(
+            manual
+                .base_where()
+                .contains("AND trigger_source = 'manual'")
+        );
     }
 
     #[test]
