@@ -1,0 +1,225 @@
+{
+ "events": [
+  {
+   "id": "evt_0",
+   "aggregateID": "ses_e30bf8c90ffeQ4XtkWaM1gb3Vl",
+   "seq": 0,
+   "type": "session.created.2",
+   "data": {
+    "info": {
+     "id": "ses_e30bf8c90ffeQ4XtkWaM1gb3Vl",
+     "projectID": "80f7b333ad0563226a5dcecfc4cd1ca772286d61",
+     "agent": "build",
+     "model": {
+      "id": "deepseek-flash",
+      "providerID": "deepseek",
+      "variant": "none"
+     },
+     "cost": 0.001481598,
+     "tokens": {
+      "input": 9381,
+      "output": 78,
+      "reasoning": 0,
+      "cache": {
+       "read": 9216,
+       "write": 0
+      }
+     },
+     "outcome": "succeeded",
+     "time": {
+      "created": 1794478470022,
+      "updated": 1794478478016,
+      "busy": 1794478475078,
+      "idle": 1794478478018
+     },
+     "title": "spike read",
+     "subpath": "spike/h2/work/org1",
+     "location": {
+      "directory": "/work/spike/h2/work/org1"
+     }
+    }
+   }
+  },
+  {
+   "id": "evt_1",
+   "aggregateID": "ses_e30bf8c90ffeQ4XtkWaM1gb3Vl",
+   "seq": 1,
+   "type": "message.updated.2",
+   "data": {
+    "message": {
+     "id": "msg_1cf40867e001im5anZ2mg7KT5V",
+     "time": {
+      "created": 1794478475088
+     },
+     "text": "Use the read tool to read note.txt in the current directory, then reply with only the code word.",
+     "type": "user"
+    }
+   }
+  },
+  {
+   "id": "evt_2",
+   "aggregateID": "ses_e30bf8c90ffeQ4XtkWaM1gb3Vl",
+   "seq": 2,
+   "type": "message.updated.2",
+   "data": {
+    "message": {
+     "id": "msg_1cf408757001XDWyrIP7d4em74",
+     "time": {
+      "created": 1794478475098,
+      "streamed": 1794478476465,
+      "completed": 1794478476484
+     },
+     "type": "assistant",
+     "agent": "build",
+     "model": {
+      "id": "deepseek-flash",
+      "providerID": "deepseek",
+      "variant": "none"
+     },
+     "content": [
+      {
+       "type": "tool",
+       "id": "call_00_7WDxRCxPs7KzeaiavNBM8514",
+       "name": "read",
+       "executed": false,
+       "state": {
+        "status": "completed",
+        "input": {
+         "path": "/work/spike/h2/work/org1/note.txt"
+        },
+        "content": [
+         {
+          "type": "text",
+          "text": "Read file /work/spike/h2/work/org1/note.txt, lines 1-1\n1: The secret code word is PELICAN-42."
+         }
+        ],
+        "metadata": {
+         "truncated": false
+        }
+       },
+       "time": {
+        "created": 1794478476282,
+        "ran": 1794478476464,
+        "completed": 1794478476470
+       }
+      }
+     ],
+     "snapshot": {
+      "start": "02619286612ad9519efd2cf1b5059b8b4d4e7a67",
+      "end": "02619286612ad9519efd2cf1b5059b8b4d4e7a67",
+      "files": []
+     },
+     "finish": "tool-calls",
+     "rawFinish": "tool_calls",
+     "cost": 0.00142725,
+     "tokens": {
+      "input": 9227,
+      "output": 72,
+      "reasoning": 0,
+      "cache": {
+       "read": 0,
+       "write": 0
+      }
+     }
+    }
+   }
+  },
+  {
+   "id": "evt_3",
+   "aggregateID": "ses_e30bf8c90ffeQ4XtkWaM1gb3Vl",
+   "seq": 3,
+   "type": "message.updated.2",
+   "data": {
+    "message": {
+     "id": "msg_1cf408ccb001MxaTVckqLxJXeY",
+     "time": {
+      "created": 1794478476493,
+      "streamed": 1794478478000,
+      "completed": 1794478478016
+     },
+     "type": "assistant",
+     "agent": "build",
+     "model": {
+      "id": "deepseek-flash",
+      "providerID": "deepseek",
+      "variant": "none"
+     },
+     "content": [
+      {
+       "type": "text",
+       "text": "PELICAN-42"
+      }
+     ],
+     "snapshot": {
+      "start": "02619286612ad9519efd2cf1b5059b8b4d4e7a67",
+      "end": "02619286612ad9519efd2cf1b5059b8b4d4e7a67",
+      "files": []
+     },
+     "finish": "stop",
+     "rawFinish": "stop",
+     "cost": 5.4348e-05,
+     "tokens": {
+      "input": 154,
+      "output": 6,
+      "reasoning": 0,
+      "cache": {
+       "read": 9216,
+       "write": 0
+      }
+     }
+    }
+   }
+  },
+  {
+   "id": "evt_4",
+   "aggregateID": "ses_e30bf8c90ffeQ4XtkWaM1gb3Vl",
+   "seq": 4,
+   "type": "message.updated.2",
+   "data": {
+    "message": {
+     "id": "msg_1cf4092c2001YfQOqKs2XUcjHm",
+     "time": {
+      "created": 1794478478018
+     },
+     "type": "idle",
+     "outcome": "failed",
+     "error": {
+      "type": "provider.auth",
+      "message": "bad key"
+     }
+    }
+   }
+  }
+ ],
+ "expected": {
+  "turns": [
+   {
+    "user_message_id": "msg_1cf40867e001im5anZ2mg7KT5V",
+    "created": 1794478475088,
+    "user": {
+     "text": "Use the read tool to read note.txt in the current directory, then reply with only the code word.",
+     "images": []
+    },
+    "frames": [
+     {
+      "type": "message_delta",
+      "content": "PELICAN-42"
+     },
+     {
+      "type": "error",
+      "error": "bad key",
+      "recoverable": false
+     },
+     {
+      "type": "complete"
+     }
+    ],
+    "error": "bad key",
+    "first_seq": 1,
+    "last_seq": 4
+   }
+  ],
+  "title": "spike read",
+  "last_seq": 4
+ }
+}

@@ -88,11 +88,11 @@ use crate::ai_chat::{
     admission::{self, AdmitError, AdmittedTurn},
     cancel::cancel_chat_turn,
     fork,
+    projection::Folded,
     rca_ledger::{RunTranscript, TranscriptQuestion, decode_run},
-    rca_thread::{
-        SUBMIT_REPORT, ThreadPart, ThreadStats, ToolPart, project_rca_thread, updated_part,
-    },
+    rca_thread::{SUBMIT_REPORT, ThreadPart, ThreadStats, ToolPart, project_rca_thread},
     read_committed_events,
+    record_v2::{event_parts, record_message},
 };
 
 /// The user text of the one continuation turn.
@@ -500,6 +500,7 @@ async fn start_turn(
         run.org_id.clone(),
         run.run_id.clone(),
         row.session_id.clone(),
+        row.last_committed_seq,
     );
     let identity = TurnIdentity {
         org_id: run.org_id.clone(),
@@ -1561,29 +1562,41 @@ impl Tokens {
 struct Progress {
     parts: Vec<(String, ThreadPart)>,
     tokens: Vec<(String, Tokens)>,
+    /// The message of each part id a 2.x record carries.
+    recorded_in: HashMap<String, String>,
 }
 
 impl Progress {
     fn of(events: &[DurableEvent]) -> Self {
         let mut progress = Self::default();
-        for part in events.iter().filter_map(updated_part) {
-            let Some(id) = part.get("id").and_then(Value::as_str) else {
-                continue;
-            };
-            if part.get("type").and_then(Value::as_str) == Some("step-finish") {
-                if let Some(tokens) = Tokens::of(part) {
-                    progress.tokens.push((id.to_string(), tokens));
-                }
-                continue;
-            }
-            if let Some(call) = ToolPart::of(part) {
-                let kind = call.kind();
-                if kind != ThreadPart::Hidden {
-                    progress.parts.push((id.to_string(), kind));
-                }
+        for event in events {
+            let message = record_message(event).and_then(|m| m.get("id")?.as_str());
+            for part in event_parts(event) {
+                progress.add(&part, message);
             }
         }
         progress
+    }
+
+    fn add(&mut self, part: &Map<String, Value>, message: Option<&str>) {
+        let Some(id) = part.get("id").and_then(Value::as_str) else {
+            return;
+        };
+        if let Some(message) = message {
+            self.recorded_in.insert(id.to_string(), message.to_string());
+        }
+        if part.get("type").and_then(Value::as_str) == Some("step-finish") {
+            if let Some(tokens) = Tokens::of(part) {
+                self.tokens.push((id.to_string(), tokens));
+            }
+            return;
+        }
+        if let Some(call) = ToolPart::of(part) {
+            let kind = call.kind();
+            if kind != ThreadPart::Hidden {
+                self.parts.push((id.to_string(), kind));
+            }
+        }
     }
 
     fn is_empty(&self) -> bool {
@@ -1604,6 +1617,8 @@ struct Tally {
     tool_calls: HashSet<String>,
     tokens: HashMap<String, Tokens>,
     stage: Option<&'static str>,
+    /// Messages committed before the turn: o2-ai re-records a changed one whole, already counted.
+    held: HashSet<String>,
 }
 
 impl Tally {
@@ -1630,7 +1645,24 @@ impl Tally {
     /// Adds a batch; returns whether any count changed and whether the stage changed.
     fn apply(&mut self, progress: Progress) -> (bool, bool) {
         let (mut changed, mut stage_changed) = (false, false);
-        for (id, kind) in progress.parts {
+        // A held message's parts are dropped whole; the finalizer's recount restores any it gained.
+        let held = |id: &str| {
+            progress
+                .recorded_in
+                .get(id)
+                .is_some_and(|message| self.held.contains(message))
+        };
+        let parts: Vec<_> = progress
+            .parts
+            .into_iter()
+            .filter(|(id, _)| !held(id))
+            .collect();
+        let tokens: Vec<_> = progress
+            .tokens
+            .into_iter()
+            .filter(|(id, _)| !held(id))
+            .collect();
+        for (id, kind) in parts {
             match kind {
                 ThreadPart::Step(stage) => {
                     let latest = if self.steps.insert(id.clone()) {
@@ -1668,7 +1700,7 @@ impl Tally {
                 ThreadPart::Hidden => {}
             }
         }
-        for (id, tokens) in progress.tokens {
+        for (id, tokens) in tokens {
             changed |= self.tokens.insert(id, tokens) != Some(tokens);
         }
         (changed, stage_changed)
@@ -1700,9 +1732,9 @@ impl Tally {
     }
 }
 
-pub fn observer(org_id: String, run_id: String, session_id: String) -> OnCommit {
+pub fn observer(org_id: String, run_id: String, session_id: String, held_seq: i64) -> OnCommit {
     let (tx, rx) = mpsc::unbounded_channel();
-    tokio::spawn(watch_progress(org_id, run_id, session_id, rx));
+    tokio::spawn(watch_progress(org_id, run_id, session_id, held_seq, rx));
     Arc::new(move |events: &[DurableEvent]| {
         let progress = Progress::of(events);
         if !progress.is_empty() {
@@ -1716,9 +1748,10 @@ async fn watch_progress(
     org_id: String,
     run_id: String,
     session_id: String,
+    held_seq: i64,
     rx: mpsc::UnboundedReceiver<Progress>,
 ) {
-    let tally = match runs_table::get_rw(&org_id, &run_id).await {
+    let mut tally = match runs_table::get_rw(&org_id, &run_id).await {
         Ok(Some(run)) => Tally::resumed(&run),
         Ok(None) => return,
         Err(e) => {
@@ -1726,6 +1759,14 @@ async fn watch_progress(
             Tally::default()
         }
     };
+    if held_seq >= 0 {
+        match read_session(&org_id, Some(&session_id)).await {
+            Ok((events, _)) => tally.held = held_messages(&events, held_seq),
+            Err(e) => {
+                log::warn!("[RCA_TURN] cannot read session {session_id} of run {run_id}: {e}")
+            }
+        }
+    }
     let refused = write_progress(tally, rx, &run_id, |patch| {
         rca_runs::update_run(&org_id, &run_id, patch)
     })
@@ -1733,6 +1774,12 @@ async fn watch_progress(
     if refused {
         stop_turn(&org_id, &session_id).await;
     }
+}
+
+/// The messages of the events up to `seq`.
+fn held_messages(events: &[DurableEvent], seq: i64) -> HashSet<String> {
+    let end = events.partition_point(|event| event.seq <= seq);
+    Folded::fold(&events[..end]).infos.keys().cloned().collect()
 }
 
 /// The loop of [watch_progress]; `write` is the run's progress write.
@@ -3596,6 +3643,28 @@ mod tests {
             let summary = patch.summary.unwrap();
             assert_eq!(summary.tool_calls, Some(VISIBLE_TOOL_CALLS));
         }
+    }
+
+    /// o2-ai re-records a changed message whole; one committed before the turn is counted already.
+    #[test]
+    fn the_observer_skips_re_records_of_held_messages() {
+        let events = rca_session();
+        let copies = crate::ai_chat::record_v2::tests::to_v2(&events);
+        let mut fresh = Tally::default();
+        fresh.apply(Progress::of(&copies));
+        assert_eq!(
+            fresh.patch().stats.unwrap().tool_calls,
+            Some(VISIBLE_TOOL_CALLS)
+        );
+
+        assert!(held_messages(&events, -1).is_empty());
+        let mut resumed = Tally {
+            held: held_messages(&events, events.last().unwrap().seq),
+            ..Default::default()
+        };
+        assert_eq!(resumed.apply(Progress::of(&copies)), (false, false));
+        let stats = resumed.patch().stats.unwrap();
+        assert_eq!((stats.steps, stats.tool_calls), (Some(0), Some(0)));
     }
 
     fn step_counts(events: &[DurableEvent]) -> (Option<u32>, Option<u32>, u32) {

@@ -1,0 +1,536 @@
+{
+ "events": [
+  {
+   "id": "evt_0",
+   "aggregateID": "ses_0817c5614ffea1NfBrR9UndbIa",
+   "seq": 0,
+   "type": "session.created.2",
+   "data": {
+    "info": {
+     "id": "ses_0817c5614ffea1NfBrR9UndbIa",
+     "projectID": "global",
+     "title": "test all tool calls",
+     "cost": 0.008716385,
+     "tokens": {
+      "input": 18317,
+      "output": 581,
+      "reasoning": 210,
+      "cache": {
+       "read": 16640,
+       "write": 0
+      }
+     },
+     "time": {
+      "created": 1784533985771,
+      "updated": 1784533996998
+     },
+     "agent": "o2-ai",
+     "model": {
+      "providerID": "deepseek",
+      "id": "deepseek-v4-pro",
+      "variant": "max"
+     },
+     "location": {
+      "directory": "__WORKSPACE__"
+     }
+    }
+   }
+  },
+  {
+   "id": "evt_1",
+   "aggregateID": "ses_0817c5614ffea1NfBrR9UndbIa",
+   "seq": 1,
+   "type": "message.updated.2",
+   "data": {
+    "message": {
+     "id": "msg_f7e83aa8a001tBj3Z8XVQUuqCn",
+     "type": "user",
+     "text": "[Context]\norg_id: default\ncurrent_page: home\nnow: 2026-07-20T13:23:05.630000+05:30 (Asia/Calcutta, 1784533985630000us)\nuser_timezone: Asia/Calcutta\n\ntest all tool calls",
+     "time": {
+      "created": 1784533985930
+     }
+    }
+   }
+  },
+  {
+   "id": "evt_2",
+   "aggregateID": "ses_0817c5614ffea1NfBrR9UndbIa",
+   "seq": 2,
+   "type": "message.updated.2",
+   "data": {
+    "message": {
+     "id": "msg_f7e83aa98001SNsuJ1c9bYUJsg",
+     "type": "assistant",
+     "agent": "o2-ai",
+     "model": {
+      "providerID": "deepseek",
+      "id": "deepseek-v4-pro",
+      "variant": "max"
+     },
+     "content": [
+      {
+       "type": "reasoning",
+       "text": "The user wants me to test all tool calls. Let me go through the available tools and test each one systematically. Let me start by testing the foundational tools and work through them.\n\nLet me first search for what tools are available via `o2_tool_search`, and also test the basic ones in parallel.\n\nI'll make a plan and execute multiple tests in parallel where possible.\n\nLet me start with several parallel calls to test different areas:\n\n1. StreamList - list streams\n2. o2_tool_search - search for tools\n3. calculate_time_range - time utility\n\nLet me batch these together.",
+       "time": {
+        "created": 1784533987318,
+        "completed": 1784533989416
+       }
+      },
+      {
+       "type": "text",
+       "text": "I'll run a comprehensive test of all tool calls across different areas. Let me batch independent calls together.\n\n**Phase 1: Discovery & Streams**"
+      },
+      {
+       "type": "tool",
+       "id": "call_00_leFP0ufpLLkBCRM6o48m0788",
+       "name": "o2_tool_search",
+       "state": {
+        "status": "completed",
+        "input": {
+         "query": "create alert",
+         "limit": 3
+        },
+        "content": [
+         {
+          "type": "text",
+          "text": "{\"tools\":[{\"name\":\"CreateAlert\",\"description\":\"Create a new alert rule with flexible query options. IMPORTANT: Alert name must use snake_case (no spaces/special chars like :,#,?,&,%,/,quotes), destinations array is required with valid destination names. QueryCondition supports 3 query types: (1) Custom - uses conditions, aggregation, vrl_function, search_event_type, multi_time_range; (2) SQL - uses sql, vrl_function, search_event_type; (3) PromQL - uses promql, promql_condition, multi_time_range\",\"inputSchema\":{\"type\":\"object\",\"properties\":{\"org_id\":{\"type\":\"string\",\"description\":\"Organization name\"},\"folder\":{\"type\":\"string\",\"description\":\"Folder ID (Required if alert folder is not the default folder)\"},\"request_body\":{\"description\":\"HTTP request body for `CreateAlert` endpoint.\\n\\nCreates a new alert with the specified configuration. The alert monitors\\na stream (logs, metrics, or traces) and triggers notifications when conditions are met.\\n\\n## Example\\n\\n```json\\n{\\n    \\\"name\\\": \\\"High Error Rate Alert\\\",\\n    \\\"stream_type\\\": \\\"logs\\\",\\n    \\\"stream_name\\\": \\\"default\\\",\\n    \\\"is_real_time\\\": false,\\n    \\\"query_condition\\\": {\\n        \\\"type\\\": \\\"sql\\\",\\n        \\\"sql\\\": \\\"SELECT count(*) as count FROM \\\\\\\"default\\\\\\\" WHERE level = 'error'\\\"\\n    },\\n    \\\"trigger_condition\\\": {\\n        \\\"period\\\": 15,\\n        \\\"operator\\\": \\\">=\\\",\\n        \\\"threshold\\\": 100,\\n        \\\"frequency\\\": 5,\\n        \\\"frequency_type\\\": \\\"minutes\\\",\\n        \\\"silence\\\": 60\\n    },\\n    \\\"destinations\\\": [\\\"slack-alerts\\\"],\\n    \\\"enabled\\\": true,\\n    \\\"description\\\": \\\"Alert when error count exceeds 100 in 15 minutes\\\"\\n}\\n```\",\"properties\":{\"alert_type\":{\"type\":\"string\",\"description\":\"Filters the alert list by alert type (scheduled, realtime, anomaly detection, or all).\",\"enum\":[\"all\",\"scheduled\",\"realtime\",\"anomaly_detection\"]},\"anomaly_config\":{\"type\":\"object\",\"description\":\"Anomaly-detection-specific fields for `CreateAlertRequestBody`.\",\"properties\":{\"alert_enabled\":{\"type\":[\"boolean\",\"null\"]},\"custom_sql\":{\"type\":[\"string\",\"null\"]},\"detection_function\":{\"type\":\"string\",\"description\":\"Aggregation function, e.g. \\\"count(*)\\\" or \\\"avg(cpu_usage)\\\"\"},\"detection_function_field\":{\"type\":[\"string\",\"null\"],\"description\":\"Field to aggregate (required for avg/sum/min/max/pXX, ignored for count).\\nCombined with `detection_function` into \\\"avg(field)\\\" before saving.\"},\"detection_window_seconds\":{\"type\":\"integer\",\"description\":\"Look-back window per detection run, in seconds\",\"format\":\"int64\"},\"filters\":{},\"histogram_interval\":{\"type\":\"string\",\"description\":\"SQL histogram bucket size, e.g. \\\"5m\\\", \\\"1h\\\"\"},\"percentile\":{\"type\":[\"number\",\"null\"],\"description\":\"Percentile threshold (50.0–99.9). Default: 97.0\\nAlso accepts the name `threshold` (integer, e.g. 97) for API convenience.\",\"format\":\"double\"},\"query_mode\":{\"type\":\"string\",\"description\":\"\\\"filters\\\" or \\\"custom_sql\\\"\"},\"rcf_num_trees\":{\"type\":[\"integer\",\"null\"],\"format\":\"int32\"},\"rcf_shingle_size\":{\"type\":[\"integer\",\"null\"],\"format\":\"int32\"},\"rcf_tree_size\":{\"type\":[\"integer\",\"null\"],\"format\":\"int32\"},\"retrain_interval_days\":{\"type\":[\"integer\",\"null\"],\"description\":\"0 = never retrain automatically; otherwise days between retrains\",\"format\":\"int32\"},\"schedule_interval\":{\"type\":\"string\",\"description\":\"How often the detection job fires, e.g. \\\"1h\\\", \\\"30m\\\"\"},\"training_window_days\":{\"type\":[\"integer\",\"null\"],\"format\":\"int32\"}},\"required\":[\"query_mode\",\"detection_function\",\"histogram_interval\",\"schedule_interval\",\"detection_window_seconds\"]},\"folder_id\":{\"type\":[\"string\",\"null\"],\"description\":\"Optional folder ID indicating the folder in which to create the alert.\\nIf omitted the alert will be created in the default folder.\",\"example\":\"default\"}}},\"timeout_seconds\":{\"type\":\"integer\",\"description\":\"Request timeout in seconds\",\"minimum\":1,\"maximum\":300,\"default\":30}},\"required\":[\"org_id\",\"request_body\"]}},{\"name\":\"CreateTemplate\",\"description\":\"Create alert template\",\"inputSchema\":{\"type\":\"object\",\"properties\":{\"org_id\":{\"type\":\"string\",\"description\":\"Organization name\"},\"request_body\":{\"type\":\"object\",\"properties\":{\"body\":{\"type\":\"string\"},\"isDefault\":{\"type\":[\"boolean\",\"null\"]},\"isPrebuilt\":{\"type\":\"boolean\",\"description\":\"True for system-managed prebuilt templates (those whose name starts\\nwith `prebuilt_`). The public API refuses updates and deletes for\\nthese, so the UI should render them as read-only.\"},\"name\":{\"type\":\"string\"},\"title\":{\"type\":\"string\"},\"type\":{\"type\":\"string\",\"enum\":[\"http\",\"email\",\"sns\",\"action\"]}},\"description\":\"Template data\"}},\"required\":[\"org_id\",\"request_body\"]}},{\"name\":\"ExportAlert\",\"description\":\"Export alert as JSON\",\"inputSchema\":{\"type\":\"object\",\"properties\":{\"org_id\":{\"type\":\"string\",\"description\":\"Organization name\"},\"alert_id\":{\"type\":\"string\",\"description\":\"Alert ID\"},\"folder\":{\"type\":\"string\",\"description\":\"Folder ID (Required if RBAC enabled)\"},\"timeout_seconds\":{\"type\":\"integer\",\"description\":\"Request timeout in seconds\",\"minimum\":1,\"maximum\":300,\"default\":30}},\"required\":[\"org_id\",\"alert_id\"]}}]}"
+         }
+        ],
+        "metadata": {
+         "truncated": false
+        }
+       },
+       "time": {
+        "created": 1784533990320,
+        "completed": 1784533990332
+       }
+      },
+      {
+       "type": "tool",
+       "id": "call_01_zT6jWoLYIGXH3nUAL46E5452",
+       "name": "o2_StreamList",
+       "state": {
+        "status": "completed",
+        "input": {
+         "org_id": "default"
+        },
+        "content": [
+         {
+          "type": "text",
+          "text": "{\"total\":16,\"items\":[{\"name\":\"app_logs\",\"stream_type\":\"logs\",\"stats\":{\"storage_size\":0.3982524871826172}},{\"name\":\"container_cpu_usage_seconds_total\",\"stream_type\":\"metrics\",\"stats\":{\"storage_size\":0.21834373474121094}},{\"name\":\"container_memory_working_set_bytes\",\"stream_type\":\"metrics\",\"stats\":{\"storage_size\":0.222137451171875}},{\"name\":\"default\",\"stream_type\":\"traces\",\"stats\":{\"storage_size\":0.6488914489746094}},{\"name\":\"distinct_values_logs_triggers\",\"stream_type\":\"metadata\",\"stats\":{\"storage_size\":0.12806320190429688}},{\"name\":\"distinct_values_traces_default\",\"stream_type\":\"metadata\",\"stats\":{\"storage_size\":0.0009241104125976562}},{\"name\":\"http_request_duration_seconds\",\"stream_type\":\"metrics\",\"stats\":{\"storage_size\":0.11787796020507812}},{\"name\":\"http_requests_errors_total\",\"stream_type\":\"metrics\",\"stats\":{\"storage_size\":0.06444358825683594}},{\"name\":\"http_requests_total\",\"stream_type\":\"metrics\",\"stats\":{\"storage_size\":0.17153167724609375}},{\"name\":\"k8s_logs\",\"stream_type\":\"logs\",\"stats\":{\"storage_size\":0.37546730041503906}},{\"name\":\"k8s_metrics\",\"stream_type\":\"logs\",\"stats\":{\"storage_size\":0.0}},{\"name\":\"k8s_traces\",\"stream_type\":\"logs\",\"stats\":{\"storage_size\":0.0}},{\"name\":\"kube_pod_status_phase\",\"stream_type\":\"metrics\",\"stats\":{\"storage_size\":0.08947467803955078}},{\"name\":\"test\",\"stream_type\":\"logs\",\"stats\":{\"storage_size\":0.00008106231689453125}},{\"name\":\"trace_list_index\",\"stream_type\":\"metadata\",\"stats\":{\"storage_size\":0.12591838836669922}},{\"name\":\"triggers\",\"stream_type\":\"logs\",\"stats\":{\"storage_size\":3.151719093322754}}]}"
+         }
+        ],
+        "metadata": {
+         "truncated": false
+        }
+       },
+       "time": {
+        "created": 1784533990605,
+        "completed": 1784533990640
+       }
+      },
+      {
+       "type": "tool",
+       "id": "call_02_ylzS73k2CYeHpphr4d9o0088",
+       "name": "calculate_time_range",
+       "state": {
+        "status": "completed",
+        "input": {
+         "duration": "1h",
+         "reference_timestamp": 1784533985630000
+        },
+        "content": [
+         {
+          "type": "text",
+          "text": "{\"start_time\":1784530385630000,\"end_time\":1784533985630000,\"start_time_iso\":\"2026-07-20T06:53:05.630Z\",\"end_time_iso\":\"2026-07-20T07:53:05.630Z\",\"duration_seconds\":3600}"
+         }
+        ],
+        "metadata": {
+         "truncated": false
+        }
+       },
+       "time": {
+        "created": 1784533991085,
+        "completed": 1784533991087
+       }
+      },
+      {
+       "type": "tool",
+       "id": "call_03_0xOfzApRtytbMcQoQAVq9569",
+       "name": "convert_time_to_microseconds",
+       "state": {
+        "status": "completed",
+        "input": {
+         "time_input": "1h ago",
+         "reference_timestamp": 1784533985630000
+        },
+        "content": [
+         {
+          "type": "text",
+          "text": "{\"timestamp_microseconds\":1784530385630000,\"timestamp_iso\":\"2026-07-20T06:53:05.630Z\",\"input_type\":\"relative\"}"
+         }
+        ],
+        "metadata": {
+         "truncated": false
+        }
+       },
+       "time": {
+        "created": 1784533991550,
+        "completed": 1784533991552
+       }
+      }
+     ],
+     "cost": 0.00743154,
+     "tokens": {
+      "input": 16352,
+      "output": 243,
+      "reasoning": 123,
+      "cache": {
+       "read": 0,
+       "write": 0
+      }
+     },
+     "time": {
+      "created": 1784533985944,
+      "completed": 1784533991651
+     },
+     "finish": "tool-calls"
+    }
+   }
+  },
+  {
+   "id": "evt_3",
+   "aggregateID": "ses_0817c5614ffea1NfBrR9UndbIa",
+   "seq": 3,
+   "type": "message.updated.2",
+   "data": {
+    "message": {
+     "id": "msg_f7e83c0e5001SoCJEFHSi2BrnJ",
+     "type": "assistant",
+     "agent": "o2-ai",
+     "model": {
+      "providerID": "deepseek",
+      "id": "deepseek-v4-pro",
+      "variant": "max"
+     },
+     "content": [
+      {
+       "type": "reasoning",
+       "text": "Phase 1 results are good. Now let me continue with Phase 2: StreamSchema, SearchSQL, Dashboard, Alert, and other tools.\n\nLet me test:\n1. StreamSchema for a log stream (app_logs)\n2. StreamSchema for a metrics stream (http_requests_total)\n3. SearchSQL on logs\n4. ListDashboards\n5. ListAlerts\n\nLet me run these in parallel.",
+       "time": {
+        "created": 1784533992649,
+        "completed": 1784533993994
+       }
+      },
+      {
+       "type": "text",
+       "text": "**Phase 2: Schemas, Queries, Dashboards & Alerts**"
+      },
+      {
+       "type": "tool",
+       "id": "call_00_CZXcNrNWg6C06wkG8kRy2321",
+       "name": "o2_StreamSchema",
+       "state": {
+        "status": "completed",
+        "input": {
+         "org_id": "default",
+         "stream_name": "app_logs",
+         "type": "logs"
+        },
+        "content": [
+         {
+          "type": "text",
+          "text": "{\"name\":\"app_logs\",\"storage_type\":\"disk\",\"stream_type\":\"logs\",\"stats\":{\"created_at\":1781863959000000,\"doc_time_min\":1781863959000000,\"doc_time_max\":1781871158000000,\"doc_num\":1444,\"file_num\":3,\"storage_size\":0.3982524871826172,\"compressed_size\":0.05468559265136719,\"index_size\":0.08455371856689453},\"schema\":[{\"name\":\"_timestamp\",\"type\":\"Int64\"},{\"name\":\"endpoint\",\"type\":\"Utf8\"},{\"name\":\"error\",\"type\":\"Utf8\"},{\"name\":\"latency_ms\",\"type\":\"Int64\"},{\"name\":\"level\",\"type\":\"Utf8\"},{\"name\":\"message\",\"type\":\"Utf8\"},{\"name\":\"method\",\"type\":\"Utf8\"},{\"name\":\"namespace\",\"type\":\"Utf8\"},{\"name\":\"service\",\"type\":\"Utf8\"},{\"name\":\"stack_trace\",\"type\":\"Utf8\"},{\"name\":\"status_code\",\"type\":\"Int64\"},{\"name\":\"trace_id\",\"type\":\"Utf8\"}],\"settings\":{\"partition_keys\":{},\"full_text_search_keys\":[],\"index_fields\":[],\"bloom_filter_fields\":[],\"distinct_value_fields\":[],\"data_retention\":0,\"max_query_range\":0,\"store_original_data\":false,\"approx_partition\":false,\"index_updated_at\":0,\"extended_retention_days\":[],\"index_original_data\":false,\"index_all_values\":false,\"enable_distinct_fields\":true,\"enable_log_patterns_extraction\":false,\"is_llm_stream\":false,\"storage_type\":\"normal\"},\"total_fields\":12}"
+         }
+        ],
+        "metadata": {
+         "truncated": false
+        }
+       },
+       "time": {
+        "created": 1784533994787,
+        "completed": 1784533994806
+       }
+      },
+      {
+       "type": "tool",
+       "id": "call_01_xSeS4levqkrBVd1qb8MU3947",
+       "name": "o2_StreamSchema",
+       "state": {
+        "status": "completed",
+        "input": {
+         "org_id": "default",
+         "stream_name": "http_requests_total",
+         "type": "metrics"
+        },
+        "content": [
+         {
+          "type": "text",
+          "text": "{\"name\":\"http_requests_total\",\"storage_type\":\"disk\",\"stream_type\":\"metrics\",\"stats\":{\"created_at\":1781871160376746,\"doc_time_min\":1781863920000000,\"doc_time_max\":1781871120000000,\"doc_num\":484,\"file_num\":3,\"storage_size\":0.17153167724609375,\"compressed_size\":0.016753196716308594,\"index_size\":0.015079498291015625},\"schema\":[{\"name\":\"__hash__\",\"type\":\"UInt64\"},{\"name\":\"__name__\",\"type\":\"Utf8\"},{\"name\":\"_timestamp\",\"type\":\"Int64\"},{\"name\":\"aggregation_temporality\",\"type\":\"Utf8\"},{\"name\":\"endpoint\",\"type\":\"Utf8\"},{\"name\":\"flag\",\"type\":\"Utf8\"},{\"name\":\"is_monotonic\",\"type\":\"Utf8\"},{\"name\":\"namespace\",\"type\":\"Utf8\"},{\"name\":\"service\",\"type\":\"Utf8\"},{\"name\":\"service_name\",\"type\":\"Utf8\"},{\"name\":\"start_time\",\"type\":\"Utf8\"},{\"name\":\"status\",\"type\":\"Utf8\"},{\"name\":\"value\",\"type\":\"Float64\"}],\"settings\":{\"partition_keys\":{},\"full_text_search_keys\":[],\"index_fields\":[],\"bloom_filter_fields\":[],\"distinct_value_fields\":[],\"data_retention\":0,\"max_query_range\":0,\"store_original_data\":false,\"approx_partition\":false,\"index_updated_at\":0,\"extended_retention_days\":[],\"index_original_data\":false,\"index_all_values\":false,\"enable_distinct_fields\":true,\"enable_log_patterns_extraction\":false,\"is_llm_stream\":false,\"storage_type\":\"normal\"},\"metrics_meta\":{\"metric_type\":\"Counter\",\"metric_family_name\":\"http_requests_total\",\"help\":\"Total HTTP requests\",\"unit\":\"\"},\"total_fields\":13}"
+         }
+        ],
+        "metadata": {
+         "truncated": false
+        }
+       },
+       "time": {
+        "created": 1784533995508,
+        "completed": 1784533995535
+       }
+      },
+      {
+       "type": "tool",
+       "id": "call_02_EsGyjrUBWjb4aBuxNxwO8561",
+       "name": "o2_SearchSQL",
+       "state": {
+        "status": "completed",
+        "input": {
+         "org_id": "default",
+         "type": "logs",
+         "request_body": {
+          "query": {
+           "sql": "SELECT _timestamp, level, message FROM app_logs ORDER BY _timestamp DESC LIMIT 5",
+           "start_time": 1784530385630000,
+           "end_time": 1784533985630000
+          }
+         }
+        },
+        "content": [
+         {
+          "type": "text",
+          "text": "{\"took\":16,\"hits\":[],\"total\":0,\"from\":0,\"size\":1000,\"scan_size\":0}"
+         }
+        ],
+        "metadata": {
+         "truncated": false
+        }
+       },
+       "time": {
+        "created": 1784533996460,
+        "completed": 1784533996493
+       }
+      },
+      {
+       "type": "tool",
+       "id": "call_03_tltw6PAczcAHJdtRxMF04139",
+       "name": "o2_tool_search",
+       "state": {
+        "status": "completed",
+        "input": {
+         "query": "list dashboards alerts",
+         "limit": 5
+        },
+        "content": [
+         {
+          "type": "text",
+          "text": "{\"tools\":[{\"name\":\"ListDashboards\",\"description\":\"List all dashboards in organization\",\"inputSchema\":{\"type\":\"object\",\"properties\":{\"org_id\":{\"type\":\"string\",\"description\":\"Organization name\"},\"folder\":{\"type\":\"string\",\"description\":\"Optional folder ID filter parameter\\n\\nIf neither `folder` nor any other filter parameter are set then this\\nwill search for all dashboards in the \\\"default\\\" folder.\\n\\nIf `folder` is not set and another filter parameter, such as `title`, is\\nset then this will search for dashboards in all folders.\"},\"title\":{\"type\":\"string\",\"description\":\"The optional case-insensitive title substring with which to filter\\ndashboards.\"},\"pageSize\":{\"type\":\"integer\",\"format\":\"int64\",\"minimum\":0,\"description\":\"The optional number of dashboards to retrieve. If not set then all\\ndashboards that match the query parameters will be returned.\\n\\nCurrently this parameter is only untilized by the API when the `title`\\nparameter is also set.\"},\"timeout_seconds\":{\"type\":\"integer\",\"description\":\"Request timeout in seconds\",\"minimum\":1,\"maximum\":300,\"default\":30}},\"required\":[\"org_id\"]}},{\"name\":\"ListAlerts\",\"description\":\"List all alerts\",\"inputSchema\":{\"type\":\"object\",\"properties\":{\"org_id\":{\"type\":\"string\",\"description\":\"Organization name\"},\"folder\":{\"type\":\"string\",\"description\":\"Optional folder ID filter parameter.\"},\"stream_type\":{\"type\":\"string\",\"enum\":[\"logs\",\"metrics\",\"traces\",\"service_graph\",\"enrichment_tables\",\"file_list\",\"metadata\",\"index\"],\"description\":\"Optional stream type filter parameter.\"},\"stream_name\":{\"type\":\"string\",\"description\":\"Optional stream name filter parameter.\\n\\nThis parameter is only used if `stream_type` is also provided.\"},\"alert_name_substring\":{\"type\":\"string\",\"description\":\"Optional case-insensitive name substring filter parameter.\"},\"owner\":{\"type\":\"string\",\"description\":\"Optional owner user filter parameter.\"},\"enabled\":{\"type\":\"boolean\",\"description\":\"Optional enabled filter parameter.\"},\"page_size\":{\"type\":\"integer\",\"format\":\"int64\",\"minimum\":0,\"description\":\"The optional number of alerts to retrieve. If not set then all alerts\\nthat match the query parameters will be returned.\"},\"page_idx\":{\"type\":\"integer\",\"format\":\"int64\",\"minimum\":0,\"description\":\"The optional page index. If not set then defaults to `0`.\\n\\nThis parameter is only used if `page_size` is also set.\"},\"alert_type\":{\"type\":\"string\",\"description\":\"Optional alert type filter: `all` (default), `scheduled`, `realtime`,\\nor `anomaly_detection`.\",\"enum\":[\"all\",\"scheduled\",\"realtime\",\"anomaly_detection\"]},\"timeout_seconds\":{\"type\":\"integer\",\"description\":\"Request timeout in seconds\",\"minimum\":1,\"maximum\":300,\"default\":30}},\"required\":[\"org_id\"]}},{\"name\":\"MoveDashboards\",\"description\":\"Move multiple dashboards to folder\",\"inputSchema\":{\"type\":\"object\",\"properties\":{\"org_id\":{\"type\":\"string\",\"description\":\"Organization name\"},\"request_body\":{\"type\":\"object\",\"description\":\"HTTP request body for `MoveDashboards` endpoint.\",\"properties\":{\"dashboard_ids\":{\"type\":\"array\",\"description\":\"IDs of the dashboards to move.\",\"items\":{\"type\":\"string\"}},\"dst_folder_id\":{\"type\":\"string\",\"description\":\"Indicates the folder to which dashboard should be moved.\"}},\"required\":[\"dashboard_ids\",\"dst_folder_id\"]}},\"required\":[\"org_id\",\"request_body\"]}},{\"name\":\"MoveAlerts\",\"description\":\"Move alerts to another folder\",\"inputSchema\":{\"type\":\"object\",\"properties\":{\"org_id\":{\"type\":\"string\",\"description\":\"Organization name\"},\"folder\":{\"type\":\"string\",\"description\":\"From Folder ID (Required if RBAC enabled)\"},\"request_body\":{\"type\":\"object\",\"description\":\"HTTP request body for `MoveAlerts` endpoint.\",\"properties\":{\"alert_ids\":{\"type\":\"array\",\"description\":\"IDs of the alerts to move.\",\"items\":{\"type\":\"string\"}},\"anomaly_config_ids\":{\"type\":\"array\",\"description\":\"IDs of anomaly detection configs to move. Defaults to empty when not\\nprovided. Callers should always supply this to avoid per-ID DB lookups.\",\"items\":{\"type\":\"string\"}},\"dst_folder_id\":{\"type\":\"string\",\"description\":\"Indicates the folder to which alerts should be moved.\"}},\"required\":[\"alert_ids\",\"dst_folder_id\"]},\"timeout_seconds\":{\"type\":\"integer\",\"description\":\"Request timeout in seconds\",\"minimum\":1,\"maximum\":300,\"default\":30}},\"required\":[\"org_id\",\"request_body\"]}},{\"name\":\"ListReports\",\"description\":\"List all reports\",\"inputSchema\":{\"type\":\"object\",\"properties\":{\"org_id\":{\"type\":\"string\",\"description\":\"Organization name\"}},\"required\":[\"org_id\"]}}]}"
+         }
+        ],
+        "metadata": {
+         "truncated": false
+        }
+       },
+       "time": {
+        "created": 1784533996892,
+        "completed": 1784533996903
+       }
+      }
+     ],
+     "cost": 0.001284845,
+     "tokens": {
+      "input": 1965,
+      "output": 338,
+      "reasoning": 87,
+      "cache": {
+       "read": 16640,
+       "write": 0
+      }
+     },
+     "time": {
+      "created": 1784533991653,
+      "completed": 1784533996994
+     },
+     "finish": "tool-calls"
+    }
+   }
+  },
+  {
+   "id": "evt_4",
+   "aggregateID": "ses_0817c5614ffea1NfBrR9UndbIa",
+   "seq": 4,
+   "type": "message.updated.2",
+   "data": {
+    "message": {
+     "id": "msg_f7e83d5c4001ta4s4BPcbPj4Ob",
+     "type": "assistant",
+     "agent": "o2-ai",
+     "model": {
+      "providerID": "deepseek",
+      "id": "deepseek-v4-pro",
+      "variant": "max"
+     },
+     "content": [],
+     "cost": 0,
+     "tokens": {
+      "input": 0,
+      "output": 0,
+      "reasoning": 0,
+      "cache": {
+       "read": 0,
+       "write": 0
+      }
+     },
+     "time": {
+      "created": 1784533996996,
+      "completed": 1784533997947
+     },
+     "error": {
+      "type": "unknown",
+      "message": "Aborted"
+     }
+    }
+   }
+  }
+ ],
+ "expected": {
+  "turns": [
+   {
+    "user_message_id": "msg_f7e83aa8a001tBj3Z8XVQUuqCn",
+    "created": 1784533985930,
+    "user": {
+     "text": "[Context]\norg_id: default\ncurrent_page: home\nnow: 2026-07-20T13:23:05.630000+05:30 (Asia/Calcutta, 1784533985630000us)\nuser_timezone: Asia/Calcutta\n\ntest all tool calls",
+     "images": []
+    },
+    "frames": [
+     {
+      "type": "message_delta",
+      "content": "I'll run a comprehensive test of all tool calls across different areas. Let me batch independent calls together.\n\n**Phase 1: "
+     },
+     {
+      "type": "message_delta",
+      "content": "Discovery & Streams**"
+     },
+     {
+      "type": "tool_call",
+      "tool": "StreamList",
+      "message": "Listing streams",
+      "context": {
+       "org_id": "default"
+      },
+      "call_id": "call_01_zT6jWoLYIGXH3nUAL46E5452"
+     },
+     {
+      "type": "tool_result",
+      "tool": "StreamList",
+      "success": true,
+      "message": "StreamList completed successfully",
+      "call_args": {
+       "org_id": "default"
+      },
+      "call_id": "call_01_zT6jWoLYIGXH3nUAL46E5452"
+     },
+     {
+      "type": "message_delta",
+      "content": "**Phase 2: Schemas, Queries, Dashboards & Alerts**"
+     },
+     {
+      "type": "tool_call",
+      "tool": "StreamSchema",
+      "message": "Fetching stream schema",
+      "context": {
+       "org_id": "default",
+       "stream_name": "app_logs",
+       "type": "logs"
+      },
+      "call_id": "call_00_CZXcNrNWg6C06wkG8kRy2321"
+     },
+     {
+      "type": "tool_result",
+      "tool": "StreamSchema",
+      "success": true,
+      "message": "StreamSchema completed successfully",
+      "call_args": {
+       "org_id": "default",
+       "stream_name": "app_logs",
+       "type": "logs"
+      },
+      "call_id": "call_00_CZXcNrNWg6C06wkG8kRy2321"
+     },
+     {
+      "type": "tool_call",
+      "tool": "StreamSchema",
+      "message": "Fetching stream schema",
+      "context": {
+       "org_id": "default",
+       "stream_name": "http_requests_total",
+       "type": "metrics"
+      },
+      "call_id": "call_01_xSeS4levqkrBVd1qb8MU3947"
+     },
+     {
+      "type": "tool_result",
+      "tool": "StreamSchema",
+      "success": true,
+      "message": "StreamSchema completed successfully",
+      "call_args": {
+       "org_id": "default",
+       "stream_name": "http_requests_total",
+       "type": "metrics"
+      },
+      "call_id": "call_01_xSeS4levqkrBVd1qb8MU3947"
+     },
+     {
+      "type": "tool_call",
+      "tool": "SearchSQL",
+      "message": "Querying logs",
+      "context": {
+       "org_id": "default",
+       "type": "logs",
+       "request_body": {
+        "query": {
+         "sql": "SELECT _timestamp, level, message FROM app_logs ORDER BY _timestamp DESC LIMIT 5",
+         "start_time": 1784530385630000,
+         "end_time": 1784533985630000
+        }
+       },
+       "sql": "SELECT _timestamp, level, message FROM app_logs ORDER BY _timestamp DESC LIMIT 5"
+      },
+      "call_id": "call_02_EsGyjrUBWjb4aBuxNxwO8561"
+     },
+     {
+      "type": "tool_result",
+      "tool": "SearchSQL",
+      "success": true,
+      "message": "SearchSQL completed successfully",
+      "response": null,
+      "call_args": {
+       "org_id": "default",
+       "type": "logs",
+       "request_body": {
+        "query": {
+         "sql": "SELECT _timestamp, level, message FROM app_logs ORDER BY _timestamp DESC LIMIT 5",
+         "start_time": 1784530385630000,
+         "end_time": 1784533985630000
+        }
+       }
+      },
+      "call_id": "call_02_EsGyjrUBWjb4aBuxNxwO8561"
+     },
+     {
+      "type": "error",
+      "error": "Aborted",
+      "recoverable": false
+     },
+     {
+      "type": "complete"
+     }
+    ],
+    "error": "Aborted",
+    "first_seq": 1,
+    "last_seq": 4
+   }
+  ],
+  "title": "test all tool calls",
+  "last_seq": 4
+ }
+}

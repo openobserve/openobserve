@@ -15,7 +15,7 @@
 
 //! Port of o2-ai's `project_events`; model names are not redacted (unknown here).
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use config::{
     meta::oncall::confidence::strip_call_ref,
@@ -26,10 +26,17 @@ use config::{
 };
 use o2_enterprise::enterprise::ai::chat::batcher::DurableEvent;
 
+use super::record_v2::{
+    LegacyMessage, MESSAGE_UPDATED, SESSION_CREATED, SESSION_UPDATED, is_v2_record, record_message,
+    tool_output_text, user_text,
+};
+
 const PLACEHOLDER_TITLE_PREFIXES: [&str; 2] = ["New session - ", "Child session - "];
 const INJECTED_KEY: &str = "o2_injected";
 const ABORTED_ERROR: &str = "MessageAbortedError";
 const DEFAULT_TURN_ERROR: &str = "The assistant failed to respond";
+/// The 2.x tool error type of a permission o2-ai denied.
+const PERMISSION_REJECTED: &str = "permission.rejected";
 
 const FLUSH_CHARS: usize = 80;
 const FLUSH_BREAKS: [char; 4] = ['.', '!', '?', '\n'];
@@ -119,6 +126,9 @@ const TOOL_DESCRIPTIONS: [(&str, &str); 37] = [
     ("ListGroups", "Listing groups"),
     ("testFunction", "Validating VRL"),
 ];
+
+/// opencode 2.x names of built-in tools; o2-ai hides them in chat history only, not in RCA threads.
+const HIDDEN_V2_TOOLS: [&str; 4] = ["shell", "subagent", "question", "apply_patch"];
 
 const PERMISSION_REJECTION_MARKERS: [&str; 5] = [
     "rejected permission",
@@ -256,35 +266,18 @@ impl StreamState {
         is_error: bool,
         frames: &mut Vec<Value>,
     ) {
-        let matched = if call_id.is_empty() {
-            None
-        } else {
-            self.pending_tool_calls.remove(call_id)
-        }
-        .or_else(|| self.last_tools_call_info.clone());
-
-        let result = if is_error {
+        if is_error {
             let err = tool_state
                 .get("error")
                 .filter(|v| truthy(v))
                 .cloned()
                 .unwrap_or_else(|| Value::Object(Map::new()));
             let message = extract_error_message(&err);
-            // o2-ai denies some permissions on purpose; their failures are not shown.
-            if is_permission_rejection(&message) {
-                self.pending_tool_calls.remove(call_id);
-                self.last_tools_call_info = None;
-                return;
-            }
             let error_type = match &err {
                 Value::Object(m) => m.get("name").cloned().unwrap_or(Value::Null),
                 _ => Value::String("ToolError".into()),
             };
-            let mut result = Map::new();
-            result.insert("error".into(), Value::Bool(true));
-            result.insert("error_type".into(), error_type);
-            result.insert("message".into(), Value::String(message));
-            result
+            self.tool_failed(call_id, tool_name, message, error_type, false, frames);
         } else {
             let metadata = tool_state
                 .get("metadata")
@@ -292,21 +285,72 @@ impl StreamState {
                 .cloned()
                 .unwrap_or_else(|| Value::Object(Map::new()));
             let result = coerce_tool_output(tool_state.get("output"), metadata);
-            if is_delete_confirmation(&result, tool_name) {
-                self.last_tools_call_info = None;
-                return;
-            }
-            if let Some(navigation) = navigation_frame(&result, tool_name) {
-                self.last_tools_call_info = None;
-                frames.push(navigation);
-                return;
-            }
-            result
-        };
+            self.tool_completed(call_id, tool_name, result, frames);
+        }
+    }
 
-        let Some(mut event) =
-            format_tool_result_event(tool_name, &result, is_error, matched.as_ref())
-        else {
+    /// The call a result answers: its own, else the last call announced.
+    fn take_call(&mut self, call_id: &str) -> Option<CallInfo> {
+        if call_id.is_empty() {
+            None
+        } else {
+            self.pending_tool_calls.remove(call_id)
+        }
+        .or_else(|| self.last_tools_call_info.clone())
+    }
+
+    fn tool_failed(
+        &mut self,
+        call_id: &str,
+        tool_name: &str,
+        message: String,
+        error_type: Value,
+        rejected: bool,
+        frames: &mut Vec<Value>,
+    ) {
+        let matched = self.take_call(call_id);
+        // o2-ai denies some permissions on purpose; their failures are not shown.
+        if rejected || is_permission_rejection(&message) {
+            self.last_tools_call_info = None;
+            return;
+        }
+        let mut result = Map::new();
+        result.insert("error".into(), Value::Bool(true));
+        result.insert("error_type".into(), error_type);
+        result.insert("message".into(), Value::String(message));
+        self.push_result(call_id, tool_name, &result, true, matched.as_ref(), frames);
+    }
+
+    fn tool_completed(
+        &mut self,
+        call_id: &str,
+        tool_name: &str,
+        result: Map<String, Value>,
+        frames: &mut Vec<Value>,
+    ) {
+        let matched = self.take_call(call_id);
+        if is_delete_confirmation(&result, tool_name) {
+            self.last_tools_call_info = None;
+            return;
+        }
+        if let Some(navigation) = navigation_frame(&result, tool_name) {
+            self.last_tools_call_info = None;
+            frames.push(navigation);
+            return;
+        }
+        self.push_result(call_id, tool_name, &result, false, matched.as_ref(), frames);
+    }
+
+    fn push_result(
+        &mut self,
+        call_id: &str,
+        tool_name: &str,
+        result: &Map<String, Value>,
+        is_error: bool,
+        matched: Option<&CallInfo>,
+        frames: &mut Vec<Value>,
+    ) {
+        let Some(mut event) = format_tool_result_event(tool_name, result, is_error, matched) else {
             return;
         };
         if !call_id.is_empty() {
@@ -314,6 +358,47 @@ impl StreamState {
         }
         self.last_tools_call_info = None;
         frames.push(Value::Object(event));
+    }
+
+    /// o2-ai's tool events of one settled 2.x tool item; history projects each message once.
+    fn v2_tool(&mut self, item: &Map<String, Value>, frames: &mut Vec<Value>) {
+        let call_id = item
+            .get("id")
+            .filter(|v| truthy(v))
+            .map(py_str)
+            .unwrap_or_default();
+        let name = item
+            .get("name")
+            .filter(|v| truthy(v))
+            .map_or_else(|| "unknown".to_string(), py_str);
+        let empty = Map::new();
+        let state = obj(item.get("state")).unwrap_or(&empty);
+        let status = state.get("status").and_then(Value::as_str);
+        if !matches!(status, Some("running" | "completed" | "error")) {
+            return;
+        }
+        self.tool_running(&call_id, &name, state, frames);
+        if status == Some("running") {
+            return;
+        }
+        if status == Some("error") {
+            let error = state
+                .get("error")
+                .filter(|v| truthy(v))
+                .cloned()
+                .unwrap_or_else(|| Value::Object(Map::new()));
+            let rejected = obj(Some(&error))
+                .and_then(|e| e.get("type"))
+                .is_some_and(|t| t == PERMISSION_REJECTED);
+            let message = v2_error_message(&error);
+            let error_type = Value::String("ToolError".into());
+            self.tool_failed(&call_id, &name, message, error_type, rejected, frames);
+        } else {
+            let metadata = Value::Object(obj(state.get("metadata")).cloned().unwrap_or_default());
+            let output = tool_output_text(state.get("content")).map(Value::String);
+            let result = coerce_tool_output(output.as_ref(), metadata);
+            self.tool_completed(&call_id, &name, result, frames);
+        }
     }
 }
 
@@ -417,6 +502,87 @@ impl Turn {
         }
     }
 
+    fn collect_v2_user(&mut self, message: &Map<String, Value>) {
+        self.user_parts.push((user_text(message), false));
+        let files = message.get("files").and_then(Value::as_array);
+        for (index, file) in files.into_iter().flatten().enumerate() {
+            let Some(file) = file.as_object() else {
+                continue;
+            };
+            let mime = file
+                .get("mime")
+                .filter(|v| truthy(v))
+                .map(py_str)
+                .unwrap_or_default();
+            let Some(data) = file.get("data").filter(|v| truthy(v)) else {
+                continue;
+            };
+            if !mime.starts_with("image/") {
+                continue;
+            }
+            let filename = file
+                .get("name")
+                .filter(|v| truthy(v))
+                .cloned()
+                .unwrap_or_else(|| Value::String(format!("image-{}", index + 1)));
+            let url = format!("data:{mime};base64,{}", py_str(data));
+            self.images
+                .push(json!({"filename": filename, "mime": mime, "url": url}));
+        }
+    }
+
+    /// Run one settled 2.x message through the live mapper, as o2-ai's `messages_to_events`.
+    fn project_v2_message(&mut self, message: &Map<String, Value>) {
+        let kind = message.get("type").and_then(Value::as_str);
+        if kind == Some("assistant") {
+            let content = message.get("content").and_then(Value::as_array);
+            for item in content.into_iter().flatten().filter_map(Value::as_object) {
+                match item.get("type").and_then(Value::as_str) {
+                    Some("text") => {
+                        let text = match item.get("text") {
+                            Some(Value::String(text)) => Some(text.as_str()),
+                            Some(other) if truthy(other) => None,
+                            _ => Some(""),
+                        };
+                        if let Some(text) = text {
+                            self.state.emit_text_delta(text, &mut self.frames);
+                        }
+                        // One text item is one block: never carry its tail into the next.
+                        self.state.flush_text_buffer(&mut self.frames);
+                    }
+                    Some("tool") => self.state.v2_tool(item, &mut self.frames),
+                    _ => {}
+                }
+            }
+        }
+        let error = obj(message.get("error"));
+        let said = |e: &Map<String, Value>| {
+            e.get("message")
+                .filter(|v| truthy(v))
+                .or_else(|| e.get("type").filter(|v| truthy(v)))
+                .map(py_str)
+                .unwrap_or_default()
+        };
+        match (kind, message.get("outcome").and_then(Value::as_str), error) {
+            (Some("idle"), Some("interrupted"), _) => self.aborted = true,
+            // A failure without an error object still fails the turn, as the live stream does.
+            (Some("idle"), Some("failed"), error) => {
+                self.error = Some(error.map(said).unwrap_or_default());
+            }
+            (Some("assistant"), _, Some(error)) => {
+                if error.get("type").and_then(Value::as_str) == Some("aborted") {
+                    self.aborted = true;
+                } else {
+                    self.error = Some(said(error));
+                }
+            }
+            _ => {}
+        }
+        if self.error.as_deref() == Some("") {
+            self.error = Some(DEFAULT_TURN_ERROR.to_string());
+        }
+    }
+
     fn user_text(&self) -> String {
         let joined = self
             .user_parts
@@ -464,13 +630,44 @@ pub(crate) struct Folded {
 }
 
 impl Folded {
+    /// Both record generations, a 2.x message as its 1.x view unless the 1.x events hold it.
     pub(crate) fn fold(events: &[DurableEvent]) -> Self {
+        let mut folded = Self::fold_v1(events);
+        let held: HashSet<String> = folded.infos.keys().cloned().collect();
+        for event in events {
+            let Some(message) = record_message(event) else {
+                continue;
+            };
+            let Some(legacy) = LegacyMessage::of(message, None) else {
+                continue;
+            };
+            if held.contains(&legacy.id) {
+                continue;
+            }
+            let parts = legacy.parts.into_iter().filter_map(|part| {
+                let id = part.get("id").and_then(Value::as_str)?.to_string();
+                Some((id, Value::Object(part)))
+            });
+            folded.parts.insert(legacy.id.clone(), parts.collect());
+            folded
+                .infos
+                .insert(legacy.id.clone(), Value::Object(legacy.info));
+            folded.cover(&legacy.id, event.seq);
+        }
+        folded
+    }
+
+    /// The 1.x events only; `last_seq` still covers every event.
+    fn fold_v1(events: &[DurableEvent]) -> Self {
         let mut folded = Folded {
             last_seq: -1,
             ..Default::default()
         };
         for event in events {
             folded.last_seq = folded.last_seq.max(event.seq);
+            if is_v2_record(event) {
+                continue;
+            }
             let empty = Map::new();
             let data = match &event.data {
                 Value::Object(m) => m,
@@ -546,48 +743,18 @@ impl Folded {
 
 /// o2-ai's `project_events` output for ascending events, plus each turn's `first_seq`/`last_seq`.
 pub fn project(events: &[DurableEvent]) -> Value {
-    let folded = Folded::fold(events);
-    let empty = Map::new();
-    let mut turns: Map<String, Value> = Map::new();
-    let mut projected: Vec<Turn> = Vec::new();
-    for (msg_id, info) in &folded.infos {
-        let Some(info) = info.as_object() else {
-            continue;
-        };
-        if info.get("role").and_then(Value::as_str) != Some("user") {
-            continue;
-        }
-        let mut turn = Turn {
-            user_message_id: info.get("id").cloned().unwrap_or(Value::Null),
-            created: obj(info.get("time"))
-                .and_then(|t| t.get("created"))
-                .cloned()
-                .unwrap_or(Value::Null),
-            ..Default::default()
-        };
-        turn.cover(folded.spans.get(msg_id));
-        turn.collect_user_parts(folded.parts.get(msg_id).unwrap_or(&empty));
-        turns.insert(msg_id.clone(), Value::from(projected.len()));
-        projected.push(turn);
+    let folded = Folded::fold_v1(events);
+    let mut turns = project_v1(&folded);
+    let mut title = folded.title.clone();
+    if events.iter().any(is_v2_record) {
+        let (v2_turns, v2_title) = project_v2(events, &folded.infos);
+        turns.extend(v2_turns);
+        title = v2_title.or(title);
+        // Only a log holding 2.x records is ordered by creation, so a 1.x chat projects as before.
+        turns.sort_by(|a, b| created_order(&a.created, &b.created));
     }
-
-    for (msg_id, info) in &folded.infos {
-        let Some(info) = info.as_object() else {
-            continue;
-        };
-        if info.get("role").and_then(Value::as_str) != Some("assistant") {
-            continue;
-        }
-        let parent = truthy_key(info.get("parentID")).unwrap_or_default();
-        if let Some(index) = turns.get(&parent).and_then(Value::as_u64) {
-            let turn = &mut projected[index as usize];
-            turn.cover(folded.spans.get(msg_id));
-            turn.project_assistant_message(info, folded.parts.get(msg_id).unwrap_or(&empty));
-        }
-    }
-
-    let turns: Vec<Value> = projected.into_iter().map(Turn::into_value).collect();
-    json!({"turns": turns, "title": folded.title, "last_seq": folded.last_seq})
+    let turns: Vec<Value> = turns.into_iter().map(Turn::into_value).collect();
+    json!({"turns": turns, "title": title, "last_seq": folded.last_seq})
 }
 
 /// [`redact_turns`] on a projection (`{"turns": [...]}`) or a bare list of turns.
@@ -634,6 +801,128 @@ pub fn keep_inline_images(turn: &mut Value) {
             image.insert("url".into(), Value::Null);
         }
     }
+}
+
+/// The 1.x turns: each user message, answered by the assistant messages naming it as parent.
+fn project_v1(folded: &Folded) -> Vec<Turn> {
+    let empty = Map::new();
+    let mut turns: HashMap<&str, usize> = HashMap::new();
+    let mut projected: Vec<Turn> = Vec::new();
+    for (msg_id, info) in &folded.infos {
+        let Some(info) = info.as_object() else {
+            continue;
+        };
+        if info.get("role").and_then(Value::as_str) != Some("user") {
+            continue;
+        }
+        let mut turn = Turn {
+            user_message_id: info.get("id").cloned().unwrap_or(Value::Null),
+            created: obj(info.get("time"))
+                .and_then(|t| t.get("created"))
+                .cloned()
+                .unwrap_or(Value::Null),
+            ..Default::default()
+        };
+        turn.cover(folded.spans.get(msg_id));
+        turn.collect_user_parts(folded.parts.get(msg_id).unwrap_or(&empty));
+        turns.insert(msg_id, projected.len());
+        projected.push(turn);
+    }
+
+    for (msg_id, info) in &folded.infos {
+        let Some(info) = info.as_object() else {
+            continue;
+        };
+        if info.get("role").and_then(Value::as_str) != Some("assistant") {
+            continue;
+        }
+        let parent = truthy_key(info.get("parentID")).unwrap_or_default();
+        if let Some(&index) = turns.get(parent.as_str()) {
+            let turn = &mut projected[index];
+            turn.cover(folded.spans.get(msg_id));
+            turn.project_assistant_message(info, folded.parts.get(msg_id).unwrap_or(&empty));
+        }
+    }
+    projected
+}
+
+/// The 2.x turns and generated title; `held` is the 1.x messages, whose 2.x copies are skipped.
+fn project_v2(events: &[DurableEvent], held: &Map<String, Value>) -> (Vec<Turn>, Option<String>) {
+    let mut title = None;
+    // As o2-ai's dict: a re-recorded message keeps its first position and takes its latest record.
+    let mut messages: Vec<(String, &Map<String, Value>)> = Vec::new();
+    let mut slots: HashMap<String, usize> = HashMap::new();
+    let mut spans: HashMap<String, (i64, i64)> = HashMap::new();
+    for event in events {
+        let Value::Object(data) = &event.data else {
+            continue;
+        };
+        let kind = event.event_type.as_str();
+        if let (SESSION_CREATED | SESSION_UPDATED, Some(info)) = (kind, obj(data.get("info"))) {
+            if let Some(generated) = info.get("title").and_then(generated_title) {
+                title = Some(generated);
+            }
+            continue;
+        }
+        let Some(message) = obj(data.get("message")).filter(|_| kind == MESSAGE_UPDATED) else {
+            continue;
+        };
+        let Some(msg_id) = message.get("id").filter(|v| truthy(v)).map(py_str) else {
+            continue;
+        };
+        if held.contains_key(&msg_id) {
+            continue;
+        }
+        let span = spans
+            .entry(msg_id.clone())
+            .or_insert((event.seq, event.seq));
+        *span = (span.0.min(event.seq), span.1.max(event.seq));
+        match slots.get(&msg_id) {
+            Some(&slot) => messages[slot].1 = message,
+            None => {
+                slots.insert(msg_id.clone(), messages.len());
+                messages.push((msg_id, message));
+            }
+        }
+    }
+
+    let mut turns: Vec<Turn> = Vec::new();
+    for (msg_id, message) in messages {
+        if message.get("type").and_then(Value::as_str) == Some("user") {
+            let mut turn = Turn {
+                user_message_id: Value::String(msg_id.clone()),
+                created: obj(message.get("time"))
+                    .and_then(|t| t.get("created"))
+                    .cloned()
+                    .unwrap_or(Value::Null),
+                ..Default::default()
+            };
+            turn.collect_v2_user(message);
+            turns.push(turn);
+        } else if let Some(turn) = turns.last_mut() {
+            turn.project_v2_message(message);
+        } else {
+            continue;
+        }
+        if let Some(turn) = turns.last_mut() {
+            turn.cover(spans.get(&msg_id));
+        }
+    }
+    (turns, title)
+}
+
+/// o2-ai's turn order: by the user message's creation, turns without one last.
+fn created_order(a: &Value, b: &Value) -> std::cmp::Ordering {
+    let key = |created: &Value| {
+        let at = if truthy(created) {
+            created.as_f64().unwrap_or(0.0)
+        } else {
+            0.0
+        };
+        (created.is_null(), at)
+    };
+    let ((a_null, a_at), (b_null, b_at)) = (key(a), key(b));
+    a_null.cmp(&b_null).then(a_at.total_cmp(&b_at))
 }
 
 fn redact_frame(frame: &mut Value) {
@@ -717,12 +1006,16 @@ pub(crate) fn strip_mcp_prefix(tool_name: &str) -> &str {
     }
 }
 
+fn hidden_in_chat(tool_name: &str) -> bool {
+    HIDDEN_TOOLS.contains(&tool_name) || HIDDEN_V2_TOOLS.contains(&tool_name)
+}
+
 fn resolve_tool_call(
     tool_name: &str,
     args: &Map<String, Value>,
 ) -> Option<(String, Map<String, Value>)> {
     let tool_name = strip_mcp_prefix(tool_name);
-    if HIDDEN_TOOLS.contains(&tool_name) {
+    if hidden_in_chat(tool_name) {
         return None;
     }
     if tool_name == "tools_call" {
@@ -785,7 +1078,7 @@ fn format_tool_result_event(
     call_info: Option<&CallInfo>,
 ) -> Option<Map<String, Value>> {
     let tool_name = strip_mcp_prefix(tool_name);
-    if HIDDEN_TOOLS.contains(&tool_name) {
+    if hidden_in_chat(tool_name) {
         return None;
     }
     if is_error
@@ -1209,6 +1502,20 @@ pub(crate) fn extract_error_message(error: &Value) -> String {
     }
 }
 
+/// o2-ai's 2.x error message: [`extract_error_message`], falling back to the error's `type`.
+pub(crate) fn v2_error_message(error: &Value) -> String {
+    let said = |m: &Map<String, Value>, keys: [&str; 2]| {
+        keys.iter().any(|k| m.get(*k).is_some_and(truthy))
+    };
+    let type_only = error
+        .as_object()
+        .filter(|m| !said(m, ["message", "name"]))
+        .filter(|m| !obj(m.get("data")).is_some_and(|d| said(d, ["message", "error"])))
+        .and_then(|m| m.get("type"))
+        .filter(|t| truthy(t));
+    type_only.map_or_else(|| extract_error_message(error), py_str)
+}
+
 /// Char index up to which streamed text can be emitted without splitting a redacted term.
 fn stream_split(text: &[char]) -> usize {
     let mut cut = text.len();
@@ -1267,7 +1574,7 @@ fn py_num_eq(value: &Value, n: i64) -> bool {
 }
 
 /// Python `str(value)` for a JSON value.
-fn py_str(value: &Value) -> String {
+pub(crate) fn py_str(value: &Value) -> String {
     match value {
         Value::String(s) => s.clone(),
         Value::Null => "None".into(),
@@ -1448,6 +1755,26 @@ mod tests {
         }
     }
 
+    #[test]
+    fn a_failed_idle_without_an_error_fails_the_turn() {
+        let record = |seq: i64, message: Value| DurableEvent {
+            id: format!("evt_{seq}"),
+            aggregate_id: "ses_F".into(),
+            seq,
+            event_type: MESSAGE_UPDATED.into(),
+            data: json!({"message": message}),
+        };
+        let events = [
+            record(0, json!({"id": "msg_u", "type": "user", "text": "hi"})),
+            record(
+                1,
+                json!({"id": "msg_i", "type": "idle", "outcome": "failed"}),
+            ),
+        ];
+        let projected = project(&events);
+        assert_eq!(projected["turns"][0]["error"], DEFAULT_TURN_ERROR);
+    }
+
     /// A `record_step` part is stored in full but projects to no tool frame.
     #[test]
     fn record_step_is_stored_but_never_projected() {
@@ -1566,5 +1893,56 @@ mod tests {
             strip_mcp_prefix("o2_correlate_streams"),
             "correlate_streams"
         );
+    }
+
+    #[test]
+    fn a_2x_shell_call_is_hidden_in_chat_but_stays_an_rca_row() {
+        let mut events =
+            crate::ai_chat::record_v2::tests::golden_events("v2_user_text_and_tools.json");
+        let projected = project(&events).to_string();
+        assert!(projected.contains("tool_call"), "{projected}");
+        events[2].data["message"]["content"][0]["name"] = json!("shell");
+        let projected = project(&events).to_string();
+        assert!(!projected.contains("tool_call"), "{projected}");
+        assert_eq!(
+            crate::ai_chat::rca_thread::ThreadPart::of("shell", "completed", None),
+            crate::ai_chat::rca_thread::ThreadPart::Row
+        );
+    }
+
+    /// A log without 2.x records keeps log order even where creation times disagree.
+    #[test]
+    fn only_a_log_with_2x_records_is_ordered_by_creation() {
+        let (events, expected) = load("structure.json");
+        let created: Vec<&Value> = expected["turns"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|t| &t["created"])
+            .collect();
+        assert!(
+            created.windows(2).any(|w| w[0].as_i64() > w[1].as_i64()),
+            "{created:?}"
+        );
+        let mut mixed = events.clone();
+        mixed.push(DurableEvent {
+            id: "evt_x".into(),
+            aggregate_id: events[0].aggregate_id.clone(),
+            seq: events.last().unwrap().seq + 1,
+            event_type: SESSION_UPDATED.into(),
+            data: json!({"info": {"title": "Pool exhaustion"}}),
+        });
+        let sorted = project(&mixed);
+        let created: Vec<Option<i64>> = sorted["turns"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|t| t["created"].as_i64())
+            .collect();
+        assert_eq!(
+            created,
+            [Some(1), Some(1), Some(1), Some(1), Some(99), None]
+        );
+        assert_eq!(sorted["title"], "Pool exhaustion");
     }
 }
