@@ -916,6 +916,50 @@ describe("openAssistant: door default agent (MULTI-AGENT-06)", () => {
     expect(h.store.state.sessions[sid].agentId).toBe("generate-query");
   });
 
+  it("gives the agent picked on a new-chat door to the blank chat it reuses, over that chat's older pick", async () => {
+    const h = setup();
+    h.store.syncCapability({ ...capability, agents: ROSTER });
+    const sid = h.store.createSession({
+      origin: { entryKind: "header_button", objectKind: "none", container: "sidebar" },
+      thread: "new",
+    });
+    h.store.pickAgent(sid, "generate-query", "picker");
+    h.store.open({ kind: "sidebar" }, { sid });
+    const result = ok(
+      await h.open({
+        entryKind: "home_launcher",
+        entryVerb: "ask",
+        objectKind: "none",
+        intent: "stage",
+        thread: "new",
+        container: "sidebar",
+        agent: "sre",
+        payload: { chips: [], text: "why 5xx?" },
+      }),
+    );
+    expect(result.sid).toBe(sid);
+    expect(h.store.state.sessions[sid].agentId).toBe("sre");
+  });
+
+  it("keeps a blank chat's own pick over a new-chat door's default agent", async () => {
+    const h = setup();
+    h.store.syncCapability({ ...capability, agents: ROSTER });
+    const sid = h.store.createSession({
+      origin: { entryKind: "header_button", objectKind: "none", container: "sidebar" },
+      thread: "new",
+    });
+    h.store.pickAgent(sid, "generate-query", "picker");
+    h.store.open({ kind: "sidebar" }, { sid });
+    const call = explain({
+      intent: "stage",
+      entryVerb: "troubleshoot",
+      objectKind: "alert_firing",
+      container: "sidebar",
+    });
+    ok(await h.open(call));
+    expect(h.store.state.sessions[sid].agentId).toBe("generate-query");
+  });
+
   it("sends an investigation to the default assistant while the Investigator is unavailable", async () => {
     const h = setup();
     const roster = ROSTER.map((row) =>

@@ -438,9 +438,12 @@ function applyDoorAgent(
 ): void {
   const session = store.state.sessions[sid];
   // A transcript the door itself seeded into a chat it just made is not a turn anyone spoke in.
-  if (!session || session.agentId || (!created && session.messages.length > 0)) return;
+  if (!session || (!created && session.messages.length > 0)) return;
+  // A blank chat a new-chat door reuses stands in for a new one, so the door's named agent replaces its older pick.
+  const asNew = !!args.agent && (args.thread ?? defaultThread(args.entryVerb)) === "new";
+  if (session.agentId && !asNew) return;
   const agent = doorAgent(args.agent ?? defaultAgentFor(args), store.state.capability.agents);
-  if (agent) store.pickAgent(sid, agent, "door");
+  if (agent && agent !== session.agentId) store.pickAgent(sid, agent, "door");
 }
 
 function defaultThread(verb: OpenAssistantArgs["entryVerb"]): "new" | "current" | "auto" {
