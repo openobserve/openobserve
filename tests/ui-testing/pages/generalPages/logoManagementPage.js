@@ -118,6 +118,9 @@ export
     await this.customLogoTextBox.fill(text);
     await this.submitButton.waitFor({ state: 'visible' });
     await this.submitButton.click({ force: true });
+    // Save turns disabled again only once the save bar is clean, i.e. the text was stored.
+    await expect(this.submitButton).toBeDisabled({ timeout: 30000 });
+    await expect(this.customLogoTextBox).toHaveValue(text);
 }
 
     async uploadLogo(filePath) {
