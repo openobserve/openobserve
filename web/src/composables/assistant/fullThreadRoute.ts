@@ -13,9 +13,19 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import type { LocationQuery, LocationQueryRaw, RouteLocationRaw } from "vue-router";
+import {
+  isNavigationFailure,
+  type LocationQuery,
+  type LocationQueryRaw,
+  type NavigationFailure,
+  type RouteLocationRaw,
+  type Router,
+} from "vue-router";
 
 import { overviewFocusListening } from "@/composables/goto/goToRequests";
+
+import type { AssistantStoreInternal } from "./assistantStore";
+import { runtimeHandle } from "./runtimeHandle";
 
 /** Home shows a thread at Full density while this query key is present; an empty value is the active or a new chat. */
 export const THREAD_QUERY_KEY = "thread";
@@ -68,6 +78,22 @@ export function withoutThread(query: LocationQuery): LocationQuery {
   const next = { ...query };
   delete next[THREAD_QUERY_KEY];
   return next;
+}
+
+/** A link out of the full view: the page opens with the same chat floating over it; below lg or at the window cap it only navigates. */
+export async function pushFromThread(
+  router: Pick<Router, "push">,
+  to: RouteLocationRaw,
+  store?: Pick<AssistantStoreInternal, "state" | "floatChat">,
+): Promise<NavigationFailure | void | undefined> {
+  const live = store ?? runtimeHandle().value?.store;
+  const shell = live?.state.shell;
+  const sid = shell?.placement.kind === "full" ? shell.activeSid : null;
+  const failure = await router.push(to);
+  // Leaving closes the full view; one that went back to its side panel keeps the chat there.
+  if (sid && !isNavigationFailure(failure) && live?.state.shell.placement.kind === "hidden")
+    live.floatChat(sid, { focus: "none" });
+  return failure;
 }
 
 /** Home's AI tab back on its Ask box, focused: where a chat on Home starts over. */

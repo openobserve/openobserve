@@ -23,6 +23,7 @@ import {
   fakeVuex,
 } from "@/components/ai-assistant/__tests__/fakeAssistant";
 import type { AssistantCapability, GateCode } from "@/composables/assistant";
+import { pushFromThread } from "@/composables/assistant/pure";
 
 import { SHELL_ROUTE_CONTEXT } from "@/components/ai-assistant/shell/AssistantShell.vue";
 import { closeLockedPanel } from "@/components/ai-assistant/shell/lockedPanel";
@@ -210,6 +211,24 @@ describe("AssistantView", () => {
     await router.push("/logs");
     await flushPromises();
     expect(store.state.shell.placement).toEqual({ kind: "sidebar" });
+    expect(store.state.shell.activeSid).toBe(sid);
+  });
+
+  it("floats the chat over the page a thread link opens, and takes it back from the window on return", async () => {
+    const { store, router } = await setup();
+    await flushPromises();
+    const sid = store.state.shell.activeSid as string;
+    await router.replace(`/assistant/${sid}`);
+    await flushPromises();
+    await pushFromThread(router, "/logs", store);
+    await flushPromises();
+    expect(router.currentRoute.value.path).toBe("/logs");
+    expect(store.windowOf(sid)?.state).toBe("open");
+    expect(store.state.shell.placement.kind).toBe("hidden");
+    await router.push(`/assistant/${sid}`);
+    await flushPromises();
+    expect(store.windowOf(sid)).toBeNull();
+    expect(store.state.shell.placement.kind).toBe("full");
     expect(store.state.shell.activeSid).toBe(sid);
   });
 

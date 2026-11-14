@@ -722,6 +722,7 @@ import {
   assistantSessionSourceKey,
   assistantTranscriptHostKey,
   isFullThreadRoute,
+  pushFromThread,
   recordedLedger,
   type AssistantEvidenceHost,
   type AssistantTranscriptHost,
@@ -1366,10 +1367,10 @@ function onOutcomeAction(sid: string, action: OutcomeAction, outcome: TurnOutcom
       );
       return;
     case "open_iam_roles":
-      return void router.push({ name: "roles", query }).catch(() => undefined);
+      return void pushFromThread(router, { name: "roles", query }).catch(() => undefined);
     case "manage_usage":
     case "view_plans":
-      return void router.push({ name: "plans", query }).catch(() => undefined);
+      return void pushFromThread(router, { name: "plans", query }).catch(() => undefined);
     case "copy_request":
       return copyCreditRequest();
     default:

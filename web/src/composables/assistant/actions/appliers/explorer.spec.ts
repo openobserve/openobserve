@@ -52,6 +52,14 @@ describe("explorer applier", () => {
     expect(pushed.query).not.toHaveProperty("run");
   });
 
+  it("opens Logs from the full-page thread with that thread floating over it", async () => {
+    const { env, sid, store, router } = makeEnv();
+    store.open({ kind: "full" }, { sid, focus: "none" });
+    router.push.mockImplementation(async () => store.close("route"));
+    await explorerApplier(sid, { kind: "open_in_explorer", query, explorer: "logs" }, env);
+    expect(store.windowOf(sid)?.state).toBe("open");
+  });
+
   it("opens a new tab with noopener from a docked container", async () => {
     const { env, sid, store, router } = makeEnv();
     store.state.shell.placement = { kind: "docked", hostId: "alert_query" };

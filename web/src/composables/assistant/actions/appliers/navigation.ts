@@ -30,6 +30,7 @@ import {
 } from "../../assistantSet";
 import type { Sid } from "../../assistantStore.types";
 import { holdChatWindow } from "../../context/pageContext";
+import { pushFromThread } from "../../fullThreadRoute";
 import { MARKDOWN_LINK_ROUTES } from "../../navigationRoutes";
 import { registerApplier, type ActionEnv, type Applier } from "../registry";
 import type { ActionResult, AssistantAction, RouteTarget } from "../types";
@@ -85,7 +86,7 @@ export async function openTarget(
   const held = !session.composer.timeOverride;
   // The link carries its own range; the chat keeps the window it had, and the page's range stays an opt-in.
   holdChatWindow(store, sid);
-  const failure = await router.push(location);
+  const failure = await pushFromThread(router, location, store);
   if (isNavigationFailure(failure)) {
     if (held) store.setTimeOverride(sid, null);
     return { ok: false, reason: "guard_declined" };

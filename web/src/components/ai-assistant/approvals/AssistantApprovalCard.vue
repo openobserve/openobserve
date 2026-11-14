@@ -344,6 +344,7 @@ import {
   canAlwaysAllow,
   isReplyingTo,
   isApprovalChange,
+  pushFromThread,
   type QuestionOption,
 } from "@/composables/assistant/pure";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
@@ -698,7 +699,7 @@ function editInEditor(): void {
   if (!target) return;
   pressed.value = "finish";
   decide({ approved: false, reason: "edited" });
-  void router.push(target.route).catch(() => {});
+  void pushFromThread(router, target.route).catch(() => {});
 }
 
 function decide(decision: ApprovalDecision): void {
