@@ -64,6 +64,8 @@ export interface StarterPack {
   alerts: string[];
   savedViews: PackSavedView[];
   bundledAlerts?: PackBundledAlert[];
+  /** Spellings of one field; the only alias source on OSS, which has no semantic groups. */
+  aliases?: string[][];
 }
 
 export interface PackRecordItem {

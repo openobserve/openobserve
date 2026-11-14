@@ -15,15 +15,20 @@
 
 import { computed, onScopeDispose, ref } from "vue";
 
+import { useAlertLibrary } from "@/composables/alerts/useAlertLibrary";
 import { readQuery } from "@/composables/query/readQuery";
 import useHttpStreaming from "@/composables/useStreamingSearch";
 import { workloadStateFromNames } from "@/composables/useWorkloadDetection";
+import { STARTER_PACKS_ENABLED } from "@/constants/starterPacks";
 import { streamNameListQuery, streamSchemaQuery } from "@/services/stream.queries";
 import { generateTraceContext } from "@/utils/zincutils";
 import {
   DETECTION_STREAMS,
   EVENTS_STREAM,
 } from "@/views/Infrastructure/kubernetes2/kubernetesQueries";
+
+import { KUBERNETES_PACK } from "./kubernetesPack";
+import { matchPack, readOrgStreams } from "./packMatchData";
 
 export type PackMatchState = "checking" | "matched" | "waiting" | "none" | "error";
 
@@ -38,8 +43,13 @@ interface MatchOptions {
   poll?: boolean;
 }
 
-const hasSchema = async (org: string, name: string, type: string): Promise<string[]> => {
-  const schema = await readQuery(streamSchemaQuery(org, name, type), true);
+const hasSchema = async (
+  org: string,
+  name: string,
+  type: string,
+  force: boolean,
+): Promise<string[]> => {
+  const schema = await readQuery(streamSchemaQuery(org, name, type), force);
   return ((schema?.schema ?? []) as Array<{ name: string }>).map((field) => field.name);
 };
 
@@ -49,6 +59,7 @@ const readNames = async (org: string, type: string): Promise<string[]> =>
 /** Whether this org's data fits the Kubernetes pack, and which clusters it has seen. */
 export function useStarterPackMatcher(org: string, { poll = false }: MatchOptions = {}) {
   const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } = useHttpStreaming();
+  const library = STARTER_PACKS_ENABLED ? useAlertLibrary() : null;
   const state = ref<PackMatchState>("checking");
   const clusters = ref<string[]>([]);
   const streams = ref<string[]>([]);
@@ -104,12 +115,22 @@ export function useStarterPackMatcher(org: string, { poll = false }: MatchOption
     });
 
   const decide = async (): Promise<{ next: PackMatchState; seen: string[]; found: string[] }> => {
-    const [metrics, logs] = await Promise.all([readNames(org, "metrics"), readNames(org, "logs")]);
+    const orgStreams = library ? await readOrgStreams(org) : null;
+    const [metrics, logs] = orgStreams
+      ? [[...(orgStreams.metrics?.keys() ?? [])], [...(orgStreams.logs?.keys() ?? [])]]
+      : await Promise.all([readNames(org, "metrics"), readNames(org, "logs")]);
     const present = DETECTION_STREAMS.filter((name) => metrics.includes(name));
-    const columns = await Promise.all(present.map((name) => hasSchema(org, name, "metrics")));
+    const columns = await Promise.all(
+      present.map((name) => hasSchema(org, name, "metrics", !library)),
+    );
     const anchor = columns.findIndex((fields) => fields.length > 0);
     const found = logs.includes(EVENTS_STREAM) ? [...present, EVENTS_STREAM] : present;
-    if (anchor >= 0) {
+    const matched =
+      library && orgStreams
+        ? (await matchPack(org, KUBERNETES_PACK, orgStreams, library)).ready
+        : anchor >= 0;
+    if (matched) {
+      if (anchor < 0) return { next: "matched", seen: [], found };
       const column = CLUSTER_COLUMNS.find((name) => columns[anchor].includes(name));
       const seen = column ? await readClusters(present[anchor], "metrics", column) : [];
       return { next: "matched", seen, found };

@@ -47,6 +47,7 @@ import { viewTypeOf } from "@/services/saved_views";
 import { streamNameListQuery, streamSchemaQuery } from "@/services/stream.queries";
 import type { AlertLibraryEntry } from "@/types/alertLibrary";
 import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboardSchemaVersion";
+import { STARTER_PACKS_ENABLED } from "@/constants/starterPacks";
 import { buildSavedViewPayload } from "@/utils/logs/savedViewPayload";
 import { getUUID } from "@/utils/uuid";
 
@@ -66,6 +67,7 @@ import {
   type StarterPack,
 } from "./types";
 import { dashboardStreams, fitDashboard, type DashboardFit } from "./dashboardFit";
+import { matchAlerts, readOrgStreams } from "./packMatchData";
 import { contentHash, useInstallRecords } from "./useInstallRecords";
 import { strictRenames } from "./strictRenames";
 import { rewriteAlert, rewriteDashboard, StreamRewriteError } from "./streamRewriter";
@@ -343,8 +345,10 @@ export function useStarterPacks(org: string) {
     entry: AlertLibraryEntry | undefined,
     streams: Record<string, Set<string>>,
     repairs: PackRepair[],
+    verdicts: Map<string, boolean> | null,
   ): PackNotIncludedItem["reason"] | null => {
     if (!entry) return "unavailable";
+    if (verdicts) return verdicts.get(entry.id) ? null : "no_data";
     const names = streams[entry.stream_type];
     const fits = (name: string) => names?.has(name) || repairs.some(({ from }) => from === name);
     return entry.required_streams.every(fits) ? null : "no_data";
@@ -370,6 +374,14 @@ export function useStarterPacks(org: string) {
       streams[type] ? strictRenames([name], streams[type]) : [],
     );
     const repairs = [...new Map(found.map((repair) => [repair.from, repair])).values()];
+    const verdicts = STARTER_PACKS_ENABLED
+      ? await matchAlerts(
+          org,
+          [...entries.values()].filter(({ id }) => pack.alerts.includes(id)),
+          await readOrgStreams(org),
+          { loadFile: loadAlertFile, packs: [pack], repairs },
+        )
+      : null;
     const names: Record<string, string> = {};
     for (const { id, title } of pack.dashboards) names[id] = title;
     for (const { id, name } of pack.savedViews) names[id] = name;
@@ -396,7 +408,9 @@ export function useStarterPacks(org: string) {
         continue;
       }
       const missing =
-        item.kind === "alert" ? notIncludedAlert(entries.get(item.itemId), streams, repairs) : null;
+        item.kind === "alert"
+          ? notIncludedAlert(entries.get(item.itemId), streams, repairs, verdicts)
+          : null;
       if (item.kind !== "folder" && item.status === "existing") {
         notIncluded.push({ kind: item.kind, itemId: item.itemId, name, reason: "already_have" });
       } else if (missing) {
