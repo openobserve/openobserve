@@ -841,11 +841,21 @@ mod tests {
         ] {
             assert!(tools.iter().all(|tool| tool.name != name), "{name}");
         }
-        for (name, fields) in [
-            ("UserUpdate", &["first_name", "new_password", "role"][..]),
-            ("CreateAlert", &["name", "folder_id"][..]),
-        ] {
-            let tool = tools.iter().find(|tool| tool.name == name).unwrap();
+        // Enterprise exposes only UserGet on the user path, so UserUpdate is not a tool there.
+        let user_update_is_tool = !cfg!(feature = "enterprise");
+        assert_eq!(
+            tools.iter().any(|tool| tool.name == "UserUpdate"),
+            user_update_is_tool
+        );
+        let mut body_checks = vec![("CreateAlert", &["name", "folder_id"][..])];
+        if user_update_is_tool {
+            body_checks.push(("UserUpdate", &["first_name", "new_password", "role"][..]));
+        }
+        for (name, fields) in body_checks {
+            let tool = tools
+                .iter()
+                .find(|tool| tool.name == name)
+                .unwrap_or_else(|| panic!("{name} is not an MCP tool"));
             let body = &tool.input_schema["properties"]["request_body"];
             for field in fields {
                 assert!(
@@ -853,6 +863,9 @@ mod tests {
                     "{name} cannot express {field}"
                 );
             }
+        }
+        if !user_update_is_tool {
+            return;
         }
 
         let user_update = openobserve_mcp::tools::get_tool_metadata("UserUpdate").unwrap();
