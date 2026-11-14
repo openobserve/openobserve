@@ -20,6 +20,7 @@ import { trackAssistant } from "@/services/assistantAnalytics";
 import type { PaidOverageFeature, PaidOverageStatus } from "@/services/paidOverage";
 import { raw, type I18nKey } from "@/types/i18n";
 
+import { leavingThread } from "./fullThreadRoute";
 import { runtimeHandle } from "./runtimeHandle";
 
 import type {
@@ -420,11 +421,14 @@ export function cancelConsentOnClose(
   consent: Pick<ConsentService, "cancel">,
 ): () => void {
   return watch(
-    () => [state().shell.placement.kind, state().shell.activeSid] as const,
-    ([kind], [before, sid]) => {
-      if (!sid || kind === before || kind !== "hidden") return;
-      if (state().shell.windows.some((w) => w.sid === sid)) return;
-      if (state().sessions[sid]?.pendingConsent) consent.cancel(sid, "container_closed");
+    () => [state().shell.placement.kind, state().shell.activeSid, leavingThread.value] as const,
+    ([kind, , moving], [before, sid, moved]) => {
+      // A link out of the full view closes it before the chat floats, so the card waits for where the chat lands.
+      if (moving) return;
+      const closed = moved ?? (kind !== before && kind === "hidden" ? sid : null);
+      if (!closed || state().shell.placement.kind !== "hidden") return;
+      if (state().shell.windows.some((w) => w.sid === closed)) return;
+      if (state().sessions[closed]?.pendingConsent) consent.cancel(closed, "container_closed");
     },
   );
 }

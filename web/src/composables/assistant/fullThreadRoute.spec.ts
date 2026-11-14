@@ -14,11 +14,13 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, vi } from "vitest";
+import { nextTick } from "vue";
 import { createMemoryHistory, createRouter } from "vue-router";
 
 import { onOverviewFocusRequest } from "@/composables/goto/goToRequests";
 
 import { makeEnv } from "./actions/__tests__/actionEnv";
+import { cancelConsentOnClose } from "./consent";
 import { isHomeAskShown, pushFromThread } from "./fullThreadRoute";
 
 describe("pushFromThread", () => {
@@ -37,6 +39,22 @@ describe("pushFromThread", () => {
     expect(store.state.shell.windows).toEqual([expect.objectContaining({ sid, state: "open" })]);
     expect(store.state.shell.placement.kind).toBe("hidden");
     expect(store.focusRequest.value).toBe(focus);
+  });
+
+  it("keeps a waiting consent card on a chat that floats over the new page, and cancels it when the chat cannot float", async () => {
+    for (const floats of [true, false]) {
+      const { store, sid } = makeEnv();
+      store.state.sessions[sid].pendingConsent = { turnId: "turn-1" } as never;
+      const cancel = vi.fn();
+      const stop = cancelConsentOnClose(() => store.state, { cancel });
+      store.open({ kind: "full" }, { sid, focus: "none" });
+      await nextTick();
+      if (!floats) vi.spyOn(store, "floatChat").mockReturnValue({ ok: false, reason: "no_room" });
+      await pushFromThread(leaving(store), { name: "logs" }, store);
+      await nextTick();
+      expect(cancel).toHaveBeenCalledTimes(floats ? 0 : 1);
+      stop();
+    }
   });
 
   it("leaves a chat in the side panel where it is", async () => {

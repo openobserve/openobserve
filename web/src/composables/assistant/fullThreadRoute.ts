@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { shallowRef } from "vue";
 import {
   isNavigationFailure,
   type LocationQuery,
@@ -80,6 +81,9 @@ export function withoutThread(query: LocationQuery): LocationQuery {
   return next;
 }
 
+/** The chat a link out of the full view is moving; the full view closes before the chat floats. */
+export const leavingThread = /* @__PURE__ */ shallowRef<string | null>(null);
+
 /** A link out of the full view: the page opens with the same chat floating over it; below lg or at the window cap it only navigates. */
 export async function pushFromThread(
   router: Pick<Router, "push">,
@@ -89,11 +93,16 @@ export async function pushFromThread(
   const live = store ?? runtimeHandle().value?.store;
   const shell = live?.state.shell;
   const sid = shell?.placement.kind === "full" ? shell.activeSid : null;
-  const failure = await router.push(to);
-  // Leaving closes the full view; one that went back to its side panel keeps the chat there.
-  if (sid && !isNavigationFailure(failure) && live?.state.shell.placement.kind === "hidden")
-    live.floatChat(sid, { focus: "none" });
-  return failure;
+  if (sid) leavingThread.value = sid;
+  try {
+    const failure = await router.push(to);
+    // Leaving closes the full view; one that went back to its side panel keeps the chat there.
+    if (sid && !isNavigationFailure(failure) && live?.state.shell.placement.kind === "hidden")
+      live.floatChat(sid, { focus: "none" });
+    return failure;
+  } finally {
+    if (sid && leavingThread.value === sid) leavingThread.value = null;
+  }
 }
 
 /** Home's AI tab back on its Ask box, focused: where a chat on Home starts over. */
