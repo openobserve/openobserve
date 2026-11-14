@@ -829,7 +829,7 @@ const notice = computed(() =>
 );
 
 const textboxAttrs = computed(() => ({
-  "aria-label": t("assistant.composer.name", { product: t("assistant.name") }),
+  "aria-label": t("assistant.composer.name", { product: agentLabel.value }),
   "aria-multiline": "true",
   "aria-placeholder": placeholder.value,
   "aria-describedby": notice.value ? noticeId : undefined,

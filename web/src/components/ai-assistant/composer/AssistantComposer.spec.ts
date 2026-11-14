@@ -184,6 +184,7 @@ describe("names and regions (CT-08)", () => {
     store.state.sessions[sid].nextAgentId = "sre";
     await flushPromises();
     expect(textarea().attributes("placeholder")).toBe("Ask Investigator…");
+    expect(textarea().attributes("aria-label")).toBe("Message Investigator");
     expect(wrapper.get(NOTICE).attributes("title")).toBe(
       "Investigator answers from now on. Earlier answers stay.",
     );

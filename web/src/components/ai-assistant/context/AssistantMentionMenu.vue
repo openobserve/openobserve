@@ -70,14 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           role="option"
           :aria-selected="item.id === activeOptionId"
           :aria-disabled="item.disabled || undefined"
-          :aria-label="
-            item.action
-              ? item.label
-              : t('assistant.composer.mention.optionName', {
-                  group: group.title,
-                  label: item.label,
-                })
-          "
+          :aria-label="item.action ? item.label : optionName(group.title, item)"
           :class="rowClass(item)"
           :data-test="
             item.action
@@ -589,6 +582,14 @@ function rowGlyph(item: MentionOption): IconName | undefined {
   if (item.glyph) return item.glyph;
   if (item.action) return undefined;
   return item.disabled ? assistantGlyph.locked : chipGlyph[item.kind];
+}
+
+// Two streams of one name differ only by type, so the shown type is part of the name.
+function optionName(group: I18nText, item: MentionOption): I18nText {
+  const name = t("assistant.composer.mention.optionName", { group, label: item.label });
+  return item.secondary
+    ? t("assistant.composer.mention.optionName", { group: name, label: item.secondary })
+    : name;
 }
 
 // Each other character, `_` included, becomes its code point, so `app.log` and `app_log` never share an id.

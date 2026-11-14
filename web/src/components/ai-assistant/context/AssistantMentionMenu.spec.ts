@@ -314,6 +314,16 @@ describe("AssistantMentionMenu", () => {
     expect(options()[0].getAttribute("aria-label")).toContain("Streams, ");
   });
 
+  it("names two streams of one name apart by their type", async () => {
+    const { options } = await open("checkout");
+    queryClient.setQueryData(streamKeys.nameList(ORG, "traces"), [{ name: "checkout" }]);
+    await flushPromises();
+    const names = options()
+      .filter((row) => row.dataset.kind === "stream")
+      .map((row) => row.getAttribute("aria-label"));
+    expect(names).toEqual(["Streams, checkout, logs", "Streams, checkout, traces"]);
+  });
+
   it("marks every option with its kind's glyph and its type, and keeps Show all as plain link text", async () => {
     const { options } = await open();
     for (const row of options())
