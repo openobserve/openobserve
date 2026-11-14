@@ -3984,6 +3984,14 @@ export class AlertsPage {
         testLogger.info('Alert row is visible', { alertName });
     }
 
+    async expectAlertRowCount(count, timeout = 10000) {
+        await expect(this.page.locator('[data-test^="alert-list-"][data-test$="-update-alert"]')).toHaveCount(count, { timeout });
+    }
+
+    async expectAlertSearchValue(value) {
+        await expect(this.page.locator(this.locators.alertSearchInputField)).toHaveValue(value);
+    }
+
     /**
      * Click the update button for a specific alert
      */

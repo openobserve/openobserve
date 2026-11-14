@@ -86,6 +86,32 @@ test.describe('Composite alerts — builder', {
     await expect(pm.compositeAlertsPage.save()).toBeDisabled();
   });
 
+  test('B2b · Add alert stays disabled while the child alerts load, then adds one (ENT#2996)', {
+    tag: ['@bug-2996', '@P3'],
+  }, async ({ page }) => {
+    await children(page, 'b2b', 1);
+    let held = 0;
+    await page.route(/\/api\/v2\/[^/]+\/alerts\?.*alert_type=all/, async (route) => {
+      held += 1;
+      await new Promise((r) => setTimeout(r, 5000));
+      return route.continue();
+    });
+    await pm.compositeAlertsPage.openCreate();
+    const optionsLoaded = pm.compositeAlertsPage.waitForChildOptions();
+    await pm.compositeAlertsPage.typeTab().click();
+    await expect(pm.compositeAlertsPage.form()).toBeVisible();
+
+    await expect(pm.compositeAlertsPage.childAdd(), 'Add must not look usable before there is a child to add').toBeDisabled();
+    await pm.compositeAlertsPage.childAdd().click({ force: true });
+    await expect(pm.compositeAlertsPage.selectedChildRows()).toHaveCount(0);
+
+    expect(await optionsLoaded, 'the candidate fetch must have returned').not.toBeNull();
+    expect(held, 'the candidate fetch must have gone through the delayed route').toBeGreaterThan(0);
+    await expect(pm.compositeAlertsPage.childAdd()).toBeEnabled({ timeout: 10000 });
+    await pm.compositeAlertsPage.addChild();
+    await expect(pm.compositeAlertsPage.selectedChildRows()).toHaveCount(1);
+  });
+
   test('B3/B4 · adding children fills lettered slots in order', async ({ page }) => {
     const [a, b] = await children(page, 'b3', 2);
     await openBuilderWith(page, [a, b]);
