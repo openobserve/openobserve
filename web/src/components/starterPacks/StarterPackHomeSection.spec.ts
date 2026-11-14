@@ -30,8 +30,11 @@ const fake = vi.hoisted(() => ({
   flows: {} as Record<string, any>,
   matchers: {} as Record<string, any>,
   dismissal: null as any,
-  menu: null as any,
   org: null as any,
+  hasUserData: null as any,
+  browser: {
+    saveBuiltIn: vi.fn(),
+  },
   push: vi.fn(async () => undefined),
   copy: vi.fn(),
 }));
@@ -44,9 +47,14 @@ vi.mock("@/composables/starterPacks/useStarterPackMatcher", () => ({
     fake.matchers[pack.id],
 }));
 vi.mock("@/composables/starterPacks/packDismissal", () => ({
-  usePackDismissal: (_surface: string, _org: string, id: string) =>
-    id === "menu" ? fake.menu : fake.dismissal,
+  usePackDismissal: () => fake.dismissal,
   usePackHiddenForOrg: () => fake.org,
+}));
+vi.mock("@/composables/useOrgHasUserData", () => ({
+  useOrgHasUserData: () => ({ hasUserData: fake.hasUserData }),
+}));
+vi.mock("@/composables/starterPacks/useBrowserMatches", () => ({
+  useBrowserMatches: () => fake.browser,
 }));
 vi.mock("vue-router", () => ({ useRouter: () => ({ push: fake.push }) }));
 
@@ -98,15 +106,14 @@ describe("StarterPackHomeSection", () => {
     fake.flows = { kubernetes: fakeFlow(), hosts: fakeFlow({ pack: HOSTS_PACK }) };
     fake.matchers = { kubernetes: matcherDouble(), hosts: matcherDouble() };
     fake.dismissal = dismissalDouble();
-    fake.menu = dismissalDouble();
+    fake.hasUserData = ref(true);
+    fake.browser.saveBuiltIn.mockClear();
     fake.copy.mockClear();
     fake.org = {
       hidden: ref(false),
-      sharedOrg: ref(false),
       loaded: ref(true),
       load: vi.fn(),
       show: vi.fn(),
-      loadUserCount: vi.fn(),
       hide: vi.fn(),
     };
   });
@@ -131,11 +138,11 @@ describe("StarterPackHomeSection", () => {
     fake.matchers.hosts.state.value = "matched";
     await nextTick();
     expect(has(wrapper, "home-pack-card-skeleton")).toBe(false);
-    expect(has(wrapper, "home-pack-hosts-card-best")).toBe(true);
-    expect(has(wrapper, "home-pack-card-best")).toBe(false);
+    expect(has(wrapper, "home-pack-hosts-card")).toBe(true);
+    expect(has(wrapper, "home-pack-card")).toBe(true);
   });
 
-  it("keeps the row, not the menu, while an install is still running", async () => {
+  it("keeps the card while an install is still running", async () => {
     const wrapper = await render();
     fake.flows.kubernetes.running.value = true;
     fake.flows.kubernetes.record.value = { status: "incomplete" };
@@ -143,46 +150,111 @@ describe("StarterPackHomeSection", () => {
     const home = homeOf(wrapper);
     expect(wrapper.get('[data-test="home-pack-card"]').attributes("data-status")).toBe("running");
     expect(has(wrapper, "home-pack-offer")).toBe(true);
-    expect(home.showMenu.value).toBe(false);
     expect(home.setUp.value).toEqual([]);
     fake.flows.kubernetes.record.value = { status: "complete" };
     fake.flows.kubernetes.running.value = false;
     await nextTick();
     expect(has(wrapper, "home-pack-offer")).toBe(false);
-    expect(home.showMenu.value).toBe(true);
+    expect(home.setUp.value.map((item) => item.pack.id)).toEqual(["kubernetes"]);
   });
 
-  it("shows the tiles, the matched streams and Set up <pack>, then lands on the dashboard", async () => {
-    const wrapper = await render();
-    expect(wrapper.get('[data-test="home-pack-card-row-dashboard"]').text()).toContain(
-      "1 dashboard",
+  it("shows the strip title, counts with a plain bell and the matched stream", async () => {
+    const wrapper = await render([KUBERNETES_PACK, HOSTS_PACK]);
+    const header = wrapper.get('[data-test="home-pack-offer-header"]').text();
+    expect(header).toContain("Ready-made content for your data");
+    expect(header).toContain("2 starter packs fit streams you already send");
+    expect(wrapper.get('[data-test="home-pack-card-row-dashboard"]').text()).toBe("1 dashboard");
+    expect(wrapper.get('[data-test="home-pack-card-row-alert"]').text()).toBe("2 alerts");
+    expect(wrapper.text()).not.toContain("Silent until you turn them on");
+    expect(wrapper.get('[data-test="home-pack-card-icon-alert"]').attributes("name")).toBe(
+      "notifications",
     );
-    const alerts = wrapper.get('[data-test="home-pack-card-row-alert"]').text();
-    expect(alerts).toContain("2 alerts");
-    expect(alerts).toContain("Silent until you turn them on");
-    expect(has(wrapper, "home-pack-card-row-savedView")).toBe(true);
-    expect(wrapper.get('[data-test="home-pack-card-streams"]').text()).toContain("k8s_events");
-    expect(wrapper.get('[data-test="home-pack-card-setup-btn"]').text()).toBe("Set up Kubernetes");
-    await wrapper.get('[data-test="home-pack-card-setup-btn"]').trigger("click");
-    await flushPromises();
-    expect(fake.flows.kubernetes.install).toHaveBeenCalled();
-    expect(fake.flows.kubernetes.land).toHaveBeenCalledWith();
+    expect(wrapper.get('[data-test="home-pack-card-row-savedView"]').text()).toBe("1 saved view");
+    expect(wrapper.get('[data-test="home-pack-card-streams"]').text()).toContain("Fits k8s_events");
   });
 
-  it("shows two streams and folds the rest into a +N badge with a hover list", async () => {
+  it("opens the setup popup from Set up and never installs from the card", async () => {
+    const wrapper = await render();
+    const setUp = wrapper.get('[data-test="home-pack-card-setup-btn"]');
+    expect(setUp.text()).toBe("Set up");
+    expect(has(wrapper, "home-pack-card-details-btn")).toBe(false);
+    expect(wrapper.text()).not.toContain("What gets created");
+    await setUp.trigger("click");
+    await flushPromises();
+    expect(homeOf(wrapper).items[0].drawerOpen.value).toBe(true);
+    expect(fake.flows.kubernetes.install).not.toHaveBeenCalled();
+    expect(fake.flows.kubernetes.land).not.toHaveBeenCalled();
+  });
+
+  it("keeps the old browser copy when a pack's install records fail to load", async () => {
+    fake.flows.hosts.loadFailed.value = true;
+    await render([KUBERNETES_PACK, HOSTS_PACK]);
+    expect(fake.browser.saveBuiltIn).not.toHaveBeenCalled();
+  });
+
+  it("keeps the old browser copy when a pack's match check fails", async () => {
+    fake.matchers.hosts.state.value = "error";
+    await render([KUBERNETES_PACK, HOSTS_PACK]);
+    expect(fake.browser.saveBuiltIn).not.toHaveBeenCalled();
+  });
+
+  it("saves the built-in check to the browser copy once every pack has answered", async () => {
+    fake.matchers.hosts.state.value = "checking";
+    fake.matchers.kubernetes.streams.value = ["k8s_events", "k8s_logs"];
+    const wrapper = await render([KUBERNETES_PACK, HOSTS_PACK]);
+    expect(fake.browser.saveBuiltIn).not.toHaveBeenCalled();
+    fake.matchers.hosts.state.value = "none";
+    await nextTick();
+    expect(fake.browser.saveBuiltIn).toHaveBeenCalledTimes(1);
+    const [sources, installed, interrupted] = fake.browser.saveBuiltIn.mock.calls[0];
+    expect(sources).toEqual([
+      expect.objectContaining({
+        id: "kubernetes",
+        packId: "kubernetes",
+        streams: ["k8s_events", "k8s_logs"],
+      }),
+    ]);
+    expect(sources[0].items.map((item: { kind: string }) => item.kind)).toContain("alert");
+    expect(installed).toEqual([]);
+    expect(interrupted).toBeNull();
+    wrapper.unmount();
+  });
+
+  it("lists installed packs and an interrupted install in the browser copy", async () => {
+    fake.flows.kubernetes.record = shallowRef({ status: "complete" });
+    fake.flows.hosts.interrupted.value = true;
+    fake.flows.hosts.record = shallowRef({ status: "incomplete" });
+    fake.flows.hosts.made.value = [{}];
+    fake.flows.hosts.toCreate.value = [{}, {}, {}];
+    await render([KUBERNETES_PACK, HOSTS_PACK]);
+    const [sources, installed, interrupted] = fake.browser.saveBuiltIn.mock.calls.at(-1)!;
+    expect(sources).toEqual([]);
+    expect(installed).toEqual(["kubernetes"]);
+    expect(interrupted).toEqual({ packId: "hosts", label: "Hosts", done: 1, total: 3 });
+  });
+
+  it("shows one stream and folds the rest into a +N badge with a hover list", async () => {
     fake.matchers.kubernetes.streams.value = ["a", "b", "c", "d"];
     fake.matchers.kubernetes.clusters.value = ["staging-eu-1"];
     const wrapper = await render();
     expect(wrapper.get('[data-test="home-pack-card-from"]').text()).toBe("from staging-eu-1");
-    expect(wrapper.get('[data-test="home-pack-streams-more"]').text()).toContain("+2 streams");
+    expect(wrapper.get('[data-test="home-pack-streams-more"]').text()).toContain("+3 streams");
     expect(wrapper.get('[data-test="home-pack-streams-more-list"]').text()).toContain("d");
   });
 
-  it("marks only the first offered pack as the place to start", async () => {
-    const wrapper = await render([KUBERNETES_PACK, HOSTS_PACK]);
-    expect(has(wrapper, "home-pack-card-best")).toBe(true);
-    expect(has(wrapper, "home-pack-hosts-card-best")).toBe(false);
-    expect(wrapper.get('[data-test="home-pack-hosts-card-setup-btn"]').text()).toBe("Set up Hosts");
+  it("offers a Browse starter packs card beside the packs", async () => {
+    const wrapper = await render();
+    expect(wrapper.get('[data-test="home-pack-find-other"]').text()).toContain(
+      "Find packs for other data",
+    );
+    expect(wrapper.get('[data-test="home-pack-find-other"]').text()).toContain(
+      "Nginx, PostgreSQL, AWS and more in the Starter Packs library.",
+    );
+    await wrapper.get('[data-test="home-pack-find-other-browse-btn"]').trigger("click");
+    expect(fake.push).toHaveBeenCalledWith({
+      name: "starterPacks",
+      query: { org_identifier: "org" },
+    });
   });
 
   it("shows no alerts tile and no placeholder for a pack with no alerts", async () => {
@@ -202,17 +274,12 @@ describe("StarterPackHomeSection", () => {
     expect(has(wrapper, "home-pack-card")).toBe(true);
   });
 
-  it("offers Hide for everyone to admins of orgs with two or more users only", async () => {
+  it("has no Hide button on the strip, even for an admin", async () => {
     fake.flows.kubernetes.isAdmin.value = true;
-    const solo = await render();
-    expect(fake.org.loadUserCount).toHaveBeenCalled();
-    expect(has(solo, "home-pack-card-hide-all-btn")).toBe(false);
-    fake.org.sharedOrg.value = true;
-    await nextTick();
-    expect(has(solo, "home-pack-card-hide-all-btn")).toBe(true);
-    fake.flows.kubernetes.isAdmin.value = false;
-    await nextTick();
-    expect(has(solo, "home-pack-card-hide-all-btn")).toBe(false);
+    const wrapper = await render();
+    expect(has(wrapper, "home-pack-card")).toBe(true);
+    expect(has(wrapper, "home-pack-card-hide-all-btn")).toBe(false);
+    expect(wrapper.text()).not.toContain("Hide");
   });
 
   it("shows nothing for a pack hidden for everyone, and spends nothing on its matcher", async () => {
@@ -231,18 +298,16 @@ describe("StarterPackHomeSection", () => {
     expect(fake.org.show).toHaveBeenCalled();
   });
 
-  it("drops the section once a pack is set up and hands Overview the menu and silent alerts", async () => {
+  it("drops the section once a pack is set up and hands Overview the silent alerts", async () => {
     fake.org.hidden.value = true;
     fake.flows.kubernetes.record = shallowRef({ status: "complete" });
     const wrapper = await render();
     expect(has(wrapper, "home-pack-offer")).toBe(false);
     const home = homeOf(wrapper);
-    expect(home.showMenu.value).toBe(true);
+    expect(home).not.toHaveProperty("showMenu");
     expect(home.silent.value.map((item) => item.pack.id)).toEqual(["kubernetes"]);
     fake.flows.kubernetes.remindAlerts.value = false;
     expect(home.silent.value).toEqual([]);
-    fake.menu.dismiss();
-    expect(home.showMenu.value).toBe(false);
   });
 
   it("spends nothing on the matcher for an installed or dismissed pack", async () => {
@@ -266,6 +331,7 @@ describe("StarterPackHomeSection", () => {
     expect(has(none, "home-pack-hosts-card")).toBe(true);
 
     fake.matchers.kubernetes.state.value = "error";
+    fake.matchers.hosts.state.value = "none";
     const wrapper = await render();
     await wrapper.get('[data-test="home-pack-card-retry-btn"]').trigger("click");
     expect(fake.matchers.kubernetes.retry).toHaveBeenCalled();
@@ -279,11 +345,21 @@ describe("StarterPackHomeSection", () => {
     expect(homeOf(wrapper).items[0].drawerOpen.value).toBe(true);
   });
 
-  it("swaps Set up for Copy link when the user may not create the pack", async () => {
+  it("says nothing about no match while the org has no data of its own", async () => {
+    fake.hasUserData = ref(false);
+    fake.matchers.kubernetes.state.value = "none";
+    const wrapper = await render();
+    expect(homeOf(wrapper).empty.value).toBe(false);
+    expect(has(wrapper, "home-pack-empty")).toBe(false);
+    expect(wrapper.findComponent({ name: "StarterPackFindMore" }).exists()).toBe(false);
+  });
+
+  it("swaps Set up for Ask an admin and Copy link when the user may not create the pack", async () => {
     fake.flows.kubernetes.forbidden.value = true;
     const wrapper = await render();
     expect(has(wrapper, "home-pack-card-setup-btn")).toBe(false);
-    expect(has(wrapper, "home-pack-card-copy-link-btn")).toBe(true);
+    expect(wrapper.get('[data-test="home-pack-card-ask-admin-btn"]').text()).toBe("Ask an admin");
+    expect(wrapper.get('[data-test="home-pack-card-copy-link-btn"]').text()).toBe("Copy link");
   });
 
   it("copies the pack page link from the Copy link button of a pack the user may not create", async () => {

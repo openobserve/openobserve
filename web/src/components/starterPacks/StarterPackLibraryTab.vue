@@ -281,17 +281,8 @@ const ingestionGuide = (row: LibraryRow) =>
     .push({ name: row.pack.collectorRoute ?? "ingestion", query: { org_identifier: props.org } })
     .catch(() => {});
 
-const seeIncluded = (row: LibraryRow) => {
+const setUp = (row: LibraryRow) => {
   drawerPackId.value = row.pack.id;
-};
-
-const install = async (row: LibraryRow) => {
-  const flow = flowOf(row);
-  drawerPackId.value = row.pack.id;
-  if (await flow.install()) {
-    drawerPackId.value = null;
-    await flow.land();
-  }
 };
 
 const retry = async (row: LibraryRow) => {
@@ -593,15 +584,6 @@ defineExpose({ refresh: () => load({ quiet: true }) });
               >
                 {{ t("starterPacks.libraryTabs.openPack") }}
               </OButton>
-              <OButton
-                variant="ghost-primary"
-                size="sm"
-                class="shrink-0"
-                :data-test="`library-tab-see-${row.id}`"
-                @click="seeIncluded(row)"
-              >
-                {{ t("starterPacks.libraryTabs.whatGetsCreated") }}
-              </OButton>
             </template>
             <template v-else>
               <OButton
@@ -610,20 +592,11 @@ defineExpose({ refresh: () => load({ quiet: true }) });
                 class="min-w-0"
                 :title="t('starterPacks.libraryTabs.setUpPack', { title: raw(row.title) })"
                 :data-test="`library-tab-install-${row.id}`"
-                @click="install(row)"
+                @click="setUp(row)"
               >
                 <span class="truncate">{{
                   t("starterPacks.libraryTabs.setUpPack", { title: raw(row.title) })
                 }}</span>
-              </OButton>
-              <OButton
-                variant="ghost-primary"
-                size="sm"
-                class="shrink-0"
-                :data-test="`library-tab-see-${row.id}`"
-                @click="seeIncluded(row)"
-              >
-                {{ t("starterPacks.libraryTabs.whatGetsCreated") }}
               </OButton>
             </template>
           </div>

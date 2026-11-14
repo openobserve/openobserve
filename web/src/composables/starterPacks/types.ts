@@ -140,8 +140,6 @@ export interface StarterPack {
   signals?: string[];
   /** Image path under assets, shown beside the pack title on Home. */
   logo?: string;
-  /** One-line descriptions for the Home tiles of what the pack creates. */
-  tiles?: Partial<Record<"dashboard" | "alert" | "savedView", I18nKey>>;
 }
 
 export interface PackRecordItem {

@@ -208,11 +208,11 @@ const rowStateClass = (row: { org: OrgOption; index: number }) => {
           variant="outline-primary"
           size="xs"
           data-test="navbar-organizations-select-trigger"
-          class="text-text-body! w-56 max-md:w-28 md:max-xl:w-full"
+          class="text-text-body! w-56 max-md:w-20 max-md:gap-1! max-md:ps-2! max-md:pe-1.5! md:max-xl:w-full"
           :class="open ? 'ring-focus-ring-accent ring-2 ring-inset' : ''"
         >
           <template #icon-left>
-            <OIcon name="domain" size="sm" class="shrink-0 opacity-60" />
+            <OIcon name="domain" size="sm" class="shrink-0 opacity-60 max-md:hidden" />
           </template>
           <OTruncatedText v-if="current?.label" class="flex-1 text-left">{{
             current.label

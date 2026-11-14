@@ -40,9 +40,7 @@ vi.mock("@/components/starterPacks/StarterPackHomeSection.vue", async () => {
       name: "StarterPackHomeSection",
       emits: ["ready"],
       setup(_props, { emit }) {
-        mounted(() =>
-          emit("ready", { showSection: vueRef(packs.showSection), showMenu: vueRef(false) }),
-        );
+        mounted(() => emit("ready", { showSection: vueRef(packs.showSection) }));
         return () => render("div", { "data-test": "home-pack-section-stub" });
       },
     }),
@@ -74,6 +72,15 @@ vi.mock("@/components/ingestion/FirstDataPanel.vue", async () => {
   };
 });
 vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
+const overviewData = vi.hoisted(() => ({
+  getOrgOverview: vi.fn(async () => ({
+    data: {
+      streams: { status: "ok", data: { total_streams: 9 } },
+      limits: { status: "ok", data: { used_today_gb: 1.2 } },
+    },
+  })),
+}));
+vi.mock("@/services/overview", () => ({ default: overviewData }));
 vi.mock("@/views/OverviewTab.vue", () => ({
   default: {
     name: "OverviewTab",
@@ -387,6 +394,31 @@ describe("HomeView", () => {
         expect(panelShown()).toBe(true);
       });
     }
+
+    it("shows one line of stream totals under the strip while Overview is hidden", async () => {
+      setFlag(false);
+      wrapper = mountHome();
+      await flushPromises();
+      expect(has("home-stream-totals")).toBe(false);
+      await notMonitored(true);
+      await flushPromises();
+      const line = wrapper.get('[data-test="home-stream-totals"]');
+      expect(line.get('[data-test="home-stream-totals-count"]').text()).toBe("9 streams");
+      expect(line.get('[data-test="home-stream-totals-today"]').text()).toBe("1.20 GB today");
+      const push = vi.spyOn(router, "push");
+      await line.get('[data-test="home-stream-totals-open-btn"]').trigger("click");
+      expect(push).toHaveBeenCalledWith(expect.objectContaining({ name: "logstreams" }));
+      push.mockRestore();
+    });
+
+    it("shows no stream totals when the Starter Packs section is not shown", async () => {
+      packs.showSection = false;
+      setFlag(false);
+      wrapper = mountHome();
+      await flushPromises();
+      await notMonitored(true);
+      expect(has("home-stream-totals")).toBe(false);
+    });
 
     it("keeps the Overview panel when the Starter Packs section is not shown", async () => {
       packs.showSection = false;

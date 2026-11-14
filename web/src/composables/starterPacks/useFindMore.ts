@@ -25,6 +25,7 @@ import type { AlertLibraryEntry } from "@/types/alertLibrary";
 import {
   DISMISSED_KEY,
   LAST_CHECK_KEY,
+  NO_DISMISSALS,
   groupFindMore,
   itemKey,
   libraryPack,
@@ -38,9 +39,12 @@ import {
 import { STARTER_PACKS } from "./kubernetesPack";
 import { matchAlerts, matchPack, readOrgStreams } from "./packMatchData";
 import type { StarterPack } from "./types";
+import { useBrowserMatches } from "./useBrowserMatches";
 import { useInstallRecords } from "./useInstallRecords";
 import { useStarterPacks } from "./useStarterPacks";
 import { queriesPerDay } from "./wouldFire";
+
+const REFUSED = [401, 403];
 
 /** What an Add made, kept so its Undo removes exactly that. */
 export interface FindMoreAdded {
@@ -78,6 +82,13 @@ export function useFindMoreCheck(org: string) {
   // Only a missing key reads as none; any other failure must not let a write wipe the list.
   const readDismissals = async () =>
     parseDismissals(await readQuery(kvValueQuery(org, DISMISSED_KEY), true));
+
+  // A user refused the org list still gets a check; writes keep using the strict read above.
+  const readDismissalsForCheck = () =>
+    readDismissals().catch((error) => {
+      if (REFUSED.includes(error?.response?.status)) return NO_DISMISSALS;
+      throw error;
+    });
   const readLast = async () => parseResult(await readKv(org, LAST_CHECK_KEY));
 
   const writeLast = (result: FindMoreResult) =>
@@ -121,7 +132,7 @@ export function useFindMoreCheck(org: string) {
     const [streams, manifest, dismissals] = await Promise.all([
       readOrgStreams(org),
       loadManifest(),
-      readDismissals(),
+      readDismissalsForCheck(),
     ]);
     const library = { loadManifest, loadAlertFile };
     const packAlerts = new Set(STARTER_PACKS.flatMap((pack) => pack.alerts));
@@ -171,6 +182,7 @@ export function useFindMore(org: string) {
   const runner = useFindMoreCheck(org);
   const installer = useStarterPacks(org);
   const { loadManifest } = useAlertLibrary();
+  const browser = useBrowserMatches(org);
   const result = ref<FindMoreResult | null>(null);
   const state = ref<"idle" | "checking" | "ready" | "error">("idle");
   const added = ref<FindMoreAdded[]>([]);
@@ -246,7 +258,10 @@ export function useFindMore(org: string) {
       const { done, complete } = await install(await packFor(source), source);
       added.value = [...added.value, done];
       // An incomplete install keeps the source listed; Undo still covers what was made.
-      if (complete) dropSource(source.id);
+      if (complete) {
+        dropSource(source.id);
+        browser.markInstalled(source.id, source.packId);
+      }
       return complete;
     } catch {
       return false;

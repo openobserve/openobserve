@@ -19,6 +19,7 @@ import { computed, useTemplateRef } from "vue";
 import { useStore } from "vuex";
 import StarterPackFindMore from "@/components/starterPacks/StarterPackFindMore.vue";
 import StarterPackLibraryTab from "@/components/starterPacks/StarterPackLibraryTab.vue";
+import StarterPackMatchCheck from "@/components/starterPacks/StarterPackMatchCheck.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { useI18nTyped } from "@/types/i18n";
 
@@ -26,7 +27,7 @@ const { t } = useI18nTyped();
 const store = useStore();
 const org = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
 const list = useTemplateRef<InstanceType<typeof StarterPackLibraryTab>>("list");
-// Find more can add pack items, so the list re-reads what is installed.
+// Find more and the match check can change what is installed, so the list re-reads it.
 const refreshList = () => void list.value?.refresh();
 </script>
 
@@ -35,11 +36,12 @@ const refreshList = () => void list.value?.refresh();
     bleed
     :title="t('menu.starterPacks')"
     :subtitle="t('starterPacks.libraryTabs.subtitle')"
-    icon="inventory-2"
+    icon="package-2"
     title-data-test="starter-packs-title"
     data-test="starter-packs-page"
   >
     <template #actions>
+      <StarterPackMatchCheck v-if="org" :key="org" :org="org" @checked="refreshList" />
       <StarterPackFindMore :key="org" :org="org" daily-toggle @changed="refreshList" />
     </template>
     <StarterPackLibraryTab v-if="org" ref="list" :key="org" :org="org" />
