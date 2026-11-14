@@ -28518,7 +28518,7 @@
   },
   "slackApp": {
     "prereq": {
-      "title": "ステップ 0 · サーバーの前提条件",
+      "title": "ステップ 1 · サーバーの前提条件",
       "subtitle": "Slack の設定前にこのサーバーでチェックされます",
       "columnSetting": "設定項目",
       "columnResult": "結果",
@@ -28589,7 +28589,7 @@
       "back": "戻る",
       "finish": "完了",
       "connection": {
-        "title": "ステップ 1 · 接続",
+        "title": "ステップ 2 · 接続",
         "description": "このチェックは、本番と同じコードパスでこのサーバーから Slack に到達します。",
         "allPassed": "このサーバーから Slack に到達できます",
         "someFailed": "このサーバーから Slack に到達できません。プロキシまたはファイアウォールで *.slack.com を許可してから、再チェックしてください。",
@@ -28598,7 +28598,7 @@
         "socketHost": "WebSocket ホスト {host}"
       },
       "create": {
-        "title": "ステップ 2 · アプリを作成",
+        "title": "ステップ 3 · アプリを作成",
         "modeLabel": "接続モード",
         "socket": "Socket Mode",
         "socketDescription": "推奨。OpenObserve が接続を開くため、Slack 側に公開 URL は不要です",
@@ -28627,7 +28627,7 @@
         "signingSecretRequired": "HTTPモードには署名シークレットが必要です"
       },
       "install": {
-        "title": "ステップ3 · インストール",
+        "title": "ステップ4 · インストール",
         "created": "アプリを作成しました · {appId}",
         "allowHint": "Slackのインストール画面が開きます。そこで「許可する」をクリックしてください。ボットトークンはSlackから自動的に返されるため、コピーする必要はありません。",
         "allow": "Slackで許可する",
@@ -28650,7 +28650,7 @@
         "appNotCreatedByO2": "このアプリはOpenObserveが作成したものではないため、Slackに残ります。不要になった場合はSlackで削除してください。"
       },
       "test": {
-        "title": "ステップ4 · テストとリンク",
+        "title": "ステップ5 · テストとリンク",
         "run": "チェックを実行",
         "signIn": "「Sign in with Slack」をテストする",
         "signInPassed": "「Sign in with Slack」は正常に動作します",

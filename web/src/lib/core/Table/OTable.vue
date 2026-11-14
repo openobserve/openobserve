@@ -12,6 +12,7 @@ import {
   readonly,
   ref,
   shallowRef,
+  useAttrs,
   watch,
   watchEffect,
 } from "vue";
@@ -71,6 +72,8 @@ import { TABLE_FORBIDDEN_STATE_KEY } from "./tableForbiddenState";
 import OTableLoading from "./sub-components/OTableLoading.vue";
 import OTableError from "./sub-components/OTableError.vue";
 import OTableOverflowTooltip from "./sub-components/OTableOverflowTooltip.vue";
+import OTableRowActions from "./sub-components/OTableRowActions.vue";
+import ONameLinkCell from "./cells/ONameLinkCell.vue";
 import { PIVOT_TABLE_TOTAL_COLUMN_WIDTH } from "@/utils/dashboard/constants";
 import { injectContextMenuRootContext } from "reka-ui";
 import { useDelayedFlag } from "@/composables/shared/useDelayedFlag";
@@ -176,6 +179,21 @@ const isRowClickable = computed(() => {
 // If we forward an empty slot for every column, OTableBodyCell sees $slots.default as truthy
 // and renders the (empty) slot instead of falling through to the plain-text {{ displayValue }}.
 const cellSlotColumns = computed(() => props.columns.filter((col) => slots[`cell-${col.id}`]));
+
+// A page's own cell slot wins over `rowActions` and `meta.link`, so a table can move one column at a time.
+const rowActionsColumnId = computed<string | undefined>(() => {
+  if (!props.rowActions) return undefined;
+  const col = props.columns.find((c) => c.isAction === true || c.id === "actions");
+  return col && !slots[`cell-${col.id}`] ? col.id : undefined;
+});
+const linkColumns = computed(() =>
+  props.columns.filter((col) => col.meta?.link && !slots[`cell-${col.id}`]),
+);
+const attrs = useAttrs();
+const nameLinkDataTest = computed(() => `${attrs["data-test"] ?? "o2-table"}-name-link`);
+function linkCellText(col: OTableColumnDef<TData>, value: unknown, row: TData): unknown {
+  return col.meta?.format ? col.meta.format(value, row) : value;
+}
 
 // ── Refs for virtual scroll & keyboard ──────────────────────────
 const scrollContainerRef = ref<HTMLElement | null>(null);
@@ -627,6 +645,9 @@ const {
     get keepPageOnDataChange() {
       return props.keepPageOnDataChange;
     },
+    get rowActions() {
+      return props.rowActions;
+    },
   },
   emit,
 );
@@ -1023,11 +1044,15 @@ const measuredColumnSizeVars = ref<Record<string, string>>({});
 // vertical scrollbar (clientWidth excludes it) and any sub-pixel rounding, so
 // the table fills with no gap AND no 1-10px overflow scrollbar.
 const measuredFlexFill = ref<Record<string, number>>({});
+// Rendered fixed columns can be wider than their nominal sizes, so only the
+// measurement knows when the minimums no longer fit.
+const measuredFillOverflow = ref(false);
 
 function measureFlexFill() {
   const root = scrollContainerRef.value;
   if (!root || frozen.value || !flexColIds.value.length) {
     if (Object.keys(measuredFlexFill.value).length) measuredFlexFill.value = {};
+    measuredFillOverflow.value = false;
     return;
   }
   const cw = root.clientWidth;
@@ -1042,12 +1067,8 @@ function measureFlexFill() {
   // Floor the leftover so the flex column can NEVER be a sub-pixel wider than the
   // exact remaining space — that rounding is what shows as a 1-2px scrollbar.
   const available = Math.max(0, Math.floor(cw - nonFlexSum));
-  const per = Math.max(Math.floor(available / ids.length), 0);
-  const next: Record<string, number> = {};
-  ids.forEach((id, i) => {
-    const w = i === ids.length - 1 ? available - per * (ids.length - 1) : per;
-    next[id] = Math.max(w, colMinSize(id));
-  });
+  const next = splitFill(available, ids);
+  measuredFillOverflow.value = ids.reduce((a, id) => a + next[id], 0) > available + 1;
   const cur = measuredFlexFill.value;
   const changed = Object.keys(cur).length !== ids.length || ids.some((id) => cur[id] !== next[id]);
   if (changed) measuredFlexFill.value = next;
@@ -1149,10 +1170,10 @@ const allowHorizontalScroll = computed(() => {
     if (frozen.value) return realSum() > containerWidth.value + 1;
     // Fill → scroll once the columns can't fit even at their min widths
     // (table-fixed otherwise grows past 100% and the overflow is clipped).
-    return fillMinSum() > containerWidth.value + 1;
+    return measuredFillOverflow.value || fillFloorSum() > containerWidth.value + 1;
   }
   // Past the columns' min widths the table grows anyway, clipping trailing columns out of reach.
-  return fillMinSum() > containerWidth.value + 1;
+  return fillFloorSum() > containerWidth.value + 1;
 });
 
 const SPACER_ID = "__spacer__";
@@ -1237,6 +1258,16 @@ function fillMinSum(): number {
   return nonFlexFixedSum() + flexColIds.value.reduce((a, id) => a + colMinSize(id), 0);
 }
 
+// With row actions an elastic filler counts at its floor: past it the table scrolls instead of crushing it.
+function fillFloorSum(): number {
+  if (!props.rowActions) return fillMinSum();
+  const elastic = table
+    .getVisibleLeafColumns()
+    .filter((c) => (c.columnDef.meta as any)?.autoWidth)
+    .reduce((a, c) => a + colMinSize(c.id), 0);
+  return fillMinSum() + elastic;
+}
+
 // CSS size-var overrides:
 //  • Fill state → each flex column = its (measured) fill width; spacer = 0.
 //  • Frozen state → each flex column = its frozen width; spacer = the leftover.
@@ -1270,19 +1301,29 @@ const dynamicSizeVars = computed<Record<string, string>>(() => {
 // Drives both the fill-state CSS var and the freeze.
 function fillWidths(): Record<string, number> {
   const ids = flexColIds.value;
+  if (!ids.length || containerWidth.value <= 0) return {};
+  return splitFill(containerWidth.value - nonFlexFixedSum(), ids);
+}
+
+// Equal shares, except a column whose minimum is larger keeps it and the rest share what is left,
+// so the widths never add up past `available` while the minimums fit.
+function splitFill(available: number, ids: string[]): Record<string, number> {
   const out: Record<string, number> = {};
-  if (!ids.length || containerWidth.value <= 0) return out;
-  const mins = ids.map(colMinSize);
-  const minTotal = mins.reduce((a, b) => a + b, 0);
-  const available = containerWidth.value - nonFlexFixedSum();
-  if (available <= minTotal) {
-    ids.forEach((id, i) => (out[id] = mins[i]));
-    return out;
+  let open = [...ids];
+  let left = available;
+  for (;;) {
+    const per = Math.floor(left / Math.max(open.length, 1));
+    const held = open.filter((id) => colMinSize(id) > per);
+    if (!held.length) break;
+    for (const id of held) {
+      out[id] = colMinSize(id);
+      left -= out[id];
+    }
+    open = open.filter((id) => !held.includes(id));
   }
-  const extra = available - minTotal;
-  const per = Math.floor(extra / ids.length);
-  ids.forEach((id, i) => {
-    out[id] = mins[i] + (i === ids.length - 1 ? extra - per * (ids.length - 1) : per);
+  const per = open.length ? Math.floor(left / open.length) : 0;
+  open.forEach((id, i) => {
+    out[id] = i === open.length - 1 ? left - per * (open.length - 1) : per;
   });
   return out;
 }
@@ -1338,7 +1379,7 @@ const minTableWidth = computed<string | undefined>(() => {
     return sum > 0 ? `${sum}px` : undefined;
   }
   if (useComputedWidth.value || containerWidth.value <= 0) return undefined;
-  if (fillMinSum() <= containerWidth.value + 1) return undefined;
+  if (fillFloorSum() <= containerWidth.value + 1) return undefined;
   // table-fixed hands a filler column 0px once the fixed columns alone overflow.
   const fillers = cols
     .filter((c) => (c.columnDef.meta as any)?.flex || (c.columnDef.meta as any)?.autoWidth)
@@ -1850,6 +1891,33 @@ defineExpose({
                 :column="slotProps.column"
                 :index="slotProps.index"
               />
+            </template>
+            <template v-if="rowActionsColumnId" #[`cell-${rowActionsColumnId}`]="slotProps">
+              <slot
+                v-if="slots['row-actions'] && (props.rowActionsSlot?.(slotProps.row) ?? true)"
+                name="row-actions"
+                :row="slotProps.row"
+                :index="slotProps.index"
+              />
+              <OTableRowActions
+                v-else
+                :actions="props.rowActions ?? []"
+                :row="slotProps.row"
+                :index="slotProps.index"
+                :more-data-test="props.rowActionsMoreDataTest"
+              />
+            </template>
+            <template
+              v-for="col in linkColumns"
+              :key="`link-${col.id}`"
+              #[`cell-${col.id}`]="slotProps"
+            >
+              <ONameLinkCell
+                :to="col.meta?.link?.(slotProps.row)"
+                :data-test="col.meta?.link?.(slotProps.row) ? nameLinkDataTest : undefined"
+              >
+                {{ linkCellText(col, slotProps.value, slotProps.row) }}
+              </ONameLinkCell>
             </template>
 
             <!-- Expansion slot -->

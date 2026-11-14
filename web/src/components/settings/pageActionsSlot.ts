@@ -13,13 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-export interface SettingRowPairProps {
-  dataTest?: string;
-}
-
-export interface SettingRowPairSlots {
-  /** Exactly two OSettingRow. */
-  default?: () => unknown;
-  /** Full-width content under both cells — a cross-field validation message. */
-  footer?: () => unknown;
-}
+/** The Settings shell's header action area; a page without its own header teleports its buttons into it. */
+export const PAGE_ACTIONS_SLOT_ID = "settings-page-actions-slot";
+export const PAGE_ACTIONS_SLOT = `#${PAGE_ACTIONS_SLOT_ID}`;

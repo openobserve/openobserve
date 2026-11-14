@@ -20,23 +20,27 @@ import { useMutation, useQuery } from "@tanstack/vue-query";
 import { useStore } from "vuex";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OCard from "@/lib/core/Card/OCard.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OFormSection from "@/lib/core/FormSection/OFormSection.vue";
+import OSettingRow from "@/lib/core/SettingRow/OSettingRow.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OForm from "@/lib/forms/Form/OForm.vue";
-import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import { useFormCounts } from "@/lib/forms/SaveBar/formCounts";
+import { useOForm } from "@/lib/forms/Form/useOForm";
+import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
 import OFormTagInput from "@/lib/forms/TagInput/OFormTagInput.vue";
 import {
   linkAllMutation,
   slackLinkingQuery,
   updateLinkingMutation,
 } from "@/services/slack.queries";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import type { InstallationView } from "@/types/slack";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import SlackLinkedPeople from "./SlackLinkedPeople.vue";
 import { useSlackReadOnly } from "./slackReadOnly";
+import { useSavedBaseline, useSlackSavePart } from "./slackSaveBar";
 import { makeLinkingSchema, type LinkingForm } from "./SlackSettings.schema";
 
 const props = defineProps<{ installation: InstallationView }>();
@@ -53,9 +57,7 @@ const linking = useQuery(() => slackLinkingQuery(org.value, id.value));
 const update = useMutation(() => updateLinkingMutation(org.value, id.value));
 const linkAll = useMutation(() => linkAllMutation(org.value, id.value));
 
-const editing = ref(false);
 const peopleOpen = ref(false);
-const schema = makeLinkingSchema(t);
 
 const view = computed(() => linking.data.value ?? null);
 const domainsText = computed(() => (view.value?.domains ?? []).join(", "));
@@ -63,7 +65,7 @@ const summary = computed(() => {
   const current = view.value;
   if (!current) return "";
   if (!current.enabled) return t("slackApp.linking.offSummary");
-  // Typed-in domains are one Edit domains click away; only a mapping's domains need saying, since they cannot be edited here.
+  // Only a mapping's domains need saying: the typed-in ones are in the row below.
   return current.source === "mapping"
     ? t("slackApp.linking.mappedSummary", { domains: domainsText.value })
     : "";
@@ -80,19 +82,47 @@ const formDefaults = computed<LinkingForm>(() => ({
   domains: [...((mapped.value ? view.value?.manual_domains : view.value?.domains) ?? [])],
 }));
 
-// Under a mapping the view's domains are the mapping's, so the toggle must not write them as the manual list.
-const toggle = (value: unknown): void => {
-  const enabled = value === true;
-  const current = view.value;
-  if (!current) return;
-  update.mutate(current.source === "mapping" ? { enabled } : { enabled, domains: current.domains });
-};
+const sameDomains = (a: string[], b: string[]): boolean =>
+  a.length === b.length && a.every((domain, index) => domain === b[index]);
 
-const saveDomains = async (value: LinkingForm): Promise<void> => {
-  await update.mutateAsync({ enabled: value.enabled, domains: value.domains });
-  editing.value = false;
+const save = async (value: LinkingForm): Promise<void> => {
+  const domainsChanged = !sameDomains(value.domains, baseline.baseline.value.domains);
+  // Under a mapping an untouched manual list is not written back, so the switch alone sends only itself.
+  const body =
+    mapped.value && !domainsChanged
+      ? { enabled: value.enabled }
+      : { enabled: value.enabled, domains: value.domains };
+  await baseline.save(() => update.mutateAsync(body));
   toast({ variant: "success", message: t("slackApp.linking.saved") });
 };
+
+const form = useOForm<LinkingForm>({
+  defaultValues: formDefaults.value,
+  schema: makeLinkingSchema(t),
+  validateOn: "leave",
+  onSubmit: save,
+});
+const values = form.useStore((s) => s.values);
+const baseline = useSavedBaseline(form, values, () => formDefaults.value);
+const { errors } = useFormCounts(form);
+const changes = computed(() => {
+  if (!view.value || managed.value) return 0;
+  return baseline.changed.value.length;
+});
+
+useSlackSavePart({
+  changes: () => changes.value,
+  errors: () => errors.value,
+  save: async () => {
+    try {
+      await form.handleSubmit();
+    } catch {
+      return false;
+    }
+    return form.state.isValid && changes.value === 0;
+  },
+  discard: baseline.discard,
+});
 
 const runLinkAll = async (): Promise<void> => {
   try {
@@ -110,18 +140,16 @@ const runLinkAll = async (): Promise<void> => {
 </script>
 
 <template>
-  <section class="flex flex-col gap-3" data-test="slack-linking">
-    <div class="flex flex-wrap items-start justify-between gap-3">
-      <div class="flex flex-col gap-0.5">
-        <h2 class="text-text-heading m-0 text-lg font-semibold">
-          {{ t("slackApp.linking.title") }}
-        </h2>
-        <p v-if="managed" class="text-text-secondary m-0 text-sm">
-          {{ t("slackApp.linking.setByInstanceAdmin") }}
-        </p>
-      </div>
+  <OFormSection
+    variant="plain"
+    :title="t('slackApp.linking.title')"
+    :description="
+      managed ? t('slackApp.linking.setByInstanceAdmin') : t('slackApp.linking.removedUsers')
+    "
+    data-test="slack-linking"
+  >
+    <template v-if="!managed" #actions>
       <OButton
-        v-if="!managed"
         variant="outline"
         size="sm-action"
         icon-left="manage-accounts"
@@ -130,7 +158,7 @@ const runLinkAll = async (): Promise<void> => {
       >
         {{ t("slackApp.linking.manage") }}
       </OButton>
-    </div>
+    </template>
 
     <OSkeleton v-if="linking.isPending.value" class="h-32 w-full" />
     <OEmptyState
@@ -141,123 +169,92 @@ const runLinkAll = async (): Promise<void> => {
       data-test="slack-linking-error"
       @action="linking.refetch()"
     />
-    <OCard v-else-if="view" variant="outlined" class="divide-border-default divide-y">
-      <div class="flex flex-col gap-3 p-4">
-        <div class="flex flex-wrap items-center justify-between gap-3">
-          <div class="flex min-w-0 flex-col gap-0.5">
-            <span class="text-text-heading text-sm font-medium">
-              {{ t("slackApp.linking.auto") }}
-            </span>
+    <OForm v-else-if="view" :form="form" novalidate data-test="slack-linking-form">
+      <OSettingRow
+        control-at="end"
+        :label="t('slackApp.linking.auto')"
+        data-test="slack-linking-auto"
+      >
+        <template #description>
+          <span v-if="managed" data-test="slack-linking-counts">
+            {{
+              t("slackApp.linking.managedCounts", {
+                linked: autoCount + view.counts.oidc,
+                auto: autoCount,
+                manual: view.counts.oidc,
+              })
+            }}
+          </span>
+          <template v-else>
             <span
-              v-if="managed"
-              class="text-text-secondary text-sm"
-              data-test="slack-linking-counts"
+              v-if="noDomains"
+              class="text-status-warning-text block"
+              data-test="slack-linking-no-domains"
             >
-              {{
-                t("slackApp.linking.managedCounts", {
-                  linked: autoCount + view.counts.oidc,
-                  auto: autoCount,
-                  manual: view.counts.oidc,
-                })
-              }}
+              {{ t("slackApp.linking.noDomains") }}
+              <template v-if="view.counts.skipped_domain > 0">
+                ·
+                {{
+                  t(
+                    "slackApp.linking.skippedDomain",
+                    { count: view.counts.skipped_domain },
+                    view.counts.skipped_domain,
+                  )
+                }}
+              </template>
             </span>
-            <template v-else>
-              <span
-                v-if="noDomains"
-                class="text-status-warning-text text-sm"
-                data-test="slack-linking-no-domains"
-              >
-                {{ t("slackApp.linking.noDomains") }}
-                <template v-if="view.counts.skipped_domain > 0">
-                  ·
-                  {{
-                    t(
-                      "slackApp.linking.skippedDomain",
-                      { count: view.counts.skipped_domain },
-                      view.counts.skipped_domain,
-                    )
-                  }}
-                </template>
-              </span>
-              <span
-                v-else-if="summary"
-                class="text-text-secondary text-sm"
-                data-test="slack-linking-summary"
-              >
-                {{ summary }}
-              </span>
-              <span class="text-text-secondary text-xs" data-test="slack-linking-counts">
-                {{ t("slackApp.linking.counts", { auto: autoCount, oidc: view.counts.oidc }) }}
-              </span>
-            </template>
-          </div>
-          <div class="flex items-center gap-2">
-            <OButton
-              v-if="!editing && !managed"
-              variant="outline"
-              size="sm"
-              icon-left="edit"
-              :disabled="readOnly"
-              data-test="slack-linking-edit"
-              @click="editing = true"
-            >
-              {{ t("slackApp.linking.editDomains") }}
-              <OTooltip
-                v-if="readOnly"
-                side="bottom"
-                :content="t('slackApp.connect.permissionHint')"
-              />
-            </OButton>
-            <OSwitch
-              :model-value="view.enabled"
-              :label="view.enabled ? t('slackApp.linking.on') : t('slackApp.linking.off')"
-              label-position="left"
-              :disabled="managed || readOnly || update.isPending.value"
-              data-test="slack-linking-switch"
-              @update:model-value="toggle"
-            />
-          </div>
-        </div>
-        <p v-if="view.source === 'mapping' && !managed" class="text-text-secondary m-0 text-xs">
-          {{ t("slackApp.linking.mappedReadonly") }}
-        </p>
-        <OForm
-          v-if="editing && !managed"
-          :schema="schema"
-          :default-values="formDefaults"
-          class="flex flex-col gap-3"
-          data-test="slack-linking-form"
-          @submit="saveDomains"
-        >
-          <div class="flex flex-col gap-1">
-            <span class="text-text-label text-compact font-medium">{{
-              mapped ? t("slackApp.linking.manualForUnmapped") : t("slackApp.linking.domains")
-            }}</span>
-            <OFormTagInput name="domains" data-test="slack-linking-domains" />
-          </div>
-          <p class="text-text-secondary m-0 text-xs">{{ t("slackApp.linking.domainsHelp") }}</p>
-          <div class="flex gap-2">
-            <OButton variant="outline" size="sm-action" @click="editing = false">
-              {{ t("common.cancel") }}
-            </OButton>
-            <OButton variant="primary" size="sm-action" type="submit">
-              {{ t("common.save") }}
-            </OButton>
-          </div>
-        </OForm>
-      </div>
+            <span v-else-if="summary" class="block" data-test="slack-linking-summary">
+              {{ summary }}
+            </span>
+            <span class="block" data-test="slack-linking-counts">
+              {{ t("slackApp.linking.counts", { auto: autoCount, oidc: view.counts.oidc }) }}
+            </span>
+          </template>
+        </template>
+        <span data-test="slack-linking-switch">
+          <OFormSwitch
+            name="enabled"
+            off-tone="neutral"
+            state-text
+            :disabled="managed || readOnly"
+            :aria-label="t('slackApp.linking.auto')"
+          />
+          <OTooltip v-if="readOnly" side="bottom" :content="t('slackApp.connect.permissionHint')" />
+        </span>
+      </OSettingRow>
 
-      <div
+      <OSettingRow
+        v-if="!managed"
+        control-at="end"
+        :label="mapped ? t('slackApp.linking.manualForUnmapped') : t('slackApp.linking.domains')"
+        data-test="slack-linking-domains-row"
+      >
+        <template #description>
+          {{ t("slackApp.linking.domainsHelp") }}
+          <span v-if="mapped" class="block">{{ t("slackApp.linking.mappedReadonly") }}</span>
+        </template>
+        <OFormTagInput
+          v-if="!readOnly"
+          name="domains"
+          class="w-full"
+          :aria-label="
+            mapped ? t('slackApp.linking.manualForUnmapped') : t('slackApp.linking.domains')
+          "
+          data-test="slack-linking-domains"
+        />
+        <span v-else class="text-text-body text-sm" data-test="slack-linking-domains-readonly">
+          {{ raw(baseline.baseline.value.domains.join(", ") || "—") }}
+          <OTooltip side="bottom" :content="t('slackApp.connect.permissionHint')" />
+        </span>
+      </OSettingRow>
+
+      <OSettingRow
         v-if="matches > 0"
-        class="flex flex-wrap items-center justify-between gap-3 p-4"
+        control-at="end"
+        :label="t('slackApp.linking.matches', { count: matches }, matches)"
+        :description="t('slackApp.linking.matchesHelp')"
         data-test="slack-linking-matches"
       >
-        <div class="flex min-w-0 flex-col gap-0.5">
-          <span class="text-text-heading text-sm font-medium">
-            {{ t("slackApp.linking.matches", { count: matches }, matches) }}
-          </span>
-          <span class="text-text-secondary text-xs">{{ t("slackApp.linking.matchesHelp") }}</span>
-        </div>
         <OButton
           variant="outline"
           size="sm-action"
@@ -268,16 +265,13 @@ const runLinkAll = async (): Promise<void> => {
         >
           {{ t("slackApp.linking.linkAllMatches", { count: matches }) }}
         </OButton>
-      </div>
+      </OSettingRow>
 
-      <div class="flex flex-wrap items-center justify-between gap-3 p-4">
-        <span class="text-text-heading text-sm font-medium">
-          {{ t("slackApp.linking.appHome") }}
-        </span>
+      <OSettingRow control-at="end" :label="t('slackApp.linking.appHome')">
         <OTag variant="success-soft" :label="t('slackApp.linking.enabled')" />
-      </div>
-    </OCard>
+      </OSettingRow>
+    </OForm>
 
     <SlackLinkedPeople v-model:open="peopleOpen" :installation-id="installation.id" />
-  </section>
+  </OFormSection>
 </template>

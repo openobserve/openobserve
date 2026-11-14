@@ -4,6 +4,8 @@ import type { I18nText } from "@/types/i18n";
 import type { ForbiddenState } from "@/utils/featureGate";
 
 import type { Component, ComputedRef, InjectionKey, Ref } from "vue";
+import type { RouteLocationRaw } from "vue-router";
+import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import type { Row, Table } from "@tanstack/vue-table";
 import type { StatTone } from "@/lib/data/StatStrip/OStatStrip.types";
 import type { TooltipSide } from "@/lib/overlay/Tooltip/OTooltip.types";
@@ -213,8 +215,51 @@ export interface OTableColumnMeta {
   cellOverflowTooltip?: boolean;
   /** Show the per-column "format this column" icon (requires `enableColumnFormat` on OTable) */
   formattable?: boolean;
+  /** Buttons the actions column is sized for. Ignored when the table has `rowActions`. */
+  actionCount?: number;
+  /** Renders the cell as a link that opens the item. Return undefined for a row that cannot be opened. */
+  link?: (row: any) => RouteLocationRaw | (() => void) | undefined;
   /** Arbitrary metadata for custom cell renderers */
   [key: string]: any;
+}
+
+// ── Row actions ──────────────────────────────────────────────────
+
+/** A value, or one read from the row. */
+export type OTableRowValue<T, TData = any> = T | ((row: TData) => T);
+
+export type OTableRowActionTone = "destructive" | "success";
+
+/** `"more"` is the menu trigger, asked when the action sits inside the menu. */
+export type OTableRowActionPlacement = "inline" | "menu" | "more";
+
+export interface OTableRowActionMark {
+  /** Names the marked part: the button tooltip, the menu dot tooltip, or the menu trigger. */
+  label?: I18nText;
+  dataTest?: string;
+}
+
+export interface OTableRowAction<TData = any> {
+  /** "edit" and "delete" are placed first and last; any other id is the item's own action. */
+  id: string;
+  label: OTableRowValue<I18nText, TData>;
+  icon: OTableRowValue<IconName, TData>;
+  onSelect: (row: TData) => void;
+  visible?: (row: TData) => boolean;
+  /** `true`, or the reason shown in the tooltip. */
+  disabled?: (row: TData) => boolean | I18nText;
+  /** Keeps this action inline when more than three exist. At most two are honoured. */
+  inline?: boolean;
+  /** Colour of the button. `id: "delete"` is destructive without it. */
+  tone?: OTableRowValue<OTableRowActionTone | undefined, TData>;
+  /** Row shortcut this action answers (`data-row-action`), also from inside the menu. Defaults to `id`. */
+  shortcut?: OTableRowValue<string, TData>;
+  /** A spinner replaces the button while true; the mark names it. */
+  loading?: (row: TData) => boolean | OTableRowActionMark;
+  /** A dot on the action, for example a kept unsaved copy. */
+  badge?: (row: TData, placement: OTableRowActionPlacement) => boolean | OTableRowActionMark;
+  /** Full data-test for the inline button; the menu item appends "-menu". */
+  dataTest?: (row: TData, index: number) => string;
 }
 
 export interface OTableColumnDef<TData = any> {
@@ -304,6 +349,12 @@ export interface OTableProps<TData = any> {
   data: TData[];
   /** Column definitions */
   columns: OTableColumnDef<TData>[];
+  /** Row actions the table draws in its actions column; a `#cell-<actions column id>` slot wins. */
+  rowActions?: OTableRowAction<TData>[];
+  /** data-test of the row's "more actions" trigger. Default `o2-table-row-more-actions`. */
+  rowActionsMoreDataTest?: string | ((row: TData, index: number) => string);
+  /** Rows whose actions are drawn by the `#row-actions` slot. With the slot and no prop: every row. */
+  rowActionsSlot?: (row: TData) => boolean;
 
   // ── Pagination ──
   pagination?: OTablePaginationMode;
@@ -677,6 +728,8 @@ export interface OTableSlots<TData = any> {
     value: any;
     active?: boolean;
   }) => any;
+  /** Replaces the `rowActions` buttons on the rows `rowActionsSlot` names. */
+  "row-actions"?: (props: { row: TData; index: number }) => any;
   /** Inline actions right of the built-in copy button (requires `enable-cell-copy`). */
   "copy-actions"?: (props: { columnId: string; row: TData; value: any }) => any;
   /** Per-column cell slot (`#cell-<columnId>`) — scoped to the plain row data

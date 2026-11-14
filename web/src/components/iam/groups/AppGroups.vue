@@ -57,6 +57,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data="rows"
           :columns="columns"
           row-key="group_name"
+          :row-actions="rowActions"
+          row-actions-more-data-test="iam-groups-row-more-actions"
           :loading="loading"
           :forbidden="forbidden"
           forbidden-resource="groups"
@@ -116,62 +118,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 {{ t("iam.groupsPage.assignBtn") }}
               </OButton>
-            </div>
-          </template>
-          <template #cell-actions="{ row }">
-            <div class="flex items-center justify-center">
-              <OButton
-                :data-test="`iam-groups-edit-${row.group_name}-role-icon`"
-                data-row-action="edit"
-                variant="ghost"
-                size="icon-sm"
-                class="max-md:hidden"
-                :title="t('common.edit')"
-                @click="editGroup(row)"
-              >
-                <OIcon name="edit" size="sm" />
-              </OButton>
-              <OButton
-                :data-test="`iam-groups-delete-${row.group_name}-role-icon`"
-                data-row-action="delete"
-                variant="ghost"
-                size="icon-sm"
-                class="max-md:hidden"
-                :title="t('common.delete')"
-                @click="showConfirmDialog(row)"
-              >
-                <OIcon name="delete" size="sm" />
-              </OButton>
-              <ODropdown side="bottom" align="end">
-                <template #trigger>
-                  <OButton
-                    :aria-label="t('common.moreActions')"
-                    icon-left="more-vert"
-                    variant="ghost"
-                    size="icon-xs-sq"
-                    class="md:hidden"
-                    data-test="iam-groups-row-more-actions"
-                    @click.stop
-                  />
-                </template>
-                <ODropdownItem
-                  icon-left="edit"
-                  class="md:hidden"
-                  :data-test="`iam-groups-edit-${row.group_name}-role-icon-menu`"
-                  @select="editGroup(row)"
-                >
-                  <span>{{ t("common.edit") }}</span>
-                </ODropdownItem>
-                <ODropdownItem
-                  icon-left="delete"
-                  variant="destructive"
-                  class="md:hidden"
-                  :data-test="`iam-groups-delete-${row.group_name}-role-icon-menu`"
-                  @select="showConfirmDialog(row)"
-                >
-                  <span>{{ t("common.delete") }}</span>
-                </ODropdownItem>
-              </ODropdown>
             </div>
           </template>
           <template #empty>
@@ -236,11 +182,9 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
-import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
-import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
-import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import type { OTableColumnDef, OTableRowAction } from "@/lib/core/Table/OTable.types";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { cloneDeep } from "lodash-es";
@@ -251,7 +195,6 @@ import users from "@/services/users";
 import usePermissions from "@/composables/iam/usePermissions";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { useReo } from "@/services/reodotdev_analytics";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -391,7 +334,7 @@ const columns = computed<OTableColumnDef[]>(() => {
       header: t("iam.groupName"),
       accessorKey: "group_name",
       sortable: true,
-      meta: { align: "left", autoWidth: true, isName: true },
+      meta: { align: "left", autoWidth: true, isName: true, link: editGroupRoute },
     },
   ];
 
@@ -411,14 +354,27 @@ const columns = computed<OTableColumnDef[]>(() => {
     header: t("alerts.actions"),
     isAction: true,
     pinned: "right",
-    size: 80,
-    minSize: 64,
-    maxSize: 100,
-    meta: { align: "center", actionCount: 2 },
   });
 
   return cols;
 });
+
+const rowActions: OTableRowAction[] = [
+  {
+    id: "edit",
+    label: t("common.edit"),
+    icon: "edit",
+    onSelect: (row) => editGroup(row),
+    dataTest: (row) => `iam-groups-edit-${row.group_name}-role-icon`,
+  },
+  {
+    id: "delete",
+    label: t("common.delete"),
+    icon: "delete",
+    onSelect: (row) => showConfirmDialog(row),
+    dataTest: (row) => `iam-groups-delete-${row.group_name}-role-icon`,
+  },
+];
 
 onBeforeMount(() => {
   setupGroups();
@@ -457,16 +413,17 @@ const onGroupAdded = (payload: { group_name: string; data?: any }) => {
   });
 };
 
+const editGroupRoute = (group: any) => ({
+  name: "editGroup",
+  params: {
+    group_name: group.group_name,
+  },
+  query: {
+    org_identifier: store.state.selectedOrganization.identifier,
+  },
+});
 const editGroup = (group: any) => {
-  router.push({
-    name: "editGroup",
-    params: {
-      group_name: group.group_name,
-    },
-    query: {
-      org_identifier: store.state.selectedOrganization.identifier,
-    },
-  });
+  router.push(editGroupRoute(group));
 };
 
 const orgIdForList = useOrgId();

@@ -175,10 +175,11 @@ The recipe every list toolbar follows:
   column is dropped and persisted desktop column sizes are ignored. Tablets get a
   horizontal-scroll fallback once fill columns can't fit. **Do not hide data columns
   for mobile** — there is no per-column breakpoint flag.
-- **Row actions → one kebab below md.** Inline action buttons get
-  `class="max-md:hidden"`; add one `ODropdown` whose trigger is `md:hidden` and whose
-  items (each `class="md:hidden"`) mirror the inline buttons — same `v-if`, same
-  `:disabled`, `data-test="<inline data-test>-menu"`:
+- **Row actions → one kebab below md.** Prefer `OTable`'s `row-actions` prop: pass
+  the list once and the table draws at most three buttons at md and up (more than
+  three: two plus a menu), in the fixed order Edit, the item's own actions, Delete,
+  and one kebab below md. The hand-written form below remains for tables not yet
+  moved:
 
   ```vue
   <OButton class="max-md:hidden" icon-left="edit" :data-test="`x-${row.id}-edit`" @click="edit(row)" />

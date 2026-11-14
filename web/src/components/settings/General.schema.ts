@@ -1,9 +1,9 @@
 // Copyright 2026 OpenObserve Inc.
 //
 // Validation schema for the General Settings "platform settings" form (the two
-// number fields inside the <OForm>). The logo text / logo uploads / theme color
-// chips are pure-UI controls with their own inline actions and are decoupled
-// OUTSIDE the form, so they are NOT in this schema.
+// number fields and the branding text inside the <OForm>). The logo uploads and
+// theme color chips are pure-UI controls with their own actions and are NOT in
+// this schema.
 //
 // Rules:
 //   • scrape_interval: required AND ≥ 0 (0 is a valid value).
@@ -40,9 +40,11 @@ export const makeGeneralSettingsSchema = (t: (_key: string) => string) =>
         (v) =>
           isEmpty(v) || (!Number.isNaN(Number(v)) && Number(v) >= 1000 && Number(v) <= 1000000),
         {
-          message: t("settings.maxSeriesPerQueryValidation"),
+          message: t("settings.general.maxSeriesError"),
         },
       ),
+    // Instance branding text, saved by its own request; empty restores the default name.
+    custom_logo_text: z.string().max(100, t("settings.general.logoTextTooLong")),
   });
 
 export type GeneralSettingsForm = z.infer<ReturnType<typeof makeGeneralSettingsSchema>>;

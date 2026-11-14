@@ -15,14 +15,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OCard class="border-card-glass-border mb-4 border border-solid" data-test="license-status-card">
-    <OCardSection role="body">
-      <div class="mb-3 text-xl font-semibold">{{ t("about.license_status_title") }}</div>
+  <OFormSection
+    variant="plain"
+    class="mb-4"
+    :title="t('about.license_status_title')"
+    data-test="license-status-card"
+  >
+    <div
+      v-if="(envKeyActive && revHwmWarning?.source !== 'env') || revHwmWarning"
+      class="border-border-default flex flex-col gap-3 border-b px-4 py-3"
+    >
       <OBanner
         v-if="envKeyActive && revHwmWarning?.source !== 'env'"
         :variant="envKeyInUse ? 'warning' : 'info'"
         :icon="envKeyInUse ? 'warning' : 'info'"
-        class="mb-3"
         :content="
           envKeyInUse
             ? t('about.license_status_env_key')
@@ -34,7 +40,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="revHwmWarning"
         variant="warning"
         icon="warning"
-        class="mb-3"
         inline-actions
         :content="revWarningText"
         data-test="license-status-rev-hwm"
@@ -50,56 +55,56 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
         </template>
       </OBanner>
-      <ODescriptionList>
-        <ODescriptionItem :label="t('about.license_status_search')">
-          <div data-test="license-status-search">
-            <OBadge :variant="decision.search_allowed ? 'success' : 'error'">
-              {{
-                decision.search_allowed
-                  ? t("about.license_status_on")
-                  : t("about.license_status_paused")
-              }}
-            </OBadge>
-            <div v-if="restoredByWaiver && base" class="mt-2 text-sm">
-              {{
-                t(
-                  "about.license_status_on_by_waiver",
-                  { exceeded: base.exceeded_days, allowed: base.allowed_days },
-                  base.allowed_days,
-                )
-              }}
-            </div>
-            <ul v-if="reasons.length" class="mt-2 list-disc ps-5 text-sm">
-              <li v-for="reason in reasons" :key="reason.key" data-test="license-status-reason">
-                {{ reason.text }}
-              </li>
-            </ul>
-          </div>
-        </ODescriptionItem>
-        <ODescriptionItem :label="t('about.license_status_limit_today')">
-          <span data-test="license-status-limit">{{ limitText }}</span>
-        </ODescriptionItem>
-        <ODescriptionItem
-          v-if="evaluated && decision.limit_today_gb != null && daysText"
-          :label="t('about.license_status_allowed_days')"
-          data-test="license-status-days"
-        >
-          {{ daysText }}
-        </ODescriptionItem>
-        <ODescriptionItem
-          v-if="relief.reportGraceUntil !== undefined"
-          :label="t('about.license_status_reporting')"
-          data-test="license-status-reporting"
-        >
+    </div>
+    <OSettingRow control-at="end" :label="t('about.license_status_search')">
+      <div data-test="license-status-search">
+        <OBadge :variant="decision.search_allowed ? 'success' : 'error'">
           {{
-            t("about.license_status_reporting_grace", {
-              end: formatUtc(relief.reportGraceUntil, locale, false),
-            })
+            decision.search_allowed
+              ? t("about.license_status_on")
+              : t("about.license_status_paused")
           }}
-        </ODescriptionItem>
-      </ODescriptionList>
-    </OCardSection>
-  </OCard>
+        </OBadge>
+        <div v-if="restoredByWaiver && base" class="mt-2 text-sm">
+          {{
+            t(
+              "about.license_status_on_by_waiver",
+              { exceeded: base.exceeded_days, allowed: base.allowed_days },
+              base.allowed_days,
+            )
+          }}
+        </div>
+        <ul v-if="reasons.length" class="mt-2 list-disc ps-5 text-sm">
+          <li v-for="reason in reasons" :key="reason.key" data-test="license-status-reason">
+            {{ reason.text }}
+          </li>
+        </ul>
+      </div>
+    </OSettingRow>
+    <OSettingRow control-at="end" :label="t('about.license_status_limit_today')">
+      <span class="text-sm" data-test="license-status-limit">{{ limitText }}</span>
+    </OSettingRow>
+    <OSettingRow
+      control-at="end"
+      v-if="evaluated && decision.limit_today_gb != null && daysText"
+      :label="t('about.license_status_allowed_days')"
+      data-test="license-status-days"
+    >
+      <span class="text-sm">{{ daysText }}</span>
+    </OSettingRow>
+    <OSettingRow
+      control-at="end"
+      v-if="relief.reportGraceUntil !== undefined"
+      :label="t('about.license_status_reporting')"
+      data-test="license-status-reporting"
+    >
+      <span class="text-sm">{{
+        t("about.license_status_reporting_grace", {
+          end: formatUtc(relief.reportGraceUntil, locale, false),
+        })
+      }}</span>
+    </OSettingRow>
+  </OFormSection>
 </template>
 
 <script setup lang="ts">
@@ -108,10 +113,8 @@ import { useI18nTyped, raw } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
-import OCard from "@/lib/core/Card/OCard.vue";
-import OCardSection from "@/lib/core/Card/OCardSection.vue";
-import ODescriptionItem from "@/lib/lists/DescriptionList/ODescriptionItem.vue";
-import ODescriptionList from "@/lib/lists/DescriptionList/ODescriptionList.vue";
+import OFormSection from "@/lib/core/FormSection/OFormSection.vue";
+import OSettingRow from "@/lib/core/SettingRow/OSettingRow.vue";
 import {
   issuedOn,
   formatUtc,
@@ -262,6 +265,9 @@ const limitText = computed(() => {
   if (!evaluated.value) return "—";
   if (d.limit_today_gb == null) return t("about.license_status_unlimited");
   const percent = quotaPercent(d) ?? 0;
-  return t("about.license_status_limit_value", { limit: d.limit_today_gb, percent });
+  return t("about.license_status_limit_value", {
+    limit: d.limit_today_gb.toLocaleString(locale.value),
+    percent,
+  });
 });
 </script>
