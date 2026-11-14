@@ -26,7 +26,14 @@ export interface SqlFilterBuilderProps {
   freeText?: boolean;
   /** Listed above the fields while the bar is empty and nothing is typed. */
   extraSuggestions?: FilterBarExtraSection;
+  /** Lines of chips shown before the bar scrolls; 0 lifts the cap. */
+  maxRows?: number;
   dataTest?: string;
+}
+
+export interface SqlFilterBuilderExpose {
+  /** Focuses the bar and opens its list, as a click on it does. */
+  activate: () => void;
 }
 
 export interface SqlFilterBuilderEmits {
