@@ -22,7 +22,7 @@ import OnCallFitChips from "@/components/oncall/OnCallFitChips.vue";
 import OnCallPersonName from "@/components/oncall/OnCallPersonName.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OCard from "@/lib/core/Card/OCard.vue";
+import OFormSection from "@/lib/core/FormSection/OFormSection.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
@@ -121,23 +121,20 @@ const runRemind = async () => {
 </script>
 
 <template>
-  <OCard
+  <OFormSection
     v-if="rows.length"
-    variant="outlined"
-    class="flex flex-col gap-3 p-4"
+    variant="plain"
+    :title="t('slackApp.oncallUnlinked.title', { product: raw('Slack') })"
     data-test="slack-oncall-unlinked"
   >
-    <div class="flex flex-wrap items-center justify-between gap-3">
-      <span class="text-text-heading flex min-w-0 items-center gap-2 text-sm font-medium">
-        {{ t("slackApp.oncallUnlinked.title", { product: raw("Slack") }) }}
-        <OTag
-          type="countChip"
-          value="warning"
-          size="sm"
-          :label="t('slackApp.oncallUnlinked.count', { count: rows.length }, rows.length)"
-          data-test="slack-oncall-unlinked-count"
-        />
-      </span>
+    <template #actions>
+      <OTag
+        type="countChip"
+        value="warning"
+        size="sm"
+        :label="t('slackApp.oncallUnlinked.count', { count: rows.length }, rows.length)"
+        data-test="slack-oncall-unlinked-count"
+      />
       <OButton
         variant="outline"
         size="sm-action"
@@ -148,61 +145,64 @@ const runRemind = async () => {
       >
         {{ t("slackApp.oncallUnlinked.remind") }}
       </OButton>
-    </div>
-    <OTable
-      :data="rows"
-      :columns="columns"
-      row-key="email"
-      :pagination="rows.length > PAGE_SIZE ? 'client' : 'none'"
-      :page-size="PAGE_SIZE"
-      :show-global-filter="false"
-      :cell-overflow-tooltip="false"
-      dense
-    >
-      <template #cell-email="{ row }">
-        <span :data-test="`slack-oncall-unlinked-person-${row.email}`">
-          <OnCallPersonName class="block min-w-0 truncate" :email="row.email" />
-        </span>
-      </template>
-      <template #cell-teams="{ row }">
-        <OnCallFitChips
-          :items="row.teams"
-          :tooltip="raw(row.teams.map((team) => team.name).join(', '))"
-          :data-test="`slack-oncall-unlinked-teams-${row.email}`"
-        >
-          <template #item="{ item }">
-            <OTag size="sm" variant="default-soft" data-test="slack-oncall-unlinked-team">
-              <OTruncatedText>{{ raw(item.name) }}</OTruncatedText>
-            </OTag>
-          </template>
-        </OnCallFitChips>
-      </template>
-      <template #cell-next_shift="{ row }">
-        <OTag
-          v-if="row.onCallNow"
-          variant="success-soft"
-          size="sm"
-          :label="t('slackApp.oncallUnlinked.onCallNow')"
-          :data-test="`slack-oncall-unlinked-now-${row.email}`"
-        />
-        <OTimeCell
-          v-else
-          :value="row.nextShiftAt"
-          unit="us"
-          :timezone="timezone"
-          :empty-label="raw('—')"
-        />
-      </template>
-      <template #cell-reminder="{ row }">
-        <span :data-test="`slack-oncall-unlinked-reminder-${row.email}`">
+    </template>
+    <div class="rounded-b-surface -mx-4 -my-3 overflow-hidden">
+      <OTable
+        :data="rows"
+        :columns="columns"
+        row-key="email"
+        :pagination="rows.length > PAGE_SIZE ? 'client' : 'none'"
+        :page-size="PAGE_SIZE"
+        :show-global-filter="false"
+        :cell-overflow-tooltip="false"
+        :frame="false"
+        dense
+      >
+        <template #cell-email="{ row }">
+          <span :data-test="`slack-oncall-unlinked-person-${row.email}`">
+            <OnCallPersonName class="block min-w-0 truncate" :email="row.email" />
+          </span>
+        </template>
+        <template #cell-teams="{ row }">
+          <OnCallFitChips
+            :items="row.teams"
+            :tooltip="raw(row.teams.map((team) => team.name).join(', '))"
+            :data-test="`slack-oncall-unlinked-teams-${row.email}`"
+          >
+            <template #item="{ item }">
+              <OTag size="sm" variant="default-soft" data-test="slack-oncall-unlinked-team">
+                <OTruncatedText>{{ raw(item.name) }}</OTruncatedText>
+              </OTag>
+            </template>
+          </OnCallFitChips>
+        </template>
+        <template #cell-next_shift="{ row }">
+          <OTag
+            v-if="row.onCallNow"
+            variant="success-soft"
+            size="sm"
+            :label="t('slackApp.oncallUnlinked.onCallNow')"
+            :data-test="`slack-oncall-unlinked-now-${row.email}`"
+          />
           <OTimeCell
-            :value="row.remindedAt"
+            v-else
+            :value="row.nextShiftAt"
             unit="us"
             :timezone="timezone"
-            :empty-label="t('slackApp.oncallUnlinked.notSent')"
+            :empty-label="raw('—')"
           />
-        </span>
-      </template>
-    </OTable>
-  </OCard>
+        </template>
+        <template #cell-reminder="{ row }">
+          <span :data-test="`slack-oncall-unlinked-reminder-${row.email}`">
+            <OTimeCell
+              :value="row.remindedAt"
+              unit="us"
+              :timezone="timezone"
+              :empty-label="t('slackApp.oncallUnlinked.notSent')"
+            />
+          </span>
+        </template>
+      </OTable>
+    </div>
+  </OFormSection>
 </template>

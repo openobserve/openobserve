@@ -379,8 +379,9 @@ import AndroidIcon from "~icons/material-symbols/android";
 import PhoneIphoneIcon from "~icons/material-symbols/phone-iphone-outline";
 import CallIcon from "~icons/material-symbols/call-outline";
 
-// Brand mark (not a Material Symbol) — a local inline SVG component. See McpLogo.vue.
+// Brand marks (not Material Symbols) — local inline SVG components using currentColor.
 import McpLogo from "./McpLogo.vue";
+import SlackLogo from "./SlackLogo.vue";
 
 import type { Component } from "vue";
 
@@ -388,6 +389,7 @@ export const iconRegistry = {
   alarm: Alarm,
   add: Add,
   mcp: McpLogo,
+  slack: SlackLogo,
   "arrow-back": ArrowBack,
   "arrow-back-ios-new": ArrowBackIosNew,
   "arrow-downward": ArrowDownward,

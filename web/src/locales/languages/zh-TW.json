@@ -28540,7 +28540,7 @@
   },
   "slackApp": {
     "prereq": {
-      "title": "步驟 0 · 伺服器先決條件",
+      "title": "步驟 1 · 伺服器先決條件",
       "subtitle": "在進行任何 Slack 設定前，已於此伺服器檢查",
       "columnSetting": "設定",
       "columnResult": "結果",
@@ -28611,7 +28611,7 @@
       "back": "上一步",
       "finish": "完成",
       "connection": {
-        "title": "步驟 1 · 連線",
+        "title": "步驟 2 · 連線",
         "description": "此檢查會從本伺服器經由與正式環境相同的程式碼路徑連線至 Slack。",
         "allPassed": "可從此伺服器連線至 Slack",
         "someFailed": "無法從此伺服器連線至 Slack。請在您的代理或防火牆允許 *.slack.com，然後重新檢查。",
@@ -28620,7 +28620,7 @@
         "socketHost": "WebSocket 主機 {host}"
       },
       "create": {
-        "title": "步驟 2 · 建立應用程式",
+        "title": "步驟 3 · 建立應用程式",
         "modeLabel": "連線模式",
         "socket": "Socket 模式",
         "socketDescription": "建議使用。由 OpenObserve 建立連線，因此 Slack 不需要公開 URL",
@@ -28649,7 +28649,7 @@
         "signingSecretRequired": "HTTP 模式需要簽署密鑰"
       },
       "install": {
-        "title": "步驟 3 · 安裝",
+        "title": "步驟 4 · 安裝",
         "created": "應用程式已建立 · {appId}",
         "allowHint": "開啟 Slack 的安裝畫面：請在那裡按一下「允許」。Bot 權杖會由 Slack 自動傳回；無需複製。",
         "allow": "在 Slack 中允許",
@@ -28672,7 +28672,7 @@
         "appNotCreatedByO2": "OpenObserve 並未建立此應用程式，因此它會留在 Slack 中。若不再需要，請在該處刪除。"
       },
       "test": {
-        "title": "步驟 4 · 測試與連結",
+        "title": "步驟 5 · 測試與連結",
         "run": "執行檢查",
         "signIn": "測試「使用 Slack 登入」",
         "signInPassed": "「使用 Slack 登入」運作正常",

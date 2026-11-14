@@ -81,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- fixed height so switching tabs or searching never moves what sits below -->
     <div
-      class="border-border-default bg-surface-subtle rounded-default h-44 [scrollbar-gutter:stable] overflow-auto border px-3 pb-2"
+      class="bg-surface-subtle rounded-default h-44 [scrollbar-gutter:stable] overflow-auto px-3 pb-2"
       data-test="settings-license-features-list"
     >
       <div

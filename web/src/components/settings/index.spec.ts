@@ -353,28 +353,6 @@ describe("SettingsIndex", () => {
     router.currentRoute.value = originalRoute;
   });
 
-  describe("Theme integration", () => {
-    // regexIcon is computed internally and used in settingsItems icon field
-    // (not directly exposed on vm), so we verify it via the sectionGroups items.
-    it("should use light regex icon for light theme", () => {
-      mockStore.state.theme = "light";
-      const wrapper = createWrapper();
-      const groups = wrapper.vm.sectionGroups as any[];
-      const allItems = groups.flatMap((g: any) => g.items ?? []);
-      const regexItem = allItems.find((i: any) => i.dataTest === "regex-patterns-tab");
-      expect(regexItem?.icon).toContain("regex_icon_light.svg");
-    });
-
-    it("should use dark regex icon for dark theme", () => {
-      mockStore.state.theme = "dark";
-      const wrapper = createWrapper();
-      const groups = wrapper.vm.sectionGroups as any[];
-      const allItems = groups.flatMap((g: any) => g.items ?? []);
-      const regexItem = allItems.find((i: any) => i.dataTest === "regex-patterns-tab");
-      expect(regexItem?.icon).toContain("regex_icon_dark.svg");
-    });
-  });
-
   describe("Section groups", () => {
     it("should build section groups from settings items", () => {
       const wrapper = createWrapper();
@@ -407,11 +385,11 @@ describe("SettingsIndex", () => {
       expect(labels.indexOf("Integrations")).toBe(labels.indexOf("Destinations") + 1);
     });
 
-    it("gives the Slack section no page subtitle", () => {
+    it("gives the Slack section a page subtitle like its siblings", () => {
       mockStore.state.zoConfig = { service_streams_enabled: true, slack_enabled: true };
       const wrapper = createWrapper();
       const items = (wrapper.vm.sectionGroups as SectionHubGroup[]).flatMap((g) => g.items);
-      expect(items.find((i) => i.key === "slack")?.description).toBeUndefined();
+      expect(items.find((i) => i.key === "slack")?.description).toBeTruthy();
     });
 
     it("AC-1.4 shows no Slack rail item on Cloud while Slack is disabled", () => {

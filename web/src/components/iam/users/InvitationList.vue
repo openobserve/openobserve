@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <OPageLayout
-    :title="t('invitation.pendingInvitations')"
+    :title="t('iam.invitations')"
     :subtitle="t('iam.invitationList.subtitle')"
     icon="mail"
     bleed

@@ -25,7 +25,7 @@ export class CorrelationSettingsPage {
         // The Correlation Settings tabs wrapper (data-test container).
         this.correlationSettingsTabs = '[data-test="correlation-settings-tabs"]';
         // Save button on the Detection Rules ("Distinguish Services By") view.
-        this.saveConfigurationButtonName = 'Save Configuration';
+        this.detectionRulesSaveBtn = '[data-test="service-identity-save-btn"]';
         // Placeholder text of the "+ Add field" OSelect trigger.
         this.selectAFieldText = 'Select a field';
         // Visible tab labels (post-revamp): the tab `name` attrs are
@@ -189,11 +189,11 @@ export class CorrelationSettingsPage {
     }
 
     /**
-     * "Save Configuration" button on the Detection Rules view.
+     * Save on the Detection Rules view: the page's save bar keeps the old button's data-test.
      * @returns {import('@playwright/test').Locator}
      */
     getSaveConfigurationButton() {
-        return this.page.getByRole('button', { name: this.saveConfigurationButtonName });
+        return this.page.locator(this.detectionRulesSaveBtn);
     }
 
     /**
@@ -251,11 +251,8 @@ export class CorrelationSettingsPage {
     }
 
     async expectServiceDiscoveryContentVisible() {
-        // Detection Rules view: the "Save Configuration" button anchors it
-        // (the old dual-list Service Identity save-btn was removed in the revamp).
-        await expect(
-            this.page.getByRole('button', { name: this.saveConfigurationButtonName }).first(),
-        ).toBeVisible({ timeout: 15000 });
+        // Detection Rules view: the save bar's Save anchors it.
+        await expect(this.getSaveConfigurationButton().first()).toBeVisible({ timeout: 15000 });
     }
 
     async expectFieldAliasesContentVisible() {

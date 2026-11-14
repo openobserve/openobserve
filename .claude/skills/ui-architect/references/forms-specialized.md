@@ -5,6 +5,7 @@ The `OForm` container + `useOForm` composable own field registration, validation
 ## Table of contents
 
 - [OForm + useOForm](#oform--useoform) — container & validation (read first)
+- [OSaveBar + useLeaveGuard](#osavebar--useleaveguard) — the one Save/Discard bar of an always-editable settings page, and the Save/Cancel footer of a create page
 - [OColor](#ocolor) — hex color picker
 - [OEmojiPicker](#oemojipicker) — curated emoji picker
 - [ODate](#odate) — single date
@@ -23,7 +24,7 @@ The `OForm` container + `useOForm` composable own field registration, validation
 
 `OForm` is the form **container**. It builds (or accepts) a TanStack `@tanstack/vue-form` instance, `provide()`s it under `FORM_CONTEXT_KEY`, and every `OForm*` field wrapper `inject()`s that context and registers itself via `form.Field` keyed by its `name` prop. There is no manual field registration — dropping an `OFormInput :name="..."` inside `<OForm>` is the registration.
 
-**Validation timing (submit-then-change):** when you pass a `schema`, nothing validates while typing or on blur — the first submit reveals all errors, then every field re-validates live on each change. This is wired with `revalidateLogic({ mode: "submit", modeAfterSubmission: "change" })` and a single `onDynamic`/`onDynamicAsync` validator source; TanStack routes each schema issue to the field whose `name` matches the schema key, so individual fields need no per-field validators.
+**Validation timing (submit-then-change):** when you pass a `schema`, nothing validates while typing or on blur — the first submit reveals all errors, then every field re-validates live on each change. This is wired with `revalidateLogic({ mode: "submit", modeAfterSubmission: "change" })` and a single `onDynamic`/`onDynamicAsync` validator source; TanStack routes each schema issue to the field whose `name` matches the schema key, so individual fields need no per-field validators. Always-editable settings pages opt in to **leave-then-change** with `validateOn: "leave"`: a field the user changed shows its error when they leave it, then on every change until fixed, and Save still reveals everything. `coupled` lists groups of fields checked together (for example `[["min", "max"]]`); the group reveals together and a message the schema reports on every member prints once, on the group's last member. A custom field wrapper reads its error through `useVisibleFieldError(form)` from `@/lib/forms/Form/fieldError`, never `field.state.meta.errors` directly.
 
 **Submit:** `OForm` **awaits** your `@submit` handler, so TanStack's `isSubmitting` stays true for the whole save. That drives the Save spinner automatically (an `ODialog`/`ODrawer` footer button linked by `form-id`, via the injected `FORM_SUBMIT_STATE_KEY`; or an inline button through the default slot's `isSubmitting`/`canSubmit` scope). Double-submit (e.g. Enter while saving) is guarded.
 
@@ -39,6 +40,8 @@ The `OForm` container + `useOForm` composable own field registration, validation
 - `onSubmit` (`(values: T) => unknown | Promise<unknown>`) — written `@submit="handler"` in templates; awaited
 - `greedy` (`boolean`, default `false`) — validate every field instead of stopping at the first error
 - `form` (`OFormInstance`) — an externally-created form from `useOForm()`; when present OForm uses it instead of creating its own
+- `validateOn` (`"submit" | "leave"`, default `"submit"`) — when a field's error first shows; used only when OForm builds its own form
+- `coupled` (`FormFieldPath<T>[][]`, default `[]`) — groups of fields checked together in leave mode; used only when OForm builds its own form
 
 **Slots:** default only — scoped as `{ isSubmitting, canSubmit }`.
 **Emits:** `reset` — fired when `.reset()` is called on the ref.
@@ -50,7 +53,7 @@ The `OForm` container + `useOForm` composable own field registration, validation
 **Import:** `import { useOForm } from "@/lib/forms/Form/useOForm"`
 **Use when:** The component that **owns** `<OForm>` needs the form state reactively at `setup()` — e.g. a discriminated form whose visible sections depend on a `kind` field (`v-if` / `v-for` / `OStepper`). Create the form in setup, read it with `form.useStore(selector)`, write it with `form.setFieldValue(...)`, then hand it to `<OForm :form="form">`.
 **Don't use for:** A field **inside** `<OForm>` (a descendant) — it should `inject(FORM_CONTEXT_KEY)` instead. Simple forms with no parent-side conditional rendering need only `<OForm :default-values :schema @submit>` (OForm calls `useOForm` internally with the identical config).
-**Signature:** `useOForm<T>({ defaultValues: T, schema?: unknown, onSubmit?: (values: T) => unknown | Promise<unknown> })` → a TanStack form instance (`OFormInstance`). The config is guaranteed identical to OForm's internal fallback (same submit-then-change timing, single `onDynamic` source, awaited `onSubmit`).
+**Signature:** `useOForm<T>({ defaultValues: T, schema?: unknown, onSubmit?: (values: T) => unknown | Promise<unknown>, validateOn?: "submit" | "leave", coupled?: FormFieldPath<T>[][] })` → a TanStack form instance (`OFormInstance`). The config is guaranteed identical to OForm's internal fallback (same submit-then-change timing, single `onDynamic` source, awaited `onSubmit`).
 
 **End-to-end example (simple path — OForm owns the form):**
 
@@ -117,6 +120,92 @@ const kind = form.useStore((s) => s.values.kind);
     <OFormInput v-if="kind === 'http'" name="url" label="URL" />
   </OForm>
 </template>
+```
+
+---
+
+## OSaveBar + useLeaveGuard
+
+### OSaveBar
+
+**Import:** `@/lib/forms/SaveBar/OSaveBar.vue`
+**Use when:** An always-editable settings page (no dialog, no edit mode): one bar pinned to the bottom of the content that says how many values changed and holds Discard and Save. A full-page create/edit editor with a Cancel that leaves uses the same bar with `mode="create"`. One bar per page; never a second Save button on the page.
+**Don't use for:** Dialog and drawer forms (their footer owns Save), or actions that are not values (uploads, "Add …", delete): those keep their own buttons and are not counted.
+**Key props:**
+
+- `mode` (`"edit" | "create"`, default `"edit"`) — `"create"` is for a new record: no change count, Save works on an untouched form, and Cancel (emits `cancel`) replaces Discard
+- `form` (`OFormInstance`, default: the enclosing `OForm`) — source of the counts and of submit; pass it only when the bar sits outside the `<OForm>`
+- `changeCount` (`number`, default: fields that differ from the saved values; a number field's text equal to the saved number is not a change) — override for pages with state outside the form. `useFormCounts(form)` (`@/lib/forms/SaveBar/formCounts`) gives the same `changes` and `errors` to add page state to, and for `useLeaveGuard`
+- `errorCount` (`number`, default: fields printing an error; a `coupled` group prints one, so it is one field to fix)
+- `loaded` (`boolean`, default `true`) — `false` until the saved values arrive
+- `saving` (`boolean`, default: the form's `isSubmitting`)
+- `contentSize` (`"sm" | "md" | "lg" | "xl" | "full"`, default `"lg"`) — the contents end at the form column's width
+- `dataTest` (`string`, default `"save-bar"`) — parts: `-status`, `-fix`, `-discard`, `-save`
+- `saveDataTest`, `discardDataTest` (`string`) — replace `<dataTest>-save` / `-discard` when the page's button already has a selector; an existing `data-test` is never renamed
+- `cancelDataTest` (`string`) — replaces `<dataTest>-cancel` in create mode
+- `saveLabel` (`string`) — replaces "Save" on the primary, such as "Continue" on a step
+- `saveDisabled` (`boolean`) — disables the primary for a reason the form does not know, such as a step with nothing chosen
+- `submit` (`boolean`, default `true`) — `false` makes the primary a plain button that emits `save` without submitting
+- `formId` (`string`) — the `<form>`'s id, when the bar renders outside it (teleported into the Settings shell's slot); Enter in a field then still reaches Save
+
+**States:**
+
+| State | Status | Discard | Save |
+| --- | --- | --- | --- |
+| Loading (`loaded` false) | skeleton line | hidden | disabled |
+| Clean | "No changes to save" | hidden | disabled |
+| Changed | "1 unsaved change" / "N unsaved changes" ("N changes" below `md`) | shown | enabled |
+| Changed, invalid | same, then the link "Fix N fields" | shown | enabled |
+| Saving | unchanged | disabled | spinner |
+| Create mode (`mode="create"`) | empty; "Fix N fields" when invalid | replaced by Cancel | enabled once loaded |
+
+Save is the form's submit button, so Enter in a text field saves when something changed and does nothing when clean. Save is disabled only when nothing changed. On an invalid form it sends nothing, reveals every error and focuses the first invalid field; "Fix N fields" does the same without submitting. Discard resets the form to the last saved values with no confirm. After a successful save call `form.reset(savedValues)` so the bar returns to Clean; success and failure stay the page's own toasts.
+**Slots:** `start` — page actions that are not values, before the status; `actions` — buttons before Cancel or Discard, such as a step's Back.
+**Emits:** `save` (a valid submit has run; normally use the form's `@submit`), `discard` (after the reset), `cancel` (create mode: the user gave up the new record; the page decides whether to ask first).
+**Example:**
+
+```vue
+<OForm ref="formRef" validate-on="leave" :schema="schema" :default-values="saved" @submit="save">
+  <!-- sections and rows -->
+  <Teleport defer :to="SAVE_BAR_SLOT">
+    <OSaveBar class="px-4" form-id="general-settings-form" :loaded="!isLoading" data-test="settings-general-save-bar" />
+  </Teleport>
+</OForm>
+```
+
+A create page keeps the bar as the last child of its `OForm`:
+
+```vue
+<OSaveBar
+  mode="create"
+  data-test="add-cipher-key-footer"
+  save-data-test="add-cipher-key-save-btn"
+  cancel-data-test="add-cipher-key-cancel-btn"
+  @cancel="closeEditor"
+/>
+```
+
+In the Settings shell the bar is teleported to `SAVE_BAR_SLOT` (`@/components/settings/saveBarSlot`), a row below the scroller: the strip spans the pane, stays at its bottom on a short page, and its contents end at the form column. Outside that shell, leave the bar as the last child of the form; it is `sticky bottom-0`.
+
+**Family:** `OForm validate-on="leave"`, `OSettingRow`, `useLeaveGuard`. Recipe: [page-recipes.md](page-recipes.md) § Settings form page.
+
+### useLeaveGuard
+
+**Import:** `@/lib/forms/SaveBar/useLeaveGuard`
+**Use when:** Every page with an `OSaveBar`. Call it once in the page's setup; the bar does not call it.
+**Signature:** `useLeaveGuard(isDirty: Ref<boolean> | (() => boolean), options?: { count?: () => number; onDiscard?: () => void })`
+**Behaviour:** while dirty, leaving the route or switching organization opens the shared confirm dialog ("Discard changes" / "Keep editing") and follows the answer; a reload or tab close gets the browser's own prompt. On confirm it calls `onDiscard` first: discard the form there with `discardFormChanges(form)` (`@/lib/forms/SaveBar/formCounts`), because Settings pages are kept alive and would come back dirty. Use it rather than `form.reset()`: a save still open when the user leaves then lands as the saved values, and the discarded edits do not return as unsaved changes.
+**`confirmLeave()`** (same module): a change that is not a navigation and unmounts the page, such as the header's organization switch, awaits it before committing anything and stops on `false`. It asks the dirty pages on screen with the same dialog; the navigation that follows a `true` does not ask again.
+**Example:**
+
+```ts
+const changes = form.useStore(
+  (s) => Object.values(s.fieldMeta).filter((m) => m && !m.isDefaultValue).length,
+);
+useLeaveGuard(() => changes.value > 0, {
+  count: () => changes.value,
+  onDiscard: () => discardFormChanges(form),
+});
 ```
 
 ---

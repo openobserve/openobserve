@@ -15,8 +15,7 @@ export
 
 
         this.submitButton = page.locator('[data-test="dashboard-add-submit"]'); // Add appropriate data-test attribute
-        this.customLogoText = page.locator("[aria-label ='Custom Logo Text']");
-        this.saveButton = page.locator('[data-test="settings_ent_logo_custom_text_save_btn"]');
+        this.customLogoText = page.locator("[aria-label ='Custom logo text']");
         this.deleteLogoButton = page.locator('[data-test="setting_ent_custom_logo_img_delete_btn"]');
         this.confirmDeleteButton = page.locator('[data-test="logs-search-bar-confirm-dialog-ok-btn"]');
         this.fileUploadInput = page.locator('input[data-test="setting_ent_custom_logo_img_file_upload"]');

@@ -21,6 +21,7 @@ import { useStore } from "vuex";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OFormSection from "@/lib/core/FormSection/OFormSection.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
@@ -168,7 +169,7 @@ const columns = computed<OTableColumnDef<SlackChannelDefaultRow>[]>(() => [
   { id: "set_by", header: t("slackApp.channels.columnSetBy"), size: 220 },
   {
     id: "actions",
-    header: raw(""),
+    header: t("common.actions"),
     size: ownOrgOnly.value ? 170 : 100,
     isAction: true,
     pinned: "right",
@@ -209,13 +210,13 @@ const save = async (value: DefaultForm): Promise<void> => {
 </script>
 
 <template>
-  <section class="flex flex-col gap-3" data-test="slack-channel-defaults">
-    <div class="flex flex-wrap items-start justify-between gap-3">
-      <div class="flex flex-col gap-0.5">
-        <h2 class="text-text-heading m-0 text-lg font-semibold">
-          {{ t("slackApp.channels.title") }}
-        </h2>
-      </div>
+  <OFormSection
+    variant="plain"
+    :title="t('slackApp.channels.title')"
+    :description="t('slackApp.channels.description')"
+    data-test="slack-channel-defaults"
+  >
+    <template #actions>
       <OButton
         variant="outline"
         size="sm-action"
@@ -227,134 +228,133 @@ const save = async (value: DefaultForm): Promise<void> => {
         {{ t("slackApp.channels.setDefault") }}
         <OTooltip v-if="readOnly" side="bottom" :content="t('slackApp.connect.permissionHint')" />
       </OButton>
-    </div>
+    </template>
 
-    <OTable
-      :data="rows"
-      :columns="columns"
-      row-key="channel_id"
-      pagination="none"
-      :show-global-filter="false"
-      :loading="defaults.isPending.value"
-      :error="loadError"
-      :forbidden="forbidden"
-      :cell-overflow-tooltip="false"
-      dense
-    >
-      <template #cell-channel="{ row }">{{ raw(`#${row.channel_name}`) }}</template>
-      <template #cell-default_org="{ row }">
-        {{
-          ownerName(row) ??
-          (row.set_by_this_org ? t("slackApp.channels.thisOrg") : t("slackApp.channels.anotherOrg"))
-        }}
-      </template>
-      <template #cell-answers="{ row }">
-        <span v-if="!canChange(row) && ownOrgOnly" class="text-text-muted">{{ raw("—") }}</span>
-        <template v-else>
+    <div class="rounded-b-surface -mx-4 -my-3 overflow-hidden">
+      <OTable
+        :data="rows"
+        :columns="columns"
+        row-key="channel_id"
+        pagination="none"
+        :show-global-filter="false"
+        :loading="defaults.isPending.value"
+        :error="loadError"
+        :forbidden="forbidden"
+        :cell-overflow-tooltip="false"
+        :frame="false"
+        dense
+      >
+        <template #cell-channel="{ row }">{{ raw(`#${row.channel_name}`) }}</template>
+        <template #cell-default_org="{ row }">
           {{
-            row.answer_mode === "thread"
-              ? t("slackApp.channels.thread")
-              : t("slackApp.channels.private")
+            ownerName(row) ??
+            (row.set_by_this_org
+              ? t("slackApp.channels.thisOrg")
+              : t("slackApp.channels.anotherOrg"))
           }}
         </template>
-      </template>
-      <template #cell-alert_routes="{ row }">
-        <template v-if="alertRoutes[row.channel_id]">
-          {{
-            t(
-              "slackApp.channels.alertRoutes",
-              { count: alertRoutes[row.channel_id] },
-              alertRoutes[row.channel_id],
-            )
-          }}
+        <template #cell-answers="{ row }">
+          <span v-if="!canChange(row) && ownOrgOnly" class="text-text-muted">{{ raw("—") }}</span>
+          <template v-else>
+            {{
+              row.answer_mode === "thread"
+                ? t("slackApp.channels.thread")
+                : t("slackApp.channels.private")
+            }}
+          </template>
         </template>
-        <span v-else class="text-text-muted">{{ raw("—") }}</span>
-      </template>
-      <template #cell-set_by="{ row }">
-        <span v-if="!canChange(row) && ownOrgOnly" class="text-text-muted">{{ raw("—") }}</span>
-        <template v-else>{{ t(`slackApp.channels.setFrom.${row.set_from}`) }}</template>
-      </template>
-      <template #cell-actions="{ row }">
-        <div v-if="canChange(row)" class="flex items-center justify-end">
-          <OButton
-            variant="ghost"
-            size="icon-sm"
-            icon-left="edit"
-            class="max-md:hidden"
-            :aria-label="t('slackApp.channels.edit')"
-            :data-test="`slack-channel-edit-${row.channel_id}`"
-            @click.stop="openDrawer(row)"
-          >
-            <OTooltip side="bottom" :content="t('slackApp.channels.edit')" />
-          </OButton>
-          <OButton
-            variant="ghost-destructive"
-            size="icon-sm"
-            icon-left="delete-outline"
-            class="max-md:hidden"
-            :aria-label="t('slackApp.channels.remove')"
-            :data-test="`slack-channel-remove-${row.channel_id}`"
-            @click.stop="askRemove(row)"
-          >
-            <OTooltip side="bottom" :content="t('slackApp.channels.remove')" />
-          </OButton>
-          <ODropdown side="bottom" align="end">
-            <template #trigger>
-              <OButton
-                icon-left="more-vert"
-                :aria-label="t('dashboard.moreActions')"
-                variant="ghost"
-                size="icon-xs-sq"
-                class="md:hidden"
-                :data-test="`slack-channel-${row.channel_id}-menu`"
-                @click.stop
-              />
-            </template>
-            <ODropdownItem
+        <template #cell-alert_routes="{ row }">
+          <template v-if="alertRoutes[row.channel_id]">
+            {{
+              t(
+                "slackApp.channels.alertRoutes",
+                { count: alertRoutes[row.channel_id] },
+                alertRoutes[row.channel_id],
+              )
+            }}
+          </template>
+          <span v-else class="text-text-muted">{{ raw("—") }}</span>
+        </template>
+        <template #cell-set_by="{ row }">
+          <span v-if="!canChange(row) && ownOrgOnly" class="text-text-muted">{{ raw("—") }}</span>
+          <template v-else>{{ t(`slackApp.channels.setFrom.${row.set_from}`) }}</template>
+        </template>
+        <template #cell-actions="{ row }">
+          <div v-if="canChange(row)" class="flex items-center justify-end">
+            <OButton
+              variant="ghost"
+              size="icon-sm"
               icon-left="edit"
-              :data-test="`slack-channel-edit-${row.channel_id}-menu`"
-              @select="openDrawer(row)"
+              class="max-md:hidden"
+              :aria-label="t('slackApp.channels.edit')"
+              :data-test="`slack-channel-edit-${row.channel_id}`"
+              @click.stop="openDrawer(row)"
             >
-              {{ t("slackApp.channels.edit") }}
-            </ODropdownItem>
-            <ODropdownItem
+              <OTooltip side="bottom" :content="t('slackApp.channels.edit')" />
+            </OButton>
+            <OButton
+              variant="ghost-destructive"
+              size="icon-sm"
               icon-left="delete-outline"
-              variant="destructive"
-              :data-test="`slack-channel-remove-${row.channel_id}-menu`"
-              @select="askRemove(row)"
+              class="max-md:hidden"
+              :aria-label="t('slackApp.channels.remove')"
+              :data-test="`slack-channel-remove-${row.channel_id}`"
+              @click.stop="askRemove(row)"
             >
-              {{ t("slackApp.channels.remove") }}
-            </ODropdownItem>
-          </ODropdown>
-        </div>
-        <span
-          v-else-if="ownOrgOnly"
-          class="text-text-secondary flex items-center justify-end gap-1 text-xs"
-          data-test="slack-channel-instance-only"
-        >
-          <OIcon name="lock" size="xs" />
-          {{ t("slackApp.channels.instanceAdminOnly") }}
-        </span>
-      </template>
-      <template #error>
-        <OEmptyState
-          size="compact"
-          preset="load-error"
-          :backdrop="false"
-          data-test="slack-channel-defaults-error"
-          @action="defaults.refetch()"
-        />
-      </template>
-      <template #empty>
-        <OEmptyState
-          size="compact"
-          illustration="board"
-          :title="t('slackApp.channels.empty')"
-          :description="t('slackApp.channels.emptyDescription')"
-          :backdrop="false"
-        />
-      </template>
-    </OTable>
+              <OTooltip side="bottom" :content="t('slackApp.channels.remove')" />
+            </OButton>
+            <ODropdown side="bottom" align="end">
+              <template #trigger>
+                <OButton
+                  icon-left="more-vert"
+                  :aria-label="t('dashboard.moreActions')"
+                  variant="ghost"
+                  size="icon-xs-sq"
+                  class="md:hidden"
+                  :data-test="`slack-channel-${row.channel_id}-menu`"
+                  @click.stop
+                />
+              </template>
+              <ODropdownItem
+                icon-left="edit"
+                :data-test="`slack-channel-edit-${row.channel_id}-menu`"
+                @select="openDrawer(row)"
+              >
+                {{ t("slackApp.channels.edit") }}
+              </ODropdownItem>
+              <ODropdownItem
+                icon-left="delete-outline"
+                variant="destructive"
+                :data-test="`slack-channel-remove-${row.channel_id}-menu`"
+                @select="askRemove(row)"
+              >
+                {{ t("slackApp.channels.remove") }}
+              </ODropdownItem>
+            </ODropdown>
+          </div>
+          <span
+            v-else-if="ownOrgOnly"
+            class="text-text-secondary flex items-center justify-end gap-1 text-xs"
+            data-test="slack-channel-instance-only"
+          >
+            <OIcon name="lock" size="xs" />
+            {{ t("slackApp.channels.instanceAdminOnly") }}
+          </span>
+        </template>
+        <template #error>
+          <OEmptyState
+            size="compact"
+            preset="load-error"
+            :backdrop="false"
+            data-test="slack-channel-defaults-error"
+            @action="defaults.refetch()"
+          />
+        </template>
+        <template #empty>
+          <OEmptyState size="compact" preset="no-slack-channel-defaults" :backdrop="false" />
+        </template>
+      </OTable>
+    </div>
 
     <ODrawer
       v-model:open="drawerOpen"
@@ -460,5 +460,5 @@ const save = async (value: DefaultForm): Promise<void> => {
       focus-cancel
       @update:ok="confirmRemove"
     />
-  </section>
+  </OFormSection>
 </template>

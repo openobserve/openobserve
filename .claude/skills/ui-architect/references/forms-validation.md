@@ -161,11 +161,14 @@ binding.
 
 ## 3. Validation timing & the `required` prop
 
-Validation timing is **submit-then-change**, owned by `OForm` (via TanStack's
-`revalidateLogic`): nothing validates while the user types or on blur, so errors
-stay hidden during first entry; the first submit reveals all errors at once; then
-each field re-validates live on every change. You don't configure this — it's
-baked into `OForm`. The schema file only describes _what_ is valid, never _when_.
+Validation timing defaults to **submit-then-change**, owned by `OForm`: errors
+stay hidden during first entry; the first submit reveals all at once; then each
+field re-validates on every change. Always-editable settings pages (the ones with
+an `OSaveBar`) opt in to **leave-then-change** with `validate-on="leave"`: a field
+the user changed shows its error when they leave it, then on every change until
+fixed; Save still reveals everything. List fields that are checked together in
+`coupled`. No other timing exists, and the schema file only describes _what_ is
+valid, never _when_.
 
 Mark required fields with the **`required` prop** on the `OForm*` component — it
 renders the required affordance and is the accessible signal. **Never hardcode a
@@ -201,6 +204,8 @@ save and the Save button shows its spinner on its own. Therefore:
 - **Do not** disable Save on invalid (`:primary-button-disabled` /
   `:disabled`). Save stays enabled; clicking an invalid form reveals the errors.
   That's the intended UX — a disabled button that never explains itself is worse.
+  The one disabled Save is `OSaveBar`'s clean state, which explains itself with
+  "No changes to save".
 - The default slot also exposes `{ isSubmitting, canSubmit }` for an inline
   button that wants the spinner: `<OForm v-slot="{ isSubmitting }">`
 

@@ -153,10 +153,9 @@ describe("InvitationList - rendering", () => {
     expect(wrapper.exists()).toBe(true);
   });
 
-  it("renders the pending invitations title", async () => {
+  it("titles the page with its menu label", async () => {
     const wrapper = await mountInvitationList();
-    // Title is passed as a prop to OPageHeader; verify the component mounts with the expected text
-    expect(wrapper.text()).toContain("Pending Invitations");
+    expect(wrapper.text()).toContain(i18n.global.t("iam.invitations"));
   });
 
   it("renders both ODialog instances (accept + reject confirmations)", async () => {

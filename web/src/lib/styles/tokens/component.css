@@ -665,6 +665,8 @@
   ); /* ON-track fill — solid primary-500, fixed both themes (matches switch-border) */
   --color-switch-disabled-border: var(--color-grey-300);
   --color-switch-disabled-thumb: var(--color-grey-300);
+  --color-switch-border-off-neutral: var(--color-grey-500);
+  --color-switch-thumb-off-neutral: var(--color-grey-500);
 
   /* Checkbox (OCheckbox) */
   --color-checkbox-bg: var(--color-surface-base);
@@ -1606,6 +1608,8 @@
   --color-switch-track-on: var(--color-switch-track-on);
   --color-switch-disabled-border: var(--color-switch-disabled-border);
   --color-switch-disabled-thumb: var(--color-switch-disabled-thumb);
+  --color-switch-border-off-neutral: var(--color-switch-border-off-neutral);
+  --color-switch-thumb-off-neutral: var(--color-switch-thumb-off-neutral);
 
   /* Checkbox (OCheckbox) */
   --color-checkbox-bg: var(--color-checkbox-bg);

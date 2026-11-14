@@ -28545,7 +28545,7 @@
   },
   "slackApp": {
     "prereq": {
-      "title": "Krok 0 · Wymagania serwera",
+      "title": "Krok 1 · Wymagania serwera",
       "subtitle": "Sprawdzane na tym serwerze przed rozpoczęciem pracy ze Slackiem",
       "columnSetting": "Ustawienie",
       "columnResult": "Wynik",
@@ -28616,7 +28616,7 @@
       "back": "Wstecz",
       "finish": "Zakończ",
       "connection": {
-        "title": "Krok 1 · Połączenie",
+        "title": "Krok 2 · Połączenie",
         "description": "Test łączności dociera do Slacka z tego serwera przez tę samą ścieżkę kodu, której używa środowisko produkcyjne.",
         "allPassed": "Slack jest dostępny z tego serwera",
         "someFailed": "Nie można połączyć się ze Slackiem z tego serwera. Zezwól na *.slack.com w swoim proxy lub zaporze ogniowej, a następnie ponów sprawdzanie.",
@@ -28625,7 +28625,7 @@
         "socketHost": "Host WebSocket {host}"
       },
       "create": {
-        "title": "Krok 2 · Tworzenie aplikacji",
+        "title": "Krok 3 · Tworzenie aplikacji",
         "modeLabel": "Tryb połączenia",
         "socket": "Tryb Socket",
         "socketDescription": "Zalecany. OpenObserve otwiera połączenie, więc Slack nie potrzebuje publicznego adresu URL",
@@ -28654,7 +28654,7 @@
         "signingSecretRequired": "Tryb HTTP wymaga sekretu podpisywania"
       },
       "install": {
-        "title": "Krok 3 · Instalacja",
+        "title": "Krok 4 · Instalacja",
         "created": "Aplikacja utworzona · {appId}",
         "allowHint": "Otwiera ekran instalacji w Slacku: kliknij tam Zezwól. Token bota wraca z Slacka automatycznie; nic nie trzeba kopiować.",
         "allow": "Zezwól w Slacku",
@@ -28677,7 +28677,7 @@
         "appNotCreatedByO2": "OpenObserve nie utworzyło tej aplikacji, więc pozostaje ona w Slacku. Usuń ją tam, jeśli nie jest już potrzebna."
       },
       "test": {
-        "title": "Krok 4 · Test i łączenie",
+        "title": "Krok 5 · Test i łączenie",
         "run": "Uruchom sprawdzenia",
         "signIn": "Przetestuj Sign in with Slack",
         "signInPassed": "Sign in with Slack działa",

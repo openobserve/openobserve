@@ -913,6 +913,7 @@ const MCP_OPT_OUT_CATEGORIES: [&str; 2] = ["authorization", "users"];
             openobserve_api_management::request::query_history::QueryHistoryListResponse,
             openobserve_api_management::request::query_history::QueryHistoryClearResponse,
             meta::user::UpdateUser,
+            meta::user::UpdateUserRole,
             meta::user::UserRoleRequest,
             meta::user::PostUserRequest,
             meta::user::UserOrgRole,

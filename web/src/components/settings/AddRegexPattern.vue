@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :title="
       isEdit ? t('regex_patterns.edit_regex_pattern') : t('regex_patterns.create_regex_pattern')
     "
-    :width="isFullScreen ? 100 : store.state.isAiChatEnabled || dockOpen ? 70 : 40"
+    :size="isFullScreen ? 'full' : store.state.isAiChatEnabled || dockOpen ? 'xxl' : 'lg'"
     :primary-button-label="
       isEdit ? t('regex_patterns.update_close') : t('regex_patterns.create_close')
     "

@@ -313,8 +313,7 @@ import {
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
 import { pageCardClasses } from "@/layouts/pageCard";
-import { useRoute, useRouter, RouterView, isNavigationFailure } from "vue-router";
-import { orgSwitchListRoute, orgSwitchPending } from "@/utils/orgScopedRoutes";
+import { useRoute, useRouter, RouterView } from "vue-router";
 import { solutionModeForPath } from "@/utils/security/solutionMode";
 import { useSecurityAccess } from "@/composables/security/useSecurityAccess";
 import config from "../aws-exports";
@@ -349,6 +348,8 @@ import { signOutDraftsToConfirm, signOutThroughLeaveGuards } from "@/utils/draft
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import { confirmLeave, releaseLeave } from "@/lib/forms/SaveBar/useLeaveGuard";
+import { switchOrganization, toOrganizationOption } from "@/utils/organizationSwitch";
 import useBreakpoint from "@/composables/useBreakpoint";
 import SlackIcon from "@/components/icons/SlackIcon.vue";
 import ManagementIcon from "@/components/icons/ManagementIcon.vue";
@@ -1369,44 +1370,29 @@ export default defineComponent({
         return;
       }
       const targetOrg = { ...selectedOrg.value };
-      const orgIdentifier = targetOrg.identifier;
-      const listRoute = orgSwitchListRoute(
-        router.currentRoute.value.name,
-        router.currentRoute.value.query,
-      );
-      if (listRoute) {
-        if (orgIdentifier === store.state.selectedOrganization?.identifier) return;
-        // leave before anything resets: the page's id is org-scoped and would fail to load in the new org
-        orgSwitchPending.value = true;
-        const failure = await router
-          .replace({ name: listRoute, query: { org_identifier: orgIdentifier } })
-          .finally(() => {
-            orgSwitchPending.value = false;
-          });
-        if (isNavigationFailure(failure)) {
-          // the leave was blocked (e.g. the unsaved-changes prompt was declined), so the user stays in the current org
-          selectedOrg.value = { ...store.state.selectedOrganization };
-          return;
-        }
+      const keepCurrent = () => {
+        const current = store.state.selectedOrganization;
+        selectedOrg.value =
+          orgOptions.value.find((org) => org.identifier === current?.identifier) ?? current;
+      };
+      // Re-picking the current org switches nothing, so it must not ask to discard the page's edits.
+      if (targetOrg.identifier === store.state.selectedOrganization?.identifier)
+        return keepCurrent();
+      // Asked before anything is committed: the switch unmounts the page, and its edits cannot be brought back.
+      if (!(await confirmLeave())) return keepCurrent();
+      const queryParams =
+        router.currentRoute.value.path.indexOf(".logs") > -1 ? router.currentRoute.value.query : {};
+      const switched = await switchOrganization({ store, router, resetStreams }, targetOrg, {
+        path: router.currentRoute.value.path,
+        query: {
+          ...queryParams,
+          org_identifier: targetOrg.identifier,
+        },
+      });
+      if (!switched) {
+        releaseLeave();
+        return keepCurrent();
       }
-      resetStreams();
-      store.dispatch("logs/resetLogs");
-      store.dispatch("setIsDataIngested", false);
-      if (!listRoute) {
-        const queryParams =
-          router.currentRoute.value.path.indexOf(".logs") > -1
-            ? router.currentRoute.value.query
-            : {};
-        router.push({
-          path: router.currentRoute.value.path,
-          query: {
-            ...queryParams,
-            org_identifier: orgIdentifier,
-          },
-        });
-      }
-      useLocalOrganization(targetOrg);
-      store.dispatch("setSelectedOrganization", targetOrg);
       // setSelectedOrganization();
       // if (
       //   config.isCloud &&
@@ -1549,26 +1535,7 @@ export default defineComponent({
                 label: string;
                 created_at?: number;
               }) => {
-                // `label` is the real name here — General.vue's delete-confirm gate matches it; disambiguation is applied only on the dropdown copy below.
-                const optiondata: any = {
-                  label: data.name,
-                  id: data.id,
-                  identifier: data.identifier,
-                  user_email: store.state.userInfo.email,
-                  ingest_threshold: data.ingest_threshold,
-                  search_threshold: data.search_threshold,
-                  subscription_type: Object.prototype.hasOwnProperty.call(
-                    data,
-                    "CustomerBillingObj",
-                  )
-                    ? data.CustomerBillingObj.subscription_type
-                    : "",
-                  status: data.status,
-                  note: Object.prototype.hasOwnProperty.call(data, "CustomerBillingObj")
-                    ? data.CustomerBillingObj.note
-                    : "",
-                  created_at: data.created_at,
-                };
+                const optiondata: any = toOrganizationOption(data, store.state.userInfo.email);
 
                 if (
                   config.isCloud == "true" &&

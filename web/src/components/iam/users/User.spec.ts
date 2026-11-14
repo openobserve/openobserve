@@ -292,6 +292,21 @@ describe("User Component", () => {
     expect(wrapper.vm.filterQuery).toBe("alice");
   });
 
+  it("counts the summary tiles over the searched rows, not the role facet", async () => {
+    wrapper.vm.rows = [
+      { email: "ann@example.com", role: "admin", roles: ["admin"] },
+      { email: "bob@example.com", role: "viewer", roles: ["viewer"] },
+    ];
+    const tile = (key: string) => wrapper.vm.summaryStats.find((s: any) => s.key === key)?.value;
+
+    wrapper.vm.filterQuery = "ann";
+    wrapper.vm.roleFilter = "viewer";
+    expect([tile("admin"), tile("viewer"), tile("total")]).toEqual([1, 0, 1]);
+
+    wrapper.vm.filterQuery = "zzqq";
+    expect([tile("admin"), tile("viewer"), tile("total")]).toEqual([0, 0, 0]);
+  });
+
   // ---------------------------------------------------------------------
   // Initialization
   // ---------------------------------------------------------------------
@@ -1382,8 +1397,8 @@ describe("User Component", () => {
   describe("pa gap fixes: user list test ids (P8)", () => {
     it("P8-R4: the edit actions' test ids carry a row index, never the email", async () => {
       const OTableRows = {
-        props: ["data"],
-        template: `<div><div v-for="(row, i) in data" :key="i"><slot name="cell-actions" :row="row" :index="i" /></div></div>`,
+        props: ["data", "rowActions"],
+        template: `<div><div v-for="(row, i) in data" :key="i"><i v-for="action in rowActions" :key="action.id" :data-test="action.dataTest(row, i)" /></div></div>`,
       };
       const w = mount(User, {
         global: {

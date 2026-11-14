@@ -32,6 +32,11 @@ const node = document.createElement("div");
 node.setAttribute("id", uniqueNodeId);
 document.body.appendChild(node);
 
+// The page teleports its save bar into the Settings shell's slot.
+const saveBarSlot = document.createElement("div");
+saveBarSlot.setAttribute("id", "settings-save-bar-slot");
+document.body.appendChild(saveBarSlot);
+
 // Mock toast
 vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: vi.fn(),
@@ -119,6 +124,8 @@ const mockRouter = createIsolatedMockRouter();
 
 vi.mock("vue-router", () => ({
   useRouter: () => mockRouter,
+  onBeforeRouteLeave: vi.fn(),
+  onBeforeRouteUpdate: vi.fn(),
 }));
 
 describe("DomainManagement Integration Tests", () => {

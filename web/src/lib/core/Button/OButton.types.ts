@@ -53,6 +53,8 @@ export type ButtonVariant =
   | "webinar-dismiss"
   // Banner action — inline text-link style button for actions inside an OBanner bar
   | "banner-dismiss"
+  // Text link inside running copy (a description, a help line); keeps the surrounding font size
+  | "link"
   // Pricing template chip — pill-shaped toggle chip for quick-setup template selection
   | "pricing-chip"
   | "section-chip"

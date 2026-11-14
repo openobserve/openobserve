@@ -60,9 +60,9 @@ import AddRegexPattern from "./AddRegexPattern.vue";
 
 const drawer = {
   name: "ODrawer",
-  props: ["open", "width"],
+  props: ["open", "size"],
   template:
-    '<div data-test="o-drawer-stub" :data-width="String(width)"><slot name="header-right" /><slot /></div>',
+    '<div data-test="o-drawer-stub" :data-size="String(size)"><slot name="header-right" /><slot /></div>',
 };
 
 async function setup() {
@@ -132,13 +132,13 @@ describe("AddRegexPattern with the revamped assistant", () => {
 
   it("widens the drawer as it did for the legacy chat while docked, and docks in its body row", async () => {
     const { wrapper, runtime } = await setup();
-    expect(wrapper.get('[data-test="add-regex-pattern-drawer"]').attributes("data-width")).toBe(
-      "40",
+    expect(wrapper.get('[data-test="add-regex-pattern-drawer"]').attributes("data-size")).toBe(
+      "lg",
     );
     runtime.store.open({ kind: "docked", hostId: "regex" }, { focus: "none" });
     await settleAsyncParts();
-    expect(wrapper.get('[data-test="add-regex-pattern-drawer"]').attributes("data-width")).toBe(
-      "70",
+    expect(wrapper.get('[data-test="add-regex-pattern-drawer"]').attributes("data-size")).toBe(
+      "xxl",
     );
     expect(wrapper.find('[data-test="assistant-dock-stub"]').exists()).toBe(true);
   });

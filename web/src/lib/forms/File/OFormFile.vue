@@ -4,7 +4,7 @@
 import { inject } from "vue";
 import OFile from "./OFile.vue";
 import { FORM_CONTEXT_KEY } from "../Form/OForm.types";
-import { firstFieldError } from "../Form/fieldError";
+import { useVisibleFieldError } from "../Form/fieldError";
 import { raw } from "@/types/i18n";
 import type { FormFileProps } from "./OFormFile.types";
 import type { FileValue } from "./OFile.types";
@@ -14,6 +14,7 @@ defineOptions({ inheritAttrs: false });
 const props = defineProps<FormFileProps>();
 
 const form = inject(FORM_CONTEXT_KEY, null);
+const shown = useVisibleFieldError(form);
 
 if (import.meta.env.DEV && !form) {
   console.warn("[OFormFile] must be rendered inside <OForm>. No form context found.");
@@ -44,11 +45,9 @@ if (import.meta.env.DEV && !form) {
           :id="props.id"
           :name="props.name"
           :model-value="field.state.value"
-          :error="field.state.meta.errors.length > 0"
+          :error="shown(field).invalid"
           :error-message="
-            field.state.meta.errors.length > 0
-              ? raw(firstFieldError(field.state.meta.errors))
-              : undefined
+            shown(field).message !== undefined ? raw(shown(field).message) : undefined
           "
           @update:model-value="
             (v: FileValue) => {

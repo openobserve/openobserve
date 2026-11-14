@@ -28545,7 +28545,7 @@
   },
   "slackApp": {
     "prereq": {
-      "title": "Bước 0 · Điều kiện tiên quyết của máy chủ",
+      "title": "Bước 1 · Điều kiện tiên quyết của máy chủ",
       "subtitle": "Được kiểm tra trên máy chủ này trước khi thực hiện bất kỳ thao tác nào với Slack",
       "columnSetting": "Thiết lập",
       "columnResult": "Kết quả",
@@ -28616,7 +28616,7 @@
       "back": "Quay lại",
       "finish": "Hoàn tất",
       "connection": {
-        "title": "Bước 1 · Kết nối",
+        "title": "Bước 2 · Kết nối",
         "description": "Bước kiểm tra truy cập Slack từ máy chủ này qua đúng luồng mã mà môi trường production sử dụng.",
         "allPassed": "Có thể truy cập Slack từ máy chủ này",
         "someFailed": "Không thể truy cập Slack từ máy chủ này. Hãy cho phép *.slack.com đi qua proxy hoặc tường lửa, rồi Kiểm tra lại.",
@@ -28625,7 +28625,7 @@
         "socketHost": "Máy chủ WebSocket {host}"
       },
       "create": {
-        "title": "Bước 2 · Tạo ứng dụng",
+        "title": "Bước 3 · Tạo ứng dụng",
         "modeLabel": "Chế độ kết nối",
         "socket": "Chế độ Socket",
         "socketDescription": "Được khuyến nghị. OpenObserve mở kết nối, nên Slack không cần URL công khai",
@@ -28654,7 +28654,7 @@
         "signingSecretRequired": "Chế độ HTTP cần signing secret"
       },
       "install": {
-        "title": "Bước 3 · Cài đặt",
+        "title": "Bước 4 · Cài đặt",
         "created": "Đã tạo ứng dụng · {appId}",
         "allowHint": "Mở màn hình cài đặt của Slack: nhấp Cho phép tại đó. Bot token sẽ tự động được Slack trả về; không cần sao chép gì.",
         "allow": "Cho phép trong Slack",
@@ -28677,7 +28677,7 @@
         "appNotCreatedByO2": "OpenObserve không tạo ứng dụng này, nên ứng dụng vẫn ở lại trong Slack. Hãy xóa tại đó nếu bạn không còn cần đến."
       },
       "test": {
-        "title": "Bước 4 · Kiểm tra và liên kết",
+        "title": "Bước 5 · Kiểm tra và liên kết",
         "run": "Chạy kiểm tra",
         "signIn": "Kiểm tra Đăng nhập bằng Slack",
         "signInPassed": "Đăng nhập bằng Slack hoạt động",

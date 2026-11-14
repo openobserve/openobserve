@@ -15,11 +15,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <script setup lang="ts">
-import { raw, type I18nText } from "@/types/i18n";
+import OFormSection from "@/lib/core/FormSection/OFormSection.vue";
+import type { I18nText } from "@/types/i18n";
 
 defineProps<{
   sectionId: string;
-  /** Without a title the section is a plain column: one section reads as today's page. */
+  /** With a title the section is one card; without, a plain column of its own cards. */
   title?: I18nText;
   description?: I18nText;
 }>();
@@ -31,17 +32,18 @@ defineProps<{
     class="flex scroll-mt-16 flex-col gap-6"
     :data-test="`slack-section-${sectionId}`"
   >
-    <div
+    <OFormSection
       v-if="title"
-      class="flex flex-col gap-0.5"
+      variant="plain"
+      :title="title"
+      :description="description"
       :data-test="`slack-section-${sectionId}-heading`"
     >
-      <h2 class="text-text-heading m-0 flex items-baseline gap-1.5 text-xl font-semibold">
-        {{ title }}
-        <span class="text-text-muted font-normal" aria-hidden="true">{{ raw("#") }}</span>
-      </h2>
-      <p v-if="description" class="text-text-secondary m-0 max-w-190 text-sm">{{ description }}</p>
-    </div>
-    <slot />
+      <template v-if="$slots.actions" #actions>
+        <slot name="actions" />
+      </template>
+      <slot />
+    </OFormSection>
+    <slot v-else />
   </section>
 </template>

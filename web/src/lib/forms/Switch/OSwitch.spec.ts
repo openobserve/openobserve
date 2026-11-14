@@ -136,6 +136,36 @@ describe("OSwitch", () => {
     expect(wrapper.find("button").attributes("aria-labelledby")).toBeUndefined();
   });
 
+  it("state text follows the value and is absent by default", async () => {
+    const rows = [
+      { props: { modelValue: true }, text: undefined },
+      { props: { modelValue: true, stateText: true }, text: "On" },
+      { props: { modelValue: false, stateText: true }, text: "Off" },
+      { props: { modelValue: "no", checkedValue: "yes", stateText: true }, text: "Off" },
+      { props: { modelValue: "yes", checkedValue: "yes", stateText: true }, text: "On" },
+    ];
+    for (const row of rows) {
+      const sw = mount(OSwitch, {
+        props: row.props,
+        attrs: { "data-test": "sw", "aria-label": "Feature" },
+      });
+      const state = sw.find('[data-test="sw-state"]');
+      expect(state.exists()).toBe(row.text !== undefined);
+      if (row.text !== undefined) {
+        expect(state.text()).toBe(row.text);
+        expect(state.attributes("aria-hidden")).toBe("true");
+      }
+      sw.unmount();
+    }
+
+    wrapper = mount(OSwitch, {
+      props: { modelValue: false, stateText: true },
+      attrs: { "data-test": "sw", "aria-label": "Feature" },
+    });
+    await wrapper.find("button").trigger("click");
+    expect(wrapper.find('[data-test="sw-state"]').text()).toBe("On");
+  });
+
   it("toggles when the wrapper div (label gap) is clicked", async () => {
     wrapper = mount(OSwitch, {
       props: { modelValue: false, label: "Notifications" },

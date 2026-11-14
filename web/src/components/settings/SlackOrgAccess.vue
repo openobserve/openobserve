@@ -20,8 +20,8 @@ import { useMutation, useQuery } from "@tanstack/vue-query";
 import { useStore } from "vuex";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OCard from "@/lib/core/Card/OCard.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OFormSection from "@/lib/core/FormSection/OFormSection.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
@@ -235,17 +235,17 @@ const otherAppOrgs = (orgIds: readonly string[]): string => orgIds.join(", ");
 </script>
 
 <template>
-  <OCard variant="outlined" class="gap-4 p-5" data-test="slack-org-access">
-    <div class="flex flex-wrap items-start justify-between gap-3">
-      <div class="flex flex-col gap-0.5">
-        <h2 class="text-text-heading m-0 text-lg font-semibold">
-          {{ t("slackApp.orgAccess.title") }}
-        </h2>
-      </div>
-      <span v-if="view" class="text-text-secondary text-sm" data-test="slack-org-access-count">{{
+  <OFormSection
+    variant="plain"
+    :title="t('slackApp.orgAccess.title')"
+    :description="t('slackApp.orgAccess.description', { team })"
+    data-test="slack-org-access"
+  >
+    <template v-if="view" #actions>
+      <span class="text-text-secondary text-sm" data-test="slack-org-access-count">{{
         t("slackApp.orgAccess.count", { selected: selectedCount, total })
       }}</span>
-    </div>
+    </template>
 
     <div v-if="access.isPending.value" class="flex justify-center py-8">
       <OSpinner size="md" />
@@ -258,7 +258,7 @@ const otherAppOrgs = (orgIds: readonly string[]): string => orgIds.join(", ");
       data-test="slack-org-access-load-error"
       @action="access.refetch()"
     />
-    <template v-else>
+    <div v-else class="flex flex-col gap-4">
       <OBanner v-if="onlyMeta" variant="info" icon="info" data-test="slack-org-access-only-meta">
         <span class="text-text-heading font-semibold">{{
           t("slackApp.orgAccess.onlyMetaTitle", { team })
@@ -397,7 +397,7 @@ const otherAppOrgs = (orgIds: readonly string[]): string => orgIds.join(", ");
           {{ t("common.save") }}
         </OButton>
       </div>
-    </template>
+    </div>
 
     <ODialog
       v-model:open="confirmOpen"
@@ -458,5 +458,5 @@ const otherAppOrgs = (orgIds: readonly string[]): string => orgIds.join(", ");
         </div>
       </div>
     </ODialog>
-  </OCard>
+  </OFormSection>
 </template>

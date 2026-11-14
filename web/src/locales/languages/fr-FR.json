@@ -28545,7 +28545,7 @@
   },
   "slackApp": {
     "prereq": {
-      "title": "Étape 0 · Prérequis serveur",
+      "title": "Étape 1 · Prérequis serveur",
       "subtitle": "Vérifiés sur ce serveur avant toute configuration Slack",
       "columnSetting": "Paramètre",
       "columnResult": "Résultat",
@@ -28616,7 +28616,7 @@
       "back": "Retour",
       "finish": "Terminer",
       "connection": {
-        "title": "Étape 1 · Connexion",
+        "title": "Étape 2 · Connexion",
         "description": "La vérification atteint Slack depuis ce serveur via le même chemin de code que celui utilisé en production.",
         "allPassed": "Slack est accessible depuis ce serveur",
         "someFailed": "Slack n’est pas accessible depuis ce serveur. Autorisez *.slack.com à travers votre proxy ou pare-feu, puis vérifiez à nouveau.",
@@ -28625,7 +28625,7 @@
         "socketHost": "Hôte WebSocket {host}"
       },
       "create": {
-        "title": "Étape 2 · Créer l’application",
+        "title": "Étape 3 · Créer l’application",
         "modeLabel": "Mode de connexion",
         "socket": "Mode Socket",
         "socketDescription": "Recommandé. OpenObserve ouvre la connexion, donc Slack n’a besoin d’aucune URL publique",
@@ -28654,7 +28654,7 @@
         "signingSecretRequired": "Le mode HTTP nécessite le secret de signature"
       },
       "install": {
-        "title": "Étape 3 · Installation",
+        "title": "Étape 4 · Installation",
         "created": "Application créée · {appId}",
         "allowHint": "Ouvre l'écran d'installation de Slack : cliquez sur Autoriser. Le token du bot revient automatiquement de Slack ; rien à copier.",
         "allow": "Autoriser dans Slack",
@@ -28677,7 +28677,7 @@
         "appNotCreatedByO2": "OpenObserve n'a pas créé cette application ; elle reste donc dans Slack. Supprimez-la là-bas si vous n'en avez plus besoin."
       },
       "test": {
-        "title": "Étape 4 · Test et liaison",
+        "title": "Étape 5 · Test et liaison",
         "run": "Lancer les vérifications",
         "signIn": "Tester Sign in with Slack",
         "signInPassed": "Sign in with Slack fonctionne",

@@ -43,6 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div class="flex h-full min-h-0 flex-col">
       <div
+        v-if="rows.length"
         class="border-border-default flex shrink-0 flex-col gap-2 border-b px-4 py-3"
         data-test="announcement-list-live"
       >
@@ -90,28 +91,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           pagination="none"
           sorting="none"
           :default-columns="false"
+          :enable-column-resize="true"
           :show-global-filter="false"
           :column-visibility="isMobile ? PHONE_HIDDEN_COLUMNS : undefined"
           :loading="configQuery.isLoading.value"
+          :row-actions="rowActions"
           @row-click="(row) => openEditor({ index: String(row.index) })"
         >
           <template #empty>
             <OEmptyState
               v-if="!configQuery.isLoading.value"
               size="hero"
-              icon="campaign"
-              :title="t('announcements.settings.emptyTitle')"
-              :description="t('announcements.settings.emptyHint')"
-              :action-label="t('announcements.settings.addBanner')"
+              preset="no-announcement-banners"
               data-test="announcement-list-empty"
               @action="openEditor()"
             />
           </template>
           <template #cell-message="{ row }">
             <div class="flex min-w-0 items-center gap-2">
-              <OTruncatedText as="span" class="text-text-heading block text-sm">{{
-                row.text
-              }}</OTruncatedText>
+              <ONameLinkCell
+                :to="() => openEditor({ index: String(row.index) })"
+                data-test="announcement-list-table-name-link"
+              >
+                {{ row.text }}
+              </ONameLinkCell>
               <EditorDraftDot
                 v-if="row.draftKey && bannerDrafts.ids.has(row.draftKey)"
                 :saved-at="bannerDrafts.savedAt(row.draftKey)"
@@ -133,44 +136,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               {{ row.statusLabel }}
             </OBadge>
-          </template>
-          <template #cell-actions="{ row }">
-            <div class="flex items-center justify-center gap-1">
-              <OButton
-                variant="ghost"
-                size="icon-xs-sq"
-                icon-left="edit"
-                :title="t('announcements.card.edit')"
-                :aria-label="t('announcements.card.edit')"
-                :data-test="`announcement-list-edit-${row.index}`"
-                @click.stop="openEditor({ index: String(row.index) })"
-              />
-              <OButton
-                variant="ghost"
-                size="icon-xs-sq"
-                icon-left="content-copy"
-                :aria-label="duplicateLabel(row)"
-                :data-test="`announcement-list-duplicate-${row.index}`"
-                @click.stop="openEditor({ duplicate: String(row.index) })"
-              >
-                <OTooltip side="bottom" :content="duplicateLabel(row)" />
-                <EditorDraftDot
-                  v-if="hasDuplicateDraft(row)"
-                  corner
-                  :tooltip="false"
-                  :data-test="`announcement-list-${row.index}-duplicate-draft-dot`"
-                />
-              </OButton>
-              <OButton
-                variant="ghost-destructive"
-                size="icon-xs-sq"
-                icon-left="delete"
-                :title="t('announcements.card.remove')"
-                :aria-label="t('announcements.card.remove')"
-                :data-test="`announcement-list-delete-${row.index}`"
-                @click.stop="confirmDelete(row.index)"
-              />
-            </div>
           </template>
         </OTable>
       </div>
@@ -206,17 +171,16 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
-import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import { ONameLinkCell } from "@/lib/core/Table/cells";
+import type { OTableColumnDef, OTableRowAction } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
-import { useDraftLabel } from "@/components/common/drafts/useDraftLabel";
-import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useEditorDraftIds } from "@/composables/useEditorDraft";
 import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
 import { announcementConfigQuery } from "@/services/announcements.queries";
 import analytics from "@/services/product_analytics";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { useDraftLabel } from "@/components/common/drafts/useDraftLabel";
 import type { BannerVariantName } from "@/utils/announcementOrder";
 import { bannerRank } from "@/utils/announcementOrder";
 import { bannerMessageText } from "@/utils/announcementMarkdown";
@@ -291,14 +255,6 @@ const { update } = useAnnouncementConfigUpdate();
 const bannerDrafts = useEditorDraftIds("announcement_banner");
 const hasDuplicateDraft = (row: BannerRow) =>
   !!row.draftKey && bannerDrafts.hasNewVariant(`duplicate:${row.draftKey}`);
-const draftLabel = useDraftLabel();
-// The corner dot is presentational, so Duplicate says it reopens a kept copy, dated, in its own name.
-const duplicateLabel = (row: BannerRow): I18nText => {
-  const label = t("announcements.list.duplicate");
-  return hasDuplicateDraft(row)
-    ? draftLabel(label, bannerDrafts.savedAtVariant(`duplicate:${row.draftKey}`))
-    : label;
-};
 
 // A copy of a deleted banner has nothing left to come from, so its draft goes too.
 const dropBannerDrafts = (key: string) => {
@@ -382,25 +338,64 @@ const columns = computed<OTableColumnDef<BannerRow>[]>(() => [
     id: "message",
     header: t("announcements.form.message"),
     accessorKey: "text",
-    size: 360,
+    size: 320,
     minSize: 200,
     meta: { align: "left", flex: true },
   },
-  { id: "severity", header: t("announcements.form.severity"), size: 120 },
-  { id: "status", header: t("announcements.list.statusHeader"), size: 120 },
+  { id: "severity", header: t("announcements.form.severity"), size: 110 },
+  { id: "status", header: t("announcements.list.statusHeader"), size: 110 },
   {
     id: "schedule",
     header: t("announcements.form.schedule"),
     accessorKey: "schedule",
-    size: 240,
+    size: 220,
+    minSize: 180,
+    meta: { flex: true },
   },
-  { id: "audience", header: t("announcements.form.orgs"), accessorKey: "audience", size: 170 },
+  { id: "audience", header: t("announcements.form.orgs"), accessorKey: "audience", size: 150 },
   {
     id: "actions",
     header: t("announcements.list.actions"),
     isAction: true,
     pinned: "right",
-    meta: { align: "center", actionCount: 3 },
+  },
+]);
+
+const draftLabel = useDraftLabel();
+// The dot is presentational, so Duplicate says it reopens a kept copy, dated, in its own name.
+const duplicateLabel = (row: BannerRow): I18nText => {
+  const label = t("announcements.list.duplicate");
+  return hasDuplicateDraft(row)
+    ? draftLabel(label, bannerDrafts.savedAtVariant(`duplicate:${row.draftKey}`))
+    : label;
+};
+
+const rowActions = computed<OTableRowAction<BannerRow>[]>(() => [
+  {
+    id: "edit",
+    label: t("announcements.card.edit"),
+    icon: "edit",
+    onSelect: (row) => openEditor({ index: String(row.index) }),
+    dataTest: (row) => `announcement-list-edit-${row.index}`,
+  },
+  {
+    id: "duplicate",
+    label: duplicateLabel,
+    icon: "content-copy",
+    onSelect: (row) => openEditor({ duplicate: String(row.index) }),
+    badge: (row) =>
+      hasDuplicateDraft(row) && {
+        label: duplicateLabel(row),
+        dataTest: `announcement-list-${row.index}-duplicate-draft-dot`,
+      },
+    dataTest: (row) => `announcement-list-duplicate-${row.index}`,
+  },
+  {
+    id: "delete",
+    label: t("announcements.card.remove"),
+    icon: "delete",
+    onSelect: (row) => confirmDelete(row.index),
+    dataTest: (row) => `announcement-list-delete-${row.index}`,
   },
 ]);
 

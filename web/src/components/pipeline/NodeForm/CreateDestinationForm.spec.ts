@@ -130,6 +130,27 @@ describe("CreateDestinationForm", () => {
       await flushPromises();
       expect(wrapper.find('[data-test="add-destination-method-select"]').exists()).toBe(true);
     });
+
+    it("the cards are one radio group: arrows move focus, Space chooses", async () => {
+      document.body.appendChild(wrapper.element);
+      const cards = wrapper.findAll('[role="radiogroup"] [role="radio"]');
+      const tabStops = () => cards.filter((c: any) => c.attributes("tabindex") === "0");
+      expect(tabStops()).toHaveLength(1);
+      expect(tabStops()[0].attributes("aria-checked")).toBe("true");
+
+      await cards[0].trigger("keydown", { key: "ArrowRight" });
+      expect(document.activeElement).toBe(cards[1].element);
+      expect(getFormField(wrapper, "destination_type")).toBe("openobserve");
+
+      await cards[0].trigger("keydown", { key: "ArrowLeft" });
+      expect(document.activeElement).toBe(cards[cards.length - 1].element);
+
+      await cards[1].trigger("keydown", { key: " " });
+      await flushPromises();
+      expect(cards[1].attributes("aria-checked")).toBe("true");
+      expect(tabStops().map((c: any) => c.element)).toEqual([cards[1].element]);
+      wrapper.element.remove();
+    });
   });
 
   // ─────────────────────────────────────────────────────────────────────────────

@@ -114,7 +114,8 @@ export class TelephonySettingsPage {
   }
 
   async expectForbidden(sentence) {
-    await expect(this.page.locator(this.locators.forbidden)).toHaveText(sentence, { timeout: 45000 });
+    // The forbidden state is an empty state: a "no access" heading above this sentence.
+    await expect(this.page.locator(this.locators.forbidden)).toContainText(sentence, { timeout: 45000 });
     await expect(this.page.locator(this.locators.connected)).toHaveCount(0);
     await this.expectNoHero();
   }

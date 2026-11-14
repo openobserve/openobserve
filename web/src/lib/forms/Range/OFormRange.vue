@@ -4,7 +4,7 @@
 import { inject } from "vue";
 import ORange from "./ORange.vue";
 import { FORM_CONTEXT_KEY } from "../Form/OForm.types";
-import { firstFieldError } from "../Form/fieldError";
+import { useVisibleFieldError } from "../Form/fieldError";
 import type { FormRangeProps } from "./OFormRange.types";
 import type { RangeValue } from "./ORange.types";
 
@@ -19,6 +19,7 @@ defineOptions({ inheritAttrs: false });
 const props = defineProps<FormRangeProps>();
 
 const form = inject(FORM_CONTEXT_KEY, null);
+const shown = useVisibleFieldError(form);
 
 if (import.meta.env.DEV && !form) {
   console.warn("[OFormRange] must be rendered inside <OForm>. No form context found.");
@@ -49,7 +50,7 @@ if (import.meta.env.DEV && !form) {
           :markers="props.markers"
           :marker-labels="props.markerLabels"
           :model-value="field.state.value"
-          :error="field.state.meta.errors.length > 0"
+          :error="shown(field).invalid"
           @update:model-value="
             (v: RangeValue) => {
               field.handleChange(v);
@@ -62,8 +63,8 @@ if (import.meta.env.DEV && !form) {
             <slot name="label" />
           </template>
         </ORange>
-        <div v-if="field.state.meta.errors.length > 0" class="text-slider-error-text text-xs">
-          {{ firstFieldError(field.state.meta.errors) }}
+        <div v-if="shown(field).message !== undefined" class="text-slider-error-text text-xs">
+          {{ shown(field).message }}
         </div>
       </div>
     </template>
