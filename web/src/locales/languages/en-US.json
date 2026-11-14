@@ -33622,7 +33622,7 @@
       "durationP95": "Duration p95",
       "whereUnscoped": "Charts and tables are not scoped to {where}: the stream schema could not be read.",
       "whereUnscopedOutside": "Charts and tables are not scoped to the instances outside Kubernetes: the stream schema could not be read.",
-      "byVersion": "By version",
+      "byVersion": "Version traffic",
       "onlyOneVersion": "Only one version so far"
     },
     "compare": {

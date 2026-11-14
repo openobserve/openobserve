@@ -1422,7 +1422,7 @@ describe("ServiceGraphNodeSidePanel", () => {
       await flushPromises();
       await flushPromises();
       const tab = wrapper.vm.availableResourceTabConfigs[0];
-      expect(String(tab.label)).toBe("By version");
+      expect(String(tab.label)).toBe("Version traffic");
       expect(String(tab.colLabel)).toBe("Version");
     });
 
