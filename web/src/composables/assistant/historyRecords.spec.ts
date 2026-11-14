@@ -408,3 +408,58 @@ describe("historyRecords: a write an Always grant let run, live (P2-2 gap 1)", (
     expect(session.ledger).toHaveLength(1);
   });
 });
+
+// A delete of two streams gathered into one card: the turn stored one request per target, the row holds the card.
+describe("historyRecords: a gathered card past its deadline", () => {
+  const target = (name: string) => ({ type: "stream", id: name, name: `${name} (logs)` });
+  const part = (n: number, name: string) => ({
+    type: "confirmation_required",
+    tool: "o2_delete",
+    kind: "delete",
+    id: `call_${n}`,
+    targets: [target(name)],
+    args: { items: [{ resource_type: "stream", name: `${name} (logs)`, id: name }] },
+    message: `Do you really want to delete the "${name} (logs)" stream?`,
+  });
+  const card = {
+    ...part(0, "a"),
+    id: "apr_g",
+    targets: [target("a"), target("b")],
+    args: { items: [] },
+    message: "Do you really want to delete these 2 resources?",
+    expires_at: 1_000,
+  };
+  const detail = parseChatDetail({
+    session_id: "s1",
+    pending_approval: true,
+    turns: [
+      {
+        turn_id: "t1",
+        user: { text: "delete my streams" },
+        status: "completed",
+        frames: [
+          { type: "tool_call", tool: "delete", call_id: "call_0" },
+          part(0, "a"),
+          { type: "tool_call", tool: "delete", call_id: "call_1" },
+          part(1, "b"),
+          { type: "message_delta", content: "I proposed deleting both." },
+          { type: "complete" },
+        ],
+      },
+    ],
+    approvals: [{ id: "apr_g", status: "pending", card, expires_at: 1_000_000 }],
+  });
+
+  it("shows the card once, as expired, never one unanswered row per target", () => {
+    const messages = projectRecord(shownTurns(detail), "owner", {
+      timezone: "UTC",
+      scrubModels: false,
+      approvals: detail.approvals,
+      now: 2_000,
+    });
+    const cards = messages.flatMap((m) => m.contentBlocks ?? []).filter((b) => b.approval);
+    expect(cards.map((b) => b.approval?.id)).toEqual(["apr_g"]);
+    expect(cards[0].approval).toMatchObject({ recorded: { status: "expired" } });
+    expect(cards[0].approval?.noDecision).toBeUndefined();
+  });
+});

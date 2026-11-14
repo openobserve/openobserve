@@ -195,6 +195,8 @@ export function createHistoryRecords(ctx: HistoryCtx, list: HistoryList) {
     const cards = waiting.filter((open) => placeCard(messages, open.turnId, open.card));
     const card = cards[0]?.card ?? null;
     const settled = !detail.active_turn && !turns.some((turn) => turn.status === "running");
+    // The server keeps an expired card pending; this read found nothing to answer until the chat changes.
+    const lapsed = detail.pending_approval === true && settled && !cards.length;
     ctx.deps.store().adoptSession(sid, {
       ...adoptBase(sid, detail.title, cached, detail),
       messages,
@@ -206,6 +208,7 @@ export function createHistoryRecords(ctx: HistoryCtx, list: HistoryList) {
         forkedFromShare: detail.forked_from_share ?? null,
         branchedFrom: branchedFromOf(detail.branched_from),
         pinned: detail.pinned ?? cached?.pinned ?? false,
+        lapsedAt: lapsed ? Math.floor(detail.updated_at / 1000) : null,
         ...forkSeedField(detail, cached),
       },
     });
@@ -447,7 +450,7 @@ export function branchedFromOf(value: unknown): BranchedFromRef | null {
 
 /** The owner's own reload folds unscrubbed, as the live stream showed it and `owner.json` pins it. */
 export function ownerOptions(ctx: HistoryCtx) {
-  return { timezone: ctx.deps.timezone(), scrubModels: false, t: ctx.deps.t };
+  return { timezone: ctx.deps.timezone(), scrubModels: false, t: ctx.deps.t, now: ctx.deps.now() };
 }
 
 /** Today's server history drops `confirmation_required`; the card this browser saw goes back where it was. */
@@ -477,7 +480,8 @@ export function shownTurns(
   detail: Pick<ChatDetail, "turns" | "seed" | "branched_from" | "approvals" | "active_turn_id">,
   turns: StoredTurn[] = detail.turns ?? [],
 ): StoredTurn[] {
-  const own = withPendingCards(withDecidedCards(turns, detail.approvals), detail);
+  const gathered = withGatheredCards(turns, detail.approvals);
+  const own = withPendingCards(withDecidedCards(gathered, detail.approvals), detail);
   // A share fork shows its seed above the divider instead; a branch continues it as its own turns.
   const carried = detail.branched_from ? (detail.seed?.turns ?? []) : [];
   return carried.length ? [...carried, ...own] : own;
@@ -646,6 +650,40 @@ function withPendingCards(
     let at = turn.frames.length;
     while (at > 0 && CLOSING_FRAMES.has(turn.frames[at - 1]?.type)) at -= 1;
     return { ...turn, frames: [...turn.frames.slice(0, at), ...cards, ...turn.frames.slice(at)] };
+  });
+}
+
+// The server gathers one request per target into one card; the turn's stored per-target requests read as that card, once.
+function withGatheredCards(
+  turns: StoredTurn[],
+  approvals: readonly ChatApproval[] | undefined,
+): StoredTurn[] {
+  const rows = (approvals ?? []).filter((row) => Array.isArray(row.card?.targets));
+  if (!rows.length) return turns;
+  const ids = new Set(rows.map((row) => row.id));
+  const keys = (frame: any): string[] =>
+    (Array.isArray(frame?.targets) ? frame.targets : []).map(
+      (target: any) => `${target?.type}:${target?.name ?? target?.id}`,
+    );
+  const rowOf = (frame: any) => {
+    const wanted = keys(frame);
+    if (frame?.type !== "confirmation_required" || ids.has(frame.id) || !wanted.length) return;
+    return rows.find((row) => {
+      const covered = new Set(keys(row.card));
+      return wanted.every((key) => covered.has(key));
+    });
+  };
+  return turns.map((turn) => {
+    if (!turn.frames.some(rowOf)) return turn;
+    const placed = new Set(turn.frames.filter(isCardFrame).map((frame) => frame?.id));
+    const frames = turn.frames.flatMap((frame) => {
+      const row = rowOf(frame);
+      if (!row) return [frame];
+      if (placed.has(row.id)) return [];
+      placed.add(row.id);
+      return [row.card];
+    });
+    return { ...turn, frames };
   });
 }
 

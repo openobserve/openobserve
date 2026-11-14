@@ -214,6 +214,8 @@ export interface RecordMeta {
   ephemeral: boolean;
   pinned: boolean;
   seed?: ForkSeed;
+  /** Ms `updated_at` of the read that found nothing waiting though the server still said pending. */
+  lapsedAt?: number | null;
 }
 
 /** `branched_from` of a chat made by Branch in new chat. */

@@ -83,6 +83,8 @@ export interface ProjectRecordOptions {
   t?: TranslateFn;
   /** The chat read's `approvals[]`: how the owner answered cards whose resolution the turns lack. */
   approvals?: readonly ChatApproval[];
+  /** Epoch ms; with it, a row still pending past its expiry reads as expired. */
+  now?: number;
 }
 
 declare module "@/ts/interfaces/chat" {
@@ -684,7 +686,7 @@ function settleMessage(
   const blocks = message.contentBlocks ?? [];
   for (const block of blocks) {
     if (block.approval && !blocks.some((other) => other.resolved?.id === block.approval?.id))
-      block.approval = withRecordedDecision(block.approval, options.approvals);
+      block.approval = withRecordedDecision(block.approval, options.approvals, options.now);
     // Targets come from the arguments on an untyped card, so the redaction goes after the fold, not before it.
     if (block.approval && options.redacted) block.approval = redactedApproval(block.approval);
     if (block.resolved && options.redacted) {
@@ -723,8 +725,15 @@ function settleMessage(
 function withRecordedDecision(
   card: ApprovalBlockData,
   approvals: readonly ChatApproval[] | undefined,
+  now?: number,
 ): ApprovalBlockData {
-  const row = approvals?.find((approval) => approval.id === card.id);
+  const found = approvals?.find((approval) => approval.id === card.id);
+  const lapsed =
+    found?.status === "pending" &&
+    now !== undefined &&
+    found.expires_at !== undefined &&
+    found.expires_at <= now * 1000;
+  const row = lapsed ? { ...found, status: "expired" as const } : found;
   const decided = row && row.status !== "pending" && (row.status !== "approved" || !!row.at);
   if (!row || !decided) return { ...card, noDecision: true };
   const recorded = {

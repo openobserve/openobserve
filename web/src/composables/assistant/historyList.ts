@@ -42,7 +42,7 @@ import {
 import type { LocalRecord } from "./historyDb";
 import { readHistoryFilter, writeHistoryFilter } from "./prefs";
 import { runAgentKey } from "./runs";
-import { endedHere, isTerminal } from "./turnStates";
+import { endedHere, isTerminal, lapsedHere } from "./turnStates";
 
 export const LIST_REREAD_MS = 15_000;
 
@@ -357,7 +357,9 @@ function listLightOf(rows: ComputedRef<HistoryRow[]>, ctx: HistoryCtx) {
   return computed<{ state: "needs_you" | "working"; sid: Sid } | null>(() => {
     const sessions = ctx.deps.store().state.sessions;
     const remote = rows.value.filter((row) => !sessions[row.sid]?.turnMeta.ownedByThisTab);
-    const waiting = remote.find((row) => row.pendingApproval);
+    const waiting = remote.find(
+      (row) => row.pendingApproval && !lapsedHere(sessions[row.sid], row.updatedAt),
+    );
     if (waiting) return { state: "needs_you", sid: waiting.sid };
     const working = remote.find((row) => row.activeTurn);
     return working ? { state: "working", sid: working.sid } : null;
@@ -427,7 +429,9 @@ function withLiveSessions(rows: HistoryRow[], ctx: HistoryCtx): HistoryRow[] {
       ...row,
       title: session.title && session.titleSource === "renamed" ? session.title : row.title,
       activeTurn: running || (row.activeTurn && !settled),
-      pendingApproval: !!session.pendingApproval || (row.pendingApproval && !settled),
+      pendingApproval:
+        !!session.pendingApproval ||
+        (row.pendingApproval && !settled && !lapsedHere(session, row.updatedAt)),
       share: session.share ?? row.share,
     };
   });

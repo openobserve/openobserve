@@ -30,7 +30,7 @@ import { isHelperChat } from "./historyContext";
 import { HEARTBEAT_TRUST_MS } from "./historyElsewhere";
 import type { RemoteTurn } from "./lifecycle";
 import { runtimeHandle } from "./runtimeHandle";
-import { endedHere } from "./turnStates";
+import { endedHere, lapsedHere } from "./turnStates";
 
 /** The list shows the server's cap once a 429 named it; until then this default (`80` §1.3). */
 export const RUN_CAP_DEFAULT = 3;
@@ -423,7 +423,11 @@ export function createRuns(deps: RunsDeps): AssistantRuns {
       const others = chats.value.filter(
         (chat) => !sessions[chat.session_id]?.turnMeta.ownedByThisTab,
       );
-      const waiting = others.find((chat) => chat.pending_approval);
+      const waiting = others.find(
+        (chat) =>
+          chat.pending_approval &&
+          !lapsedHere(sessions[chat.session_id], Math.floor(chat.updated_at / 1000)),
+      );
       if (waiting) return { state: "needs_you", sid: waiting.session_id };
       const working = others.find((chat) => chat.active_turn);
       return working ? { state: "working", sid: working.session_id } : null;
@@ -595,7 +599,7 @@ function serverRow(
     startedAt,
     turnId: chat.active_turn_id ?? null,
   };
-  if (chat.pending_approval)
+  if (chat.pending_approval && !lapsedHere(session, startedAt ?? 0))
     return { ...base, group: "needs_you", status: "needsApproval", request: chat.session_id };
   if (chat.active_turn) {
     const other = !!chat.active_turn_client_id && chat.active_turn_client_id !== input.clientId;

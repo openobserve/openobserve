@@ -1753,6 +1753,44 @@ describe("useAssistantHistory reload of a chat waiting on an approval", () => {
       expect(fake.store.state.sessions[sid].pendingApproval).toBeNull();
     });
 
+    it("leaves Needs You once a reopened card is past its expiry, though the server still says pending", async () => {
+      const updatedAt = (Date.now() - 5_000) * 1000;
+      const summary = {
+        session_id: sid,
+        title: "Mute cart alerts",
+        created_at: 1,
+        updated_at: updatedAt,
+        last_committed_seq: 3,
+        active_turn: false,
+        pending_approval: true,
+        last_turn_status: "completed",
+        seen: true,
+      } as ChatSummaryWire;
+      const fake = await reopen(endedWaiting(Date.now() - 1_000, { updated_at: updatedAt }), [
+        summary,
+      ]);
+      const session = fake.store.state.sessions[sid];
+      expect(fake.history.rows.value.find((row) => row.sid === sid)?.pendingApproval).toBe(false);
+      expect(fake.history.listLight.value).toBeNull();
+      const input = {
+        sessions: [session],
+        cleared: {},
+        org: "default",
+        userOrgKey: session.userOrgKey,
+        clientId: "me",
+        now: Date.now(),
+        remote: [],
+      };
+      expect(
+        runsList({ ...input, chats: [summary] }).find((row) => row.sid === sid),
+      ).toBeUndefined();
+      // A card raised after the read moves the chat on, so it needs the user again.
+      const later = { ...summary, updated_at: updatedAt + 60_000_000 };
+      expect(runsList({ ...input, chats: [later] }).find((row) => row.sid === sid)).toMatchObject({
+        group: "needs_you",
+      });
+    });
+
     it("reads the card as still open on a later check, never as withdrawn", () => {
       const expiresAt = Date.now() + 600_000;
       expect(serverCardOf(endedWaiting(expiresAt) as never, "t1", id)).toMatchObject({

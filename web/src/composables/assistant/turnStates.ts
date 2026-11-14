@@ -74,6 +74,15 @@ export function isRunning(turn: TurnState): boolean {
   return turn.state !== "idle" && !isTerminal(turn);
 }
 
+/** The server's pending flag on a chat updated no later than the read that found nothing waiting. */
+export function lapsedHere(
+  session: { record?: { lapsedAt?: number | null } } | undefined,
+  updatedAt: number,
+): boolean {
+  const at = session?.record?.lapsedAt;
+  return typeof at === "number" && updatedAt <= at;
+}
+
 /** True when this tab saw the turn a list summary calls running end, so that summary is stale. */
 export function endedHere(
   session: {
