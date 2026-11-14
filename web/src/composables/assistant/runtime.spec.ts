@@ -31,6 +31,7 @@ import { openTabWithoutOpener } from "./openTab";
 import { pushRecall, readRecall } from "./prefs";
 import { useAssistantRuns } from "./runs";
 import { getAssistantRuntime, resetAssistantRuntimeForTests } from "./runtime";
+import { RECONNECT_DELAYS_MS } from "./turnEngine";
 
 vi.mock("@/aws-exports", () => ({ default: { isEnterprise: "true", isCloud: "false" } }));
 
@@ -54,6 +55,7 @@ const CONFIG = {
 };
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllGlobals();
   resetAssistantRuntimeForTests();
   queryClient.clear();
@@ -61,6 +63,9 @@ afterEach(() => {
   localStorage.clear();
   vi.clearAllMocks();
 });
+
+const frame = (name: string) =>
+  JSON.parse(readFileSync(join(__dirname, "__fixtures__", "frames", `${name}.json`), "utf8")).frame;
 
 const context = (role: string, org = ref("org1")) => ({
   getOrg: () => ({ identifier: org.value, name: org.value }),
@@ -228,9 +233,6 @@ describe("assistant runtime", () => {
   });
 
   it("sends a turn end to end through the registered engine (WP-03 §5.9)", async () => {
-    const frame = (name: string) =>
-      JSON.parse(readFileSync(join(__dirname, "__fixtures__", "frames", `${name}.json`), "utf8"))
-        .frame;
     const frames = ["status", "title", "tool_call", "tool_result", "message_delta", "complete"].map(
       frame,
     );
@@ -259,5 +261,45 @@ describe("assistant runtime", () => {
     expect(session.messages.map((m) => m.role)).toEqual(["user", "assistant"]);
     expect(session.turnMeta.traceId).toBe("4bf92f3577b34da6a3ce929d0e0e4736");
     expect(session.turnMeta.usage).toMatchObject({ tokensIn: 18342, tokensOut: 612 });
+  });
+
+  it("resumes a dropped stream of a saved chat from its last seq (HT-06)", async () => {
+    const sse = (items: [number, unknown][]) =>
+      new Response(items.map(([id, f]) => `id: ${id}\ndata: ${JSON.stringify(f)}\n\n`).join(""), {
+        status: 200,
+        headers: { "Content-Type": "text/event-stream" },
+      });
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        sse([
+          [1, frame("status")],
+          [2, frame("message_delta")],
+        ]),
+      )
+      .mockResolvedValueOnce(
+        sse([
+          [2, frame("message_delta")],
+          [3, frame("complete")],
+        ]),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("requestAnimationFrame", (cb: () => void) => setTimeout(cb, 0));
+    assistantStore.init(context("admin"));
+    await vi.waitFor(() => expect(assistantStore.state.ready).toBe(true));
+    vi.useFakeTimers();
+    const sid = assistantStore.createSession({
+      origin: { entryKind: "header_button", objectKind: "none", container: "sidebar" },
+      thread: "new",
+    });
+    assistantStore.setDraft(sid, { text: "why?" });
+    const sent = assistantStore.send(sid);
+    await vi.waitFor(() =>
+      expect(assistantStore.state.sessions[sid].turn.state).toBe("reconnecting"),
+    );
+    await vi.advanceTimersByTimeAsync(RECONNECT_DELAYS_MS[0]);
+    await expect(sent).resolves.toMatchObject({ state: "done" });
+    expect(String(fetchMock.mock.calls[1][0])).toMatch(/\/ai\/chats\/[^/]+\/turns\/[^/]+\/stream/);
+    expect(fetchMock.mock.calls[1][1].headers["Last-Event-ID"]).toBe("2");
   });
 });

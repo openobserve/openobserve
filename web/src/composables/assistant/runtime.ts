@@ -538,6 +538,8 @@ function engineDeps(
     pageContext: () => contextRegistry.getActiveContext(),
     uiVersion: () => uiVersion.value,
     container: () => containerOf(store().state.shell.placement, lgUp()) ?? "home",
+    // The turn-stream route serves only a server that saves chats; it answers 404 otherwise.
+    tailEnabled: () => capability().capability.value.persistence,
     approvals: () => deps.approvals,
   };
 }
