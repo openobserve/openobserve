@@ -1469,7 +1469,7 @@ describe("O2AIChat session, persistence and lifecycle", () => {
       );
       const dialog = wrapper
         .findAllComponents({ name: "ODialog" })
-        .find((c) => c.props("title") === "Delete Chat")!;
+        .find((c) => c.props("title") === "Delete chat")!;
       // A danger primary makes ODialog focus Cancel on open, so no focus prop is needed.
       expect(dialog.props("primary")).toMatchObject({ label: "Delete", variant: "danger" });
     });

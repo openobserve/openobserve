@@ -32,9 +32,6 @@
     bleed
   >
     <template #actions>
-      <!-- The provider behind the Terraform export, which is otherwise only
-           discoverable once the export dialog is already open. -->
-      <IacRegistryLinks data-test="slos-slolist-iac-registries" :compact="isMobile" />
       <OButton
         variant="secondary"
         icon="upload-file"
@@ -59,6 +56,18 @@
           data-test="slos-slolist-new-draft-dot"
         />
       </OButton>
+      <ODropdown side="bottom" align="end">
+        <template #trigger>
+          <OButton
+            icon-only
+            variant="ghost"
+            icon="more-horiz"
+            data-test="app-page-header-more-btn"
+            :label="t('common.more')"
+          />
+        </template>
+        <IacRegistryLinks menu data-test="slos-slolist-iac-registries" />
+      </ODropdown>
     </template>
 
     <!-- SLOs share the ALERT folder namespace (there is no FolderType::Slos),
@@ -96,7 +105,7 @@
       @update:current-page="onPageChange"
     >
       <template #toolbar>
-        <div class="flex min-w-0 flex-1 flex-wrap items-center gap-2 gap-y-1.5 max-md:contents">
+        <div class="contents">
           <OToggleGroup v-model="typeFilter" mobile-dropdown data-test="slos-slolist-type-filter">
             <OToggleGroupItem
               v-for="opt in typeOptions"
@@ -114,7 +123,7 @@
                will not shrink below its content width without it, which is
                how a long placeholder pushes the toolbar wider than the table.
                Same wrapper the Alerts toolbar uses. -->
-          <div class="min-w-0 flex-1 max-md:min-w-40">
+          <div class="min-w-0 flex-1 max-md:min-w-40 md:min-w-48">
             <OSearchInput
               v-model="search"
               class="w-full"
@@ -122,6 +131,18 @@
               data-test="slos-slolist-search"
             />
           </div>
+          <OStatStrip
+            :items="stats"
+            :loading="loading"
+            selectable
+            :row="false"
+            multiple
+            :selected-keys="healthFilters"
+            default-key="total"
+            class="max-md:order-last"
+            data-test="slos-slolist-stats"
+            @update:selected-keys="healthFilters = $event as SloHealth[]"
+          />
         </div>
       </template>
 
@@ -136,26 +157,6 @@
           data-test="slos-slolist-refresh"
           @click="refresh"
         />
-      </template>
-
-      <!-- Health tiles sit in #subheader so search and the type filter stay
-           ABOVE them, matching the Alerts list: you narrow the set first, then
-           read the counts for what you narrowed to. Always rendered (skeleton
-           while loading) so data arriving never shifts the rows below. -->
-      <template #subheader>
-        <div
-          class="px-page-edge border-table-row-divider border-b py-1.5"
-          data-test="slos-slolist-stats"
-        >
-          <OStatStrip
-            :items="stats"
-            :loading="loading"
-            selectable
-            multiple
-            :selected-keys="healthFilters"
-            @update:selected-keys="healthFilters = $event as SloHealth[]"
-          />
-        </div>
       </template>
 
       <template #cell-name="{ row }">
@@ -588,7 +589,6 @@ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import type { SloListItem } from "@/ts/interfaces/slo";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import useBreakpoint from "@/composables/useBreakpoint";
 import { useListViewState } from "@/composables/useListViewState";
 import alertsService from "@/services/alerts";
 import { sloDetailRoute } from "@/utils/alerts/sloAlertRouting";
@@ -609,7 +609,6 @@ import {
 } from "@/composables/useSloFormat";
 
 const { t } = useI18nTyped();
-const { isMobile } = useBreakpoint();
 const router = useRouter();
 const route = useRoute();
 const store = useStore();
@@ -935,7 +934,7 @@ const stats = computed<StatItem[]>(() => {
       label: t("slos.health.budget_blown"),
       value: counts.budget_blown,
       icon: "local-fire-department",
-      tone: "err",
+      tone: "error",
       max: total,
     },
     {
@@ -944,7 +943,7 @@ const stats = computed<StatItem[]>(() => {
       label: t("slos.health.at_risk"),
       value: counts.at_risk,
       icon: "trending-down",
-      tone: "warn",
+      tone: "warning",
       max: total,
     },
     {
@@ -953,7 +952,7 @@ const stats = computed<StatItem[]>(() => {
       label: t("slos.health.meeting"),
       value: counts.meeting,
       icon: "check-circle",
-      tone: "ok",
+      tone: "success",
       max: total,
     },
     {
@@ -970,7 +969,8 @@ const stats = computed<StatItem[]>(() => {
       dataTest: "slos-slolist-stat-total",
       label: t("common.allStatuses"),
       value: total,
-      all: true,
+      tone: "primary",
+      selectable: true,
     },
   ];
 });

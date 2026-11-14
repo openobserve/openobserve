@@ -27,7 +27,7 @@ import type { CodeBlockProps, CodeBlockEmits, CodeBlockSlots } from "./OCodeBloc
 const { t } = useI18nTyped();
 
 // One number feeds both the stylesheet and the collapsed-height maths, so they cannot drift.
-const CODE_LINE_HEIGHT = 1.5;
+const CODE_LINE_HEIGHT = 1.55;
 
 const MASK_CHAR = "•";
 
@@ -126,9 +126,9 @@ const onNativeCopy = () => {
     :data-test="dataTest"
   >
     <div
-      class="o2-code-toolbar border-border-subtle text-text-secondary flex h-9 items-center gap-2 border-b ps-3 pe-1 text-xs"
+      class="o2-code-toolbar border-border-default text-text-secondary flex h-9 items-center gap-2 border-b ps-3 pe-1 text-xs"
     >
-      <span class="text-text-heading min-w-0 truncate font-mono" :data-test="`${dataTest}-name`">{{
+      <span class="text-text-body min-w-0 truncate font-mono" :data-test="`${dataTest}-name`">{{
         headName
       }}</span>
       <span v-if="headLang" class="shrink-0">{{ raw(headLang) }}</span>
@@ -222,8 +222,8 @@ const onNativeCopy = () => {
   overflow-x: auto;
   background: transparent;
   /* The size sits here so an em-based max-height resolves against the code's own type size. */
-  font-size: var(--text-xs);
-  line-height: var(--code-line-height, 1.5);
+  font-size: var(--text-compact);
+  line-height: var(--code-line-height, 1.55);
 }
 
 .o2-code-pre code {

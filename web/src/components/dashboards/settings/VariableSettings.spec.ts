@@ -272,7 +272,7 @@ describe("VariableSettings", () => {
     it("should display variable type labels correctly", async () => {
       const vm = wrapper.vm as any;
 
-      expect(vm.getVariableTypeLabel("query_values")).toBe("Query Values");
+      expect(vm.getVariableTypeLabel("query_values")).toBe("Query values");
       expect(vm.getVariableTypeLabel("constant")).toBe("Constant");
       expect(vm.getVariableTypeLabel("textbox")).toBe("Textbox");
       expect(vm.getVariableTypeLabel("custom")).toBe("Custom");
@@ -549,7 +549,7 @@ describe("VariableSettings", () => {
       const odialog = wrapper.find('[data-test="o-dialog-stub"]');
       expect(odialog.exists()).toBe(true);
       expect(wrapper.find('[data-test="o-dialog-title"]').text()).toBe(
-        "Variables Dependency Graph",
+        "Variables dependency graph",
       );
     });
 

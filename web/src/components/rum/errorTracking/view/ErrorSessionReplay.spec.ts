@@ -107,7 +107,7 @@ describe("ErrorSessionReplay", () => {
 
     it("renders a heading with Session Replay text", () => {
       // Assert
-      expect(wrapper.find("h4").text()).toContain("Session Replay");
+      expect(wrapper.find("h4").text()).toContain("Session replay");
     });
 
     it("renders the hint small element", () => {

@@ -78,8 +78,8 @@ const mockSearchObj = reactive({
     },
     resultGrid: {
       columns: [
-        { name: "service_name", label: "Service Name" },
-        { name: "operation_name", label: "Operation Name" },
+        { name: "service_name", label: "Service name" },
+        { name: "operation_name", label: "Operation name" },
       ],
       currentPage: 1,
     },
@@ -232,7 +232,7 @@ describe("SearchResult", () => {
     it("keeps the spans wording in the Spans view", async () => {
       (mockSearchObj.meta as any).searchMode = "spans";
       await flushPromises();
-      expect(countText()).toContain("Spans Found");
+      expect(countText()).toContain("Spans found");
     });
   });
 
@@ -764,7 +764,7 @@ describe("SearchResult header through a re-run (T-3)", () => {
     await flushPromises();
     await startRerun();
 
-    expect(badge().text()).toBe("1.3K Spans Found");
+    expect(badge().text()).toBe("1.3K Spans found");
     expect(errorChip().exists()).toBe(true);
     expect(errorChip().text()).toContain("38");
     expect(pagerGroup().exists()).toBe(true);
@@ -796,11 +796,11 @@ describe("SearchResult header through a re-run (T-3)", () => {
     vi.advanceTimersByTime(200);
     mockSearchObj.loading = false;
     await wrapper.vm.$nextTick();
-    expect(badge().text()).toBe("1.3K Spans Found");
+    expect(badge().text()).toBe("1.3K Spans found");
 
     settle(2500, 41);
     await wrapper.vm.$nextTick();
-    expect(badge().text()).toBe("2.5K Spans Found");
+    expect(badge().text()).toBe("2.5K Spans found");
     expect(badge().find(".opacity-60").exists()).toBe(false);
     expect(errorChip().text()).toContain("41");
   });
@@ -921,7 +921,7 @@ describe("SearchResult header through a re-run (T-3)", () => {
 
     expect(wrapper.find('[data-test="traces-search-result-refresh-failed"]').exists()).toBe(true);
     expect(badge().find(".opacity-60").exists()).toBe(false);
-    expect(badge().text()).toBe("1.3K Spans Found");
+    expect(badge().text()).toBe("1.3K Spans found");
     expect(errorChip().classes()).not.toContain("opacity-60");
     expect(errorChip().attributes("aria-disabled")).toBeUndefined();
     expect(pagerGroup().classes()).not.toContain("opacity-60");

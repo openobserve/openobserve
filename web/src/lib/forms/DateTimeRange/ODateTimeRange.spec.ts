@@ -273,7 +273,7 @@ describe("ODateTimeRange Component", () => {
       wrapper.vm.relativeValue = 15;
       wrapper.vm.relativePeriod = "m";
 
-      expect(wrapper.vm.getDisplayValue).toBe("Past 15 Minutes");
+      expect(wrapper.vm.getDisplayValue).toBe("Past 15 minutes");
     });
 
     it("should test getDisplayValue computed property for absolute type", () => {

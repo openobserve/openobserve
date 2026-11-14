@@ -428,30 +428,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             table-id="settings-nodes"
             :loading="loading"
           >
-            <!-- Health strip: node counts by status, doubling as the status facet.
-                 Attention-first — offline, then starting, then online, Total last. -->
-            <template #subheader>
-              <div
-                class="px-page-edge border-table-row-divider border-b py-1.5"
-                data-test="nodes-summary"
-              >
-                <OStatStrip
-                  :items="summaryStats"
-                  :loading="loading"
-                  selectable
-                  multiple
-                  :selected-keys="statusFilters"
-                  @update:selected-keys="onStatKeys"
-                />
-              </div>
-            </template>
-
             <template #toolbar>
               <OSearchInput
                 data-test="nodes-search-input"
                 v-model="filterQuery"
-                class="flex-1"
+                class="min-w-0 flex-1 md:min-w-48"
                 :placeholder="t('nodes.search')"
+              />
+              <OStatStrip
+                :items="summaryStats"
+                :loading="loading"
+                selectable
+                :row="false"
+                multiple
+                :selected-keys="statusFilters"
+                default-key="total"
+                class="max-md:order-last"
+                data-test="nodes-summary"
+                @update:selected-keys="onStatKeys"
               />
             </template>
             <template #toolbar-trailing>
@@ -1209,7 +1203,7 @@ export default defineComponent({
     const summaryStats = computed<StatItem[]>(() => {
       const c = healthCounts.value;
       const hasData = c.total > 0;
-      const v = (n: number): number | null => (hasData ? n : null);
+      const v = (n: number): string | number => (hasData ? n : "—");
       const share = hasData ? c.total : undefined;
       return [
         {
@@ -1217,7 +1211,7 @@ export default defineComponent({
           label: t("nodes.summaryOffline"),
           value: v(c.offline),
           icon: "error-outline",
-          tone: "err",
+          tone: "error",
           max: share,
           dataTest: "nodes-summary-offline",
         },
@@ -1226,7 +1220,7 @@ export default defineComponent({
           label: t("nodes.summaryStarting"),
           value: v(c.prepare),
           icon: "hourglass-empty",
-          tone: "warn",
+          tone: "warning",
           max: share,
           dataTest: "nodes-summary-prepare",
         },
@@ -1235,7 +1229,7 @@ export default defineComponent({
           label: t("nodes.summaryOnline"),
           value: v(c.online),
           icon: "check-circle",
-          tone: "ok",
+          tone: "success",
           max: share,
           dataTest: "nodes-summary-online",
         },
@@ -1244,7 +1238,10 @@ export default defineComponent({
           label: t("common.all"),
           value: v(c.total),
           icon: "hub",
-          all: true,
+          tone: "primary",
+          // Clickable (it CLEARS the status facet) but never shows the ring — the
+          // selected key is only ever a real status, never "total". No bar: its
+          // share of itself is always 100%.
           dataTest: "nodes-summary-total",
         },
       ];

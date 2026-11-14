@@ -217,7 +217,7 @@ describe("Query Component", () => {
       await wrapper.vm.openDeleteDialog();
 
       expect(wrapper.vm.dialog.show).toBe(true);
-      expect(wrapper.vm.dialog.title).toBe("Delete Node");
+      expect(wrapper.vm.dialog.title).toBe("Delete node");
       expect(wrapper.vm.dialog.message).toBe("Are you sure you want to delete stream routing?");
     });
   });

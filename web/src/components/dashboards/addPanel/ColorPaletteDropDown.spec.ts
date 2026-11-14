@@ -257,11 +257,11 @@ describe("ColorPaletteDropDown", () => {
       expect(colorOptions.length).toBeGreaterThan(10);
 
       // Should have group headers
-      const bySeriesGroup = colorOptions.find((opt) => opt.label === "By Series");
+      const bySeriesGroup = colorOptions.find((opt) => opt.label === "By series");
       expect(bySeriesGroup).toBeDefined();
       expect(bySeriesGroup.header).toBe(true);
 
-      const byValueGroup = colorOptions.find((opt) => opt.label === "By Value");
+      const byValueGroup = colorOptions.find((opt) => opt.label === "By value");
       expect(byValueGroup).toBeDefined();
       expect(byValueGroup.header).toBe(true);
     });
@@ -271,7 +271,7 @@ describe("ColorPaletteDropDown", () => {
       const defaultOption = colorOptions.find((opt) => opt.value === "palette-classic-by-series");
 
       expect(defaultOption).toBeDefined();
-      expect(defaultOption.label).toBe("Default Palette (By Series)");
+      expect(defaultOption.label).toBe("Default palette (by series)");
       expect(defaultOption.subLabel).toBe("Series with the same name will use the same color");
       expect(defaultOption.colorPalette).toEqual(mockColorPalette);
     });
@@ -314,7 +314,7 @@ describe("ColorPaletteDropDown", () => {
     });
 
     it("should return correct label for default mode", () => {
-      expect(wrapper.vm.selectedOptionLabel).toBe("Default Palette (By Series)");
+      expect(wrapper.vm.selectedOptionLabel).toBe("Default palette (by series)");
     });
 
     it("should return correct label for palette-classic mode", async () => {
@@ -328,7 +328,7 @@ describe("ColorPaletteDropDown", () => {
       mockDashboardPanelData.data.config.color.mode = "fixed";
       await nextTick();
 
-      expect(wrapper.vm.selectedOptionLabel).toBe("Single Color");
+      expect(wrapper.vm.selectedOptionLabel).toBe("Single color");
     });
 
     it("should return default label for unknown mode", async () => {
@@ -349,7 +349,7 @@ describe("ColorPaletteDropDown", () => {
       wrapper = createWrapper();
       await nextTick();
 
-      expect(wrapper.vm.selectedOptionLabel).toBe("Default Palette (By Series)");
+      expect(wrapper.vm.selectedOptionLabel).toBe("Default palette (by series)");
 
       // Restore original color config
       mockDashboardPanelData.data.config.color = originalColor;
@@ -560,7 +560,7 @@ describe("ColorPaletteDropDown", () => {
       const groupOption = colorOptions.find((opt) => opt.header);
 
       expect(groupOption).toBeDefined();
-      expect(groupOption.label).toBe("By Series");
+      expect(groupOption.label).toBe("By series");
     });
 
     it("should handle options with colorPalette arrays", () => {
@@ -665,7 +665,7 @@ describe("ColorPaletteDropDown", () => {
       wrapper = createWrapper();
       await nextTick();
 
-      expect(wrapper.vm.selectedOptionLabel).toBe("Default Palette (By Series)");
+      expect(wrapper.vm.selectedOptionLabel).toBe("Default palette (by series)");
 
       // Restore original color config
       mockDashboardPanelData.data.config.color = originalColor;
@@ -678,7 +678,7 @@ describe("ColorPaletteDropDown", () => {
       wrapper = createWrapper();
       await nextTick();
 
-      expect(wrapper.vm.selectedOptionLabel).toBe("Default Palette (By Series)");
+      expect(wrapper.vm.selectedOptionLabel).toBe("Default palette (by series)");
 
       // Restore original mode
       mockDashboardPanelData.data.config.color.mode = originalMode;
@@ -720,7 +720,7 @@ describe("ColorPaletteDropDown", () => {
       mockDashboardPanelData.data.config.color.mode = "fixed";
       await nextTick();
 
-      expect(wrapper.vm.selectedOptionLabel).toBe("Single Color");
+      expect(wrapper.vm.selectedOptionLabel).toBe("Single color");
     });
 
     it("should cleanup correctly on unmount", () => {
@@ -761,7 +761,7 @@ describe("ColorPaletteDropDown", () => {
       await nextTick();
 
       expect(mockDashboardPanelData.data.config.color.mode).toBe("fixed");
-      expect(wrapper.vm.selectedOptionLabel).toBe("Single Color");
+      expect(wrapper.vm.selectedOptionLabel).toBe("Single color");
 
       // Change to continuous mode
       wrapper.vm.onColorModeChange("continuous-temperature");

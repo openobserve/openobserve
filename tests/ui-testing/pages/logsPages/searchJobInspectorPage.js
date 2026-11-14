@@ -295,7 +295,7 @@ export class SearchJobInspectorPage {
     const tiles = [
       { label: 'Results', key: 'results' },
       { label: 'Events', key: 'events' },
-      { label: 'Time Taken', key: 'timeTaken' },
+      { label: 'Time taken', key: 'timeTaken' },
       { label: 'Trace ID', key: 'traceId' }
     ];
 

@@ -41,19 +41,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OStatStrip>
             <OTooltip :content="t('onlineEvals.quality.tiles.attentionTooltip')">
               <OStatCard
+                class="grow basis-52 max-lg:shrink-0 max-lg:basis-auto"
                 :label="t('onlineEvals.quality.tiles.attention')"
-                :value="tiles.attention"
-                :loading="loading"
+                :value="loading ? '—' : tiles.attention"
                 :max="tiles.total"
-                :tone="tiles.attention > 0 ? 'err' : 'neutral'"
+                :tone="tiles.attention > 0 ? 'error' : 'neutral'"
                 clickable
                 :selected="tileFilter === 'attention'"
                 data-test="quality-tile-attention"
                 @click="toggleTile('attention')"
               >
                 <template #value>
-                  <span data-test="quality-tile-attention-value">{{ tiles.attention }}</span>
-                  <span class="text-text-secondary text-compact ms-1 font-medium">{{
+                  <span data-test="quality-tile-attention-value">{{
+                    loading ? "—" : tiles.attention
+                  }}</span>
+                  <span v-if="!loading" class="text-text-secondary ms-1 text-sm font-normal">{{
                     t("onlineEvals.quality.tiles.ofTotal", { total: tiles.total })
                   }}</span>
                 </template>
@@ -68,11 +70,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OTooltip>
             <OTooltip :content="t('onlineEvals.quality.tiles.withoutResultTooltip')">
               <OStatCard
+                class="grow basis-52 max-lg:shrink-0 max-lg:basis-auto"
                 :label="t('onlineEvals.quality.tiles.withoutResult')"
-                :value="tiles.withoutResult"
-                :loading="loading"
+                :value="loading ? '—' : tiles.withoutResult"
                 :max="tiles.total"
-                :tone="tiles.withoutResult > 0 ? 'warn' : 'neutral'"
+                :tone="tiles.withoutResult > 0 ? 'warning' : 'neutral'"
                 clickable
                 :selected="tileFilter === 'withoutResult'"
                 data-test="quality-tile-without-result"
@@ -80,9 +82,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <template #value>
                   <span data-test="quality-tile-without-result-value">{{
-                    tiles.withoutResult
+                    loading ? "—" : tiles.withoutResult
                   }}</span>
-                  <span class="text-text-secondary text-compact ms-1 font-medium">{{
+                  <span v-if="!loading" class="text-text-secondary ms-1 text-sm font-normal">{{
                     t("onlineEvals.quality.tiles.ofTotal", { total: tiles.total })
                   }}</span>
                 </template>

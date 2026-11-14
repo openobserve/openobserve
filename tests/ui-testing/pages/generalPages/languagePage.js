@@ -36,7 +36,7 @@ class LanguagePage {
   // PO can resolve the locator through a constructor factory (POM strict).
   SUB_PAGES = {
     Logs: [
-      { name: 'SQL Mode', action: 'toggleSqlMode' },
+      { name: 'SQL mode', action: 'toggleSqlMode' },
     ],
     RUM: [
       { name: 'Sessions', path: '/rum/sessions' },
@@ -46,20 +46,20 @@ class LanguagePage {
     ],
     Pipelines: [
       { name: 'Functions', path: '/pipeline/functions' },
-      { name: 'Enrichment Tables', path: '/pipeline/enrichment-tables' },
+      { name: 'Enrichment tables', path: '/pipeline/enrichment-tables' },
       { name: 'Pipelines List', path: '/pipeline/pipelines' },
     ],
     Streams: [
       { name: 'Stream Explorer', path: '/streams/stream-explore' },
     ],
     Reports: [
-      { name: 'Create Report', path: '/reports/create' },
+      { name: 'Create report', path: '/reports/create' },
     ],
     Alerts: [
       { name: 'Alerts Tab', tabDataTest: 'alerts-alerts-tab' },
       { name: 'Destinations Tab', tabDataTest: 'alerts-destinations-tab' },
       { name: 'Templates Tab', tabDataTest: 'alerts-templates-tab' },
-      { name: 'Alert History', path: '/alerts/history' },
+      { name: 'Alert history', path: '/alerts/history' },
     ],
     'Data Sources': [
       { name: 'Logs Ingestion', path: '/ingestion/custom/logs' },
@@ -94,20 +94,20 @@ class LanguagePage {
     'Search', 'Refresh', 'Back', 'Next', 'Previous', 'Confirm', 'Submit',
     'Home', 'Logs', 'Metrics', 'Traces', 'Dashboards', 'Streams', 'Alerts',
     'Data sources', 'Ingestion', 'Settings', 'Management', 'Help', 'About',
-    'Sign Out', 'Language', 'Reports', 'IAM', 'Functions', 'Pipelines',
+    'Sign out', 'Language', 'Reports', 'IAM', 'Functions', 'Pipelines',
     'Query', 'Fields', 'Results', 'Filter', 'Filters', 'Name', 'Type', 'Value',
     'Description', 'Status', 'Actions', 'Duration', 'Date', 'Time',
     'Start time', 'End time', 'Timestamp', 'Source', 'Details',
     'Search Results', 'No results found', 'Records per page', 'Showing',
-    'SQL Mode', 'Quick Mode', 'Syntax guide', 'Run query', 'Export logs',
-    'Histogram', 'Editors', 'Patterns', 'Search Stream', 'Select Stream',
+    'SQL mode', 'Quick mode', 'Syntax guide', 'Run query', 'Export logs',
+    'Histogram', 'Editors', 'Patterns', 'Search stream', 'Select stream',
     'Select metric', 'Add metric', 'Aggregation', 'Group by', 'Legend',
-    'Add Dashboard', 'Add Panel', 'Dashboard', 'Panel', 'Variables',
+    'Add Dashboard', 'Add panel', 'Dashboard', 'Panel', 'Variables',
     'Import', 'Export', 'Clone', 'Folder', 'Add Folder',
     'Stream', 'Schema', 'Settings', 'Retention', 'Storage', 'Index',
-    'Add Stream', 'Delete Stream', 'Partition',
+    'Add Stream', 'Delete stream', 'Partition',
     'Alert', 'Destination', 'Template', 'Trigger', 'Condition', 'Threshold',
-    'Create Alert', 'Edit Alert', 'Add Destination', 'Add Template',
+    'Create Alert', 'Edit alert', 'Add Destination', 'Add Template',
     'Real Time', 'Scheduled', 'Enabled', 'Disabled',
     'Data Sources', 'Custom', 'Recommended', 'Logs', 'Metrics', 'Traces',
     'FluentBit', 'Fluentd', 'Vector', 'OTEL', 'Prometheus', 'Kubernetes',

@@ -46,7 +46,7 @@
         <div class="flex items-center gap-2">
           <OIcon v-if="isDanger" name="warning" size="sm" class="text-status-error-text shrink-0" />
           <h2
-            class="text-base font-semibold"
+            class="text-title font-semibold"
             :class="isDanger ? 'text-status-error-text' : 'text-text-heading'"
           >
             {{ title }}<span v-if="required" class="text-text-body"> *</span>
@@ -87,10 +87,7 @@
   >
     <div class="border-border-default border-b px-3 py-2.5">
       <div class="flex items-center gap-2">
-        <!-- The accent bar. A 3px rule rather than an icon: it marks the header
-             as a section boundary without competing with the controls below. -->
-        <div class="rounded-default bg-theme-accent h-4 w-0.75 shrink-0" />
-        <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">
+        <span class="text-title text-text-heading font-semibold">
           {{ title }}<span v-if="required" class="text-text-body"> *</span>
         </span>
         <span

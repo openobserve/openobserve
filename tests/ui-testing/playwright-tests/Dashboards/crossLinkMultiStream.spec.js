@@ -443,7 +443,7 @@ test.describe("Cross-Linking Multi-Stream testcases", () => {
         await pm.chartTypeSelector.selectChartType("table");
         await pm.dashboardPanelActions.addPanelName("CrossLink UNION Panel");
 
-        // Open config sidebar and enable "Allow Dynamic Columns"
+        // Open config sidebar and enable "Allow dynamic columns"
         await pm.dashboardPanelConfigs.openConfigPanel();
         await pm.dashboardPanelConfigs.selectDynamicColumns();
         await page.waitForTimeout(500);

@@ -27,7 +27,7 @@ export class SDRPatternsPage {
     this.patternNameInput = page.locator('[data-test="add-regex-pattern-name-input-field"]');
     this.patternDescriptionInput = page.locator('[data-test="add-regex-pattern-description-input-field"]');
     this.patternInput = page.locator('[data-test="add-regex-pattern-input-field"]');
-    this.testInputButton = page.getByRole('button', { name: 'Test Input' });
+    this.testInputButton = page.getByRole('button', { name: 'Test input' });
     // ODrawer teleports panel to <body> via DialogPortal; compound selectors across that
     // boundary can be unreliable in Playwright. Use direct selectors — only one drawer
     // is ever open at a time during these tests so there is no ambiguity.
@@ -258,7 +258,7 @@ export class SDRPatternsPage {
     // Verify Import Pattern dialog is visible
     await expect(this.page.getByText('Import Pattern')).toBeVisible();
 
-    // Click "File Upload / JSON" tab to reveal the file input
+    // Click "File upload / JSON" tab to reveal the file input
     const fileTab = this.page.locator('[data-test="tab-import_json_file"]');
     await expect(fileTab).toBeVisible();
     await fileTab.click();

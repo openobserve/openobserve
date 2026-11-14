@@ -106,7 +106,7 @@ test.describe('First data journey', () => {
         await sendTrace(request, orgId, await orgToken(request, orgId));
 
         await expect(ob.firstData).toBeVisible({ timeout: 60000 });
-        await expect(ob.firstDataOpen).toHaveText('Explore Your Traces');
+        await expect(ob.firstDataOpen).toHaveText('Explore your traces');
         await ob.firstDataOpen.click(); interactions += 1;
         await expect(page).toHaveURL(/\/traces\?/);
         expect(new URL(page.url()).searchParams.get('stream')).toBe('default');

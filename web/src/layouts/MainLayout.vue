@@ -146,13 +146,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <main
           data-test="main-content"
           class="bg-surface-chrome-deeper flex min-h-0 flex-col"
-          :class="
-            store.state.kioskMode
-              ? ''
-              : focusMode
-                ? 'px-2 pb-2 max-md:px-0'
-                : 'pe-2 pb-2 max-md:pe-0'
-          "
           :style="{
             width:
               focusMode || !store.state.isAiChatEnabled || isChatOverlay || store.state.kioskMode
@@ -162,14 +155,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   : '75%',
           }"
         >
-          <!-- Content card — all pages render inside this. The border stays present in both
-               themes (transparent in light) so toggling dark mode can't shift page content by 1px. -->
+          <!-- The content plane meets the right and bottom window edges; only the corner under the rail rounds (L1). -->
           <div
-            class="bg-surface-base flex min-h-0 flex-1 flex-col overflow-hidden"
-            :class="[
-              store.state.kioskMode ? '' : 'rounded-surface border shadow-md',
-              isDark ? 'border-border-default' : 'border-transparent',
-            ]"
+            class="bg-surface-base border-border-subtle flex min-h-0 flex-1 flex-col overflow-hidden"
+            :class="
+              store.state.kioskMode
+                ? ''
+                : focusMode
+                  ? 'border-t'
+                  : 'rounded-ss-surface border-s border-t max-md:rounded-none max-md:border-s-0'
+            "
           >
             <div
               v-if="isLoading && fullConfigSettled && !holdForOnboarding"
@@ -226,10 +221,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :class="[
             isDark ? 'dark-mode-chat-container' : 'light-mode-chat-container',
             { 'o2-sidebar--expanded': store.state.isAiChatExpanded },
-            // The chat is a floating card in both modes — match the main content
-            // card's right/bottom gap (+ rounded-surface corners) so they read as
-            // the same card. Expanding only widens it; it never overlays the header.
-            'pe-2 pb-2',
             isChatOverlay
               ? 'fixed inset-x-0 bottom-0 z-50 ps-2'
               : 'sticky top-[var(--navbar-height,2.25rem)] self-start',

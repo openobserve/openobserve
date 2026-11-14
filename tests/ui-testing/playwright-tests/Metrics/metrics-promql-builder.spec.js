@@ -1103,7 +1103,7 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     expect(await pm.metricsPage.isErrorNotificationVisible()).toBe(false);
     testLogger.info('Query ran successfully, no errors');
 
-    // 8. Save to dashboard via "Add To Dashboard" dialog
+    // 8. Save to dashboard via "Add to dashboard" dialog
     const addClicked = await builder.clickAddToDashboard();
     expect(addClicked).toBe(true);
     testLogger.info('Add To Dashboard dialog opened');

@@ -48,23 +48,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @sort-change="onSortChange"
       @row-click="openRun"
     >
-      <template #subheader>
-        <div
-          class="px-page-edge border-table-row-divider border-b py-1.5"
-          data-test="reports-reportrunhistory-summary"
-        >
-          <OStatStrip
-            :items="tiles"
-            :loading="history.isLoading.value"
-            selectable
-            :selected-key="tile"
-            @select="onTileSelect"
-          />
-        </div>
-      </template>
-
       <template #toolbar>
-        <div class="flex min-w-0 flex-1 flex-wrap items-center gap-2 max-md:contents">
+        <div class="contents">
           <slot name="toolbar-start" />
           <OToggleGroup
             :model-value="range"
@@ -108,6 +93,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("reports.history.triggerManual") }}
             </OToggleGroupItem>
           </OToggleGroup>
+          <OStatStrip
+            :items="tiles"
+            :loading="history.isLoading.value"
+            selectable
+            compact
+            :row="false"
+            default-key="all"
+            :selected-key="tile"
+            class="max-md:order-last"
+            data-test="reports-reportrunhistory-summary"
+            @select="onTileSelect"
+          />
         </div>
       </template>
 
@@ -447,25 +444,25 @@ const tiles = computed<StatItem[]>(() => {
     {
       key: "error",
       label: t("reports.history.tileFailed"),
-      value: c ? c.error : null,
+      value: c?.error ?? 0,
       icon: "error",
-      tone: "err",
+      tone: "error",
       dataTest: "reports-reportrunhistory-tile-error",
     },
     {
       key: "skipped",
       label: t("reports.history.tileSkipped"),
-      value: c ? c.skipped : null,
+      value: c?.skipped ?? 0,
       icon: "block",
-      tone: "warn",
+      tone: "warning",
       dataTest: "reports-reportrunhistory-tile-skipped",
     },
     {
       key: "succeeded",
       label: t("reports.history.tileSent"),
-      value: c ? (props.showCachedTile ? c.succeeded : c.succeeded + c.cached) : null,
+      value: props.showCachedTile ? (c?.succeeded ?? 0) : (c?.succeeded ?? 0) + (c?.cached ?? 0),
       icon: "send",
-      tone: "ok",
+      tone: "success",
       dataTest: "reports-reportrunhistory-tile-sent",
     },
   ];
@@ -473,23 +470,25 @@ const tiles = computed<StatItem[]>(() => {
     items.push({
       key: "cached",
       label: t("reports.history.tileCached"),
-      value: c ? c.cached : null,
+      value: c?.cached ?? 0,
       icon: "database",
+      tone: "blue",
       dataTest: "reports-reportrunhistory-tile-cached",
     });
   }
   items.push({
     key: "all",
     label: t("reports.history.tileAll"),
-    value: c ? c.total : null,
+    value: c?.total ?? 0,
     icon: "history",
+    tone: "neutral",
     dataTest: "reports-reportrunhistory-tile-all",
   });
   return items;
 });
 
-const onTileSelect = (key: string | null) => {
-  tile.value = key as Tile | null;
+const onTileSelect = (key: string) => {
+  tile.value = key === "all" || key === tile.value ? null : (key as Tile);
   currentPage.value = 1;
 };
 

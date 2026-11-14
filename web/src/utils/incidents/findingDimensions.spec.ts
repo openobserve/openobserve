@@ -36,7 +36,7 @@ const RAW = /autoobserve_finding|stream_name|stream_type|stream_silence/;
 describe("findingDimensions", () => {
   it("finding dimensions read as words, never keys", () => {
     const shown = Object.entries(F).map(([key, value]) => dimensionDisplay(gt, F, key, value));
-    expect(shown.map((d) => d.label)).toEqual(["Finding", "Stream Type", "Stream Name"]);
+    expect(shown.map((d) => d.label)).toEqual(["Finding", "Stream type", "Stream name"]);
     expect(shown.map((d) => d.value)).toEqual(["Stopped sending data", "logs", "checkout"]);
     const kind = (k: string) =>
       dimensionDisplay(gt, { ...F, autoobserve_finding: k }, "autoobserve_finding", k).value;
@@ -85,7 +85,7 @@ describe("findingDimensions", () => {
 
   it("a finding trigger's labels are the finding in words, in order", () => {
     const labels = findingLabels(gt, F);
-    expect(Object.keys(labels!)).toEqual(["Finding", "Stream Name", "Stream Type"]);
+    expect(Object.keys(labels!)).toEqual(["Finding", "Stream name", "Stream type"]);
     expect(Object.values(labels!)).toEqual(["Stopped sending data", "checkout", "logs"]);
     expect(findingLabels(gt, { service: "api" })).toBeNull();
   });

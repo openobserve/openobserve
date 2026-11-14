@@ -6,7 +6,7 @@ const { ingestTestData: _ingestData } = require('../utils/data-ingestion.js');
 const { getOrgIdentifier } = require('../utils/cloud-auth.js');
 
 // ============================================================================
-// GH #14488 — "Refresh Cache & Run Query" visibility must be consistent
+// GH #14488 — "Refresh cache & run query" visibility must be consistent
 // between the Logs tab and the Visualize tab, independent of the
 // auto_query_enabled flag (which only gates Live Mode) and independent of
 // enterprise vs OSS build (the backend supports clear_cache in both —

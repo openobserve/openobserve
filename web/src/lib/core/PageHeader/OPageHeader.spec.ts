@@ -221,7 +221,7 @@ describe("OPageHeader context line (H4)", () => {
   it.each([
     ["/settings/correlation/services", "Settings"],
     ["/iam/users", "IAM"],
-    ["/ai/model-pricing", "AI Observability"],
+    ["/ai/model-pricing", "AI observability"],
   ])("names the module whose section rail holds %s, in either solution", async (path, label) => {
     await mountAt(path, { title: raw("Page") }, {}, links);
     expect(contextText()).toBe(label);
@@ -375,6 +375,9 @@ describe("OPageHeader stability (H1, H8, header-spec test)", () => {
     expect(band.contains(tabRow)).toBe(false);
     expect(band.compareDocumentPosition(tabRow)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
     expect(tabRow.className).toContain("h-10");
+    // A fixed track bottom-aligns the taller strip, so the underline sits on the row's divider.
+    expect(tabRow.className).toContain("grid-rows-[minmax(0,1fr)]");
+    expect(tabRow.className).toContain("pb-px");
   });
 
   it("puts the title in the same box with a context label, a back link or tabs", async () => {

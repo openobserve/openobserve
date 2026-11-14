@@ -280,7 +280,7 @@ describe("OnboardingAgentSetup", () => {
     const panel = byTest(w, "onboarding-first-data");
     expect(panel.text()).toContain("Your data is arriving");
     expect(panel.text()).toContain("3 records arrived in default");
-    expect(byTest(w, "onboarding-first-data-open").text()).toBe("Explore Your Traces");
+    expect(byTest(w, "onboarding-first-data-open").text()).toBe("Explore your traces");
   });
 
   it("names each step once, as a heading, with no disabled button", async () => {

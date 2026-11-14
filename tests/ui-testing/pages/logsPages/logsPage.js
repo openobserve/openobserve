@@ -54,7 +54,7 @@ export class LogsPage {
         // OSwitch renders the wrapper data-test on a div and the toggle state on an inner
         // <button data-state="checked|unchecked"> — drill into that button via data-state attr.
         this.sqlModeToggleStateBtn = '[data-test="logs-search-bar-sql-mode-toggle-btn"] [data-state]';
-        this.sqlModeSwitch = { role: 'switch', name: 'SQL Mode' };
+        this.sqlModeSwitch = { role: 'switch', name: 'SQL mode' };
         this.dateTimeButton = '[data-test="date-time-btn"]';
         this.indexDropDown = '[data-test="log-search-index-list-select-stream"]';
         // OSelect post-migration: the wrapper is a div (cannot be `.fill()`'d) — use the
@@ -222,7 +222,7 @@ export class LogsPage {
         this.qPageContainer = '[data-test="logs-page-container"]';
         this.cmContent = '.view-lines';
         this.cmLine = '.view-line';
-        this.searchFunctionInput = { placeholder: 'Search Function' };
+        this.searchFunctionInput = { placeholder: 'Search function' };
         this.timestampFieldTable = '[data-test="log-search-index-list-fields-table"]';
 
         // Error handling locators
@@ -2833,7 +2833,7 @@ export class LogsPage {
     async runQueryAfterModeChange(timeout = 60000) {
         if (await this.logsQueryPage._isAutoQueryEnabled()) {
             // Auto-run fires after mode switch — wait for the button to return
-            // to "Run Query" (not disabled / loading / Cancel) before asserting.
+            // to "Run query" (not disabled / loading / Cancel) before asserting.
             await this.page.waitForFunction(
                 (sel) => {
                     const b = document.querySelector(sel);
@@ -3825,7 +3825,7 @@ export class LogsPage {
     // "Add field to the table" shares the include data-test, so the menu item is picked by its label.
     async includeLogDetailFieldValue(field) {
         await this.page.locator(this.logDetailDialog).locator(`[data-test="log-details-include-exclude-field-btn-${field}"]`).click();
-        await this.page.locator(this.includeFieldButton).filter({ hasText: 'Include Search Term' }).click();
+        await this.page.locator(this.includeFieldButton).filter({ hasText: 'Include search term' }).click();
     }
 
     async clickCloseDialog() {
@@ -4040,7 +4040,7 @@ export class LogsPage {
      * @returns {Promise<boolean>}
      */
     async isViewRelatedButtonVisible() {
-        // Correlation ("View Related") was redesigned into inline tabs in the log-detail drawer;
+        // Correlation ("View related") was redesigned into inline tabs in the log-detail drawer;
         // the old log-correlation-btn is gone. The presence of the traces correlation tab means
         // the enterprise correlation feature is available (OSS lacks it, so the caller skips).
         try {
@@ -7788,7 +7788,7 @@ export class LogsPage {
     async clickShareLinkAndExpectNotification() {
         await this.clickShareLinkButton();
 
-        // Wait for the share-RESULT toast specifically — the "Link Copied Successfully!"
+        // Wait for the share-RESULT toast specifically — the "Link copied successfully!"
         // success toast OR the "Error while copy link" error toast — matched by message
         // and .first(). This skips an unrelated "Running query cancelled" info toast that
         // can coexist, which would otherwise trip strict mode on the broad selector.
@@ -7922,7 +7922,7 @@ export class LogsPage {
 
         await this.clickShareLinkButton();
 
-        // Wait for the SUCCESS ("Link Copied Successfully!") toast specifically, using
+        // Wait for the SUCCESS ("Link copied successfully!") toast specifically, using
         // .first(). A clickRefresh just before sharing can leave a "Running query
         // cancelled successfully" info toast on screen; the broad any-variant
         // successNotification selector then matches 2 toasts and trips strict mode.
@@ -11762,7 +11762,7 @@ export class LogsPage {
     }
 
     /**
-     * Get "Include Search Term" menu item (Bug #11041)
+     * Get "Include search term" menu item (Bug #11041)
      * @returns {Locator}
      */
     getIncludeSearchTermMenuItem() {
@@ -12179,7 +12179,7 @@ export class LogsPage {
     }
 
     /**
-     * Click "List Scheduled Search" in the open More Options menu.
+     * Click "List scheduled search" in the open More Options menu.
      * Uses the data-test selector on the menu item when available (enterprise),
      * falling back to text-based DOM matching for OSS builds.
      */
@@ -12191,7 +12191,7 @@ export class LogsPage {
             await this.page.evaluate(() => {
                 const items = document.querySelectorAll('[role="menuitem"]');
                 for (const item of items) {
-                    if (item.textContent?.trim() === 'List Scheduled Search') {
+                    if (item.textContent?.trim() === 'List scheduled search') {
                         item.click();
                         break;
                     }
@@ -12280,7 +12280,7 @@ export class LogsPage {
     }
 
     /**
-     * Open the "Refresh Cache & Run Query" / Live Mode dropdown next to the
+     * Open the "Refresh cache & run query" / Live Mode dropdown next to the
      * Run Query button. Works on both the Logs tab and the Visualize tab —
      * both render the same trigger data-test (GH #14488 requires their
      * dropdown to be visibility-consistent).
@@ -12294,11 +12294,11 @@ export class LogsPage {
     }
 
     /**
-     * Locator for the "Refresh Cache & Run Query" item inside the open dropdown.
+     * Locator for the "Refresh cache & run query" item inside the open dropdown.
      * @returns {import('@playwright/test').Locator}
      */
     getRefreshCacheAndRunQueryMenuItem() {
-        return this.page.getByRole('menuitem', { name: 'Refresh Cache & Run Query' });
+        return this.page.getByRole('menuitem', { name: 'Refresh cache & run query' });
     }
 
     /**
@@ -12310,7 +12310,7 @@ export class LogsPage {
     }
 
     /**
-     * Open the dropdown and click "Refresh Cache & Run Query", waiting for the
+     * Open the dropdown and click "Refresh cache & run query", waiting for the
      * resulting search request — which must be issued with clear_cache=true,
      * bypassing the result cache, matching the backend's meta::search::Request
      * contract (src/config/src/meta/search.rs).
@@ -13100,7 +13100,7 @@ export class LogsPage {
 
     /**
      * Asserts the stream dropdown wrapper shows the selected stream name
-     * (i.e. the placeholder "Select Stream" has been replaced by a selected-item chip).
+     * (i.e. the placeholder "Select stream" has been replaced by a selected-item chip).
      * Uses the wrapper div since OSelect renders selected items as tokens within it.
      * @param {string} streamName
      */

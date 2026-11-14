@@ -54,7 +54,7 @@ describe("enterpriseFeatures", () => {
       const ctx = buildFeatureGateContext();
       const result = checkFeatureAccess("cipherKeys", ctx);
       expect(result.allowed).toBe(false);
-      expect(result.message).toMatch(/Cipher Keys/);
+      expect(result.message).toMatch(/Cipher keys/);
       expect(result.message).toMatch(/Enterprise/);
     });
 

@@ -460,7 +460,7 @@ const stats = computed<StatItem[]>(() => {
       ...countTile(r.finding_count, locale.value),
       sub: t(verdict.labelKey),
       icon: "fact-check",
-      tone: hasFindings.value ? "warn" : "neutral",
+      tone: hasFindings.value ? "warning" : "neutral",
     },
     {
       key: "scope",

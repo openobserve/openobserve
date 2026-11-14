@@ -15,17 +15,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
+  <!-- The group owns one outline, so a disabled shift button never breaks the edge around all three parts. -->
   <div
     class="date-time-container inline-flex items-stretch [&_button:focus-visible]:z-1"
-    :class="{ 'w-full [&>*]:flex-1': fieldAppearance }"
+    :class="{
+      'rounded-default border-button-outline-border border': !hideRangeShift,
+      'h-control-sm': !hideRangeShift && size === 'sm',
+      'h-control-md': !hideRangeShift && size !== 'sm',
+      'w-full [&>*]:flex-1': fieldAppearance,
+    }"
   >
     <OTooltip v-if="!hideRangeShift" :content="t('common.previous')">
       <OButton
         icon-only
         data-test="date-time-prev-btn"
-        variant="secondary"
-        :size="size"
-        class="rounded-e-none!"
+        variant="ghost"
+        size="sm"
+        class="border-e-button-outline-border! h-auto! rounded-e-none!"
         icon="chevron-left"
         :aria-label="t('common.previous')"
         :disabled="disabled || disablePrevShift"
@@ -56,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             [selectedType + 'type']: !disableRelative,
             hideRelative: disableRelative,
             'w-54 max-md:w-auto max-md:max-w-full max-md:min-w-0': !fieldAppearance,
-            '-ms-px rounded-none!': !hideRangeShift,
+            'h-auto! rounded-none! border-0!': !hideRangeShift,
             'border-select-border! enabled:hover:border-select-border-hover! w-full font-normal':
               fieldAppearance,
           }"
@@ -69,6 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <OTruncatedText
             class="date-time-label flex-1 text-left"
+            :class="fieldAppearance ? undefined : 'font-semibold'"
             :tooltip="triggerTooltip ? false : undefined"
             >{{ triggerLabel }}</OTruncatedText
           >
@@ -361,9 +368,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         icon-only
         data-test="date-time-next-btn"
-        variant="secondary"
-        :size="size"
-        class="-ms-px rounded-s-none!"
+        variant="ghost"
+        size="sm"
+        class="border-s-button-outline-border! h-auto! rounded-s-none!"
         icon="chevron-right"
         :aria-label="t('common.next')"
         :disabled="disabled || isNextShiftDisabled()"

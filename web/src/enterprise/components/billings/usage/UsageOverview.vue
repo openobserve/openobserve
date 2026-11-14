@@ -70,7 +70,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <OStatStrip
         :items="kpiStats"
-        size="lg"
         stacked
         class="shrink-0"
         data-test="billings-usageoverview-kpis"

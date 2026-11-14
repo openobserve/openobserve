@@ -23,10 +23,22 @@
         <template #toolbar>
           <OSearchInput
             :model-value="search"
-            class="min-w-0 flex-1"
+            class="min-w-0 flex-1 md:min-w-48"
             :placeholder="t('onlineEvals.scoreConfig.searchPlaceholder')"
             data-test="score-config-list-search-input"
             @update:model-value="$emit('update:search', $event as string)"
+          />
+          <OStatStrip
+            :items="summaryStats"
+            :loading="loading"
+            selectable
+            :row="false"
+            multiple
+            :selected-keys="typeFilters"
+            default-key="all"
+            class="max-md:order-last"
+            data-test="score-config-list-summary"
+            @update:selected-keys="typeFilters = $event as DataType[]"
           />
         </template>
 
@@ -38,24 +50,6 @@
             data-test="score-config-list-refresh-btn"
             @click="emit('refresh')"
           />
-        </template>
-
-        <!-- Data-type breakdown (catalog signal) — doubles as a filter synced to
-             the type dropdown; Total last, never itself the active tile. -->
-        <template #subheader>
-          <div
-            class="px-page-edge border-table-row-divider border-b py-1.5"
-            data-test="score-config-list-summary"
-          >
-            <OStatStrip
-              :items="summaryStats"
-              :loading="loading"
-              selectable
-              multiple
-              :selected-keys="typeFilters"
-              @update:selected-keys="typeFilters = $event as DataType[]"
-            />
-          </div>
         </template>
 
         <template #empty>
@@ -370,7 +364,7 @@ const typeCounts = computed(() => {
 const summaryStats = computed<StatItem[]>(() => {
   const c = typeCounts.value;
   const has = c.total > 0;
-  const v = (n: number): number | null => (has ? n : null);
+  const v = (n: number): string | number => (has ? n : "—");
   const share = has ? c.total : undefined;
   return [
     {
@@ -378,6 +372,7 @@ const summaryStats = computed<StatItem[]>(() => {
       label: t("onlineEvals.scoreConfig.dataTypes.numeric"),
       value: v(c.numeric),
       icon: "tag",
+      tone: "blue",
       max: share,
       dataTest: "score-config-summary-numeric",
     },
@@ -386,6 +381,7 @@ const summaryStats = computed<StatItem[]>(() => {
       label: t("onlineEvals.scoreConfig.dataTypes.categorical"),
       value: v(c.categorical),
       icon: "category",
+      tone: "purple",
       max: share,
       dataTest: "score-config-summary-categorical",
     },
@@ -394,6 +390,7 @@ const summaryStats = computed<StatItem[]>(() => {
       label: t("onlineEvals.scoreConfig.dataTypes.boolean"),
       value: v(c.boolean),
       icon: "toggle-off",
+      tone: "teal",
       max: share,
       dataTest: "score-config-summary-boolean",
     },
@@ -402,6 +399,7 @@ const summaryStats = computed<StatItem[]>(() => {
       label: t("onlineEvals.summaryAll"),
       value: v(c.total),
       icon: "format-list-bulleted",
+      tone: "primary",
       dataTest: "score-config-summary-all",
     },
   ];

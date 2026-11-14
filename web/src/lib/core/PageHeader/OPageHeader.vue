@@ -146,9 +146,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- OTabs insets its first label by its own list and tab padding (0.6875rem), so the row starts that much before the gutter. -->
+    <!-- The strip is taller than the row (OTabs' top inset), so a fixed track pins its bottom, and the underline, onto the divider. -->
     <div
       v-if="hasTabs()"
-      class="pe-page-edge relative grid h-10 grid-cols-[minmax(0,1fr)] items-end ps-[calc(var(--spacing-page-edge)-0.6875rem)]"
+      class="pe-page-edge relative grid h-10 grid-cols-[minmax(0,1fr)] grid-rows-[minmax(0,1fr)] items-end ps-[calc(var(--spacing-page-edge)-0.6875rem)] pb-px"
       data-test="o-page-header-tabs"
     >
       <div

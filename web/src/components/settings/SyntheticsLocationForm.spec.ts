@@ -171,8 +171,8 @@ describe("SyntheticsLocationForm", () => {
 
     // The ODrawer renders edit-mode title and button labels.
     const drawer = wrapper.findComponent({ name: "ODrawer" });
-    expect(drawer.props("title")).toBe("Edit Location");
-    expect(drawer.props("primary")?.label).toBe("Update & Close");
+    expect(drawer.props("title")).toBe("Edit location");
+    expect(drawer.props("primary")?.label).toBe("Update & close");
 
     // Defaults computed seeds the form values for edit mode.
     expect(wrapper.vm.locationFormDefaults).toEqual({

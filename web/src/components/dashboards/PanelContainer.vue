@@ -983,7 +983,7 @@ export default defineComponent({
       // Read AFTER the renderer's own conversion settled — the emit is that signal.
       const verdict = PanleSchemaRendererRef.value?.noData;
       if (verdict === undefined) return;
-      curatedSeriesEmpty.value = verdict === "No Data";
+      curatedSeriesEmpty.value = verdict === "No data";
     };
     /** Only ever claimed after a load actually settled — never while pending. */
     /**

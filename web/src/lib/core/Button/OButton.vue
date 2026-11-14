@@ -90,9 +90,8 @@ onMounted(() => {
 });
 onBeforeUnmount(() => clearTimeout(nameCheckTimer));
 
-const FILLED_DISABLED = "bg-surface-subtle text-text-disabled border-transparent";
 const BARE_DISABLED = "bg-transparent text-text-disabled border-transparent";
-// Inside a hovered table row a neutral hover fill would match the row fill, so it steps up to the row-action fill.
+// Inside a hovered table row the accent hover would match the row fill, so it steps up to the row-action fill.
 const ROW_STEP = "group-hover/row:hover:not-active:bg-table-row-action-hover-bg";
 
 const looks: Record<ButtonVariant, ButtonVariantLook> = {
@@ -100,17 +99,19 @@ const looks: Record<ButtonVariant, ButtonVariantLook> = {
     base: "bg-button-primary text-button-primary-foreground border-transparent",
     interactive: "hover:bg-button-primary-hover active:bg-button-primary-active",
     pressed: "bg-button-primary-active text-button-primary-foreground border-transparent",
-    disabled: FILLED_DISABLED,
+    disabled: "bg-button-primary-disabled text-button-primary-foreground border-transparent",
   },
   secondary: {
-    base: "bg-button-secondary text-button-outline-text border-button-outline-border",
-    interactive: `hover:bg-surface-subtle active:bg-surface-subtle-hover ${ROW_STEP}`,
-    pressed: "bg-surface-accent-hover text-accent-on-tint border-button-outline-hover-border",
-    disabled: FILLED_DISABLED,
+    base: "bg-transparent text-button-outline-text border-button-outline-border",
+    interactive:
+      "hover:bg-button-outline-hover-bg hover:border-button-outline-hover-border active:bg-button-outline-active-bg",
+    pressed: "bg-surface-accent-active text-accent-on-tint border-button-outline-hover-border",
+    // Faded whole, so a disabled outline keeps its edge where it sits in a joined group.
+    disabled: "bg-transparent text-button-outline-text border-button-outline-border opacity-50",
   },
   ghost: {
-    base: "bg-transparent text-text-secondary border-transparent",
-    interactive: `hover:bg-surface-subtle hover:text-text-heading active:bg-surface-subtle-hover active:text-text-heading ${ROW_STEP}`,
+    base: "bg-transparent text-button-ghost-text border-transparent",
+    interactive: `hover:bg-button-ghost-hover-bg active:bg-button-ghost-active-bg ${ROW_STEP}`,
     pressed: "bg-surface-accent-hover text-accent-on-tint border-transparent",
     disabled: BARE_DISABLED,
   },
@@ -125,20 +126,22 @@ const looks: Record<ButtonVariant, ButtonVariantLook> = {
     base: "bg-button-destructive text-button-destructive-foreground border-transparent",
     interactive: "hover:bg-button-destructive-hover active:bg-button-destructive-hover",
     pressed: "bg-button-destructive-hover text-button-destructive-foreground border-transparent",
-    disabled: FILLED_DISABLED,
+    disabled:
+      "bg-button-destructive text-button-destructive-foreground border-transparent opacity-60",
   },
   "danger-ghost": {
     base: "bg-transparent text-button-ghost-destructive-text border-transparent",
     interactive:
       "hover:bg-button-ghost-destructive-hover-bg active:bg-button-ghost-destructive-active-bg",
     pressed: "bg-button-ghost-destructive-active-bg text-button-ghost-destructive-text",
-    disabled: BARE_DISABLED,
+    disabled: "bg-transparent text-button-ghost-destructive-text border-transparent opacity-60",
   },
   link: {
-    base: "bg-transparent text-text-link border-transparent",
-    interactive: "hover:text-text-link-hover hover:underline",
-    pressed: "bg-transparent text-text-link-hover border-transparent underline",
-    disabled: BARE_DISABLED,
+    base: "bg-transparent text-text-link border-transparent underline underline-offset-2",
+    interactive: "hover:opacity-80",
+    pressed: "bg-transparent text-text-link-hover border-transparent underline underline-offset-2",
+    disabled:
+      "bg-transparent text-text-link border-transparent underline underline-offset-2 opacity-60",
   },
 };
 
@@ -170,7 +173,8 @@ const look = computed(() => looks[props.variant] ?? looks.secondary);
 const stateClasses = computed(() => {
   if (isDisabled.value) return `${look.value.disabled} cursor-not-allowed`;
   if (props.pressed) return look.value.pressed;
-  if (props.loading) return `${look.value.base} cursor-progress`;
+  // A busy button keeps focus, so it reads unavailable by its look rather than native disabled.
+  if (props.loading) return `${look.value.disabled} cursor-not-allowed`;
   return `${look.value.base} ${look.value.interactive} cursor-pointer`;
 });
 

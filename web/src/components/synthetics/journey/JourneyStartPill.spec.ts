@@ -178,7 +178,7 @@ describe("JourneyStartPill", () => {
     const emptySpan = wrapper
       .get(URL_HALF)
       .findAll("span")
-      .filter((s) => s.text() === "Set a Starting URL")
+      .filter((s) => s.text() === "Set a starting URL")
       .at(-1);
     expect(emptySpan?.classes()).toContain("font-normal");
   });
@@ -442,7 +442,7 @@ describe("JourneyStartPill", () => {
     const tips = wrapper
       .findAllComponents(OTooltipStub)
       .map((c) => c.props("content") as string | undefined);
-    expect(tips).toContain("Edit Starting URL");
+    expect(tips).toContain("Edit starting URL");
     expect(tips).toContain("Change environments");
   });
 

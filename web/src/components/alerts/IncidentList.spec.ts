@@ -1274,7 +1274,7 @@ describe("IncidentList.vue", () => {
       expect(chips.map((c) => c.props("dimKey"))).toEqual(["autoobserve_finding", "stream_name"]);
       expect(more.text()).toContain("+2 more");
       expect(more.find('[data-test="o-tooltip"]').text().replace(/\s+/g, "")).toBe(
-        "StreamType=logsenv=prod",
+        "Streamtype=logsenv=prod",
       );
     });
 
@@ -1290,17 +1290,17 @@ describe("IncidentList.vue", () => {
         stream_type: "logs",
         stream_name: "checkout",
       });
-      expect(chips.map((c) => c.props("keyLabel"))).toEqual(["Finding", "Stream Name"]);
+      expect(chips.map((c) => c.props("keyLabel"))).toEqual(["Finding", "Stream name"]);
       expect(chips.map((c) => c.props("dimKey"))).toEqual(["autoobserve_finding", "stream_name"]);
       // The key and value segments render side by side, so text() joins them.
       expect(chips.map((c) => c.text())).toEqual([
         "Finding" + "Stopped sending data",
-        "Stream Name" + "checkout",
+        "Stream name" + "checkout",
       ]);
       expect(chips.map((c) => c.props("tooltip"))).toEqual([false, false]);
       expect(more.text()).toContain("+1 more");
       expect(more.find('[data-test="o-tooltip"]').text().replace(/\s+/g, "")).toBe(
-        "StreamType=logs",
+        "Streamtype=logs",
       );
       const shown = [
         ...chips.map((c) => c.html()),

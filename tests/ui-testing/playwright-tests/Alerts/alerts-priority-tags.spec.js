@@ -103,7 +103,7 @@ test.describe('Alerts — priority, tags & additional variables', {
         await pm.alertsPage.addTag('  PROD  ');
         await pm.alertsPage.addTag('Service:Checkout');
 
-        // The destination lives on the "Alert Rules" tab, NOT Advanced — switch back first,
+        // The destination lives on the "Alert rules" tab, NOT Advanced — switch back first,
         // otherwise the select is not in the DOM.
         await pm.alertsPage.openConditionTab();
         await pm.alertsPage.selectDestinationByName(DEST);
@@ -140,7 +140,7 @@ test.describe('Alerts — priority, tags & additional variables', {
         // Add one key/value variable on the Advanced tab.
         await pm.alertsPage.addAlertVariable('team', 'payments');
 
-        // The destination lives on the "Alert Rules" tab, not Advanced.
+        // The destination lives on the "Alert rules" tab, not Advanced.
         await pm.alertsPage.openConditionTab();
         await pm.alertsPage.selectDestinationByName(DEST);
 
@@ -276,10 +276,10 @@ test.describe('Alerts — priority, tags & additional variables', {
         await page.waitForLoadState('networkidle', { timeout: NETWORK_IDLE_TIMEOUT_MS }).catch(() => {});
 
         await pm.alertsPage.expectSectionTabLabels([
-            'All Alerts', 'Notification Destinations', 'Destination Templates', 'Alert Library',
+            'All Alerts', 'Notification destinations', 'Destination templates', 'Alert library',
         ]);
-        await pm.alertsPage.expectSectionTabLabel('alertDestinations', 'Notification Destinations');
-        await pm.alertsPage.expectSectionTabLabel('alertLibrary', 'Alert Library');
+        await pm.alertsPage.expectSectionTabLabel('alertDestinations', 'Notification destinations');
+        await pm.alertsPage.expectSectionTabLabel('alertLibrary', 'Alert library');
         testLogger.info('Section tab strip shows the renamed labels');
     });
 });

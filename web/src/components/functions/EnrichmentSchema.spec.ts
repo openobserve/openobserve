@@ -126,7 +126,7 @@ describe("EnrichmentSchema.vue Branch Coverage", () => {
       wrapper = mount(EnrichmentSchema, buildMountOptions());
       await flushPromises();
       expect(wrapper.find('[data-test-stub="o-drawer"]').attributes("data-title")).toBe(
-        "Stream Detail",
+        "Stream detail",
       );
     });
 
@@ -185,7 +185,7 @@ describe("EnrichmentSchema.vue Branch Coverage", () => {
       await nextTick();
 
       const streamElements = wrapper.findAll('[data-test="schema-stream-title-text"]');
-      const hasDocCountElement = streamElements.some((el) => el.text().includes("Docs Count"));
+      const hasDocCountElement = streamElements.some((el) => el.text().includes("Docs count"));
       expect(hasDocCountElement).toBe(true);
     });
 
@@ -205,7 +205,7 @@ describe("EnrichmentSchema.vue Branch Coverage", () => {
       await nextTick();
 
       const streamElements = wrapper.findAll('[data-test="schema-stream-title-text"]');
-      const hasDocCountElement = streamElements.some((el) => el.text().includes("Docs Count"));
+      const hasDocCountElement = streamElements.some((el) => el.text().includes("Docs count"));
       expect(hasDocCountElement).toBe(false);
     });
   });

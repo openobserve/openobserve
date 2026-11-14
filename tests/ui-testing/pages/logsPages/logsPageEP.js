@@ -73,7 +73,7 @@ async validateAddJob(jobId) {
 
   // OTable rows are indexed as [data-test="o2-table-row-{index}"] (positional integer).
   // trace_id is the row-key but is NOT a visible column, so filter({ hasText }) won't match.
-  // Instead: intercept the GET response from clicking "Get Jobs" to find the job's row index.
+  // Instead: intercept the GET response from clicking "Get jobs" to find the job's row index.
   const getJobsBtn = this.page.locator('[data-test="search-scheduler-get-jobs-btn"]');
   await getJobsBtn.waitFor({ state: 'visible', timeout: 10000 });
   const responsePromise = this.page.waitForResponse(

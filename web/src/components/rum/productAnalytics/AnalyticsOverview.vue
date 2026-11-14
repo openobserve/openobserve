@@ -602,9 +602,10 @@ const kpis = computed<StatItem[]>(() => {
       key: "sessions",
       label: t("rum.analytics.kpi.sessions"),
       value: addCommasToNumber(sessions),
+      tone: "blue",
       icon: "group",
       dataTest: "rum-analytics-kpi-sessions",
-      delta:
+      trend:
         change === null
           ? undefined
           : {
@@ -618,7 +619,7 @@ const kpis = computed<StatItem[]>(() => {
         unit.partial || id?.field === "usr_anonymous_id"
           ? unit.label
           : t("rum.analytics.kpi.users"),
-      value: id?.field ? addCommasToNumber(id.users) : null,
+      value: id?.field ? addCommasToNumber(id.users) : "—",
       sub: !id
         ? undefined
         : id.field
@@ -629,6 +630,7 @@ const kpis = computed<StatItem[]>(() => {
         unit.partial && id?.field
           ? t("rum.analytics.identity.countedBy", { field: raw(id.field) })
           : undefined,
+      tone: "teal",
       icon: "person",
       dataTest: "rum-analytics-kpi-users",
     },
@@ -638,6 +640,7 @@ const kpis = computed<StatItem[]>(() => {
       value: sessions > 0 ? ((s?.views ?? 0) / sessions).toFixed(1) : "0.0",
       sub: t("rum.analytics.exclusions.pagesPerSessionTip"),
       subIcon: "info-outline",
+      tone: "purple",
       icon: "article",
       dataTest: "rum-analytics-kpi-pages-per-session",
     },
@@ -645,6 +648,7 @@ const kpis = computed<StatItem[]>(() => {
       key: "coverage",
       label: t("rum.analytics.kpi.coverage"),
       value: `${((id?.field ? id.coverage : 0) * 100).toFixed(1)}%`,
+      tone: "neutral",
       icon: "how-to-reg",
       dataTest: "rum-analytics-kpi-identity-coverage",
     },

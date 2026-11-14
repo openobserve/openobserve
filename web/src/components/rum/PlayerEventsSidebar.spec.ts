@@ -374,7 +374,7 @@ describe("PlayerEventsSidebar", () => {
       });
       await wrapper.vm.$nextTick();
 
-      expect(wrapper.find('[data-test="event-metadata"]').text()).toContain("Unknown User");
+      expect(wrapper.find('[data-test="event-metadata"]').text()).toContain("Unknown user");
     });
   });
 

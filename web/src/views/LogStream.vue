@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Outside the table: these totals cover every stream type, not the paginated rows. -->
       <template #subnav>
         <div class="px-page-edge py-1.5" data-test="log-stream-summary">
-          <OStatStrip :items="summaryStats" :loading="summaryLoading" />
+          <OStatStrip :items="summaryStats" :loading="summaryLoading" inline />
         </div>
       </template>
 
@@ -458,7 +458,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
-import type { StatDelta, StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
+import type { StatItem, StatTrend } from "@/lib/data/StatStrip/OStatStrip.types";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import streamService from "../services/stream";
 import { addCommasToNumber, formatEventCount } from "@/utils/formatters";
@@ -958,20 +958,19 @@ export default defineComponent({
     // Same five figures as the Home → Usage tiles, and deliberately the SAME
     // labels (the `home.*` keys), the same icons and the same formatters — the org
     // footprint must not read as "2,900,000,000 Records" here and "2.9B Events"
-    // there. No tones: none of these numbers is a health signal.
+    // there. Tones stay in the decorative families (no green/amber/red) because
+    // none of these numbers is a health signal.
     const summaryStats = computed<StatItem[]>(() => {
       const s = streamSummary.value;
-      const count = (n: unknown): string | null =>
-        Number(n) > 0 ? formatEventCount(Number(n)) : null;
-      const size = (n: unknown): string | null =>
-        Number(n) > 0 ? formatSizeFromMB(Number(n)) : null;
-      // How much smaller the data is on disk than as ingested — shown as a delta
+      const count = (n: unknown): string => (Number(n) > 0 ? formatEventCount(Number(n)) : "—");
+      const size = (n: unknown): string => (Number(n) > 0 ? formatSizeFromMB(Number(n)) : "—");
+      // How much smaller the data is on disk than as ingested — shown as a trend
       // beside the compressed size, so the tile keeps Home's number AND answers
       // "how good is that?" without a second size to divide.
-      const compressionDelta = (): StatDelta | undefined => {
+      const compressionTrend = (): StatTrend | undefined => {
         const ratio = compressionRatio(s?.total_storage_size, s?.total_compressed_size);
         if (!ratio) return undefined;
-        return { direction: "down", label: raw(ratio), tone: "ok" };
+        return { direction: "down", label: raw(ratio), tone: "success" };
       };
       return [
         {
@@ -979,6 +978,7 @@ export default defineComponent({
           label: t("home.streams"),
           value: count(s?.num_streams),
           icon: "window",
+          tone: "primary",
           dataTest: "log-stream-summary-streams",
         },
         {
@@ -986,6 +986,7 @@ export default defineComponent({
           label: t("home.docsCountLbl"),
           value: count(s?.total_records),
           icon: "bar-chart",
+          tone: "info",
           dataTest: "log-stream-summary-events",
         },
         {
@@ -993,6 +994,7 @@ export default defineComponent({
           label: t("home.totalDataIngested"),
           value: size(s?.total_storage_size),
           icon: "download",
+          tone: "teal",
           dataTest: "log-stream-summary-storage",
         },
         // Cloud does not report compressed size (its column and its Home tile are
@@ -1004,7 +1006,8 @@ export default defineComponent({
                 label: t("home.totalDataCompressed"),
                 value: size(s?.total_compressed_size),
                 icon: "compress",
-                delta: compressionDelta(),
+                tone: "purple",
+                trend: compressionTrend(),
                 dataTest: "log-stream-summary-compressed",
               } as StatItem,
               {
@@ -1012,6 +1015,7 @@ export default defineComponent({
                 label: t("home.indexSizeLbl"),
                 value: size(s?.total_index_size),
                 icon: "save",
+                tone: "neutral",
                 dataTest: "log-stream-summary-index",
               } as StatItem,
             ]

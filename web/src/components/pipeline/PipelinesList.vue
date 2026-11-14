@@ -54,27 +54,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model:expanded-ids="expandedId"
           class="h-full w-full"
         >
-          <!-- Summary strip: operational state counts for the current tab, doubling
-               as the state facet (the toggle group above facets by pipeline TYPE,
-               so the two never overlap). Always rendered so rows never shift. -->
-          <template #subheader>
-            <div
-              class="px-page-edge border-table-row-divider border-b py-1.5"
-              data-test="pipeline-list-summary"
-            >
-              <OStatStrip
-                :items="summaryStats"
-                :loading="loading"
-                selectable
-                multiple
-                :selected-keys="stateFilters"
-                @update:selected-keys="stateFilters = $event as PipelineStateKey[]"
-              />
-            </div>
-          </template>
-
           <template #toolbar>
-            <div class="flex min-w-0 flex-1 items-center gap-2 max-md:contents">
+            <div class="contents">
               <OToggleGroup
                 mobile-dropdown
                 :model-value="activeTab"
@@ -94,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ t("pipeline_list.tab_realtime") }}
                 </OToggleGroupItem>
               </OToggleGroup>
-              <div class="min-w-0 flex-1 max-md:min-w-40">
+              <div class="min-w-0 flex-1 max-md:min-w-40 md:min-w-48">
                 <OSearchInput
                   data-test="pipeline-list-search-input"
                   v-model="filterQuery"
@@ -103,6 +84,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                 </OSearchInput>
               </div>
+              <!-- Facets by state; the toggle group facets by type, so the two never overlap. -->
+              <OStatStrip
+                :items="summaryStats"
+                :loading="loading"
+                selectable
+                :row="false"
+                multiple
+                :selected-keys="stateFilters"
+                default-key="total"
+                class="max-md:order-last"
+                data-test="pipeline-list-summary"
+                @update:selected-keys="stateFilters = $event as PipelineStateKey[]"
+              />
             </div>
           </template>
           <template #toolbar-trailing>
@@ -874,7 +868,7 @@ const stateCounts = computed(() => {
 const summaryStats = computed<StatItem[]>(() => {
   const c = stateCounts.value;
   const hasData = c.total > 0;
-  const v = (n: number): number | null => (hasData ? n : null);
+  const v = (n: number): string | number => (hasData ? n : "—");
   const share = hasData ? c.total : undefined;
   return [
     {
@@ -882,7 +876,7 @@ const summaryStats = computed<StatItem[]>(() => {
       label: t("pipeline_list.summaryErrored"),
       value: v(c.errored),
       icon: "error-outline",
-      tone: "err",
+      tone: "error",
       max: share,
       dataTest: "pipeline-summary-errored",
     },
@@ -900,7 +894,7 @@ const summaryStats = computed<StatItem[]>(() => {
       label: t("pipeline_list.summaryActive"),
       value: v(c.active),
       icon: "check-circle",
-      tone: "ok",
+      tone: "success",
       max: share,
       dataTest: "pipeline-summary-active",
     },
@@ -909,7 +903,10 @@ const summaryStats = computed<StatItem[]>(() => {
       label: t("common.allStates"),
       value: v(c.total),
       icon: "format-list-bulleted",
-      all: true,
+      tone: "primary",
+      // Clickable (it CLEARS the state facet) but never shows the ring — the
+      // selected key is only ever a real state, never "total". No bar: its share
+      // of itself is always 100%.
       dataTest: "pipeline-summary-total",
     },
   ];

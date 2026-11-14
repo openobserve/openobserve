@@ -1160,7 +1160,7 @@ const topStats = computed<StatItem[]>(() => {
       label: t("oncall.statAckedIn"),
       value: formatMicrosDuration(r.acked_at - r.opened_at),
       icon: "check-circle",
-      tone: "ok",
+      tone: "success",
       dataTest: "oncall-response-stat-ack",
     });
   } else if (!r.closed_at) {
@@ -1169,7 +1169,7 @@ const topStats = computed<StatItem[]>(() => {
       label: t("oncall.statUnackedFor"),
       value: formatMicrosDuration(nowMicros.value - r.opened_at),
       icon: "schedule",
-      tone: "warn",
+      tone: "warning",
       dataTest: "oncall-response-stat-ack",
     });
   }

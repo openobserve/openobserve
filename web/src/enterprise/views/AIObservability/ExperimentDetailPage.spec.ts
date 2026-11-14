@@ -115,7 +115,7 @@ describe("ExperimentDetailPage", () => {
     expect(cost).toContain("$0.1182");
     expect(cost).toContain("Task $0.0406 · Scoring $0.0775");
     expect(wrapper.get('[data-test="ai-experiment-detail-p50"]').text()).toContain(
-      "P50 Task Latency",
+      "P50 task latency",
     );
   });
 
@@ -394,7 +394,7 @@ describe("ExperimentDetailPage", () => {
     await flushPromises();
 
     const meta = wrapper.get('[data-test="ai-experiment-detail-meta"]').text();
-    expect(meta).toContain("Inline Prompt");
+    expect(meta).toContain("Inline prompt");
     expect(meta).toContain("gpt-4o");
     expect(meta).toContain("1 scorer");
     expect(meta).not.toContain("inline_prompt");

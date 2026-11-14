@@ -358,7 +358,7 @@ describe("IngestLogs Component", () => {
       await wrapper.vm.copyToClipboardFn(mockContent);
 
       expect(copyToClipboard).toHaveBeenCalledWith("log ingestion snippet", expect.any(Function), {
-        successMessage: "Content Copied Successfully!",
+        successMessage: "Content copied successfully!",
         errorMessage: "Error while copy content.",
         timeout: 5000,
       });
@@ -403,7 +403,7 @@ describe("IngestLogs Component", () => {
       await wrapper.vm.copyToClipboardFn({ innerText: "" });
 
       expect(copyToClipboard).toHaveBeenCalledWith("", expect.any(Function), {
-        successMessage: "Content Copied Successfully!",
+        successMessage: "Content copied successfully!",
         errorMessage: "Error while copy content.",
         timeout: 5000,
       });
@@ -415,7 +415,7 @@ describe("IngestLogs Component", () => {
       await wrapper.vm.copyToClipboardFn({});
 
       expect(copyToClipboard).toHaveBeenCalledWith(undefined, expect.any(Function), {
-        successMessage: "Content Copied Successfully!",
+        successMessage: "Content copied successfully!",
         errorMessage: "Error while copy content.",
         timeout: 5000,
       });

@@ -1287,8 +1287,8 @@ describe("MetricDetailView", () => {
     it("keeps Open in Visualize named when its label is hidden on a phone", () => {
       wrapper = mountView();
       const open = wrapper.find('[data-test="metrics-detail-open-visualize"]');
-      expect(open.attributes("aria-label")).toBe("Open in Visualize");
-      expect(open.find("span.max-md\\:hidden").text()).toBe("Open in Visualize");
+      expect(open.attributes("aria-label")).toBe("Open in visualize");
+      expect(open.find("span.max-md\\:hidden").text()).toBe("Open in visualize");
     });
 
     it("closes, opens Visualize and toggles the favorite", async () => {

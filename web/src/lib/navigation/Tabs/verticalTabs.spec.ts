@@ -37,10 +37,10 @@ const MAIN: Record<string, [string, string]> = {
   "--color-focus-ring-accent": ["#3f7994", "#79a1b4"],
   "--color-tabs-active-bg": ["#e2ebef", "#19303b"],
   "--color-tabs-active-text": ["#326176", "#ffffff"],
-  "--color-tabs-disabled-text": ["#a3a3a3", "#525252"],
-  "--color-tabs-hover-text": ["#262626", "#e5e5e5"],
-  "--color-tabs-rail-hover-bg": ["#ededed", "#262626"],
-  "--color-text-body": ["#404040", "#d4d4d4"],
+  "--color-tabs-disabled-text": ["#9ea4b4", "#4b5163"],
+  "--color-tabs-hover-text": ["#222534", "#e3e5eb"],
+  "--color-tabs-rail-hover-bg": ["#eceef2", "#222534"],
+  "--color-text-body": ["#3b3f4f", "#d0d5e1"],
 };
 
 const UTILITY = /^(?:[a-z-]+:)*(?:text|bg|border(?:-[se])?|outline)-([a-z][a-z0-9-]+)$/;
@@ -90,7 +90,7 @@ function colourTokens(classes: string[]): string[] {
   return [...names].sort();
 }
 
-describe("vertical tabs render as on main", () => {
+describe("vertical tabs render with their pinned colours", () => {
   it("colours the active tab in brand ink at the medium weight with a full accent ring", () => {
     const { active } = tabs(mountRail("a"));
     expect(active.classes()).toEqual(
@@ -137,7 +137,7 @@ describe("vertical tabs render as on main", () => {
   it.each([
     ["light", 0],
     ["dark", 1],
-  ] as const)("resolves every tab colour to main's value in %s", (theme, index) => {
+  ] as const)("resolves every tab colour to its pinned value in %s", (theme, index) => {
     const classes = [
       ...Object.values(tabs(mountRail("a"))),
       tabs(mountRail("a", true)).active,

@@ -439,19 +439,19 @@ const ruleStats = computed<StatItem[]>(() => [
     subIcon: "info-outline",
     value:
       streamsLoading.value || installPending.value || checksLoading.value
-        ? null
+        ? "—"
         : ruleCounts.value.ready,
     icon: "lightbulb",
-    tone: "warn",
+    tone: "warning",
     max: ruleRows.value.length,
     dataTest: "security-content-stat-ready",
   },
   {
     key: "installed",
     label: t("siem.content.stat.installed"),
-    value: installPending.value ? null : ruleCounts.value.installed,
+    value: installPending.value ? "—" : ruleCounts.value.installed,
     icon: "verified-user",
-    tone: "ok",
+    tone: "success",
     max: ruleRows.value.length,
     dataTest: "security-content-stat-installed",
   },
@@ -460,8 +460,9 @@ const ruleStats = computed<StatItem[]>(() => [
     label: t("siem.content.stat.applies"),
     sub: t("siem.content.stat.appliesHint"),
     subIcon: "info-outline",
-    value: streamsLoading.value ? null : ruleCounts.value.applies,
+    value: streamsLoading.value ? "—" : ruleCounts.value.applies,
     icon: "database",
+    tone: "primary",
     max: ruleRows.value.length,
     dataTest: "security-content-stat-applies",
   },
@@ -627,9 +628,9 @@ const sourceStats = computed<StatItem[]>(() => [
   {
     key: "detected",
     label: t("siem.content.stat.detected"),
-    value: streamsLoading.value ? null : sourceRows.value.filter((r) => r.streams.length).length,
+    value: streamsLoading.value ? "—" : sourceRows.value.filter((r) => r.streams.length).length,
     icon: "database",
-    tone: "ok",
+    tone: "success",
     max: sourceRows.value.length,
     dataTest: "security-content-stat-detected",
   },
@@ -1096,21 +1097,8 @@ const STATUS_VARIANT: Record<string, "ok" | "neutral" | "warn" | "neutral"> = {
         @sort-change="() => nextTick(syncIndexes)"
         @row-click="(row: RuleRow) => showRule(row.id)"
       >
-        <template #subheader>
-          <div class="px-page-edge border-table-row-divider border-b py-1.5">
-            <OStatStrip
-              compact-values
-              :items="ruleStats"
-              selectable
-              multiple
-              :selected-keys="ruleFacets"
-              data-test="security-content-rule-stats"
-              @update:selected-keys="ruleFacets = $event as RuleFacet[]"
-            />
-          </div>
-        </template>
         <template #toolbar>
-          <div class="flex w-full items-center gap-2">
+          <div class="contents">
             <div class="w-40 shrink-0">
               <OSelect
                 :aria-label="t('siem.aria.severityFilter')"
@@ -1124,9 +1112,21 @@ const STATUS_VARIANT: Record<string, "ok" | "neutral" | "warn" | "neutral"> = {
             </div>
             <OSearchInput
               v-model="ruleSearch"
-              class="flex-1"
+              class="min-w-0 flex-1 md:min-w-48"
               :placeholder="t('siem.content.searchRules')"
               data-test="security-content-search-rules"
+            />
+            <OStatStrip
+              compact-values
+              :items="ruleStats"
+              selectable
+              :row="false"
+              class="max-md:order-last"
+              multiple
+              :selected-keys="ruleFacets"
+              default-key="all"
+              data-test="security-content-rule-stats"
+              @update:selected-keys="ruleFacets = $event as RuleFacet[]"
             />
             <OButton
               v-if="canAuthor"
@@ -1259,24 +1259,25 @@ const STATUS_VARIANT: Record<string, "ok" | "neutral" | "warn" | "neutral"> = {
         @sort-change="() => nextTick(syncIndexes)"
         @row-click="(row: SourceRow) => showSource(row.id)"
       >
-        <template #subheader>
-          <div class="px-page-edge border-table-row-divider border-b py-1.5">
-            <OStatStrip
-              compact-values
-              :items="sourceStats"
-              selectable
-              :selected-key="sourceFacet"
-              data-test="security-content-source-stats"
-              @select="(key: string | null) => (sourceFacet = key ? 'detected' : null)"
-            />
-          </div>
-        </template>
         <template #toolbar>
           <OSearchInput
             v-model="sourceSearch"
-            class="w-full"
+            class="min-w-0 flex-1 md:min-w-48"
             :placeholder="t('siem.content.searchSources')"
             data-test="security-content-search-sources"
+          />
+          <OStatStrip
+            compact-values
+            :items="sourceStats"
+            selectable
+            :row="false"
+            class="max-md:order-last"
+            :selected-key="sourceFacet"
+            data-test="security-content-source-stats"
+            @select="
+              (key: string) =>
+                (sourceFacet = key === 'all' || sourceFacet === key ? null : 'detected')
+            "
           />
         </template>
         <template #cell-label="{ row }">

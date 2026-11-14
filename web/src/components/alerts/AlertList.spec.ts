@@ -699,16 +699,13 @@ describe("AlertList - data fetching and columns", () => {
     expect(wrapper.vm.stateCounts.paused).toBe(1);
     expect(wrapper.vm.stateCounts.failed).toBe(1);
 
-    // The strip sits in the table frame below the toolbar, not inside it (F7).
-    const summary = wrapper.find('[data-test="alert-list-summary"]');
+    // The chips share the search row, after the search input and before refresh.
+    const toolbar = wrapper.get('[data-test="o2-table-toolbar"]');
+    const summary = toolbar.find('[data-test="alert-list-summary"]');
     expect(summary.exists()).toBe(true);
-    expect(
-      wrapper
-        .get('[data-test="o2-table-toolbar"]')
-        .find('[data-test="alert-list-summary"]')
-        .exists(),
-    ).toBe(false);
-    expect(summary.find('[data-test="o-stat-strip"]').exists()).toBe(true);
+    const search = toolbar.get('[data-test="alert-list-search-input"]').element;
+    expect(search.compareDocumentPosition(summary.element)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(summary.find('[data-test="o-stat-strip-chips"]').exists()).toBe(true);
     // The KpiCards inside must actually render their content — guards against
     // the components being imported but not registered (renders as empty
     // unknown elements, which the exists() check alone would not catch).
@@ -1539,7 +1536,7 @@ describe("AlertList - row actions keep the view", () => {
     await flushPromises();
     expect(names(wrapper)).toContain("Alert 6");
 
-    wrapper.vm.onStatSelect(null);
+    wrapper.vm.onStatSelect("active");
     await flushPromises();
     wrapper.vm.onStatSelect("active");
     await flushPromises();
@@ -4265,10 +4262,8 @@ describe("AlertList - first run and the alert library", () => {
     expect(wrapper.find('[data-test="alert-list-empty-new-alert"]').exists()).toBe(true);
   });
 
-  it("renders the summary strip as stacked filter tiles", async () => {
+  it("passes the compact flag to the summary strip", async () => {
     const wrapper: any = await mountList();
-    const strip = wrapper.findComponent({ name: "OStatStrip" });
-    expect(strip.props("selectable")).toBe(true);
-    expect(strip.props("stacked")).toBe(true);
+    expect(wrapper.findComponent({ name: "OStatStrip" }).props("compact")).toBe(true);
   });
 });

@@ -143,7 +143,7 @@ test.describe("Unflattened testcases", () => {
       'Failed to find _o2_id field in log details' +
       (backendReady
         ? ''
-        : ' — the search API never returned a record containing _o2_id, so "Store Original Data" had not taken effect on the backend') +
+        : ' — the search API never returned a record containing _o2_id, so "Store original data" had not taken effect on the backend') +
       ` (${Math.round(Math.max(0, msLeft(0)) / 1000)}s of test budget left)`
     );
   }

@@ -93,7 +93,7 @@ describe("MainLayout — Product Analytics menu entry", () => {
     const items = await railItems();
     const at = items.findIndex((l) => l.name === "rum");
     expect(items[at + 1]).toEqual({
-      title: "Product Analytics",
+      title: "Product analytics",
       icon: "insights",
       link: "/product-analytics",
       name: "productAnalytics",

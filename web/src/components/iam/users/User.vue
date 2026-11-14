@@ -65,34 +65,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           table-id="iam-users-list"
           @update:selected-ids="handleSelectedIdsUpdate"
         >
-          <!-- Access screens have no health state, so the strip counts ROLE
-               MEMBERSHIP and doubles as the role facet: the org's biggest roles
-               first, the tail folded into one tile, Total last and never
-               highlighted. Deliberately no green/amber/red — a role is a category,
-               not a severity. -->
-          <template #subheader>
-            <div
-              class="px-page-edge border-table-row-divider border-b py-1.5"
-              data-test="user-list-summary"
-            >
-              <OStatStrip
-                :items="summaryStats"
-                :loading="loading"
-                selectable
-                multiple
-                :selected-keys="roleFilters"
-                @update:selected-keys="roleFilters = $event"
-              />
-            </div>
-          </template>
-
           <template #toolbar>
-            <div class="flex min-w-0 flex-1 items-center gap-2 max-md:contents">
+            <div class="contents">
               <OSearchInput
                 v-model="filterQuery"
                 :placeholder="t('user.search')"
                 data-test="user-list-search-input"
-                class="flex-1"
+                class="min-w-0 flex-1 max-md:min-w-40 md:min-w-48"
+              />
+              <!-- Counts role membership: a role is a category, not a severity, so no status tones. -->
+              <OStatStrip
+                :items="summaryStats"
+                :loading="loading"
+                selectable
+                :row="false"
+                multiple
+                :selected-keys="roleFilters"
+                default-key="total"
+                class="max-md:order-last"
+                data-test="user-list-summary"
+                @update:selected-keys="roleFilters = $event"
               />
             </div>
           </template>
@@ -648,6 +640,15 @@ export default defineComponent({
       ).length;
     });
 
+    // Built-in roles keep the privilege ramp; every custom role reads teal so it is
+    // visibly "not a built-in" without each one inventing its own colour.
+    const roleTone = (key: string): StatItem["tone"] => {
+      if (key === "root" || key === "admin") return "orange";
+      if (key === "editor" || key === "member") return "blue";
+      if (key === "user" || key === "viewer") return "neutral";
+      if (key === "serviceaccount") return "purple";
+      return "teal";
+    };
     const roleIcon = (key: string): IconName => {
       if (key === "root" || key === "admin") return "admin-panel-settings";
       if (key === "editor" || key === "member") return "edit";
@@ -693,8 +694,8 @@ export default defineComponent({
       );
     });
 
-    const onStatSelect = (key: string | null) => {
-      roleFilters.value = key === null ? [] : toggleFilterKey(roleFilters.value, key, "total");
+    const onStatSelect = (key: string) => {
+      roleFilters.value = toggleFilterKey(roleFilters.value, key, "total");
     };
 
     const hasInvited = computed(() => (rows.value || []).some((row: any) => isInvited(row)));
@@ -705,7 +706,7 @@ export default defineComponent({
     const summaryStats = computed<StatItem[]>(() => {
       const total = searchedRows.value.length;
       const hasData = (rows.value || []).length > 0;
-      const v = (n: number): number | null => (hasData ? n : null);
+      const v = (n: number): string | number => (hasData ? n : "—");
       const share = total > 0 ? total : undefined;
 
       const tiles: StatItem[] = visibleRoles.value.map((role) => ({
@@ -714,6 +715,7 @@ export default defineComponent({
         label: raw(role.label),
         value: v(countRole(role.key)),
         icon: roleIcon(role.key),
+        tone: roleTone(role.key),
         max: share,
         dataTest: `user-summary-role-${role.key}`,
       }));
@@ -724,6 +726,7 @@ export default defineComponent({
           label: t("iam.summaryOtherRoles", { count: overflowRoles.value.length }),
           value: v(overflowUserCount.value),
           icon: "more-horiz",
+          tone: "teal",
           max: share,
           dataTest: "user-summary-other-roles",
         });
@@ -736,6 +739,7 @@ export default defineComponent({
           label: t("iam.summaryInvited"),
           value: v(invitedCount.value),
           icon: "person-add",
+          tone: "purple",
           max: share,
           dataTest: "user-summary-invited",
         });
@@ -746,7 +750,8 @@ export default defineComponent({
         label: t("common.all"),
         value: v(total),
         icon: "group-work",
-        all: true,
+        tone: "primary",
+        // Clickable (it clears the facet) but never shows the ring.
         dataTest: "user-summary-total",
       });
       return tiles;

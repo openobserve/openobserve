@@ -556,7 +556,7 @@ export default class DashboardVariablesScoped {
   }
 
   /**
-   * Get the "No Data Found" indicator locator for a variable query-value selector
+   * Get the "No data found" indicator locator for a variable query-value selector
    * @returns {import('@playwright/test').Locator}
    */
   getVariableNoDataLocator() {
@@ -842,7 +842,7 @@ export default class DashboardVariablesScoped {
   }
 
   /**
-   * Select a tab (by label) in the variable "Selected Tabs" dropdown, then close it
+   * Select a tab (by label) in the variable "Selected tabs" dropdown, then close it
    * @param {string} tabLabel - data-test-label of the tab option (e.g. "Tab2", "Default")
    */
   async selectVariableTab(tabLabel) {
@@ -864,7 +864,7 @@ export default class DashboardVariablesScoped {
   }
 
   /**
-   * Select a panel (by label) in the variable "Selected Panels" dropdown, then close it
+   * Select a panel (by label) in the variable "Selected panels" dropdown, then close it
    * @param {string} panelLabel - data-test-label of the panel option (e.g. "Panel1")
    */
   async selectVariablePanel(panelLabel) {
@@ -1061,8 +1061,8 @@ export default class DashboardVariablesScoped {
     // Select Scope Level - Map scope value to UI text
     const scopeUIText = {
       'global': 'Global',
-      'tabs': 'Selected Tabs',
-      'panels': 'Selected Panels'
+      'tabs': 'Selected tabs',
+      'panels': 'Selected panels'
     };
 
     await this.page.locator('[data-test="dashboard-variable-scope-select"]').click();
@@ -1587,7 +1587,7 @@ export default class DashboardVariablesScoped {
   /**
    * Verify deleted tab/panel shows "(deleted)" in variable assignment
    * This method verifies the deleted scope label by hovering over the scope chip
-   * and checking if the tooltip contains "Deleted Tab" or "Deleted Panel"
+   * and checking if the tooltip contains "Deleted tab" or "Deleted panel"
    * @param {string} scopeType - 'tab' or 'panel' (also accepts 'tabs' or 'panels')
    */
   async verifyDeletedScopeLabel(scopeType) {
@@ -1600,11 +1600,11 @@ export default class DashboardVariablesScoped {
     const scopeChip = this.page.locator('[data-test="dashboard-variable-scope-badge"]').first();
     await scopeChip.waitFor({ state: "visible", timeout: 5000 });
 
-    // Hover over the scope chip to see the tooltip showing "Deleted Tab" or "Deleted Panel"
+    // Hover over the scope chip to see the tooltip showing "Deleted tab" or "Deleted panel"
     await scopeChip.hover();
 
-    // Wait for tooltip to appear and verify it contains "Deleted Tab" or "Deleted Panel"
-    const expectedText = normalizedType === 'tab' ? 'Deleted Tab' : 'Deleted Panel';
+    // Wait for tooltip to appear and verify it contains "Deleted tab" or "Deleted panel"
+    const expectedText = normalizedType === 'tab' ? 'Deleted tab' : 'Deleted panel';
     const tooltip = this.page.locator('[data-test="o-tooltip-content"]');
     await expect(tooltip).toBeVisible({ timeout: 5000 });
     await expect(tooltip).toContainText(expectedText, { ignoreCase: true });
@@ -2582,11 +2582,11 @@ export default class DashboardVariablesScoped {
 
   /**
    * Change variable type on an open edit form (e.g., from query_values to constant)
-   * @param {string} typeName - Type name (e.g., "Constant", "Query Values", "Custom", "Textbox")
+   * @param {string} typeName - Type name (e.g., "Constant", "Query values", "Custom", "Textbox")
    */
   async changeVariableType(typeName) {
     const typeValueMap = {
-      'Query Values': 'query_values',
+      'Query values': 'query_values',
       'Constant': 'constant',
       'Textbox': 'textbox',
       'Custom': 'custom',
@@ -2614,7 +2614,7 @@ export default class DashboardVariablesScoped {
   }
 
   /**
-   * Locator for the dashboard-level "Refresh Cache & Reload" menu item.
+   * Locator for the dashboard-level "Refresh cache & reload" menu item.
    * @returns {import('@playwright/test').Locator}
    */
   getRefreshWithoutCacheMenuItem() {
@@ -2622,7 +2622,7 @@ export default class DashboardVariablesScoped {
   }
 
   /**
-   * Open the refresh-options dropdown, click "Refresh Cache & Reload", and wait
+   * Open the refresh-options dropdown, click "Refresh cache & reload", and wait
    * for the resulting _search_stream request carrying clear_cache=true. Returns
    * the matched request URL so the caller can assert the cache flag.
    * @returns {Promise<URL>}
@@ -2662,7 +2662,7 @@ export default class DashboardVariablesScoped {
   }
 
   /**
-   * Locator for the panel-level "Refresh Cache & Reload" menu item.
+   * Locator for the panel-level "Refresh cache & reload" menu item.
    * @returns {import('@playwright/test').Locator}
    */
   getPanelRefreshWithoutCacheItem() {
@@ -2670,7 +2670,7 @@ export default class DashboardVariablesScoped {
   }
 
   /**
-   * Open a panel's kebab dropdown, click its "Refresh Cache & Reload" item, and
+   * Open a panel's kebab dropdown, click its "Refresh cache & reload" item, and
    * wait for the resulting _search_stream request carrying clear_cache=true.
    * @param {string} title - Panel title (kebab data-test suffix)
    * @returns {Promise<URL>}

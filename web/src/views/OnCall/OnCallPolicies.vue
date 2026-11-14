@@ -58,19 +58,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:sort-by="sortBy = $event"
       @update:sort-order="sortOrder = $event"
     >
-      <template #subheader>
-        <div class="px-page-edge border-table-row-divider border-b py-1.5">
-          <OStatStrip :items="summaryStats" :loading="loading" />
-        </div>
+      <template v-if="!lgUp" #subheader>
+        <OStatStrip :items="summaryStats" :loading="loading" row />
       </template>
 
       <template #toolbar>
-        <div class="flex min-w-0 flex-1 items-center gap-2 max-md:contents">
+        <div class="flex w-full items-center gap-2 max-md:contents">
           <OSearchInput
             v-model="search"
             class="flex-1"
             :placeholder="t('oncall.searchTeams')"
             data-test="oncall-policies-search"
+          />
+          <OStatStrip
+            v-if="lgUp"
+            :items="summaryStats"
+            :loading="loading"
+            inline
+            class="shrink-0"
           />
         </div>
       </template>
@@ -172,6 +177,7 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import { queryClient } from "@/composables/query/queryClient";
 import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
 import { useEditorDraftIds } from "@/composables/useEditorDraft";
+import useBreakpoint from "@/composables/useBreakpoint";
 import { useListViewState } from "@/composables/useListViewState";
 import { oncallTeamsQuery, teamPolicyQuery, whoIsOnCallQuery } from "@/services/oncall.queries";
 import type { OnCallPolicy, OnCallPosition, OnCallTeam } from "@/ts/interfaces/oncall";
@@ -191,6 +197,7 @@ interface PolicyRow {
 }
 
 const { t } = useI18nTyped();
+const { lgUp } = useBreakpoint();
 const store = useStore();
 const router = useRouter();
 
@@ -288,7 +295,7 @@ const summaryStats = computed<StatItem[]>(() => [
     label: t("oncall.statCoverageGaps"),
     value: rows.value.filter((row) => !row.onCall).length,
     icon: "person-pin-circle",
-    tone: rows.value.some((row) => !row.onCall) ? "err" : "neutral",
+    tone: rows.value.some((row) => !row.onCall) ? "error" : "neutral",
     dataTest: "oncall-policies-stat-gaps",
   },
   {
@@ -296,7 +303,7 @@ const summaryStats = computed<StatItem[]>(() => [
     label: t("oncall.statSilentPriorities"),
     value: rows.value.reduce((total, row) => total + row.silent.length, 0),
     icon: "volume-off",
-    tone: "warn",
+    tone: "warning",
     dataTest: "oncall-policies-stat-silent",
   },
   {
@@ -304,7 +311,7 @@ const summaryStats = computed<StatItem[]>(() => [
     label: t("oncall.statUnreachableRungs"),
     value: rows.value.reduce((total, row) => total + row.unreachable.length, 0),
     icon: "warning-amber",
-    tone: rows.value.some((row) => row.unreachable.length) ? "err" : "neutral",
+    tone: rows.value.some((row) => row.unreachable.length) ? "error" : "neutral",
     dataTest: "oncall-policies-stat-unreachable",
   },
 ]);

@@ -113,12 +113,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #subheader>
           <!-- Always rendered — `:loading` draws the skeleton — so arriving
                data never shifts the rows below it. -->
-          <div
-            class="px-page-edge border-table-row-divider border-b py-1.5"
+          <OStatStrip
+            :items="summaryStats"
+            :loading="loading"
+            row
             data-test="dbm-activity-summary"
-          >
-            <OStatStrip :items="summaryStats" :loading="loading" />
-          </div>
+          />
 
           <!-- The wait-event breakdown, grouped by the ENGINE'S OWN vocabulary.
                A unified cross-engine taxonomy was considered and withdrawn:
@@ -654,32 +654,35 @@ const summaryStats = computed<StatItem[]>(() => {
       label: t("dbm.activity.summary.sessions"),
       // No `??` fallback to the row count: that would silently swap a capped
       // sample in under an aggregate label, next to aggregate-grain tiles.
-      value: sampleTotal.value,
+      value: sampleTotal.value ?? raw("—"),
       icon: "database",
+      tone: "neutral",
       dataTest: "dbm-activity-summary-sessions",
     },
     {
       key: "onCpu",
       label: t("dbm.activity.summary.onCpu"),
-      value: sampledWaits ? waits.onCpu : null,
+      value: sampledWaits ? waits.onCpu : raw("—"),
       icon: "speed",
+      tone: "neutral",
       dataTest: "dbm-activity-summary-on-cpu",
     },
     {
       key: "waiting",
       label: t("dbm.activity.summary.waiting"),
-      value: sampledWaits ? waits.waiting : null,
+      value: sampledWaits ? waits.waiting : raw("—"),
       icon: "timer",
+      tone: "neutral",
       dataTest: "dbm-activity-summary-waiting",
     },
     {
       key: "idleInTransaction",
       label: t("dbm.activity.summary.idleInTransaction"),
-      value: sampledStates ? idleInTransaction : null,
+      value: sampledStates ? idleInTransaction : raw("—"),
       icon: "lock",
       // Tone follows the MEASUREMENT, so an unsampled window cannot go amber:
       // a warning colour is itself a claim that something was found.
-      tone: sampledStates && idleInTransaction > 0 ? "warn" : "neutral",
+      tone: sampledStates && idleInTransaction > 0 ? "warning" : "neutral",
       dataTest: "dbm-activity-summary-idle-in-transaction",
     },
   ];

@@ -1489,7 +1489,7 @@ const serverTileItems = computed<StatItem[]>(() =>
   serverTiles.value.map((tile) => ({
     key: tile.id,
     label: t(`dbm.detail.serverMetrics.${tile.labelKey}`),
-    value: tile.value === "—" ? null : raw(tile.value),
+    value: raw(tile.value),
     dataTest: `dbm-detail-server-metric-${tile.id}`,
   })),
 );

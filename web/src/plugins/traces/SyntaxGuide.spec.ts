@@ -111,7 +111,7 @@ describe("SyntaxGuide", () => {
       // utilities; the title still renders as .label inside the menu panel.
 
       const title = document.querySelector('[data-test="syntax-guide-menu"] .label');
-      expect(title?.textContent).toBe("Syntax Guide");
+      expect(title?.textContent).toBe("Syntax guide");
     });
 
     it("should display normal mode syntax examples", async () => {

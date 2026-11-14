@@ -216,7 +216,7 @@ test.describe("Org-Level Ingestion Tokens", () => {
         await page.goto(`${process.env.ZO_BASE_URL}/web/ingestion?org_identifier=${process.env.ORGNAME || 'default'}`);
         await page.waitForLoadState('domcontentloaded');
 
-        // Click "Manage Tokens" button
+        // Click "Manage tokens" button
         await pageManager.ingestionTokensPage.clickManageTokens();
 
         // Should navigate to IAM > Ingestion Tokens

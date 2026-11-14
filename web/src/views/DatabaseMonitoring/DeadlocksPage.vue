@@ -127,12 +127,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #subheader>
           <!-- The window's counts live inside the table frame, not in the page
                header: they summarise exactly the rows below. -->
-          <div
-            class="px-page-edge border-table-row-divider border-b py-1.5"
+          <OStatStrip
+            :items="summaryStats"
+            :loading="loading"
+            row
             data-test="dbm-deadlocks-summary"
-          >
-            <OStatStrip :items="summaryStats" :loading="loading" />
-          </div>
+          />
 
           <!-- ONE storm band, not two. The completion-bias caution has no
                condition of its own beyond `storm`, so it rides inside this
@@ -800,15 +800,15 @@ const summaryStats = computed<StatItem[]>(() => [
   {
     key: "deadlocks",
     label: t("dbm.deadlocks.summary.deadlocks"),
-    value: notCollecting.value ? null : eventCount.value,
+    value: notCollecting.value ? raw("—") : eventCount.value,
     icon: "swap-horiz",
-    tone: eventCount.value > 0 ? "err" : "neutral",
+    tone: eventCount.value > 0 ? "error" : "neutral",
     dataTest: "dbm-deadlocks-summary-deadlocks",
   },
   {
     key: "pairs",
     label: t("dbm.deadlocks.summary.pairs"),
-    value: notCollecting.value ? null : rows.value.length,
+    value: notCollecting.value ? raw("—") : rows.value.length,
     icon: "filter-list",
     tone: "neutral",
     dataTest: "dbm-deadlocks-summary-pairs",

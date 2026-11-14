@@ -385,8 +385,8 @@ describe("AlertCalibrationDigestDetail for a scoped reader", () => {
     expect(wrapper.find('[data-test="alert-calibration-digest-clean"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="alert-calibration-digest-none-found"]').exists()).toBe(false);
     const items = wrapper.findComponent(OStatStrip).props("items") as StatItem[];
-    expect(items[0]).toMatchObject({ value: null, tone: "warn" });
-    expect(items[2]).toMatchObject({ value: null });
+    expect(items[0]).toMatchObject({ value: "—", tone: "warning" });
+    expect(items[2]).toMatchObject({ value: "—" });
     expect(wrapper.text()).not.toContain("null");
     wrapper.unmount();
 
@@ -491,7 +491,7 @@ describe("AlertCalibrationDigestDetail dismissed tile", () => {
 
     const scoped = await mountDetail([{ ...finding(1, 1), dismissed_count: null }]);
     await flushPromises();
-    expect(tile(scoped)?.value).toBeNull();
+    expect(tile(scoped)?.value).toBe("—");
     expect(tile(scoped)?.sub).toBe("Shown only with access to every alert");
     expect(tile(scoped)?.subIcon).toBe("info-outline");
     scoped.unmount();

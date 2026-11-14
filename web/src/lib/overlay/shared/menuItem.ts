@@ -12,8 +12,8 @@ const TONE: Record<MenuItemTone, string> = {
 export function menuItemClasses(tone: MenuItemTone, unavailable: boolean, twoLine: boolean) {
   return [
     "group/item relative flex w-full items-center gap-2",
-    "min-h-control-md rounded-chip px-2 text-compact",
-    twoLine && "py-1",
+    "min-h-control-md rounded-default px-3 text-compact",
+    twoLine ? "py-1" : "py-1.5",
     "cursor-pointer outline-none select-none",
     "transition-colors duration-(--duration-control) ease-(--ease-control)",
     unavailable

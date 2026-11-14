@@ -630,7 +630,7 @@ export class AlertManagement {
         await alertNameCell.click();
         await this.page.waitForTimeout(1500);
 
-        await expect(this.page.getByText('Alert History', { exact: false }).first()).toBeVisible({ timeout: 5000 });
+        await expect(this.page.getByText('Alert history', { exact: false }).first()).toBeVisible({ timeout: 5000 });
         testLogger.info('Alert history drawer opened');
     }
 

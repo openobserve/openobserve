@@ -359,7 +359,7 @@ describe("useQuery", () => {
 
     it("calls showErrorNotification and returns undefined on internal error", () => {
       const result = buildQueryPayload(null as any, t);
-      expect(mockShowErrorNotification).toHaveBeenCalledWith("Invalid SQL Syntax");
+      expect(mockShowErrorNotification).toHaveBeenCalledWith("Invalid SQL syntax");
       expect(result).toBeUndefined();
     });
   });

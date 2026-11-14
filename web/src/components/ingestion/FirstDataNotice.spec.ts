@@ -29,7 +29,7 @@ describe("FirstDataNotice — open in the signal page", () => {
   it("opens the signal page when its license is enabled", async () => {
     const wrapper = mountNotice("metrics", { traces: "locked" });
     const open = wrapper.find('[data-test="first-data-notice-open-btn"]');
-    expect(open.text()).toBe("Open in Metrics");
+    expect(open.text()).toBe("Open in metrics");
     expect(open.attributes("disabled")).toBeUndefined();
     await open.trigger("click");
     expect(wrapper.emitted("open")).toHaveLength(1);

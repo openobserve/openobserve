@@ -82,7 +82,7 @@ describe("ResumePipelineDialog", () => {
     const dialog = wrapper.findComponent(ODialogStub);
     expect(dialog.exists()).toBe(true);
     expect(dialog.props("size")).toBe("sm");
-    expect(dialog.props("title")).toBe("Resume Pipeline Ingestion");
+    expect(dialog.props("title")).toBe("Resume pipeline ingestion");
     expect(dialog.props("subtitle")).toBe("Last paused: 2023-01-01 10:00:00");
     expect(dialog.props("primary")?.label).toBeTruthy();
     expect(dialog.props("secondary")?.label).toBeTruthy();

@@ -30,7 +30,6 @@
             data-test="scorer-form-identity-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
-              <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">{{
                 t("onlineEvals.scorer.identitySection")
               }}</span>
@@ -108,7 +107,6 @@
             data-test="scorer-form-judge-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
-              <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">{{
                 t("onlineEvals.scorer.judgeSection")
               }}</span>
@@ -320,7 +318,6 @@
             data-test="scorer-form-code-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
-              <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">{{
                 t("codeScorer.codeSection")
               }}</span>
@@ -402,7 +399,6 @@
             data-test="scorer-form-endpoint-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
-              <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">{{
                 t("onlineEvals.scorer.endpointSection")
               }}</span>
@@ -467,7 +463,6 @@
             data-test="scorer-form-auth-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
-              <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">{{
                 t("onlineEvals.scorer.authSection")
               }}</span>
@@ -564,7 +559,6 @@
             data-test="scorer-form-headers-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
-              <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">{{
                 t("onlineEvals.scorer.headersSection")
               }}</span>
@@ -633,7 +627,6 @@
             data-test="scorer-form-body-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
-              <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">{{
                 t("onlineEvals.scorer.requestBodySection")
               }}</span>

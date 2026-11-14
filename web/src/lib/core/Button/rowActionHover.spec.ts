@@ -26,15 +26,15 @@ function classesOf(variant: ButtonVariant): string[] {
     .classes();
 }
 
-describe("a neutral hover inside a hovered table row", () => {
-  it.each(["secondary", "ghost", "accent-ghost"] as const)(
+describe("an accent hover inside a hovered table row", () => {
+  it.each(["ghost", "accent-ghost"] as const)(
     "steps the %s hover up to the row-action fill",
     (variant) => {
       expect(classesOf(variant)).toContain(STEP);
     },
   );
 
-  it.each(["primary", "danger", "danger-ghost", "link"] as const)(
+  it.each(["primary", "secondary", "danger", "danger-ghost", "link"] as const)(
     "leaves the %s hover, which never matched the row fill, alone",
     (variant) => {
       expect(classesOf(variant)).not.toContain(STEP);

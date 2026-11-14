@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// Spec for AnomalyDetectionConfig (the "Detection Config" step of the anomaly
+// Spec for AnomalyDetectionConfig (the "Detection config" step of the anomaly
 // wizard) —
 // the real <OForm> the migration introduced: per-mode required validation, the
 // two §4-restored rules (training_window_days ≥1, detection_function required —
@@ -1018,7 +1018,7 @@ describe("AnomalyDetectionConfig", () => {
       wrapper = mountConfig();
       await flushPromises();
 
-      expect(wrapper.text()).toContain("SQL Preview");
+      expect(wrapper.text()).toContain("SQL preview");
       expect(wrapper.text()).not.toContain("Anomaly Score Range");
     });
 
@@ -1055,17 +1055,17 @@ describe("AnomalyDetectionConfig", () => {
         label("anomaly-detection-window-unit"),
       ];
       expect(units).toEqual([
-        "Detection Resolution unit",
-        "Check Every unit",
-        "Look Back Window unit",
+        "Detection resolution unit",
+        "Check every unit",
+        "Look back window unit",
       ]);
       expect(new Set(units).size).toBe(units.length);
 
-      expect(label("anomaly-detection-function")).toBe("Detection Function");
-      expect(label("anomaly-histogram-interval-value")).toBe("Detection Resolution");
-      expect(label("anomaly-schedule-interval-value")).toBe("Check Every");
-      expect(label("anomaly-detection-window-value")).toBe("Look Back Window");
-      expect(label("anomaly-training-window")).toBe("Training Window");
+      expect(label("anomaly-detection-function")).toBe("Detection function");
+      expect(label("anomaly-histogram-interval-value")).toBe("Detection resolution");
+      expect(label("anomaly-schedule-interval-value")).toBe("Check every");
+      expect(label("anomaly-detection-window-value")).toBe("Look back window");
+      expect(label("anomaly-training-window")).toBe("Training window");
     });
 
     it("names the custom-SQL detection resolution unit after its row", async () => {
@@ -1076,7 +1076,7 @@ describe("AnomalyDetectionConfig", () => {
           .find('[data-test="anomaly-histogram-interval-unit"]')
           .find("[aria-label]")
           .attributes("aria-label"),
-      ).toBe("Detection Resolution unit");
+      ).toBe("Detection resolution unit");
     });
 
     it("exposes no mark-line or series-max machinery", async () => {
@@ -1095,7 +1095,7 @@ describe("AnomalyDetectionConfig", () => {
     const saved = [
       { field: "alpha", operator: "=", value: "1" },
       { field: "beta", operator: "IN", value: "'a', 'b'" },
-      { field: "gamma", operator: "Is Not Null", value: "" },
+      { field: "gamma", operator: "Is not null", value: "" },
     ];
 
     it("draws one chip per saved row, in order", async () => {

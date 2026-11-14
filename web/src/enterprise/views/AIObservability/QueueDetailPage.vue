@@ -103,24 +103,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="h-full w-full"
         @row-click="startReviewing"
       >
-        <!-- Status split as filter tiles: the counts are what tells a reviewer
-             whether this queue is worth opening. -->
-        <template #subheader>
-          <div
-            class="px-page-edge border-table-row-divider border-b py-1.5"
-            data-test="ai-queue-detail-summary"
-          >
-            <OStatStrip
-              :items="summaryStats"
-              :loading="loading"
-              selectable
-              multiple
-              :selected-keys="statusFilters"
-              @update:selected-keys="statusFilters = $event as LlmQueueItemStatus[]"
-            />
-          </div>
-        </template>
-
         <template #toolbar-trailing>
           <OButton
             icon-only
@@ -137,9 +119,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #toolbar>
           <OSearchInput
             v-model="search"
-            class="min-w-0 flex-1"
+            class="min-w-0 flex-1 md:min-w-48"
             :placeholder="t('aiObservability.queues.detail.searchPlaceholder')"
             data-test="ai-queue-detail-search-input"
+          />
+          <OStatStrip
+            :items="summaryStats"
+            :loading="loading"
+            selectable
+            :row="false"
+            multiple
+            :selected-keys="statusFilters"
+            default-key="all"
+            class="max-md:order-last"
+            data-test="ai-queue-detail-summary"
+            @update:selected-keys="statusFilters = $event as LlmQueueItemStatus[]"
           />
         </template>
 
@@ -269,14 +263,14 @@ const visibleItems = computed(() =>
 
 const summaryStats = computed<StatItem[]>(() => {
   const total = items.value.length;
-  const value = (n: number): number | null => (total ? n : null);
+  const value = (n: number): string | number => (total ? n : DASH);
   return [
     {
       key: "pending",
       label: t("aiObservability.queues.detail.status.pending"),
       value: value(pendingCount.value),
       icon: "fiber-manual-record",
-      tone: "warn",
+      tone: "warning",
       max: total || undefined,
       dataTest: "ai-queue-detail-summary-pending",
     },
@@ -285,7 +279,7 @@ const summaryStats = computed<StatItem[]>(() => {
       label: t("aiObservability.queues.detail.status.reviewed"),
       value: value(reviewedCount.value),
       icon: "check-circle",
-      tone: "ok",
+      tone: "success",
       max: total || undefined,
       dataTest: "ai-queue-detail-summary-reviewed",
     },
@@ -294,6 +288,7 @@ const summaryStats = computed<StatItem[]>(() => {
       label: t("aiObservability.queues.detail.allItems"),
       value: value(total),
       icon: "format-list-bulleted",
+      tone: "primary",
       dataTest: "ai-queue-detail-summary-all",
     },
   ];

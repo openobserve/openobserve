@@ -132,9 +132,9 @@ describe("TraceHeader", () => {
       expect(operationNameSection.exists()).toBe(true);
     });
 
-    it("should display 'Operation Name' text", () => {
+    it("should display 'Operation name' text", () => {
       const operationNameSection = wrapper.find('[data-test="trace-header-operation-name"]');
-      expect(operationNameSection.text()).toContain("Operation Name");
+      expect(operationNameSection.text()).toContain("Operation name");
     });
 
     it("should have correct width based on splitterWidth prop", () => {
@@ -650,7 +650,7 @@ describe("TraceHeader", () => {
 
       const opName = wrapper.find('[data-test="trace-header-operation-name"]');
       expect(opName.exists()).toBe(true);
-      expect(opName.text()).toContain("Operation Name");
+      expect(opName.text()).toContain("Operation name");
     });
   });
 

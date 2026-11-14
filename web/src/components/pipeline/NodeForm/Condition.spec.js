@@ -269,7 +269,7 @@ describe("Condition.vue (drawer chrome)", () => {
     const wrapper = createWrapper({ isEditNode: true });
     await wrapper.find('[data-test="delete-btn"]').trigger("click");
     expect(wrapper.vm.dialog.show).toBe(true);
-    expect(wrapper.vm.dialog.title).toBe("Delete Node");
+    expect(wrapper.vm.dialog.title).toBe("Delete node");
     expect(typeof wrapper.vm.dialog.okCallback).toBe("function");
   });
 

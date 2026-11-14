@@ -65,8 +65,8 @@ describe("OButton", () => {
 
     it.each([
       ["primary", "bg-button-primary"],
-      ["secondary", "bg-button-secondary"],
-      ["ghost", "text-text-secondary"],
+      ["secondary", "border-button-outline-border"],
+      ["ghost", "text-button-ghost-text"],
       ["accent-ghost", "text-text-link"],
       ["danger", "bg-button-destructive"],
       ["danger-ghost", "text-button-ghost-destructive-text"],
@@ -176,7 +176,8 @@ describe("OButton", () => {
       const wrapper = mount(OButton, { props: { disabled: true } });
       expect(wrapper.attributes("disabled")).toBeDefined();
       expect(wrapper.attributes("aria-disabled")).toBe("true");
-      expect(wrapper.classes()).toContain("text-text-disabled");
+      expect(wrapper.classes()).toContain("opacity-50");
+      expect(wrapper.classes()).toContain("border-button-outline-border");
       await wrapper.trigger("click");
       expect(wrapper.emitted("click")).toBeUndefined();
     });

@@ -123,6 +123,7 @@ body {
   font-size: var(--text-compact);
   font-weight: var(--font-normal);
   line-height: var(--leading-base);
+  font-variant-numeric: tabular-nums;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }

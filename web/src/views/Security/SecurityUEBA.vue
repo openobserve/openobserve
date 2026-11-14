@@ -400,7 +400,7 @@ const stats = computed<StatItem[]>(() => {
       label: t("siem.ueba.stat.critical"),
       value: count("critical"),
       icon: "emergency",
-      tone: "crit",
+      tone: "error",
       max: n,
       dataTest: "security-ueba-stat-critical",
     },
@@ -409,7 +409,7 @@ const stats = computed<StatItem[]>(() => {
       label: t("siem.ueba.stat.high"),
       value: count("high"),
       icon: "warning",
-      tone: "err",
+      tone: "orange",
       max: n,
       dataTest: "security-ueba-stat-high",
     },
@@ -418,7 +418,7 @@ const stats = computed<StatItem[]>(() => {
       label: t("siem.ueba.stat.medium"),
       value: count("medium"),
       icon: "report-problem",
-      tone: "warn",
+      tone: "warning",
       max: n,
       dataTest: "security-ueba-stat-medium",
     },
@@ -769,26 +769,25 @@ const noUserSources = computed(
         @row-click="openUser"
         @sort-change="() => nextTick(relocate)"
       >
-        <template #subheader>
-          <div class="px-page-edge border-table-row-divider border-b py-1.5">
-            <OStatStrip
-              compact-values
-              :items="stats"
-              :loading="tableLoading"
-              selectable
-              multiple
-              :selected-keys="toneFilters"
-              data-test="security-ueba-stats"
-              @update:selected-keys="toneFilters = $event as SeverityTone[]"
-            />
-          </div>
-        </template>
         <template #toolbar>
           <OSearchInput
             v-model="search"
             :placeholder="t('siem.ueba.search')"
-            class="max-w-md flex-1"
+            class="min-w-0 flex-1 md:min-w-48"
             data-test="security-ueba-search"
+          />
+          <OStatStrip
+            compact-values
+            :items="stats"
+            :loading="tableLoading"
+            selectable
+            :row="false"
+            class="max-md:order-last"
+            multiple
+            :selected-keys="toneFilters"
+            default-key="all"
+            data-test="security-ueba-stats"
+            @update:selected-keys="toneFilters = $event as SeverityTone[]"
           />
         </template>
         <template #toolbar-trailing>

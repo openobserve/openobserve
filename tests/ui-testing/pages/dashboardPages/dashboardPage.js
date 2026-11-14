@@ -298,7 +298,7 @@ export class DashboardPage {
     // Wait for Vue components to mount
     await this.page.waitForTimeout(2000);
 
-    // Wait for and click the "Add Panel" button
+    // Wait for and click the "Add panel" button
     await this.addPanelBtn.waitFor({ state: 'visible', timeout: 15000 });
     await this.addPanelBtn.click();
 

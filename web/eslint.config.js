@@ -935,7 +935,18 @@ const o2ControlsApi = {
 // Display components accept only the v2 API: tones by meaning, the fixed sizes, and no
 // appearance overrides (guidelines C2-C6, K1-K6, F7, D4, S1). Values come from each *.types.ts.
 const CHIP_TONES = ["neutral", "outline", "accent", "ok", "warn", "err", "crit", "info"];
-const STAT_TONES = ["neutral", "ok", "warn", "err", "crit", "info"];
+const STAT_TONES = [
+  "success",
+  "warning",
+  "error",
+  "primary",
+  "info",
+  "orange",
+  "blue",
+  "teal",
+  "purple",
+  "neutral",
+];
 const CHIP_CLASS_BAN =
   /^(uppercase|tracking-\S+|(min-)?h-\S+|p[xy]?-\S+|leading-\S+|rounded(-\S+)?|text-(3xs|2xs|xs|compact|sm|base))$/;
 const CHIP_REMOVED = {
@@ -973,20 +984,7 @@ const DISPLAY_API = {
   ODimensionChip: { values: { tone: CHIP_TONES }, removed: { variant: "tone" } },
   OSeverity: { values: { level: ["fatal", "error", "warn", "info", "debug"] } },
   OCountBadge: { values: { tone: ["err", "neutral", "accent"] } },
-  OStatStrip: {
-    values: { size: ["md", "lg"] },
-    removed: {
-      "default-key": null,
-      tray: null,
-      compact: null,
-      row: 'a band div ("px-page-edge border-b py-1.5") around the strip',
-      inline: null,
-    },
-  },
-  OStatCard: {
-    values: { tone: STAT_TONES, size: ["md", "lg"] },
-    removed: { trend: "delta", tray: null, compact: null, variant: null, quiet: null },
-  },
+  OStatCard: { values: { tone: STAT_TONES } },
   OCard: {
     removed: { variant: null },
     classBan: /^(rounded(-\S+)?|shadow(-\S+)?|card-container|p[xy]?-\S+)$/,

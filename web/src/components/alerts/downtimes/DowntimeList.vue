@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <div class="h-full min-w-0 flex-1 max-md:h-auto max-md:min-h-0">
-          <div class="bg-card-glass-bg flex h-full flex-col">
+          <div class="bg-card-glass-bg @container/downtime-toolbar flex h-full flex-col">
             <OTable
               v-model:selected-ids="selectedIds"
               class="min-h-0 flex-1"
@@ -73,23 +73,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :get-row-style="rowStyle"
               @row-click="openDetail"
             >
-              <template #subheader>
-                <div
-                  class="px-page-edge border-table-row-divider border-b py-1.5"
-                  data-test="downtime-list-summary"
-                >
-                  <OStatStrip
-                    :items="summaryStats"
-                    :loading="loading"
-                    stacked
-                    selectable
-                    multiple
-                    :selected-keys="statFilters"
-                    @update:selected-keys="onStatKeys"
-                  />
+              <template v-if="truncatedNotice" #subheader>
+                <div class="px-page-edge border-table-row-divider border-b py-1.5">
                   <OInlineNotice
-                    v-if="truncatedNotice"
-                    class="mt-1.5"
                     tone="info"
                     :message="truncatedNotice"
                     data-test="downtime-list-truncated"
@@ -98,9 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
 
               <template #toolbar>
-                <div
-                  class="@container/downtime-toolbar flex min-w-0 flex-1 items-center gap-2 max-md:contents"
-                >
+                <div class="contents">
                   <OToggleGroup
                     mobile-dropdown
                     :model-value="typeFilter"
@@ -114,10 +98,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :icon-left="option.icon"
                       :data-test="`downtime-list-type-${option.value}`"
                     >
-                      <span class="@max-[38rem]/downtime-toolbar:hidden">{{ option.label }}</span>
+                      <span class="@max-[48rem]/downtime-toolbar:hidden">{{ option.label }}</span>
                     </OToggleGroupItem>
                   </OToggleGroup>
-                  <div class="min-w-0 flex-1 max-md:min-w-40">
+                  <div class="min-w-0 flex-1 max-md:min-w-40 md:min-w-48">
                     <OSearchInput
                       v-model="search"
                       :placeholder="
@@ -147,6 +131,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @update:scope="(v) => (searchAcrossFolders = v === 'all')"
                     />
                   </div>
+                  <OStatStrip
+                    :items="summaryStats"
+                    :loading="loading"
+                    selectable
+                    :row="false"
+                    multiple
+                    :selected-keys="statFilters"
+                    default-key="total"
+                    class="max-md:order-last"
+                    data-test="downtime-list-summary"
+                    @update:selected-keys="onStatKeys"
+                  />
                 </div>
               </template>
 
@@ -910,7 +906,7 @@ const summaryStats = computed<StatItem[]>(() => {
   const server = serverCounts.value;
   const hasData = rows.length > 0 || !!server;
   const count = (key: keyof DowntimeCounts, pred: (r: DowntimeListItem) => boolean) =>
-    server ? (server.counts?.[key] ?? 0) : hasData ? rows.filter(pred).length : null;
+    server ? (server.counts?.[key] ?? 0) : hasData ? rows.filter(pred).length : "—";
   const total = server ? server.total : rows.length;
   const share = hasData ? total : undefined;
   return [
@@ -919,7 +915,7 @@ const summaryStats = computed<StatItem[]>(() => {
       label: t("alerts.downtimes.stats.active"),
       value: count("active", (r) => r.status === "active"),
       icon: "notifications-paused",
-      tone: "warn",
+      tone: "warning",
       max: share,
       dataTest: "downtime-summary-active",
     },
@@ -928,6 +924,7 @@ const summaryStats = computed<StatItem[]>(() => {
       label: t("alerts.downtimes.stats.scheduled"),
       value: count("scheduled", (r) => r.status === "scheduled"),
       icon: "schedule",
+      tone: "blue",
       max: share,
       dataTest: "downtime-summary-scheduled",
     },
@@ -970,9 +967,9 @@ const summaryStats = computed<StatItem[]>(() => {
     {
       key: "total",
       label: t("common.allStatuses"),
-      value: hasData ? total : null,
+      value: hasData ? total : "—",
       icon: "format-list-bulleted",
-      all: true,
+      tone: "primary",
       dataTest: "downtime-summary-total",
     },
   ];

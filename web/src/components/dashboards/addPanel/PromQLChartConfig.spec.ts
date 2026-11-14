@@ -232,7 +232,7 @@ describe("PromQLChartConfig", () => {
     });
   });
 
-  describe("Table Aggregations", () => {
+  describe("Table aggregations", () => {
     it("should show aggregations selector in all mode", async () => {
       // Set mode BEFORE creating wrapper
       mockDashboardPanelData.data.config.promql_table_mode = "all";
@@ -264,14 +264,14 @@ describe("PromQLChartConfig", () => {
     });
   });
 
-  describe("Column Filters", () => {
+  describe("Column filters", () => {
     it("should show column filters in all mode", async () => {
       mockDashboardPanelData.data.config.promql_table_mode = "all";
       wrapper = createWrapper({ chartType: "table" });
       await wrapper.vm.$nextTick();
       await flushPromises();
 
-      expect(wrapper.text()).toContain("Column Filters");
+      expect(wrapper.text()).toContain("Column filters");
       expect(wrapper.find('[data-test="dashboard-config-visible-columns"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="dashboard-config-hidden-columns"]').exists()).toBe(true);
     });
@@ -304,14 +304,14 @@ describe("PromQLChartConfig", () => {
     });
   });
 
-  describe("Sticky Columns", () => {
+  describe("Sticky columns", () => {
     it("should show sticky columns config in all mode", async () => {
       mockDashboardPanelData.data.config.promql_table_mode = "all";
       wrapper = createWrapper({ chartType: "table" });
       await wrapper.vm.$nextTick();
       await flushPromises();
 
-      expect(wrapper.text()).toContain("Sticky Columns");
+      expect(wrapper.text()).toContain("Sticky columns");
       expect(wrapper.find('[data-test="dashboard-config-sticky-first-column"]').exists()).toBe(
         true,
       );
@@ -358,7 +358,7 @@ describe("PromQLChartConfig", () => {
     });
   });
 
-  describe("Column Order", () => {
+  describe("Column order", () => {
     it("should show column order config in all mode", async () => {
       mockDashboardPanelData.data.config.promql_table_mode = "all";
       wrapper = createWrapper({ chartType: "table" });

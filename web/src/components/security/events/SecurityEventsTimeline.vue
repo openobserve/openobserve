@@ -57,7 +57,7 @@ const stats = computed<StatItem[]>(() => {
   return shownTones.value.map((tone) => ({
     key: tone,
     label: t(toneLabelKey(tone)),
-    value: h ? h.totals[tone] : null,
+    value: h ? h.totals[tone] : "—",
     icon: TONE_ICON[tone],
     tone: TONE_STAT[tone],
     max: h?.total || undefined,
@@ -93,6 +93,7 @@ function onTones(keys: string[]) {
       :items="stats"
       :loading="loading && !histogram"
       selectable
+      :row="false"
       multiple
       :selected-keys="selectedTones"
       @update:selected-keys="onTones"

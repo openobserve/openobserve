@@ -441,11 +441,11 @@ onActivated(() => {
   suspended.value = false;
 });
 
-// One gap from the trigger for every tooltip (6 px).
-const SIDE_OFFSET = 6;
+// One gap from the trigger for every tooltip (4 px).
+const SIDE_OFFSET = 4;
 
 const contentClasses = computed(() => [
-  "z-10100 max-w-70 px-2 py-1.5",
+  "z-10100 max-w-70 px-2.5 py-1.5",
   "bg-surface-overlay rounded-menu border border-tooltip-border shadow-md",
   "text-xs text-text-body font-medium leading-snug",
   // Force long unbreakable tokens (file paths, hashes, URLs) to wrap inside the

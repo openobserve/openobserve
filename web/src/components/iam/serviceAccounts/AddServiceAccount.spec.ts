@@ -208,7 +208,7 @@ describe("AddServiceAccount", () => {
       expect(w.find('[data-test="iam-add-service-account-name-input"]').exists()).toBe(false);
       expect(getDescriptionInput(w).exists()).toBe(true);
       expect(w.find('[data-test-stub="o-dialog"]').attributes("data-title")).toBe(
-        "Update Service Account",
+        "Update service account",
       );
       w.unmount();
     });

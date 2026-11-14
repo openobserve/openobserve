@@ -301,7 +301,7 @@ describe("FolderList.vue", () => {
 
     describe("updateFolderList", () => {
       it("should update folder list and emit event", async () => {
-        const mockFolders = [{ folderId: "new-folder", name: "New Folder" }];
+        const mockFolders = [{ folderId: "new-folder", name: "New folder" }];
 
         await wrapper.vm.updateFolderList(mockFolders);
 
@@ -538,7 +538,7 @@ describe("FolderList.vue", () => {
     it("reads Folders in the rail header and Add Folder on the add button by default", () => {
       expect(wrapper.text()).toContain("Folders");
       expect(wrapper.find('[data-test="dashboard-new-folder-btn"]').attributes("title")).toBe(
-        "Add Folder",
+        "Add folder",
       );
     });
 

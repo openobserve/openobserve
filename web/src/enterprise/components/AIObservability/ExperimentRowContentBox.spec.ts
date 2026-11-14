@@ -30,9 +30,9 @@ function mountBox(props: Record<string, unknown> = {}) {
 
 describe("ExperimentRowContentBox", () => {
   it("renders its own label and, when given one, the source tag", () => {
-    const wrapper = mountBox({ tagLabel: "From Dataset" });
+    const wrapper = mountBox({ tagLabel: "From dataset" });
     expect(wrapper.text()).toContain("Input");
-    expect(wrapper.text()).toContain("From Dataset");
+    expect(wrapper.text()).toContain("From dataset");
   });
 
   it("omits the tag when the box has no source to name", () => {
@@ -52,7 +52,7 @@ describe("ExperimentRowContentBox", () => {
   it("shows Enter Fullscreen until the parent reports this box IS the fullscreen element", () => {
     const collapsed = mountBox({ fullscreen: false });
     expect(collapsed.get('[data-test="box-fullscreen"]').attributes("title")).toBe(
-      "Enter Fullscreen",
+      "Enter fullscreen",
     );
     expect(collapsed.get('[data-test="box-fullscreen"]').attributes("data-icon")).toBe(
       "fullscreen",
@@ -60,7 +60,7 @@ describe("ExperimentRowContentBox", () => {
 
     const expanded = mountBox({ fullscreen: true });
     expect(expanded.get('[data-test="box-fullscreen"]').attributes("title")).toBe(
-      "Exit Fullscreen",
+      "Exit fullscreen",
     );
     expect(expanded.get('[data-test="box-fullscreen"]').attributes("data-icon")).toBe(
       "fullscreen-exit",

@@ -29,8 +29,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template #actions>
-        <!-- The provider behind the Terraform export tab, which is otherwise
-             only discoverable once the export dialog is already open. -->
         <OTooltip v-if="anomalyTabLicenseLocked" :content="anomalyLockedReason">
           <span class="inline-flex">
             <OButton data-test="alert-list-add-alert-btn" variant="primary" disabled>
@@ -75,10 +73,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="alert-list-add-alert-draft-dot"
           />
         </OButton>
+        <!-- Under 640 px the header's own More holds the overflow, so the pair folds in there instead. -->
+        <ODropdown v-if="smUp" side="bottom" align="end">
+          <template #trigger>
+            <OButton
+              icon-only
+              variant="ghost"
+              icon="more-horiz"
+              data-test="app-page-header-more-btn"
+              :label="t('common.more')"
+            />
+          </template>
+          <IacRegistryLinks menu data-test="alert-list-iac-registries" />
+        </ODropdown>
       </template>
 
       <template #actions-overflow>
-        <IacRegistryLinks data-test="alert-list-iac-registries" :compact="isCompactToolbar" />
+        <IacRegistryLinks v-if="!smUp" data-test="alert-list-iac-registries" compact />
         <!-- Import button -->
         <OButton
           :class="isCompactToolbar ? 'min-w-0! px-2! py-0!' : ''"
@@ -119,7 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <!-- Right: Table -->
         <div class="h-full min-w-0 flex-1 max-md:h-auto max-md:min-h-0">
-          <div class="bg-card-glass-bg flex h-full flex-col">
+          <div class="bg-card-glass-bg @container/alert-toolbar flex h-full flex-col">
             <!-- Alert List Table (shows all alert types including anomaly detection rows) -->
             <OTable
               class="min-h-0 flex-1"
@@ -154,12 +165,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :get-row-style="alertRowStyle"
               @row-click="triggerExpand"
             >
-              <!-- Summary strip: at-a-glance operational counts for the folder.
-                     Rendered via OTable's #subheader slot so it sits BELOW the
-                     search/tabs and above the rows. Always rendered (skeleton
-                     while loading) so data arriving never shifts the layout. -->
-              <template #subheader>
-                <div v-if="levelFilter" class="px-3 pt-2" data-test="alert-list-level-filter">
+              <!-- A level from an Overview link has no chip, so it shows as a removable filter here. -->
+              <template v-if="levelFilter" #subheader>
+                <div class="px-3 pt-2" data-test="alert-list-level-filter">
                   <OButton
                     variant="secondary"
                     size="sm"
@@ -171,28 +179,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     {{ levelFilterLabel }}
                   </OButton>
                 </div>
-                <div
-                  class="px-page-edge border-table-row-divider border-b py-1.5"
-                  data-test="alert-list-summary"
-                >
-                  <OStatStrip
-                    :items="summaryStats"
-                    :loading="loading"
-                    stacked
-                    selectable
-                    multiple
-                    :selected-keys="stateFilters"
-                    @update:selected-keys="onStateFiltersUpdate"
-                  />
-                </div>
               </template>
 
               <!-- Toolbar: alert-type filter + search (inline folder scope) + refresh. -->
               <template #toolbar>
-                <!-- A container, not a viewport breakpoint: the folder rail squeezes this toolbar at any width. -->
-                <div
-                  class="@container/alert-toolbar flex min-w-0 flex-1 flex-wrap items-center gap-2 gap-y-1.5 max-md:contents"
-                >
+                <!-- Children of the toolbar row, so the chips can wrap below them; label queries read the table column. -->
+                <div class="contents">
                   <OToggleGroup
                     mobile-dropdown
                     :model-value="activeTab"
@@ -208,12 +200,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :title="lgUp || tab.locked ? undefined : tab.label"
                         :data-test="`alert-list-tab-${tab.value}`"
                       >
-                        <span class="@max-[42rem]/alert-toolbar:hidden">{{ tab.label }}</span>
+                        <span class="@max-[52rem]/alert-toolbar:hidden">{{ tab.label }}</span>
                       </OToggleGroupItem>
                     </template>
                   </OToggleGroup>
                   <!-- flex-1 is basis-0, so below lg the full-width basis is what wraps the input before its scope chips spill. -->
-                  <div class="min-w-0 flex-1 md:max-lg:basis-full">
+                  <div class="min-w-0 flex-1 md:min-w-48 md:max-lg:basis-full">
                     <OSearchInput
                       v-model="dynamicQueryModel"
                       :placeholder="
@@ -242,6 +234,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @update:scope="(v) => (searchAcrossFolders = v === 'all')"
                     />
                   </div>
+                  <OStatStrip
+                    :items="summaryStats"
+                    :loading="loading"
+                    compact
+                    selectable
+                    :row="false"
+                    multiple
+                    :selected-keys="stateFilters"
+                    default-key="total"
+                    class="max-md:order-last"
+                    data-test="alert-list-summary"
+                    @update:selected-keys="onStateFiltersUpdate"
+                  />
                 </div>
               </template>
               <template #toolbar-trailing>
@@ -1443,7 +1448,7 @@ export default defineComponent({
   setup() {
     const store = useStore();
     const { t } = useI18nTyped();
-    const { lgUp } = useBreakpoint();
+    const { lgUp, smUp } = useBreakpoint();
 
     // On-call is separately gated, so the column and its lookup vanish with it
     // rather than showing a header nothing can ever fill.
@@ -1926,7 +1931,7 @@ export default defineComponent({
     const summaryStats = computed<StatItem[]>(() => {
       const c = stateCounts.value;
       const hasData = c.total > 0;
-      const v = (n: number): number | null => (hasData ? n : null);
+      const v = (n: number): string | number => (hasData ? n : "—");
       const share = hasData ? c.total : undefined;
       // Severity-descending, matching the Incidents / Eval Jobs strips; Total stays last.
       return [
@@ -1935,7 +1940,7 @@ export default defineComponent({
           label: t("alerts.summaryFailed"),
           value: v(c.failed),
           icon: "error-outline",
-          tone: "err",
+          tone: "error",
           max: share,
           dataTest: "alert-summary-failed",
         },
@@ -1944,7 +1949,7 @@ export default defineComponent({
           label: t("alerts.summaryFiring"),
           value: v(c.firing),
           icon: "notifications-active",
-          tone: "err",
+          tone: "error",
           max: share,
           dataTest: "alert-summary-firing",
         },
@@ -1953,7 +1958,7 @@ export default defineComponent({
           label: t("alerts.ack.tile"),
           value: v(c.acknowledged),
           icon: "person",
-          tone: "neutral",
+          tone: "blue",
           max: share,
           dataTest: "alert-summary-acknowledged",
         },
@@ -1962,7 +1967,7 @@ export default defineComponent({
           label: t("alerts.summaryEvalError"),
           value: v(c.error),
           icon: "report-problem",
-          tone: "err",
+          tone: "error",
           max: share,
           dataTest: "alert-summary-error",
         },
@@ -1971,7 +1976,7 @@ export default defineComponent({
           label: t("alerts.summaryDeliveryFailed"),
           value: v(c.notify_failed),
           icon: "notifications-paused",
-          tone: "err",
+          tone: "error",
           max: share,
           dataTest: "alert-summary-notify-failed",
         },
@@ -1980,7 +1985,7 @@ export default defineComponent({
           label: t("alerts.summaryRecent"),
           value: v(c.recent),
           icon: "bolt",
-          tone: "warn",
+          tone: "warning",
           max: share,
           dataTest: "alert-summary-recent",
         },
@@ -1989,7 +1994,7 @@ export default defineComponent({
           label: t("alerts.summaryActive"),
           value: v(c.active),
           icon: "check-circle",
-          tone: "ok",
+          tone: "success",
           max: share,
           dataTest: "alert-summary-active",
         },
@@ -2007,7 +2012,10 @@ export default defineComponent({
           label: t("common.allStates"),
           value: v(c.total),
           icon: "format-list-bulleted",
-          all: true,
+          tone: "primary",
+          // Total is clickable (clears the filter) but never shows the ring — the
+          // selected key is only ever a real state, never "total". No bar (its
+          // share of itself is always 100%).
           dataTest: "alert-summary-total",
         },
       ];
@@ -2127,11 +2135,11 @@ export default defineComponent({
     const clearLevelFilter = () => {
       levelFilter.value = null;
     };
-    const onStatSelect = (key: string | null) => {
+    const onStatSelect = (key: string) => {
       levelFilter.value = null;
-      stateFilters.value = key === null ? [] : toggleFilterKey(stateFilters.value, key, "total");
+      stateFilters.value = toggleFilterKey(stateFilters.value, key, "total");
     };
-    // Any tile change drops the linked level, as the level has no tile of its own.
+    // Any chip change drops the linked level, as the level has no chip of its own.
     const onStateFiltersUpdate = (keys: string[]) => {
       levelFilter.value = null;
       stateFilters.value = keys.filter(isAlertStateKey);
@@ -4942,6 +4950,7 @@ export default defineComponent({
       bulkDeleteLoading,
       config,
       isCompactToolbar,
+      smUp,
       isAnomalyDetectionEnabled,
       anomalyLicenseLocked,
       anomalyLockedReason,

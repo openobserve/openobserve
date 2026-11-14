@@ -37,36 +37,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="fleet-collectors-table"
       @row-click="openCollector"
     >
-      <template #subheader>
-        <div class="px-page-edge border-table-row-divider border-b py-1.5">
-          <OStatStrip
-            :items="statusStats"
-            :loading="loading"
-            selectable
-            multiple
-            :selected-keys="statusFilters"
-            @update:selected-keys="statusFilters = $event"
-          />
-        </div>
-      </template>
-
       <template #toolbar>
-        <div
-          class="flex min-w-0 flex-1 items-center gap-2 max-md:contents"
-          data-drawer-anchor="fleet-collectors-toolbar"
-        >
+        <div class="contents">
           <OButton
             icon-only
             variant="secondary"
             icon="filter-list"
             class="lg:hidden"
+            data-drawer-anchor="fleet-collectors-toolbar"
             :aria-label="t('common.filters')"
             data-test="fleet-collectors-mobile-filters-btn"
             @click="mobileFiltersOpen = true"
           >
             <OTooltip :content="t('common.filters')" />
           </OButton>
-          <div class="min-w-0 flex-1 max-md:min-w-40">
+          <div class="min-w-0 flex-1 max-md:min-w-40 md:min-w-48">
             <OSearchInput
               v-model="search"
               class="w-full"
@@ -87,6 +72,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :options="osOptions"
             :placeholder="t('fleet.collectors.allOs')"
             data-test="fleet-collectors-os-filter"
+          />
+          <OStatStrip
+            :items="statusStats"
+            compact
+            selectable
+            :row="false"
+            multiple
+            :selected-keys="statusFilters"
+            default-key="all"
+            class="max-md:order-last"
+            @update:selected-keys="statusFilters = $event"
           />
         </div>
       </template>
@@ -499,46 +495,49 @@ const statusCounts = computed(() => {
 const statusStats = computed<StatItem[]>(() => {
   const counts = statusCounts.value;
   const n = (key: "offline" | "degraded" | "unknown" | "outdated" | "online") =>
-    counts?.[key] ?? null;
+    counts?.[key] ?? DASH;
   const items: StatItem[] = [
     {
-      key: "offline",
-      label: t("fleet.stats.offline"),
-      value: n("offline"),
-      icon: "cloud-off",
-      tone: "err",
-    },
-    {
-      key: "degraded",
-      label: t("fleet.stats.degraded"),
-      value: n("degraded"),
-      icon: "warning",
-      tone: "warn",
-    },
-    {
-      key: "unknown",
-      label: t("fleet.stats.unknown"),
-      value: n("unknown"),
-      icon: "help-outline",
-    },
-    {
-      key: "outdated",
-      label: t("fleet.stats.outdated"),
-      value: n("outdated"),
-      icon: "update",
+      key: "all",
+      label: t("common.all"),
+      value: counts?.total ?? DASH,
+      icon: "dns",
+      tone: "neutral",
     },
     {
       key: "online",
       label: t("fleet.stats.online"),
       value: n("online"),
       icon: "check-circle",
-      tone: "ok",
+      tone: "success",
     },
     {
-      key: "all",
-      label: t("common.all"),
-      value: counts?.total ?? null,
-      icon: "dns",
+      key: "offline",
+      label: t("fleet.stats.offline"),
+      value: n("offline"),
+      icon: "cloud-off",
+      tone: "error",
+    },
+    {
+      key: "degraded",
+      label: t("fleet.stats.degraded"),
+      value: n("degraded"),
+      icon: "warning",
+      tone: "warning",
+    },
+    {
+      key: "unknown",
+      label: t("fleet.stats.unknown"),
+      value: n("unknown"),
+      icon: "help-outline",
+      tone: "neutral",
+    },
+    {
+      key: "outdated",
+      label: t("fleet.stats.outdated"),
+      value: n("outdated"),
+      icon: "update",
+      tone: "neutral",
     },
   ];
   return items.map((item) => ({ ...item, dataTest: `fleet-collectors-stat-${item.key}` }));

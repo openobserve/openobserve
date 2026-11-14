@@ -117,7 +117,7 @@ describe("PatternCard", () => {
     });
   });
 
-  describe("Anomaly Detection", () => {
+  describe("Anomaly detection", () => {
     it("should display anomaly badge when pattern is an anomaly", async () => {
       await wrapper.setProps({
         pattern: { ...mockPattern, is_anomaly: true },
@@ -126,7 +126,7 @@ describe("PatternCard", () => {
 
       const anomalyBadge = wrapper.find('[data-test="pattern-card-0-anomaly-badge"]');
       expect(anomalyBadge.exists()).toBe(true);
-      expect(anomalyBadge.text()).toContain("Rare Pattern");
+      expect(anomalyBadge.text()).toContain("Rare pattern");
     });
 
     it("should not display anomaly badge when pattern is not an anomaly", () => {

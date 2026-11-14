@@ -739,7 +739,7 @@ export class AlertCreationWizard {
             'Real-time': 'true',
             Realtime: 'true',
             Anomaly: 'anomaly',
-            'Anomaly Detection': 'anomaly',
+            'Anomaly detection': 'anomaly',
             Composite: 'composite',
         };
         const value = valueMap[typeName] ?? typeName.toLowerCase();
@@ -752,8 +752,8 @@ export class AlertCreationWizard {
 
     async _switchToTab(tabName) {
         // Preferred: stable data-test toggle items from AddAlert.vue
-        // (`add-alert-tab-<key>`, keys: condition = "Alert Rules", advanced = "Advanced").
-        const tabKey = tabName === 'Alert Rules' ? 'condition' : tabName.toLowerCase();
+        // (`add-alert-tab-<key>`, keys: condition = "Alert rules", advanced = "Advanced").
+        const tabKey = tabName === 'Alert rules' ? 'condition' : tabName.toLowerCase();
         const dataTestTab = this.page.locator(`[data-test="add-alert-tab-${tabKey}"]`).first();
         if (await dataTestTab.isVisible({ timeout: 3000 }).catch(() => false)) {
             await dataTestTab.click({ force: true });
@@ -788,7 +788,7 @@ export class AlertCreationWizard {
     }
 
     async _switchToAlertRulesTab() {
-        await this._switchToTab('Alert Rules');
+        await this._switchToTab('Alert rules');
     }
 
     async _replaceSqlEditorQuery(query) {

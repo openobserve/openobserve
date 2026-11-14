@@ -354,7 +354,7 @@ describe("DestinationPreview", () => {
     wrapper = mountComponent({ type: "slack" });
     const copyBtn = wrapper.find('[data-test="preview-copy-button"]');
     expect(copyBtn.exists()).toBe(true);
-    expect(copyBtn.text()).toContain("Copy Template");
+    expect(copyBtn.text()).toContain("Copy template");
   });
 
   it("should reflect modelValue=false on ODialog open prop", () => {
@@ -433,7 +433,7 @@ describe("DestinationPreview", () => {
 
   it("names a custom destination Web Hook in the dialog title", () => {
     wrapper = mountComponent({ type: "custom" });
-    expect(wrapper.findComponent(ODialogStub).props("title")).toContain("Web Hook");
+    expect(wrapper.findComponent(ODialogStub).props("title")).toContain("Web hook");
   });
 
   it("notes a generic sample only when asked", () => {

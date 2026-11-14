@@ -26,7 +26,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-show="!expanded"
       class="shrink-0"
       :items="stats"
+      compact
       selectable
+      :tray="false"
+      :selected-key="null"
       @select="onStatSelect"
     />
     <FleetFlowOverview
@@ -44,7 +47,7 @@ import { computed, ref } from "vue";
 import OContent from "@/lib/core/Content/OContent.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { FLOW_POLL_MS } from "@/services/fleet.queries";
 import FleetFlowOverview from "./FleetFlowOverview.vue";
 import FleetTokenExpiryBanner from "./FleetTokenExpiryBanner.vue";
@@ -55,22 +58,38 @@ const emit = defineEmits<{
   navigate: [tab: FleetTab, query?: Record<string, string>];
 }>();
 
+const DASH = raw("—");
 const { t } = useI18nTyped();
 const { summary, refetch } = useFleetSummary(FLOW_POLL_MS);
 const expanded = ref(false);
 
-// The summary already covers only the fleets the caller may read.
+// The summary already covers only the fleets the caller may read; largest count first.
 const stats = computed<StatItem[]>(() => {
   const counts = summary.value?.collectors;
   const total = counts?.total;
-  const n = (key: keyof NonNullable<typeof counts>) => counts?.[key] ?? null;
+  const n = (key: keyof NonNullable<typeof counts>) => counts?.[key] ?? DASH;
   const items: StatItem[] = [
+    {
+      key: "total",
+      label: t("fleet.stats.total"),
+      value: n("total"),
+      icon: "dns",
+      tone: "neutral",
+    },
+    {
+      key: "online",
+      label: t("fleet.stats.online"),
+      value: n("online"),
+      icon: "check-circle",
+      tone: "success",
+      max: total,
+    },
     {
       key: "offline",
       label: t("fleet.stats.offline"),
       value: n("offline"),
       icon: "cloud-off",
-      tone: "err",
+      tone: "error",
       max: total,
     },
     {
@@ -78,7 +97,7 @@ const stats = computed<StatItem[]>(() => {
       label: t("fleet.stats.degraded"),
       value: n("degraded"),
       icon: "warning",
-      tone: "warn",
+      tone: "warning",
       max: total,
     },
     {
@@ -86,28 +105,14 @@ const stats = computed<StatItem[]>(() => {
       label: t("fleet.stats.unknown"),
       value: n("unknown"),
       icon: "help-outline",
+      tone: "neutral",
       max: total,
-    },
-    {
-      key: "online",
-      label: t("fleet.stats.online"),
-      value: n("online"),
-      icon: "check-circle",
-      tone: "ok",
-      max: total,
-    },
-    {
-      key: "total",
-      label: t("fleet.stats.total"),
-      value: n("total"),
-      icon: "dns",
-      all: true,
     },
   ];
   return items.map((item) => ({ ...item, dataTest: `fleet-overview-stat-${item.key}` }));
 });
 
-function onStatSelect(key: string | null) {
-  emit("navigate", "fleets", { scope: "all", ...(key ? { status: key } : {}) });
+function onStatSelect(key: string) {
+  emit("navigate", "fleets", { scope: "all", ...(key === "total" ? {} : { status: key }) });
 }
 </script>

@@ -65,9 +65,9 @@ describe("rumCard builder", () => {
   // ── provider metadata ────────────────────────────────────────────────────────
 
   describe("provider", () => {
-    it("sets provider.name to 'Real User Monitoring'", () => {
+    it("sets provider.name to 'Real user monitoring'", () => {
       const card = buildCard();
-      expect(card.provider.name).toBe("Real User Monitoring");
+      expect(card.provider.name).toBe("Real user monitoring");
     });
 
     it("includes a non-empty tagline", () => {
@@ -83,7 +83,7 @@ describe("rumCard builder", () => {
     it("includes Sessions, Errors, Web Vitals and Session Replay in metaBadges", () => {
       const card = buildCard();
       expect(card.provider.metaBadges).toEqual(
-        expect.arrayContaining(["Sessions", "Errors", "Web Vitals", "Session Replay"]),
+        expect.arrayContaining(["Sessions", "Errors", "Web Vitals", "Session replay"]),
       );
     });
 

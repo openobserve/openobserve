@@ -136,7 +136,7 @@ describe("AddAnnotation", () => {
 
   it("uses the Add Annotation title when no annotation prop is provided", () => {
     const dialog = wrapper.findAllComponents(ODialogStub)[0];
-    expect(dialog.props("title")).toBe("Add Annotation");
+    expect(dialog.props("title")).toBe("Add annotation");
   });
 
   it("forwards size='lg' to the outer ODialog, which asks before discarding edits instead of blocking Escape", () => {
@@ -156,7 +156,7 @@ describe("AddAnnotation", () => {
     await flushPromises();
 
     const dialog = wrapper.findAllComponents(ODialogStub)[0];
-    expect(dialog.props("title")).toBe("Edit Annotation");
+    expect(dialog.props("title")).toBe("Edit annotation");
   });
 
   it("renders save/update and cancel buttons", () => {
@@ -269,7 +269,7 @@ describe("AddAnnotation", () => {
     let dialogs = wrapper.findAllComponents(ODialogStub);
     const innerDialogBefore = dialogs[1];
     expect(innerDialogBefore.props("open")).toBe(false);
-    expect(innerDialogBefore.props("title")).toBe("Confirm Delete");
+    expect(innerDialogBefore.props("title")).toBe("Confirm delete");
     expect(innerDialogBefore.props("primary")?.label).toBe("Delete");
     expect(innerDialogBefore.props("secondary")?.label).toBe("Cancel");
     expect(innerDialogBefore.props("primary")?.variant).toBe("danger");

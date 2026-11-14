@@ -244,7 +244,7 @@ describe("QueryInspector", () => {
 
       const dialog = wrapper.findComponent({ name: "ODialog" });
       expect(dialog.exists()).toBe(true);
-      expect(dialog.props("title")).toBe("Query Inspector");
+      expect(dialog.props("title")).toBe("Query inspector");
       expect(dialog.props("subtitle")).toContain("Panel : Error Analysis Dashboard");
       expect(dialog.props("subtitle")).toContain("Total Queries: 2");
       expect(dialog.props("size")).toBe("lg");
@@ -322,7 +322,7 @@ describe("QueryInspector", () => {
       await flushPromises();
 
       const dialog = wrapper.findComponent({ name: "ODialog" });
-      expect(dialog.props("title")).toBe("Query Inspector");
+      expect(dialog.props("title")).toBe("Query inspector");
     });
 
     it("should display panel title via ODialog subtitle", async () => {
@@ -478,14 +478,14 @@ describe("QueryInspector", () => {
       wrapper = createWrapper();
       await flushPromises();
 
-      expect(wrapper.text()).toContain("Original Query");
+      expect(wrapper.text()).toContain("Original query");
     });
 
     it("should display executed query", async () => {
       wrapper = createWrapper();
       await flushPromises();
 
-      expect(wrapper.text()).toContain("Executed Query");
+      expect(wrapper.text()).toContain("Executed query");
     });
   });
 
@@ -1244,7 +1244,7 @@ describe("QueryInspector", () => {
       wrapper = createWrapper();
       await flushPromises();
 
-      expect(wrapper.text()).toContain("Fixed Variables");
+      expect(wrapper.text()).toContain("Fixed variables");
       expect(wrapper.text()).toContain("service");
       expect(wrapper.text()).toContain("api");
     });
@@ -1253,7 +1253,7 @@ describe("QueryInspector", () => {
       wrapper = createWrapper();
       await flushPromises();
 
-      expect(wrapper.text()).toContain("Dynamic Variables");
+      expect(wrapper.text()).toContain("Dynamic variables");
       expect(wrapper.text()).toContain("count");
       expect(wrapper.text()).toContain(">=");
       expect(wrapper.text()).toContain("100");
@@ -1286,7 +1286,7 @@ describe("QueryInspector", () => {
       wrapper = createWrapper();
       await flushPromises();
 
-      expect(wrapper.text()).toContain("Start Time");
+      expect(wrapper.text()).toContain("Start time");
       expect(wrapper.text()).toContain("1640995200000");
     });
 
@@ -1294,7 +1294,7 @@ describe("QueryInspector", () => {
       wrapper = createWrapper();
       await flushPromises();
 
-      expect(wrapper.text()).toContain("End Time");
+      expect(wrapper.text()).toContain("End time");
       expect(wrapper.text()).toContain("1641081600000");
     });
   });

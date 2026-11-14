@@ -452,7 +452,7 @@ export class StreamsPage {
         await retentionTab.waitFor({ state: 'visible', timeout: 15000 });
         await retentionTab.click();
 
-        // Wait for the tab's date picker ("Select Date" button) to render before
+        // Wait for the tab's date picker ("Select date" button) to render before
         // returning — this is the exact element the caller needs, so a fixed 1s
         // wait was the source of the "date-time-btn not visible" CI failure.
         await this.page.locator('[data-test="date-time-btn"]').waitFor({ state: 'visible', timeout: 15000 });

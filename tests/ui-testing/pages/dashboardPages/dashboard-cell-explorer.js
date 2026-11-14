@@ -60,8 +60,8 @@ export default class DashboardCellExplorerPage {
     this.surroundWindowBtn = page.locator('[data-test="log-explorer-surround-window"]');
     // Copy-link OButton has no data-test; located by its i18n label.
     this.copyLinkBtn = page.getByRole("button", { name: "Copy link" });
-    this.anomalyProfileHeader = page.getByText("Field Anomaly Profile").first();
-    this.surroundingHeader = page.getByText("Surrounding Events").first();
+    this.anomalyProfileHeader = page.getByText("Field anomaly profile").first();
+    this.surroundingHeader = page.getByText("Surrounding events").first();
   }
 
   /**

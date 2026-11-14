@@ -299,7 +299,7 @@ describe("UsageOverview for an org with no bill", () => {
       "retention",
     );
     const pane = wrapper.find('[data-test="billings-usageoverview-daily-pane"]');
-    expect(pane.text()).toContain("Daily Volume");
+    expect(pane.text()).toContain("Daily volume");
     const schema = wrapper.findComponent({ name: "UsageCachedChart" }).props("panelSchema") as any;
     expect(schema.config.unit).toBe("megabytes");
     expect(schema.queries[0].query).toContain('sum(size) as "y_axis_1"');
@@ -325,7 +325,7 @@ describe("UsageOverview for an org with no bill", () => {
     expect(wrapper.findComponent({ name: "UsageBillStrip" }).exists()).toBe(true);
     expect(wrapper.findComponent({ name: "UsageMeterTable" }).props("volumeOnly")).toBe(false);
     const pane = wrapper.find('[data-test="billings-usageoverview-daily-pane"]');
-    expect(pane.text()).toContain("Daily Cost");
+    expect(pane.text()).toContain("Daily cost");
     const schema = wrapper.findComponent({ name: "UsageCachedChart" }).props("panelSchema") as any;
     expect(schema.config.unit).toBe("currency");
   });

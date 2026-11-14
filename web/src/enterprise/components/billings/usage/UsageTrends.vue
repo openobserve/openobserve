@@ -82,7 +82,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OStatStrip
         :items="kpiStats"
         :loading="loading"
-        size="lg"
         stacked
         class="shrink-0"
         data-test="billings-usagetrends-kpis"

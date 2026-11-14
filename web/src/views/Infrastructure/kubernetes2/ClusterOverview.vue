@@ -214,17 +214,17 @@ const nodesTile = computed(() => {
   const nodes = scopedNodes.value;
   const ready = nodes.filter((n) => n.ready === "true").length;
   const tone: StatTone = nodes.some((n) => n.ready === "false")
-    ? "err"
+    ? "error"
     : ready < nodes.length
-      ? "warn"
+      ? "warning"
       : nodes.length
-        ? "ok"
+        ? "success"
         : "neutral";
   return { value: `${ready} / ${nodes.length}`, tone };
 });
 
 const podsTone = computed<StatTone>(() =>
-  buckets.value.failing ? "err" : buckets.value.pending ? "warn" : "ok",
+  buckets.value.failing ? "error" : buckets.value.pending ? "warning" : "success",
 );
 
 const alertsTile = computed(() => {
@@ -233,7 +233,7 @@ const alertsTile = computed(() => {
   if (!signals.alertsAvailable.value && !signals.incidentsAvailable.value) {
     const locked = signals.alertsLocked.value;
     return {
-      value: null,
+      value: "—",
       sub: locked ? signals.alertsLockedReason.value : t("infra.k8s2.overviewKpiUnavailable"),
       tone: "neutral" as StatTone,
       locked,
@@ -246,7 +246,7 @@ const alertsTile = computed(() => {
   return {
     value: firing,
     sub,
-    tone: (firing || incidents ? "err" : "ok") as StatTone,
+    tone: (firing || incidents ? "error" : "success") as StatTone,
     locked: false,
   };
 });
@@ -392,7 +392,6 @@ function onAlertsTile() {
       <div class="grid grid-cols-2 gap-3 lg:grid-cols-4" data-test="k8s2-overview-kpis">
         <OStatCard
           clickable
-          size="lg"
           icon="dns"
           :label="t('infra.k8s2.overviewKpiNodes')"
           :value="nodesTile.value"
@@ -404,7 +403,6 @@ function onAlertsTile() {
         />
         <OStatCard
           clickable
-          size="lg"
           icon="hub"
           :label="t('infra.k8s2.overviewPods')"
           :value="`${buckets.ready} / ${buckets.total}`"
@@ -422,20 +420,18 @@ function onAlertsTile() {
         />
         <OStatCard
           clickable
-          size="lg"
           icon="notifications"
           :label="t('infra.k8s2.overviewKpiWarnings')"
           :value="warningRows.length"
           sub-icon="info"
           :sub="t('infra.k8s2.overviewKpiWarningsSub')"
-          :tone="warningRows.length ? 'warn' : 'ok'"
+          :tone="warningRows.length ? 'warning' : 'success'"
           :loading="awaiting"
           data-test="k8s2-overview-kpi-warnings"
           @click="emit('navigate', { view: 'events', status: 'warnings' })"
         />
         <OStatCard
           :clickable="!alertsTile.locked"
-          size="lg"
           icon="campaign"
           :label="t('infra.k8s2.overviewKpiAlerts')"
           :value="alertsTile.value"

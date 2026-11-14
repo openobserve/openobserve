@@ -301,22 +301,22 @@ watch(filtersKey, () => {
 });
 
 const STATUS_TILE: Record<CaseStatus, Pick<StatItem, "icon" | "tone">> = {
-  open: { icon: "inbox", tone: "err" },
-  acknowledged: { icon: "visibility", tone: "warn" },
-  resolved: { icon: "task-alt", tone: "ok" },
+  open: { icon: "inbox", tone: "error" },
+  acknowledged: { icon: "visibility", tone: "warning" },
+  resolved: { icon: "task-alt", tone: "success" },
 };
 const stats = computed<StatItem[]>(() =>
   CASE_STATUSES.map((status) => ({
     key: status,
     label: t(`siem.caseStatus.${status}`),
-    value: totals.value[status],
+    value: totals.value[status] ?? "—",
     icon: STATUS_TILE[status].icon,
     tone: STATUS_TILE[status].tone,
     dataTest: `security-cases-stat-${status}`,
   })),
 );
-function onStatusTile(key: string | null) {
-  statusFilter.value = key as CaseStatus | null;
+function onStatusTile(key: string) {
+  statusFilter.value = statusFilter.value === key ? null : (key as CaseStatus);
 }
 const showingClosed = computed(
   () => statusFilter.value === ALL_STATUSES || statusFilter.value === "resolved",
@@ -1357,18 +1357,11 @@ onMounted(() => {
       </OButton>
     </template>
     <div class="flex min-h-0 flex-1 flex-col">
-      <div class="border-border-default px-page-edge flex shrink-0 flex-col gap-2 border-b py-3">
-        <SecurityNotices :notices="notices" data-test="security-cases-notices" />
-        <OStatStrip
-          compact-values
-          :items="stats"
-          :loading="totals.open === null && loading"
-          selectable
-          :selected-key="statusFilter"
-          data-test="security-cases-stats"
-          @select="onStatusTile"
-        />
-      </div>
+      <SecurityNotices
+        :notices="notices"
+        class="mx-page-edge my-3 shrink-0"
+        data-test="security-cases-notices"
+      />
 
       <OTable
         :data="cases"
@@ -1407,8 +1400,8 @@ onMounted(() => {
           />
         </template>
         <template #toolbar>
-          <div class="flex min-w-0 flex-1 flex-wrap items-center gap-3">
-            <div class="w-80 max-md:w-full">
+          <div class="contents">
+            <div class="min-w-0 flex-1 max-md:min-w-40 md:min-w-48">
               <OSearchInput
                 v-model="search"
                 :placeholder="t('siem.cases.searchAll')"
@@ -1461,6 +1454,17 @@ onMounted(() => {
               class="shrink-0"
               data-test="security-cases-show-closed"
               @update:model-value="toggleClosed"
+            />
+            <OStatStrip
+              compact-values
+              :items="stats"
+              :loading="totals.open === null && loading"
+              selectable
+              :row="false"
+              class="max-md:order-last"
+              :selected-key="statusFilter"
+              data-test="security-cases-stats"
+              @select="onStatusTile"
             />
           </div>
         </template>

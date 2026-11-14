@@ -461,7 +461,6 @@ import LiveNoticeState from "@/components/autoobserve/live/LiveNoticeState.vue";
 import {
   countOrDash,
   countTile,
-  coverageStatTone,
   coverageNoteRows,
   findingsByRule,
   isScoped,
@@ -733,15 +732,15 @@ const latestStats = computed<StatItem[]>(() => {
     {
       key: "findings",
       label: t("alertCalibration.dashboard.openFindings"),
-      ...(countsPending.value ? { value: null } : countTile(openTotal.value, locale.value)),
+      ...(countsPending.value ? { value: raw("—") } : countTile(openTotal.value, locale.value)),
       icon: "fact-check",
       tone: countsPending.value
         ? "neutral"
         : (openTotal.value ?? 0) > 0
-          ? "warn"
+          ? "warning"
           : isScoped(run) || allDismissed.value
             ? "neutral"
-            : "ok",
+            : "success",
     },
     {
       key: "scope",
@@ -756,7 +755,7 @@ const latestStats = computed<StatItem[]>(() => {
       label: t("alertCalibration.dashboard.coverage"),
       value: t(verdict.shortKey),
       icon: "verified-user",
-      tone: coverageStatTone(verdict.tone),
+      tone: verdict.tone,
     },
   ];
 });

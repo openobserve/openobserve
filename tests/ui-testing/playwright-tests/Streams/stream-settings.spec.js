@@ -58,7 +58,7 @@ test.describe("Stream Index Type Configuration Tests", () => {
     });
 
     // SKIPPED: product regression on alpha's deployed Stream Detail drawer.
-    // Clicking the "Extended Retention" tab collapses the entire drawer content
+    // Clicking the "Extended retention" tab collapses the entire drawer content
     // (data-test elements drop from 274 -> 2: only the title + close button
     // remain), so the date picker ([data-test="date-time-btn"]) never renders
     // and the retention flow is unreachable. Verified via DOM diff on alpha

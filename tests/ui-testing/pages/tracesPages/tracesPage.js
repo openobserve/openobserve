@@ -354,7 +354,7 @@ export class TracesPage {
     // The wrapper renders immediately, but its options arrive with the async
     // stream-list fetch. Opening the popover before then finds an empty list,
     // every retry below misses, and selection silently no-ops — which surfaces
-    // later as "Select Stream First" and zero query results. Wait for the
+    // later as "Select stream first" and zero query results. Wait for the
     // option to exist in the DOM first.
     const optionReady = `[data-test="log-search-index-list-select-stream-option"][data-test-value="${streamName}"]`;
     await this.page
@@ -3022,7 +3022,7 @@ export class TracesPage {
   }
 
   /**
-   * Locate the "System Instructions" collapsible trigger (rendered above the
+   * Locate the "System instructions" collapsible trigger (rendered above the
    * Input pane when `gen_ai_system_instructions` is present).
    */
   getSystemInstructionsTrigger() {
@@ -3030,21 +3030,21 @@ export class TracesPage {
   }
 
   /**
-   * Assert the "System Instructions" collapsible is present.
+   * Assert the "System instructions" collapsible is present.
    */
   async expectSystemInstructionsVisible() {
     await expect(this.getSystemInstructionsTrigger()).toBeVisible({ timeout: 15000 });
   }
 
   /**
-   * Expand the "System Instructions" collapsible.
+   * Expand the "System instructions" collapsible.
    */
   async expandSystemInstructions() {
     await this.getSystemInstructionsTrigger().click();
   }
 
   /**
-   * Assert the expanded "System Instructions" body shows `text` (visible, not
+   * Assert the expanded "System instructions" body shows `text` (visible, not
    * merely present in the DOM).
    */
   async expectSystemInstructionsContains(text) {

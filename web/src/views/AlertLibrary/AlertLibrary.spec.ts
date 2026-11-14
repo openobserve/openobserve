@@ -319,13 +319,13 @@ describe("AlertLibrary", () => {
     ).not.toContain("Not ingested");
   });
 
-  it("counts ready, needs-data and total over what is in view, with All last", async () => {
+  it("counts ready, needs-data and total over what is in view, with All first", async () => {
     const wrapper = await mountView();
     const tiles = wrapper.findAll('[data-test^="alert-library-stat-"]');
     expect(tiles.map((tile) => tile.attributes("data-test"))).toEqual([
+      "alert-library-stat-all",
       "alert-library-stat-ready",
       "alert-library-stat-missing",
-      "alert-library-stat-all",
     ]);
     // All four alerts are in view; only cert-expiring's stream is missing.
     expect(stat(wrapper, "ready").text()).toContain("3");
@@ -617,19 +617,23 @@ describe("AlertLibrary", () => {
       expect(rail.props("search")).toBe("");
     });
   });
-  it("lights no tile once no facet is chosen, since All is never drawn as selected", async () => {
+  it("shows the All tile as the active one once no facet is chosen", async () => {
+    // The strip has a state — "no availability filter" — that used to light no
+    // tile at all, while the All tile it corresponds to was a button that could
+    // never look pressed.
     const wrapper = await mountView();
     const pressed = () => pressedTiles(wrapper);
 
-    expect(pressed()).toEqual([]);
+    expect(pressed()).toEqual(["all"]);
 
     await wrapper.find('[data-test="alert-library-stat-ready"]').trigger("click");
     await flushPromises();
     expect(pressed()).toEqual(["ready"]);
 
+    // Toggling the active tile off returns to All — and now says so.
     await wrapper.find('[data-test="alert-library-stat-ready"]').trigger("click");
     await flushPromises();
-    expect(pressed()).toEqual([]);
+    expect(pressed()).toEqual(["all"]);
   });
 
   describe("first open", () => {
@@ -651,7 +655,7 @@ describe("AlertLibrary", () => {
       expect(pressedTiles(wrapper)).toEqual(["missing"]);
       await wrapper.find('[data-test="alert-library-stat-all"]').trigger("click");
       await flushPromises();
-      expect(pressedTiles(wrapper)).toEqual([]);
+      expect(pressedTiles(wrapper)).toEqual(["all"]);
       expect(wrapper.find('[data-test="alert-library-card-k8s/cert-expiring"]').exists()).toBe(
         true,
       );
@@ -660,7 +664,7 @@ describe("AlertLibrary", () => {
     it("falls back to All when nothing in the library is ready", async () => {
       getStreams.mockReset().mockResolvedValue({ name: "all", list: [] });
       const wrapper = await mountView({ firstOpen: true });
-      expect(pressedTiles(wrapper)).toEqual([]);
+      expect(pressedTiles(wrapper)).toEqual(["all"]);
       expect(wrapper.find('[data-test="alert-library-card-k8s/cert-expiring"]').exists()).toBe(
         true,
       );
@@ -669,7 +673,7 @@ describe("AlertLibrary", () => {
     it("falls back to All when readiness could not be checked", async () => {
       getStreams.mockReset().mockRejectedValue(new Error("streams unavailable"));
       const wrapper = await mountView({ firstOpen: true });
-      expect(pressedTiles(wrapper)).toEqual([]);
+      expect(pressedTiles(wrapper)).toEqual(["all"]);
     });
 
     it("keeps Ready to use while the streams are still loading", async () => {
@@ -852,18 +856,18 @@ describe("AlertLibrary", () => {
       expect(toolbar().contains(wrapper.get(`[data-test="${BAR}"]`).element)).toBe(true);
     });
 
-    it("shares the search row, leaving the stat tiles alone", async () => {
-      // The strip sits below the toolbar (F7); hosting the controls there would re-flow its tiles.
+    it("shares the search row, keeping the selection controls out of the chip strip", async () => {
+      // The chips sit on the search row; hosting the controls inside the strip would re-flow it.
       const wrapper = await mountView();
       await tick(wrapper, BOX);
 
       const searchRow = wrapper.get('[data-test="alert-library-toolbar"]').element;
+      const strip = wrapper.get('[data-test="alert-library-strip"]').element;
       expect(searchRow.contains(wrapper.get('[data-test="alert-library-search"]').element)).toBe(
         true,
       );
-      expect(searchRow.contains(wrapper.get('[data-test="alert-library-strip"]').element)).toBe(
-        false,
-      );
+      expect(searchRow.contains(strip)).toBe(true);
+      expect(strip.contains(wrapper.get(`[data-test="${BAR}"]`).element)).toBe(false);
       // The search field is the only elastic thing on the row, so it is the only
       // thing the controls take width from.
       expect(wrapper.get('[data-test="alert-library-search"]').classes()).toContain("flex-1");

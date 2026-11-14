@@ -61,6 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OStatCard
           v-for="tile in tiles"
           :key="tile.key"
+          class="grow basis-52 max-lg:shrink-0 max-lg:basis-auto"
           :label="tile.label"
           :icon="tile.icon"
           :value="tile.text"

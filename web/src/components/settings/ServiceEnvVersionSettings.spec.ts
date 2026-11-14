@@ -205,7 +205,7 @@ describe("Correlation Settings entry points", () => {
     });
     await flushPromises();
     const tabs = wrapper.findAll("[role=tab], [data-test$='-tab']").map((tab) => tab.text());
-    expect(tabs.indexOf("Environments & versions")).toBe(tabs.indexOf("Detection Rules") + 1);
+    expect(tabs.indexOf("Environments & versions")).toBe(tabs.indexOf("Detection rules") + 1);
     expect(wrapper.find('[data-test="env-versions-pane"]').exists()).toBe(true);
   });
 

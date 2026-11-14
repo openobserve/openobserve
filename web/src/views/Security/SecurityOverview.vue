@@ -428,7 +428,7 @@ const stats = computed<StatItem[]>(() => [
     label: t("siem.overview.stat.critical"),
     value: toneCounts.value.critical,
     icon: "emergency",
-    tone: "crit",
+    tone: "error",
     dataTest: "security-overview-stat-critical",
   },
   {
@@ -436,15 +436,15 @@ const stats = computed<StatItem[]>(() => [
     label: t("siem.overview.stat.high"),
     value: toneCounts.value.high,
     icon: "warning",
-    tone: "err",
+    tone: "orange",
     dataTest: "security-overview-stat-high",
   },
   {
     key: "cases",
     label: t("siem.overview.stat.openCases"),
-    value: casesUnsupported.value || casesDenials.value.length ? null : openCasesTotal.value,
+    value: casesUnsupported.value || casesDenials.value.length ? "—" : openCasesTotal.value,
     icon: "assignment",
-    tone: "warn",
+    tone: "warning",
     dataTest: "security-overview-stat-cases",
   },
   {
@@ -452,6 +452,7 @@ const stats = computed<StatItem[]>(() => [
     label: t("siem.overview.stat.firingDetections"),
     value: firingDetections.value,
     icon: "notifications-active",
+    tone: "primary",
     dataTest: "security-overview-stat-firing",
   },
   {
@@ -459,7 +460,7 @@ const stats = computed<StatItem[]>(() => [
     label: t("siem.overview.stat.quietSources"),
     value: quietSources.value,
     icon: "sync-problem",
-    tone: "warn",
+    tone: "warning",
     dataTest: "security-overview-stat-quiet",
   },
   {
@@ -467,7 +468,7 @@ const stats = computed<StatItem[]>(() => [
     label: t("siem.overview.stat.activeRules"),
     value: siemRows.value.length ? `${enabledRules.value} / ${siemRows.value.length}` : 0,
     icon: "verified-user",
-    tone: "ok",
+    tone: "success",
     dataTest: "security-overview-stat-rules",
   },
 ]);
@@ -485,8 +486,7 @@ function openAlerts(extra: Record<string, string> = {}) {
   nav("/security/alerts", { period: range.value, ...extra });
 }
 
-function onStat(key: string | null) {
-  if (!key) return;
+function onStat(key: string) {
   if (key === "critical" || key === "high") return openAlerts({ facet: key });
   if (key === "firing") return openAlerts();
   if (key === "quiet") {
@@ -623,10 +623,10 @@ function nav(path: string, query: Record<string, string> = {}) {
 
       <OStatStrip
         compact-values
-        size="lg"
         :items="stats"
         :loading="!summaryLanded"
         selectable
+        :row="false"
         :selected-key="null"
         data-test="security-overview-stats"
         @select="onStat"

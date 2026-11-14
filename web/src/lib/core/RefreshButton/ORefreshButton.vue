@@ -145,20 +145,24 @@ function handleClick(e: MouseEvent) {
           >{{ t("refreshButton.failed") }}</span
         >
       </template>
-      <span
-        v-else-if="autoInterval"
-        class="text-text-secondary text-xs font-normal whitespace-nowrap tabular-nums max-lg:hidden"
-        :data-test="`${dataTest}-auto`"
-        aria-hidden="true"
-        >{{ t("refreshButton.autoOn", { interval: intervalLabel(autoInterval) }) }}</span
-      >
-      <span
-        v-else-if="lastRunAt"
-        class="text-text-secondary text-xs font-normal whitespace-nowrap tabular-nums max-lg:hidden"
-        :data-test="`${dataTest}-age`"
-        aria-hidden="true"
-        >{{ loading ? t("refreshButton.refreshing") : ageLabel }}</span
-      >
+      <template v-else-if="autoInterval || lastRunAt">
+        <span class="bg-border-default h-4 w-px shrink-0 max-lg:hidden" aria-hidden="true" />
+        <!-- No colour class: the age is the button's label, so it takes the button's ink. -->
+        <span
+          v-if="autoInterval"
+          class="inline-block min-w-12 text-left text-xs whitespace-nowrap tabular-nums max-lg:hidden"
+          :data-test="`${dataTest}-auto`"
+          aria-hidden="true"
+          >{{ t("refreshButton.autoOn", { interval: intervalLabel(autoInterval) }) }}</span
+        >
+        <span
+          v-else
+          class="inline-block min-w-12 text-left text-xs whitespace-nowrap tabular-nums max-lg:hidden"
+          :data-test="`${dataTest}-age`"
+          aria-hidden="true"
+          >{{ loading ? t("refreshButton.refreshing") : ageLabel }}</span
+        >
+      </template>
     </OButton>
     <ODropdown v-if="autoRefresh !== undefined" align="end">
       <template #trigger>

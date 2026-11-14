@@ -255,7 +255,7 @@ test.describe("ConfigPanel — Advanced Settings", () => {
 
     const bgColorDropdown = pm.dashboardPanelConfigs.bgColor;
     await expect(bgColorDropdown).toBeVisible();
-    await pm.dashboardPanelConfigs.selectBGColor("Single Color");
+    await pm.dashboardPanelConfigs.selectBGColor("Single color");
     await pm.dashboardPanelActions.applyDashboardBtn();
     // Let the query settle before saving — savePanel racing an in-flight Apply is a
     // recurring source of intermittent save failures.
@@ -265,7 +265,7 @@ test.describe("ConfigPanel — Advanced Settings", () => {
     await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying background color Single Color persists after save");
     await reopenPanelConfig(page, pm);
-    await expect(pm.dashboardPanelConfigs.bgColor).toContainText("Single Color");
+    await expect(pm.dashboardPanelConfigs.bgColor).toContainText("Single color");
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
   });

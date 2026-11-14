@@ -210,7 +210,7 @@ describe("DbSpanDetails", () => {
         db_operation_name: "SELECT",
       });
       const grid = wrapper.find('[data-test="traces-db-span-details-metadata-grid"]');
-      expect(grid.text()).toContain("DB System");
+      expect(grid.text()).toContain("DB system");
       expect(grid.text()).toContain("mysql");
       expect(grid.text()).toContain("Operation");
       expect(grid.text()).toContain("SELECT");
@@ -220,7 +220,7 @@ describe("DbSpanDetails", () => {
       wrapper = mountDbSpanDetails({ db_system: "postgresql" });
       const grid = wrapper.find('[data-test="traces-db-span-details-metadata-grid"]');
       expect(grid.text()).not.toContain("User");
-      expect(grid.text()).not.toContain("Stored Procedure");
+      expect(grid.text()).not.toContain("Stored procedure");
     });
 
     it("should display host as address:port combination", () => {

@@ -32,7 +32,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Wide: only the org table scrolls, so the save bar stays in view. Stacked: the tab scrolls. -->
     <OStatStrip
       :items="kpiStats"
-      size="lg"
       stacked
       class="shrink-0"
       data-test="billings-usagesuperbudget-kpis"

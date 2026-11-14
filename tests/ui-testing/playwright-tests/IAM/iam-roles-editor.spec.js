@@ -217,7 +217,7 @@ test.describe('IAM · Edit Role · navigation and filtering', { tag: '@enterpris
     }, async () => {
         await pm.rolesPage.openModule('stream');
         await expect(pm.rolesPage.paneResources).toBeVisible();
-        // "Every Stream" is the widest scope for the stream module.
+        // "Every stream" is the widest scope for the stream module.
         await expect(pm.rolesPage.scopeRow('stream')).toBeVisible({ timeout: 15000 });
     });
 
@@ -326,7 +326,7 @@ test.describe('IAM · Edit Role · navigation and filtering', { tag: '@enterpris
     //
     // It last read 48 rail modules against 49 visible top-level resources, because
     // railModuleKeys() dropped the real `summary` module: the helper filtered that slug
-    // believing "Role Overview" shared it. It does not — Role Overview is
+    // believing "Role overview" shared it. It does not — Role Overview is
     // `edit-role-module-rail-overview` — so the filter is gone and the count should now
     // line up. That was verified on pentest too: the rail is complete and `summary` is
     // grantable. o2-enterprise#2717 was filed off the old reading and closed as invalid.

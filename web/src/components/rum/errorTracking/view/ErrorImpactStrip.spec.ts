@@ -85,17 +85,12 @@ describe("ErrorImpactStrip", () => {
   });
 
   describe("missing data", () => {
-    it("holds a skeleton in every tile while loading, never a number", () => {
+    it("shows a dash for every tile while loading", () => {
       wrapper = mountComponent({ loading: true });
 
-      const skeleton = (key: string) =>
-        wrapper.find(
-          `[data-test="rum-error-impact-${key}"] [data-test="o-stat-card-value-skeleton"]`,
-        );
-      expect(skeleton("events").exists()).toBe(true);
-      expect(skeleton("users").exists()).toBe(true);
-      expect(skeleton("first-seen").exists()).toBe(true);
-      expect(tileText("events")).not.toContain("1.2K");
+      expect(tileText("events")).toContain("—");
+      expect(tileText("users")).toContain("—");
+      expect(tileText("first-seen")).toContain("—");
     });
 
     it("hides the lifespan caption while loading", () => {

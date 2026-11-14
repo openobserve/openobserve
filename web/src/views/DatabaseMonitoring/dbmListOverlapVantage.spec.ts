@@ -230,8 +230,8 @@ describe("QueriesPage sources its overlap measures from the database", () => {
       expect(stats).toContain("overlapTile(totals.calls.value, measured, formatCount)");
       expect(stats).toContain("overlapTile(totals.time.value, measured, formatNs)");
       // `null` from the seam becomes the em dash OStatCard already renders.
-      expect(stats).toContain("value: calls.value,");
-      expect(stats).toContain("value: time.value,");
+      expect(stats).toContain('calls.value ?? raw("—")');
+      expect(stats).toContain('time.value ?? raw("—")');
     });
 
     /**
@@ -246,10 +246,10 @@ describe("QueriesPage sources its overlap measures from the database", () => {
       );
       const queriesTile = stats.slice(
         stats.indexOf('key: "queries"'),
-        stats.indexOf("dataTest:", stats.indexOf('key: "queries"')),
+        stats.indexOf('key: "calls"'),
       );
       expect(queriesTile).toContain("measured");
-      expect(queriesTile).toContain(": null,");
+      expect(queriesTile).toContain('raw("—")');
     });
 
     /**
@@ -400,8 +400,8 @@ describe("DatabasesPage qualifies its overlap measures", () => {
       );
       expect(stats).toContain("overlapTile(totalCalls.value, traceVantage.value, formatCount)");
       expect(stats).toContain("overlapTile(totalTime.value, traceVantage.value, formatNs)");
-      expect(stats).toContain("value: calls.value,");
-      expect(stats).toContain("value: time.value,");
+      expect(stats).toContain('calls.value ?? raw("—")');
+      expect(stats).toContain('time.value ?? raw("—")');
     });
 
     /**
@@ -417,7 +417,7 @@ describe("DatabasesPage qualifies its overlap measures", () => {
       );
       const fleetTile = stats.slice(
         stats.indexOf('key: "databases"'),
-        stats.indexOf("dataTest:", stats.indexOf('key: "databases"')),
+        stats.indexOf('key: "calls"'),
       );
       expect(fleetTile).toContain("value: fleetRowCount.value");
       expect(fleetTile).not.toContain("overlapTile");
@@ -446,8 +446,8 @@ describe("ActivityPage does not fabricate a session breakdown it never sampled",
       source.indexOf("const countLine = computed"),
     );
     expect(stats).toContain("const sampledWaits = waitBuckets.value.length > 0");
-    expect(stats).toContain("sampledWaits ? waits.onCpu : null");
-    expect(stats).toContain("sampledWaits ? waits.waiting : null");
+    expect(stats).toContain('sampledWaits ? waits.onCpu : raw("—")');
+    expect(stats).toContain('sampledWaits ? waits.waiting : raw("—")');
   });
 
   it("withholds the idle-in-transaction tile when no states were sampled", () => {
@@ -456,7 +456,7 @@ describe("ActivityPage does not fabricate a session breakdown it never sampled",
       source.indexOf("const countLine = computed"),
     );
     expect(stats).toContain("const sampledStates = stateBuckets.value.length > 0");
-    expect(stats).toContain("sampledStates ? idleInTransaction : null");
+    expect(stats).toContain('sampledStates ? idleInTransaction : raw("—")');
   });
 
   /**
@@ -468,7 +468,7 @@ describe("ActivityPage does not fabricate a session breakdown it never sampled",
       source.indexOf("const summaryStats = computed"),
       source.indexOf("const countLine = computed"),
     );
-    expect(stats).toContain('sampledStates && idleInTransaction > 0 ? "warn" : "neutral"');
+    expect(stats).toContain('sampledStates && idleInTransaction > 0 ? "warning" : "neutral"');
   });
 
   /**
@@ -481,7 +481,7 @@ describe("ActivityPage does not fabricate a session breakdown it never sampled",
       source.indexOf("const summaryStats = computed"),
       source.indexOf("const countLine = computed"),
     );
-    expect(stats).toContain("value: sampleTotal.value,");
+    expect(stats).toContain('sampleTotal.value ?? raw("—")');
   });
 });
 

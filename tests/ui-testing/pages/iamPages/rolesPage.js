@@ -13,7 +13,7 @@ import { expect } from '@playwright/test';
 // the UI labels them List / Get / Create / Update / Delete / All.
 export const ACTIONS = ['AllowAll', 'AllowList', 'AllowGet', 'AllowPost', 'AllowPut', 'AllowDelete'];
 
-// One rail row per permission module. "Role Overview" is NOT one of these — it has its
+// One rail row per permission module. "Role overview" is NOT one of these — it has its
 // own slug, `edit-role-module-rail-overview` (ModuleRail.vue).
 const RAIL_ITEM = 'edit-role-module-rail-item-';
 
@@ -64,13 +64,13 @@ export class RolesPage {
         this.railScopeAll = page.locator('[data-test="edit-role-module-rail-scope-all"]');
         this.railScopeGranted = page.locator('[data-test="edit-role-module-rail-scope-granted"]');
         this.railTabs = page.locator('[data-test="edit-role-module-rail-tabs"]');
-        // "Role Overview" — the landing pane, not a permission module. It carries its
+        // "Role overview" — the landing pane, not a permission module. It carries its
         // own slug (`-overview`, ModuleRail.vue), NOT `-item-summary`: that one belongs
         // to the real `summary` permission module, and clicking it opens that module's
         // pane instead of the overview.
         this.railSummaryItem = page.locator('[data-test="edit-role-module-rail-overview"]');
         this.railNoMatch = page.locator('[data-test="edit-role-module-rail-no-match"]');
-        // "All Modules" — pinned under Role Overview; one row per module, each its module-wide grant.
+        // "All modules" — pinned under Role Overview; one row per module, each its module-wide grant.
         this.railAllModules = page.locator('[data-test="edit-role-module-rail-all-modules"]');
 
         // ---------- module pane ----------

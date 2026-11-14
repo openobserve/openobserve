@@ -121,7 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- RIGHT MAIN: filter bar + table -->
       <div
         v-if="activeSection === 'checks'"
-        class="flex min-w-0 flex-1 flex-col overflow-hidden max-md:min-h-0"
+        class="@container/synthetics-toolbar flex min-w-0 flex-1 flex-col overflow-hidden max-md:min-h-0"
       >
         <!-- ── CHECKS TABLE ── -->
         <MonitorTable
@@ -170,31 +170,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           @empty-action="onEmptyAction"
         >
-          <!-- Health strip: the status facet, attention-first (failing → degrading
-               → passing → unknown), with Total last. It replaces the status dropdown
-               that used to hide these same counts inside its option labels. -->
-          <template #subheader>
-            <div
-              class="px-page-edge border-table-row-divider border-b py-1.5"
-              data-test="synthetic-monitoring-summary"
-            >
-              <OStatStrip
-                :items="summaryStats"
-                :loading="loading"
-                selectable
-                multiple
-                :selected-keys="statusFilters"
-                @update:selected-keys="statusFilters = $event"
-              />
-            </div>
-          </template>
-
           <!-- Toolbar content rendered inside OTable's toolbar bar -->
           <template #toolbar>
-            <!-- A container, not a viewport breakpoint: the folder rail squeezes this toolbar at any width. -->
-            <div
-              class="@container/synthetics-toolbar flex min-w-0 flex-1 flex-wrap items-center gap-2 gap-y-1.5 max-md:contents"
-            >
+            <!-- Children of the toolbar row, so the chips can wrap below them; label queries read the table column. -->
+            <div class="contents">
               <!-- Type tabs -->
               <OToggleGroup
                 mobile-dropdown
@@ -209,13 +188,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :icon-left="tab.icon"
                   :title="lgUp ? undefined : tab.label"
                 >
-                  <span class="@max-[38rem]/synthetics-toolbar:hidden">{{ tab.label }}</span>
+                  <span class="@max-[48rem]/synthetics-toolbar:hidden">{{ tab.label }}</span>
                 </OToggleGroupItem>
               </OToggleGroup>
 
               <!-- Search -->
               <!-- flex-1 is basis-0, so the min-w floor is what wraps the input instead of shrinking it to nothing. -->
-              <div class="min-w-0 flex-1 md:max-lg:min-w-60">
+              <div class="min-w-0 flex-1 md:min-w-48 md:max-lg:min-w-60">
                 <OInput
                   v-model="search"
                   :placeholder="
@@ -259,8 +238,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OInput>
               </div>
 
-              <!-- Status is faceted by the summary strip below, not by a dropdown -
-                   the counts belong on screen, not hidden inside option labels. -->
+              <!-- Status is faceted by these chips, not a dropdown: the counts belong on screen. -->
+              <OStatStrip
+                :items="summaryStats"
+                :loading="loading"
+                selectable
+                :row="false"
+                multiple
+                :selected-keys="statusFilters"
+                default-key="all"
+                class="max-md:order-last"
+                data-test="synthetic-monitoring-summary"
+                @update:selected-keys="statusFilters = $event"
+              />
             </div>
           </template>
 
@@ -1365,7 +1355,7 @@ const summaryStats = computed<StatItem[]>(() => {
   const ms = filteredStatusMonitors.value;
   const total = ms.length;
   const count = (status: string) => ms.filter((m) => m.status === status).length;
-  const v = (n: number): number | null => (total > 0 ? n : null);
+  const v = (n: number): string | number => (total > 0 ? n : "—");
   const share = total > 0 ? total : undefined;
   const tiles: StatItem[] = [
     {
@@ -1373,7 +1363,7 @@ const summaryStats = computed<StatItem[]>(() => {
       label: t("synthetics.filters.failed"),
       value: v(count("failed")),
       icon: "error-outline",
-      tone: "err",
+      tone: "error",
       max: share,
       dataTest: "synthetics-summary-failed",
     },
@@ -1382,7 +1372,7 @@ const summaryStats = computed<StatItem[]>(() => {
       label: t("synthetics.filters.error"),
       value: v(count("error")),
       icon: "error-outline",
-      tone: "err",
+      tone: "error",
       max: share,
       dataTest: "synthetics-summary-error",
     },
@@ -1391,7 +1381,7 @@ const summaryStats = computed<StatItem[]>(() => {
       label: t("synthetics.filters.warning"),
       value: v(count("warning")),
       icon: "warning-amber",
-      tone: "warn",
+      tone: "warning",
       max: share,
       dataTest: "synthetics-summary-warning",
     },
@@ -1400,7 +1390,7 @@ const summaryStats = computed<StatItem[]>(() => {
       label: t("synthetics.filters.passed"),
       value: v(count("passed")),
       icon: "check-circle",
-      tone: "ok",
+      tone: "success",
       max: share,
       dataTest: "synthetics-summary-passed",
     },
@@ -1412,7 +1402,7 @@ const summaryStats = computed<StatItem[]>(() => {
       label: t("synthetics.filters.misconfigured"),
       value: v(count("misconfigured")),
       icon: "error-outline",
-      tone: "err",
+      tone: "error",
       max: share,
       dataTest: "synthetics-summary-misconfigured",
     },
@@ -1421,7 +1411,7 @@ const summaryStats = computed<StatItem[]>(() => {
       label: t("synthetics.filters.partial"),
       value: v(count("partial")),
       icon: "warning-amber",
-      tone: "warn",
+      tone: "warning",
       max: share,
       dataTest: "synthetics-summary-partial",
     },
@@ -1461,6 +1451,7 @@ const summaryStats = computed<StatItem[]>(() => {
     label: t("common.allStatuses"),
     value: v(total),
     icon: "monitor-heart",
+    tone: "primary",
     dataTest: "synthetics-summary-total",
   });
   return tiles;

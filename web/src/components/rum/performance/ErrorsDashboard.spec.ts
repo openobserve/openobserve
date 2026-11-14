@@ -294,7 +294,7 @@ describe("ErrorsDashboard", () => {
       await nextTick();
 
       // Assert
-      expect(wrapper.text()).toContain("Loading Dashboard");
+      expect(wrapper.text()).toContain("Loading dashboard");
     });
   });
 

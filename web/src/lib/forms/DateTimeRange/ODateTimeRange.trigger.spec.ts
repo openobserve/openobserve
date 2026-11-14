@@ -63,18 +63,29 @@ describe("ODateTimeRange trigger", () => {
     vi.useRealTimers();
   });
 
-  it("sizes the trigger and the shift buttons from the size prop, md by default", async () => {
+  it("sizes the group and its trigger from the size prop, md by default", async () => {
     createWrapper();
     await flushPromises();
-    for (const id of ["date-time-btn", "date-time-prev-btn", "date-time-next-btn"]) {
-      expect(button(id).props("size")).toBe("md");
-    }
+    expect(button("date-time-btn").props("size")).toBe("md");
+    expect(wrapper!.get(".date-time-container").classes()).toContain("h-control-md");
     wrapper!.unmount();
     createWrapper({ size: "sm" });
     await flushPromises();
-    for (const id of ["date-time-btn", "date-time-prev-btn", "date-time-next-btn"]) {
-      expect(button(id).props("size")).toBe("sm");
-    }
+    expect(button("date-time-btn").props("size")).toBe("sm");
+    expect(wrapper!.get(".date-time-container").classes()).toContain("h-control-sm");
+  });
+
+  it("draws one outline around the group, so a disabled shift button keeps the edge", async () => {
+    createWrapper();
+    await flushPromises();
+    const group = wrapper!.get(".date-time-container").classes();
+    expect(group).toContain("border");
+    expect(group).toContain("border-button-outline-border");
+    const next = button("date-time-next-btn");
+    expect(next.props("variant")).toBe("ghost");
+    expect(next.classes()).toContain("border-s-button-outline-border!");
+    expect(button("date-time-prev-btn").classes()).toContain("border-e-button-outline-border!");
+    expect(button("date-time-btn").classes()).toContain("border-0!");
   });
 
   it("keeps one trigger width whether the range is relative or absolute", async () => {
@@ -141,7 +152,7 @@ describe("ODateTimeRange trigger", () => {
   it("leaves relative labels and the caller's trigger text as they are", async () => {
     createWrapper({ autoApply: true });
     await flushPromises();
-    expect(wrapper!.vm.triggerLabel).toBe("Past 15 Minutes");
+    expect(wrapper!.vm.triggerLabel).toBe("Past 15 minutes");
     expect(wrapper!.vm.triggerTooltip).toBeUndefined();
     wrapper!.unmount();
     createWrapper({ autoApply: true, triggerText: "Next 24 hours" });

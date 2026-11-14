@@ -20,66 +20,64 @@
         <!-- The bucket counts double as the row filter, so the summary and the
              control that acts on it are the same strip rather than two rows. -->
         <template #subheader>
-          <div
-            class="px-page-edge border-table-row-divider flex flex-wrap items-end gap-3 border-b py-1.5"
-            data-test="ai-experiment-counts"
-          >
-            <div class="min-w-0 flex-1">
-              <OStatStrip
-                :items="bucketStats"
-                selectable
-                multiple
-                :selected-keys="bucketFilters"
-                @update:selected-keys="bucketFilters = $event"
-              />
-            </div>
-            <!-- Label sits ABOVE its control (not beside it) so the pair reads
+          <div data-test="ai-experiment-counts">
+            <OStatStrip
+              :items="bucketStats"
+              selectable
+              :default-key="TOTAL"
+              multiple
+              :selected-keys="bucketFilters"
+              class="gap-x-3"
+              @update:selected-keys="bucketFilters = $event"
+            >
+              <!-- Label sits ABOVE its control (not beside it) so the pair reads
                  as one compact field instead of eating horizontal room the
                  bucket stats need — same idea as a labeled form field. -->
-            <div class="flex shrink-0 items-end gap-3">
-              <div class="flex flex-col gap-0.5">
-                <span class="text-text-tertiary text-xs">
-                  {{ t("aiObservability.experiments.comparePage.panel.outcomeDimensions") }}
-                </span>
-                <!-- The tooltip sits on the select itself, not the label, so it
+              <div class="ms-auto flex shrink-0 items-end gap-3">
+                <div class="flex flex-col gap-0.5">
+                  <span class="text-text-tertiary text-xs">
+                    {{ t("aiObservability.experiments.comparePage.panel.outcomeDimensions") }}
+                  </span>
+                  <!-- The tooltip sits on the select itself, not the label, so it
                      describes what the CURRENT selection does rather than a
                      generic hint disconnected from the visible value. -->
-                <OTooltip :content="outcomeTooltip">
-                  <OSelect
-                    :model-value="selectedDimensions"
-                    :options="outcomeOptions"
-                    :aria-label="
-                      t('aiObservability.experiments.comparePage.panel.outcomeDimensions')
-                    "
-                    :disabled="loading"
-                    :searchable="true"
-                    multiple
-                    select-all
-                    width="s"
-                    data-test="ai-experiment-comparison-outcome-dimensions"
-                    @update:model-value="selectOutcomeDimensions"
-                  >
-                    <template #trigger>{{ selectionLabel }}</template>
-                  </OSelect>
-                </OTooltip>
+                  <OTooltip :content="outcomeTooltip">
+                    <OSelect
+                      :model-value="selectedDimensions"
+                      :options="outcomeOptions"
+                      :aria-label="
+                        t('aiObservability.experiments.comparePage.panel.outcomeDimensions')
+                      "
+                      :disabled="loading"
+                      :searchable="true"
+                      multiple
+                      select-all
+                      width="s"
+                      data-test="ai-experiment-comparison-outcome-dimensions"
+                      @update:model-value="selectOutcomeDimensions"
+                    >
+                      <template #trigger>{{ selectionLabel }}</template>
+                    </OSelect>
+                  </OTooltip>
+                </div>
+                <div class="flex flex-col gap-0.5">
+                  <span class="text-text-tertiary text-xs">
+                    {{ t("aiObservability.experiments.comparePage.panel.threshold") }}
+                  </span>
+                  <OTooltip :content="thresholdTooltip">
+                    <OSelect
+                      :model-value="comparison.threshold"
+                      :options="thresholdOptions"
+                      :searchable="false"
+                      :disabled="loading"
+                      width="s"
+                      data-test="ai-experiment-comparison-threshold"
+                      @update:model-value="selectThreshold"
+                    />
+                  </OTooltip>
+                </div>
               </div>
-              <div class="flex flex-col gap-0.5">
-                <span class="text-text-tertiary text-xs">
-                  {{ t("aiObservability.experiments.comparePage.panel.threshold") }}
-                </span>
-                <OTooltip :content="thresholdTooltip">
-                  <OSelect
-                    :model-value="comparison.threshold"
-                    :options="thresholdOptions"
-                    :searchable="false"
-                    :disabled="loading"
-                    width="s"
-                    data-test="ai-experiment-comparison-threshold"
-                    @update:model-value="selectThreshold"
-                  />
-                </OTooltip>
-              </div>
-            </div>
+            </OStatStrip>
           </div>
         </template>
 
@@ -225,10 +223,10 @@ const FILTER_LABELS: Record<string, I18nText> = {
 };
 
 const FILTER_TONES: Record<string, StatTone> = {
-  regressed: "err",
-  improved: "ok",
+  regressed: "error",
+  improved: "success",
   unchanged: "neutral",
-  uncompared: "warn",
+  uncompared: "warning",
 };
 
 const FILTER_ICONS: Record<string, IconName> = {
@@ -250,7 +248,7 @@ const BUCKET_BADGES: Record<ExperimentComparisonBucket, ChipTone> = {
   missing: "warn",
 };
 
-/** An empty list is "no filter"; the All tile clears rather than being a selection. */
+/** `null` is "no filter" — the All tile clears rather than being a selection. */
 const bucketFilters = ref<string[]>([]);
 
 // A delta smaller than this counts as neutral. Fixed steps rather than a free
@@ -364,7 +362,8 @@ const bucketStats = computed<StatItem[]>(() => [
     label: t("common.all"),
     value: totalRows.value,
     icon: "format-list-bulleted" as IconName,
-    all: true,
+    tone: "primary" as StatTone,
+    // The default chip: it reads as active while unfiltered, and Clear lands on it.
     dataTest: "ai-experiment-count-total",
   },
 ]);

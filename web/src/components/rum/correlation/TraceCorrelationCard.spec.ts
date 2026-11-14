@@ -201,7 +201,7 @@ describe("TraceCorrelationCard", () => {
       mockHasBackendTrace.value = false;
       await nextTick();
       expect(wrapper.find('[data-test="trace-correlation-error"]').exists()).toBe(true);
-      expect(wrapper.text()).toContain("Unable to Load Correlation Data");
+      expect(wrapper.text()).toContain("Unable to load correlation data");
       expect(wrapper.text()).not.toContain("Trace data may take up to 30 seconds");
       expect(wrapper.text()).not.toContain("Performance breakdown");
       const refresh = findButtonByText(wrapper, "Refresh");
@@ -214,9 +214,9 @@ describe("TraceCorrelationCard", () => {
       expect(wrapper.exists()).toBe(true);
     });
 
-    it("displays 'Distributed Trace' as the card title", () => {
+    it("displays 'Distributed trace' as the card title", () => {
       // Assert
-      expect(wrapper.text()).toContain("Distributed Trace");
+      expect(wrapper.text()).toContain("Distributed trace");
     });
 
     it("displays trace ID section when traceId is provided", () => {
@@ -335,22 +335,22 @@ describe("TraceCorrelationCard", () => {
 
     it("displays Application Span label", () => {
       // Assert
-      expect(wrapper.text()).toContain("Application Span");
+      expect(wrapper.text()).toContain("Application span");
     });
 
     it("displays Browser SDK Span label", () => {
       // Assert
-      expect(wrapper.text()).toContain("Browser SDK Span");
+      expect(wrapper.text()).toContain("Browser SDK span");
     });
 
     it("displays Backend Spans label", () => {
       // Assert
-      expect(wrapper.text()).toContain("Backend Spans");
+      expect(wrapper.text()).toContain("Backend spans");
     });
 
     it("displays backend span count in parentheses", () => {
       // Assert
-      expect(wrapper.text()).toContain("Backend Spans (2)");
+      expect(wrapper.text()).toContain("Backend spans (2)");
     });
   });
 
@@ -457,7 +457,7 @@ describe("TraceCorrelationCard", () => {
   describe("action buttons", () => {
     it("displays View Trace Details button", () => {
       // Act
-      const viewBtn = findButtonByText(wrapper, "View Trace Details");
+      const viewBtn = findButtonByText(wrapper, "View trace details");
 
       // Assert
       expect(viewBtn).toBeDefined();
@@ -466,7 +466,7 @@ describe("TraceCorrelationCard", () => {
 
     it("enables View Trace Details button when backend trace exists", () => {
       // Act
-      const viewBtn = findButtonByText(wrapper, "View Trace Details");
+      const viewBtn = findButtonByText(wrapper, "View trace details");
 
       // Assert
       expect(viewBtn?.attributes("disabled")).toBeUndefined();
@@ -478,7 +478,7 @@ describe("TraceCorrelationCard", () => {
       await flushPromises();
       const push = vi.spyOn(router, "push").mockResolvedValue(undefined);
 
-      await findButtonByText(wrapper, "View Trace Details")?.trigger("click");
+      await findButtonByText(wrapper, "View trace details")?.trigger("click");
 
       expect(push).toHaveBeenCalledWith({
         name: "traceDetails",
@@ -499,7 +499,7 @@ describe("TraceCorrelationCard", () => {
       await flushPromises();
       const push = vi.spyOn(router, "push").mockResolvedValue(undefined);
 
-      await findButtonByText(wrapper, "View Trace Details")?.trigger("click");
+      await findButtonByText(wrapper, "View trace details")?.trigger("click");
 
       expect(push).not.toHaveBeenCalled();
       push.mockRestore();
@@ -517,7 +517,7 @@ describe("TraceCorrelationCard", () => {
       // Act
       wrapper = mountComponent();
       await flushPromises();
-      const viewBtn = findButtonByText(wrapper, "View Trace Details");
+      const viewBtn = findButtonByText(wrapper, "View trace details");
 
       // Assert
       expect(viewBtn?.attributes("disabled")).toBeDefined();
@@ -660,7 +660,7 @@ describe("TraceCorrelationCard", () => {
 
     it("View Trace Details button is reachable via keyboard (Enter keydown)", async () => {
       // Arrange
-      const viewBtn = findButtonByText(wrapper, "View Trace Details");
+      const viewBtn = findButtonByText(wrapper, "View trace details");
 
       // Act — trigger Enter keydown (button remains accessible)
       await viewBtn?.trigger("keydown.enter");
@@ -770,7 +770,7 @@ describe("TraceCorrelationCard", () => {
 
       // Assert
       expect(w.exists()).toBe(true);
-      expect(w.text()).toContain("Distributed Trace");
+      expect(w.text()).toContain("Distributed trace");
       w.unmount();
     });
 
@@ -889,11 +889,11 @@ describe("TraceCorrelationCard", () => {
     it("handles complete trace correlation flow", async () => {
       // Arrange: component mounted with trace data
       expect(wrapper.exists()).toBe(true);
-      expect(wrapper.text()).toContain("Distributed Trace");
+      expect(wrapper.text()).toContain("Distributed trace");
 
       // Act: verify trace info is shown
       expect(wrapper.text()).toContain("test-tra...23456789");
-      expect(wrapper.text()).toContain("Backend Spans (2)");
+      expect(wrapper.text()).toContain("Backend spans (2)");
 
       // Act: copy trace ID
       const copyBtn = findCopyButton(wrapper);
@@ -919,7 +919,7 @@ describe("TraceCorrelationCard", () => {
       expect(wrapper.text()).toContain("Backend trace data not yet available");
 
       // Assert: View Trace Details button is disabled
-      const viewBtn = findButtonByText(wrapper, "View Trace Details");
+      const viewBtn = findButtonByText(wrapper, "View trace details");
       expect(viewBtn?.attributes("disabled")).toBeDefined();
     });
   });

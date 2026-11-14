@@ -31,11 +31,11 @@ export class LlmProvidersPage {
 
         // The API-key "required" `*` marker is a conditional span with no data-test.
         // It renders only in create mode for openai/deepseek/anthropic. It lives in
-        // the API Key label (label.o-input-label containing the "API Key" text),
+        // the API Key label (label.o-input-label containing the "API key" text),
         // so scope the `*` span to that label. (Recommended upstream fix: give it
         // data-test="provider-form-api-key-required"; fallback selector used here.)
         this.apiKeyRequiredMarker =
-            'label.o-input-label:has-text("API Key") span.select-none';
+            'label.o-input-label:has-text("API key") span.select-none';
 
         // ── Toast notifications (same audit pattern as the settings POM) ─────
         this.toastSuccess = '[data-test-variant="success"]';

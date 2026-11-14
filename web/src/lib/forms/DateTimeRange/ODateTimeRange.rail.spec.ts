@@ -455,7 +455,7 @@ describe("ODateTimeRange rail", () => {
 
       expect(wrapper!.vm.calendarToken).toBeNull();
       expect(lastEmit().relativeTimePeriod).toBe("3d");
-      expect(wrapper!.vm.triggerLabel).toBe("Past 3 Days");
+      expect(wrapper!.vm.triggerLabel).toBe("Past 3 days");
     });
 
     it("runs the minute clock only while a calendar range can be on screen", async () => {

@@ -8,11 +8,11 @@ export class StreamAssociationPage {
 
     // Navigation
     this.streamsMenuItem = page.locator('[data-test="menu-link-\\/streams-item"]');
-    this.searchStreamInput = page.getByPlaceholder('Search Stream');
+    this.searchStreamInput = page.getByPlaceholder('Search stream');
     this.streamDetailButton = page.getByRole('button', { name: 'Stream Detail' });
 
     // Pattern Association Dialog
-    this.addPatternCell = page.getByRole('cell', { name: 'Add Pattern' });
+    this.addPatternCell = page.getByRole('cell', { name: 'Add pattern' });
     this.noPatternAppliedTitle = page.locator('[data-test="associated-regex-patterns-no-pattern-applied-title"]');
     // OInput uses inheritAttrs:false — data-test lands on wrapper div; inner <input> gets data-test="{attr}-field"
     this.patternSearchInput = page.locator('[data-test="associated-regex-patterns-search-input-field"]');
@@ -25,9 +25,9 @@ export class StreamAssociationPage {
     this.queryCheckbox = page.locator('[data-test="associated-regex-patterns-query-checkbox"]');
 
     // Action Buttons
-    // "Add Pattern" inside the AssociatedRegexPatterns panel (emits addPattern to parent, sets isFormDirty)
+    // "Add pattern" inside the AssociatedRegexPatterns panel (emits addPattern to parent, sets isFormDirty)
     this.addPatternButton = page.locator('[data-test="associated-regex-patterns-add-pattern-btn"]');
-    // "Update Changes" is in the ODrawer footer — disabled until isFormDirty is true
+    // "Update changes" is in the ODrawer footer — disabled until isFormDirty is true
     this.updateButton = page.locator('[data-test="schema-pattern-association-update-btn"]');
     this.closeButton = page.locator('[data-test="associated-regex-patterns-close-btn"]');
     // Cancel in ODrawer footer (also closes the pattern association drawer)
@@ -355,7 +355,7 @@ export class StreamAssociationPage {
   /**
    * Save pattern association changes via the MAIN stream-settings button.
    *
-   * WORKAROUND: The "Update Changes" button in the pattern-association drawer
+   * WORKAROUND: The "Update changes" button in the pattern-association drawer
    * footer is permanently disabled because assocPatternsRef is declared as a
    * template ref in schema.vue but never returned from setup() — so
    * assocPatternsRef?.isFormDirty is always undefined (falsy).
@@ -465,9 +465,9 @@ export class StreamAssociationPage {
     await this.openStreamDetail(streamName);
     await this.page.waitForTimeout(1000);
 
-    // Find the field row and click "Remove Pattern" button where "Add Pattern" was
+    // Find the field row and click "Remove pattern" button where "Add pattern" was
     const fieldRow = this.page.locator(`tr:has-text("${fieldName}")`).first();
-    const removeButton = fieldRow.getByRole('cell', { name: 'Remove Pattern' });
+    const removeButton = fieldRow.getByRole('cell', { name: 'Remove pattern' });
 
     const removeButtonVisible = await removeButton.isVisible().catch(() => false);
 
@@ -514,7 +514,7 @@ export class StreamAssociationPage {
     await this.page.waitForTimeout(2000);
 
     // Click Remove Pattern button
-    const removeButton = this.page.getByRole('button', { name: 'Remove Pattern' });
+    const removeButton = this.page.getByRole('button', { name: 'Remove pattern' });
     await removeButton.click();
     testLogger.info('Clicked Remove Pattern button');
     await this.page.waitForTimeout(1500);
@@ -574,7 +574,7 @@ export class StreamAssociationPage {
         await this.selectQueryTime();
       }
 
-      // Click "Add Pattern" button to add this pattern
+      // Click "Add pattern" button to add this pattern
       await this.clickAddPattern();
       testLogger.info(`✓ Pattern ${patternName} added (${i + 1}/${patternsConfig.length})`);
 
@@ -690,7 +690,7 @@ export class StreamAssociationPage {
           await this.page.waitForTimeout(500);
 
           // Click Remove Pattern button
-          const removeButton = this.page.getByRole('button', { name: 'Remove Pattern' });
+          const removeButton = this.page.getByRole('button', { name: 'Remove pattern' });
           await removeButton.click();
           testLogger.info(`✓ Removed pattern: ${patternName}`);
           patternsRemoved++;
@@ -726,7 +726,7 @@ export class StreamAssociationPage {
         await this.page.waitForTimeout(500);
 
         // Click Remove Pattern button
-        const removeButton = this.page.getByRole('button', { name: 'Remove Pattern' });
+        const removeButton = this.page.getByRole('button', { name: 'Remove pattern' });
         await removeButton.click();
         testLogger.info(`Removed pattern #${patternsRemoved + 1}`);
         patternsRemoved++;
@@ -739,12 +739,12 @@ export class StreamAssociationPage {
     // Save and close the pattern-association drawer via main button
     await this.saveViaMainButton();
 
-    // Verify field now shows "Add Pattern" (pattern-association drawer is closed; first drawer still open)
+    // Verify field now shows "Add pattern" (pattern-association drawer is closed; first drawer still open)
     await this.page.waitForTimeout(500);
-    const addPatternCell = this.page.getByRole('cell', { name: 'Add Pattern' });
+    const addPatternCell = this.page.getByRole('cell', { name: 'Add pattern' });
     const addPatternVisible = await addPatternCell.isVisible({ timeout: 3000 }).catch(() => false);
     if (addPatternVisible) {
-      testLogger.info('✓ Field now shows "Add Pattern" (all patterns removed)');
+      testLogger.info('✓ Field now shows "Add pattern" (all patterns removed)');
     }
 
     // Close the stream detail sidebar
@@ -935,7 +935,7 @@ export class StreamAssociationPage {
       await this.page.waitForTimeout(500);
 
       // Click Remove Pattern button
-      const removeButton = this.page.getByRole('button', { name: 'Remove Pattern' });
+      const removeButton = this.page.getByRole('button', { name: 'Remove pattern' });
       await removeButton.click();
       testLogger.info(`Removed pattern #${patternsRemoved + 1}`);
       patternsRemoved++;
@@ -947,12 +947,12 @@ export class StreamAssociationPage {
     // Save and close the pattern-association drawer via main button
     await this.saveViaMainButton();
 
-    // Verify field now shows "Add Pattern" (first drawer still open after save)
+    // Verify field now shows "Add pattern" (first drawer still open after save)
     await this.page.waitForTimeout(500);
-    const addPatternCell = this.page.getByRole('cell', { name: 'Add Pattern' });
+    const addPatternCell = this.page.getByRole('cell', { name: 'Add pattern' });
     const addPatternVisible = await addPatternCell.isVisible({ timeout: 3000 }).catch(() => false);
     if (addPatternVisible) {
-      testLogger.info('✓ Field now shows "Add Pattern" (all patterns removed)');
+      testLogger.info('✓ Field now shows "Add pattern" (all patterns removed)');
     }
 
     // Close the stream detail sidebar

@@ -2174,14 +2174,14 @@ export default defineComponent({
           filteredData.value.some((item: any) => item?.result?.length);
         // Series without the lat/lon labels convert to no points.
         if (hasResults && type === "geomap" && panelData.value?.chartType === "geomap") {
-          return hasGeoPoints() ? "" : "No Data";
+          return hasGeoPoints() ? "" : "No data";
         }
         if (hasResults) return "";
         // During a reload the executor clears state.data before the new results
         // stream in. Keep showing the previously rendered chart while loading
         // (matching the SQL branch below); only show "No Data" once the load
         // completes with no results.
-        return loading.value && panelData.value?.options?.series?.length > 0 ? "" : "No Data";
+        return loading.value && panelData.value?.options?.series?.length > 0 ? "" : "No data";
       }
 
       const hasRawData = data.value?.length && data.value[0]?.length;
@@ -2190,7 +2190,7 @@ export default defineComponent({
       // suppress "No Data" only while still loading to avoid flicker.
       // Once loading completes with empty data, show "No Data".
       if (!hasRawData) {
-        return loading.value && panelData.value?.chartType ? "" : "No Data";
+        return loading.value && panelData.value?.chartType ? "" : "No data";
       }
 
       // Custom chart output is user-defined ECharts options, so row presence is the only reliable signal.
@@ -2204,21 +2204,21 @@ export default defineComponent({
       }
 
       if (type === "flame-graph") {
-        return panelData.value?.root ? "" : "No Data";
+        return panelData.value?.root ? "" : "No data";
       }
 
       if (type === "logs") {
-        return panelData.value?.rows?.length > 0 ? "" : "No Data";
+        return panelData.value?.rows?.length > 0 ? "" : "No data";
       }
 
       // Table renders raw rows; the conversion returns { rows, columns }.
       if (type === "table") {
-        return panelData.value?.rows?.length > 0 ? "" : "No Data";
+        return panelData.value?.rows?.length > 0 ? "" : "No data";
       }
 
       // Rows with null lat/lon are dropped, so raw rows can still mean no points.
       if (type === "geomap") {
-        return hasGeoPoints() ? "" : "No Data";
+        return hasGeoPoints() ? "" : "No data";
       }
 
       // Maps handles its own empty state.
@@ -2228,7 +2228,7 @@ export default defineComponent({
 
       // Sankey returns { options: null } when data is invalid.
       if (type === "sankey") {
-        return panelData.value?.options != null ? "" : "No Data";
+        return panelData.value?.options != null ? "" : "No data";
       }
 
       // Metric/gauge series are always created by the converter
@@ -2236,13 +2236,13 @@ export default defineComponent({
       if (type === "metric" || type === "gauge") {
         const firstRow = data.value[0]?.[0];
         const yAlias = panelSchema.value.queries[0].fields.y.map((it: any) => it.alias || []);
-        return yAlias.every((y: any) => getDataValue(firstRow, y) != null) ? "" : "No Data";
+        return yAlias.every((y: any) => getDataValue(firstRow, y) != null) ? "" : "No data";
       }
 
       // For all other chart types (line, area, bar, scatter, heatmap, etc.),
       // the series filter in the conversion pipeline already excluded series
       // whose data is entirely null. Just check what survived.
-      return panelData.value?.options?.series?.length > 0 ? "" : "No Data";
+      return panelData.value?.options?.series?.length > 0 ? "" : "No data";
     });
 
     const customNoDataText = computed(() =>
@@ -2353,13 +2353,13 @@ export default defineComponent({
 
     // An empty layer list would still build a bare map, so it gets the placeholder too.
     const geoMapRendererData = computed(() =>
-      panelData.value?.chartType === "geomap" && noData.value !== "No Data" && hasGeoPoints()
+      panelData.value?.chartType === "geomap" && noData.value !== "No data" && hasGeoPoints()
         ? panelData.value
         : { options: { backgroundColor: "transparent" } },
     );
 
     const chartRendererData = computed(() => {
-      if (noData.value === "No Data") {
+      if (noData.value === "No data") {
         return { options: { backgroundColor: "transparent" } };
       }
       if (
@@ -2516,7 +2516,7 @@ export default defineComponent({
         // and never refreshes panelData — so guard on noData here to avoid
         // rendering the stale converted rows behind the "No Data" state.
         // Mirrors chartRendererData's noData guard for the chart path.
-        if (noData.value === "No Data") {
+        if (noData.value === "No data") {
           return { rows: [], columns: [] };
         }
         if (panelSchema.value.queryType === "promql") {

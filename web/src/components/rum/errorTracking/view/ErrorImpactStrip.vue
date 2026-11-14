@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <section :aria-label="t('rum.errorDetail.impactAria')" data-test="rum-error-impact-strip">
-    <OStatStrip :items="items" :loading="loading" />
+    <OStatStrip :items="items" />
     <small v-if="scopeCaption" class="mt-1 block" data-test="rum-error-impact-strip-scope">{{
       scopeCaption
     }}</small>
@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
-import type { StatItem, StatValue } from "@/lib/data/StatStrip/OStatStrip.types";
+import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import { formatLargeNumber } from "@/utils/formatters";
 import { formatCompactAge, formatRelativeTime } from "@/utils/rum/errorIssueUtils";
 import type { ErrorImpact } from "@/composables/rum/useErrorDetail";
@@ -47,12 +47,13 @@ const props = withDefaults(
 
 const { t } = useI18nTyped();
 
-// Unknown rather than zero while loading or unavailable: "0 users affected" is a claim.
-const count = (value: number | null | undefined): StatValue =>
-  props.loading || value == null ? null : formatLargeNumber(value);
+// A dash while loading (and when the aggregate is unavailable) rather than a
+// zero: "0 users affected" is a claim, "—" is the absence of one.
+const count = (value: number | null | undefined): string | number =>
+  props.loading || value == null ? "—" : formatLargeNumber(value);
 
-const age = (value: number | undefined): StatValue =>
-  props.loading || !value ? null : formatCompactAge(value);
+const age = (value: number | undefined): string =>
+  props.loading || !value ? "—" : formatCompactAge(value);
 
 const items = computed<StatItem[]>(() => {
   const impact = props.impact;
@@ -62,7 +63,7 @@ const items = computed<StatItem[]>(() => {
       label: t("rum.errorDetail.occurrences"),
       value: count(impact?.events),
       icon: "error",
-      tone: "err",
+      tone: "error",
       dataTest: "rum-error-impact-events",
     },
     {
@@ -70,7 +71,7 @@ const items = computed<StatItem[]>(() => {
       label: t("rum.usersAffected"),
       value: count(impact?.usersAffected),
       icon: "group",
-      tone: "warn",
+      tone: "warning",
       dataTest: "rum-error-impact-users",
     },
     {
@@ -86,6 +87,7 @@ const items = computed<StatItem[]>(() => {
       label: t("rum.errorDetail.firstSeen"),
       value: age(impact?.firstSeen),
       icon: "history",
+      tone: "neutral",
       dataTest: "rum-error-impact-first-seen",
     },
     {
@@ -93,6 +95,7 @@ const items = computed<StatItem[]>(() => {
       label: t("rum.errorDetail.lastSeen"),
       value: age(impact?.lastSeen),
       icon: "schedule",
+      tone: "neutral",
       dataTest: "rum-error-impact-last-seen",
     },
   ];

@@ -625,9 +625,9 @@ describe("ServiceAccountsList Component", () => {
       );
 
       expect(sreAgent.role).toBe("SreAgent");
-      // The UI should display "System Managed" instead of raw role for system accounts
-      const displayRole = sreAgent.is_system ? "System Managed" : sreAgent.role;
-      expect(displayRole).toBe("System Managed");
+      // The UI should display "System managed" instead of raw role for system accounts
+      const displayRole = sreAgent.is_system ? "System managed" : sreAgent.role;
+      expect(displayRole).toBe("System managed");
     });
 
     it("excludes system-managed rows from selection via isRowSelectable", () => {
@@ -1001,7 +1001,7 @@ describe("ServiceAccountsList Component", () => {
       const dialogHtml = tokenDialog.html();
       expect(dialogHtml).toContain("cURL");
       expect(dialogHtml).toContain("Header");
-      expect(dialogHtml).toContain("Environment Variable");
+      expect(dialogHtml).toContain("Environment variable");
     });
 
     it("renders cURL snippet with serviceToken and org identifier", () => {

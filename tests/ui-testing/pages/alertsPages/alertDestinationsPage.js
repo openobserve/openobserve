@@ -1225,7 +1225,7 @@ export class AlertDestinationsPage {
         // Try multiple fallback selectors for the import button
         const importBtnFallbackLocators = [
             this.destinationImportButton,
-            'button:has-text("Import Destination")',
+            'button:has-text("Import destination")',
             '[data-test*="destination-import"]',
             'button:has-text("Import")',
             'table button:has-text("Import")',

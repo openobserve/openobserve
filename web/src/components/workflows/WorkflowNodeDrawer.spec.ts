@@ -491,7 +491,7 @@ describe("WorkflowNodeDrawer", () => {
       expect(deleteBtn(wrapper).attributes("disabled")).toBeDefined();
     });
 
-    // The inline "Create New Destination" form lives inside the Config pane, and an
+    // The inline "Create new destination" form lives inside the Config pane, and an
     // unfinished one simply saves a dummy node — so the footer stays intact rather
     // than trapping the user in a form with no way out.
     it("keeps Delete available while the destination body creates a new destination", async () => {
@@ -700,7 +700,7 @@ describe("WorkflowNodeDrawer", () => {
     });
   });
 
-  // Re-running a step is now "Run Step" in the footer (it executes against the
+  // Re-running a step is now "Run step" in the footer (it executes against the
   // Input pane's records), replacing the old Replay button.
   describe("run step (NDV footer)", () => {
     const runBtn = (w: any) => w.find('[data-test="workflow-node-execute"]');
@@ -1798,7 +1798,7 @@ describe("WorkflowNodeDrawer", () => {
       wrapper = mountDrawer();
       await nextTick();
 
-      expect(wrapper.find(STATUS).text()).toBe("No Match");
+      expect(wrapper.find(STATUS).text()).toBe("No match");
       expect(wrapper.find(STATUS).text()).not.toContain("Passed");
       const noMatch = wrapper.find(NO_MATCH);
       expect(noMatch.exists()).toBe(true);
@@ -1836,7 +1836,7 @@ describe("WorkflowNodeDrawer", () => {
       expect(rows.length).toBe(2);
       expect(rows[0].text()).toContain("Payments");
       expect(rows[0].text()).toContain("2");
-      expect(rows[1].text()).toContain("Everything Else");
+      expect(rows[1].text()).toContain("Everything else");
       expect(rows[1].text()).toContain("0");
       expect(wrapper.find(DROPPED).text()).toMatch(/1/);
     });
@@ -1855,7 +1855,7 @@ describe("WorkflowNodeDrawer", () => {
       wrapper = mountDrawer();
       await nextTick();
 
-      expect(wrapper.find(STATUS).text()).toBe("No Match");
+      expect(wrapper.find(STATUS).text()).toBe("No match");
       expect(wrapper.find(DROPPED).text()).toMatch(/3/);
     });
 

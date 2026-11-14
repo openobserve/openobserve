@@ -273,14 +273,14 @@ describe("DrilldownPopUp", () => {
       wrapper = createWrapper();
 
       const dialog = wrapper.findComponent(ODialogStub);
-      expect(dialog.props("title")).toBe("Create Drilldown");
+      expect(dialog.props("title")).toBe("Create drilldown");
     });
 
     it("should forward edit-drilldown title to ODialog in edit mode", () => {
       wrapper = createWrapper({ isEditMode: true, drilldownDataIndex: 0 });
 
       const dialog = wrapper.findComponent(ODialogStub);
-      expect(dialog.props("title")).toBe("Edit Drilldown");
+      expect(dialog.props("title")).toBe("Edit drilldown");
     });
 
     it("should forward md size to ODialog", () => {
@@ -477,7 +477,7 @@ describe("DrilldownPopUp", () => {
     });
 
     it("should show logs mode selection", () => {
-      expect(wrapper.text()).toContain("Select Logs Mode:");
+      expect(wrapper.text()).toContain("Select logs mode:");
     });
 
     it("should default to auto logs mode", () => {
@@ -499,7 +499,7 @@ describe("DrilldownPopUp", () => {
       wrapper.vm.form.setFieldValue("data.logsMode", "custom");
       await flushPromises();
 
-      expect(wrapper.text()).toContain("Custom SQL Query");
+      expect(wrapper.text()).toContain("Custom SQL query");
     });
 
     it("should update query value", async () => {

@@ -160,7 +160,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="bg-card-glass-bg stream-config-card [container-type:inline-size] shrink-0 [container-name:stream-config]"
           >
             <div class="border-border-default flex items-center gap-0 border-b px-3 py-2.5">
-              <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact me-3 font-semibold tracking-[0.01em]">{{
                 t("alerts.alertType")
               }}</span>

@@ -102,7 +102,7 @@ describe("ExternalDestination.vue (drawer chrome)", () => {
   it("mounts and renders the shared DestinationPicker as its body", () => {
     const wrapper = createWrapper();
     expect(wrapper.find(".destination-picker-stub").exists()).toBe(true);
-    expect(wrapper.find(".o-drawer-title").text()).toContain("External Destination");
+    expect(wrapper.find(".o-drawer-title").text()).toContain("External destination");
   });
 
   it("seeds the picker with the saved destination when editing", () => {
@@ -172,7 +172,7 @@ describe("ExternalDestination.vue (drawer chrome)", () => {
     await wrapper.find('[data-test="delete-btn"]').trigger("click");
     const dialog = (wrapper.vm as any).dialog;
     expect(dialog.show).toBe(true);
-    expect(dialog.title).toBe("Delete Node");
+    expect(dialog.title).toBe("Delete node");
     expect(typeof dialog.okCallback).toBe("function");
   });
 

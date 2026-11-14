@@ -233,15 +233,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #subheader>
           <!-- The window's totals live inside the table frame, not in the page
                header: they summarise exactly the rows below. -->
-          <div
-            class="px-page-edge border-table-row-divider border-b py-1.5"
-            data-test="dbm-queries-summary"
-          >
+          <div data-test="dbm-queries-summary">
             <OStatStrip
               :items="visibleSummaryStats"
               :loading="loading"
               selectable
               :selected-key="statFilter"
+              default-key="queries"
               @select="onStatSelect"
             />
           </div>
@@ -518,12 +516,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                the failure tile — which only traces can answer — is absent
                rather than claiming an all-clear. -->
           <template #subheader>
-            <div
-              class="px-page-edge border-table-row-divider border-b py-1.5"
+            <OStatStrip
+              :items="visibleSummaryStats"
+              :loading="loading"
+              row
               data-test="dbm-server-queries-summary"
-            >
-              <OStatStrip :items="visibleSummaryStats" :loading="loading" />
-            </div>
+            />
           </template>
           <template #cell-query="{ row }">
             <DbmQueryCell
@@ -1133,8 +1131,8 @@ const fallbackTimeQualifier = computed(() =>
  */
 // The Failed tile narrows the table to the queries with a failed call; Calls and Database time are totals, not rows.
 const statFilter = ref<"failed" | null>(null);
-const onStatSelect = (key: string | null) => {
-  statFilter.value = key === "failed" ? "failed" : null;
+const onStatSelect = (key: string) => {
+  statFilter.value = key === "failed" && statFilter.value !== "failed" ? "failed" : null;
 };
 
 const summaryStats = computed<StatItem[]>(() => {
@@ -1163,42 +1161,6 @@ const summaryStats = computed<StatItem[]>(() => {
   const time = overlapTile(totals.time.value, measured, formatNs);
 
   return [
-    // TRACE-ONLY: the server feed carries no error counts. In fallback mode
-    // the tile is REMOVED rather than shown as "—" under a label promising a
-    // measurement — see `visibleSummaryStats`.
-    {
-      key: "failed",
-      label: t("dbm.queries.summary.failed"),
-      value: errorCount.value ? formatCount(errorCount.value) : null,
-      icon: "error-outline",
-      tone: errorCount.value ? "err" : "neutral",
-      selectable: errorCount.value > 0 || statFilter.value === "failed",
-      dataTest: "dbm-queries-summary-failed",
-    },
-    {
-      key: "calls",
-      label: t("dbm.queries.summary.calls"),
-      value: calls.value,
-      // D2: the qualifier renders only alongside a value it can qualify.
-      ...(calls.qualified
-        ? { sub: qualifier(totals.calls.qualifierKey), ...qualifierIcon(totals.calls.qualifierKey) }
-        : {}),
-      icon: "bar-chart",
-      tone: "info",
-      selectable: false,
-      dataTest: "dbm-queries-summary-calls",
-    },
-    {
-      key: "time",
-      label: t("dbm.queries.summary.time"),
-      value: time.value,
-      ...(time.qualified
-        ? { sub: qualifier(totals.time.qualifierKey), ...qualifierIcon(totals.time.qualifierKey) }
-        : {}),
-      icon: "timer",
-      selectable: false,
-      dataTest: "dbm-queries-summary-time",
-    },
     {
       key: "queries",
       // In fallback mode the count describes the rows actually on screen.
@@ -1211,10 +1173,47 @@ const summaryStats = computed<StatItem[]>(() => {
         ? serverListShown.value
           ? filteredServerRows.value.length
           : rows.value.length
-        : null,
+        : raw("—"),
       icon: "database",
-      all: true,
+      tone: "primary",
       dataTest: "dbm-queries-summary-queries",
+    },
+    {
+      key: "calls",
+      label: t("dbm.queries.summary.calls"),
+      value: calls.value ?? raw("—"),
+      // D2: the qualifier renders only alongside a value it can qualify.
+      ...(calls.qualified
+        ? { sub: qualifier(totals.calls.qualifierKey), ...qualifierIcon(totals.calls.qualifierKey) }
+        : {}),
+      icon: "bar-chart",
+      tone: "info",
+      selectable: false,
+      dataTest: "dbm-queries-summary-calls",
+    },
+    {
+      key: "time",
+      label: t("dbm.queries.summary.time"),
+      value: time.value ?? raw("—"),
+      ...(time.qualified
+        ? { sub: qualifier(totals.time.qualifierKey), ...qualifierIcon(totals.time.qualifierKey) }
+        : {}),
+      icon: "timer",
+      tone: "teal",
+      selectable: false,
+      dataTest: "dbm-queries-summary-time",
+    },
+    // TRACE-ONLY: the server feed carries no error counts. In fallback mode
+    // the tile is REMOVED rather than shown as "—" under a label promising a
+    // measurement — see `visibleSummaryStats`.
+    {
+      key: "failed",
+      label: t("dbm.queries.summary.failed"),
+      value: errorCount.value ? formatCount(errorCount.value) : raw("—"),
+      icon: "error-outline",
+      tone: errorCount.value ? "error" : "neutral",
+      selectable: errorCount.value > 0 || statFilter.value === "failed",
+      dataTest: "dbm-queries-summary-failed",
     },
   ];
 });

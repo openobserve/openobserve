@@ -243,9 +243,10 @@ const stats = computed<StatItem[]>(() => [
     label: t("siem.detections.stat.fired"),
     value:
       firingsError.value || (firingsLoading.value && !firings.value.size)
-        ? null
+        ? "—"
         : counts.value.fired,
     icon: "local-fire-department",
+    tone: "orange",
     max: scoped.value.length || undefined,
     dataTest: "security-detections-stat-fired",
   },
@@ -254,7 +255,7 @@ const stats = computed<StatItem[]>(() => [
     label: t("siem.detections.stat.erroring"),
     value: counts.value.erroring,
     icon: "error-outline",
-    tone: "err",
+    tone: "error",
     max: scoped.value.length || undefined,
     dataTest: "security-detections-stat-erroring",
   },
@@ -263,7 +264,7 @@ const stats = computed<StatItem[]>(() => [
     label: t("siem.detections.stat.notifyFailing"),
     value: counts.value.notifyFailing,
     icon: "warning-amber",
-    tone: "warn",
+    tone: "warning",
     max: scoped.value.length || undefined,
     dataTest: "security-detections-stat-notify-failing",
   },
@@ -272,7 +273,7 @@ const stats = computed<StatItem[]>(() => [
     label: t("siem.detections.stat.enabled"),
     value: counts.value.enabled,
     icon: "verified-user",
-    tone: "ok",
+    tone: "success",
     max: scoped.value.length || undefined,
     dataTest: "security-detections-stat-enabled",
   },
@@ -290,6 +291,7 @@ const stats = computed<StatItem[]>(() => [
     label: t("siem.detections.stat.all"),
     value: scoped.value.length,
     icon: "shield-alert-outline",
+    tone: "primary",
     dataTest: "security-detections-stat-all",
   },
 ]);
@@ -875,23 +877,8 @@ watch(orgId, () => void refresh());
         @row-click="openDrawer"
         @sort-change="() => nextTick(syncIndex)"
       >
-        <template #subheader>
-          <div class="px-page-edge border-table-row-divider border-b py-1.5">
-            <OStatStrip
-              compact-values
-              :items="stats"
-              :loading="loading && !rows.length"
-              selectable
-              multiple
-              :selected-keys="facets"
-              data-test="security-detections-stats"
-              @update:selected-keys="facets = $event as Facet[]"
-            />
-          </div>
-        </template>
-
         <template #toolbar>
-          <div class="flex min-w-0 flex-1 items-center gap-2">
+          <div class="contents">
             <div class="w-40 shrink-0">
               <OSelect
                 :aria-label="t('siem.aria.severityFilter')"
@@ -905,9 +892,22 @@ watch(orgId, () => void refresh());
             </div>
             <OSearchInput
               v-model="search"
-              class="flex-1"
+              class="min-w-0 flex-1 md:min-w-48"
               :placeholder="t('siem.detections.search')"
               data-test="security-detections-search"
+            />
+            <OStatStrip
+              compact-values
+              :items="stats"
+              :loading="loading && !rows.length"
+              selectable
+              :row="false"
+              class="max-md:order-last"
+              multiple
+              :selected-keys="facets"
+              default-key="all"
+              data-test="security-detections-stats"
+              @update:selected-keys="facets = $event as Facet[]"
             />
           </div>
         </template>

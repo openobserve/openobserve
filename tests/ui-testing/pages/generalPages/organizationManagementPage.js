@@ -126,8 +126,8 @@ export class OrganizationManagementPage {
     async expectStatusStepsColumnsVisible() {
         await expect(this.statusStepsUsedHeader).toBeVisible();
         await expect(this.statusStepsTotalHeader).toBeVisible();
-        await expect(this.statusStepsUsedHeader).toContainText('Status Steps Used');
-        await expect(this.statusStepsTotalHeader).toContainText('Status Steps Total');
+        await expect(this.statusStepsUsedHeader).toContainText('Status steps used');
+        await expect(this.statusStepsTotalHeader).toContainText('Status steps total');
     }
 
     async expectStatusStepsCellsNumeric(orgIdentifier) {
@@ -144,7 +144,7 @@ export class OrganizationManagementPage {
     async expectStatusStepsTabActive(orgName) {
         await expect(this.statusStepsTab).toHaveAttribute('data-state', 'active');
         await expect(this.usageLimitsDialog).toContainText(`Set Status Steps for ${orgName}`);
-        await expect(this.usageLimitsDialog).toContainText('Total Status Steps');
+        await expect(this.usageLimitsDialog).toContainText('Total status steps');
     }
 
     async expectProtocolStepsWording(orgName) {
@@ -155,7 +155,7 @@ export class OrganizationManagementPage {
         await expect(this.usageLimitsDialog).toContainText(`Set Status Steps for ${orgName}`);
         await expect(this.usageLimitsDialog).not.toContainText('Set Protocol Steps for');
         await expect(this.usageLimitsDialog).toContainText('resets each month');
-        await expect(this.usageLimitsDialog).toContainText('Total Status Steps');
+        await expect(this.usageLimitsDialog).toContainText('Total status steps');
         await expect(this.usageLimitsDialog).toContainText(`Currently used: ${usedText} steps`);
     }
 

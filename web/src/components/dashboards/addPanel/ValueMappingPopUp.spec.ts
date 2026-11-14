@@ -129,7 +129,7 @@ describe("ValueMappingPopUp", () => {
     it("should forward title to ODialog", () => {
       wrapper = createWrapper();
       const dialog = wrapper.findComponent(ODialogStub);
-      expect(dialog.props("title")).toBe("Value Mappings");
+      expect(dialog.props("title")).toBe("Value mappings");
     });
 
     it("should forward open=true to ODialog when open prop is true", () => {

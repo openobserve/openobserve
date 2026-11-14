@@ -37,6 +37,20 @@ a guideline, the guideline wins.
   every change. The page header has its own spec: [header-spec.md](references/header-spec.md).
   Why each rule exists (the survey register and bug list):
   [ui-audit-2026-11.md](references/ui-audit-2026-11.md).
+- **Verify by looking, not by counting.** Before a UI change is done, take 2x close-ups of
+  the header, tabs, toolbar and first rows of every screen it touches, on `main` and on the
+  branch, and check each pair against the guideline ids. In particular:
+  - indicators sit on their dividers;
+  - every control in a row shares one height and one border language;
+  - grouped controls share one border;
+  - text is sentence case (T5);
+  - the header has at most two secondary actions (H3).
+
+  Lint, type-check and metrics (heights, radii, error counts) are necessary but never prove
+  how a screen looks.
+- **Recent polish on `main` is the baseline.** Before changing a shared component, read
+  `git log origin/main -- <component>`. Keep what recent polish commits decided unless a
+  guideline says otherwise, and name that guideline in the change.
 
 ---
 
@@ -579,8 +593,8 @@ saturated colour spent only on the one signal each screen exists to surface.
 Which signal that is changes by page type (**monitoring** = state/severity;
 **catalog** = category/recency/ownership; **access** = role; **forms** =
 progress/validity), and you colour it with the shared toolkit — `OStatStrip` /
-`OStatCard` summary tiles (optionally filter tiles, single or multi-select, via
-`OTable`'s `#subheader` slot), `OTag` chips from `badgeGroups.ts`, a row state rail + light
+`OStatCard` summary tiles (multi-select filter chips in `OTable`'s `#toolbar`
+after the search; see calm-signal § Summary-strip conventions), `OTag` chips from `badgeGroups.ts`, a row state rail + light
 exception-only highlight, recency-aware `OTimeCell`, `OUserCell` avatars. Keep
 everything else quiet: highlight exceptions not the norm, muted `0`/`—`,
 border-not-fill selection, one primary action, no layout shift. Full playbook +

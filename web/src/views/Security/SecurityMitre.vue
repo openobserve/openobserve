@@ -306,7 +306,7 @@ const stats = computed<StatItem[]>(() => [
     label: t("siem.mitrePage.stat.firing"),
     value: summary.value.techniquesFiring,
     icon: "local-fire-department",
-    tone: "err",
+    tone: "error",
     dataTest: "security-mitre-stat-firing",
   },
   {
@@ -314,7 +314,7 @@ const stats = computed<StatItem[]>(() => [
     label: t("siem.mitrePage.stat.gaps"),
     value: summary.value.gaps,
     icon: "grid-on",
-    tone: "warn",
+    tone: "warning",
     dataTest: "security-mitre-stat-gaps",
   },
   {
@@ -323,7 +323,7 @@ const stats = computed<StatItem[]>(() => [
     value: summary.value.techniquesCovered,
     max: summary.value.techniquesTotal || undefined,
     icon: "verified-user",
-    tone: "ok",
+    tone: "success",
     dataTest: "security-mitre-stat-covered",
   },
   {
@@ -332,13 +332,14 @@ const stats = computed<StatItem[]>(() => [
     value: summary.value.tacticsCovered,
     max: summary.value.tacticsTotal,
     icon: "target",
+    tone: "primary",
     selectable: false,
     dataTest: "security-mitre-stat-tactics",
   },
 ]);
 const selectedStat = computed(() => (view.value === "all" ? null : view.value));
-function onStat(key: string | null) {
-  view.value = (key as View | null) ?? "all";
+function onStat(key: string) {
+  view.value = view.value === key ? "all" : (key as View);
 }
 
 const HEAT_CLASS = [
@@ -490,6 +491,7 @@ function openDetections() {
         :items="stats"
         :loading="(rulesLoading && !siemRows.length) || lastRunAt === null"
         selectable
+        :row="false"
         :selected-key="selectedStat"
         data-test="security-mitre-stats"
         @select="onStat"

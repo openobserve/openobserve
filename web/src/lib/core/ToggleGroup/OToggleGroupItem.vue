@@ -87,7 +87,7 @@ const sizeClasses = computed(() => {
   }
   return iconOnly.value
     ? "h-control-sm w-control-sm gap-1.5"
-    : "h-control-sm gap-1.5 px-2.5 text-compact max-md:px-2";
+    : "h-control-sm gap-1.5 px-2.5 text-compact max-md:px-1.5";
 });
 
 function lockClass(icon: string): string | undefined {
@@ -165,7 +165,7 @@ const itemAriaLabel = computed(
         sizeClasses,
         // Base state - inactive (transparent on track)
         'bg-toggle-item-bg text-toggle-item-text font-medium whitespace-nowrap',
-        'rounded-chip',
+        'rounded-default',
         'transition-[color,background-color,box-shadow] duration-(--duration-control) ease-(--ease-control)',
         'cursor-pointer outline-none',
         // Hover (inactive only) — scoped to data-state=off so hovering the

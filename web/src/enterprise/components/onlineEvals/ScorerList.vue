@@ -23,10 +23,22 @@
         <template #toolbar>
           <OSearchInput
             :model-value="search"
-            class="min-w-0 flex-1"
+            class="min-w-0 flex-1 md:min-w-48"
             :placeholder="t('onlineEvals.scorer.searchPlaceholder')"
             data-test="scorer-list-search-input"
             @update:model-value="$emit('update:search', $event as string)"
+          />
+          <OStatStrip
+            :items="summaryStats"
+            :loading="loading"
+            selectable
+            :row="false"
+            multiple
+            :selected-keys="typeFilters"
+            default-key="all"
+            class="max-md:order-last"
+            data-test="scorer-list-summary"
+            @update:selected-keys="typeFilters = $event as ScorerType[]"
           />
         </template>
 
@@ -38,24 +50,6 @@
             data-test="scorer-list-refresh-btn"
             @click="emit('refresh')"
           />
-        </template>
-
-        <!-- Type breakdown (catalog signal) — doubles as a filter synced to the
-             type dropdown; Total last, never itself the active tile. -->
-        <template #subheader>
-          <div
-            class="px-page-edge border-table-row-divider border-b py-1.5"
-            data-test="scorer-list-summary"
-          >
-            <OStatStrip
-              :items="summaryStats"
-              :loading="loading"
-              selectable
-              multiple
-              :selected-keys="typeFilters"
-              @update:selected-keys="typeFilters = $event as ScorerType[]"
-            />
-          </div>
         </template>
 
         <template #empty>
@@ -370,7 +364,7 @@ const typeCounts = computed(() => {
 const summaryStats = computed<StatItem[]>(() => {
   const c = typeCounts.value;
   const has = c.total > 0;
-  const v = (n: number): number | null => (has ? n : null);
+  const v = (n: number): string | number => (has ? n : "—");
   const share = has ? c.total : undefined;
   return [
     {
@@ -378,6 +372,7 @@ const summaryStats = computed<StatItem[]>(() => {
       label: t("onlineEvals.scorer.badgeLlm"),
       value: v(c.llm),
       icon: "auto-awesome",
+      tone: "blue",
       max: share,
       dataTest: "scorer-summary-llm",
     },
@@ -386,6 +381,7 @@ const summaryStats = computed<StatItem[]>(() => {
       label: t("onlineEvals.scorer.badgeRemote"),
       value: v(c.remote),
       icon: "cloud",
+      tone: "teal",
       max: share,
       dataTest: "scorer-summary-remote",
     },
@@ -394,6 +390,7 @@ const summaryStats = computed<StatItem[]>(() => {
       label: t("codeScorer.summaryLabel"),
       value: v(c.code),
       icon: "code",
+      tone: "purple",
       max: share,
       dataTest: "scorer-summary-code",
     },
@@ -402,6 +399,7 @@ const summaryStats = computed<StatItem[]>(() => {
       label: t("onlineEvals.summaryAll"),
       value: v(c.total),
       icon: "format-list-bulleted",
+      tone: "primary",
       dataTest: "scorer-summary-all",
     },
   ];

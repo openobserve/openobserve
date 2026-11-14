@@ -507,14 +507,14 @@ describe("DetailTable Component", () => {
     const mockCrossLinks = {
       stream_links: [
         {
-          name: "View Trace",
+          name: "View trace",
           url: "https://traces.example.com/${field.__value}",
           fields: [{ name: "trace_id", alias: "kubernetes_container_name" }],
         },
       ],
       org_links: [
         {
-          name: "View Dashboard",
+          name: "View dashboard",
           url: "https://dashboard.example.com/${field.__value}",
           fields: [{ name: "host", alias: "kubernetes_container_hash" }],
         },
@@ -544,7 +544,7 @@ describe("DetailTable Component", () => {
 
       const result = wrapper.vm.getCrossLinksForField("kubernetes_container_name");
       expect(result).toHaveLength(1);
-      expect(result[0].name).toBe("View Trace");
+      expect(result[0].name).toBe("View trace");
       expect(result[0].resolvedUrl).toBe("https://traces.example.com/my-trace-123");
     });
 
@@ -558,7 +558,7 @@ describe("DetailTable Component", () => {
 
       const result = wrapper.vm.getCrossLinksForField("kubernetes_container_hash");
       expect(result).toHaveLength(1);
-      expect(result[0].name).toBe("View Dashboard");
+      expect(result[0].name).toBe("View dashboard");
       expect(result[0].resolvedUrl).toBe("https://dashboard.example.com/host-abc");
     });
 
@@ -593,7 +593,7 @@ describe("DetailTable Component", () => {
       wrapper.vm.searchObj.data.crossLinks = {
         stream_links: [
           {
-            name: "No Match",
+            name: "No match",
             url: "https://example.com/${field.__value}",
             fields: [{ name: "foo", alias: "bar" }],
           },
@@ -737,7 +737,7 @@ describe("DetailTable Component", () => {
       expect(result[0].resolvedUrl).toBe("https://example.com/search?q=hello%20world%26foo%3Dbar");
     });
   });
-  // The "View Trace" action used to live inside JsonPreview, i.e. inside the JSON
+  // The "View trace" action used to live inside JsonPreview, i.e. inside the JSON
   // tab. It now sits in this component's header row next to the wrap toggle so it
   // stays reachable from every tab, and JsonPreview is told to hide its own copy.
   describe("View Trace action in the header", () => {

@@ -505,10 +505,10 @@ describe("useRoutes (router.ts)", () => {
       expect(cbRoute.component).toBeDefined();
     });
 
-    it("should have meta title 'Login Callback' for /cb route", () => {
+    it("should have meta title 'Login callback' for /cb route", () => {
       const { parentRoutes } = useRoutes();
       const cbRoute = parentRoutes.find((r: any) => r.path === "/cb");
-      expect(enTitle(cbRoute.meta.titleKey)).toBe("Login Callback");
+      expect(enTitle(cbRoute.meta.titleKey)).toBe("Login callback");
     });
   });
 
@@ -1358,10 +1358,10 @@ describe("useRoutes (router.ts)", () => {
       expect(route.path).toBe("history");
     });
 
-    it("should have meta title 'Pipeline History' for pipelineHistory route", () => {
+    it("should have meta title 'Pipeline history' for pipelineHistory route", () => {
       const { homeChildRoutes } = useRoutes();
       const route = findRoute(homeChildRoutes, "pipelineHistory");
-      expect(enTitle(route.meta.titleKey)).toBe("Pipeline History");
+      expect(enTitle(route.meta.titleKey)).toBe("Pipeline history");
     });
 
     it("should include pipelineBackfill route", () => {
@@ -1376,10 +1376,10 @@ describe("useRoutes (router.ts)", () => {
       expect(route.path).toBe("backfill");
     });
 
-    it("should have meta title 'Pipeline Backfill Jobs' for pipelineBackfill route", () => {
+    it("should have meta title 'Pipeline backfill jobs' for pipelineBackfill route", () => {
       const { homeChildRoutes } = useRoutes();
       const route = findRoute(homeChildRoutes, "pipelineBackfill");
-      expect(enTitle(route.meta.titleKey)).toBe("Pipeline Backfill Jobs");
+      expect(enTitle(route.meta.titleKey)).toBe("Pipeline backfill jobs");
     });
 
     it("should call routeGuard in pipeline route beforeEnter", async () => {
@@ -1986,10 +1986,10 @@ describe("useRoutes (router.ts)", () => {
       expect(route.path).toBe("member_subscription");
     });
 
-    it("should have meta title 'Member Subscription' for member_subscription route", () => {
+    it("should have meta title 'Member subscription' for member_subscription route", () => {
       const { homeChildRoutes } = useRoutes();
       const route = findRoute(homeChildRoutes, "member_subscription");
-      expect(enTitle(route.meta.titleKey)).toBe("Member Subscription");
+      expect(enTitle(route.meta.titleKey)).toBe("Member subscription");
     });
   });
 
@@ -2260,10 +2260,10 @@ describe("useRoutes (router.ts)", () => {
       expect(lastRoute.path).toBe("/:catchAll(.*)*");
     });
 
-    it("should have meta title '404 - Not Found' for catch-all route", () => {
+    it("should have meta title '404 - Not found' for catch-all route", () => {
       const { homeChildRoutes } = useRoutes();
       const lastRoute = homeChildRoutes[homeChildRoutes.length - 1];
-      expect(enTitle(lastRoute.meta.titleKey)).toBe("404 - Not Found");
+      expect(enTitle(lastRoute.meta.titleKey)).toBe("404 - Not found");
     });
 
     it("should have keepAlive true for catch-all route", () => {

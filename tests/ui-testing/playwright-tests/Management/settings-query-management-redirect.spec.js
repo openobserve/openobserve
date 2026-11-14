@@ -2,7 +2,7 @@
 //
 // Settings Query Management Redirect — navigation/gating E2E tests.
 //
-// Query Management ("Running Queries") is an enterprise-only, meta-org-only
+// Query Management ("Running queries") is an enterprise-only, meta-org-only
 // settings section. On an OSS build the observable behavior is: (1) the Query
 // Management tab is absent from the Settings rail, and (2) a direct URL to
 // /settings/query_management redirects to the enterprise-locked page. The runtime

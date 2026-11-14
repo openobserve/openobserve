@@ -364,7 +364,7 @@ describe("GroupUsers Component", () => {
     });
 
     it("has correct search placeholder", () => {
-      const searchInput = wrapper.find('input[placeholder="Search User"]');
+      const searchInput = wrapper.find('input[placeholder="Search user"]');
       expect(searchInput.exists()).toBe(true);
     });
   });
@@ -1026,7 +1026,7 @@ describe("GroupUsers Component", () => {
     });
 
     it("has proper form labels and placeholders", () => {
-      const searchInput = wrapper.find('input[placeholder="Search User"]');
+      const searchInput = wrapper.find('input[placeholder="Search user"]');
       expect(searchInput.exists()).toBe(true);
     });
 

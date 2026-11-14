@@ -1,6 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
 //
-// Query Management ("Running Queries") is enterprise-only and meta-org-only:
+// Query Management ("Running queries") is enterprise-only and meta-org-only:
 // an OSS build redirects /settings/query_management to the enterprise-locked
 // page, and an enterprise build redirects any non-meta org back to General
 // Settings. The page therefore has to be reached as `_meta` on an enterprise

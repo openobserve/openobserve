@@ -320,15 +320,25 @@ describe("segmented control (item 3)", () => {
   });
 });
 
-describe("stat strip filter tiles", () => {
-  const tileToken = (part: "value" | "label", tone: "err" | "neutral", value: number) => {
+describe("stat strip filter chips", () => {
+  const badgeFill = (tone: "error" | "neutral", value: number) =>
+    tone === "error" && value > 0 ? "--color-badge-error-soft-bg" : "--color-surface-subtle";
+
+  const tileToken = (part: "value" | "label", tone: "error" | "neutral", value: number) => {
     const wrapper = mount(OStatCard, {
-      props: { clickable: true, selected: false, tone, label: raw("Failed"), value },
+      props: {
+        variant: "chip",
+        clickable: true,
+        selected: false,
+        tone,
+        label: raw("Failed"),
+        value,
+      },
     });
     const text = wrapper
       .get(`[data-test="o-stat-card-${part}"]`)
       .classes()
-      .find((c) => c.startsWith("text-") && !/^text-(xs|sm|xl|2xl|compact)$/.test(c));
+      .find((c) => c.startsWith("text-") && c !== "text-2xs");
     wrapper.unmount();
     if (!text) throw new Error(`no text colour on the ${tone} ${part}`);
     return `--color-${text.slice("text-".length)}`;
@@ -337,21 +347,25 @@ describe("stat strip filter tiles", () => {
   it.each(
     BOTH.flatMap((theme) =>
       [
-        ["error count", "value", "err", 1],
+        ["error count", "value", "error", 1],
         ["neutral count", "value", "neutral", 1],
-        ["zero count", "value", "err", 0],
+        ["zero count", "value", "error", 0],
         ["label", "label", "neutral", 1],
       ].map(([what, part, tone, value]) => [theme, what, part, tone, value] as const),
     ),
   )(
-    "keeps an unselected %s filter tile's %s readable on its surface",
+    "keeps an unselected %s filter chip's %s readable on its fill",
     (theme, _what, part, tone, value) => {
       const token = tileToken(
         part as "value" | "label",
-        tone as "err" | "neutral",
+        tone as "error" | "neutral",
         value as number,
       );
-      expect(ratio(token, "--color-surface-base", theme)).toBeGreaterThanOrEqual(TEXT_MIN);
+      const fill =
+        part === "value"
+          ? badgeFill(tone as "error" | "neutral", value as number)
+          : "--color-surface-base";
+      expect(ratio(token, fill, theme)).toBeGreaterThanOrEqual(TEXT_MIN);
     },
   );
 });
@@ -474,7 +488,7 @@ describe("dark selected fills (item 12)", () => {
   );
 
   it.each(FILLS)("keeps %s readable under the O2 Signature dark accent", (fill, text) => {
-    const signature = PREDEFINED_THEMES.find((theme) => theme.dark.themeColor === "#8B8DF0");
+    const signature = PREDEFINED_THEMES.find((theme) => theme.name === "O2 Signature");
     expect(signature).toBeDefined();
     const scope = themed(signature!.dark.themeColor, "dark");
     const page = resolveColor("--color-surface-base", scope)!;

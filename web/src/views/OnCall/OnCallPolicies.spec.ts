@@ -15,6 +15,7 @@
 
 import { flushPromises, mount } from "@vue/test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { nextTick, type Ref } from "vue";
 
 import i18n from "@/locales";
 import { resetListViewState, useListViewState } from "@/composables/useListViewState";
@@ -26,6 +27,19 @@ import { writeEditorDraft } from "@/utils/drafts/editorDraftStore";
 vi.mock("@/services/oncall", () => ({
   default: { listTeams: vi.fn(), getPolicy: vi.fn(), whoIsOnCall: vi.fn() },
 }));
+
+vi.mock("@/composables/useBreakpoint", async () => {
+  const { computed, ref } = await vi.importActual<typeof import("vue")>("vue");
+  const lgUp = ref(true);
+  const bp = {
+    lgUp,
+    mdUp: computed(() => true),
+    isMobile: computed(() => false),
+    isTablet: computed(() => !lgUp.value),
+    isDesktop: computed(() => lgUp.value),
+  };
+  return { default: () => bp, lgUp };
+});
 
 const push = vi.fn();
 vi.mock("vue-router", () => ({ useRouter: () => ({ push }) }));
@@ -298,14 +312,23 @@ describe("OnCallPolicies - KPI placement", () => {
     service.getPolicy.mockResolvedValue({ data: { rungs: [] } } as any);
   });
 
-  // F7: the strip summarises the rows, so it sits in the table frame under the toolbar.
-  it("renders one strip in the table frame, never in the toolbar row", async () => {
+  // One strip per breakpoint: in the toolbar row from lg up, its own row under it below.
+  it("renders the real strip inline in the toolbar on desktop and under it below lg", async () => {
+    const bp = (await import("@/composables/useBreakpoint")) as unknown as { lgUp: Ref<boolean> };
+    bp.lgUp.value = true;
     const wrapper = mount(OnCallPolicies, {
       global: { plugins: [i18n, store], stubs: { ...stubs, OStatStrip: false } },
     });
     await flushPromises();
+
+    expect(wrapper.findAll(strip)).toHaveLength(1);
+    expect(wrapper.find(`[data-test="tb"] ${strip}`).exists()).toBe(true);
+    expect(wrapper.findComponent({ name: "OStatStrip" }).props("inline")).toBe(true);
+
+    bp.lgUp.value = false;
+    await nextTick();
     expect(wrapper.findAll(strip)).toHaveLength(1);
     expect(wrapper.find(`[data-test="sub"] ${strip}`).exists()).toBe(true);
-    expect(wrapper.find(`[data-test="tb"] ${strip}`).exists()).toBe(false);
+    bp.lgUp.value = true;
   });
 });

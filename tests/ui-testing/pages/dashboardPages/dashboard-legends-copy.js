@@ -32,7 +32,7 @@ export default class DashboardLegendsCopy {
   // ===== SHOW LEGENDS POPUP METHODS =====
 
   /**
-   * Get the "Show Legends" button on a panel.
+   * Get the "Show legends" button on a panel.
    * Note: The button has no data-test attribute, so we locate it by its icon
    * and the tooltip text within the panel hover toolbar.
    * @param {import('@playwright/test').Page} page - optional page override

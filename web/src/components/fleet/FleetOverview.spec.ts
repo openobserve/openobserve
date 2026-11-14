@@ -67,16 +67,16 @@ describe("FleetOverview", () => {
     vi.clearAllMocks();
   });
 
-  it("shows only collector states, attention first and total last, no outdated or rollout tile", async () => {
+  it("shows only collector states, total first then online, no outdated or rollout tile", async () => {
     vi.mocked(fleet.summary).mockResolvedValue({ data: summary } as any);
     wrapper = await mountOverview();
     const tiles = wrapper.findAll('[data-test^="fleet-overview-stat-"]');
     expect(tiles.map((el) => el.attributes("data-test"))).toEqual([
+      "fleet-overview-stat-total",
+      "fleet-overview-stat-online",
       "fleet-overview-stat-offline",
       "fleet-overview-stat-degraded",
       "fleet-overview-stat-unknown",
-      "fleet-overview-stat-online",
-      "fleet-overview-stat-total",
     ]);
     expect(tile(wrapper, "total").text()).toContain("7");
     expect(tile(wrapper, "online").text()).toContain("4");

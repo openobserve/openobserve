@@ -625,7 +625,7 @@ describe("MetricCard (ported to @/lib)", () => {
       ).toBe(true);
       // The dashboards' own copy (`panel.noData`) — the card shows the SAME
       // inline empty state a dashboard panel does.
-      expect(wrapper.text()).toContain("No Data");
+      expect(wrapper.text()).toContain("No data");
     });
 
     it("renders the chart when the preview has series", () => {

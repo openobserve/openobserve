@@ -136,7 +136,7 @@ describe("ReportRunHistory", () => {
     (w.vm as any).onTileSelect("error");
     await flushPromises();
     expect(vi.mocked(reports.getHistory).mock.calls.at(-1)![1].status).toEqual(["error"]);
-    (w.vm as any).onTileSelect(null);
+    (w.vm as any).onTileSelect("error");
     expect((w.vm as any).tile).toBeNull();
   });
 

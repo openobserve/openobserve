@@ -751,6 +751,6 @@ export class CompositeAlertsPage {
   }
 
   async expectCloneSuccessToast() {
-    await expect(this.successToast('Alert Cloned Successfully')).toBeVisible({ timeout: 30000 });
+    await expect(this.successToast('Alert cloned successfully')).toBeVisible({ timeout: 30000 });
   }
 }

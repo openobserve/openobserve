@@ -41,7 +41,6 @@
             data-test="ai-experiment-form-identity-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
-              <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">
                 {{ t("aiObservability.experiments.form.identitySection") }}
               </span>
@@ -126,7 +125,6 @@
             data-test="ai-experiment-form-task-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
-              <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">
                 {{ t("aiObservability.experiments.form.tabTask") }}
               </span>
@@ -481,7 +479,6 @@
             data-test="ai-experiment-form-scorers-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
-              <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">
                 {{ t("aiObservability.experiments.scorers") }}
               </span>

@@ -201,6 +201,7 @@
           <OStatStrip
             :items="firingTiles"
             selectable
+            :tray="false"
             data-test="alerts-alertdetail-tiles"
             @select="openIncident"
           />
@@ -640,7 +641,7 @@ const groupStats = computed<StatItem[]>(() => {
       label: t("alerts.groups.critical"),
       value: countOf("critical"),
       icon: "error",
-      tone: "err",
+      tone: "error",
       dataTest: "alerts-alertdetail-stat-critical",
     },
     {
@@ -648,7 +649,7 @@ const groupStats = computed<StatItem[]>(() => {
       label: t("alerts.groups.warning"),
       value: countOf("warning"),
       icon: "warning",
-      tone: "warn",
+      tone: "warning",
       dataTest: "alerts-alertdetail-stat-warning",
     },
     {
@@ -656,7 +657,7 @@ const groupStats = computed<StatItem[]>(() => {
       label: t("alerts.groups.ok"),
       value: countOf("ok"),
       icon: "check-circle",
-      tone: "ok",
+      tone: "success",
       dataTest: "alerts-alertdetail-stat-ok",
     },
     {
@@ -664,6 +665,7 @@ const groupStats = computed<StatItem[]>(() => {
       label: t("alerts.groups.firingTotal"),
       value: withBound(d?.groups_firing, d?.groups_firing_is_lower_bound),
       icon: "notifications-active",
+      tone: "orange",
       dataTest: "alerts-alertdetail-stat-firing",
     },
     {
@@ -764,9 +766,9 @@ const firingFor = computed(() => {
 });
 
 const LEVEL_TILES: Record<string, { label: I18nKey; tone: StatItem["tone"] }> = {
-  critical: { label: "alerts.groups.critical", tone: "err" },
-  warning: { label: "alerts.groups.warning", tone: "warn" },
-  ok: { label: "alerts.groups.ok", tone: "ok" },
+  critical: { label: "alerts.groups.critical", tone: "error" },
+  warning: { label: "alerts.groups.warning", tone: "warning" },
+  ok: { label: "alerts.groups.ok", tone: "success" },
 };
 
 const firingTiles = computed<StatItem[]>(() => {
@@ -802,7 +804,7 @@ const firingTiles = computed<StatItem[]>(() => {
   return tiles;
 });
 
-const openIncident = (key: string | null) => {
+const openIncident = (key: string) => {
   const incident = listRow.value?.incident;
   if (key !== "incident" || !incident) return;
   router.push({

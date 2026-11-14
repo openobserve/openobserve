@@ -69,7 +69,6 @@ vi.mock("@/lib/core/Table/OTable.vue", () => ({
     emits: ["rowClick"],
     template: `<div class="o-table" :data-rows="(data || []).map(r => r.id).join(',')">
       <slot name="toolbar" />
-      <slot name="subheader" />
       <template v-for="row in data" :key="row.id"><slot name="cell-actions" :row="row" /></template>
     </div>`,
   },

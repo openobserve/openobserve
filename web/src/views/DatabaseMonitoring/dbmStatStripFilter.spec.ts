@@ -44,8 +44,8 @@ describe("the Failed tile filters the list", () => {
     );
     expect(strip).toContain("selectable");
     expect(strip).toContain(':selected-key="statFilter"');
+    expect(strip).toContain(`default-key="${allKey}"`);
     expect(strip).toContain('@select="onStatSelect"');
-    expect(tile(source, allKey)).toContain("all: true");
   });
 
   it.each(PAGES)("%s keeps the totals out of the filter", (file) => {

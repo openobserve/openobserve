@@ -193,11 +193,11 @@ describe("FleetCollectors", () => {
     expect(bodyText(wrapper)).not.toMatch(/undefined|null/);
   });
 
-  it("shows unknown tiles in the strip until the list loads", async () => {
+  it("shows dashes in the strip until the list loads", async () => {
     vi.mocked(fleet.listCollectors).mockReturnValue(new Promise(() => {}) as any);
     wrapper = await mountList();
-    expect(tiles(wrapper).all.value).toBeNull();
-    expect(tiles(wrapper).offline.value).toBeNull();
+    expect(tiles(wrapper).all.value).toBe("—");
+    expect(tiles(wrapper).offline.value).toBe("—");
   });
 
   it("counts the status strip from the in-scope rows", async () => {
@@ -267,7 +267,7 @@ describe("FleetCollectors", () => {
     wrapper = await mountList("/", {}, { allFleets: false, fleetId: "f1", forbidden: true });
     expect(wrapper.find('[data-test="o2-table-forbidden"]').exists()).toBe(true);
     expect(wrapper.text()).not.toContain("edge-02");
-    expect(tiles(wrapper).all.value).toBeNull();
+    expect(tiles(wrapper).all.value).toBe("—");
     await wrapper.find('[data-test="fleet-collectors-scope-all"]').trigger("click");
     expect(wrapper.emitted("update:allFleets")?.at(-1)).toEqual([true]);
   });
@@ -404,7 +404,7 @@ describe("FleetCollectors", () => {
     await settle();
     expect(wrapper.find('[data-test="o2-table-forbidden"]').exists()).toBe(true);
     expect(wrapper.text()).not.toContain("prod-web-01");
-    expect(tiles(wrapper).all.value).toBeNull();
+    expect(tiles(wrapper).all.value).toBe("—");
   });
 
   it("keeps cached rows when a refetch fails with anything but 403", async () => {

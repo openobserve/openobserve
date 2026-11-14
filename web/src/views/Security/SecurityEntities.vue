@@ -449,6 +449,7 @@ const stats = computed<StatItem[]>(() => {
       label: t("siem.entities.signal.failures"),
       value: counts.value.failures,
       icon: "error-outline",
+      tone: "orange",
       max: allRows.value.length || undefined,
       dataTest: "security-entities-stat-failures",
     },
@@ -457,7 +458,7 @@ const stats = computed<StatItem[]>(() => {
       label: t(`siem.entities.signal.spread.${kind.value}`),
       value: counts.value.spread,
       icon: "hub",
-      tone: "warn",
+      tone: "warning",
       max: allRows.value.length || undefined,
       dataTest: "security-entities-stat-spread",
     },
@@ -468,6 +469,7 @@ const stats = computed<StatItem[]>(() => {
       label: t("siem.entities.signal.external"),
       value: counts.value.external,
       icon: "language",
+      tone: "blue",
       max: allRows.value.length || undefined,
       dataTest: "security-entities-stat-external",
     });
@@ -898,28 +900,26 @@ const noSources = computed(
         @row-click="openEntity"
         @sort-change="() => nextTick(relocate)"
       >
-        <template #subheader>
-          <div class="px-page-edge border-table-row-divider border-b py-1.5">
+        <template #toolbar>
+          <div class="contents">
+            <OSearchInput
+              v-model="search"
+              :placeholder="t(`siem.entities.search.${kind}`)"
+              class="min-w-0 flex-1 md:min-w-48"
+              data-test="security-entities-search"
+            />
             <OStatStrip
               compact-values
               :items="stats"
               :loading="tableLoading"
               selectable
+              :row="false"
+              class="max-md:order-last"
               multiple
               :selected-keys="signalFilters"
+              default-key="all"
               data-test="security-entities-stats"
               @update:selected-keys="signalFilters = $event as EntitySignal[]"
-            />
-          </div>
-        </template>
-
-        <template #toolbar>
-          <div class="flex min-w-0 flex-1 items-center gap-2">
-            <OSearchInput
-              v-model="search"
-              :placeholder="t(`siem.entities.search.${kind}`)"
-              class="max-w-md flex-1"
-              data-test="security-entities-search"
             />
             <span class="text-text-secondary text-xs">{{ t("siem.entities.windowNote") }}</span>
           </div>

@@ -34,9 +34,6 @@ export interface UsageKpi {
   tone?: "warn" | "danger";
 }
 
-const EM_DASH = "—";
-
-/** Maps usage figures onto stat tiles; "—" is an unknown value, never text. */
 export function usageKpiStats(cards: UsageKpi[], dataTestPrefix: string): StatItem[] {
   return cards.map((card) => {
     const hint = [card.hint, card.struck].filter(Boolean).join(" ");
@@ -45,15 +42,15 @@ export function usageKpiStats(cards: UsageKpi[], dataTestPrefix: string): StatIt
       key: card.key,
       label: card.label,
       icon: card.icon,
-      value: card.value === EM_DASH ? null : card.value,
+      value: card.value,
       sub: sub ? raw(sub) : undefined,
       tone:
         card.tone === "danger"
-          ? "err"
+          ? "error"
           : card.tone === "warn"
-            ? "warn"
+            ? "warning"
             : card.positive
-              ? "ok"
+              ? "success"
               : undefined,
       dataTest: `${dataTestPrefix}-${card.key}`,
     };

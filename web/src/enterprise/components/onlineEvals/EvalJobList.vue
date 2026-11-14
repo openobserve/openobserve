@@ -25,10 +25,22 @@
         <template #toolbar>
           <OSearchInput
             :model-value="search"
-            class="min-w-0 flex-1"
+            class="min-w-0 flex-1 md:min-w-48"
             :placeholder="t('onlineEvals.job.searchPlaceholder')"
             data-test="eval-job-list-search-input"
             @update:model-value="$emit('update:search', $event as string)"
+          />
+          <OStatStrip
+            :items="summaryStats"
+            :loading="loading"
+            selectable
+            :row="false"
+            multiple
+            :selected-keys="statusFilters"
+            default-key="all"
+            class="max-md:order-last"
+            data-test="eval-job-list-summary"
+            @update:selected-keys="statusFilters = $event as EvalJobStatus[]"
           />
         </template>
 
@@ -42,20 +54,7 @@
           />
         </template>
 
-        <template #subheader>
-          <div
-            class="px-page-edge border-table-row-divider border-b py-1.5"
-            data-test="eval-job-list-summary"
-          >
-            <OStatStrip
-              :items="summaryStats"
-              :loading="loading"
-              selectable
-              multiple
-              :selected-keys="statusFilters"
-              @update:selected-keys="statusFilters = $event as EvalJobStatus[]"
-            />
-          </div>
+        <template v-if="budgetPausedRows.length" #subheader>
           <!-- Keep paused makes the pause the user's, so 00:00 UTC does not resume it. -->
           <div
             v-for="row in budgetPausedRows"
@@ -595,7 +594,7 @@ const statusCounts = computed(() => {
 const summaryStats = computed<StatItem[]>(() => {
   const c = statusCounts.value;
   const has = c.total > 0;
-  const v = (n: number): number | null => (has ? n : null);
+  const v = (n: number): string | number => (has ? n : "—");
   const share = has ? c.total : undefined;
   return [
     {
@@ -603,7 +602,7 @@ const summaryStats = computed<StatItem[]>(() => {
       label: t("onlineEvals.jobStatus.paused"),
       value: v(c.paused),
       icon: "pause",
-      tone: "warn",
+      tone: "warning",
       max: share,
       dataTest: "eval-job-summary-paused",
     },
@@ -612,7 +611,7 @@ const summaryStats = computed<StatItem[]>(() => {
       label: t("onlineEvals.jobStatus.active"),
       value: v(c.active),
       icon: "play-arrow",
-      tone: "ok",
+      tone: "success",
       max: share,
       dataTest: "eval-job-summary-active",
     },
@@ -630,6 +629,7 @@ const summaryStats = computed<StatItem[]>(() => {
       label: t("onlineEvals.summaryAll"),
       value: v(c.total),
       icon: "format-list-bulleted",
+      tone: "primary",
       dataTest: "eval-job-summary-all",
     },
   ];

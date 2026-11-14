@@ -523,8 +523,8 @@ test.describe("Logs Regression Bug Fixes", () => {
     await includeBtn.click();
     await page.waitForTimeout(1000);
 
-    // Click "Include Search Term" from the menu - try multiple possible menu texts
-    const possibleMenuTexts = ['Include Search Term', 'Include', 'Add to filter'];
+    // Click "Include search term" from the menu - try multiple possible menu texts
+    const possibleMenuTexts = ['Include search term', 'Include', 'Add to filter'];
     let includeMenuItem = null;
 
     for (const menuText of possibleMenuTexts) {

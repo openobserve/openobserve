@@ -50,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Toolbar: status toggle (All / Active / Resolved) + search — same
              shape as the Alerts page tabs. -->
         <template #toolbar>
-          <div class="flex min-w-0 flex-1 items-center gap-2 max-md:contents">
+          <div class="contents">
             <OToggleGroup
               mobile-dropdown
               :model-value="statusFilter"
@@ -76,25 +76,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OToggleGroup>
             <OSearchInput
               v-model="searchQuery"
-              class="min-w-0 flex-1 max-md:min-w-40"
+              class="min-w-0 flex-1 max-md:min-w-40 md:min-w-48"
               :placeholder="t('alerts.incidents.search')"
               data-test="incident-search-input"
             />
-          </div>
-        </template>
-        <!-- Severity summary strip below the toolbar (mirrors the Alerts state
-             strip): Total + the four severities as selectable filter tiles. -->
-        <template #subheader>
-          <div
-            class="px-page-edge border-table-row-divider border-b py-1.5"
-            data-test="incident-list-summary"
-          >
             <OStatStrip
               :items="severityStats"
               :loading="loading"
               selectable
+              :row="false"
               multiple
               :selected-keys="severityFilters"
+              default-key="total"
+              class="max-md:order-last"
+              data-test="incident-list-summary"
               @update:selected-keys="severityFilters = $event as SeverityKey[]"
             />
           </div>
@@ -751,7 +746,7 @@ export default defineComponent({
     const severityStats = computed<StatItem[]>(() => {
       const c = severityCounts.value;
       const hasData = c.total > 0;
-      const v = (n: number): number | null => (hasData ? n : null);
+      const v = (n: number): string | number => (hasData ? n : "—");
       const share = hasData ? c.total : undefined;
       return [
         {
@@ -759,7 +754,7 @@ export default defineComponent({
           label: t("alerts.incidents.severityCritical"),
           value: v(c.p1),
           icon: "error",
-          tone: "crit",
+          tone: "error",
           max: share,
           dataTest: "incident-severity-p1",
         },
@@ -768,7 +763,7 @@ export default defineComponent({
           label: t("alerts.incidents.severityHigh"),
           value: v(c.p2),
           icon: "warning",
-          tone: "err",
+          tone: "orange",
           max: share,
           dataTest: "incident-severity-p2",
         },
@@ -777,7 +772,7 @@ export default defineComponent({
           label: t("alerts.incidents.severityMedium"),
           value: v(c.p3),
           icon: "flag",
-          tone: "warn",
+          tone: "warning",
           max: share,
           dataTest: "incident-severity-p3",
         },
@@ -795,7 +790,7 @@ export default defineComponent({
           label: t("common.all"),
           value: v(c.total),
           icon: "format-list-bulleted",
-          all: true,
+          tone: "primary",
           dataTest: "incident-severity-total",
         },
       ];

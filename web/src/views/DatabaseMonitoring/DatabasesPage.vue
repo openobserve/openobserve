@@ -138,15 +138,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #subheader>
           <!-- The window's totals live inside the table frame, not in the page
                header: they summarise exactly the rows below. -->
-          <div
-            class="px-page-edge border-table-row-divider border-b py-1.5"
-            data-test="dbm-databases-summary"
-          >
+          <div data-test="dbm-databases-summary">
             <OStatStrip
               :items="summaryStats"
               :loading="loading"
               selectable
               :selected-key="statFilter"
+              default-key="databases"
               @select="onStatSelect"
             />
           </div>
@@ -687,8 +685,8 @@ const errorCount = computed(() => rows.value.reduce((acc, row) => acc + (row.err
  */
 // The Failed tile narrows the table to databases with a failed call; Calls and Database time are totals, not rows.
 const statFilter = ref<"failed" | null>(null);
-const onStatSelect = (key: string | null) => {
-  statFilter.value = key === "failed" ? "failed" : null;
+const onStatSelect = (key: string) => {
+  statFilter.value = key === "failed" && statFilter.value !== "failed" ? "failed" : null;
 };
 
 const summaryStats = computed<StatItem[]>(() => {
@@ -702,32 +700,6 @@ const summaryStats = computed<StatItem[]>(() => {
 
   return [
     {
-      key: "failed",
-      label: t("dbm.databases.summary.failed"),
-      value: errorCount.value ? formatCount(errorCount.value) : null,
-      icon: "error-outline",
-      tone: errorCount.value ? "err" : "neutral",
-      selectable: errorCount.value > 0 || statFilter.value === "failed",
-      dataTest: "dbm-databases-summary-failed",
-    },
-    {
-      key: "calls",
-      label: t("dbm.databases.summary.calls"),
-      value: calls.value,
-      icon: "bar-chart",
-      tone: "info",
-      selectable: false,
-      dataTest: "dbm-databases-summary-calls",
-    },
-    {
-      key: "time",
-      label: t("dbm.databases.summary.time"),
-      value: time.value,
-      icon: "timer",
-      selectable: false,
-      dataTest: "dbm-databases-summary-time",
-    },
-    {
       key: "databases",
       label: t("dbm.databases.summary.databases"),
       // The same count the tab badge shows: two different numbers under one
@@ -737,8 +709,35 @@ const summaryStats = computed<StatItem[]>(() => {
       // with the two query-vantage tiles beside it.
       value: fleetRowCount.value,
       icon: "database",
-      all: true,
+      tone: "primary",
       dataTest: "dbm-databases-summary-databases",
+    },
+    {
+      key: "calls",
+      label: t("dbm.databases.summary.calls"),
+      value: calls.value ?? raw("—"),
+      icon: "bar-chart",
+      tone: "info",
+      selectable: false,
+      dataTest: "dbm-databases-summary-calls",
+    },
+    {
+      key: "time",
+      label: t("dbm.databases.summary.time"),
+      value: time.value ?? raw("—"),
+      icon: "timer",
+      tone: "teal",
+      selectable: false,
+      dataTest: "dbm-databases-summary-time",
+    },
+    {
+      key: "failed",
+      label: t("dbm.databases.summary.failed"),
+      value: errorCount.value ? formatCount(errorCount.value) : raw("—"),
+      icon: "error-outline",
+      tone: errorCount.value ? "error" : "neutral",
+      selectable: errorCount.value > 0 || statFilter.value === "failed",
+      dataTest: "dbm-databases-summary-failed",
     },
   ];
 });

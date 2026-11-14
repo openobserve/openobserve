@@ -68,7 +68,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OStatCard
           :label="t('home.streams')"
           icon="window"
-          size="lg"
           :value="animatedStreamsCount || summary.streams_count"
         >
           <template #value>
@@ -82,7 +81,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OStatCard
           :label="t('home.docsCountLbl')"
           icon="bar-chart"
-          size="lg"
           :value="formattedAnimatedEventsCount"
         >
           <template #value>
@@ -96,7 +94,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OStatCard
           :label="t('home.totalDataIngested')"
           icon="download"
-          size="lg"
           :value="formattedAnimatedIngestedSize"
         >
           <template #value>
@@ -111,7 +108,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="config.isCloud == 'false'"
           :label="t('home.totalDataCompressed')"
           icon="compress"
-          size="lg"
           :value="formattedAnimatedCompressedSize"
         >
           <template #value>
@@ -126,7 +122,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="config.isCloud == 'false'"
           :label="t('home.indexSizeLbl')"
           icon="save"
-          size="lg"
           :value="formattedAnimatedIndexSize"
         >
           <template #value>

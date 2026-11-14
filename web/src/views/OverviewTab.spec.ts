@@ -1137,8 +1137,8 @@ describe("OverviewTab", () => {
       const finding = chips.slice(0, 3);
       expect(finding.map((c) => c.props("keyLabel"))).toEqual([
         "Finding",
-        "Stream Name",
-        "Stream Type",
+        "Stream name",
+        "Stream type",
       ]);
       expect(finding.map((c) => c.props("value"))).toEqual([
         "Stopped sending data",
@@ -1210,7 +1210,7 @@ describe("OverviewTab", () => {
         } as never);
         wrapper = mountOverviewTab();
         await flushPromises();
-        const buttons = wrapper.find(SERVICES).findAll('button[title="View Traces"]');
+        const buttons = wrapper.find(SERVICES).findAll('button[title="View traces"]');
         expect(buttons).toHaveLength(1);
         await buttons[0].trigger("click");
         expect(push).toHaveBeenCalledTimes(1);

@@ -128,7 +128,7 @@ const stateClasses = computed<string>(() => {
   // A locked page disables its active tab too; it still has to read as the current one.
   if (isDisabled.value && isActive.value) {
     return [
-      "text-tabs-active-text cursor-not-allowed",
+      "text-tabs-active-text cursor-not-allowed opacity-60",
       isVertical.value
         ? "bg-tabs-active-bg ring-tabs-indicator ring-1 ring-inset"
         : "border-b-2 border-transparent",
@@ -136,7 +136,7 @@ const stateClasses = computed<string>(() => {
   }
   if (isDisabled.value) {
     return [
-      "text-tabs-disabled-text cursor-not-allowed",
+      "text-tabs-disabled-text cursor-not-allowed opacity-60",
       isVertical.value ? "" : "border-b-2 border-transparent",
     ].join(" ");
   }

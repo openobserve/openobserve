@@ -4,7 +4,7 @@
 // The scheduler list used to render under `v-show="showSearchScheduler"` in the
 // logs Index.vue, and that flag was driven purely by the `action=search_scheduler`
 // URL query param. Running a search rewrote the URL WITHOUT that param, so the
-// flag flipped to false and the list — with its "Get Jobs" button — became
+// flag flipped to false and the list — with its "Get jobs" button — became
 // display:none while still sitting in the DOM. It never recovered on its own, so
 // the whole search-scheduler flow was unreachable after any search.
 //

@@ -280,7 +280,7 @@ describe("PipelineFlow.vue", () => {
     wrapper = mountComponent();
     const startNode = wrapper.find('[data-test="pipeline-flow-start-node"]');
     expect(startNode.exists()).toBe(true);
-    expect(startNode.text()).toBe("Choose a Source");
+    expect(startNode.text()).toBe("Choose a source");
   });
 
   // Test 9: Empty canvas text is hidden when nodes exist

@@ -39,10 +39,16 @@
       <OSkeleton v-if="loading && !isDesktop" shape="block" class="h-20" />
       <ODescriptionList v-else-if="!isDesktop" data-test="prompt-traffic-stats">
         <ODescriptionItem v-for="card in cards" :key="card.key" :label="card.label">{{
-          card.value ?? raw("—")
+          card.value
         }}</ODescriptionItem>
       </ODescriptionList>
-      <OStatStrip v-else :items="cards" :loading="loading" data-test="prompt-traffic-stats" />
+      <OStatStrip
+        v-else
+        :items="cards"
+        :loading="loading"
+        inline
+        data-test="prompt-traffic-stats"
+      />
 
       <section>
         <h4 class="text-text-heading mb-2 text-sm font-semibold">
@@ -188,22 +194,22 @@ const cards = computed(() => [
   {
     key: "errorRate",
     label: t("aiObservability.promptManagement.errorRate"),
-    value: kpis.value.errorRate == null ? null : `${kpis.value.errorRate.toFixed(1)}%`,
+    value: kpis.value.errorRate == null ? "—" : `${kpis.value.errorRate.toFixed(1)}%`,
   },
   {
     key: "p50Latency",
     label: t("aiObservability.promptManagement.p50Latency"),
-    value: kpis.value.p50LatencyMs == null ? null : `${kpis.value.p50LatencyMs.toFixed(0)} ms`,
+    value: kpis.value.p50LatencyMs == null ? "—" : `${kpis.value.p50LatencyMs.toFixed(0)} ms`,
   },
   {
     key: "p95Latency",
     label: t("aiObservability.promptManagement.p95Latency"),
-    value: kpis.value.p95LatencyMs == null ? null : `${kpis.value.p95LatencyMs.toFixed(0)} ms`,
+    value: kpis.value.p95LatencyMs == null ? "—" : `${kpis.value.p95LatencyMs.toFixed(0)} ms`,
   },
   {
     key: "cost",
     label: t("aiObservability.promptManagement.cost"),
-    value: kpis.value.cost == null ? null : `$${kpis.value.cost.toFixed(4)}`,
+    value: kpis.value.cost == null ? "—" : `$${kpis.value.cost.toFixed(4)}`,
   },
 ]);
 function displayMilliseconds(value: unknown): string {

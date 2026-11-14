@@ -344,7 +344,7 @@ const FACET_TILES: { key: Facet; icon: StatItem["icon"]; tone: StatItem["tone"] 
   { key: "high", icon: TONE_ICON.high, tone: TONE_STAT.high },
   { key: "medium", icon: TONE_ICON.medium, tone: TONE_STAT.medium },
   { key: "low", icon: TONE_ICON.low, tone: TONE_STAT.low },
-  { key: "error", icon: "error-outline", tone: "warn" },
+  { key: "error", icon: "error-outline", tone: "warning" },
   { key: "silenced", icon: "volume-off", tone: "neutral" },
 ];
 const stats = computed<StatItem[]>(() =>
@@ -1044,17 +1044,7 @@ onUnmounted(() => {
         data-test="security-alerts-notices"
       />
 
-      <div class="border-border-default px-page-edge flex shrink-0 flex-col gap-2 border-b py-3">
-        <OStatStrip
-          compact-values
-          :items="stats"
-          :loading="statsLoading"
-          selectable
-          multiple
-          :selected-keys="facets"
-          data-test="security-alerts-stats"
-          @update:selected-keys="facets = $event as Facet[]"
-        />
+      <div class="border-border-default px-page-edge shrink-0 border-b py-3">
         <div class="h-28">
           <SecuritySeverityChart
             :buckets="chartBuckets"
@@ -1101,8 +1091,8 @@ onUnmounted(() => {
           </OButton>
         </template>
         <template #toolbar>
-          <div class="flex min-w-0 flex-1 flex-wrap items-center gap-3">
-            <div class="w-72">
+          <div class="contents">
+            <div class="min-w-0 flex-1 max-md:min-w-40 md:min-w-48">
               <OSearchInput
                 v-model="search"
                 :placeholder="t('siem.alerts.search')"
@@ -1114,7 +1104,18 @@ onUnmounted(() => {
               :label="t('siem.alerts.showEvaluations')"
               data-test="security-alerts-evaluations"
             />
-            <div class="flex-1" />
+            <OStatStrip
+              compact-values
+              :items="stats"
+              :loading="statsLoading"
+              selectable
+              :row="false"
+              class="max-md:order-last"
+              multiple
+              :selected-keys="facets"
+              data-test="security-alerts-stats"
+              @update:selected-keys="facets = $event as Facet[]"
+            />
             <span class="text-text-secondary text-xs" data-test="security-alerts-count">
               {{
                 t("siem.alerts.count", { n: formatEventCount(filtered.length) }, filtered.length)

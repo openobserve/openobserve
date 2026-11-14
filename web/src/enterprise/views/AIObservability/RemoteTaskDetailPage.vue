@@ -109,9 +109,7 @@
         </span>
       </div>
 
-      <div class="border-border-default px-page-edge border-b py-2.5">
-        <OStatStrip :items="stats" :loading="loading" data-test="ai-remote-task-detail-stats" />
-      </div>
+      <OStatStrip :items="stats" :loading="loading" row data-test="ai-remote-task-detail-stats" />
 
       <div class="flex min-h-0 flex-1 flex-col gap-3 overflow-auto p-3">
         <template v-if="currentTab === 'configuration'">
@@ -495,7 +493,7 @@ const stats = computed<StatItem[]>(() => [
     sub: t("aiObservability.remoteTasks.detail.stats.lastVerifiedSub"),
     value: lastVerifiedLabel.value,
     icon: "check",
-    tone: task.value?.verifiedAt ? "ok" : "neutral",
+    tone: task.value?.verifiedAt ? "success" : "neutral",
     dataTest: "ai-remote-task-detail-stat-verified",
   },
 ]);

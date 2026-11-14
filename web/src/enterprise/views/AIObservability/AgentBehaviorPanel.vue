@@ -18,7 +18,7 @@
   <div class="flex flex-col gap-2.5" data-test="agent-behavior-panel">
     <!-- Summary strip: behaviour signals at a glance (loops, failures, agents). -->
     <div class="shrink-0" data-test="agent-behavior-summary">
-      <OStatStrip :items="behaviorStats" :loading="tableLoading" />
+      <OStatStrip :items="behaviorStats" :loading="tableLoading" inline />
     </div>
     <div
       class="bg-card-glass-bg rounded-default border-border-default flex min-h-0 flex-1 flex-col overflow-hidden border"
@@ -263,20 +263,21 @@ const failureRows = computed<FailureRow[]>(() =>
   buildFailureRows(scopedSignals.value, t("aiObservability.behavior.unknownAgent")),
 );
 
-// Summary strip: loops draw attention, failures are the exception, agents affected is the scope.
+// Summary strip — at-a-glance behaviour signals. Loops draw attention (warning),
+// failures are the exception (error), agents-affected is the scope (primary).
 const behaviorStats = computed<StatItem[]>(() => {
   const loops = loopRows.value;
   const failures = failureRows.value;
   const totalFailures = failures.reduce((sum, f) => sum + (f.count || 0), 0);
   const has = loops.length + failures.length > 0;
-  const v = (n: number): number | null => (has ? n : null);
+  const v = (n: number): string | number => (has ? n : "—");
   return [
     {
       key: "loops",
       label: t("aiObservability.behavior.summaryLoops"),
       value: v(countAgents(loops)),
       icon: "restart-alt",
-      tone: "warn",
+      tone: "warning",
       dataTest: "agent-behavior-summary-loops",
     },
     {
@@ -284,7 +285,7 @@ const behaviorStats = computed<StatItem[]>(() => {
       label: t("aiObservability.behavior.summaryFailures"),
       value: v(totalFailures),
       icon: "error-outline",
-      tone: "err",
+      tone: "error",
       dataTest: "agent-behavior-summary-failures",
     },
     {
@@ -292,6 +293,7 @@ const behaviorStats = computed<StatItem[]>(() => {
       label: t("aiObservability.behavior.summaryAgents"),
       value: v(countAgents([...loops, ...failures])),
       icon: "smart-toy",
+      tone: "primary",
       dataTest: "agent-behavior-summary-agents",
     },
   ];

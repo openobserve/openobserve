@@ -490,14 +490,14 @@ describe("SampleDataWelcome finish", () => {
       await click("onboarding-get-started-sample-btn");
       const progress = () => wrapper!.getComponent({ name: "SampleDataProgress" });
       expect(progress().props("done")).toBe(false);
-      expect(byTest("sample-welcome-background").text()).toBe("Continue in the Background");
+      expect(byTest("sample-welcome-background").text()).toBe("Continue in the background");
       session.status.value = "loaded";
       await flush();
       expect(view()).toBe("ready");
       expect(progress().props("done")).toBe(true);
       expect(byTest("sample-welcome-background").exists()).toBe(false);
-      expect(byTest("sample-welcome-own-way").text()).toBe("Explore on My Own");
-      expect(byTest("sample-welcome-start-tour").text()).toBe("Start the Guided Tour");
+      expect(byTest("sample-welcome-own-way").text()).toBe("Explore on my own");
+      expect(byTest("sample-welcome-start-tour").text()).toBe("Start the guided tour");
     });
 
     it("disables Explore With Sample Data while another org's load runs", async () => {
@@ -654,7 +654,7 @@ describe("SampleDataWelcome finish", () => {
     });
 
     it.each([
-      ["Skip for Now", () => click("onboarding-get-started-skip-btn")],
+      ["Skip for now", () => click("onboarding-get-started-skip-btn")],
       ["the close button", () => click("sample-welcome-close")],
       ["Escape", () => pressEscape()],
     ])("%s sends skipped: true", async (_name, act) => {

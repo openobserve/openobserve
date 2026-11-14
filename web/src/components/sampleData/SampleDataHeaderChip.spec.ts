@@ -177,7 +177,7 @@ describe("SampleDataHeaderChip", () => {
       Object.assign(data, { sample: false, own: false });
       mountChip();
       expect(items()).toEqual([]);
-      expect(tryBtn().text()).toBe("Try Sample Data");
+      expect(tryBtn().text()).toBe("Try sample data");
       await tryBtn().trigger("click");
       expect(loadInDialog).toHaveBeenCalledWith(ORG, undefined);
     });
@@ -230,7 +230,7 @@ describe("SampleDataHeaderChip", () => {
     it("shows an icon-only button with a name, and it opens the same menu", async () => {
       mountChip(true, "v0.0.0", true);
       const btn = wrapper.find('[data-test="header-sample-data-btn"]');
-      expect(btn.attributes("aria-label")).toBe("Sample Data");
+      expect(btn.attributes("aria-label")).toBe("Sample data");
       expect(btn.text()).toBe("");
       expect(btn.classes()).not.toContain("max-md:hidden");
       await btn.trigger("click");
@@ -238,7 +238,7 @@ describe("SampleDataHeaderChip", () => {
       const labels = [...document.body.querySelectorAll('[role="menuitem"]')].map((el) =>
         el.textContent?.trim(),
       );
-      expect(labels).toEqual(["Start the Guided Tour", "Delete Sample Data"]);
+      expect(labels).toEqual(["Start the guided tour", "Delete sample data"]);
     });
   });
 
@@ -267,7 +267,7 @@ describe("SampleDataHeaderChip", () => {
   });
 
   it("offers only the guided tour and Delete Sample Data", () => {
-    expect(items().map((i) => i.text())).toEqual(["Start the Guided Tour", "Delete Sample Data"]);
+    expect(items().map((i) => i.text())).toEqual(["Start the guided tour", "Delete sample data"]);
   });
 
   describe("after a load that never finished", () => {
@@ -279,9 +279,9 @@ describe("SampleDataHeaderChip", () => {
       mountChip();
       await flushPromises();
       expect(items().map((i) => i.text())).toEqual([
-        "Finish Loading",
-        "Start the Guided Tour",
-        "Delete Sample Data",
+        "Finish loading",
+        "Start the guided tour",
+        "Delete sample data",
       ]);
       await items()[0].trigger("click");
       expect(loadInDialog).toHaveBeenCalledWith(ORG, undefined);
@@ -298,13 +298,13 @@ describe("SampleDataHeaderChip", () => {
       Object.assign(data, { state: "none", loadingHere: true });
       mountChip();
       await flushPromises();
-      expect(items().map((i) => i.text())).toEqual(["Start the Guided Tour", "Delete Sample Data"]);
+      expect(items().map((i) => i.text())).toEqual(["Start the guided tour", "Delete sample data"]);
     });
   });
 
   it("keeps the menu for loaded sample data when the deployment runs another first-run flow", () => {
     mountChip(false);
-    expect(items().map((i) => i.text())).toEqual(["Start the Guided Tour", "Delete Sample Data"]);
+    expect(items().map((i) => i.text())).toEqual(["Start the guided tour", "Delete sample data"]);
   });
 
   it("starts the tour", async () => {

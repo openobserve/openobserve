@@ -1783,21 +1783,21 @@ describe("IncidentDetailDrawer.vue", () => {
         .map((row) => row.text().replace(/\s+/g, " "));
       expect(rows).toEqual([
         "Finding: Stopped sending data",
-        "Stream Name: checkout",
-        "Stream Type: logs",
+        "Stream name: checkout",
+        "Stream type: logs",
       ]);
       expect(rows.join(" ")).not.toMatch(RAW);
       wrapper.unmount();
 
       (serviceStreamsApi.getSemanticGroups as any).mockResolvedValue({
-        data: [{ id: "service", display: "Service Name", fields: ["service"] }],
+        data: [{ id: "service", display: "Service name", fields: ["service"] }],
       });
       await openOn("overview", { group_values: { service: "api" } });
       expect(
         wrapper
           .findAll('[data-test="incident-dimension-row"]')
           .map((row) => row.text().replace(/\s+/g, " ")),
-      ).toEqual(["Service Name: api"]);
+      ).toEqual(["Service name: api"]);
     });
 
     it("a finding's side panel shows the finding", async () => {
@@ -1854,7 +1854,7 @@ describe("IncidentDetailDrawer.vue", () => {
         alerts: [],
         triggers: [createAlert({ alert_id: "a1", alert_name: "ops_quiet" })],
       });
-      expect(byTest("incident-trigger-details-header").text()).toBe("Alert Details");
+      expect(byTest("incident-trigger-details-header").text()).toBe("Alert details");
       expect(byTest("incident-trigger-details-body").text()).toBe("No alert details available");
       expect(byTest("incident-finding-details").exists()).toBe(false);
       wrapper.unmount();
@@ -1887,7 +1887,7 @@ describe("IncidentDetailDrawer.vue", () => {
         .findAll("tbody tr")
         .map((row) => row.findAll('[data-test="trigger-label-chip"]').map((chip) => chip.text()));
       expect(labels).toEqual([
-        ["Finding=Stopped sending data", "Stream Name=checkout", "Stream Type=logs"],
+        ["Finding=Stopped sending data", "Stream name=checkout", "Stream type=logs"],
         ["env=prod"],
       ]);
     });

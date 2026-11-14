@@ -55,7 +55,7 @@ describe("FrustrationEventBadge", () => {
 
       // Assert
       expect(wrapper.find('[data-test="frustration-event-badge-rage_click"]').exists()).toBe(true);
-      expect(wrapper.text()).toContain("Rage Click");
+      expect(wrapper.text()).toContain("Rage click");
     });
 
     it("shows Dead Click text for dead_click type", () => {
@@ -64,7 +64,7 @@ describe("FrustrationEventBadge", () => {
 
       // Assert
       expect(wrapper.find('[data-test="frustration-event-badge-dead_click"]').exists()).toBe(true);
-      expect(wrapper.text()).toContain("Dead Click");
+      expect(wrapper.text()).toContain("Dead click");
     });
 
     it("shows Error Click text for error_click type", () => {
@@ -73,7 +73,7 @@ describe("FrustrationEventBadge", () => {
 
       // Assert
       expect(wrapper.find('[data-test="frustration-event-badge-error_click"]').exists()).toBe(true);
-      expect(wrapper.text()).toContain("Error Click");
+      expect(wrapper.text()).toContain("Error click");
     });
 
     it("shows Rage Tap text for rage_tap type", () => {
@@ -82,7 +82,7 @@ describe("FrustrationEventBadge", () => {
 
       // Assert
       expect(wrapper.find('[data-test="frustration-event-badge-rage_tap"]').exists()).toBe(true);
-      expect(wrapper.text()).toContain("Rage Tap");
+      expect(wrapper.text()).toContain("Rage tap");
     });
 
     it("shows Error Tap text for error_tap type", () => {
@@ -91,7 +91,7 @@ describe("FrustrationEventBadge", () => {
 
       // Assert
       expect(wrapper.find('[data-test="frustration-event-badge-error_tap"]').exists()).toBe(true);
-      expect(wrapper.text()).toContain("Error Tap");
+      expect(wrapper.text()).toContain("Error tap");
     });
   });
 

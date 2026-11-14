@@ -1390,7 +1390,7 @@ describe("ServiceGraphNodeSidePanel", () => {
           available_groups: [
             {
               group_id: "service-namespace",
-              display: "Service Namespace",
+              display: "Service namespace",
               stream_types: ["traces"],
               aliases: { traces: namespaceField },
               recommended: true,
@@ -1525,7 +1525,7 @@ describe("ServiceGraphNodeSidePanel", () => {
       const configs = wrapper.vm.activeResourceTabConfigs;
       const queriesTab = configs.find((c: any) => c.id === "queries");
       expect(queriesTab).toBeDefined();
-      expect(queriesTab.colLabel).toBe("DB Operation");
+      expect(queriesTab.colLabel).toBe("DB operation");
       expect(queriesTab.groupField).toContain("db_operations");
     });
   });

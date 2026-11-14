@@ -1,110 +1,76 @@
 // Copyright 2026 OpenObserve Inc.
 //
-// Types for OStatCard / OStatStrip, the one stat tile of the app (guidelines F7, C4, C6).
+// Types for OStatCard / OStatStrip — the reusable summary-stat tiles used at the
+// top of list / table / dashboard screens. `tone` is the ONE knob that drives a
+// stat's colour, so the same semantic state reads the same colour everywhere.
 
 import type { I18nText } from "@/types/i18n";
 
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 
-/** Status colour of a stat. Applied only while the value is above 0. */
-export type StatTone = "neutral" | "ok" | "warn" | "err" | "crit" | "info";
+/** Semantic colour of a stat. Maps to one icon-chip + value colour pair.
+ *  `blue` / `teal` / `purple` are the decorative tones that mirror the OTag
+ *  badge groups (scorerType, evalDataType, …), so a stat tile can match the
+ *  chip colour of the same value exactly. */
+export type StatTone =
+  | "success"
+  | "warning"
+  | "error"
+  | "primary"
+  | "info"
+  | "orange"
+  | "blue"
+  | "teal"
+  | "purple"
+  | "neutral";
 
-/** Value size: `lg` is for overview pages. */
-export type StatSize = "md" | "lg";
+/** How a tile renders: a summary card, a filter chip, or a flat inline KPI. */
+export type StatCardVariant = "card" | "chip" | "kpi";
 
-/** Change beside the value, e.g. "▲ 4%". */
-export interface StatDelta {
+/** Optional delta shown beside the value (e.g. "▲ 12%"). */
+export interface StatTrend {
   direction: "up" | "down" | "flat";
-  /** Already-formatted change, e.g. "12%" or "+4". */
+  /** Already-formatted delta text, e.g. "12%" or "+4". */
   label: I18nText;
-  tone?: "ok" | "warn" | "err" | "neutral";
+  /** Colour of the trend text. Defaults to neutral. */
+  tone?: StatTone;
 }
-
-/** A tile value: null or undefined is unknown and renders "—"; a failed load passes null, never 0. */
-export type StatValue = string | number | null | undefined;
 
 export interface StatItem {
+  /** Stable key for the v-for. */
   key: string;
+  /** Caption beside the value (already localised by the caller). */
   label: I18nText;
-  value: StatValue;
-  /** Qualifier beside the label that says what the value is when the label is ambiguous. */
+  /** The number / text shown large. */
+  value: string | number;
+  /**
+   * Short qualifier beside the label, saying what the value IS when the label
+   * alone is ambiguous (e.g. "wait time" under a generic "Database time").
+   */
   sub?: I18nText;
-  /** Shows `sub` as this glyph; `sub` becomes its accessible name and default tooltip. */
+  /** Show the qualifier as this small glyph instead of text; `sub` becomes its accessible name and default tooltip. */
   subIcon?: IconName;
+  /** The glyph's tooltip when it should say more than `sub`. */
   subTooltip?: I18nText;
+  /** Optional leading glyph, shown in a tone-coloured chip. */
   icon?: IconName;
+  /** Semantic colour. Defaults to `neutral`. */
   tone?: StatTone;
-  delta?: StatDelta;
-  /** Denominator of the proportion track; without it the track stays empty. */
+  /** Optional trend delta. */
+  trend?: StatTrend;
+  /**
+   * When set, the tile shows a thin tone-coloured proportion bar filled to
+   * `value / max` (e.g. this state's share of the total). Omit for no bar.
+   * Filter chips and inline KPIs draw no bars.
+   */
   max?: number;
-  /** Shows a number as "819.5K"; the exact number moves to the tooltip. */
+  /** Show a numeric value as "819.5K"; the exact number moves to the tooltip. */
   compactValue?: boolean;
-  /** In a selectable strip, false makes this tile a read-out rather than a filter. */
+  /**
+   * When the strip is `selectable`, set this to false to make THIS tile a plain
+   * display (not a clickable filter) — e.g. a "Total" tile. Defaults to true.
+   */
   selectable?: boolean;
-  /** The reset tile ("All"): clears the filter and is never drawn as selected. Key "all" implies it. */
-  all?: boolean;
+  /** data-test hook for the tile root. */
   dataTest?: string;
-}
-
-/** Key the strip emits on select: null clears the filter. */
-export type StatSelectKey = string | null;
-
-export interface OStatCardProps {
-  label?: I18nText;
-  value?: StatValue;
-  sub?: I18nText;
-  subIcon?: IconName;
-  subTooltip?: I18nText;
-  icon?: IconName;
-  tone?: StatTone;
-  delta?: StatDelta;
-  max?: number;
-  compactValue?: boolean;
-  size?: StatSize;
-  /** Puts the label under the value, for tiles too narrow to fit them side by side. */
-  stacked?: boolean;
-  /** Renders the tile as a filter button. */
-  clickable?: boolean;
-  selected?: boolean;
-  /** What clicking the filter tile does, shown as its tooltip. */
-  hint?: I18nText;
-  /** Shimmer in place of the value until it first arrives, never a "0" (K4). */
-  loading?: boolean;
-  dataTest?: string;
-}
-
-export interface OStatCardSlots {
-  value?(): unknown;
-  icon?(): unknown;
-  /** Overview sparkline under the track. */
-  chart?(): unknown;
-}
-
-export interface OStatStripProps {
-  items?: StatItem[];
-  loading?: boolean;
-  /** Turns the tiles into filter buttons. */
-  selectable?: boolean;
-  selectedKey?: StatSelectKey;
-  /** Tiles toggle independently into `selectedKeys`; none selected means unfiltered. */
-  multiple?: boolean;
-  /** The selected tiles in `multiple` mode. */
-  selectedKeys?: string[];
-  size?: StatSize;
-  stacked?: boolean;
-  /** What the numbers describe; a change shows the skeleton again on the next load. */
-  resetKey?: string | number | null;
-  /** Default for every item's `compactValue`. */
-  compactValues?: boolean;
-}
-
-export interface OStatStripEmits {
-  select: [key: StatSelectKey];
-  "update:selectedKey": [key: StatSelectKey];
-  "update:selectedKeys": [keys: string[]];
-}
-
-export interface OStatStripSlots {
-  /** Composed tiles: OStatCard children. */
-  default?(): unknown;
 }

@@ -1,7 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 //
 // Page Object Model for the Settings Query Management navigation/gating feature.
-// Query Management ("Running Queries") is an enterprise-only, meta-org-only
+// Query Management ("Running queries") is an enterprise-only, meta-org-only
 // settings section. On an OSS build the sidebar tab is hidden and a direct URL
 // redirects to the enterprise-locked page.
 

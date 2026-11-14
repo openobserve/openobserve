@@ -247,7 +247,7 @@ describe("QualityConfigsTable", () => {
     expect(tile.text()).toMatch(/4\s*of 16/);
     expect(tile.text()).toContain("Configs without a result");
     expect(noteOf(tile)).toBe("1 got no scores · 3 have no threshold");
-    expect(tile.find(".text-badge-warning-soft-text").exists()).toBe(true);
+    expect(tile.find(".text-icon-chip-warning-text").exists()).toBe(true);
     const onlyThreshold = mountTable({
       tiles: { ...TILES, withoutResult: 1, noScores: 0, noThreshold: 1 },
     });

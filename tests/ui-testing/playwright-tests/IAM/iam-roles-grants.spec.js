@@ -180,7 +180,7 @@ test.describe('IAM · Edit Role · grant semantics', { tag: '@enterprise' }, () 
         tag: ['@iam', '@iamRolesGrants', '@P1', '@all']
     }, async ({ page }) => {
         const name = await freshRole(page, 'lock');
-        // "Every Stream" covers logs/metrics/traces/index, so a grant there must
+        // "Every stream" covers logs/metrics/traces/index, so a grant there must
         // render the rows below as checked AND locked — access the old tree never showed.
         await setRolePerms(page, name, [{ object: obj('stream'), permission: 'AllowAll' }]);
 

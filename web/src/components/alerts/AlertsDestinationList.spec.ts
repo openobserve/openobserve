@@ -693,7 +693,7 @@ describe("AlertsDestinationList", () => {
     it("labels the column URL / Recipients, not URL", () => {
       const table = wrapper!.findComponent({ name: "OTable" });
       const urlCol = table.props("columns").find((c: any) => c.id === "url");
-      expect(urlCol?.header).toBe("URL / Recipients");
+      expect(urlCol?.header).toBe("URL / recipients");
     });
   });
 

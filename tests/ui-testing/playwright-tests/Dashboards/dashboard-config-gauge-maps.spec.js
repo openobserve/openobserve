@@ -87,7 +87,7 @@ test.describe("ConfigPanel — Gauge and Maps Settings", () => {
     await setupGeomapPanelWithConfig(page, pm, dashboardName);
 
     // By Value — min and max inputs appear
-    await pm.dashboardPanelConfigs.selectSymbolSize("By Value");
+    await pm.dashboardPanelConfigs.selectSymbolSize("By value");
     const symbolMinInput = pm.dashboardPanelConfigs.minimumSize;
     const symbolMaxInput = pm.dashboardPanelConfigs.maximumSize;
     await expect(symbolMinInput).toBeVisible();

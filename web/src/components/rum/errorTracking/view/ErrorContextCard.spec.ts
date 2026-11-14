@@ -68,7 +68,7 @@ describe("ErrorContextCard", () => {
     it("falls back to an unknown-user label when no identity was captured", () => {
       wrapper = mountComponent({});
 
-      expect(wrapper.find('[data-test="rum-error-context-user-name"]').text()).toBe("Unknown User");
+      expect(wrapper.find('[data-test="rum-error-context-user-name"]').text()).toBe("Unknown user");
     });
 
     it("derives initials from the email when there is no name", () => {

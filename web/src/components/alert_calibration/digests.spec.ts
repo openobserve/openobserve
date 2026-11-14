@@ -745,7 +745,7 @@ describe("countTile", () => {
     expect(countTile(1000, "en-US")).toEqual({ value: "1K" });
     expect(countTile(12_345, "en-US")).toEqual({ value: "12.3K" });
     expect(countTile(1_234_567, "de-DE").value).toMatch(/^1,2\sMio\.$/);
-    expect(countTile(null, "en-US")).toEqual({ value: null });
-    expect(countTile(undefined, "en-US")).toEqual({ value: null });
+    expect(countTile(null, "en-US")).toEqual({ value: "—" });
+    expect(countTile(undefined, "en-US")).toEqual({ value: "—" });
   });
 });

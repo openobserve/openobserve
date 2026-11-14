@@ -26,7 +26,7 @@ describe("dimensionLabel", () => {
     expect(dimensionLabel("k8s-namespace", t)).toBe("K8s Namespace");
     expect(dimensionLabel("k8s-deployment", t)).toBe("K8s Deployment");
     expect(dimensionLabel("k8s-pod", t)).toBe("K8s Pod");
-    expect(dimensionLabel("k8s-pod-name", t)).toBe("K8s Pod Name");
+    expect(dimensionLabel("k8s-pod-name", t)).toBe("K8s pod name");
   });
 
   it("never shows a raw key for an id it has no label for", () => {

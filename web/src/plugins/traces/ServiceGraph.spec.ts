@@ -1412,7 +1412,7 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
       const dialog = wrapper.find('[data-test="o-dialog-stub"]');
       expect(dialog.exists()).toBe(true);
       // Title prop is forwarded to the in-house ODialog
-      expect(dialog.attributes("data-title")).toBe("Service Graph Settings");
+      expect(dialog.attributes("data-title")).toBe("Service graph settings");
     });
 
     it("should close the dialog when ODialog emits click:secondary (Close)", async () => {

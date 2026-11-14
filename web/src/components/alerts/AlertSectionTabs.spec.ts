@@ -55,10 +55,10 @@ describe("AlertSectionTabs", () => {
     const labels = wrapper.findAll('[role="tab"]').map((tab) => tab.text());
     expect(labels).toEqual([
       "Firing",
-      "All Alerts",
-      "Notification Destinations",
-      "Destination Templates",
-      "Alert Library",
+      "All alerts",
+      "Notification destinations",
+      "Destination templates",
+      "Alert library",
     ]);
   });
 
@@ -150,7 +150,7 @@ describe("AlertSectionTabs", () => {
     expect(JSON.parse(localStorage.getItem("o2_alert_section_tab_order") ?? "[]")[0]).toBe(
       "alertLibrary",
     );
-    expect(wrapper.findAll('[role="tab"]')[0].text()).toContain("Alert Library");
+    expect(wrapper.findAll('[role="tab"]')[0].text()).toContain("Alert library");
   });
 
   it("survives storage that throws", async () => {
@@ -166,7 +166,7 @@ describe("AlertSectionTabs", () => {
       .findComponent({ name: "OTabs" })
       .vm.$emit("reorder", { from: "alertLibrary", to: "alertFiring", before: true });
     await flushPromises();
-    expect(wrapper.findAll('[role="tab"]')[0].text()).toContain("Alert Library");
+    expect(wrapper.findAll('[role="tab"]')[0].text()).toContain("Alert library");
   });
 
   it("marks the tab for the current route active", async () => {
@@ -207,16 +207,16 @@ describe("AlertSectionTabs", () => {
     const wrapper = mountTabs();
     expect(wrapper.findAll('[role="tab"]').map((tab) => tab.text())).toEqual([
       "Firing",
-      "All Alerts",
-      "Notification Destinations",
-      "Destination Templates",
+      "All alerts",
+      "Notification destinations",
+      "Destination templates",
     ]);
   });
 
   it("keeps the Library tab when the flag lists other menus", () => {
     store.state.zoConfig.custom_hide_menus = "openapi,reports";
     const wrapper = mountTabs();
-    expect(wrapper.findAll('[role="tab"]').map((tab) => tab.text())).toContain("Alert Library");
+    expect(wrapper.findAll('[role="tab"]').map((tab) => tab.text())).toContain("Alert library");
   });
 
   describe("license", () => {
@@ -246,8 +246,8 @@ describe("AlertSectionTabs", () => {
       store.state.zoConfig.features = { alerts: "hidden" };
       const wrapper = mountTabs();
       expect(wrapper.findAll('[role="tab"]').map((tab) => tab.text())).toEqual([
-        "Notification Destinations",
-        "Destination Templates",
+        "Notification destinations",
+        "Destination templates",
       ]);
     });
 

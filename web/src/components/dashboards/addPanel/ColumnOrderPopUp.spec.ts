@@ -119,7 +119,7 @@ describe("ColumnOrderPopUp", () => {
       wrapper = createWrapper();
 
       const dialog = wrapper.findComponent(ODialogStub);
-      expect(dialog.props("title")).toContain("Column Order");
+      expect(dialog.props("title")).toContain("Column order");
     });
 
     it("should pass primary and secondary button labels to ODialog", () => {

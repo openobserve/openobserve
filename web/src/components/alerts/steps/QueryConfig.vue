@@ -23,9 +23,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         class="section-header border-border-default flex items-center gap-0 border-b px-3 py-2.5"
       >
-        <div
-          class="section-header-accent rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0"
-        />
         <span
           class="section-header-title text-compact text-text-heading font-semibold tracking-[0.01em]"
           >{{ t("alerts.queryConfig.sectionTitle") }}</span
@@ -1042,7 +1039,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :class="'bg-surface-subtle border-border-default border-b'"
                   >
                     <div class="flex items-center gap-2">
-                      <div class="rounded-default bg-theme-accent h-3.5 w-0.75 shrink-0" />
                       <span class="text-xs font-semibold">{{
                         localTab === "sql"
                           ? t("alerts.sqlEditor")

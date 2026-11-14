@@ -53,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @row-click="open"
         >
           <template #toolbar>
-            <div class="flex min-w-0 flex-1 items-center gap-2 max-md:contents">
+            <div class="flex w-full items-center gap-2 max-md:contents">
               <OToggleGroup
                 :model-value="scope"
                 mobile-dropdown
@@ -81,9 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #subheader>
-            <div class="px-page-edge border-table-row-divider border-b py-1.5">
-              <OStatStrip :items="stats" data-test="alert-calibration-digests-stats" />
-            </div>
+            <OStatStrip :items="stats" row data-test="alert-calibration-digests-stats" />
           </template>
 
           <template #toolbar-trailing>
@@ -292,12 +290,12 @@ const stats = computed<StatItem[]>(() => {
       ...countTile(run?.finding_count, locale.value),
       sub: run ? t(coverageBadge(run).labelKey) : undefined,
       icon: "fact-check",
-      tone: (run?.finding_count ?? 0) > 0 ? "warn" : "neutral",
+      tone: (run?.finding_count ?? 0) > 0 ? "warning" : "neutral",
     },
     {
       key: "window",
       label: t("alertCalibration.digests.window"),
-      value: c ? window.count : null,
+      value: c ? window.count : raw("—"),
       sub: c ? window.unit : t("alertCalibration.digests.notConfigured"),
       icon: "calendar-month",
     },
@@ -307,7 +305,7 @@ const stats = computed<StatItem[]>(() => {
       label: c?.enabled
         ? t("alertCalibration.digests.betweenRuns", { unit: cadence.unit })
         : t("alertCalibration.digests.schedule"),
-      value: c ? (c.enabled ? cadence.count : t("alertCalibration.digests.off")) : null,
+      value: c ? (c.enabled ? cadence.count : t("alertCalibration.digests.off")) : raw("—"),
       sub: c
         ? c.enabled
           ? undefined

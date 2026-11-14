@@ -120,12 +120,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #subheader>
           <!-- The window's counts live inside the table frame, not in the page
                header: they summarise exactly the rows below. -->
-          <div
-            class="px-page-edge border-table-row-divider border-b py-1.5"
+          <OStatStrip
+            :items="summaryStats"
+            :loading="loading"
+            row
             data-test="dbm-blocked-summary"
-          >
-            <OStatStrip :items="summaryStats" :loading="loading" />
-          </div>
+          />
 
           <DbmLockCoverageLine
             v-if="samples.length"
@@ -834,15 +834,15 @@ const summaryStats = computed<StatItem[]>(() => [
   {
     key: "waiting",
     label: t("dbm.blocked.summary.waiting"),
-    value: notCollecting.value ? null : waitingCount.value,
+    value: notCollecting.value ? raw("—") : waitingCount.value,
     icon: "lock",
-    tone: waitingCount.value > 0 ? "warn" : "neutral",
+    tone: waitingCount.value > 0 ? "warning" : "neutral",
     dataTest: "dbm-blocked-summary-waiting",
   },
   {
     key: "longest",
     label: t("dbm.blocked.summary.longest"),
-    value: notCollecting.value || !longestWait.value ? null : formatSeconds(longestWait.value),
+    value: notCollecting.value || !longestWait.value ? raw("—") : formatSeconds(longestWait.value),
     icon: "timer",
     tone: "neutral",
     dataTest: "dbm-blocked-summary-longest",
@@ -850,7 +850,7 @@ const summaryStats = computed<StatItem[]>(() => [
   {
     key: "chains",
     label: t("dbm.blocked.summary.chains"),
-    value: notCollecting.value ? null : chains.value.length,
+    value: notCollecting.value ? raw("—") : chains.value.length,
     icon: "account-tree",
     tone: "neutral",
     dataTest: "dbm-blocked-summary-chains",

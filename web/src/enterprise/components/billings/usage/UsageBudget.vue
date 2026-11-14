@@ -29,13 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="@container/budget flex flex-col gap-3 pb-3"
     data-test="billings-usagebudget-root"
   >
-    <OStatStrip
-      :items="kpiStats"
-      size="lg"
-      stacked
-      class="shrink-0"
-      data-test="billings-usagebudget-kpis"
-    />
+    <OStatStrip :items="kpiStats" stacked class="shrink-0" data-test="billings-usagebudget-kpis" />
 
     <div
       class="grid items-stretch gap-3 @min-[62rem]/budget:grid-cols-[minmax(0,1.55fr)_minmax(18.75rem,0.85fr)]"

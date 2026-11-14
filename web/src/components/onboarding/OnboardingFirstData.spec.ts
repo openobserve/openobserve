@@ -90,15 +90,15 @@ describe("OnboardingFirstData", () => {
   it.each([
     [
       "logs",
-      "Explore Your Logs",
+      "Explore your logs",
       { stream: "default", stream_type: "logs", from: String(RANGE.rangeStart) },
     ],
     [
       "metrics",
-      "Explore Your Metrics",
+      "Explore your metrics",
       { metric: "default", from: String(RANGE.rangeStart / 1000) },
     ],
-    ["traces", "Explore Your Traces", { stream: "default", from: String(RANGE.rangeStart) }],
+    ["traces", "Explore your traces", { stream: "default", from: String(RANGE.rangeStart) }],
   ] as const)("opens the %s stream and time range that arrived", async (type, label, query) => {
     const { wrapper, router } = await mountPanel(resultFor(type));
     expect(wrapper.find('[data-test="onboarding-first-data-open"]').text()).toBe(label);
@@ -117,8 +117,8 @@ describe("OnboardingFirstData", () => {
   it("offers one next step and one way to add more, nothing else", async () => {
     const { wrapper } = await mountPanel();
     expect(wrapper.findAll("button").map((b) => b.text())).toEqual([
-      "Explore Your Logs",
-      "Add Another Source",
+      "Explore your logs",
+      "Add another source",
     ]);
   });
 

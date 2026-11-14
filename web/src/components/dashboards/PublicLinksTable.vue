@@ -36,25 +36,9 @@
       table-id="public-links"
       data-test="dashboards-public-links-table"
     >
-      <template #subheader>
-        <div
-          class="px-page-edge border-table-row-divider border-b py-1.5"
-          data-test="dashboards-public-links-summary"
-        >
-          <OStatStrip
-            :items="summaryStats"
-            :loading="loading"
-            selectable
-            multiple
-            :selected-keys="statusFilters"
-            @update:selected-keys="statusFilters = $event as StatusFilter[]"
-          />
-        </div>
-      </template>
-
       <template #toolbar>
-        <div class="flex min-w-0 flex-1 items-center gap-2 max-md:contents">
-          <div class="min-w-0 flex-1 max-md:min-w-40">
+        <div class="contents">
+          <div class="min-w-0 flex-1 max-md:min-w-40 md:min-w-48">
             <OSearchInput
               v-model="searchQuery"
               :placeholder="t('dashboard.publicLinks.search')"
@@ -63,6 +47,19 @@
             >
             </OSearchInput>
           </div>
+          <OStatStrip
+            :items="summaryStats"
+            :loading="loading"
+            selectable
+            compact
+            :row="false"
+            multiple
+            :selected-keys="statusFilters"
+            default-key="all"
+            class="max-md:order-last"
+            data-test="dashboards-public-links-summary"
+            @update:selected-keys="statusFilters = $event as StatusFilter[]"
+          />
         </div>
       </template>
       <template #toolbar-trailing>
@@ -565,6 +562,30 @@ watch(attentionKnown, (known) => {
 const summaryStats = computed<StatItem[]>(() => {
   const needsAttention = countOf("attention");
   return [
+    {
+      key: "live",
+      label: t("components.badge.publicLinkStatus.live"),
+      value: countOf("live"),
+      icon: "check-circle",
+      tone: "success",
+      dataTest: "dashboards-public-links-summary-live",
+    },
+    {
+      key: "notViewed",
+      label: t("components.badge.publicLinkStatus.notViewed"),
+      value: countOf("notViewed"),
+      icon: "visibility-off",
+      tone: "neutral",
+      dataTest: "dashboards-public-links-summary-not-viewed",
+    },
+    {
+      key: "paused",
+      label: t("components.badge.publicLinkStatus.paused"),
+      value: countOf("paused"),
+      icon: "pause",
+      tone: "neutral",
+      dataTest: "dashboards-public-links-summary-paused",
+    },
     ...(attentionKnown.value
       ? ([
           {
@@ -572,7 +593,7 @@ const summaryStats = computed<StatItem[]>(() => {
             label: t("components.badge.publicLinkStatus.needsAttention"),
             value: needsAttention,
             icon: "warning-amber",
-            tone: needsAttention > 0 ? "warn" : "neutral",
+            tone: needsAttention > 0 ? "warning" : "neutral",
             dataTest: "dashboards-public-links-summary-attention",
           },
         ] satisfies StatItem[])
@@ -586,34 +607,11 @@ const summaryStats = computed<StatItem[]>(() => {
       dataTest: "dashboards-public-links-summary-expired",
     },
     {
-      key: "notViewed",
-      label: t("components.badge.publicLinkStatus.notViewed"),
-      value: countOf("notViewed"),
-      icon: "visibility-off",
-      tone: "neutral",
-      dataTest: "dashboards-public-links-summary-not-viewed",
-    },
-    {
-      key: "live",
-      label: t("components.badge.publicLinkStatus.live"),
-      value: countOf("live"),
-      icon: "check-circle",
-      tone: "ok",
-      dataTest: "dashboards-public-links-summary-live",
-    },
-    {
-      key: "paused",
-      label: t("components.badge.publicLinkStatus.paused"),
-      value: countOf("paused"),
-      icon: "pause",
-      tone: "neutral",
-      dataTest: "dashboards-public-links-summary-paused",
-    },
-    {
       key: "all",
       label: t("dashboard.publicLinks.summaryAll"),
       value: links.value.length,
       icon: "format-list-bulleted",
+      tone: "primary",
       dataTest: "dashboards-public-links-summary-all",
     },
   ];

@@ -98,7 +98,7 @@ describe("ingestion.setupCard i18n keys (design 4.2 — the 9 new en-US keys)", 
   it("leads the imported/exists toast copy with the Infra → Hosts destination (4.2)", () => {
     expect(i18n.global.t("ingestion.setupCard.hostDashboardImported")).toContain("Infra → Hosts");
     expect(i18n.global.t("ingestion.setupCard.hostDashboardExists")).toContain("Infra → Hosts");
-    expect(i18n.global.t("ingestion.setupCard.viewHosts")).toBe("View Hosts");
+    expect(i18n.global.t("ingestion.setupCard.viewHosts")).toBe("View hosts");
     expect(i18n.global.t("ingestion.setupCard.dashboardReadyTitle")).toBe("Get your dashboard");
   });
 });

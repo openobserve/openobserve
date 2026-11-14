@@ -174,7 +174,7 @@ export class AlertsFormValidationPage {
     // The Custom card text is "Custom"; we use getByText scoped to the selector.
     const selector = this.page.locator(this.prebuiltDestinationSelector);
     await selector.waitFor({ state: 'visible', timeout: 10000 });
-    // The card renders t('alerts.customDestination') = "Custom Destination"
+    // The card renders t('alerts.customDestination') = "Custom destination"
     await selector.locator('[data-test="destination-type-card"][data-type="custom"]').click();
     // After selecting Custom, the tabs + name + URL inputs should appear
     await this.page.locator(this.destTabsContainer).waitFor({ state: 'visible', timeout: 10000 });

@@ -190,7 +190,7 @@ describe("useHistogram Composable", () => {
       mockState.searchObj.meta.logsVisualizeToggle = "logs";
 
       expect(wrapper.vm.getHistogramTitle()).toBe(
-        "Showing 1 to 100 out of 250 events in 42 ms. (Scan Size: 0 MB)",
+        "Showing 1 to 100 out of 250 events in 42 ms. (Scan size: 0 MB)",
       );
     });
 
@@ -199,7 +199,7 @@ describe("useHistogram Composable", () => {
       mockState.searchObj.data.queryResults.result_cache_ratio = 50;
 
       expect(wrapper.vm.getHistogramTitle()).toBe(
-        "Showing 1 to 100 out of 250 events in 42 ms. (Delta Scan Size: 0 MB)",
+        "Showing 1 to 100 out of 250 events in 42 ms. (Delta scan size: 0 MB)",
       );
     });
 
@@ -237,7 +237,7 @@ describe("useHistogram Composable", () => {
         end: 100,
         total: "250",
         took: 42,
-        scanLabel: "Scan Size",
+        scanLabel: "Scan size",
         scanSize: "0 MB",
       });
     });

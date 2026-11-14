@@ -265,7 +265,7 @@ test.describe("VRL visualization support testcases", () => {
     await pm.logsVisualise.runQueryAndWaitForCompletion();
     await pm.logsVisualise.verifyChartRenders(page);
 
-    // Click "Add To Dashboard" button
+    // Click "Add to dashboard" button
     await pm.logsVisualise.addPanelToNewDashboard(
       randomDashboardName,
       panelName
@@ -605,7 +605,7 @@ test.describe("VRL visualization support testcases", () => {
     // Open config panel to verify dynamic columns is enabled
     await pm.dashboardPanelConfigs.openConfigPanel();
 
-    // Verify "Allow Dynamic Columns" toggle is enabled
+    // Verify "Allow dynamic columns" toggle is enabled
     const dynamicColumnsToggle = pm.dashboardPanelConfigs.dynamicColumnBtn;
     await dynamicColumnsToggle.waitFor({ state: "visible", timeout: 10000 });
 

@@ -227,51 +227,60 @@ function pause(alert: Alert) {
 ### OStatStrip / OStatCard
 
 **Import:** `@/lib/data/StatStrip/OStatStrip.vue` · `OStatCard.vue` (types in `OStatStrip.types.ts`)
-**Use when:** The ONE stat tile, for a real distribution people act on whose numbers vary and
-are not already on screen (F7). Value first (20/600 tabular; 24 with `size="lg"` on
-overviews), the label beside it (12/500 secondary; it truncates, the value never does), an
-optional 24 px tone icon chip, and a 3 px proportion track that is always drawn. 136–240 px
-wide, `rounded-default`, 1 px border. Same box loading or loaded (K4).
-**Two modes:**
+**Use when:** The ONE stat primitive, for a real distribution people act on whose numbers vary
+and are not already on screen (F7). The strip picks one of three looks by its job:
 
-- **Display** — a read-out row.
-- **Filter** (`selectable`) — inside the table frame between the toolbar and the table header
-  (OTable `#subheader`), attention-first left to right, "All" LAST. Each tile is a
-  `<button aria-pressed>`; selected is an accent border, hover a lighter one, never a fill or a
-  shadow (C6). Clicking the selected tile again clears it (emits `null`); the "All" tile (key
-  `all` or `all: true`) clears the filter and is NEVER drawn as selected. The applied filter
-  also shows as a chip (F5).
+- **Filter chips** (`selectable`) — 32 px chips (icon or tone dot, label, count badge) in
+  `OTable`'s `#toolbar` right after the search, with `:row="false"`. They share the search row
+  only while every chip fits (`useInlineFit`), else take their own full-width toolbar line;
+  phones always get their own line. Overflow scrolls sideways under edge fades with a chevron,
+  never wraps. The reset chip (`default-key`, "All") leads, carries the total and reads as
+  quietly selected while nothing is picked; Esc resets. Selected is an accent border plus soft
+  fill with a primary count badge; error/warning chips above 0 get a tinted badge. The tooltip
+  says what a click does ("Show only / Also show / Stop showing …"). `multiple` toggles chips
+  into `v-model:selected-keys` (empty means unfiltered). A strip whose only clickable chip would
+  be the reset chip renders as KPIs; `selectable: false` items render as KPIs ahead of the chips.
+- **Inline KPI line** (`inline`, read-only) — icon · value · label, no border, for a toolbar
+  row. `row` gives a read-only strip its own band above the table header (page-edge padding,
+  bottom hairline) — e.g. DB monitoring.
+- **Cards** (read-only, or `selectable :tray="false"` tiles that navigate) — value (24/600
+  tabular) beside the label, a tone icon chip and a proportion bar that is always drawn; they
+  wrap at `basis-52` (`compact`: `basis-36`) and grow to fill the row. `stacked` puts each label
+  under its value. Below lg they compact (label moves to the tile's `title`).
 
-**Values (C4):** `0` renders a muted "0" with no tone; `null`/`undefined` renders a muted "—".
-A failed load passes `null`, never `0`. `tone` colours the value, icon and fill only above 0.
+**Values (C4):** a value is shown verbatim; pass "—" for unknown and a real `0` renders "0".
+Both render muted, and only a non-zero value takes the tone colour. `loading` holds a skeleton
+until the FIRST load lands; a refresh keeps the last numbers unless `resetKey` changes.
 **Key props:**
 
-- Strip: `items` (`StatItem[]`), `loading` (first load only; a refresh keeps the numbers),
-  `selectable`, `selectedKey` (+ `@select(key | null)` / `update:selectedKey`), `size`
-  (`md` | `lg`), `stacked`, `resetKey`, `compactValues`.
-- `StatItem`: `{ key, label, value, tone?, icon?, max?, delta?, sub?, subIcon?, subTooltip?,
-  compactValue?, selectable?, all?, dataTest? }`.
-- `tone` — status only: `neutral` (default) | `ok` | `warn` | `err` | `crit` | `info`.
-- `delta` — `{ direction: 'up' | 'down' | 'flat', label, tone?: 'ok' | 'warn' | 'err' | 'neutral' }`.
-- `OStatCard` takes the same fields plus `clickable`, `selected`, `loading`; slots `#value`,
-  `#icon`, `#chart` (overview sparkline).
+- Strip: `items` (`StatItem[]`), `loading`, `selectable`, `tray` (`false` = clickable cards),
+  `inline`, `row` (default on for filter chips), `selectedKey` + `@select(key)`, `multiple` +
+  `v-model:selected-keys`, `defaultKey`, `compact`, `resetKey`, `compactValues`, `stacked`.
+- `StatItem`: `{ key, label, value, icon?, tone?, trend?, max?, sub?, subIcon?, subTooltip?,
+  compactValue?, selectable?, dataTest? }`.
+- `tone` — `success | warning | error | primary | info | orange | blue | teal | purple |
+  neutral` (default). `blue`/`teal`/`purple` mirror the OTag badge groups.
+- `trend` — `{ direction: 'up' | 'down' | 'flat', label, tone? }`.
+- `OStatCard` takes the same fields plus `variant` (`card` | `chip` | `kpi`, set by the strip),
+  `clickable`, `selected`, `quiet`, `hint`, `loading`; slots `#value`, `#icon`, `#chart`
+  (overview sparkline).
 
-**Removed:** `defaultKey` (All is never highlighted), `tray` (border selection only),
-`compact` (min width 136 covers it), `trend` → `delta`, decorative tones (primary, orange, blue,
-teal, purple → neutral; success → ok, warning → warn, error → err). Use the strip instead of
-`KpiCard` / `KpiCardRow` / `UsageKpiCard` / `ProfileStatTile` for new work. Conventions:
-[calm-signal.md § Summary-strip conventions](calm-signal.md#summary-strip-conventions).
+Use the strip instead of `KpiCard` / `KpiCardRow` / `ProfileStatTile` for new work.
+Conventions: [calm-signal.md § Summary-strip conventions](calm-signal.md#summary-strip-conventions).
 
 ```vue
+<!-- #toolbar, right after the search box -->
 <OStatStrip
+  :items="summaryStats"
+  :loading="loading"
   selectable
-  :items="[
-    { key: 'firing', label: t('alerts.firing'), value: counts.firing, tone: 'err', icon: 'notifications-active', max: total },
-    { key: 'paused', label: t('alerts.paused'), value: counts.paused, max: total },
-    { key: 'all', label: t('common.all'), value: total },
-  ]"
-  :selected-key="stateFilter"
-  @select="stateFilter = $event"
+  multiple
+  :row="false"
+  :selected-keys="stateFilters"
+  default-key="total"
+  class="max-md:order-last"
+  data-test="pipeline-list-summary"
+  @update:selected-keys="stateFilters = $event"
 />
 ```
 

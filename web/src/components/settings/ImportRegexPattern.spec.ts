@@ -323,7 +323,7 @@ describe("ImportRegexPattern", () => {
       const result = await wrapper.vm.createRegexPattern(mockPayload, 1);
 
       expect(result).toBe(false);
-      expect(wrapper.vm.regexPatternCreators[0].message).toContain("Unknown Error");
+      expect(wrapper.vm.regexPatternCreators[0].message).toContain("Unknown error");
     });
   });
 

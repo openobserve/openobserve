@@ -405,7 +405,7 @@ describe("PerformanceSummary", () => {
 
     // Assert
     expect(wrapper.find('[data-test="performance-summary-loading-indicator"]').exists()).toBe(true);
-    expect(wrapper.text()).toContain("Loading Dashboard");
+    expect(wrapper.text()).toContain("Loading dashboard");
   });
 
   it("hides loading indicator when isLoading is empty", async () => {
@@ -1128,7 +1128,7 @@ describe("PerformanceSummary", () => {
     await nextTick();
 
     // Assert
-    expect(wrapper.text()).toContain("Loading Dashboard");
+    expect(wrapper.text()).toContain("Loading dashboard");
   });
 
   it("hides loading indicator when all loading states are cleared", async () => {

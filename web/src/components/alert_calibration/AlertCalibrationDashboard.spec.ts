@@ -445,7 +445,7 @@ describe("AlertCalibrationDashboard", () => {
       const items = wrapper.findComponent(OStatStrip).props("items") as StatItem[];
       expect(items[0]).toMatchObject({ value: "0", tone: "neutral" });
       expect(items[1]).toMatchObject({
-        value: null,
+        value: "—",
         sub: "Shown only with access to every alert",
         subIcon: "info-outline",
       });
@@ -466,7 +466,7 @@ describe("AlertCalibrationDashboard", () => {
     expect(banner.text()).toBe("The latest run found nothing to fix.");
     expect(banner.props("tone")).toBe("ok");
     const items = root.findComponent(OStatStrip).props("items") as StatItem[];
-    expect(items[0]).toMatchObject({ value: "0", tone: "ok" });
+    expect(items[0]).toMatchObject({ value: "0", tone: "success" });
     expect(items[1]).toMatchObject({ value: "4" });
     expect(items[1].sub).toBeUndefined();
     root.unmount();
@@ -492,7 +492,7 @@ describe("AlertCalibrationDashboard", () => {
     );
     expect(banner.props("tone")).toBe("warn");
     const items = wrapper.findComponent(OStatStrip).props("items") as StatItem[];
-    expect(items[0]).toMatchObject({ value: null, tone: "neutral" });
+    expect(items[0]).toMatchObject({ value: "—", tone: "neutral" });
     wrapper.unmount();
   });
 
@@ -576,7 +576,7 @@ describe("AlertCalibrationDashboard", () => {
       ]);
       expect(banners[0].props("tone")).toBe("warn");
       const items = wrapper.findComponent(OStatStrip).props("items") as StatItem[];
-      expect(items[0]).toMatchObject({ value: null, tone: "neutral" });
+      expect(items[0]).toMatchObject({ value: "—", tone: "neutral" });
       const rules = wrapper.findAll('[data-test^="alert-calibration-dashboard-rule-"]');
       expect(rules.length).toBeGreaterThan(0);
       for (const rule of rules) {
@@ -630,7 +630,7 @@ describe("AlertCalibrationDashboard", () => {
       "Alert definition checks need AutoObserve, which is off. The other checks ran.",
     ]);
     const items = wrapper.findComponent(OStatStrip).props("items") as StatItem[];
-    expect(items[1]).toMatchObject({ value: null });
+    expect(items[1]).toMatchObject({ value: "—" });
     wrapper.unmount();
   });
 
@@ -660,7 +660,7 @@ describe("AlertCalibrationDashboard", () => {
       "Counts on the alerts you can access are not ready yet. Refresh shortly.",
     ]);
     const items = wrapper.findComponent(OStatStrip).props("items") as StatItem[];
-    expect(items[0]).toMatchObject({ value: null, tone: "neutral" });
+    expect(items[0]).toMatchObject({ value: "—", tone: "neutral" });
     const rules = wrapper.findAll('[data-test^="alert-calibration-dashboard-rule-"]');
     expect(rules.length).toBeGreaterThan(0);
     for (const rule of rules) expect(rule.text()).toContain("Pending");

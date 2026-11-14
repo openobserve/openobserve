@@ -245,17 +245,18 @@ const stats = computed<StatItem[]>(() => [
   {
     key: "matched",
     label: t("siem.intel.stat.matched"),
-    value: sweep.lastRunAt.value === null ? null : sweep.matches.value.length,
+    value: sweep.lastRunAt.value === null ? "—" : sweep.matches.value.length,
     icon: "radar",
-    tone: "err",
+    tone: "error",
     max: liveIndicators.value.length || undefined,
     dataTest: "security-intel-stat-matched",
   },
   {
     key: "hits",
     label: t("siem.intel.stat.hits"),
-    value: sweep.lastRunAt.value === null ? null : formatEventCount(totalHits.value),
+    value: sweep.lastRunAt.value === null ? "—" : formatEventCount(totalHits.value),
     icon: "local-fire-department",
+    tone: "orange",
     dataTest: "security-intel-stat-hits",
   },
   {
@@ -263,6 +264,7 @@ const stats = computed<StatItem[]>(() => [
     label: t("siem.intel.stat.indicators"),
     value: formatEventCount(indicators.value.length),
     icon: "shield",
+    tone: "primary",
     dataTest: "security-intel-stat-indicators",
   },
   {
@@ -270,7 +272,7 @@ const stats = computed<StatItem[]>(() => [
     label: t("siem.intel.stat.expiring"),
     value: expiring.value,
     icon: "schedule",
-    tone: "warn",
+    tone: "warning",
     dataTest: "security-intel-stat-expiring",
   },
   {
@@ -358,8 +360,7 @@ const notices = computed<SecurityNotice[]>(() => {
   return out;
 });
 
-function onStat(key: string | null) {
-  if (!key) return;
+function onStat(key: string) {
   if (key === "matched" || key === "hits") tab.value = "matches";
   else tab.value = "indicators";
   if (key === "expiring") expiryFilter.value = true;
@@ -962,6 +963,7 @@ async function onSaved() {
           :items="stats"
           :loading="loading && !indicators.length"
           selectable
+          :row="false"
           :selected-key="null"
           data-test="security-intel-stats"
           @select="onStat"

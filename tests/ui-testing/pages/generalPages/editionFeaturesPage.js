@@ -11,29 +11,29 @@ const testLogger = require('../../playwright-tests/utils/test-logger.js');
 // NOTE: workload_mgmt, query_opt, ai_assistant and telemetry_corr currently fall back
 // to the /docs/ homepage — no dedicated short link is configured for them yet.
 export const ENTERPRISE_FEATURES = [
-  { name: 'Single Sign On', slug: 'sso', beta: false, ha: true, expectedPath: '/docs/user-guide/account-administration/identity-and-access-management/sso/' },
-  { name: 'Role Based Access Control', slug: 'rbac', beta: false, ha: true, expectedPath: '/docs/user-guide/account-administration/identity-and-access-management/role-based-access-control/' },
-  { name: 'Federated Search / Supercluster', slug: 'fed_search', beta: false, ha: true, expectedPath: '/docs/user-guide/data-exploration/federated-search/' },
-  { name: 'Query Management', slug: 'query_mgmt', beta: false, ha: false, expectedPath: '/docs/user-guide/account-administration/management/query-management/' },
-  { name: 'Audit Trail', slug: 'audit_trail', beta: false, ha: false, expectedPath: '/docs/user-guide/account-administration/management/audit-trail/' },
-  { name: 'Sensitive Data Redaction', slug: 'data_redact', beta: false, ha: false, expectedPath: '/docs/user-guide/account-administration/management/sensitive-data-redaction/' },
-  { name: 'Pipeline Remote Destinations', slug: 'pipeline_remote', beta: false, ha: false, expectedPath: '/docs/user-guide/data-processing/pipelines/remote-destination/' },
-  { name: 'Incident Management', slug: 'incident_mgmt', beta: true, ha: true, expectedPath: '/docs/user-guide/analytics/incidents/' },
+  { name: 'Single sign on', slug: 'sso', beta: false, ha: true, expectedPath: '/docs/user-guide/account-administration/identity-and-access-management/sso/' },
+  { name: 'Role based access control', slug: 'rbac', beta: false, ha: true, expectedPath: '/docs/user-guide/account-administration/identity-and-access-management/role-based-access-control/' },
+  { name: 'Federated search / supercluster', slug: 'fed_search', beta: false, ha: true, expectedPath: '/docs/user-guide/data-exploration/federated-search/' },
+  { name: 'Query management', slug: 'query_mgmt', beta: false, ha: false, expectedPath: '/docs/user-guide/account-administration/management/query-management/' },
+  { name: 'Audit trail', slug: 'audit_trail', beta: false, ha: false, expectedPath: '/docs/user-guide/account-administration/management/audit-trail/' },
+  { name: 'Sensitive data redaction', slug: 'data_redact', beta: false, ha: false, expectedPath: '/docs/user-guide/account-administration/management/sensitive-data-redaction/' },
+  { name: 'Pipeline remote destinations', slug: 'pipeline_remote', beta: false, ha: false, expectedPath: '/docs/user-guide/data-processing/pipelines/remote-destination/' },
+  { name: 'Incident management', slug: 'incident_mgmt', beta: true, ha: true, expectedPath: '/docs/user-guide/analytics/incidents/' },
   // sre_agent: o2.ws redirect resolves to /docs/administration/deployment/sre-agent-setup-guide/
   // but that page issues a client-side redirect to /docs/enterprise-setup/sre-agent/ — assert
   // the final user-visible URL.
-  { name: 'SRE Agent', slug: 'sre_agent', beta: true, ha: true, expectedPath: '/docs/enterprise-setup/sre-agent/' },
+  { name: 'SRE agent', slug: 'sre_agent', beta: true, ha: true, expectedPath: '/docs/enterprise-setup/sre-agent/' },
   { name: 'O2 Assistant', slug: 'ai_assistant', beta: true, ha: true, expectedPath: '/docs/' },
-  { name: 'Anomaly Detection', slug: 'anomaly_detect', beta: true, ha: false, expectedPath: '/docs/user-guide/analytics/alerts/anomaly-detection/' },
-  { name: 'Metrics Auto Downsampling', slug: 'metrics_downsample', beta: false, ha: false, expectedPath: '/docs/user-guide/data-exploration/metrics/downsampling-metrics/' },
-  { name: 'Log Patterns', slug: 'log_patterns', beta: false, ha: false, expectedPath: '/blog/log-patterns-automatic-pattern-extraction-faster-analysis/' },
-  { name: 'Rate Limiting', slug: 'rate_limit', beta: false, ha: false, expectedPath: '/docs/user-guide/account-administration/identity-and-access-management/quotas/how-quotas-work/' },
-  { name: 'Logs, Metrics & Traces Correlation', slug: 'telemetry_corr', beta: false, ha: false, expectedPath: '/docs/' },
-  { name: 'Service Graph', slug: 'service_maps', beta: false, ha: false, expectedPath: '/docs/user-guide/data-exploration/traces/service-graph/' },
+  { name: 'Anomaly detection', slug: 'anomaly_detect', beta: true, ha: false, expectedPath: '/docs/user-guide/analytics/alerts/anomaly-detection/' },
+  { name: 'Metrics auto downsampling', slug: 'metrics_downsample', beta: false, ha: false, expectedPath: '/docs/user-guide/data-exploration/metrics/downsampling-metrics/' },
+  { name: 'Log patterns', slug: 'log_patterns', beta: false, ha: false, expectedPath: '/blog/log-patterns-automatic-pattern-extraction-faster-analysis/' },
+  { name: 'Rate limiting', slug: 'rate_limit', beta: false, ha: false, expectedPath: '/docs/user-guide/account-administration/identity-and-access-management/quotas/how-quotas-work/' },
+  { name: 'Logs, metrics & traces correlation', slug: 'telemetry_corr', beta: false, ha: false, expectedPath: '/docs/' },
+  { name: 'Service graph', slug: 'service_maps', beta: false, ha: false, expectedPath: '/docs/user-guide/data-exploration/traces/service-graph/' },
 ];
 
 // Cloud-only feature: rendered with v-show, so present in DOM but hidden on OSS/ENT.
-export const CLOUD_ONLY_FEATURE_NAME = 'Bring Your Own Bucket';
+export const CLOUD_ONLY_FEATURE_NAME = 'Bring your own bucket';
 
 // Hero panel link buttons (EnterpriseUpgradeDialog.vue openDownloadPage/openDocsLink).
 export const HERO_LINKS = {
