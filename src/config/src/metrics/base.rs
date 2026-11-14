@@ -1576,6 +1576,30 @@ pub static NODE_MEMORY_USAGE: Lazy<IntGaugeVec> = Lazy::new(|| {
     )
     .expect("Metric created")
 });
+pub static MEMORY_CIRCUIT_BREAKER_TRIPPED: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "memory_circuit_breaker_tripped",
+            "1 while the memory circuit breaker rejects requests, else 0",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &[],
+    )
+    .expect("Metric created")
+});
+pub static MEMORY_CIRCUIT_BREAKER_TRIPS: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "memory_circuit_breaker_trips_total",
+            "Times the memory circuit breaker tripped",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &[],
+    )
+    .expect("Metric created")
+});
 pub static NODE_DISK_TOTAL: Lazy<IntGaugeVec> = Lazy::new(|| {
     IntGaugeVec::new(
         Opts::new("node_disk_total", "Total disk space")
@@ -3525,6 +3549,12 @@ pub(crate) fn register(registry: &Registry) {
         .register(Box::new(NODE_MEMORY_USAGE.clone()))
         .expect("Metric registered");
     registry
+        .register(Box::new(MEMORY_CIRCUIT_BREAKER_TRIPPED.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(MEMORY_CIRCUIT_BREAKER_TRIPS.clone()))
+        .expect("Metric registered");
+    registry
         .register(Box::new(NODE_DISK_TOTAL.clone()))
         .expect("Metric registered");
     registry
@@ -3998,6 +4028,8 @@ mod tests {
         let _ = NODE_CPU_USAGE.clone();
         let _ = NODE_MEMORY_TOTAL.clone();
         let _ = NODE_MEMORY_USAGE.clone();
+        let _ = MEMORY_CIRCUIT_BREAKER_TRIPPED.clone();
+        let _ = MEMORY_CIRCUIT_BREAKER_TRIPS.clone();
         let _ = NODE_DISK_TOTAL.clone();
         let _ = NODE_DISK_USAGE.clone();
         let _ = NODE_TCP_CONNECTIONS.clone();

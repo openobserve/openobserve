@@ -82,7 +82,7 @@ impl Search for Searcher {
                     response,
                 }))
             }
-            Err(e) => Err(Status::internal(format!("search failed: {e}"))),
+            Err(e) => Err(search_error_status(&e, "search failed")),
         }
     }
 
@@ -116,7 +116,7 @@ impl Search for Searcher {
                     response,
                 }))
             }
-            Err(e) => Err(Status::internal(format!("search failed: {e}"))),
+            Err(e) => Err(search_error_status(&e, "search failed")),
         }
     }
 
@@ -153,7 +153,7 @@ impl Search for Searcher {
                     response,
                 }))
             }
-            Err(e) => Err(Status::internal(format!("search partition failed: {e}"))),
+            Err(e) => Err(search_error_status(&e, "search partition failed")),
         }
     }
 
@@ -485,9 +485,32 @@ impl Search for Searcher {
     }
 }
 
+/// A 503 stays decodable by the caller; other errors keep the text callers already parse.
+fn search_error_status(e: &infra::errors::Error, context: &str) -> Status {
+    e.to_unavailable_status()
+        .unwrap_or_else(|| Status::internal(format!("{context}: {e}")))
+}
+
 #[cfg(test)]
 mod tests {
+    use infra::errors::{Error, ErrorCodes};
+
     use super::*;
+
+    #[test]
+    fn test_search_error_status_keeps_a_503_retryable() {
+        let overload = search_error_status(&Error::ResourceError("full".into()), "search failed");
+        assert_eq!(overload.code(), tonic::Code::Unavailable);
+        assert!(matches!(
+            ErrorCodes::from_json(overload.message()).unwrap(),
+            ErrorCodes::ServiceUnavailable(reason) if reason == "full"
+        ));
+
+        let timeout = Error::ErrorCode(ErrorCodes::SearchTimeout("slow".into()));
+        let status = search_error_status(&timeout, "search failed");
+        assert_eq!(status.code(), tonic::Code::Internal);
+        assert_eq!(status.message(), format!("search failed: {timeout}"));
+    }
 
     #[cfg(not(feature = "enterprise"))]
     #[tokio::test]

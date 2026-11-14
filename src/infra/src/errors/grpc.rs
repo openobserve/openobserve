@@ -35,16 +35,40 @@ impl From<ErrorCodes> for DataFusionError {
     }
 }
 
+impl Error {
+    /// A 503 crosses a gRPC hop as `Unavailable` carrying its error code JSON, so the peer
+    /// answers 503 too; None for every other error.
+    pub fn to_unavailable_status(&self) -> Option<tonic::Status> {
+        let code = match self {
+            Error::ResourceError(reason) => ErrorCodes::ServiceUnavailable(reason.clone()),
+            Error::ErrorCode(code @ ErrorCodes::ServiceUnavailable(_)) => code.clone(),
+            _ => return None,
+        };
+        Some(tonic::Status::unavailable(code.to_json()))
+    }
+}
+
+impl ErrorCodes {
+    /// Decodes the status of [`Error::to_unavailable_status`] sent by a peer node.
+    pub fn from_unavailable_status(status: &tonic::Status) -> Option<Self> {
+        if status.code() != tonic::Code::Unavailable {
+            return None;
+        }
+        match ErrorCodes::from_json(status.message()) {
+            Ok(code @ ErrorCodes::ServiceUnavailable(_)) => Some(code),
+            _ => None,
+        }
+    }
+}
+
 impl From<DataFusionError> for Error {
     fn from(err: DataFusionError) -> Self {
-        let err = match err {
-            DataFusionError::External(external) => match external.downcast::<DataFusionErrorCode>()
-            {
-                Ok(code) => return Error::ErrorCode(code.0),
-                Err(external) => DataFusionError::External(external),
-            },
-            err => err,
-        };
+        // Operators such as RepartitionExec wrap a child's error in Shared or Context.
+        if let DataFusionError::External(external) = err.find_root()
+            && let Some(code) = external.downcast_ref::<DataFusionErrorCode>()
+        {
+            return Error::ErrorCode(code.0.clone());
+        }
         if let DataFusionError::SchemaError(schema_err, _) = &err
             && let SchemaError::FieldNotFound {
                 field,
@@ -152,6 +176,56 @@ mod tests {
             Error::from(df_err),
             Error::ErrorCode(ErrorCodes::SearchCancelQuery(message)) if message == "canceled"
         ));
+    }
+
+    #[test]
+    fn test_from_datafusion_error_code_survives_wrapping() {
+        let code: DataFusionError = ErrorCodes::ServiceUnavailable("full".to_string()).into();
+        let wrapped = DataFusionError::Shared(std::sync::Arc::new(code)).context("repartition");
+        assert!(matches!(
+            Error::from(wrapped),
+            Error::ErrorCode(ErrorCodes::ServiceUnavailable(reason)) if reason == "full"
+        ));
+    }
+
+    #[test]
+    fn test_a_503_crosses_grpc_as_unavailable() {
+        let status = Error::ResourceError("memory is full".to_string())
+            .to_unavailable_status()
+            .unwrap();
+        assert_eq!(status.code(), tonic::Code::Unavailable);
+        assert!(matches!(
+            ErrorCodes::from_json(status.message()).unwrap(),
+            ErrorCodes::ServiceUnavailable(reason) if reason == "memory is full"
+        ));
+        assert!(matches!(
+            ErrorCodes::from_unavailable_status(&status),
+            Some(ErrorCodes::ServiceUnavailable(reason)) if reason == "memory is full"
+        ));
+        let relayed = Error::ErrorCode(ErrorCodes::ServiceUnavailable("full".to_string()));
+        assert_eq!(
+            relayed.to_unavailable_status().unwrap().message(),
+            ErrorCodes::ServiceUnavailable("full".to_string()).to_json()
+        );
+    }
+
+    #[test]
+    fn test_other_errors_keep_their_grpc_status() {
+        for err in [
+            Error::ErrorCode(ErrorCodes::SearchTimeout("slow".to_string())),
+            Error::Message("boom".to_string()),
+        ] {
+            assert!(err.to_unavailable_status().is_none(), "{err}");
+        }
+        for status in [
+            tonic::Status::unavailable("tcp connect error"),
+            tonic::Status::internal(ErrorCodes::ServiceUnavailable("x".to_string()).to_json()),
+        ] {
+            assert!(
+                ErrorCodes::from_unavailable_status(&status).is_none(),
+                "{status}"
+            );
+        }
     }
 
     #[test]
