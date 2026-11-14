@@ -241,11 +241,18 @@ const sizeClasses = computed(() => {
 
 const isFullSize = computed(() => props.size === "full");
 
+const pinnedTop = ref<number | null>(null);
+
 // Inline style for explicit width/maxHeight override
 const contentStyle = computed(() => {
   const style: Record<string, string> = {};
   if (props.width != null) style.width = `${props.width}vw`;
   if (props.maxHeight != null) style.maxHeight = `${props.maxHeight}vh`;
+  if (pinnedTop.value != null && !isFullSize.value) {
+    style.top = `${pinnedTop.value}px`;
+    style.translate = "-50% 0";
+    style.maxHeight = `min(${props.maxHeight ?? 90}vh, calc(95vh - ${pinnedTop.value}px))`;
+  }
   return Object.keys(style).length ? style : undefined;
 });
 
@@ -388,6 +395,41 @@ const {
   detach: detachShadow,
 } = useScrollShadow(bodyRef);
 
+// Pinned from the first interaction so a reveal never moves what was clicked; earlier loads still centre.
+function pinPanelTop() {
+  if (pinnedTop.value != null || isFullSize.value) return;
+  const panel = bodyRef.value?.closest<HTMLElement>("[data-o2-dialog]");
+  if (!panel) return;
+  pinnedTop.value = Math.max(0, (window.innerHeight - panel.getBoundingClientRect().height) / 2);
+}
+
+watchEffect((cleanup) => {
+  if (!shown.value) {
+    pinnedTop.value = null;
+    return;
+  }
+  // Closing or deactivating runs the cleanup, so a repin queued before it never lands on a hidden panel.
+  let live = true;
+  // A new viewport height re-centres a pinned panel once, then holds the new top.
+  const repin = () => {
+    if (pinnedTop.value == null) return;
+    pinnedTop.value = null;
+    nextTick(() => {
+      if (live && shown.value) pinPanelTop();
+    });
+  };
+  window.addEventListener("resize", repin);
+  cleanup(() => {
+    live = false;
+    window.removeEventListener("resize", repin);
+  });
+});
+
+// A fullscreen panel fills the viewport, so a top pinned at its earlier size would be stale when it shrinks back.
+watch(isFullSize, (full) => {
+  if (full) pinnedTop.value = null;
+});
+
 // The body unmounts while a kept-alive host is away, so its listeners follow what is shown.
 watch(shown, (open) => {
   if (open) {
@@ -421,7 +463,7 @@ const overlayScope = useOverlayScope();
           'bg-dialog-overlay',
           'data-[state=open]:animate-in data-[state=open]:fade-in-0',
           'data-[state=closed]:animate-out data-[state=closed]:fade-out-0',
-          'data-[state=closed]:duration-90 data-[state=open]:duration-110',
+          'data-[state=closed]:duration-(--duration-dialog-out) data-[state=open]:duration-(--duration-dialog-in)',
         ]"
       />
 
@@ -452,19 +494,18 @@ const overlayScope = useOverlayScope();
           'text-dialog-content-text',
           // Focus ring
           'focus-visible:ring-dialog-focus-ring outline-none focus-visible:ring-2',
-          // Animation — single-direction rise: slides up from ~24px below while
-          // fading in, soft ease-out-expo settle (150ms); fades + drops back out
-          // (100ms). No scale, so nothing squishes — it just glides into place.
           'data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:slide-in-from-bottom-6',
           'data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:slide-out-to-bottom-2',
-          'data-[state=open]:duration-150 data-[state=open]:ease-[cubic-bezier(0.16,1,0.3,1)]',
-          'data-[state=closed]:duration-100 data-[state=closed]:ease-in',
+          'data-[state=open]:duration-(--duration-dialog-in) data-[state=open]:ease-(--ease-out-expo)',
+          'data-[state=closed]:duration-(--duration-dialog-out) data-[state=closed]:ease-(--ease-overlay-out)',
         ]"
         @escape-key-down="handleEscapeKeyDown"
         @interact-outside="handleInteractOutside"
         @open-auto-focus="handleOpenAutoFocus"
         @close-auto-focus="handleCloseAutoFocus"
         @keydown="handleContentKeydown"
+        @pointerdown.capture="pinPanelTop"
+        @keydown.capture="pinPanelTop"
       >
         <!--
           DialogTitle is ALWAYS rendered for accessibility.

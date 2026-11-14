@@ -420,7 +420,7 @@ const triggerClasses = computed(() => [
             :class="[
               'ring-offset-surface-base focus-visible:ring-datepicker-focus-ring flex-1 border-b-2 py-2.5 text-sm ring-offset-1 transition-[color,background-color,border-color,box-shadow] duration-150 outline-none focus-visible:ring-2',
               activeTab === 'relative'
-                ? 'border-datepicker-day-selected-bg text-datepicker-day-selected-bg font-medium'
+                ? 'border-datepicker-day-selected-bg text-datepicker-accent-text font-medium'
                 : 'text-datepicker-weekday-text hover:text-datepicker-heading-text border-transparent',
             ]"
             data-test="datetimerange-tab-relative"
@@ -433,7 +433,7 @@ const triggerClasses = computed(() => [
             :class="[
               'ring-offset-surface-base focus-visible:ring-datepicker-focus-ring flex-1 border-b-2 py-2.5 text-sm ring-offset-1 transition-[color,background-color,border-color,box-shadow] duration-150 outline-none focus-visible:ring-2',
               activeTab === 'absolute'
-                ? 'border-datepicker-day-selected-bg text-datepicker-day-selected-bg font-medium'
+                ? 'border-datepicker-day-selected-bg text-datepicker-accent-text font-medium'
                 : 'text-datepicker-weekday-text hover:text-datepicker-heading-text border-transparent',
             ]"
             data-test="datetimerange-tab-absolute"

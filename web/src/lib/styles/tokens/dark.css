@@ -86,6 +86,7 @@
   --color-text-code: var(--color-grey-300); /* inline code, monospace */
   --color-text-inverse: var(--color-grey-900); /* text on light/colored bg */
   --color-accent: var(--color-primary-400); /* brand accent — lighter shade for dark surfaces */
+  --color-accent-on-tint: var(--color-primary-200);
   /* Only accent + warning need a dark step; danger/success hold their light value. */
   --color-focus-ring-accent: var(--color-primary-400);
   --color-focus-ring-warning: var(--color-warning-500);
@@ -207,6 +208,7 @@
 
   /* ghost-primary */
   --color-button-ghost-primary-text: var(--color-primary-400);
+  --color-button-ghost-primary-hover-text: var(--color-accent-on-tint);
   --color-button-ghost-primary-hover-bg: var(--color-surface-accent-hover);
   --color-button-ghost-primary-active-bg: var(--color-surface-accent-active);
 
@@ -221,7 +223,7 @@
   --color-button-ghost-success-active-bg: var(--color-surface-overlay);
 
   /* ghost-muted */
-  --color-button-ghost-muted-hover-text: var(--color-primary-400);
+  --color-button-ghost-muted-hover-text: var(--color-accent-on-tint);
   --color-button-ghost-muted-hover-bg: var(--color-surface-accent-hover);
   --color-button-ghost-muted-active-bg: var(--color-surface-accent-active);
 
@@ -260,6 +262,8 @@
   --color-tabs-rail-hover-bg: var(--color-grey-800);
   --color-tabs-bar-border: var(--color-grey-700);
   --color-nav-label-accent: var(--color-accent);
+  --color-nav-flyout-item-hover-bg: var(--color-surface-accent-hover);
+  --color-nav-flyout-item-selected-bg: var(--color-surface-accent-active);
 
   /* Collapsible */
   --color-collapsible-trigger-hover-bg: var(--color-primary-900);
@@ -430,7 +434,7 @@
   --color-select-content-border: var(--color-border-default);
   --color-select-item-hover-bg: var(--color-surface-accent-hover);
   --color-select-item-selected-bg: var(--color-surface-accent-active);
-  --color-select-item-selected-text: var(--color-primary-200);
+  --color-select-item-selected-text: var(--color-accent-on-tint);
   --color-select-item-disabled: var(--color-text-disabled);
   --color-select-header-bg: color-mix(
     in srgb,
@@ -441,11 +445,7 @@
   --color-select-header-action-text: var(--color-primary-300);
   --color-select-header-action-hover-bg: var(--color-surface-accent-hover);
 
-  /* Switch (OSwitch) — same off-vs-on-vs-disabled differentiation as light
-       mode. OFF uses primary outline + primary thumb (interactive signal).
-       ON gets a primary-filled track + white thumb (handled in the Vue
-       template). DISABLED stays grey + dashed so it's clearly distinct
-       from both OFF and ON. */
+  /* Switch (OSwitch) */
   --color-switch-border: var(--color-primary-500);
   --color-switch-border-off: var(--color-primary-500);
   --color-switch-thumb-off: var(--color-primary-500);
@@ -456,15 +456,16 @@
   /* Checkbox (OCheckbox) */
   --color-checkbox-bg: var(--color-surface-panel);
   --color-checkbox-border: var(--color-border-strong);
-  --color-checkbox-checked-bg: var(--color-primary-500);
-  --color-checkbox-checked-border: var(--color-primary-500);
+  /* The primary button's fill, so the white tick clears 4.5:1. */
+  --color-checkbox-checked-bg: var(--color-button-primary);
+  --color-checkbox-checked-border: var(--color-button-primary);
+  /* theme.ts swaps the primary button's foreground to dark ink on light accents such as #8B8DF0. */
+  --color-checkbox-checked-fg: var(--color-button-primary-foreground);
   --color-checkbox-disabled-bg: var(--color-surface-subtle);
   --color-checkbox-disabled-border: var(--color-border-default);
 
-  /* Radio (ORadio) — same rationale as switch: primary outline by default
-       (signals interactivity), grey only when disabled. */
+  /* Radio (ORadio) */
   --color-radio-bg: var(--color-surface-panel);
-  --color-radio-border: var(--color-primary-500);
   --color-radio-checked-border: var(--color-primary-500);
   --color-radio-checked-dot: var(--color-primary-500);
   --color-radio-disabled-bg: var(--color-surface-subtle);
@@ -505,7 +506,9 @@
   --color-datepicker-popup-bg: var(--color-surface-overlay);
   --color-datepicker-popup-border: var(--color-border-default);
   --color-datepicker-day-hover-bg: var(--color-surface-accent-hover);
-  --color-datepicker-day-selected-bg: var(--color-primary-500);
+  --color-datepicker-day-selected-bg: var(--color-button-primary);
+  --color-datepicker-day-selected-text: var(--color-button-primary-foreground);
+  --color-datepicker-accent-text: var(--color-primary-500);
   --color-datepicker-day-today-border: var(--color-primary-400);
   --color-datepicker-day-outside-text: var(--color-text-disabled);
   --color-datepicker-nav-hover-bg: var(--color-surface-accent-hover);
@@ -513,10 +516,12 @@
   --color-datepicker-day-range-text: var(--color-primary-200);
   --color-datepicker-clock-face-bg: var(--color-surface-panel);
   --color-datepicker-clock-header-bg: var(--color-primary-800);
-  --color-datepicker-clock-selected-bg: var(--color-primary-500);
+  --color-datepicker-clock-selected-bg: var(--color-button-primary);
+  --color-datepicker-clock-selected-text: var(--color-button-primary-foreground);
   --color-datepicker-clock-hover-bg: var(--color-surface-accent-hover);
   --color-datepicker-relative-btn-bg: var(--color-surface-panel);
-  --color-datepicker-relative-btn-selected-bg: var(--color-primary-500);
+  --color-datepicker-relative-btn-selected-bg: var(--color-button-primary);
+  --color-datepicker-relative-btn-selected-text: var(--color-button-primary-foreground);
   --color-datepicker-relative-btn-hover-bg: var(--color-surface-accent-hover);
 
   /* Color picker */
@@ -530,6 +535,8 @@
        slightly lifted frame around the content. Shared by ODialog + ODrawer. */
   --color-dialog-bg: var(--color-surface-base);
   --color-dialog-border: var(--d-border);
+  --shadow-dialog:
+    0 1.5rem 3rem -0.75rem var(--shadow-lg-c1), 0 0.5rem 1rem -0.25rem var(--shadow-lg-c2);
   --color-dialog-header-bg: var(--color-surface-panel);
   --color-dialog-header-text: var(--color-text-heading);
   --color-dialog-header-border: var(--d-border);
@@ -541,7 +548,8 @@
   --color-dialog-close-active-bg: var(--d-border);
 
   /* Pagination */
-  --color-pagination-item-active-bg: var(--color-primary-800);
+  --color-pagination-item-active-bg: var(--color-button-primary);
+  --color-pagination-item-active-text: var(--color-button-primary-foreground);
 
   /* Timeline */
   --color-timeline-dot-destructive: var(--color-error-500);
@@ -827,6 +835,7 @@
   /* OTable (dark) */
   --color-table-header-bg: var(--d-overlay); /* header band lifts off rows */
   --color-table-row-hover-bg: var(--d-hover); /* neutral hover (not teal-washed) */
+  --color-table-row-action-hover-bg: var(--color-surface-accent-hover);
   --color-table-row-selected-bg: var(--d-selected); /* teal-tinted selection */
   /* grey-400 drops to ~4.3:1 on the selected fill of brighter custom themes. */
   --color-table-row-text-secondary-tinted: color-mix(

@@ -190,7 +190,7 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import EmptyStateIngestionCard from "@/lib/core/EmptyState/EmptyStateIngestionCard.vue";
 import EmptyStateIngestionChip from "@/lib/core/EmptyState/EmptyStateIngestionChip.vue";
 import SampleDataCallout from "@/components/sampleData/SampleDataCallout.vue";
-import { sampleDataFlowOn } from "@/utils/firstRunFlow";
+import { sampleDataOffered } from "@/utils/firstRunFlow";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { getImageURL } from "@/utils/zincutils";
 import { useSetupTarget } from "@/composables/useSetupTarget";
@@ -251,7 +251,12 @@ const orgQuery = computed(() => ({
   org_identifier: store.state.selectedOrganization?.identifier,
 }));
 
-const sampleDataFlow = computed(() => sampleDataFlowOn(store.state.zoConfig));
+const sampleDataFlow = computed(() =>
+  sampleDataOffered(
+    store.state.zoConfig,
+    store.state.organizationData?.organizationSettings?.free_trial_expiry,
+  ),
+);
 
 // Uses v-html — fully i18n-controlled, no user input.
 const description = computed(() => DOMPurify.sanitize(t("home.noDataState.description")));

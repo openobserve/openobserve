@@ -323,7 +323,7 @@ describe("SyntheticMonitoring", () => {
       useListViewState("synthetics", {
         folder: "",
         activeTab: "all",
-        statusFilter: "all",
+        statusFilter: [] as string[] | string,
         typeFilter: "all",
         locationFilter: "all",
         search: "",
@@ -353,6 +353,16 @@ describe("SyntheticMonitoring", () => {
       expect(mt.props("pageSize")).toBe(50);
       expect(mt.props("sortBy")).toBe("name");
       expect(mt.props("sortOrder")).toBe("desc");
+    });
+
+    it("restores a legacy single status and saves picked statuses as a list", async () => {
+      Object.assign(seed(), { statusFilter: "failed" });
+      wrapper = mountPage();
+      const vm = wrapper.vm as any;
+      expect(vm.statusFilters).toEqual(["failed"]);
+      vm.statusFilters = ["failed", "warning"];
+      await nextTick();
+      expect(seed().statusFilter).toEqual(["failed", "warning"]);
     });
 
     it("restores the type tab and drops the stored page when the folder differs", () => {

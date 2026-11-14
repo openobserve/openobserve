@@ -138,6 +138,7 @@ import Activity from "~icons/material-symbols/vital-signs";
 import AlignLeft from "~icons/material-symbols/format-align-left";
 import AlignRight from "~icons/material-symbols/format-align-right";
 import AllInclusive from "~icons/material-symbols/all-inclusive";
+import Apps from "~icons/material-symbols/apps";
 import AssignmentTurnedIn from "~icons/material-symbols/assignment-turned-in-outline";
 import AutoAwesome from "~icons/material-symbols/auto-awesome-outline";
 import BarChart from "~icons/material-symbols/bar-chart-4-bars";
@@ -512,6 +513,7 @@ export const iconRegistry = {
   "align-left": AlignLeft,
   "align-right": AlignRight,
   "all-inclusive": AllInclusive,
+  apps: Apps,
   "assignment-turned-in": AssignmentTurnedIn,
   "auto-awesome": AutoAwesome,
   "bar-chart": BarChart,

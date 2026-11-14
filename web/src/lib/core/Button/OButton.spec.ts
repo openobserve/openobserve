@@ -406,7 +406,7 @@ describe("OButton", () => {
     // Animating outline would fade the focus indicator in from the default grey.
     expect(classes).not.toMatch(/transition-\[[^\]]*outline/);
     expect(wrapper.classes()).not.toContain("transition-all");
-    expect(classes).toContain("duration-150");
+    expect(classes).toContain("duration-(--duration-control)");
   });
 
   it("does not apply the old transition-colors-only utility", () => {

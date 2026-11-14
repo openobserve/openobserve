@@ -290,6 +290,7 @@ mod m20261218_000001_ai_chat_sessions_branched_from;
 mod m20261219_000001_add_approval_scope_to_ai_actions;
 mod m20261219_000001_add_historical_to_alert_incidents;
 mod m20261220_000001_create_service_identity_tables;
+mod m20261221_000001_add_last_detection_at_to_alert_incidents;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;
 
@@ -927,6 +928,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20261103_000003_add_gap_state_to_synthetics::Migration),
             Box::new(m20261111_000001_add_false_alarm_recovery_stamp::Migration),
             Box::new(m20261220_000001_create_service_identity_tables::Migration),
+            Box::new(m20261221_000001_add_last_detection_at_to_alert_incidents::Migration),
             Box::new(m20261030_000001_add_agent_to_ai_chat_turns::Migration),
             Box::new(m20261016_000001_add_first_event_at_to_ai_chat_turns::Migration),
             Box::new(m20261020_000001_add_health_to_org_ai_toolsets::Migration),
@@ -1072,14 +1074,18 @@ mod tests {
         (153, "m20261103_000003_add_gap_state_to_synthetics"),
         (154, "m20261111_000001_add_false_alarm_recovery_stamp"),
         (155, "m20261220_000001_create_service_identity_tables"),
-        (156, "m20261016_000001_add_first_event_at_to_ai_chat_turns"),
-        (157, "m20261020_000005_create_ai_turn_marks"),
-        (158, "m20261021_000005_create_ai_chat_imports"),
-        (159, "m20261021_000006_create_paid_overage_attribution"),
-        (160, "m20261021_000007_create_ai_approvals"),
-        (161, "m20261030_000001_add_agent_to_ai_chat_turns"),
-        (162, "m20261218_000001_ai_chat_sessions_branched_from"),
-        (163, "m20261219_000001_add_approval_scope_to_ai_actions"),
+        (
+            156,
+            "m20261221_000001_add_last_detection_at_to_alert_incidents",
+        ),
+        (157, "m20261016_000001_add_first_event_at_to_ai_chat_turns"),
+        (158, "m20261020_000005_create_ai_turn_marks"),
+        (159, "m20261021_000005_create_ai_chat_imports"),
+        (160, "m20261021_000006_create_paid_overage_attribution"),
+        (161, "m20261021_000007_create_ai_approvals"),
+        (162, "m20261030_000001_add_agent_to_ai_chat_turns"),
+        (163, "m20261218_000001_ai_chat_sessions_branched_from"),
+        (164, "m20261219_000001_add_approval_scope_to_ai_actions"),
     ];
 
     // Two branches that each claim the next version merge cleanly, so a reused number must fail
@@ -1197,6 +1203,10 @@ mod tests {
             (
                 "m20251204_000001_create_alert_incidents_table",
                 "m20261219_000001_add_historical_to_alert_incidents",
+            ),
+            (
+                "m20251204_000001_create_alert_incidents_table",
+                "m20261221_000001_add_last_detection_at_to_alert_incidents",
             ),
             (
                 "m20260725_000001_create_alert_states_tables",

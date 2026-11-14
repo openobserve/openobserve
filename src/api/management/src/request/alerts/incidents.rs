@@ -681,7 +681,10 @@ pub async fn trigger_incident_rca(
     };
     use openobserve_core::alerts::rca_runs;
 
-    if let Err(resp) = security::guard_case(&org_id, &user_email.user_id, "PUT", &incident_id).await
+    // The route checks only a read, so a security case needs triage and any other incident POST.
+    if let Err(resp) =
+        security::guard_case_or_incidents(&org_id, &user_email.user_id, &incident_id, "PUT", "POST")
+            .await
     {
         return resp;
     }
@@ -1364,7 +1367,10 @@ pub async fn steer_incident_rca_run(
     use axum::http::StatusCode;
     use openobserve_core::alerts::rca_steering;
 
-    if let Err(resp) = security::guard_case(&org_id, &user_email.user_id, "PUT", &incident_id).await
+    // The route checks only a read, so a security case needs triage and any other incident POST.
+    if let Err(resp) =
+        security::guard_case_or_incidents(&org_id, &user_email.user_id, &incident_id, "PUT", "POST")
+            .await
     {
         return resp;
     }
@@ -1522,7 +1528,10 @@ pub async fn resume_incident_rca_run(
     Path((org_id, incident_id, run_id)): Path<(String, String, String)>,
     Headers(user_email): Headers<UserEmail>,
 ) -> Response {
-    if let Err(resp) = security::guard_case(&org_id, &user_email.user_id, "PUT", &incident_id).await
+    // The route checks only a read, so a security case needs triage and any other incident POST.
+    if let Err(resp) =
+        security::guard_case_or_incidents(&org_id, &user_email.user_id, &incident_id, "PUT", "POST")
+            .await
     {
         return resp;
     }
@@ -2618,6 +2627,7 @@ mod tests {
             alert_groups: None,
             historical: false,
             group_values_display: None,
+            last_detection_at: None,
         };
 
         let response = ListIncidentsResponse {
@@ -2923,6 +2933,7 @@ mod tests {
             alert_groups: None,
             historical: false,
             group_values_display: None,
+            last_detection_at: None,
         };
         let json = serde_json::to_value(&incident).unwrap();
         assert!(json.as_object().unwrap().contains_key("rca"));
@@ -3893,6 +3904,7 @@ mod tests {
             rca_off_reason: None,
             security_case: false,
             historical: false,
+            last_detection_at: None,
         };
         alert_incidents::Entity::insert(alert_incidents::ActiveModel::from(row).reset_all())
             .exec(conn)
@@ -4135,11 +4147,15 @@ mod tests {
         assert_eq!(status, StatusCode::FORBIDDEN, "{body}");
         assert!(steer_rows(&org, "run_live").await.is_empty());
 
-        for user in [STEER_ROOT, STEER_READER] {
+        // The handler checks the grant first, so a reader learns nothing about other incidents.
+        for (user, want) in [
+            (STEER_ROOT, StatusCode::NOT_FOUND),
+            (STEER_READER, StatusCode::FORBIDDEN),
+        ] {
             let (status, body) =
                 status_and_body(steer_as(&org, "inc_unknown", "run_live", user, message).await)
                     .await;
-            assert_eq!(status, StatusCode::NOT_FOUND, "{user}: {body}");
+            assert_eq!(status, want, "{user}: {body}");
         }
         for (incident, run) in [("inc_1", "run_unknown"), ("inc_2", "run_live")] {
             let (status, body) =

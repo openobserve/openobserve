@@ -154,15 +154,16 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 154: add synthetics.status_recovered_at and status_streak_sig, and
 //      status_page_notices.false_alarm_recovered_at.
 // 155: create the service version, identity, alias, deploy and verdict tables.
-// 156: add first_event_at to ai_chat_turns.
-// 157: org_ai_toolsets health; create ai_grants, ai_actions, ai_access_requests, ai_turn_marks.
-// 158: chat pins, seeds, turn versions, decisions, hide_attachments, ai_chat_feedback/imports.
-// 159: create paid_overage_attribution.
-// 160: create ai_approvals.
-// 161: add agent to ai_chat_turns.
-// 162: add branched_from to ai_chat_sessions.
-// 163: add approval_scope to ai_actions.
-pub const DB_SCHEMA_VERSION: u64 = 163;
+// 156: add alert_incidents.last_detection_at, when a new detection joined a worked case.
+// 157: add first_event_at to ai_chat_turns.
+// 158: org_ai_toolsets health; create ai_grants, ai_actions, ai_access_requests, ai_turn_marks.
+// 159: chat pins, seeds, turn versions, decisions, hide_attachments, ai_chat_feedback/imports.
+// 160: create paid_overage_attribution.
+// 161: create ai_approvals.
+// 162: add agent to ai_chat_turns.
+// 163: add branched_from to ai_chat_sessions.
+// 164: add approval_scope to ai_actions.
+pub const DB_SCHEMA_VERSION: u64 = 164;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables

@@ -29,6 +29,7 @@ import { resolveTraceSearchMode, type TraceSearchMode } from "@/ts/interfaces/tr
 import store from "@/stores";
 import { featureState, withLicenseFeature } from "@/utils/featureGate";
 import { loadSecurityAccess, securityFeatureState } from "@/composables/security/useSecurityAccess";
+import { loadSecurityMessages } from "@/locales";
 import {
   hasMetricsEditorParams,
   hasMetricsOverrideParams,
@@ -198,9 +199,10 @@ const securityGuard = (to: any, from: any, next: any) => {
     const org = to.query.org_identifier || store.state.selectedOrganization?.identifier;
     const state = securityFeatureState(store.state.zoConfig?.features);
     if (state === "hidden") return next({ name: "home", query: { org_identifier: org } });
-    if (state === "locked" || !org) return next();
-    // Waits for the answer so the page mounts already knowing whether to lock.
-    loadSecurityAccess(String(org)).finally(() => next());
+    // Waits for the messages and the access answer so the page mounts translated and knowing whether to lock.
+    const loads: Promise<unknown>[] = [loadSecurityMessages()];
+    if (state !== "locked" && org) loads.push(loadSecurityAccess(String(org)));
+    Promise.allSettled(loads).finally(() => next());
   });
 };
 

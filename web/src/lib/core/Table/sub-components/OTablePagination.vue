@@ -231,7 +231,7 @@ const selectionLabel = computed(() => {
       <span
         v-else
         :class="[
-          'text-primary text-xs whitespace-nowrap transition-opacity',
+          'text-text-secondary text-xs whitespace-nowrap tabular-nums transition-opacity',
           stale ? 'opacity-60' : '',
           rangeHidden ? 'invisible' : '',
         ]"
@@ -252,7 +252,7 @@ const selectionLabel = computed(() => {
       <div
         v-if="pageSizeOptions.length > 0"
         :class="[
-          'text-primary flex items-center gap-1.5 text-xs transition-opacity',
+          'flex items-center gap-1.5 text-xs transition-opacity',
           stale ? 'cursor-not-allowed opacity-60' : '',
         ]"
         :role="pagingInactive ? 'group' : undefined"

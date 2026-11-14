@@ -288,7 +288,7 @@ const SEARCH_CALLERS: [(&str, &str, Caller); 78] = [
     ("api/management/src/request/db_monitoring/service/common.rs", "stats_search_once", Caller::Routed("db_monitoring::handler::")),
     ("api/management/src/request/db_monitoring/service/instance_metrics.rs", "run_metrics_search", Caller::Routed("db_monitoring::handler::")),
     ("api/management/src/request/gen_ai_health.rs", "run_sql", Caller::InHandler),
-    ("api/management/src/request/security/audit.rs", "search_audit", Caller::Exempt("Security audit trail from the meta org audit stream; its route stays open")),
+    ("api/management/src/request/security/audit.rs", "search_meta", Caller::Exempt("Security audit trail from the meta org audit stream; its route stays open")),
     ("api/management/src/request/security/intel.rs", "run_search", Caller::InHandler),
     ("api/management/src/request/security/investigate.rs", "run_sql", Caller::InHandler),
     ("api/management/src/request/security/sigma.rs", "search_rows", Caller::InHandler),

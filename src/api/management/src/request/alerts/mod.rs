@@ -442,6 +442,15 @@ pub async fn create_alert(
     if let Err(resp) = security::validate_detection(&org_id, Some(&folder_id), &alert).await {
         return resp;
     }
+    // An import or `?overwrite=true` naming a stored detection's id must not rewrite its query.
+    #[cfg(feature = "enterprise")]
+    if let Some(alert_id) = alert.id
+        && let Err(resp) =
+            security::guard_detection_definition(&org_id, &user_email.user_id, alert_id, &alert)
+                .await
+    {
+        return resp;
+    }
     if let Err(resp) = validate_oncall_team(&org_id, alert.oncall_team.as_deref()).await {
         return resp;
     }
@@ -2492,6 +2501,12 @@ pub async fn update_alert(
     alert.id = Some(alert_id);
     #[cfg(feature = "enterprise")]
     if let Err(resp) = security::validate_detection(&org_id, None, &alert).await {
+        return resp;
+    }
+    #[cfg(feature = "enterprise")]
+    if let Err(resp) =
+        security::guard_detection_definition(&org_id, &user_email.user_id, alert_id, &alert).await
+    {
         return resp;
     }
     // the save's own checks answer first, so a bad body is never reported as a refused read
@@ -5896,6 +5911,21 @@ mod tests {
                 .await
                 .unwrap_err();
             assert_ne!(resp.status(), StatusCode::FORBIDDEN);
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_every_save_of_a_stored_alert_guards_a_detections_definition() {
+        let text = include_str!("mod.rs");
+        for signature in ["pub async fn create_alert(", "pub async fn update_alert("] {
+            let start = text.find(signature).expect("handler");
+            let body = &text[start..];
+            let body = &body[..body.find("\n}\n").expect("handler end")];
+            assert!(
+                body.contains("security::guard_detection_definition("),
+                "{signature} must refuse a change to a detection's Sigma-compiled query"
+            );
         }
     }
 }

@@ -320,7 +320,7 @@ import { useSecurityAccess } from "@/composables/security/useSecurityAccess";
 import config from "../aws-exports";
 
 import { setLanguage } from "../utils/cookies";
-import { getLocale } from "../locales";
+import { getLocale, loadSecurityMessages, securityMessagesRevision } from "../locales";
 
 import { assistantSignOut } from "@/utils/assistant/assistantSignOut";
 import MainLayoutOpenSourceMixin from "@/mixins/mainLayout.mixin";
@@ -726,7 +726,18 @@ export default defineComponent({
         store.state.zoConfig.version != ""
       ),
     );
-    const securityNavLinks = buildSecurityNavLinks(t);
+    // The rail can show on a shared route (settings, IAM) before any Security page loaded its messages.
+    const securityNavLinks = computed(() => {
+      void securityMessagesRevision.value;
+      return buildSecurityNavLinks(t);
+    });
+    watch(
+      () => store.state.solutionMode,
+      (mode) => {
+        if (mode === "security") loadSecurityMessages().catch(() => {});
+      },
+      { immediate: true },
+    );
 
     // The URL decides the mode, so a shared /security link or a /logs jump shows the matching nav.
     const route = useRoute();
@@ -772,7 +783,7 @@ export default defineComponent({
       !menuReady.value
         ? []
         : store.state.solutionMode === "security"
-          ? securityNavLinks
+          ? securityNavLinks.value
           : linksList.value,
     );
 

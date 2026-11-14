@@ -27,11 +27,23 @@
         <template #toolbar>
           <OSearchInput
             :model-value="search"
-            class="min-w-0 flex-1"
+            class="min-w-0 flex-1 md:min-w-48"
             :placeholder="t('onlineEvals.job.searchPlaceholder')"
             data-test="eval-job-list-search-input"
             clearable
             @update:model-value="$emit('update:search', $event as string)"
+          />
+          <OStatStrip
+            :items="summaryStats"
+            :loading="loading"
+            selectable
+            :row="false"
+            multiple
+            :selected-keys="statusFilters"
+            default-key="all"
+            class="max-md:order-last"
+            data-test="eval-job-list-summary"
+            @update:selected-keys="statusFilters = $event as EvalJobStatus[]"
           />
         </template>
 
@@ -47,17 +59,7 @@
           />
         </template>
 
-        <template #subheader>
-          <div data-test="eval-job-list-summary">
-            <OStatStrip
-              :items="summaryStats"
-              :loading="loading"
-              selectable
-              :selected-key="selectedStatKey"
-              default-key="all"
-              @select="onStatSelect"
-            />
-          </div>
+        <template v-if="budgetPausedRows.length" #subheader>
           <!-- Keep paused makes the pause the user's, so 00:00 UTC does not resume it. -->
           <div
             v-for="row in budgetPausedRows"
@@ -403,6 +405,7 @@ import {
   type JobSpend,
 } from "./utils/evalSpend";
 import type { SpendError } from "@/utils/alerts/aiBudgets";
+import { matchesAnyKey } from "@/utils/filterKeys";
 
 const props = defineProps<{
   rows: EvalJob[];
@@ -442,7 +445,7 @@ function canPause(status: EvalJobStatus): boolean {
 
 const { t } = useI18nTyped();
 const jobDrafts = useEditorDraftIds("eval_job");
-const statusFilter = ref<EvalJobStatus | null>(null);
+const statusFilters = ref<EvalJobStatus[]>([]);
 const selectedIds = ref<string[]>([]);
 
 function handleBulkDelete() {
@@ -574,15 +577,15 @@ const columns = computed(() =>
 );
 
 const filteredRows = computed(() =>
-  statusFilter.value
-    ? props.rows.filter((row) => statusOf(row) === statusFilter.value)
-    : props.rows,
+  props.rows.filter((row) =>
+    matchesAnyKey(statusFilters.value, row, (r, key) => statusOf(r) === key),
+  ),
 );
 
 const numberedRows = useNumberedRows(filteredRows);
 
 // Summary strip — colour-coded status counts that double as quick filters
-// (syncs with the status dropdown via `statusFilter`).
+// (syncs with the status dropdown via `statusFilters`).
 const statusCounts = computed(() => {
   const rows = props.rows || [];
   let active = 0;
@@ -640,13 +643,6 @@ const summaryStats = computed<StatItem[]>(() => {
     },
   ];
 });
-// Nothing is highlighted while viewing all rows (like the Incidents/Alerts strip);
-// the "All" tile clears the facet but is never itself the active tile.
-const selectedStatKey = computed(() => statusFilter.value);
-function onStatSelect(key: string) {
-  // Re-clicking the active tile clears the filter (toggle), matching the Alerts strip.
-  statusFilter.value = key === "all" || statusFilter.value === key ? null : (key as EvalJobStatus);
-}
 
 // Health drives the rail only for active jobs; it never changes the persisted status.
 function needsAttention(row: EvalJob): boolean {
@@ -681,7 +677,7 @@ function evalJobRowClass(row: EvalJob): string {
 // dropdown. Drives OEmptyState's `:filtered` so the body switches between
 // the first-run preset ("Create your first eval job") and the auto
 // "No evaluation jobs match these filters" + Clear-filters card.
-const hasFilters = computed(() => !!props.search?.trim() || !!statusFilter.value);
+const hasFilters = computed(() => !!props.search?.trim() || statusFilters.value.length > 0);
 
 // Wire OEmptyState's action ids back into the existing emit contract.
 // `create` mirrors a click on the OPageHeader's "New job" button;
@@ -690,7 +686,7 @@ function onEmptyAction(id?: string) {
   if (id === "create") emit("create");
   else if (id === "clear-filters") {
     emit("update:search", "");
-    statusFilter.value = null;
+    statusFilters.value = [];
   }
 }
 

@@ -83,7 +83,8 @@ export class OnCallMinePage {
 
       navReliability: '[data-test="nav-group-reliability"]',
       navMyOnCall: '[data-test="nav-group-item-onCallMine"]',
-      tooltip: '[data-test="o-tooltip-content"]',
+      // A tooltip fading out keeps data-state="closed" while the next one opens instantly.
+      tooltip: '[data-test="o-tooltip-content"]:not([data-state="closed"])',
     };
   }
 

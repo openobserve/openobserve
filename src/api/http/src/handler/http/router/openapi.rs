@@ -1170,6 +1170,19 @@ pub struct ApiDoc;
     openobserve_api_management::request::security::cases::update_case_settings,
     openobserve_api_management::request::security::cases::lookup_cases,
     openobserve_api_management::request::security::cases::promote_to_case,
+    openobserve_api_management::request::security::triage::search_cases,
+    openobserve_api_management::request::security::triage::bulk_update,
+    openobserve_api_management::request::security::triage::merge_cases,
+    openobserve_api_management::request::security::tuning::list_exceptions,
+    openobserve_api_management::request::security::tuning::create_exception,
+    openobserve_api_management::request::security::tuning::update_exception,
+    openobserve_api_management::request::security::tuning::delete_exception,
+    openobserve_api_management::request::security::tuning::list_allowlists,
+    openobserve_api_management::request::security::tuning::put_allowlist,
+    openobserve_api_management::request::security::tuning::delete_allowlist,
+    openobserve_api_management::request::security::tuning::list_suppressions,
+    openobserve_api_management::request::security::tuning::create_suppression,
+    openobserve_api_management::request::security::tuning::delete_suppression,
     openobserve_api_management::request::security::audit::list_security_audit,
     openobserve_api_management::request::security::investigate::list_entities,
     openobserve_api_management::request::security::investigate::get_entity_graph,
@@ -1186,12 +1199,17 @@ pub struct ApiDoc;
     openobserve_api_management::request::security::sources::classify_sources,
     openobserve_api_management::request::security::sources::attach_pack,
     openobserve_api_management::request::security::sources::detach_pack,
+    openobserve_api_management::request::security::sources::set_inclusion,
+    openobserve_api_management::request::security::sources::set_source_type,
+    openobserve_api_management::request::security::sources::get_source_schema,
     openobserve_api_management::request::security::sigma::get_catalog,
     openobserve_api_management::request::security::sigma::compile,
     openobserve_api_management::request::security::sigma::get_mitre_coverage,
     openobserve_api_management::request::security::sigma::get_detection_evidence,
     openobserve_api_management::request::slack::insights::get_insights_settings,
     openobserve_api_management::request::slack::insights::put_insights_settings,
+    openobserve_api_management::request::security::detections::update_detection,
+    openobserve_api_management::request::security::detections::preview_detection,
     openobserve_api_management::request::prompts::list_prompts,
     openobserve_api_management::request::prompts::create_prompt,
     openobserve_api_management::request::prompts::match_prompts,
@@ -2914,6 +2932,11 @@ mod tests {
                 "post",
                 "DetachSecuritySourcePack",
             ),
+            (
+                "/api/{org_id}/security/sources/{stream_name}/source_type",
+                "post",
+                "SetSecuritySourceType",
+            ),
         ] {
             assert_eq!(spec["paths"][path][method]["operationId"], id, "{path}");
         }
@@ -2926,6 +2949,8 @@ mod tests {
             "AttachError",
             "AttachPlan",
             "DetachSkip",
+            "SourceTypeRequest",
+            "SecurityTypeOrigin",
         ] {
             assert!(schemas.contains_key(name), "schema {name} missing");
         }
@@ -3022,6 +3047,18 @@ mod tests {
                 "get",
                 "GetDetectionEvidence",
                 "DetectionEvidence",
+            ),
+            (
+                "/api/{org_id}/security/detections/{alert_id}",
+                "put",
+                "UpdateSecurityDetection",
+                "UpdatedDetection",
+            ),
+            (
+                "/api/{org_id}/security/detections/preview",
+                "post",
+                "PreviewSecurityDetection",
+                "DetectionPreviewResponse",
             ),
         ] {
             let op = &spec["paths"][path][method];

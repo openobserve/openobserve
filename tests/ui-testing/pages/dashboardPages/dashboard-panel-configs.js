@@ -2171,9 +2171,12 @@ export default class DashboardPanelConfigs {
 
     for (let i = 0; i < total; i++) {
       try {
+        // hover() scrolls the trigger into view and Reka closes a tooltip on ancestor scroll,
+        // so scroll first; a tooltip still fading out keeps data-state="closed" and is skipped.
+        await candidates.nth(i).scrollIntoViewIfNeeded({ timeout: 5000 });
         await candidates.nth(i).hover({ timeout: 5000 });
         const tooltip = this.page
-          .locator(visibleOnly(SELECTORS.TOOLTIP_CONTENT))
+          .locator(visibleOnly(`${SELECTORS.TOOLTIP_CONTENT}:not([data-state="closed"])`))
           .first();
         await tooltip.waitFor({ state: "visible", timeout: 5000 });
         return tooltip;

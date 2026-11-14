@@ -16,7 +16,31 @@
 import { describe, expect, it, vi } from "vitest";
 import { mount } from "@vue/test-utils";
 import { h, nextTick } from "vue";
+import { TooltipProvider } from "reka-ui";
 import OTooltip from "./OTooltip.vue";
+
+function mountHoverable(delay?: number, underProvider = false) {
+  const trigger = () =>
+    h("button", { "data-test": "trigger" }, [
+      h(OTooltip, {
+        content: "Detailed failure",
+        hoverable: true,
+        ...(delay === undefined ? {} : { delay }),
+      }),
+    ]);
+  const render = underProvider
+    ? () => h(TooltipProvider, { delayDuration: 300, skipDelayDuration: 300 }, { default: trigger })
+    : trigger;
+  return mount({ render }, { attachTo: document.body });
+}
+
+const isOpen = (host: ReturnType<typeof mountHoverable>) =>
+  host.getComponent(OTooltip).findComponent({ name: "TooltipRoot" }).props("open") === true;
+
+async function settle(ms: number) {
+  await vi.advanceTimersByTimeAsync(ms);
+  await nextTick();
+}
 
 // The real portal puts the bubble outside the trigger, which is what the move-away fallback must allow for.
 describe("OTooltip hoverable bubble", () => {
@@ -46,6 +70,48 @@ describe("OTooltip hoverable bubble", () => {
       expect(host.getComponent(OTooltip).findComponent({ name: "TooltipRoot" }).props("open")).toBe(
         true,
       );
+    } finally {
+      host.unmount();
+      vi.useRealTimers();
+    }
+  });
+
+  it("stays open when the pointer returns inside the grace window and the skip window", async () => {
+    vi.useFakeTimers();
+    const host = mountHoverable(undefined, true);
+    try {
+      const trigger = host.get('[data-test="trigger"]').element;
+      trigger.dispatchEvent(new MouseEvent("mouseenter"));
+      await settle(300);
+      expect(isOpen(host)).toBe(true);
+
+      trigger.dispatchEvent(new MouseEvent("mouseleave"));
+      await settle(50);
+      trigger.dispatchEvent(new MouseEvent("mouseenter"));
+      await settle(500);
+
+      expect(isOpen(host)).toBe(true);
+    } finally {
+      host.unmount();
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not blink shut when the pointer returns inside the grace window on the delayed path", async () => {
+    vi.useFakeTimers();
+    const host = mountHoverable(300);
+    try {
+      const trigger = host.get('[data-test="trigger"]').element;
+      trigger.dispatchEvent(new MouseEvent("mouseenter"));
+      await settle(300);
+      expect(isOpen(host)).toBe(true);
+
+      trigger.dispatchEvent(new MouseEvent("mouseleave"));
+      await settle(50);
+      trigger.dispatchEvent(new MouseEvent("mouseenter"));
+      await settle(100);
+
+      expect(isOpen(host)).toBe(true);
     } finally {
       host.unmount();
       vi.useRealTimers();

@@ -1729,7 +1729,18 @@ fn service_route_table() -> Router {
         router = router
             .route("/{org_id}/security/cases", post(security::cases::promote_to_case))
             .route("/{org_id}/security/cases/by_alert", get(security::cases::lookup_cases))
-            .route("/{org_id}/security/cases/settings", get(security::cases::get_case_settings).put(security::cases::update_case_settings));
+            .route("/{org_id}/security/cases/settings", get(security::cases::get_case_settings).put(security::cases::update_case_settings))
+            // Queue work across every page: search is a read, bulk and merge are triage
+            .route("/{org_id}/security/cases/search", get(security::triage::search_cases))
+            .route("/{org_id}/security/cases/bulk", post(security::triage::bulk_update))
+            .route("/{org_id}/security/cases/merge", post(security::triage::merge_cases))
+            // Tuning applied when detections run: reads GET, writes author POST, removals admin DELETE
+            .route("/{org_id}/security/detections/{alert_id}/exceptions", get(security::tuning::list_exceptions).post(security::tuning::create_exception))
+            .route("/{org_id}/security/detections/{alert_id}/exceptions/{exception_id}", put(security::tuning::update_exception).delete(security::tuning::delete_exception))
+            .route("/{org_id}/security/allowlists", get(security::tuning::list_allowlists))
+            .route("/{org_id}/security/allowlists/{list_id}", put(security::tuning::put_allowlist).delete(security::tuning::delete_allowlist))
+            .route("/{org_id}/security/suppressions", get(security::tuning::list_suppressions).post(security::tuning::create_suppression))
+            .route("/{org_id}/security/suppressions/{suppression_id}", delete(security::tuning::delete_suppression));
     }
 
     #[cfg(feature = "enterprise")]
@@ -1756,11 +1767,17 @@ fn service_route_table() -> Router {
             .route("/{org_id}/security/sources/classify", post(security::sources::classify_sources))
             .route("/{org_id}/security/sources/{stream_name}/attach", post(security::sources::attach_pack))
             .route("/{org_id}/security/sources/{stream_name}/detach", post(security::sources::detach_pack))
+            .route("/{org_id}/security/sources/{stream_name}/include", post(security::sources::set_inclusion))
+            .route("/{org_id}/security/sources/{stream_name}/source_type", post(security::sources::set_source_type))
+            .route("/{org_id}/security/sources/{stream_name}/schema", get(security::sources::get_source_schema))
             // Sigma catalog, compiler and ATT&CK coverage: reads, compile is POST only for the body
             .route("/{org_id}/security/sigma/catalog", get(security::sigma::get_catalog))
             .route("/{org_id}/security/sigma/compile", post(security::sigma::compile))
             .route("/{org_id}/security/mitre/coverage", get(security::sigma::get_mitre_coverage))
             .route("/{org_id}/security/detections/{alert_id}/evidence", get(security::sigma::get_detection_evidence))
+            // Detection authoring: edit in place from Sigma, and a scheduler-faithful history preview
+            .route("/{org_id}/security/detections/preview", post(security::detections::preview_detection))
+            .route("/{org_id}/security/detections/{alert_id}", put(security::detections::update_detection))
             // Instance-wide native-user auth policy: authored on the meta org, enforced everywhere
             .route("/{org_id}/settings/password_policy", get(organization::password_policy::get_policy).put(organization::password_policy::set_policy))
             // Complexity requirements only: readable by any authenticated user, including one the

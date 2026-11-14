@@ -22,13 +22,19 @@ import { useI18nTyped } from "@/types/i18n";
 import { emptyFilterGroup, filterTreeToSql, type FilterGroup } from "@/utils/query/filterBar";
 import { parseSqlFilter } from "@/utils/query/filterBarParser";
 import QueryFilterBar from "./QueryFilterBar.vue";
-import type { SqlFilterBuilderEmits, SqlFilterBuilderProps } from "./SqlFilterBuilder.types";
+import type { QueryFilterBarExpose } from "./QueryFilterBar.types";
+import type {
+  SqlFilterBuilderEmits,
+  SqlFilterBuilderExpose,
+  SqlFilterBuilderProps,
+} from "./SqlFilterBuilder.types";
 
 const props = withDefaults(defineProps<SqlFilterBuilderProps>(), {
   loadValues: undefined,
   fieldsLoading: false,
   freeText: true,
   extraSuggestions: undefined,
+  maxRows: 3,
   dataTest: "sql-filter-builder",
 });
 const emit = defineEmits<SqlFilterBuilderEmits>();
@@ -36,6 +42,7 @@ const emit = defineEmits<SqlFilterBuilderEmits>();
 const { t } = useI18nTyped();
 
 const tree = ref<FilterGroup>(emptyFilterGroup());
+const barRef = ref<QueryFilterBarExpose | null>(null);
 const unparsable = ref(false);
 let lastEmitted: string | null = null;
 
@@ -67,6 +74,8 @@ function clearAndBuild() {
   unparsable.value = false;
   onTreeChange(emptyFilterGroup());
 }
+
+defineExpose<SqlFilterBuilderExpose>({ activate: () => barRef.value?.activate() });
 </script>
 
 <template>
@@ -107,6 +116,7 @@ function clearAndBuild() {
     </OBanner>
     <template v-else>
       <QueryFilterBar
+        ref="barRef"
         :model-value="tree"
         :fields="fields"
         :free-text="freeText"
@@ -115,7 +125,7 @@ function clearAndBuild() {
         :fields-loading="fieldsLoading"
         size="sm"
         appearance="plain"
-        :max-rows="3"
+        :max-rows="maxRows"
         :data-test="`${dataTest}-bar`"
         @update:model-value="onTreeChange"
         @submit="emit('submit')"

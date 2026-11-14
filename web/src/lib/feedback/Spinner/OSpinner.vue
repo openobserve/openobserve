@@ -2,13 +2,17 @@
 import type { SpinnerProps } from "./OSpinner.types";
 import { computed } from "vue";
 import { useI18nTyped } from "@/types/i18n";
+import { LOADER_REVEAL } from "@/lib/styles/motion";
 
 const { t } = useI18nTyped();
 
 const props = withDefaults(defineProps<SpinnerProps>(), {
   variant: "ring",
   size: "md",
+  instant: false,
 });
+
+const visibilityClass = computed(() => (props.instant ? "" : LOADER_REVEAL));
 
 // px dimensions per size token
 const sizeClasses: Record<NonNullable<SpinnerProps["size"]>, string> = {
@@ -31,6 +35,7 @@ const dotSizeClasses: Record<NonNullable<SpinnerProps["size"]>, string> = {
 const containerClasses = computed(() => [
   "inline-flex items-center justify-center shrink-0",
   sizeClasses[props.size ?? "md"],
+  visibilityClass.value,
 ]);
 </script>
 
@@ -66,7 +71,11 @@ const containerClasses = computed(() => [
   <!-- Dots variant -->
   <span
     v-else
-    :class="['inline-flex shrink-0 items-center justify-center gap-1', sizeClasses[size ?? 'md']]"
+    :class="[
+      'inline-flex shrink-0 items-center justify-center gap-1',
+      sizeClasses[size ?? 'md'],
+      visibilityClass,
+    ]"
     role="status"
     :aria-label="t('components.spinner.loading')"
     aria-live="polite"

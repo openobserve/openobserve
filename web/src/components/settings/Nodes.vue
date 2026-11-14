@@ -449,27 +449,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :show-global-filter="false"
             :loading="loading"
           >
-            <!-- Health strip: node counts by status, doubling as the status facet.
-                 Attention-first — offline, then starting, then online, Total last. -->
-            <template #subheader>
-              <div data-test="nodes-summary">
-                <OStatStrip
-                  :items="summaryStats"
-                  :loading="loading"
-                  selectable
-                  :selected-key="statusFilter"
-                  default-key="total"
-                  @select="onStatSelect"
-                />
-              </div>
-            </template>
-
             <template #toolbar>
               <OSearchInput
                 data-test="nodes-search-input"
                 v-model="filterQuery"
-                class="flex-1"
+                class="min-w-0 flex-1 md:min-w-48"
                 :placeholder="t('nodes.search')"
+              />
+              <OStatStrip
+                :items="summaryStats"
+                :loading="loading"
+                selectable
+                :row="false"
+                multiple
+                :selected-keys="statusFilters"
+                default-key="total"
+                class="max-md:order-last"
+                data-test="nodes-summary"
+                @update:selected-keys="onStatKeys"
               />
             </template>
             <template #toolbar-trailing>
@@ -487,10 +484,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OEmptyState
                 size="hero"
                 preset="no-nodes"
-                :filtered="!!(filterQuery || statusFilter)"
-                :hide-action="!(filterQuery || statusFilter)"
+                :filtered="!!(filterQuery || statusFilters.length)"
+                :hide-action="!(filterQuery || statusFilters.length)"
                 @action="
-                  (id) => id === 'clear-filters' && ((filterQuery = ''), (statusFilter = null))
+                  (id) => id === 'clear-filters' && ((filterQuery = ''), (statusFilters = []))
                 "
               />
             </template>
@@ -597,6 +594,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
+import { matchesAnyKey } from "@/utils/filterKeys";
 
 export default defineComponent({
   name: "PageCipherKeys",
@@ -1074,7 +1072,7 @@ export default defineComponent({
 
     const clearAll = () => {
       filterQuery.value = "";
-      statusFilter.value = null;
+      statusFilters.value = [];
       selectedRegions.value = [];
       selectedClusters.value = [];
       selectedNodetypes.value = [];
@@ -1183,23 +1181,19 @@ export default defineComponent({
     // ── Health facet + summary strip ─────────────────────────────────────────
     // Counts run over the search-filtered rows (not the facet-filtered ones) so
     // the tiles keep their totals while a facet is active.
-    const statusFilter = ref<"offline" | "prepare" | "online" | null>(null);
+    const statusFilters = ref<string[]>([]);
 
-    const displayedRows = computed(() => {
-      const rows = visibleRows.value || [];
-      const f = statusFilter.value;
-      if (!f) return rows;
-      return rows.filter((row: any) => nodeHealth(row) === f);
-    });
+    const displayedRows = computed(() =>
+      (visibleRows.value || []).filter((row: any) =>
+        matchesAnyKey(statusFilters.value, row, (r, key) => nodeHealth(r) === key),
+      ),
+    );
 
-    const onStatSelect = (key: string) => {
-      if (key === "total") {
-        statusFilter.value = null;
-        return;
-      }
-      statusFilter.value =
-        statusFilter.value === key ? null : (key as "offline" | "prepare" | "online");
-      if (statusFilter.value) analytics.track("nodes_health_filter_applied", { status: key });
+    // Only a chip being added is tracked; clearing one is not a filter applied.
+    const onStatKeys = (keys: string[]) => {
+      const added = keys.find((key) => !statusFilters.value.includes(key));
+      statusFilters.value = keys;
+      if (added) analytics.track("nodes_health_filter_applied", { status: added });
     };
 
     const healthCounts = computed(() => {
@@ -1251,7 +1245,7 @@ export default defineComponent({
         },
         {
           key: "total",
-          label: t("nodes.summaryTotal"),
+          label: t("common.all"),
           value: v(c.total),
           icon: "hub",
           tone: "primary",
@@ -1322,9 +1316,9 @@ export default defineComponent({
       nodeRowStyle,
       statusIndicatorClass,
       usageVariant,
-      statusFilter,
+      statusFilters,
       displayedRows,
-      onStatSelect,
+      onStatKeys,
       summaryStats,
       splitterModel,
       isMobile,

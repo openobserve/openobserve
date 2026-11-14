@@ -1,7 +1,12 @@
 // Copyright 2026 OpenObserve Inc.
 
 import { describe, expect, it } from "vitest";
-import { evidenceSummary, evidenceValueField } from "./firings";
+import {
+  evidenceFallbackFields,
+  evidenceKeyFields,
+  evidenceSummary,
+  evidenceValueField,
+} from "./firings";
 import type { NormalizedEvent } from "./ocsf";
 
 const OKTA_TRAVEL_SQL =
@@ -11,6 +16,12 @@ const event = (over: Partial<NormalizedEvent>): NormalizedEvent =>
   ({
     actor: "",
     srcIp: "",
+    srcPort: "",
+    dstIp: "",
+    dstPort: "",
+    host: "",
+    process: "",
+    resource: "",
     activity: "",
     operation: "",
     message: "",
@@ -59,5 +70,55 @@ describe("evidenceSummary", () => {
       message: "user.session.start",
     });
     expect(evidenceSummary(row)).toBe("bob@acme.io · user.session.start");
+  });
+});
+
+describe("evidenceKeyFields", () => {
+  it("lays out a mapped row as actor, counted value, src, dst, action and object", () => {
+    const row = event({
+      actor: "opal@acme.io",
+      srcIp: "102.129.143.20",
+      dstIp: "10.0.0.5",
+      dstPort: "443",
+      activity: "user.session.start",
+      resource: "okta",
+      raw: { client_geographicalcontext_country: "Nigeria" },
+    });
+    expect(
+      evidenceKeyFields(row, "client_geographicalcontext_country").map((f) => [f.key, f.value]),
+    ).toEqual([
+      ["actor", "opal@acme.io"],
+      ["counted", "Nigeria"],
+      ["src", "102.129.143.20"],
+      ["dst", "10.0.0.5:443"],
+      ["action", "user.session.start"],
+      ["object", "okta"],
+    ]);
+  });
+
+  it("reads an unmapped vendor row by its column names", () => {
+    const row = event({
+      raw: {
+        _timestamp: 1,
+        userPrincipalName: "dave@acme.io",
+        ipAddress: "185.220.101.47",
+        ResultType: "50126",
+        appDisplayName: "Office 365",
+      },
+    });
+    expect(evidenceKeyFields(row).map((f) => [f.key, f.column, f.value])).toEqual([
+      ["actor", "userPrincipalName", "dave@acme.io"],
+      ["src", "ipAddress", "185.220.101.47"],
+      ["action", "ResultType", "50126"],
+    ]);
+  });
+
+  it("falls back to the first populated columns when nothing is recognised", () => {
+    expect(
+      evidenceFallbackFields({ _timestamp: 1, zo_rn: 1, a: "x", b: "", c: { d: 1 }, e: 2 }),
+    ).toEqual([
+      { column: "a", value: "x" },
+      { column: "e", value: "2" },
+    ]);
   });
 });

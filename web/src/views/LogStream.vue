@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Outside the table: these totals cover every stream type, not the paginated rows. -->
       <template #subnav>
         <div class="px-page-edge py-1.5" data-test="log-stream-summary">
-          <OStatStrip :items="summaryStats" :loading="summaryLoading" />
+          <OStatStrip :items="summaryStats" :loading="summaryLoading" inline />
         </div>
       </template>
 

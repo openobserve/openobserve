@@ -72,6 +72,9 @@ source of truth for both the locale codes and the language names used in the pro
 ## How It Works
 
 1. **Source File**: All translations originate from `web/src/locales/languages/en-US.json`
+   plus `security/en-US.json`, which holds the `siem` namespace (split out so the web
+   entry chunk does not ship it; `SPLIT_NAMESPACES` in translator.py). The script reads
+   each locale's files as one tree and writes `siem` back to `security/<locale>.json`
 2. **Translation**: New/changed keys are translated by DeepSeek, in batches, with
    interpolation placeholders (`{count}`, `%s`, `@:linked.key`) and vue-i18n
    literal escapes (`{'{'}`, `{'@'}`) validated per string
@@ -355,6 +358,7 @@ scripts/translations/
 └── requirements.txt   # Python dependencies
 
 web/src/locales/languages/
+├── security/<locale>.json  # The `siem` namespace of each locale, loaded lazily
 ├── en-US.json           # Source file (English)
 ├── ar-SA.json           # Arabic translations
 ├── tr-TR.json           # Turkish translations

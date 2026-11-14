@@ -651,6 +651,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="showFilterBuilder"
           class="h-full overflow-y-auto py-0.75 ps-1.5"
           :class="isAiEnabled ? 'pe-18' : 'pe-10'"
+          @pointerdown.self.prevent="activateFilterBuilder"
         >
           <SqlFilterBuilder
             ref="filterBuilderRef"
@@ -1098,9 +1099,11 @@ export default defineComponent({
 
     const { builderOn: filterBuilderOn, toggle: toggleFilterBuilder } =
       useFilterBuilderPreference("o2.traces.queryInput");
-    const filterBuilderRef = ref(null);
+    const filterBuilderRef = ref<InstanceType<typeof SqlFilterBuilder> | null>(null);
     // The query pane grows with the builder's lines (it caps itself at three), so nothing in it is cut.
     const filterBuilderGrowth = useFilterBarGrowth(filterBuilderRef);
+    // The pane is taller than the bar, so a press on its blank part must still start a filter.
+    const activateFilterBuilder = () => filterBuilderRef.value?.activate();
     watch(filterBuilderGrowth, (growth) => emit("filterBuilderGrowth", growth), {
       immediate: true,
     });
@@ -1863,6 +1866,7 @@ export default defineComponent({
       openAiFromBuilder,
       filterBuilderFields,
       filterBuilderRef,
+      activateFilterBuilder,
       loadFilterBuilderValues,
       onFilterBuilderQuery,
       effectiveSuggestions,

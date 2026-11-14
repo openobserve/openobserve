@@ -235,13 +235,13 @@ describe("OTab", () => {
 
   // --- Transition & focus outline ---
 
-  it("puts the hover-in and hover-out motion tokens on the colour transition", () => {
+  it("puts the shared control motion tokens on the colour transition", () => {
     const classes = mountTab().find('[role="tab"]').classes();
     expect(classes).toContain(
       "transition-[color,background-color,border-color,text-decoration-color,fill,stroke]",
     );
-    expect(classes).toContain("duration-(--duration-hover-out)");
-    expect(classes).toContain("hover:duration-(--duration-hover-in)");
+    expect(classes).toContain("duration-(--duration-control)");
+    expect(classes).toContain("ease-(--ease-control)");
     expect(classes).not.toContain("transition-colors");
   });
 

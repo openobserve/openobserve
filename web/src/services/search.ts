@@ -43,6 +43,7 @@ const search = {
       is_ui_histogram,
       validate,
       signal,
+      security_scope,
     }: {
       org_identifier: string;
       query: any;
@@ -59,6 +60,8 @@ const search = {
       tab_name?: string;
       is_ui_histogram?: boolean;
       validate?: boolean;
+      /** A Security page's search, which Security read may run on the org's Security sources. */
+      security_scope?: boolean;
       /**
        * Aborts the request. Callers that leave a view mid-query should pass one and
        * abort on unmount: an abandoned search still occupies a slot in the server's
@@ -90,6 +93,7 @@ const search = {
     if (is_ui_histogram) url += `&is_ui_histogram=${is_ui_histogram}`;
     if (is_multi_stream_search) url += `&is_multi_stream_search=${is_multi_stream_search}`;
     if (validate) url += `&validate=${validate}`;
+    if (security_scope) url += `&security_scope=true`;
     // Built once and reused by every post() branch below, so the signal reaches the
     // multi-stream and aggs paths too — not just the default one. Always patches
     // large integers (any field, e.g. a user-defined `userid`, #14376) so

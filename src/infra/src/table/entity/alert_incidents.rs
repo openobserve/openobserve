@@ -56,6 +56,8 @@ pub struct Model {
     /// Every firing came from a backfill over past data, so it describes no current activity.
     #[sea_orm(default_value = false)]
     pub historical: bool,
+    /// When a different detection last joined the case while someone was working it.
+    pub last_detection_at: Option<i64>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
@@ -107,6 +109,7 @@ mod tests {
             rca_off_reason: None,
             security_case: false,
             historical: false,
+            last_detection_at: None,
         };
         assert_eq!(m.id, "inc-1");
         assert_eq!(m.status, "open");
@@ -149,6 +152,7 @@ mod tests {
             rca_off_reason: None,
             security_case: false,
             historical: false,
+            last_detection_at: None,
         };
         assert_eq!(m.acknowledged_by.as_deref(), Some("user@example.com"));
         assert_eq!(m.acknowledged_at, Some(1500));

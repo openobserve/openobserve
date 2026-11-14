@@ -18,7 +18,7 @@ limitations under the License. -->
       <div
         class="selector-grid grid auto-cols-fr grid-flow-col gap-2 @max-[54rem]/dest-picker:auto-cols-auto @max-[54rem]/dest-picker:grid-flow-row @max-[54rem]/dest-picker:grid-cols-5 @max-[27rem]/dest-picker:grid-cols-2"
       >
-        <OTooltip v-for="tile in tiles" :key="tile.id" :delay="300">
+        <OTooltip v-for="tile in tiles" :key="tile.id">
           <template #content>
             <div v-for="(part, index) in tile.tips" :key="index" :class="index > 0 && 'mt-1'">
               {{ part }}

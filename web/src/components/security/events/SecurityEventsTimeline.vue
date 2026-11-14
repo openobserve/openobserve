@@ -53,7 +53,7 @@ const valuesForTone = (tone: SeverityTone): SeverityValue[] => TONE_SEVERITY_IDS
 
 const stats = computed<StatItem[]>(() => {
   const h = props.histogram;
-  // No "All" tile: re-clicking the active tile clears the facet.
+  // No "All" tile: re-clicking a picked tile drops it, and Clear empties the facet.
   return shownTones.value.map((tone) => ({
     key: tone,
     label: t(toneLabelKey(tone)),
@@ -65,23 +65,19 @@ const stats = computed<StatItem[]>(() => {
   }));
 });
 
-const selectedTone = computed<string | null>(() => {
-  if (!severity.value.length) return null;
+// A tile reads as picked while every severity value it covers is in the filter.
+const selectedTones = computed<SeverityTone[]>(() => {
   const current = new Set(severity.value.map(String));
-  return (
-    shownTones.value.find((tone) => {
-      const values = valuesForTone(tone).map(String);
-      return values.length === current.size && values.every((v) => current.has(v));
-    }) ?? null
+  return shownTones.value.filter((tone) =>
+    valuesForTone(tone).every((v) => current.has(String(v))),
   );
 });
+const highlightTone = computed(() =>
+  selectedTones.value.length === 1 ? selectedTones.value[0] : null,
+);
 
-function onTile(key: string) {
-  if (key === selectedTone.value) {
-    severity.value = [];
-    return;
-  }
-  severity.value = [...valuesForTone(key as SeverityTone)];
+function onTones(keys: string[]) {
+  severity.value = (keys as SeverityTone[]).flatMap((tone) => valuesForTone(tone));
 }
 </script>
 
@@ -97,15 +93,17 @@ function onTile(key: string) {
       :items="stats"
       :loading="loading && !histogram"
       selectable
-      :selected-key="selectedTone"
-      @select="onTile"
+      :row="false"
+      multiple
+      :selected-keys="selectedTones"
+      @update:selected-keys="onTones"
     />
     <div class="h-28">
       <SecuritySeverityChart
         :buckets="histogram?.buckets ?? []"
         :series="chartSeries"
         :loading="loading"
-        :highlight="selectedTone"
+        :highlight="highlightTone"
         :min="Math.floor(start / 1000)"
         :max="Math.ceil(end / 1000)"
         zoomable
