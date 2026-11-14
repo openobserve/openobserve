@@ -30,7 +30,10 @@ use futures::{Stream, StreamExt, ready};
 use tonic::Streaming;
 
 use crate::{
-    datafusion::distributed::remote_scan::query_context::{QueryContext, process_partial_err},
+    datafusion::distributed::{
+        analyze::profile::REMOTE_PROFILE_TIMEOUT,
+        remote_scan::query_context::{QueryContext, process_partial_err},
+    },
     inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
 };
 
@@ -86,6 +89,20 @@ impl FlightDecoderStream {
                         guard.push_str(&err);
                     }
                 }
+            }
+        }
+    }
+
+    /// Reads the rest of the stream for its messages; the batches nobody asked for are dropped.
+    async fn drain(mut self) {
+        log::info!(
+            "[trace_id {}] flight->search: explain analyze reads the rest of the stream from node: {}",
+            self.query_context.trace_id,
+            self.query_context.node.get_name(),
+        );
+        while let Some(Ok(message)) = self.inner.next().await {
+            if let FlightMessage::CustomMessage(message) = message {
+                self.process_custom_message(message);
             }
         }
     }
@@ -246,6 +263,50 @@ impl Drop for FlightDecoderStream {
                     .build(),
             )
         )
+    }
+}
+
+/// Under EXPLAIN ANALYZE, reads to its end a stream its consumer dropped early, so the node's
+/// last messages, its profile among them, still arrive.
+pub struct DrainOnDrop {
+    stream: Option<FlightDecoderStream>,
+    drain: bool,
+}
+
+impl DrainOnDrop {
+    pub fn new(stream: FlightDecoderStream, drain: bool) -> Self {
+        Self {
+            stream: Some(stream),
+            drain,
+        }
+    }
+}
+
+impl Stream for DrainOnDrop {
+    type Item = Result<RecordBatch>;
+
+    fn poll_next(
+        mut self: Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> Poll<Option<Result<RecordBatch>>> {
+        let Some(stream) = self.stream.as_mut() else {
+            return Poll::Ready(None);
+        };
+        let poll = stream.poll_next_unpin(cx);
+        if matches!(poll, Poll::Ready(None)) {
+            self.stream = None;
+        }
+        poll
+    }
+}
+
+impl Drop for DrainOnDrop {
+    fn drop(&mut self) {
+        if let Some(stream) = self.stream.take()
+            && self.drain
+        {
+            tokio::spawn(tokio::time::timeout(REMOTE_PROFILE_TIMEOUT, stream.drain()));
+        }
     }
 }
 

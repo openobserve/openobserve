@@ -44,7 +44,7 @@ use crate::datafusion::{
         analyze::profile::NodeProfileRecorder,
         codec::get_physical_extension_codec,
         remote_scan::{
-            decoder_stream::FlightDecoderStream,
+            decoder_stream::{DrainOnDrop, FlightDecoderStream},
             flight_client::make_flight_client,
             query_context::{EmptyStream, QueryContext, get_empty_stream, process_partial_err},
         },
@@ -299,7 +299,8 @@ async fn get_remote_batch(
         }
     }
 
-    let mut recorder = if remote_scan_node.search_infos.is_analyze {
+    let is_analyze = remote_scan_node.search_infos.is_analyze;
+    let mut recorder = if is_analyze {
         NodeProfileRecorder::start(node_profiles, partition, node.as_ref())
     } else {
         NodeProfileRecorder::default()
@@ -387,7 +388,8 @@ async fn get_remote_batch(
         .with_start_time(start)
         .with_node_profile(recorder);
 
-    let mut stream = FlightDecoderStream::new(stream, schema.clone(), metrics, query_context);
+    let stream = FlightDecoderStream::new(stream, schema.clone(), metrics, query_context);
+    let mut stream = DrainOnDrop::new(stream, is_analyze);
     let stream = async_stream::stream! {
         let timeout = tokio::time::sleep(tokio::time::Duration::from_secs(timeout));
         pin_mut!(timeout);

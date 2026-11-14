@@ -174,12 +174,21 @@ impl FlightService for FlightServiceImpl {
         };
 
         // One stream per output partition so they encode in parallel
-        let streams = execute_stream_partitioned(plan, ctx.task_ctx()).map_err(|e| {
+        let streams = execute_stream_partitioned(plan.clone(), ctx.task_ctx()).map_err(|e| {
             log::error!(
                 "[trace_id {trace_id}] flight->search: do_get physical plan execution error: {e:?}",
             );
             Status::internal(e.to_string())
         })?;
+        // A cluster leader's profile is built at the end of its stream and must include its nodes.
+        let streams = if req.search_info.is_analyze {
+            streams
+                .into_iter()
+                .map(|s| profile::end_after_remote_profiles(s, plan.clone()))
+                .collect()
+        } else {
+            streams
+        };
 
         let mut stream = FlightEncoderStreamBuilder::new(session_guard, node_messages)
             .with_trace_id(trace_id.to_string())
