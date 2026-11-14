@@ -54,6 +54,8 @@ const aiChatBranch = {
   branch: (org: string, sessionId: string, body: BranchChatRequest) =>
     http().post<BranchChatResponse>(`/api/${enc(org)}/ai/chats/${enc(sessionId)}/branch`, body, {
       headers: { "Content-Type": "application/json" },
+      silentForbidden: true,
+      assistantManaged: true,
     }),
 };
 
