@@ -16,7 +16,9 @@
 import { mount } from "@vue/test-utils";
 import { describe, expect, it } from "vitest";
 
-import AssistantComposerPlusMenu, { type ComposerPlusAction } from "./AssistantComposerPlusMenu.vue";
+import AssistantComposerPlusMenu, {
+  type ComposerPlusAction,
+} from "./AssistantComposerPlusMenu.vue";
 
 // ODropdown renders its items only when open; the stub renders them in place.
 const stubs = {
@@ -60,7 +62,9 @@ describe("AssistantComposerPlusMenu", () => {
     expect(setup(["context", "time"]).findAll('[role="menuitem"]')).toHaveLength(2);
     expect(setup([]).find('[data-test="assistant-composer-plus"]').exists()).toBe(false);
     expect(
-      setup(["time"], true).get('[data-test="assistant-composer-plus"]').attributes("aria-disabled"),
+      setup(["time"], true)
+        .get('[data-test="assistant-composer-plus"]')
+        .attributes("aria-disabled"),
     ).toBe("true");
   });
 
