@@ -67,31 +67,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           table-id="iam-users-list"
           @update:selected-ids="handleSelectedIdsUpdate"
         >
-          <!-- Access screens have no health state, so the strip counts ROLE
-               MEMBERSHIP and doubles as the role facet: the org's biggest roles
-               first, the tail folded into one tile, Total last and never
-               highlighted. Deliberately no green/amber/red — a role is a category,
-               not a severity. -->
-          <template #subheader>
-            <div data-test="user-list-summary">
-              <OStatStrip
-                :items="summaryStats"
-                :loading="loading"
-                selectable
-                :selected-key="roleFilter"
-                default-key="total"
-                @select="onStatSelect"
-              />
-            </div>
-          </template>
-
           <template #toolbar>
-            <div class="flex w-full min-w-0 items-center gap-2 max-md:contents">
+            <div class="contents">
               <OSearchInput
                 v-model="filterQuery"
                 :placeholder="t('user.search')"
                 data-test="user-list-search-input"
-                class="flex-1"
+                class="min-w-0 flex-1 max-md:min-w-40 md:min-w-48"
+              />
+              <!-- Counts role membership: a role is a category, not a severity, so no status tones. -->
+              <OStatStrip
+                :items="summaryStats"
+                :loading="loading"
+                selectable
+                :row="false"
+                multiple
+                :selected-keys="roleFilters"
+                default-key="total"
+                class="max-md:order-last"
+                data-test="user-list-summary"
+                @update:selected-keys="roleFilters = $event"
               />
             </div>
           </template>
@@ -110,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OEmptyState
               size="hero"
               preset="no-users"
-              :filtered="!!(filterQuery || roleFilter)"
+              :filtered="!!(filterQuery || roleFilters.length)"
               @action="(id) => (id === 'clear-filters' ? clearFilters() : openAddFlow())"
             >
               <template v-if="searchInviteEmail" #actions>
@@ -443,6 +438,7 @@ import { featureState, forbiddenState, type ForbiddenState } from "@/utils/featu
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import { COL } from "@/lib/core/Table/OTable.types";
+import { matchesAnyKey, toggleFilterKey } from "@/utils/filterKeys";
 
 export default defineComponent({
   name: "UserPageOpenSource",
@@ -744,26 +740,24 @@ export default defineComponent({
     // keep their totals while a facet is active.
     const OVERFLOW_KEY = "__other_roles__";
     const INVITED_KEY = "__invited__";
-    const roleFilter = ref<string | null>(null);
+    const roleFilters = ref<string[]>([]);
+
+    const matchesRoleKey = (row: any, key: string, overflow: Set<string>) => {
+      if (key === INVITED_KEY) return isInvited(row);
+      if (key === OVERFLOW_KEY) return userRoles(row).some((r) => overflow.has(r.toLowerCase()));
+      return hasRole(row, key);
+    };
 
     const displayedRows = computed(() => {
       const all = rows.value || [];
-      const f = roleFilter.value;
-      if (!f) return all;
-      if (f === INVITED_KEY) return all.filter((row: any) => isInvited(row));
-      if (f === OVERFLOW_KEY) {
-        const keys = new Set(overflowRoles.value.map((r) => r.key));
-        return all.filter((row: any) => userRoles(row).some((r) => keys.has(r.toLowerCase())));
-      }
-      return all.filter((row: any) => hasRole(row, f));
+      const overflow = new Set(overflowRoles.value.map((r) => r.key));
+      return all.filter((row: any) =>
+        matchesAnyKey(roleFilters.value, row, (r, key) => matchesRoleKey(r, key, overflow)),
+      );
     });
 
     const onStatSelect = (key: string) => {
-      if (key === "total") {
-        roleFilter.value = null;
-        return;
-      }
-      roleFilter.value = roleFilter.value === key ? null : key;
+      roleFilters.value = toggleFilterKey(roleFilters.value, key, "total");
     };
 
     const invitedCount = computed(
@@ -814,7 +808,7 @@ export default defineComponent({
 
       tiles.push({
         key: "total",
-        label: t("iam.summaryTotalUsers"),
+        label: t("common.all"),
         value: v(total),
         icon: "group-work",
         tone: "primary",
@@ -1533,7 +1527,7 @@ export default defineComponent({
 
     const clearFilters = () => {
       filterQuery.value = "";
-      roleFilter.value = null;
+      roleFilters.value = [];
     };
 
     // A search for one well-formed address that is not a member becomes an invite offer.
@@ -1795,7 +1789,7 @@ export default defineComponent({
       bulkBlockCount,
       rows,
       displayedRows,
-      roleFilter,
+      roleFilters,
       onStatSelect,
       summaryStats,
       tableKey,

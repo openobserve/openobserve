@@ -66,7 +66,7 @@ const visible = computed(() =>
     class="text-text-secondary inline-flex min-w-0 items-center gap-1.5 text-xs whitespace-nowrap tabular-nums"
     :data-test="dataTest"
   >
-    <OSpinner size="xs" aria-hidden="true" />
+    <OSpinner size="xs" aria-hidden="true" instant />
     <span aria-hidden="true">{{ visible }}</span>
     <span class="sr-only">{{ status }}</span>
   </span>

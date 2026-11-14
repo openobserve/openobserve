@@ -45,10 +45,11 @@ export class QuickFilterCardsPage {
     return this.page.locator(LISTS[list].card(key));
   }
 
-  /** The card's value comes first in its text; a digit right after it would mean a bigger number. */
+  /** A chip card renders its label before the count, so assert on the count badge alone. */
   async expectCardCount(list, key, count) {
-    await expect(this.card(list, key), `${list} card "${key}" count`).toHaveText(
-      new RegExp(`^\\s*${count}(?!\\d)`),
+    const value = this.card(list, key).locator('[data-test="o-stat-card-value"]');
+    await expect(value, `${list} card "${key}" count`).toHaveText(
+      new RegExp(`^\\s*${count}\\s*$`),
       { timeout: 30000 },
     );
   }

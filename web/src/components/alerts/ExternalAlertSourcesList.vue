@@ -125,7 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="text-status-warning-text"
                 data-test="alert-sources-never-resolves-icon"
               >
-                <OTooltip :delay="300" :max-width="'20rem'">
+                <OTooltip :max-width="'20rem'">
                   <template #content>
                     <span class="font-medium">
                       {{ t("alert_sources.resolveWiringWarningTitle", { name: row.displayName }) }}

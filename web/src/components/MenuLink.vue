@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <!-- Always wrapped (disabled when silent) so the tile element the rail measures never remounts. -->
-  <OTooltip :disabled="!tooltipText" :side="tooltipSide" :delay="300">
+  <OTooltip :disabled="!tooltipText" :side="tooltipSide">
     <!-- Single dynamic root so external links (<a>), internal links (<router-link>)
          and submenu-group triggers (<button>, used by ONavGroup) all share the
          exact same tile markup and styling — a group tile is literally a MenuLink. -->
@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <div
             v-if="badge && badge > 0"
-            class="menu-badge text-3xs text-text-inverse shadow-error-500/50 border-menu-badge-ring bg-gradient-notification absolute -top-1 -right-2 z-1 flex h-4 min-w-4 animate-pulse items-center justify-center rounded-full border-2 px-1 leading-none font-bold shadow-md"
+            class="menu-badge text-3xs text-text-inverse shadow-error-500/50 border-menu-badge-ring bg-gradient-notification absolute -top-1 -right-2 z-1 flex h-4 min-w-4 animate-pulse items-center justify-center rounded-full border-2 px-1 leading-none font-bold shadow-md [animation-iteration-count:3]"
             aria-live="polite"
             :aria-label="t('common.notificationsCount', { count: badge })"
           >

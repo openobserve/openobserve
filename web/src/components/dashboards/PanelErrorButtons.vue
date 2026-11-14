@@ -27,7 +27,6 @@
           side="bottom"
           align="end"
           max-width="22rem"
-          :delay="300"
           hoverable
           :open="openTooltip === notice.id"
           @update:open="(open: boolean) => setTooltipOpen(notice.id, open)"
@@ -59,7 +58,6 @@
           side="bottom"
           align="end"
           max-width="22rem"
-          :delay="300"
           hoverable
           :open="openTooltip === 'collapsed'"
           @update:open="(open: boolean) => setTooltipOpen('collapsed', open)"

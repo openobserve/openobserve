@@ -40,7 +40,7 @@ const FALLBACKS: Record<string, string> = {
   "--color-border-default": "#d4d4d4",
   "--color-border-strong": "#a3a3a3",
   "--color-border-subtle": "#ededed",
-  "--color-border-control": "#949494",
+  "--color-border-control": "#8a8a8a",
   "--color-surface-base": "#ffffff",
   "--color-surface-overlay": "#ffffff",
   "--color-map-card-header": "#e5e5e5",

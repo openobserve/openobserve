@@ -1666,7 +1666,7 @@ const fieldWidthClass = computed(() => {
                     'cursor-pointer outline-none select-none',
                     'hover:bg-select-item-hover-bg',
                     'focus-visible:bg-select-item-hover-bg',
-                    'transition-colors duration-(--duration-hover-out) hover:duration-(--duration-hover-in)',
+                    'transition-colors duration-(--duration-control) ease-(--ease-control)',
                     'border-select-content-border mb-1 border-b pb-1.5',
                   ]"
                   data-test="o-select-all"
@@ -1796,7 +1796,7 @@ const fieldWidthClass = computed(() => {
                         :class="[
                           'flex h-full w-full items-center justify-between gap-2 ps-3 pe-3 text-sm',
                           'text-select-item-text cursor-pointer select-none',
-                          'transition-colors duration-(--duration-hover-out) hover:duration-(--duration-hover-in)',
+                          'transition-colors duration-(--duration-control) ease-(--ease-control)',
                           vRow.index === highlightedIndex
                             ? 'bg-select-item-hover-bg'
                             : 'hover:bg-select-item-hover-bg',
@@ -1842,7 +1842,7 @@ const fieldWidthClass = computed(() => {
                             'pe-3 text-sm',
                             'text-select-item-text',
                             'cursor-pointer outline-none select-none',
-                            'transition-colors duration-(--duration-hover-out) hover:duration-(--duration-hover-in)',
+                            'transition-colors duration-(--duration-control) ease-(--ease-control)',
                             // Use flex-col for stacked rich items; flex-row for inline subLabel or simple items
                             (filteredOptions[vRow.index].subLabel &&
                               !filteredOptions[vRow.index].subLabelInline) ||
@@ -2237,11 +2237,11 @@ const fieldWidthClass = computed(() => {
             'bg-select-content-bg',
             // Clip-path reveal: unveiled at full size from its trigger edge (no
             // scale/squish). Wipes down by default; top-placed wipes up. Soft
-            // ease-out-expo in (200ms), quick wipe out (140ms).
-            'data-[state=open]:animate-[o2-reveal-down-in_140ms_cubic-bezier(0.16,1,0.3,1)]',
-            'data-[state=closed]:animate-[o2-reveal-down-out_100ms_cubic-bezier(0.4,0,1,1)]',
-            'data-[side=top]:data-[state=open]:animate-[o2-reveal-up-in_140ms_cubic-bezier(0.16,1,0.3,1)]',
-            'data-[side=top]:data-[state=closed]:animate-[o2-reveal-up-out_100ms_cubic-bezier(0.4,0,1,1)]',
+            // ease-out-expo in, quick wipe out.
+            'data-[state=open]:animate-[o2-reveal-down-in_var(--duration-overlay-in)_var(--ease-out-expo)]',
+            'data-[state=closed]:animate-[o2-reveal-down-out_var(--duration-overlay-out)_var(--ease-overlay-out)]',
+            'data-[side=top]:data-[state=open]:animate-[o2-reveal-up-in_var(--duration-overlay-in)_var(--ease-out-expo)]',
+            'data-[side=top]:data-[state=closed]:animate-[o2-reveal-up-out_var(--duration-overlay-out)_var(--ease-overlay-out)]',
           ]"
           :style="[
             dropdownStyle,

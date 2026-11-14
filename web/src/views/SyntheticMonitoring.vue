@@ -131,7 +131,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- RIGHT MAIN: filter bar + table -->
       <div
         v-if="activeSection === 'checks'"
-        class="flex min-w-0 flex-1 flex-col overflow-hidden max-md:min-h-0"
+        class="@container/synthetics-toolbar flex min-w-0 flex-1 flex-col overflow-hidden max-md:min-h-0"
       >
         <!-- ── CHECKS TABLE ── -->
         <MonitorTable
@@ -180,28 +180,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           @empty-action="onEmptyAction"
         >
-          <!-- Health strip: the status facet, attention-first (failing → degrading
-               → passing → unknown), with Total last. It replaces the status dropdown
-               that used to hide these same counts inside its option labels. -->
-          <template #subheader>
-            <div data-test="synthetic-monitoring-summary">
-              <OStatStrip
-                :items="summaryStats"
-                :loading="loading"
-                selectable
-                :selected-key="statusFilter === 'all' ? null : statusFilter"
-                default-key="all"
-                @select="onStatSelect"
-              />
-            </div>
-          </template>
-
           <!-- Toolbar content rendered inside OTable's toolbar bar -->
           <template #toolbar>
-            <!-- A container, not a viewport breakpoint: the folder rail squeezes this toolbar at any width. -->
-            <div
-              class="@container/synthetics-toolbar flex min-w-0 flex-1 flex-wrap items-center gap-2 gap-y-1.5 max-md:contents"
-            >
+            <!-- Children of the toolbar row, so the chips can wrap below them; label queries read the table column. -->
+            <div class="contents">
               <!-- Type tabs -->
               <OToggleGroup
                 mobile-dropdown
@@ -217,13 +199,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :icon-left="tab.icon"
                   :title="lgUp ? undefined : tab.label"
                 >
-                  <span class="@max-[38rem]/synthetics-toolbar:hidden">{{ tab.label }}</span>
+                  <span class="@max-[48rem]/synthetics-toolbar:hidden">{{ tab.label }}</span>
                 </OToggleGroupItem>
               </OToggleGroup>
 
               <!-- Search -->
               <!-- flex-1 is basis-0, so the min-w floor is what wraps the input instead of shrinking it to nothing. -->
-              <div class="min-w-0 flex-1 md:max-lg:min-w-60">
+              <div class="min-w-0 flex-1 md:min-w-48 md:max-lg:min-w-60">
                 <OInput
                   v-model="search"
                   :placeholder="
@@ -268,8 +250,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OInput>
               </div>
 
-              <!-- Status is faceted by the summary strip below, not by a dropdown -
-                   the counts belong on screen, not hidden inside option labels. -->
+              <!-- Status is faceted by these chips, not a dropdown: the counts belong on screen. -->
+              <OStatStrip
+                :items="summaryStats"
+                :loading="loading"
+                selectable
+                :row="false"
+                multiple
+                :selected-keys="statusFilters"
+                default-key="all"
+                class="max-md:order-last"
+                data-test="synthetic-monitoring-summary"
+                @update:selected-keys="statusFilters = $event"
+              />
             </div>
           </template>
 
@@ -573,6 +566,7 @@ import { useListViewState } from "@/composables/useListViewState";
 import { useEditorDraftIds } from "@/composables/useEditorDraft";
 import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
 import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
+import { matchesAnyKey, readFilterKeys } from "@/utils/filterKeys";
 
 const router = useRouter();
 const route = useRoute();
@@ -884,7 +878,7 @@ watch(
 const savedView = useListViewState("synthetics", {
   folder: "",
   activeTab: "all",
-  statusFilter: "all",
+  statusFilter: [] as string[],
   typeFilter: "all",
   locationFilter: "all",
   search: "",
@@ -898,7 +892,8 @@ const savedFolder = (route.query.folder as string) ?? "default";
 if (savedView.folder && savedView.folder !== savedFolder) savedView.currentPage = 1;
 const activeTab = ref(savedView.activeTab);
 const monitorTableMode = computed(() => (activeTab.value === "browser" ? "browser" : "all"));
-const statusFilter = ref(savedView.statusFilter);
+const isStatusKey = (key: string): key is string => !!key && key !== "all";
+const statusFilters = ref<string[]>(readFilterKeys(savedView.statusFilter, isStatusKey));
 const typeFilter = ref(savedView.typeFilter);
 const locationFilter = ref(savedView.locationFilter);
 const search = ref(savedView.search);
@@ -908,13 +903,13 @@ const sortBy = ref(savedView.sortBy);
 const sortOrder = ref<"asc" | "desc">(savedView.sortOrder);
 const monitorTableRef = ref<InstanceType<typeof MonitorTable> | null>(null);
 
-watch([activeTab, statusFilter, typeFilter, locationFilter, search], () => {
+watch([activeTab, statusFilters, typeFilter, locationFilter, search], () => {
   currentPage.value = 1;
 });
 watch(
   [
     activeTab,
-    statusFilter,
+    statusFilters,
     typeFilter,
     locationFilter,
     search,
@@ -927,7 +922,7 @@ watch(
     Object.assign(savedView, {
       folder: activeFolderId.value,
       activeTab: activeTab.value,
-      statusFilter: statusFilter.value,
+      statusFilter: statusFilters.value,
       typeFilter: typeFilter.value,
       locationFilter: locationFilter.value,
       search: search.value,
@@ -1472,9 +1467,7 @@ const summaryStats = computed<StatItem[]>(() => {
   }
   tiles.push({
     key: "all",
-    // "All", not "All Statuses": the tile sits in a row of statuses, so the noun is
-    // already established, and its job is simply "clear the facet".
-    label: t("synthetics.filters.all"),
+    label: t("common.allStatuses"),
     value: v(total),
     icon: "monitor-heart",
     tone: "primary",
@@ -1483,15 +1476,10 @@ const summaryStats = computed<StatItem[]>(() => {
   return tiles;
 });
 
-// Selecting the active tile clears back to "all", like every other strip.
-const onStatSelect = (key: string) => {
-  statusFilter.value = key === "all" || statusFilter.value === key ? "all" : key;
-};
-
 const filteredMonitors = computed(() =>
   enrichedMonitors.value.filter(
     (m) =>
-      (statusFilter.value === "all" || m.status === statusFilter.value) &&
+      matchesAnyKey(statusFilters.value, m, (row, key) => row.status === key) &&
       (typeFilter.value === "all" || m.type === typeFilter.value) &&
       (locationFilter.value === "all" || m.locations.includes(locationFilter.value)) &&
       (!search.value ||
@@ -1502,12 +1490,12 @@ const filteredMonitors = computed(() =>
 
 const hasActiveFilters = computed(
   () =>
-    statusFilter.value !== "all" || locationFilter.value !== "all" || search.value.trim() !== "",
+    statusFilters.value.length > 0 || locationFilter.value !== "all" || search.value.trim() !== "",
 );
 
 const clearFilters = () => {
   search.value = "";
-  statusFilter.value = "all";
+  statusFilters.value = [];
   locationFilter.value = "all";
 };
 

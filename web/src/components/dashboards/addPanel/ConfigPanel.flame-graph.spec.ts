@@ -56,6 +56,7 @@ vi.mock("@tanstack/vue-virtual", async () => {
 });
 
 import ConfigPanel from "@/components/dashboards/addPanel/ConfigPanel.vue";
+import FlameGraphPanelConfig from "@/components/dashboards/addPanel/FlameGraphPanelConfig.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
@@ -138,6 +139,13 @@ describe("ConfigPanel flame graph settings", { timeout: 30_000 }, () => {
     });
     await flushPromises();
     await flushPromises();
+    // ConfigPanel loads this lazily; on a busy CI worker the import outlasts a fixed number of ticks.
+    if (type === "flame-graph") {
+      await vi.waitFor(() =>
+        expect(wrapper!.findComponent(FlameGraphPanelConfig).exists()).toBe(true),
+      );
+      await flushPromises();
+    }
     return panel;
   };
 

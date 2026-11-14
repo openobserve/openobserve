@@ -1135,6 +1135,8 @@
     "field": "Field",
     "enterValueOrVariable": "Enter value or $variable",
     "all": "All",
+    "allStates": "All states",
+    "allStatuses": "All statuses",
     "jsonFilesOnlyHint": ".json files only",
     "fileUploadJsonTab": "File Upload / JSON",
     "urlImportTab": "URL Import",
@@ -23810,6 +23812,14 @@
       "steps": "Steps",
       "stepOf": "Step {current} of {total}",
       "swipeHint": "swipe to see the rest"
+    },
+    "statStrip": {
+      "filters": "Filters",
+      "showOnly": "Show only {label}",
+      "alsoShow": "Also show {label}",
+      "stopShowing": "Stop showing {label}",
+      "scrollBack": "Show previous filters",
+      "scrollForward": "Show more filters"
     },
     "attributeValueCell": {
       "addIcon": "Add icon"

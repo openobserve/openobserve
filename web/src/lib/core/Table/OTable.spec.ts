@@ -3856,3 +3856,23 @@ describe("OTable row entrance", () => {
     expect(wrapper.find('[data-test="o2-table-body"]').element).toBe(before);
   });
 });
+
+describe("OTable toolbar", () => {
+  it("lays the slot content and trailing actions out as one wrapping row", () => {
+    const w = mount(OTable, {
+      props: { data: makeRows(1), columns: makeColumns() },
+      slots: {
+        toolbar: '<input data-test="search" />',
+        "toolbar-trailing": '<button data-test="refresh" />',
+      },
+    });
+    const bar = w.get('[data-test="o2-table-toolbar"]');
+    const content = bar.get('[data-test="o2-table-toolbar-content"]');
+    expect(bar.classes()).toContain("flex-wrap");
+    expect(content.classes()).toEqual(["contents"]);
+    expect(content.find('[data-test="search"]').exists()).toBe(true);
+    expect(content.find('[data-test="refresh"]').exists()).toBe(false);
+    expect(bar.find('[data-test="refresh"]').exists()).toBe(true);
+    w.unmount();
+  });
+});

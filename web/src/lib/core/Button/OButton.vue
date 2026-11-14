@@ -60,6 +60,7 @@ onBeforeUnmount(() => clearTimeout(nameCheckTimer));
 defineSlots<ButtonSlots>();
 
 // Variant class map - every entry is a full token-based class string
+// Inside a hovered table row a neutral ghost hover would match the row fill, so it steps up to the row-action fill.
 const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
   primary: [
     "bg-button-primary text-button-primary-foreground",
@@ -71,6 +72,7 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
   secondary: [
     "bg-button-secondary text-button-secondary-foreground",
     "enabled:hover:bg-button-secondary-hover",
+    "group-hover/row:enabled:hover:not-active:bg-table-row-action-hover-bg",
     "enabled:active:bg-button-secondary-active",
     "focus-visible:ring-3 focus-visible:ring-button-secondary-focus-ring",
     "disabled:bg-button-secondary-disabled disabled:text-text-disabled",
@@ -85,13 +87,15 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
   ghost: [
     "bg-transparent text-button-ghost-text border-0",
     "enabled:hover:bg-button-ghost-hover-bg",
+    "group-hover/row:enabled:hover:not-active:bg-table-row-action-hover-bg",
     "enabled:active:bg-button-ghost-active-bg",
     "focus-visible:ring-3 focus-visible:ring-button-ghost-focus-ring",
     "disabled:text-text-disabled",
   ].join(" "),
   "ghost-primary": [
     "bg-transparent text-button-ghost-primary-text border-0",
-    "enabled:hover:bg-button-ghost-primary-hover-bg",
+    "enabled:hover:text-button-ghost-primary-hover-text enabled:hover:bg-button-ghost-primary-hover-bg",
+    "group-hover/row:enabled:hover:not-active:bg-table-row-action-hover-bg",
     "enabled:active:bg-button-ghost-primary-active-bg",
     "focus-visible:ring-3 focus-visible:ring-button-ghost-primary-focus-ring",
     "disabled:text-text-disabled",
@@ -99,6 +103,7 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
   "ghost-muted": [
     "bg-transparent text-button-ghost-muted-text border-0",
     "enabled:hover:text-button-ghost-muted-hover-text enabled:hover:bg-button-ghost-muted-hover-bg",
+    "group-hover/row:enabled:hover:not-active:bg-table-row-action-hover-bg",
     "enabled:active:bg-button-ghost-muted-active-bg",
     "focus-visible:ring-3 focus-visible:ring-button-ghost-muted-focus-ring",
     "disabled:text-text-disabled",
@@ -106,6 +111,7 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
   "ghost-subtle": [
     "bg-transparent text-button-ghost-subtle-text border-0 opacity-60",
     "enabled:hover:opacity-100 enabled:hover:bg-button-ghost-subtle-hover-bg",
+    "group-hover/row:enabled:hover:not-active:bg-table-row-action-hover-bg",
     "enabled:active:bg-button-ghost-subtle-active-bg",
     "focus-visible:ring-3 focus-visible:ring-button-ghost-subtle-focus-ring",
     "disabled:text-text-disabled disabled:opacity-30",
@@ -165,6 +171,7 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
   "ghost-neutral": [
     "bg-transparent text-inherit border-0",
     "enabled:hover:bg-button-ghost-hover-bg",
+    "group-hover/row:enabled:hover:not-active:bg-table-row-action-hover-bg",
     "enabled:active:bg-button-ghost-active-bg",
     "focus-visible:ring-3 focus-visible:ring-button-ghost-focus-ring",
     "disabled:opacity-50",
@@ -193,6 +200,7 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
   "panel-collapse": [
     "bg-transparent text-button-ghost-muted-text border-0",
     "enabled:hover:text-button-ghost-muted-hover-text enabled:hover:bg-button-ghost-muted-hover-bg",
+    "group-hover/row:enabled:hover:not-active:bg-table-row-action-hover-bg",
     "enabled:active:bg-button-ghost-muted-active-bg",
     "focus-visible:ring-3 focus-visible:ring-button-ghost-muted-focus-ring",
     "disabled:opacity-50",
@@ -209,6 +217,7 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
   "sidebar-toggle": [
     "bg-surface-panel text-button-ghost-text border border-border-default",
     "enabled:hover:bg-button-ghost-hover-bg enabled:hover:border-button-border-hover",
+    "group-hover/row:enabled:hover:not-active:bg-table-row-action-hover-bg",
     "enabled:active:bg-button-ghost-active-bg",
     "focus-visible:ring-3 focus-visible:ring-button-ghost-focus-ring",
     "disabled:opacity-50",
@@ -290,7 +299,7 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
   // outline-primary: Subtle primary bg + primary text + primary border — always visually highlighted.
   // Use for edition/tier badges that must stand out without being a heavy CTA.
   "outline-primary": [
-    "bg-button-ghost-primary-active-bg text-button-ghost-primary-text border border-button-outline-hover-border",
+    "bg-button-ghost-primary-active-bg text-button-ghost-primary-hover-text border border-button-outline-hover-border",
     "enabled:hover:bg-button-ghost-primary-active-bg enabled:hover:border-button-outline-hover-border",
     "enabled:active:bg-button-ghost-primary-active-bg",
     "focus-visible:ring-3 focus-visible:ring-button-ghost-primary-focus-ring",
@@ -301,6 +310,7 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
   dashed: [
     "bg-transparent text-button-ghost-muted-text border border-dashed border-button-outline-border",
     "enabled:hover:bg-button-ghost-hover-bg enabled:hover:border-button-border-hover enabled:hover:text-button-ghost-text",
+    "group-hover/row:enabled:hover:not-active:bg-table-row-action-hover-bg",
     "enabled:active:bg-button-ghost-active-bg",
     "focus-visible:ring-3 focus-visible:ring-button-ghost-focus-ring",
     "disabled:opacity-50",
@@ -318,6 +328,7 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
     "bg-transparent text-button-ghost-text border-0 text-start rounded-default",
     "h-auto! justify-between! gap-3! px-0! py-1.5!",
     "enabled:hover:bg-button-ghost-hover-bg",
+    "group-hover/row:enabled:hover:not-active:bg-table-row-action-hover-bg",
     "enabled:active:bg-button-ghost-active-bg",
     "focus-visible:ring-3 focus-visible:ring-button-ghost-focus-ring",
     "disabled:text-text-disabled",
@@ -335,8 +346,9 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
   "pricing-chip": [
     "bg-transparent text-inherit border border-border-default",
     "!rounded-full !text-xs !font-medium !h-auto !py-1.25 !px-3.5 !gap-1.5",
-    "transition-colors duration-150",
-    "enabled:hover:border-accent enabled:hover:text-accent enabled:hover:bg-button-ghost-hover-bg",
+    "transition-colors duration-(--duration-control) ease-(--ease-control)",
+    "enabled:hover:border-accent enabled:hover:text-accent-on-tint enabled:hover:bg-button-ghost-hover-bg",
+    "group-hover/row:enabled:hover:not-active:bg-table-row-action-hover-bg",
     "disabled:opacity-60",
   ].join(" "),
   "section-chip": [
@@ -500,7 +512,7 @@ const classes = computed<string[]>(() => [
   // `as="a"` renders a real anchor, which base-elements.css underlines on hover.
   "no-underline hover:no-underline",
   // Medium (500) keeps button labels calm/simple — heavier weights read as shouty.
-  "font-medium transition-[color,background-color,border-color,text-decoration-color,fill,stroke,box-shadow] duration-150",
+  "font-medium transition-[color,background-color,border-color,text-decoration-color,fill,stroke,box-shadow] duration-(--duration-control) ease-(--ease-control)",
   "outline-none",
   // A hugging ring vanishes on accent fills, so the outline sits off a gap; ring-0! mutes the per-variant rings.
   "focus-visible:outline-2! focus-visible:outline-solid! focus-visible:outline-offset-2! focus-visible:outline-focus-ring-accent! focus-visible:ring-0!",
