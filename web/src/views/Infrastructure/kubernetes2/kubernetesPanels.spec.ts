@@ -52,9 +52,22 @@ describe("promqlPanelSchema", () => {
       queries: [{ query: "sum(x)", stream: "x" }],
       markLines: [{ value: 8, name: "Allocatable" }],
     });
-    expect(schema.config.mark_line).toEqual([{ type: "yAxis", value: 8, name: "Allocatable" }]);
+    expect(schema.config.mark_line).toEqual([
+      { type: "yAxis", value: 8, name: "Allocatable", label: "Allocatable: 8.00B" },
+    ]);
     // The axis must reach the line, as Lens's suggestedMax does, or it is drawn off the chart.
     expect(schema.config.y_axis_max).toBe(8);
     expect(schema.config.unit).toBe("bytes");
+  });
+
+  it("labels a mark line in the panel's unit, not the raw value", () => {
+    const schema = promqlPanelSchema({
+      id: "m",
+      type: "area",
+      unit: "bytes",
+      queries: [{ query: "sum(x)", stream: "x" }],
+      markLines: [{ value: 1073741824, name: "Limit" }],
+    });
+    expect(schema.config.mark_line[0].label).toBe("Limit: 1.00GB");
   });
 });

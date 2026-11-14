@@ -26136,6 +26136,7 @@
       "drawerAllocatable": "Allocatable",
       "drawerRequest": "Request",
       "drawerLimit": "Limit",
+      "drawerRequestEqualsLimit": "Request = Limit",
       "drawerReplicasDeployment": "{desired} desired, {updated} updated, {total} total, {available} available, {unavailable} unavailable",
       "drawerReplicasSet": "{desired} desired, {current} current, {ready} ready",
       "drawerReplicas": "Replicas",
