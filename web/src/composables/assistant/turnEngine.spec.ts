@@ -351,6 +351,39 @@ describe("turnEngine: send", () => {
     expect(investigate.session().composer.timeOverride).toEqual({ from: 5_000, to: 9_000 });
   });
 
+  it("regenerates over the window the question was asked with, and keeps that window on the prompt", async () => {
+    const page = {
+      currentPage: "logs",
+      timeRange: { type: "relative", relativeTimePeriod: "15m", startTime: 1, endTime: 2 },
+    };
+    const h = setup({ page });
+    const builder = vi.fn((session: AssistantSession) => ({
+      org: session.org,
+      sid: session.sid,
+      turnId: session.turnMeta.turnId ?? "",
+      message: { text: "serialized" },
+      context: { currentPage: "x", client: {} as never, user_timezone: "UTC" },
+    }));
+    h.engine.setRequestBuilder(builder);
+    h.type("how many 5xx?");
+    h.store.setTimeOverride(h.current.sid, { from: 1, to: 3_600_001, period: "1h" });
+    void h.store.send(h.current.sid);
+    await settle();
+    const asked = { from: clock - 3_600_000, to: clock };
+    expect(h.session().composer.timeOverride).toBeNull();
+    h.feed({ type: "complete" } as AssistantFrame);
+    h.end();
+    await settle();
+    clock += 60_000;
+    void h.store.regenerate(h.current.sid);
+    await settle();
+    expect(h.sends).toHaveLength(2);
+    expect(builder.mock.calls.at(-1)?.[1].timeOverride).toEqual(asked);
+    expect(h.session().messages[0].sentWindow).toEqual(asked);
+    const window = turnAnnotationKey(h.session().turnMeta.turnId!, "window");
+    expect(h.session().annotations[window]?.window).toEqual(asked);
+  });
+
   it("keeps text typed while a slow page is read, dropping only the sent window", async () => {
     let read!: () => void;
     const pageRead = new Promise<void>((resolve) => (read = resolve));

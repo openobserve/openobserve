@@ -1188,8 +1188,9 @@ function noteSentWindow(
     now,
   );
   if (!(to > from)) return null;
-  prompt.sentWindow = { from, to };
-  return prompt.sentWindow;
+  // A regenerated answer asks over the question's own window, so the question's record stays as it was.
+  if (rec.source !== "regenerate" || !prompt.sentWindow) prompt.sentWindow = { from, to };
+  return { from, to };
 }
 
 // A Home starter's question, or a Home launcher chat's first ask, over the default window may offer a wider one (PO A26).
@@ -1277,17 +1278,18 @@ function lastUserIndex(messages: ChatMessage[]): number {
   return -1;
 }
 
-// The prompt of the latest turn as a snapshot; Regenerate resends exactly it.
+// The prompt of the latest turn as a snapshot; Regenerate resends exactly it, over the window it was asked with.
 function lastPromptSnapshot(session: AssistantSession): ComposerSnapshot | null {
   const index = lastUserIndex(session.messages);
   const prompt = session.messages[index];
   if (!prompt) return null;
+  const asked = prompt.sentWindow;
   return {
     text: String(prompt.content ?? ""),
     chips: (prompt.chips ?? []).map((chip) => ({ ...toRaw(chip) })),
     images: [...(prompt.images ?? [])],
     mentions: [],
-    timeOverride: null,
+    timeOverride: asked ? { from: asked.from, to: asked.to } : null,
   };
 }
 
