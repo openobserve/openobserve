@@ -192,6 +192,17 @@ describe("useLLMInsights — fetchAll fires 3 parallel queries", () => {
     expect(sql).not.toContain("histogram(");
   });
 
+  it("escapes a double quote in the stream name in every query", async () => {
+    const { fetchAll } = useLLMInsights();
+    fetchAll('my"stream', 100, 200);
+    await flushPromises();
+
+    for (const [req] of mockFetchQueryDataWithHttpStream.mock.calls) {
+      expect(req.queryReq.query.sql).toContain('FROM "my""stream"');
+      expect(req.queryReq.query.sql).not.toContain('"my"stream"');
+    }
+  });
+
   // The histogram interval is intentionally NOT passed — the backend
   // picks an appropriate bucket width for the query window. We assert
   // `histogram(_timestamp)` with no second argument.
@@ -215,6 +226,8 @@ describe("useLLMInsights — fetchAll fires 3 parallel queries", () => {
   it("totals each trace's usage with the shared rule in stream and agent mode", async () => {
     const { fetchAll } = useLLMInsights();
     fetchAll("default", 100, 200);
+    // Past the schema lookup, so the first load's queries are sent before the second supersedes it.
+    await flushPromises();
     fetchAll("default", 100, 200, {
       name: "support-agent",
       source_stream: "default",
@@ -259,6 +272,7 @@ describe("useLLMInsights — a superseded fetchAll never lands", () => {
   it("drops a slower earlier call's results and returns only the latest call's snapshot", async () => {
     const { fetchAll, kpi } = useLLMInsights();
     const first = fetchAll("stream_a", 100, 200);
+    await flushPromises(); // the first load's queries are in flight
     const second = fetchAll("stream_b", 100, 200);
     await flushPromises();
     const cbs = mockFetchQueryDataWithHttpStream.mock.calls.map(([, c]: any) => c);
@@ -285,11 +299,36 @@ describe("useLLMInsights — a superseded fetchAll never lands", () => {
     expect(latest?.kpi.p95DurationMicros).toBe(222);
   });
 
+  // The transport drops its callbacks on cancel, so cancelAll settles the queries itself.
+  it("cancelAll settles an in-flight load: it resolves null, ends its loaders and writes nothing", async () => {
+    const { fetchAll, cancelAll, hasLoadedOnce, loading, p95Loading } = useLLMInsights();
+    const inFlight = fetchAll("stream_a", 100, 200);
+    await flushPromises();
+    expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalledTimes(3);
+
+    cancelAll();
+    expect(await inFlight).toBeNull();
+    expect(mockCancelStreamQuery).toHaveBeenCalledTimes(3);
+    expect(loading.value).toBe(false);
+    expect(p95Loading.value).toBe(false);
+    // The settled summary was not written.
+    expect(hasLoadedOnce.value).toBe(false);
+  });
+
+  it("a load cancelled during the stream schema lookup starts no queries", async () => {
+    const { fetchAll, cancelAll } = useLLMInsights();
+    const inFlight = fetchAll("stream_a", 100, 200);
+    cancelAll();
+    expect(await inFlight).toBeNull();
+    expect(mockFetchQueryDataWithHttpStream).not.toHaveBeenCalled();
+  });
+
   // A cache restore must not be overwritten by the previous stream's in-flight load.
   it("a cache restore supersedes an in-flight load and ends its loading flags", async () => {
     const { fetchAll, restore, kpi, sparklines, loading, p95Loading } = useLLMInsights();
     const inFlight = fetchAll("stream_a", 100, 200);
     expect(loading.value).toBe(true);
+    await flushPromises(); // the load's queries are in flight
     const cached = {
       kpi: { ...kpi.value, traceCount: 5, totalCost: 5, p95DurationMicros: 555 },
       sparklines: { ...sparklines.value, cost: [1] },
@@ -431,8 +470,8 @@ describe("useLLMInsights — fetchAll resolves and populates KPI on success", ()
   });
 
   // A P95 failure degrades that card to 0 without failing the whole strip.
-  it("degrades P95 to 0 and leaves the strip intact when the P95 query fails", async () => {
-    const { fetchAll, kpi, error, p95Loading, hasLoadedOnce } = useLLMInsights();
+  it("marks P95 unavailable and leaves the strip intact when the P95 query fails", async () => {
+    const { fetchAll, kpi, error, p95Loading, p95Unavailable, hasLoadedOnce } = useLLMInsights();
     const promise = fetchAll("default", 100, 200);
     await flushPromises();
 
@@ -464,6 +503,7 @@ describe("useLLMInsights — fetchAll resolves and populates KPI on success", ()
 
     expect(kpi.value.requestCount).toBe(5);
     expect(kpi.value.p95DurationMicros).toBe(0);
+    expect(p95Unavailable.value).toBe(true);
     expect(p95Loading.value).toBe(false);
     expect(hasLoadedOnce.value).toBe(true);
     // Strip survives — the P95 failure is not surfaced as a page error.

@@ -24,6 +24,7 @@ import { streamHasParentSpan } from "../llmStreamColumns";
 import { TRACE_ERRORED_SQL } from "../llmTraceOutcome";
 import useHttpStreaming from "@/composables/useStreamingSearch";
 import { streamQueryError } from "./useLLMStreamQuery";
+import { quoteStream } from "@/composables/firstEvent/confirmQuery";
 import { useStore } from "vuex";
 
 export interface LLMKPI {
@@ -80,12 +81,18 @@ export function useLLMInsights() {
   // Separate flag for the P95 card — it rides its own whole-window query, so
   // the rest of the strip (histogram-backed) never blocks on it.
   const p95Loading = ref(false);
+  // The P95 query failed: the card shows "—" instead of a fake 0.
+  const p95Unavailable = ref(false);
   const error = ref<string | null>(null);
   const hasLoadedOnce = ref(false);
   const availableStreams = ref<string[]>([]);
   const streamsLoaded = ref(false);
 
   let activeTraceIds: string[] = [];
+  // Settles a query's promise when it is cancelled; the transport drops its callbacks then.
+  const settleCancelled = new Map<string, () => void>();
+  // Bumped per fetchAll so a slower earlier load can't overwrite a newer selection's tiles.
+  let fetchSeq = 0;
 
   /**
    * Cancel every in-flight query started by THIS composable instance.
@@ -94,6 +101,8 @@ export function useLLMInsights() {
    * after the user has moved on.
    */
   function cancelAll() {
+    // Results of the cancelled queries must not land or be cached.
+    fetchSeq++;
     activeTraceIds.forEach((id) => {
       cancelStreamQueryBasedOnRequestId({
         trace_id: id,
@@ -101,6 +110,10 @@ export function useLLMInsights() {
       });
     });
     activeTraceIds = [];
+    settleCancelled.forEach((settle) => settle());
+    settleCancelled.clear();
+    loading.value = false;
+    p95Loading.value = false;
   }
 
   /**
@@ -124,6 +137,7 @@ export function useLLMInsights() {
     return new Promise((resolve, reject) => {
       const traceId = generateTraceContext().traceId;
       activeTraceIds.push(traceId);
+      settleCancelled.set(traceId, resolve);
 
       const useBase64 = store.state.zoConfig?.sql_base64_enabled;
       fetchQueryDataWithHttpStream(
@@ -150,10 +164,12 @@ export function useLLMInsights() {
             if (hits.length > 0) onData(hits);
           },
           error: (_payload: any, response: any) => {
+            settleCancelled.delete(traceId);
             activeTraceIds = activeTraceIds.filter((t) => t !== traceId);
             reject(streamQueryError(response));
           },
           complete: () => {
+            settleCancelled.delete(traceId);
             activeTraceIds = activeTraceIds.filter((t) => t !== traceId);
             resolve();
           },
@@ -185,7 +201,7 @@ export function useLLMInsights() {
     const sql = compactSql(`
       SELECT
         COALESCE(approx_percentile_cont(duration, 0.95) FILTER (WHERE gen_ai_operation_name IS NOT NULL), 0) as p95_duration
-      FROM "${streamName}"
+      FROM ${quoteStream(streamName)}
       ${scopeWhere(agent, streamName, extraFilter)}
     `);
 
@@ -210,7 +226,7 @@ export function useLLMInsights() {
     const size = 10_000;
 
     const where = scopeWhere(agent, streamName, extraFilter);
-    const from = `"${streamName}"${agentParentsJoin(streamName, hasParentSpan)}`;
+    const from = `${quoteStream(streamName)}${agentParentsJoin(streamName, hasParentSpan)}`;
     const mainSql = compactSql(`
       SELECT
         histogram(_timestamp) as ts,
@@ -293,9 +309,6 @@ export function useLLMInsights() {
     return { totals, series };
   }
 
-  // Bumped per fetchAll so a slower earlier load can't overwrite a newer selection's tiles.
-  let fetchSeq = 0;
-
   async function fetchAll(
     streamName: string,
     startTime: number,
@@ -308,6 +321,7 @@ export function useLLMInsights() {
     const isLatest = () => seq === fetchSeq;
     loading.value = true;
     p95Loading.value = true;
+    p95Unavailable.value = false;
     error.value = null;
 
     // Usage falls back to top-level agents, found via span parents when the stream stores them.
@@ -315,11 +329,14 @@ export function useLLMInsights() {
       store.state.selectedOrganization.identifier,
       streamName,
     );
+    // Cancelled or superseded during the lookup: start no queries.
+    if (!isLatest()) return null;
 
     // The returned snapshot (KPI cache) is built from these, never from the shared refs.
     const own: {
       summary?: { totals: Omit<LLMKPI, "p95DurationMicros">; series: LLMSparklineSeries };
       p95: number;
+      p95Failed?: boolean;
     } = { p95: 0 };
 
     // Resolves independently of P95 so the strip never waits on the slower query.
@@ -355,7 +372,7 @@ export function useLLMInsights() {
       });
 
     // Separate whole-window P95 with its own loader — never blocks the strip.
-    // On failure the card degrades to "0" instead of failing the whole page.
+    // On failure the card shows "—" instead of failing the whole page.
     const p95Promise = fetchLatency(streamName, startTime, endTime, agent, extraFilter)
       .then((p95DurationMicros) => {
         own.p95 = p95DurationMicros;
@@ -363,10 +380,12 @@ export function useLLMInsights() {
       .catch((e: any) => {
         console.error("LLM Insights P95 fetch error:", e);
         own.p95 = 0;
+        own.p95Failed = true;
       })
       .finally(() => {
         if (!isLatest()) return;
         kpi.value = { ...kpi.value, p95DurationMicros: own.p95 };
+        p95Unavailable.value = !!own.p95Failed;
         p95Loading.value = false;
       });
 
@@ -387,6 +406,7 @@ export function useLLMInsights() {
     error.value = null;
     loading.value = false;
     p95Loading.value = false;
+    p95Unavailable.value = false;
     hasLoadedOnce.value = true;
   }
 
@@ -395,6 +415,7 @@ export function useLLMInsights() {
     sparklines,
     loading,
     p95Loading,
+    p95Unavailable,
     error,
     hasLoadedOnce,
     availableStreams,

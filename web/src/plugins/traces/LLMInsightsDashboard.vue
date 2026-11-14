@@ -598,6 +598,7 @@ const {
   sparklines,
   loading,
   p95Loading,
+  p95Unavailable,
   error,
   fetchAll,
   restore,
@@ -926,6 +927,8 @@ async function enterCompareMode(pair?: { a: string; b: string }) {
 }
 
 function exitCompareMode() {
+  // Stop the compare queries; a run still in flight would otherwise write into the next compare.
+  versionCompare.cancel();
   compareMode.value = false;
   compareVersionList.value = [];
   compareInitialPair.value = null;
@@ -1440,8 +1443,8 @@ const kpiCards = computed<KpiCard[]>(() => {
       id: "p95",
       label: t("traces.lLMInsightsDashboard.p95Latency"),
       icon: "schedule",
-      value: p95.value,
-      unit: p95.unit,
+      value: p95Unavailable.value ? "—" : p95.value,
+      unit: p95Unavailable.value ? "" : p95.unit,
       sparkData: sparklines.value.p95Micros,
       sparkColor: "#f97316",
       loading: p95Loading.value,
@@ -1582,7 +1585,8 @@ async function loadInsights(
 
     const result = await fetchAll(stream, start, end, effectiveAgent.value, filterClause.value);
     // Snapshot this call's result so returning to this selection skips the network.
-    if (result) {
+    // A failed P95 is not cached, so a return to this selection asks for it again.
+    if (result && !p95Unavailable.value) {
       kpiCache.set(ck, { ...result, lastRunAt: lastRunAt.value });
     }
   } finally {

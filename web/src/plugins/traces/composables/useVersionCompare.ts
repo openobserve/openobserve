@@ -98,7 +98,10 @@ export function useVersionCompare() {
   const armA = useLLMInsights();
   const armB = useLLMInsights();
 
-  let rawSampleTraceIds: string[] = [];
+  // In-flight raw-sample queries by trace id; each settles its promise when cancelled.
+  const rawSampleSettle = new Map<string, () => void>();
+  // Bumped by every run() and cancel() (setPair cancels); a run that finds it changed writes nothing.
+  let runToken = 0;
 
   const a = ref<GenAiAgentListItem | null>(null) as Ref<GenAiAgentListItem | null>;
   const b = ref<GenAiAgentListItem | null>(null) as Ref<GenAiAgentListItem | null>;
@@ -115,6 +118,8 @@ export function useVersionCompare() {
   const sameVariant = computed(() => isSameVariant(a.value, b.value));
 
   function setPair(variantA: GenAiAgentListItem, variantB: GenAiAgentListItem) {
+    // The previous pair's queries must not run on or write into the new pair's arms.
+    cancel();
     a.value = variantA;
     b.value = variantB;
     windows.value = null;
@@ -134,12 +139,12 @@ export function useVersionCompare() {
     return (sql: string, startMicros: number, endMicros: number) =>
       new Promise((resolve, reject) => {
         const traceId = generateTraceContext().traceId;
-        rawSampleTraceIds.push(traceId);
+        const hits: any[] = [];
+        rawSampleSettle.set(traceId, () => resolve(hits));
         const untrack = () => {
-          rawSampleTraceIds = rawSampleTraceIds.filter((id) => id !== traceId);
+          rawSampleSettle.delete(traceId);
         };
         const useBase64 = store.state.zoConfig?.sql_base64_enabled;
-        const hits: any[] = [];
         fetchQueryDataWithHttpStream(
           {
             queryReq: {
@@ -197,6 +202,8 @@ export function useVersionCompare() {
     manualWindows?: { a?: { start: number; end: number }; b?: { start: number; end: number } },
     sharedWindow?: { start: number; end: number },
   ): Promise<void> {
+    const token = ++runToken;
+    const live = () => token === runToken;
     if (!a.value || !b.value) return;
 
     if (isUnset(a.value) || isUnset(b.value)) {
@@ -293,11 +300,20 @@ export function useVersionCompare() {
       .then((res: any) => res.data as CompareAgentVersionsResponse)
       .catch(() => null);
 
-    const [, , endpointResponse] = await Promise.all([
+    const [snapshotA, snapshotB, endpointResponse] = await Promise.all([
       fetchAPromise,
       fetchBPromise,
       endpointPromise,
     ]);
+    // A superseded or cancelled run writes nothing.
+    if (!live()) return;
+    // An arm's KPI fetch failed: the previous result belongs to another window, so clear it.
+    if (!snapshotA || !snapshotB) {
+      result.value = null;
+      errorDiff.value = null;
+      sampledNote.value = null;
+      return;
+    }
 
     const useEndpoint = !!endpointResponse && endpointHasSufficientLatencyAndCost(endpointResponse);
 
@@ -322,18 +338,23 @@ export function useVersionCompare() {
 
     const sampleAPromise = fetchRawSample(stream, filterA, queryA.start, queryA.end, runner).catch(
       (e: any) => {
-        armA.error.value = armA.error.value || e?.message || t("traces.failedToFetchSampleA");
+        if (live()) {
+          armA.error.value = armA.error.value || e?.message || t("traces.failedToFetchSampleA");
+        }
         return { durations: [], costs: [] };
       },
     );
     const sampleBPromise = fetchRawSample(stream, filterB, queryB.start, queryB.end, runner).catch(
       (e: any) => {
-        armB.error.value = armB.error.value || e?.message || t("traces.failedToFetchSampleB");
+        if (live()) {
+          armB.error.value = armB.error.value || e?.message || t("traces.failedToFetchSampleB");
+        }
         return { durations: [], costs: [] };
       },
     );
 
     const [samplesA, samplesB] = await Promise.all([sampleAPromise, sampleBPromise]);
+    if (!live()) return;
 
     // Raw-sample fallback path has no error diff (only the sketch-merge
     // endpoint computes it).
@@ -356,13 +377,17 @@ export function useVersionCompare() {
 
   // Both arms plus any in-flight raw-sample fetch outlive the component otherwise; the consumer must call this on unmount.
   function cancel() {
-    rawSampleTraceIds.forEach((traceId) =>
+    runToken++;
+    const settles = [...rawSampleSettle];
+    rawSampleSettle.clear();
+    settles.forEach(([traceId, settle]) => {
       cancelStreamQueryBasedOnRequestId({
         trace_id: traceId,
         org_id: store.state.selectedOrganization?.identifier,
-      }),
-    );
-    rawSampleTraceIds = [];
+      });
+      // The transport drops its callbacks on cancel, so settle here; run() sees it is stale.
+      settle();
+    });
     armA.cancelAll();
     armB.cancelAll();
   }
