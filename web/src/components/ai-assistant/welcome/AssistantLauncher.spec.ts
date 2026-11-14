@@ -805,7 +805,7 @@ describe("AssistantLauncher", () => {
       );
     });
 
-    it("shows no page chip in the Ask box even with alert and incident rows, and Enter still sends the range", async () => {
+    it("shows no page chip in the Ask box even with alert and incident rows", async () => {
       contextRegistry.register("home", {
         getContext: () =>
           ({
@@ -814,21 +814,43 @@ describe("AssistantLauncher", () => {
           }) as never,
       });
       contextRegistry.setActive("home");
-      const range = { from: 1_000, to: 3_601_000, period: "1h" };
-      const { wrapper } = setupOn({ layout: "overview", pageRange: range });
+      const { wrapper } = setupOn({ layout: "overview" });
       await flushPromises();
       expect(wrapper.find('[data-test="assistant-launcher-page-chip"]').exists()).toBe(false);
       expect(wrapper.find('[data-state="ghost"]').exists()).toBe(false);
       await input(wrapper).setValue("why?");
       await input(wrapper).trigger("keydown", { key: "Enter" });
-      expect(open.mock.calls[0][0].payload).toEqual({
-        text: "why?",
-        chips: [],
-        timeOverride: range,
-      });
+      expect(open.mock.calls[0][0].payload).toEqual({ text: "why?", chips: [] });
     });
 
-    it("sends Enter's line, its @ chips and the page range as a new chat in the full view", async () => {
+    it("asks over the window its chip shows: the default unpicked, a pick once one is made", async () => {
+      const { wrapper } = setupOn({ layout: "overview" });
+      await flushPromises();
+      const chip = () => wrapper.get('[data-test="assistant-context-chip-time"]');
+      const ask = async (line: string) => {
+        await input(wrapper).setValue(line);
+        await input(wrapper).trigger("keydown", { key: "Enter" });
+        return open.mock.calls.at(-1)![0].payload.timeOverride;
+      };
+      const pick = async (period: string) => {
+        await chip().trigger("click");
+        await flushPromises();
+        document.body
+          .querySelector<HTMLElement>(`[data-test="assistant-context-time-${period}"]`)!
+          .click();
+        await flushPromises();
+      };
+      expect(chip().text()).toBe("Last 15 min");
+      expect(await ask("first")).toBeUndefined();
+      await pick("7d");
+      expect(chip().text()).toBe("Last 7 days");
+      expect(await ask("second")).toMatchObject({ period: "7d" });
+      await pick("15m");
+      expect(chip().text()).toBe("Last 15 min");
+      expect(await ask("third")).toBeUndefined();
+    });
+
+    it("sends Enter's line and its @ chips as a new chat in the full view", async () => {
       const chip = {
         id: "mention:stream:logs|checkout",
         kind: "stream",
@@ -839,8 +861,7 @@ describe("AssistantLauncher", () => {
         sent: "whitelist",
       };
       mentionPick.current = { id: chip.id, kind: "stream", label: chip.label, chip };
-      const range = { from: 1_000, to: 3_601_000, period: "1h" };
-      const { wrapper } = setupOn({ layout: "overview", pageRange: range });
+      const { wrapper } = setupOn({ layout: "overview" });
       await flushPromises();
       await input(wrapper).setValue("@check");
       await flushPromises();
@@ -855,11 +876,7 @@ describe("AssistantLauncher", () => {
         intent: "send",
         thread: "new",
         container: "full",
-        payload: {
-          text: "why 5xx?",
-          chips: [chip],
-          timeOverride: range,
-        },
+        payload: { text: "why 5xx?", chips: [chip] },
       });
     });
 

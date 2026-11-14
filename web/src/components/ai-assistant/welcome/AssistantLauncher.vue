@@ -454,11 +454,8 @@ const props = withDefaults(
   defineProps<{
     /** `overview` is Home's ask field alone; `card` adds a heading, starters and recent chats. */
     layout?: "card" | "overview";
-    /** The page range in ms; the time chip mirrors it and a pick moves it. */
-    pageRange?: ComposerState["timeOverride"];
-    /** Home's wide tab: the capability cards under the field; a pick stages its prompt in the field. */
   }>(),
-  { layout: "card", pageRange: null },
+  { layout: "card" },
 );
 
 const MENTION_LISTBOX_ID = "assistant-launcher-mention-listbox";
@@ -551,7 +548,7 @@ const { shown: shownTrayChips, hidden: hiddenTrayChips } = useChipCollapse(trayC
 const seesDraft = computed<ContextDraft>(() => ({
   chips: mentionChips.value,
   images: images.value,
-  timeOverride: timeOverride.value ?? props.pageRange,
+  timeOverride: timeOverride.value,
 }));
 
 const mentionsOn = computed(() => fieldReady.value);
@@ -806,7 +803,7 @@ function ask(stage: boolean): void {
   if (!line && attached.length === 0) return openFull();
   text.value = "";
   const overview = props.layout === "overview";
-  const time = sendRange() ?? (overview ? props.pageRange : null);
+  const time = sendRange();
   const chips = mentionChips.value;
   const picked = agent.value;
   mentionChips.value = [];

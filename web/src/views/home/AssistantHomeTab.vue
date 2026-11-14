@@ -41,13 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="mx-auto max-w-3xl"
         />
         <!-- mt-3 leaves room for the chip row that floats above the box, clear of the greeting -->
-        <AssistantLauncher
-          v-else
-          ref="launcher"
-          layout="overview"
-          :page-range="pageRange"
-          class="mx-auto mt-3 max-w-3xl"
-        />
+        <AssistantLauncher v-else ref="launcher" layout="overview" class="mx-auto mt-3 max-w-3xl" />
         <AssistantHomeExamples
           v-if="state === 'ai'"
           class="mx-auto max-w-3xl"
@@ -68,21 +62,17 @@ import {
   onMounted,
   ref,
 } from "vue";
-import { useRoute } from "vue-router";
 import { useStore } from "vuex";
 
 import AssistantHomeExamples from "@/components/ai-assistant/welcome/AssistantHomeExamples.vue";
 import AssistantLauncher from "@/components/ai-assistant/welcome/AssistantLauncher.vue";
-import type { ComposerState } from "@/composables/assistant";
 import useBreakpoint from "@/composables/useBreakpoint";
 import { useI18nTyped } from "@/types/i18n";
 
 import AgentHomeAskNote from "./AgentHomeAskNote.vue";
 import AgentHomeGreeting from "./AgentHomeGreeting.vue";
 import { HOME_RAIL_CLASS } from "./homeState";
-import { DEFAULT_HOME_RANGE, periodToMs, readHomeUrl } from "./homeUrl";
 import { useAgentHomeState } from "./useAgentHomeState";
-import { useHomeRefresh } from "./useHomeRefresh";
 
 const HomeChatsRail = defineAsyncComponent(() => import("./HomeChatsRail.vue"));
 
@@ -92,19 +82,11 @@ const RISE = {
 } as const;
 
 const { t } = useI18nTyped();
-const route = useRoute();
 const store = useStore();
 const { lgUp } = useBreakpoint();
 const { state, offReason } = useAgentHomeState();
 
 const org = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
-const range = readHomeUrl(route.query).range ?? DEFAULT_HOME_RANGE;
-// A relative range ends now, so its bounds move with the clock while Home is on screen.
-const now = ref(Date.now());
-useHomeRefresh(
-  () => range.type === "relative",
-  () => (now.value = Date.now()),
-);
 
 // Past chats stay readable with the credits used up; no agent, Open Source or a loading gate draws no rail.
 const railShown = computed(() => lgUp.value && (state.value === "ai" || state.value === "budget"));
@@ -115,12 +97,6 @@ onActivated(() => {
   if (activatedOnce) focusAsk();
   activatedOnce = true;
 });
-
-const pageRange = computed<NonNullable<ComposerState["timeOverride"]>>(() =>
-  range.type === "relative"
-    ? { from: now.value - periodToMs(range.period), to: now.value, period: range.period }
-    : { from: Math.floor(range.from / 1000), to: Math.ceil(range.to / 1000) },
-);
 
 // The entrance plays once per mount; a kept-alive return re-inserts the nodes, which would replay it.
 const entering = ref(true);

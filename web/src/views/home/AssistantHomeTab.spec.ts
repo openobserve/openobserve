@@ -124,25 +124,14 @@ describe("AssistantHomeTab", () => {
     }
   });
 
-  it("hands the Ask box the URL's range: a relative period ends now, absolute bounds go from microseconds to milliseconds", async () => {
-    vi.useFakeTimers({ now: 10_000_000 });
-    try {
-      const relative = mountTab();
+  it("hands the Ask box no range of its own, so it asks over the window its chip shows", async () => {
+    for (const query of [{}, { period: "7d" }, { from: "1500", to: "2500" }]) {
+      mocks.query = query;
+      const wrapper = mountTab();
       await flushPromises();
-      expect(relative.getComponent({ name: "AssistantLauncher" }).props("pageRange")).toEqual({
-        from: 10_000_000 - 86_400_000,
-        to: 10_000_000,
-        period: "24h",
-      });
-      mocks.query = { from: "1500", to: "2500" };
-      const absolute = mountTab();
-      await flushPromises();
-      expect(absolute.getComponent({ name: "AssistantLauncher" }).props("pageRange")).toEqual({
-        from: 1,
-        to: 3,
-      });
-    } finally {
-      vi.useRealTimers();
+      expect(
+        wrapper.getComponent({ name: "AssistantLauncher" }).props("pageRange"),
+      ).toBeUndefined();
     }
   });
 
