@@ -1158,6 +1158,12 @@ export default defineComponent({
     const { t } = useI18nTyped();
     const router = useRouter();
     const versionPanel = useServicePanelRoute();
+    // Parents keep the last service's route while a dependency is selected, so only the node it names may read or write it.
+    const routeOwnsNode = computed(() => {
+      const node = props.selectedNode;
+      if (!versionPanel.state.value.open || !node || node.service_type) return false;
+      return [node.name, node.label, node.id].includes(versionPanel.state.value.service);
+    });
     const versionsEnabled = config.isEnterprise === "true" || config.isCloud === "true";
     const compareDrawer = useVersionCompareDrawer();
     const markerQuery = useQuery(
@@ -1409,7 +1415,7 @@ export default defineComponent({
       if (node?.service_type) return "";
       if (Object.prototype.hasOwnProperty.call(node ?? {}, "where_key"))
         return node.where_key || "";
-      return versionPanel.state.value.where;
+      return routeOwnsNode.value ? versionPanel.state.value.where : "";
     });
     // null holds source queries until the schema settles; an unread schema drops the where, since an absent column 400s.
     const panelWhereKey = computed<string | null>(() => {
@@ -1874,12 +1880,12 @@ export default defineComponent({
 
     // Active tab state
     const activeTab = ref<string>(
-      versionPanel.state.value.open ? versionPanel.state.value.tab : "operations",
+      routeOwnsNode.value ? versionPanel.state.value.tab : "operations",
     );
     watch(
       () => versionPanel.state.value.tab,
       (tab) => {
-        if (versionPanel.state.value.open) activeTab.value = tab;
+        if (routeOwnsNode.value) activeTab.value = tab;
       },
     );
 
@@ -2005,7 +2011,7 @@ export default defineComponent({
         return;
       }
       activeTab.value = String(name);
-      if (versionPanel.state.value.open)
+      if (routeOwnsNode.value)
         void versionPanel.update(versionPanel.state.value.where, String(name));
     }
 
@@ -2772,6 +2778,8 @@ export default defineComponent({
         }
         if (activeTab.value === "metrics") fetchMetricsCorrelation();
       },
+      // A tab restored from the route may see no later dependency change, e.g. Metrics after a failed schema read.
+      { immediate: true },
     );
 
     // Declared before discovery so the reset runs first; one source per value, so a refreshed row of the same node keeps its tab.
@@ -2795,9 +2803,7 @@ export default defineComponent({
         metricsCorrelationData.value = null;
         metricsCorrelationError.value = null;
         metricsCorrelationLoaded.value = false;
-        activeTab.value = versionPanel.state.value.open
-          ? versionPanel.state.value.tab
-          : "operations";
+        activeTab.value = routeOwnsNode.value ? versionPanel.state.value.tab : "operations";
         localRangeFilters.value.clear();
         rangeFiltersVersion.value++;
       },
@@ -2835,7 +2841,7 @@ export default defineComponent({
           return;
         }
         activeTab.value = "operations";
-        if (versionPanel.state.value.open)
+        if (routeOwnsNode.value)
           void versionPanel.update(versionPanel.state.value.where, "operations");
       },
     );

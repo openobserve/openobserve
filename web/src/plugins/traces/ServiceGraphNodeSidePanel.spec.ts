@@ -27,6 +27,7 @@ const {
   notifyMock,
   toastMock,
   routerPushMock,
+  routerReplaceMock,
   deploysQueryMock,
   routeQuery,
   panelVersions,
@@ -35,6 +36,7 @@ const {
   notifyMock: vi.fn(),
   toastMock: vi.fn(),
   routerPushMock: vi.fn(),
+  routerReplaceMock: vi.fn(),
   deploysQueryMock: vi.fn(),
   routeQuery: {} as Record<string, string>,
   panelVersions: [] as unknown[],
@@ -133,7 +135,7 @@ vi.mock("vue-router", async (importOriginal) => {
     ...actual,
     useRouter: () => ({
       push: routerPushMock,
-      replace: vi.fn(),
+      replace: routerReplaceMock,
       currentRoute: { value: { path: "/", query: {} } },
     }),
     useRoute: () => route,
@@ -1848,7 +1850,24 @@ describe("ServiceGraphNodeSidePanel", () => {
       }
     });
 
-    it("keeps the tab the route names when the row refreshes or changes place, and resets it off the route", async () => {
+    it.each([
+      { schema: "fails", stream: () => getStreamMock.mockRejectedValueOnce(new Error("schema")) },
+      { schema: "is empty", stream: () => getStreamMock.mockResolvedValueOnce({ schema: [] }) },
+    ])("loads a restored Metrics tab when the stream schema $schema", async ({ stream }) => {
+      stream();
+      Object.assign(routeQuery, { panel: "metrics", panelSvc: "frontend", panelWhere: "" });
+      try {
+        wrapper = mountPanel();
+        await flushPromises();
+        await flushPromises();
+        expect((wrapper.vm as any).activeTab).toBe("metrics");
+        expect((wrapper.vm as any).metricsCorrelationLoaded).toBe(true);
+      } finally {
+        for (const key of Object.keys(routeQuery)) delete routeQuery[key];
+      }
+    });
+
+    it("keeps the tab the route names on its own service, and resets it off the route or on another node", async () => {
       const previous = config.isEnterprise;
       config.isEnterprise = "true";
       Object.assign(routeQuery, {
@@ -1866,6 +1885,14 @@ describe("ServiceGraphNodeSidePanel", () => {
         await wrapper.setProps({ selectedNode: { ...baseNode, id: "frontend@k8s:c2/web" } });
         await flushPromises();
         expect((wrapper.vm as any).activeTab).toBe("versions");
+        routerReplaceMock.mockClear();
+        await wrapper.setProps({
+          selectedNode: { id: "mysql", name: "mysql", label: "mysql", service_type: "database" },
+        });
+        await flushPromises();
+        await flushPromises();
+        expect((wrapper.vm as any).activeTab).toBe("operations");
+        expect(routerReplaceMock).not.toHaveBeenCalled();
         for (const key of Object.keys(routeQuery)) delete reactive(routeQuery)[key];
         await wrapper.setProps({ selectedNode: { ...baseNode, id: "cart", name: "cart" } });
         await flushPromises();
