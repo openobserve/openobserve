@@ -669,6 +669,26 @@ describe("AssistantLauncher", () => {
       expect(thumbs(wrapper)).toHaveLength(0);
     });
 
+    it("moves focus to the next chip, then to the box, as chips are removed, and says each removal", async () => {
+      const { wrapper } = setupOn({ layout: "overview" });
+      await flushPromises();
+      pick(wrapper, [png("a.png"), png("b.png")]);
+      await vi.waitFor(() => expect(thumbs(wrapper)).toHaveLength(2));
+      const status = () => wrapper.get('[data-test="assistant-launcher-status"]');
+      expect(status().attributes("role")).toBe("status");
+      await thumbs(wrapper)[0].get('[data-test="assistant-context-chip-remove"]').trigger("click");
+      await flushPromises();
+      expect(thumbs(wrapper)).toHaveLength(1);
+      expect(document.activeElement).toBe(
+        thumbs(wrapper)[0].get('[data-test="assistant-context-chip-button"]').element,
+      );
+      expect(status().text()).toBe("a.png removed from context");
+      await thumbs(wrapper)[0].get('[data-test="assistant-context-chip-remove"]').trigger("click");
+      await flushPromises();
+      expect(document.activeElement).toBe(input(wrapper).element);
+      expect(status().text()).toBe("b.png removed from context");
+    });
+
     it("hands the images to the new chat with the line on Enter and on Shift+Enter, and sends images alone", async () => {
       const { wrapper } = setupOn({ layout: "overview" });
       await flushPromises();

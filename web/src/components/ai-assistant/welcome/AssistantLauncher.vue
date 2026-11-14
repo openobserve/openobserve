@@ -201,6 +201,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @size-error="(files) => files.forEach(refuseSize)"
           @type-error="() => refuse('type', t('assistant.context.imageType'))"
         />
+        <span
+          role="status"
+          aria-live="polite"
+          class="sr-only"
+          data-test="assistant-launcher-status"
+        >
+          <span v-if="status" :key="status.seq">{{ status.text }}</span>
+        </span>
       </div>
       <div
         v-if="layout === 'card'"
@@ -433,6 +441,7 @@ import AssistantComposerBottomRow, {
   SEND_ACTION_CLASS,
 } from "@/components/ai-assistant/composer/AssistantComposerBottomRow.vue";
 import AssistantComposerFrame from "@/components/ai-assistant/composer/AssistantComposerFrame.vue";
+import { announceComposer, composerUi } from "@/components/ai-assistant/composer/composerUi";
 import AssistantComposerPlusMenu, {
   type ComposerPlusAction,
 } from "@/components/ai-assistant/composer/AssistantComposerPlusMenu.vue";
@@ -545,6 +554,8 @@ const trayChips = computed<TrayChip[]>(() => [
   })),
 ]);
 const { shown: shownTrayChips, hidden: hiddenTrayChips } = useChipCollapse(trayChips, chipLayout);
+// The launcher's line has no chat yet, so it speaks through its own draft's composer status.
+const status = computed(() => composerUi(LAUNCHER_DRAFT).status);
 // The ⓘ reads what Enter would send: the @ picks, the images and the range `ask` uses.
 const seesDraft = computed<ContextDraft>(() => ({
   chips: mentionChips.value,
@@ -633,9 +644,21 @@ function mixedStream(chip: ContextChip): boolean {
   return !!held && (held.ref?.streamType ?? "logs") !== (chip.ref?.streamType ?? "logs");
 }
 
-function removeTrayChip(chip: ContextChip): void {
+async function removeTrayChip(chip: ContextChip): Promise<void> {
+  const order = trayChips.value.map((item) => item.chip.id);
+  const next = order[order.indexOf(chip.id) + 1] ?? null;
   if (chip.kind === "image") images.value = images.value.filter((image) => image.id !== chip.id);
   else mentionChips.value = mentionChips.value.filter((held) => held.id !== chip.id);
+  announceComposer(LAUNCHER_DRAFT, t("assistant.context.removed", { label: chip.label }));
+  await nextTick();
+  // Focus goes to the next shown chip, else the box, so a removal never strands it (CT-08 AC 4).
+  const at = shownTrayChips.value.findIndex((item) => item.chip.id === next);
+  const buttons = field.value?.querySelectorAll<HTMLElement>(
+    '[data-test="assistant-launcher-chip-row"] [data-test="assistant-context-chip-button"]',
+  );
+  const target = at >= 0 ? buttons?.[at] : undefined;
+  if (target) target.focus();
+  else input.value?.focus();
 }
 
 function mentionKey(event: KeyboardEvent): boolean {
