@@ -123,7 +123,7 @@ const slots = defineSlots<{
 const FOCUSABLE =
   "button:not([disabled]), [href], input, textarea, select, [tabindex]:not([tabindex='-1'])";
 
-const anchorRef = ref<{ $el?: Element } | null>(null);
+const anchorRef = ref<{ $el?: Node } | null>(null);
 let closedFromOutside = false;
 let invoker: HTMLElement | null = null;
 
@@ -133,8 +133,14 @@ function rememberInvoker(event: Event) {
   if (el) invoker = el;
 }
 
+// An anchor wrapped in a fragment (an OTooltip) exposes a text node as $el; its element follows it.
+function anchorElement(): Element | null | undefined {
+  const el = anchorRef.value?.$el;
+  return el instanceof CharacterData ? el.nextElementSibling : (el as Element | undefined);
+}
+
 watch(
-  () => anchorRef.value?.$el,
+  anchorElement,
   (el, _was, onCleanup) => {
     if (!(el instanceof HTMLElement)) return;
     el.addEventListener("focusin", rememberInvoker);
@@ -156,7 +162,7 @@ function onOpenAutoFocus(event: Event) {
 // Reka returns focus only to a trigger, so an anchored popover hands it back to its anchor unless the user clicked away.
 function onCloseAutoFocus(event: Event) {
   if (!props.autoFocus) return event.preventDefault();
-  const anchor = anchorRef.value?.$el;
+  const anchor = anchorElement();
   if (!slots.anchor || !(anchor instanceof HTMLElement) || closedFromOutside) return;
   event.preventDefault();
   // The exit animation delays this past the caller's own focus move (Tab out, the open chord); never undo it.

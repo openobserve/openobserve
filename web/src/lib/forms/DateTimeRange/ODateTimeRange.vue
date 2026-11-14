@@ -256,7 +256,13 @@ const rangeLabel = computed((): string | null => {
 function handleRangeChange(value: DateRange | undefined) {
   if (!value) return;
   stagedRange.value = value as DateRange;
-  if (value.start && value.end) autoApplyAbsolute();
+  if (!value.start || !value.end) return;
+  // Picked dates alone cover whole days, so a two-date pick applies with no time typed.
+  if (props.autoApply && !props.hideTime) {
+    stagedStartTime.value ||= props.withSeconds ? "00:00:00" : "00:00";
+    stagedEndTime.value ||= props.withSeconds ? "23:59:59" : "23:59";
+  }
+  autoApplyAbsolute();
 }
 
 const absoluteReady = computed(() => {

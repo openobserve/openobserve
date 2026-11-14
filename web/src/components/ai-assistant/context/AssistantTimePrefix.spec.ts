@@ -13,11 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { parseDate } from "@internationalized/date";
 import { enableAutoUnmount, flushPromises, mount } from "@vue/test-utils";
+import { RangeCalendarRoot } from "reka-ui";
 import { afterEach, describe, expect, it } from "vitest";
 
 import type { TimeWindow } from "@/composables/assistant";
 
+import OTime from "@/lib/forms/Time/OTime.vue";
 import OPopover from "@/lib/overlay/Popover/OPopover.vue";
 
 import AssistantTimePrefix from "./AssistantTimePrefix.vue";
@@ -163,6 +166,46 @@ describe("AssistantTimePrefix", () => {
     await flushPromises();
     expect(wrapper.emitted("change")?.[0]?.[0]).toMatchObject({ period: "1s" });
     expect(wrapper.emitted("update:open")?.at(-1)).toEqual([false]);
+  });
+
+  it("applies two picked dates over whole days and hands focus back to the chip", async () => {
+    const { wrapper, row } = await open({ window: DEFAULT });
+    row("custom")!.click();
+    await flushPromises();
+    document.body.querySelector<HTMLElement>('[data-test="datetimerange-tab-absolute"]')!.click();
+    await flushPromises();
+    wrapper.findComponent(RangeCalendarRoot).vm.$emit("update:modelValue", {
+      start: parseDate("2026-11-13"),
+      end: parseDate("2026-11-14"),
+    });
+    const { from, to } = wrapper.emitted("change")![0][0] as { from: number; to: number };
+    expect(to - from).toBe((2 * 24 * 60 - 1) * 60_000);
+    // The host swaps in the picked range in the same tick, which redraws the chip with its ✕.
+    await wrapper.setProps({ window: { from, to, source: "custom" } });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(document.activeElement).toBe(
+      wrapper.get('[data-test="assistant-context-chip-time"]').element,
+    );
+  });
+
+  it("hands focus back to the chip after Enter applies a range", async () => {
+    const from = Date.UTC(2026, 10, 13, 9);
+    const { wrapper, row } = await open({
+      window: { from, to: Date.UTC(2026, 10, 14, 18), source: "custom" },
+    });
+    row("custom")!.click();
+    await flushPromises();
+    wrapper.findAllComponents(OTime)[1].vm.$emit("update:modelValue", "20:00");
+    await flushPromises();
+    document.body
+      .querySelector('[data-test="datetimerange-end-time"] input')!
+      .dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    await flushPromises();
+    expect(wrapper.emitted("change")).toEqual([[{ from, to: Date.UTC(2026, 10, 14, 20) }]]);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(document.activeElement).toBe(
+      wrapper.get('[data-test="assistant-context-chip-time"]').element,
+    );
   });
 
   it("checks Custom Range… on a picked date range, and its picker opens on that range", async () => {

@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
@@ -1254,6 +1254,16 @@ describe("one frame, the + menu and long pastes (D4 §3.1, §3.6, §3.9)", () =>
   });
 
   it("opens the bottom time pill's picker from the + menu, and a pick changes the pill without a strip", async () => {
+    // Focus comes back to the pill, which opens its hint tooltip; jsdom has no ResizeObserver for it.
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      },
+    );
+    onTestFinished(() => vi.unstubAllGlobals());
     fake.current = fakeAssistant();
     const sid = fake.current.store.createSession({
       origin: { entryKind: "header_button", objectKind: "none", container: "sidebar" },
@@ -1281,6 +1291,7 @@ describe("one frame, the + menu and long pastes (D4 §3.1, §3.6, §3.9)", () =>
       period: "24h",
     });
     expect(wrapper.find('[data-test="assistant-composer-strip"]').exists()).toBe(false);
+    expect(document.activeElement).toBe(pill().element);
   });
 
   it("shows the agent as a pill, which opens the agent menu once there is a choice", async () => {

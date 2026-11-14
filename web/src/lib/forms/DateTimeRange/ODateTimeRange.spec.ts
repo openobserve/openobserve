@@ -62,12 +62,30 @@ describe("ODateTimeRange", () => {
       expect(wrapper.find('[data-test="datetimerange-relative-apply"]').exists()).toBe(false);
     });
 
-    it("keeps an absolute range staged until both dates and both times are set, then applies it once when an end time is left", async () => {
+    it("fills only the empty times with the whole days on the date pick that completes a range", async () => {
       wrapper = mountAuto({ mode: "absolute" });
+      pickDates({ start: RANGE.start });
+      await flushPromises();
+      expect(wrapper.emitted("change")).toBeUndefined();
+      pickDates(RANGE);
+      expect(wrapper.emitted("change")?.[0]?.[0]).toMatchObject({
+        startTime: "00:00",
+        endTime: "23:59",
+      });
+      wrapper.unmount();
+      wrapper = mountAuto({ mode: "absolute", startTime: "09:00" });
+      pickDates({ start: RANGE.start, end: RANGE.start });
+      expect(wrapper.emitted("change")?.[0]?.[0]).toMatchObject({
+        startTime: "09:00",
+        endTime: "23:59",
+      });
+    });
+
+    it("keeps typed times staged on dates already set, then applies them once when an end time is left", async () => {
+      wrapper = mountAuto({ mode: "absolute", startDate: "2026-11-10", endDate: "2026-11-12" });
       const [start, end] = wrapper.findAllComponents(OTime);
       start.vm.$emit("update:modelValue", "09:00");
       blur(start);
-      pickDates(RANGE);
       await flushPromises();
       expect(wrapper.emitted("change")).toBeUndefined();
       end.vm.$emit("update:modelValue", "17:03");
