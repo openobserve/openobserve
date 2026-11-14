@@ -29,6 +29,7 @@ import type { CapabilityAgent, GateCode, Starter } from "@/composables/assistant
 import { raw } from "@/types/i18n";
 
 import { fakeAssistant, fakeRouter, fakeVuex } from "../__tests__/fakeAssistant";
+import AssistantTimePrefix from "../context/AssistantTimePrefix.vue";
 import AssistantComposerPlusMenu, {
   type ComposerPlusAction,
 } from "../composer/AssistantComposerPlusMenu.vue";
@@ -821,6 +822,20 @@ describe("AssistantLauncher", () => {
       await input(wrapper).setValue("why?");
       await input(wrapper).trigger("keydown", { key: "Enter" });
       expect(open.mock.calls[0][0].payload).toEqual({ text: "why?", chips: [] });
+    });
+
+    it("reads a Custom Range in the user's time zone, as the chat composer does", async () => {
+      fake.current = fakeAssistant("available");
+      const vuex = fakeVuex();
+      (vuex.state as Record<string, unknown>).timezone = "Asia/Kolkata";
+      const wrapper = mount(AssistantLauncher, {
+        props: { layout: "overview" },
+        global: { plugins: [fakeRouter([]), vuex] },
+        attachTo: document.body,
+      });
+      mounted.push(wrapper);
+      await flushPromises();
+      expect(wrapper.findComponent(AssistantTimePrefix).props("timezone")).toBe("Asia/Kolkata");
     });
 
     it("asks over the window its chip shows: the default unpicked, a pick once one is made", async () => {

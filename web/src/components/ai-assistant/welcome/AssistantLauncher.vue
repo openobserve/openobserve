@@ -157,6 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <AssistantTimePrefix
                     v-model:open="timeOpen"
                     :window="window"
+                    :timezone="vuex.state.timezone || 'UTC'"
                     :disabled="fieldLoading"
                     fixed
                     align="start"
