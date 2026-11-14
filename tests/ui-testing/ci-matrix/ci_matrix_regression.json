@@ -68,7 +68,9 @@
       "dashboard-cache-browser-refresh.spec.js",
       "dashboard-save-validation-message-11283.spec.js",
       "dashboard-14479-variable-name-prefix.spec.js",
-      "dashboard-3127-shortcut-behind-drawer.spec.js"
+      "dashboard-3127-shortcut-behind-drawer.spec.js",
+      "dashboard-2140-pin-after-move.spec.js",
+      "dashboard-2120-import-folder-lock.spec.js"
     ],
     "disabled": []
   },
@@ -222,7 +224,12 @@
     "actual_folder": "RegressionSet/OnlineEvals",
     "browser": "chrome",
     "run_files": [
-      "llmProviderTypes.spec.js"
+      "llmProviderTypes.spec.js",
+      "ai-obs-3133-3141-insights-scope.spec.js",
+      "ai-obs-3145-3154-insights-panels.spec.js",
+      "ai-obs-3152-insights-empty-state.spec.js",
+      "ai-obs-2642-agent-graph-stale-window.spec.js",
+      "ai-prompts-3241-append.spec.js"
     ],
     "disabled": []
   },

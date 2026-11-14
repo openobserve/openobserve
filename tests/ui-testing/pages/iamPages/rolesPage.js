@@ -245,6 +245,12 @@ export class RolesPage {
             `[data-test="edit-role-permissions-table-body-row-${name}-col-${action}-checkbox"] [role="checkbox"]`,
         );
     }
+    entityRowCells(name) {
+        return this.page.locator(`[data-test^="edit-role-permissions-table-body-row-${name}-col-"]`);
+    }
+    entityActionCell(name, action) {
+        return this.page.locator(`[data-test="edit-role-permissions-table-body-row-${name}-col-${action}-checkbox"]`);
+    }
     /** The em-dash rendered where an action does not apply, on a pinned scope row. */
     scopeNotApplicable(key, action) {
         return this.page.locator(`[data-test="edit-role-module-pane-scope-${key}-${action}-na"]`);

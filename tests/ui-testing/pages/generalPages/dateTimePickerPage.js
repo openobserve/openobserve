@@ -58,6 +58,15 @@ export class DateTimePickerPage {
         // Apply button — rendered only when the host sets autoApply=false.
         this.applyBtn = page.locator('[data-test="date-time-apply-btn"]');
 
+        this.timezoneSelect = page.locator('[data-test="datetime-timezone-select"]').first();
+        this.timezoneSearch = page.locator('[data-test="datetime-timezone-select-search"]');
+        this.timezonePopover = page.locator('[data-test="datetime-timezone-select-popover"]');
+        this.timezoneOptions = this.timezonePopover.locator('[data-test="datetime-timezone-select-option"]');
+        // OSelect renders no data-test on its scroll container
+        this.timezoneScrollList = this.timezonePopover
+            .locator('div.overflow-auto', { has: page.locator('[data-test="datetime-timezone-select-option"]') })
+            .last();
+
         // Custom relative row — value input + unit select. The product DateTime.vue
         // renders these controls WITHOUT a data-test (testability-only), so scope
         // structurally: the custom row is the `.relative-row` that holds the native
@@ -349,6 +358,50 @@ export class DateTimePickerPage {
     async clickApply() {
         await expect(this.applyBtn).toBeVisible();
         await this.applyBtn.click();
+    }
+
+    // ==================== Timezone ====================
+
+    timezoneOption(timeZone) {
+        return this.page.locator(`[data-test="datetime-timezone-select-option"][data-test-value="${timeZone}"]`);
+    }
+
+    async selectTimezone(timeZone) {
+        await this.triggerBtn.click();
+        await this.timezoneSelect.click();
+        await this.timezoneSearch.fill(timeZone);
+        await this.timezoneOption(timeZone).click();
+        await this.page.keyboard.press('Escape').catch(() => {});
+    }
+
+    async openTimezoneList() {
+        await expect(this.triggerBtn).toBeVisible({ timeout: 30000 });
+        await this.triggerBtn.click();
+        await this.timezoneSelect.click();
+        await expect(this.timezonePopover).toBeVisible({ timeout: 15000 });
+    }
+
+    async searchTimezones(term) {
+        await this.timezoneSearch.fill(term);
+    }
+
+    async scrollTimezoneListToBottom() {
+        return this.timezoneScrollList.evaluate((el) => { el.scrollTop = el.scrollHeight; return el.scrollTop; });
+    }
+
+    async timezoneListGeometry() {
+        return this.timezoneScrollList.evaluate((el) => ({ top: el.scrollTop, max: el.scrollHeight - el.clientHeight }));
+    }
+
+    async timezoneListScrollTop() {
+        return this.timezoneScrollList.evaluate((el) => el.scrollTop);
+    }
+
+    async pickRelativePeriodAndClose(suffix) {
+        await expect(this.triggerBtn).toBeVisible({ timeout: 30000 });
+        await this.triggerBtn.click();
+        await this.relativePeriodBtn(suffix).click();
+        await this.page.keyboard.press('Escape').catch(() => {});
     }
 }
 

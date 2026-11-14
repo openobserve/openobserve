@@ -28,6 +28,11 @@ export class CorrelationSettingsPage {
         this.saveConfigurationButtonName = 'Save Configuration';
         // Placeholder text of the "+ Add field" OSelect trigger.
         this.selectAFieldText = 'Select a field';
+        this.identitySaveBtn = '[data-test="service-identity-save-btn"]';
+        this.addFieldPickerTrigger = '[data-test="service-identity-add-distinguish-btn-trigger"]';
+        this.addFieldEmptyBtn = 'button[data-test="service-identity-add-distinguish-btn"]';
+        this.addFieldOption = '[data-test="service-identity-add-distinguish-btn-option"]';
+        this.addFieldSearch = '[data-test="service-identity-add-distinguish-btn-search"]';
         // Visible tab labels (post-revamp): the tab `name` attrs are
         // services / discovery / field-aliases, rendered as
         // these i18n labels.
@@ -796,5 +801,33 @@ export class CorrelationSettingsPage {
         const dialogVisible = await this.page.locator('[data-test="time-range-editor-dialog"]')
             .isVisible({ timeout: 5000 }).catch(() => false);
         return dialogVisible;
+    }
+
+    getIdentitySaveButton() {
+        return this.page.locator(this.identitySaveBtn);
+    }
+
+    getAddFieldOptions() {
+        return this.page.locator(this.addFieldOption);
+    }
+
+    // an empty rule list shows a plain Add field button instead of the picker
+    async openAddFieldPicker() {
+        const picker = this.page.locator(this.addFieldPickerTrigger).first();
+        if (!(await picker.isVisible().catch(() => false))) {
+            const emptyAdd = this.page.locator(this.addFieldEmptyBtn);
+            if (await emptyAdd.isVisible().catch(() => false)) await emptyAdd.click();
+            else await this.page.getByRole('button', { name: /add field/i }).first().click();
+        }
+        await expect(picker, 'Add field opens a field picker').toBeVisible({ timeout: 15000 });
+        await picker.click();
+    }
+
+    async readAddFieldOptionLabels() {
+        return this.getAddFieldOptions().evaluateAll((els) => els.map((e) => e.getAttribute('data-test-label') || e.textContent || ''));
+    }
+
+    async searchAddFieldOptions(text) {
+        await this.page.locator(this.addFieldSearch).fill(text);
     }
 }

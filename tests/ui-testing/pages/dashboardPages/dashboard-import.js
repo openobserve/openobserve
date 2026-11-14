@@ -56,6 +56,22 @@ export default class DashboardImport {
     this.confirmDeleteFolderDialog = page.locator(
       '[data-test="dashboard-confirm-delete-folder-dialog"]'
     );
+    this.folderSelect = page.locator('[data-test="index-dropdown-stream_type"]').first();
+    this.folderOptions = page.locator('[data-test="index-dropdown-stream_type-option"]');
+    this.newFolderButton = page.locator('[data-test="dashboard-folder-move-new-add"]').first();
+  }
+
+  async uploadDashboardJson(fileName, dashboardJson) {
+    await this.inputFile.setInputFiles({
+      name: fileName,
+      mimeType: "application/json",
+      buffer: Buffer.from(JSON.stringify(dashboardJson)),
+    });
+  }
+
+  // a locked picker may refuse the click; the caller asserts the list stays closed
+  async tryOpenFolderSelect() {
+    await this.folderSelect.click({ force: true, timeout: 3000 }).catch(() => {});
   }
 
   /**

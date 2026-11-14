@@ -4,6 +4,7 @@ const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures
 const testLogger = require('../utils/test-logger.js');
 const { getOrgIdentifier } = require('../utils/cloud-auth.js');
 const { EmptyPagesPage } = require('../../pages/generalPages/emptyPagesPage.js');
+const { HomePage } = require('../../pages/generalPages/homePage.js');
 
 const base = () => process.env.ZO_BASE_URL.replace(/\/$/, '');
 const DAY_US = 24 * 60 * 60 * 1_000_000;
@@ -106,6 +107,11 @@ async function failSections(page, status, which = OVERVIEW_SECTIONS) {
     for (const pattern of which) {
         await page.route(pattern, (route) => route.fulfill({ status, json: { code: status, message: 'stubbed failure' } }));
     }
+}
+
+// the page-level error shows only when the overview cards fail as well; otherwise each section keeps its own Retry
+async function failOverview(page, status) {
+    await page.route(OVERVIEW_ENDPOINT, (route) => route.fulfill({ status, json: { code: status, message: 'stubbed failure' } }));
 }
 
 async function answerSectionsEmpty(page) {
@@ -222,6 +228,7 @@ const SCREENS = [
         id: 'h-home-overview-error',
         async run({ page, orgId }) {
             await failSections(page, 500);
+            await failOverview(page, 500);
             await openHome(page, orgId, 'overview');
             await expect(tid(page, 'overview-load-error-empty-state')).toBeVisible({ timeout: 30000 });
             await expect(tid(page, 'overview-load-error-retry-card')).toBeVisible();
@@ -236,9 +243,9 @@ const SCREENS = [
         },
         async run({ page, orgId }) {
             await openHome(page, orgId, 'overview');
-            await expect(tid(page, 'overview-load-error-empty-state')).toBeVisible({ timeout: 30000 });
-            await expect(tid(page, 'overview-load-error-retry-card')).toBeVisible();
+            await expect(tid(page, 'overview-headline-strip')).toBeVisible({ timeout: 30000 });
             await expect(tid(page, 'overview-not-monitored-empty-state')).toHaveCount(0);
+            await expect(tid(page, 'overview-load-error-empty-state')).toHaveCount(0);
         },
     },
     {
@@ -319,6 +326,7 @@ const SCREENS = [
         async init({ page }) {
             await pinConfig(page, { restricted_routes_on_empty_data: false });
             await failSections(page, 500);
+            await failOverview(page, 500);
         },
         async run({ page, orgId }) {
             await openHome(page, orgId, 'overview');
@@ -365,20 +373,22 @@ const SCREENS = [
         async init({ page }) {
             await pinConfig(page, { restricted_routes_on_empty_data: false });
             await page.route(/\/api\/[^/]+\/streams\?/, (route) => route.fulfill({ status: 500, json: { code: 500, message: 'stubbed failure' } }));
+            await answerSectionsEmpty(page);
         },
         async run({ page, orgId }) {
             const streamReads = [];
             page.on('request', (r) => { if (/\/api\/[^/]+\/streams\?/.test(r.url())) streamReads.push(r.url()); });
             await openHome(page, orgId, 'overview');
-            await expect(tid(page, 'overview-load-error-empty-state')).toBeVisible({ timeout: 30000 });
-            await expect(tid(page, 'overview-load-error-retry-card')).toBeVisible();
+            await expect(tid(page, 'overview-headline-strip')).toBeVisible({ timeout: 30000 });
+            await expect.poll(() => streamReads.length, { timeout: 15000 }).toBeGreaterThan(0);
+            // a failed probe is unknown, not empty, so the flag-off first-data hero must not take the page
             await expect(tid(page, 'home-first-data-hero')).toHaveCount(0);
+            await expect(tid(page, 'home-no-data-logs-card')).toHaveCount(0);
             await expect(tid(page, 'first-data-panel')).toHaveCount(0);
-            await expect(page.locator('[data-test="home-page"]').getByText('just now')).toHaveCount(0);
-            const beforeRetry = streamReads.length;
-            await tid(page, 'overview-load-error-retry-card').click();
-            await expect.poll(() => streamReads.length, { timeout: 15000 }).toBeGreaterThan(beforeRetry);
-            await expect(tid(page, 'overview-load-error-empty-state')).toBeVisible({ timeout: 30000 });
+            const beforeRefresh = streamReads.length;
+            await new HomePage(page).clickHomeRefresh();
+            await expect.poll(() => streamReads.length, { timeout: 15000, message: 'Refresh re-probes after a failed probe' }).toBeGreaterThan(beforeRefresh);
+            await expect(tid(page, 'home-first-data-hero')).toHaveCount(0);
             await page.mouse.move(760, 880);
         },
     },
@@ -408,12 +418,13 @@ const SCREENS = [
             }));
             await page.route(OVERVIEW_SECTIONS[2], (route) => route.fulfill({ json: { incidents: [], total: 0 } }));
         },
-        async run({ page, orgId }) {
+        async run({ page, orgId, buildType }) {
             await openHome(page, orgId, 'overview');
             await expect(tid(page, 'overview-anomalies-load-error')).toBeVisible({ timeout: 30000 });
             await expect(tid(page, 'overview-anomalies-load-error-retry-btn')).toBeVisible();
             await expect(tid(page, 'overview-recent-events-section')).toBeVisible();
-            await expect(tid(page, 'overview-services-section')).toBeVisible();
+            // the services section rides on incidents, which OSS shows locked
+            await expect(tid(page, 'overview-services-section')).toHaveCount(buildType === 'opensource' ? 0 : 1);
             await expect(tid(page, 'overview-load-error-empty-state')).toHaveCount(0);
         },
     },
@@ -429,12 +440,9 @@ const SCREENS = [
             const tileValue = (key) => page.locator(`[data-test="overview-headline-${key}"] [data-test="overview-tile-value"]`);
             const tileNote = (key) => page.locator(`[data-test="overview-headline-${key}"] [data-test="overview-tile-note"]`);
 
-            await expect(tid(page, 'overview-status-danger')).toBeVisible({ timeout: 30000 });
-            await expect(tid(page, 'overview-status-text')).toHaveText('Needs attention');
-            await expect(page.locator('[data-test^="overview-status-item-"]')).toHaveText(['1 alert firing']);
-            await expect(tid(page, 'overview-status-clear')).toHaveCount(0);
-
-            await expect(tileValue('firing')).toHaveText('1');
+            await expect(tileValue('firing')).toHaveText('1', { timeout: 30000 });
+            // the cards carry the problem, so no status line repeats it
+            await expect(page.locator('[role="status"][data-test^="overview-status-"]')).toHaveCount(0);
             await expect(tileValue('failing')).toHaveText('0');
             await expect(tileValue('delivery')).toHaveText('0');
             await expect(tileValue('pipelines')).toHaveText('—');
@@ -500,12 +508,14 @@ test.describe('Home before and at first data', () => {
                 if (screen.init) await screen.init({ page });
                 await navigateToBase(page);
                 const ctx = { page, request, orgId: getOrgIdentifier() };
-                if (screen.emptyOrg) ctx.orgId = await emptyOrgId(page, process.env.HOME_EMPTY_ORG || 'onboarding_test');
-                const ep = new EmptyPagesPage(page);
                 // read outside the page, so a flag-off screen's pinned config does not hide the stack's real flag
                 const cfg = await page.context().request.get(`${base()}/api/${ctx.orgId}/config`);
-                const flagOn = cfg.ok() && (await cfg.json()).restricted_routes_on_empty_data === true;
+                const cfgBody = cfg.ok() ? await cfg.json() : {};
+                ctx.buildType = cfgBody.build_type;
+                const flagOn = cfgBody.restricted_routes_on_empty_data === true;
                 test.skip(!flagOn, 'needs ZO_RESTRICTED_ROUTES_ON_EMPTY_DATA on (flag-off screens pin it off per page)');
+                if (screen.emptyOrg) ctx.orgId = await emptyOrgId(page, process.env.HOME_EMPTY_ORG || 'onboarding_test');
+                const ep = new EmptyPagesPage(page);
                 if (screen.pick) await ep.setPick(ctx.orgId, screen.pick);
                 else await page.addInitScript((k) => localStorage.removeItem(k), `o2.onboarding.firstSource.${ctx.orgId}`);
                 await screen.run(ctx);
