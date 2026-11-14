@@ -241,16 +241,22 @@ export function eventKey(row: Record<string, unknown> | null | undefined): strin
   return `${row._timestamp ?? ""}:${(hash >>> 0).toString(36)}`;
 }
 
-/** Uppercase copy with every quoted span blanked, index-aligned with `text`; null when unsafe to edit. */
-function maskSql(text: string): string | null {
+/** Uppercase copy with quoted spans blanked, index-aligned; `readOnly` reads a backslash as an escape. */
+function maskSql(text: string, readOnly = false): string | null {
   let masked = "";
   let quote: string | null = null;
   // By UTF-16 index, so `masked` and `text` stay index-aligned for slicing.
   for (let i = 0; i < text.length; i++) {
     const ch = text[i];
     if (quote) {
-      // The engine honours backslash escapes, which this masker does not track.
-      if (ch === "\\") return null;
+      // An edit must not guess how the engine reads a backslash; a read only needs the clause bounds.
+      if (ch === "\\") {
+        if (!readOnly) return null;
+        masked += "  ";
+        i += 1;
+        if (i >= text.length) masked = masked.slice(0, -1);
+        continue;
+      }
       masked += " ";
       if (ch === quote) quote = null;
     } else if (ch === "'" || ch === '"') {
@@ -268,13 +274,90 @@ const AGGREGATE_CALL =
 
 /** Whether a hand-written query returns computed rows rather than stored events. */
 export function isAggregateSql(sql: string): boolean {
-  const masked = maskSql(sql.trim());
+  const masked = maskSql(sql.trim(), true);
   if (masked === null) return false;
   const fromAt = masked.search(/\sFROM\s/);
   const select = fromAt === -1 ? masked : masked.slice(0, fromAt);
   return (
     /\bGROUP\s+BY\b/.test(masked) || /\bDISTINCT\b/.test(select) || AGGREGATE_CALL.test(select)
   );
+}
+
+/** Whether a hand-written query selects whole rows (`*`, `t.*`), not a chosen list of columns. */
+export function selectsAll(sql: string): boolean {
+  const masked = maskSql(sql.trim(), true);
+  if (masked === null) return true;
+  const fromAt = masked.search(/\sFROM\s/);
+  const list = (fromAt === -1 ? masked : masked.slice(0, fromAt)).replace(/^\s*SELECT\s+/, "");
+  return list.split(",").some((item) => /^\s*([A-Z_][A-Z0-9_]*\s*\.\s*)?\*\s*$/.test(item));
+}
+
+/** Splits at commas outside parentheses; `masked` keeps literals blank so their commas do not count. */
+function topLevelItems(masked: string, text: string): string[] {
+  const items: string[] = [];
+  let depth = 0;
+  let start = 0;
+  for (let i = 0; i < masked.length; i++) {
+    const ch = masked[i];
+    if (ch === "(") depth += 1;
+    else if (ch === ")") depth -= 1;
+    else if (ch === "," && depth === 0) {
+      items.push(text.slice(start, i));
+      start = i + 1;
+    }
+  }
+  items.push(text.slice(start));
+  return items.map((item) => item.trim());
+}
+
+const IDENT = String.raw`(?:"(?:[^"]|"")+"|[A-Za-z_][A-Za-z0-9_]*)`;
+const unquote = (ident: string) =>
+  ident.startsWith('"') ? ident.slice(1, -1).replace(/""/g, '"') : ident.toLowerCase();
+
+/** Output column names of a hand-written SELECT in order; null for `*` or an unnamed expression. */
+export function selectedColumns(sql: string): string[] | null {
+  const text = sql.trim();
+  const masked = maskSql(text, true);
+  if (masked === null) return null;
+  const head = masked.match(/^SELECT\s+(DISTINCT\s+)?/);
+  if (!head) return null;
+  const fromAt = masked.search(/\sFROM\s/);
+  if (fromAt === -1) return null;
+  const listMasked = masked.slice(head[0].length, fromAt);
+  const listText = text.slice(head[0].length, fromAt);
+  const names: string[] = [];
+  const aliased = new RegExp(String.raw`\sAS\s+(${IDENT})\s*$`, "i");
+  const bare = new RegExp(String.raw`^(?:${IDENT}\s*\.\s*)?(${IDENT})$`);
+  for (const item of topLevelItems(listMasked, listText)) {
+    const alias = item.match(aliased);
+    const plain = alias ? null : item.match(bare);
+    const name = alias?.[1] ?? plain?.[1];
+    if (!name || name === "*") return null;
+    names.push(unquote(name));
+  }
+  return names.length ? names : null;
+}
+
+/** A hit omits a null column, so the grid takes the names from the SQL, then any the server added. */
+export function projectedColumns(sql: string, returned: string[]): string[] {
+  const named = selectedColumns(sql);
+  if (!named) return returned;
+  const byLower = new Map(returned.map((c) => [c.toLowerCase(), c]));
+  const out = named.map((n) => byLower.get(n.toLowerCase()) ?? n);
+  const seen = new Set(out.map((c) => c.toLowerCase()));
+  return [...out, ...returned.filter((c) => !seen.has(c.toLowerCase()))];
+}
+
+/** A search refusal as the server worded it: the headline plus the engine's reason when it sent one. */
+export function searchErrorText(body: unknown): string {
+  if (!body || typeof body !== "object") return typeof body === "string" ? body : "";
+  const b = body as Record<string, unknown>;
+  const text = (v: unknown) => (typeof v === "string" ? v.trim() : "");
+  const message = text(b.message) || text(b.error);
+  const detail = text(b.error_detail);
+  if (!detail || message.includes(detail)) return message;
+  if (!message || detail.includes(message)) return detail;
+  return `${message}: ${detail}`;
 }
 
 /** Result columns in the order the server returned them, else the hit keys in first-seen order. */

@@ -205,12 +205,9 @@ describe("securityPresetFor", () => {
     expect(securityPresetFor([viewDenial("security", permission)])).toBe(preset);
   });
 
-  it.each(["streams", "alerts", "alert_folders"])(
-    "points a missing %s read at the viewer preset",
-    (key) => {
-      expect(securityPresetFor([viewDenial(key, "list")])).toBe("security_viewer");
-    },
-  );
+  it.each(["alerts", "alert_folders"])("points a missing %s read at the viewer preset", (key) => {
+    expect(securityPresetFor([viewDenial(key, "list")])).toBe("security_viewer");
+  });
 
   it("points a missing threat-intel list read at the analyst preset, which grants it", () => {
     expect(securityPresetFor([viewDenial("enrichment_tables", "list")])).toBe("soc_analyst");
@@ -219,6 +216,10 @@ describe("securityPresetFor", () => {
   it("names no preset for a denial outside Security", () => {
     expect(securityPresetFor([viewDenial("dashboards", "list")])).toBeNull();
     expect(securityPresetFor([viewDenial("streams", "delete")])).toBeNull();
+    expect(
+      securityPresetFor([viewDenial("streams", "list")]),
+      "Security read covers the sources, so no preset lifts another stream",
+    ).toBeNull();
   });
 });
 

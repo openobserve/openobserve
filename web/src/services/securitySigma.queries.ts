@@ -13,11 +13,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { queryOptions } from "@tanstack/vue-query";
+import { mutationOptions, queryOptions } from "@tanstack/vue-query";
 import { orgKey } from "@/composables/query/keys";
 import { LIVE_STALE_TIME, SESSION_STALE_TIME } from "@/composables/query/cachePolicy";
 import securitySigma, {
+  type AllowList,
+  type AllowListInput,
   type CompiledSigma,
+  type DetectionException,
+  type NewDetectionException,
   type DetectionEvidence,
   type EvidenceParams,
   type MitreCoverage,
@@ -50,6 +54,9 @@ export const securitySigmaKeys = {
   coverage: (org: string) => orgKey(org, "security", "mitre", "coverage"),
   evidence: (org: string, alertId: string, params: EvidenceParams) =>
     orgKey(org, "security", "detections", alertId, "evidence", params),
+  exceptions: (org: string, alertId: string) =>
+    orgKey(org, "security", "detections", alertId, "exceptions"),
+  allowlists: (org: string) => orgKey(org, "security", "allowlists"),
 };
 
 /** The shipped Sigma pack; fixed for the life of the server build. */
@@ -84,4 +91,53 @@ export const detectionEvidenceQuery = (org: string, alertId: string, params: Evi
     queryFn: async (): Promise<DetectionEvidence> =>
       (await securitySigma.evidence(org, alertId, params)).data,
     staleTime: LIVE_STALE_TIME,
+  });
+
+/** A detection's exceptions; rows matching one never fire. */
+export const detectionExceptionsQuery = (org: string, alertId: string) =>
+  queryOptions({
+    queryKey: securitySigmaKeys.exceptions(org, alertId),
+    queryFn: async (): Promise<DetectionException[]> =>
+      (await securitySigma.listExceptions(org, alertId)).data?.exceptions ?? [],
+    staleTime: LIVE_STALE_TIME,
+  });
+
+export const addDetectionExceptionMutation = (org: string, alertId: string) =>
+  mutationOptions({
+    mutationFn: async (body: NewDetectionException) =>
+      (await securitySigma.addException(org, alertId, body)).data,
+    meta: { invalidates: [securitySigmaKeys.exceptions(org, alertId)] },
+  });
+
+export const deleteDetectionExceptionMutation = (org: string, alertId: string) =>
+  mutationOptions({
+    mutationFn: async (exceptionId: string) => {
+      await securitySigma.deleteException(org, alertId, exceptionId);
+    },
+    meta: { invalidates: [securitySigmaKeys.exceptions(org, alertId)] },
+  });
+
+/** The org's allowlists, which `in_list` exceptions and case priority read. */
+export const allowlistsQuery = (org: string) =>
+  queryOptions({
+    queryKey: securitySigmaKeys.allowlists(org),
+    queryFn: async (): Promise<AllowList[]> =>
+      (await securitySigma.listAllowlists(org)).data?.lists ?? [],
+    staleTime: LIVE_STALE_TIME,
+  });
+
+/** The form shows the server's refusal itself, so the default error toast stays quiet. */
+export const saveAllowlistMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: async ({ id, body }: { id: string; body: AllowListInput }) =>
+      (await securitySigma.putAllowlist(org, id, body)).data,
+    meta: { invalidates: [securitySigmaKeys.allowlists(org)], silentError: true },
+  });
+
+export const deleteAllowlistMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: async (listId: string) => {
+      await securitySigma.deleteAllowlist(org, listId);
+    },
+    meta: { invalidates: [securitySigmaKeys.allowlists(org)], silentError: true },
   });

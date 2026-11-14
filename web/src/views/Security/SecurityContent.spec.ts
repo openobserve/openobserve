@@ -13,13 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import type { Router } from "vue-router";
 import store from "@/test/unit/helpers/store";
 import alertsService from "@/services/alerts";
 import streamService from "@/services/stream";
 import { invalidateSiemDetections } from "@/composables/security/useSiemDetections";
+import { ROOT_RULE_ID } from "./__fixtures__/sigmaFixtures";
 import {
   RULE_ACCESS_KEY,
   RULE_STOP_LOGGING,
@@ -148,6 +149,15 @@ describe("SecurityContent", () => {
     });
   });
 
+  it("binds rules by the stream's stored source type, not by its column names", async () => {
+    const { storedSourceTypes } = await import("./__fixtures__/securityFixtures");
+    storedSourceTypes.set("aws_cloudtrail", "linux_auth");
+    onTestFinished(() => storedSourceTypes.clear());
+    const w = await mountView();
+    await search(w, "Root Account");
+    expect(ruleRow(w, "AWS Root Account Activity")?.text()).not.toContain("Ready to install");
+  });
+
   it("lists data source types with the streams classified into them", async () => {
     const w = await mountView("/security/content?tab=sources");
     const table = w.find('[data-test="security-content-sources-table"]');
@@ -240,6 +250,112 @@ describe("SecurityContent rules not runnable yet", () => {
     const targets = document.querySelectorAll('[data-test="security-content-bulk-targets"] li');
     expect(targets.length).toBe(Number(ready));
     expect(document.body.textContent).toContain(`Install ${ready} detection`);
+  });
+
+  const installRunnable = async (w: VueWrapper) => {
+    const commonService = (await import("@/services/common")).default;
+    const { DETECTIONS_FOLDER_NAME } = await import("@/utils/security/detectionFolder");
+    vi.spyOn(commonService, "list_Folders").mockResolvedValue({
+      data: { list: [{ name: DETECTIONS_FOLDER_NAME, folderId: "f1" }] },
+    } as never);
+    await w.find('[data-test="security-content-select-runnable"]').trigger("click");
+    await flushPromises();
+    await w.find('[data-test="security-content-install-selected"]').trigger("click");
+    await flushPromises();
+  };
+  const clickPrimary = async () => {
+    (document.querySelector('[data-test="security-content-bulk-primary"]') as HTMLElement).click();
+    await flushPromises();
+  };
+
+  it("learns from current data first by default, then suggests the allowlists to set", async () => {
+    vi.mocked(alertsService.create_by_alert_id).mockResolvedValue({ data: {} } as never);
+    const w = await mountView();
+    await installRunnable(w);
+    expect(
+      document
+        .querySelector('[data-test="security-content-bulk-learn"] button[role="checkbox"]')
+        ?.getAttribute("aria-checked"),
+    ).toBe("true");
+    await clickPrimary();
+    await vi.waitFor(() =>
+      expect(
+        document.querySelector('[data-test="security-content-bulk-onboarding"]'),
+      ).not.toBeNull(),
+    );
+    const [, payload] = vi.mocked(alertsService.create_by_alert_id).mock.calls[0];
+    expect((payload as any).context_attributes.siem_learn_first_run).toBe("true");
+    expect(document.body.textContent).toContain("Set these allowlists first");
+  });
+
+  it("reports a bulk install that created nothing as a failure, not a success", async () => {
+    vi.mocked(alertsService.create_by_alert_id).mockRejectedValue(new Error("boom") as never);
+    const w = await mountView();
+    await installRunnable(w);
+    await clickPrimary();
+    await vi.waitFor(() =>
+      expect(
+        document.querySelector('[data-test="security-content-bulk-none-installed"]')?.textContent,
+      ).toContain("No detection was installed"),
+    );
+    expect(document.querySelector('[data-test="security-content-bulk-onboarding"]')).toBeNull();
+  });
+
+  it("never counts more rules ready to install than rules matching your sources", async () => {
+    const w = await mountView();
+    const num = (key: string) =>
+      Number(w.find(`[data-test="security-content-stat-${key}"]`).text().match(/\d+/)?.[0]);
+    expect(num("ready")).toBeGreaterThan(0);
+    expect(num("ready")).toBeLessThanOrEqual(num("applies"));
+    expect(w.find('[data-test="security-content-stat-applies"]').text()).toContain(
+      "Match your sources",
+    );
+  });
+
+  describe("an install a closed tab left unfinished", () => {
+    const RECORD_KEY = `o2.security.bulkInstall.default.${store.state.userInfo.email}`;
+    const record = (ruleKey: string) =>
+      JSON.stringify({
+        settings: { period: 30, frequency: 10, silence: 60, destinations: [], folderId: "f1" },
+        pending: [{ ruleKey, stream: "aws_cloudtrail", sourceType: "aws_cloudtrail" }],
+        savedAt: Date.now() * 1000,
+      });
+    afterEach(() => localStorage.clear());
+
+    it("is offered again, and Discard forgets it", async () => {
+      localStorage.setItem(RECORD_KEY, record(ROOT_RULE_ID));
+      const w = await mountView();
+      const banner = w.find('[data-test="security-content-bulk-resume"]');
+      expect(banner.text()).toContain("1 detection install did not finish");
+      await w.find('[data-test="security-content-bulk-discard"]').trigger("click");
+      await flushPromises();
+      expect(w.find('[data-test="security-content-bulk-resume"]').exists()).toBe(false);
+      expect(localStorage.getItem(RECORD_KEY)).toBeNull();
+    });
+
+    it("runs only the pending installs on Resume and clears the record once they settle", async () => {
+      localStorage.setItem(RECORD_KEY, record(ROOT_RULE_ID));
+      vi.mocked(alertsService.create_by_alert_id).mockResolvedValue({ data: {} } as never);
+      const w = await mountView();
+      await w.find('[data-test="security-content-bulk-resume-run"]').trigger("click");
+      await flushPromises();
+      await vi.waitFor(() =>
+        expect(
+          document.querySelector('[data-test="security-content-bulk-summary"]')?.textContent,
+        ).toContain("of 1"),
+      );
+      await vi.waitFor(() => expect(localStorage.getItem(RECORD_KEY)).toBeNull());
+      expect(
+        document.querySelectorAll('[data-test^="security-content-bulk-result-"]'),
+      ).toHaveLength(1);
+    });
+
+    it("is not offered to a triage-only analyst", async () => {
+      localStorage.setItem(RECORD_KEY, record(ROOT_RULE_ID));
+      triageOnly();
+      const w = await mountView();
+      expect(w.find('[data-test="security-content-bulk-resume"]').exists()).toBe(false);
+    });
   });
 
   it("offers no bulk selection to a triage-only analyst", async () => {

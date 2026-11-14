@@ -2,12 +2,15 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import streamService from "@/services/stream";
+import securitySources from "@/services/securitySources";
 import securityIntel, { type SweepResponse } from "@/services/securityIntel";
 import { useIntelSweep } from "@/composables/security/useIntelSweep";
 import type { Indicator } from "@/utils/security/intel";
 
-vi.mock("@/services/stream", () => ({ default: { nameList: vi.fn(), schema: vi.fn() } }));
+vi.mock("@/services/securitySources", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/services/securitySources")>()),
+  default: { schema: vi.fn() },
+}));
 vi.mock("@/services/securityIntel", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/services/securityIntel")>()),
   default: { sweep: vi.fn(), sightings: vi.fn(), validate: vi.fn() },
@@ -23,7 +26,7 @@ vi.mock("@/services/securitySources.queries", async () => {
   };
 });
 
-const streamMock = streamService as unknown as Record<string, ReturnType<typeof vi.fn>>;
+const streamMock = securitySources as unknown as Record<string, ReturnType<typeof vi.fn>>;
 const sweepMock = vi.mocked(securityIntel.sweep);
 
 const ind = (indicator: string): Indicator => ({
@@ -57,7 +60,6 @@ const WINDOW = { start: 1, end: 2 };
 
 beforeEach(() => {
   vi.clearAllMocks();
-  streamMock.nameList.mockResolvedValue({ data: { list: [{ name: "vpc" }, { name: "gone" }] } });
   streamMock.schema.mockImplementation(async (_org: string, stream: string) => {
     if (stream === "gone") throw new Error("no schema");
     return { data: { schema: [{ name: "srcaddr" }] } };
@@ -74,6 +76,8 @@ describe("useIntelSweep", () => {
     const [org, indicators, streams, window] = sweepMock.mock.calls[0];
     expect([org, indicators, window]).toEqual(["org", list, WINDOW]);
     expect(streams.map((s) => s.name)).toEqual(["vpc", "gone"]);
+    // The Security schema route, so a source-only analyst needs no stream grant.
+    expect(streamMock.schema).toHaveBeenCalledWith("org", "vpc");
     expect(sweep.streams.value).toEqual(["vpc", "gone"]);
     expect([sweep.checked.value, sweep.total.value, sweep.partial.value]).toEqual([2, 2, false]);
   });

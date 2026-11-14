@@ -20,6 +20,7 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import SecurityNotices, { type SecurityNotice } from "@/components/security/SecurityNotices.vue";
 import SecurityAccessLock from "@/components/security/SecurityAccessLock.vue";
 import { failedRequests, viewDenial, type AccessDenial } from "@/composables/useAccessStore";
@@ -29,6 +30,13 @@ import SecurityBulkInstallDialog, {
   type BulkStream,
 } from "@/components/security/SecurityBulkInstallDialog.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import {
+  readBulkRecord,
+  restoreTargets,
+  writeBulkRecord,
+  type BulkInstallRecord,
+} from "@/composables/security/useBulkInstallQueue";
+import type { BulkSettings, BulkTarget } from "@/utils/security/bulkInstall";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import SecurityRecordDrawer, {
@@ -48,7 +56,11 @@ import { blockedReason, caveat } from "@/utils/security/compileText";
 import type { CatalogRule } from "@/services/securitySigma";
 import { sigmaCatalogQuery, sigmaCompileQuery } from "@/services/securitySigma.queries";
 import { sigmaLogsourceLabel, type SourceType } from "@/services/securitySources";
-import { fetchSourceMatch, sourceTypesQuery } from "@/services/securitySources.queries";
+import {
+  fetchSecuritySources,
+  fetchSourceMatch,
+  sourceTypesQuery,
+} from "@/services/securitySources.queries";
 import { ocsfClass } from "@/utils/security/ocsf";
 import { displayOrder, positionOf, stepRow, type NavTable } from "@/utils/security/recordNav";
 import { normalizeTactic, techniqueUrl } from "@/utils/security/mitre";
@@ -63,9 +75,11 @@ import {
   groupByLogsource,
   installedBySigmaId,
   logsourceKey,
+  matchedRunnable,
   rulesForSource,
   streamsBySource,
-  streamsForRule,
+  ruleCounts as countRules,
+  ruleStreams,
   DETECTED_RAIL,
   checksByRule,
   type StreamCheck,
@@ -180,6 +194,13 @@ async function loadStreams() {
     const res = await streamService.nameList(orgId.value, "logs", true);
     if (mine !== streamsSeq) return;
     const org = orgId.value;
+    // A stream's stored type (classified from its rows, chosen by hand, or set by a pack) decides which rules apply.
+    const listing = await fetchSecuritySources(org).catch(() => null);
+    const storedType = new Map(
+      (listing?.streams ?? [])
+        .filter((row) => row.source_type)
+        .map((row) => [row.name, row.source_type]),
+    );
     const list = await Promise.all(
       (res.data?.list ?? []).map(async (s: any) => {
         const fields: string[] = (s.schema ?? []).map((f: any) => String(f.name));
@@ -189,12 +210,14 @@ async function loadStreams() {
             .filter((f: any) => f.type)
             .map((f: any) => [String(f.name), String(f.type)]),
         );
-        const match = fields.length ? await fetchSourceMatch(org, fields).catch(() => null) : null;
+        const stored = storedType.get(String(s.name));
+        const match =
+          !stored && fields.length ? await fetchSourceMatch(org, fields).catch(() => null) : null;
         return {
           name: String(s.name),
           fields,
           fieldTypes,
-          sourceId: match?.classification?.source.id ?? null,
+          sourceId: stored ?? match?.classification?.source.id ?? null,
         };
       }),
     );
@@ -248,6 +271,8 @@ interface RuleRow {
   streams: string[];
   /** Matching streams the rule actually compiles on. */
   runnable: string[];
+  /** Of those, the streams of a source the rule was written for; only these make it ready. */
+  matched: string[];
   checks: StreamCheck[];
   /** Why the rule cannot run on any matching stream yet, from the first stream's compile. */
   blocked: I18nText;
@@ -346,8 +371,9 @@ const ruleRows = computed<RuleRow[]>(() =>
       logsource: logsourceKey(rule),
       techniques: rule.techniques,
       status: rule.status ?? "",
-      streams: streamsForRule(rule, bySource.value),
+      streams: ruleStreams(rule, bySource.value, ruleChecks),
       runnable: ruleChecks.filter((c) => c.compiled.runnable).map((c) => c.stream),
+      matched: matchedRunnable(rule, ruleChecks),
       checks: ruleChecks,
       blocked: ruleChecks[0] ? blockedReason(ruleChecks[0].compiled) : raw(""),
       installed: installed.value.has(rule.id ?? ""),
@@ -357,7 +383,7 @@ const ruleRows = computed<RuleRow[]>(() =>
 );
 
 /** Applies to your data and would run there, but no detection runs it yet. */
-const isReady = (r: RuleRow) => r.runnable.length > 0 && !r.installed && !installPending.value;
+const isReady = (r: RuleRow) => r.matched.length > 0 && !r.installed && !installPending.value;
 
 type RuleFacet = "ready" | "installed" | "applies";
 const ruleFacets = ref<RuleFacet[]>([]);
@@ -367,11 +393,10 @@ const ruleSearch = ref("");
 const ruleLevel = ref<string | null>(null);
 const logsourceFilter = ref<string | null>(null);
 
-const ruleCounts = computed(() => ({
-  ready: ruleRows.value.filter(isReady).length,
-  installed: ruleRows.value.filter((r) => r.installed).length,
-  applies: ruleRows.value.filter((r) => r.streams.length).length,
-}));
+const ruleCounts = computed(() => {
+  const counts = countRules(ruleRows.value);
+  return { ...counts, ready: installPending.value ? 0 : counts.ready };
+});
 
 const filteredRules = computed(() => {
   const needle = ruleSearch.value.trim().toLowerCase();
@@ -410,6 +435,8 @@ const ruleStats = computed<StatItem[]>(() => [
   {
     key: "ready",
     label: t("siem.content.stat.ready"),
+    sub: t("siem.content.stat.readyHint"),
+    subIcon: "info-outline",
     value:
       streamsLoading.value || installPending.value || checksLoading.value
         ? "—"
@@ -431,6 +458,8 @@ const ruleStats = computed<StatItem[]>(() => [
   {
     key: "applies",
     label: t("siem.content.stat.applies"),
+    sub: t("siem.content.stat.appliesHint"),
+    subIcon: "info-outline",
     value: streamsLoading.value ? "—" : ruleCounts.value.applies,
     icon: "database",
     tone: "primary",
@@ -470,6 +499,37 @@ const existingNames = computed(() => alertRows.value.map((r) => String(r.alert.n
 function selectRunnable() {
   selectedRuleIds.value = filteredRules.value.filter(isReady).map((r) => r.id);
 }
+/** An install a closed tab left unfinished, offered again until resumed or discarded. */
+const unfinished = ref<BulkInstallRecord | null>(null);
+const recordScope = computed(() => ({
+  org: orgId.value,
+  user: String(store.state.userInfo?.email ?? ""),
+}));
+watch(recordScope, (scope) => (unfinished.value = readBulkRecord(scope)), { immediate: true });
+const resumeBatch = shallowRef<{ targets: BulkTarget[]; settings: BulkSettings } | null>(null);
+const resumeReady = computed(
+  () => !!catalog.value.length && !streamsLoading.value && !installPending.value,
+);
+function resumeInstall() {
+  const record = unfinished.value;
+  if (!record) return;
+  const targets = restoreTargets(record.pending, catalog.value, bulkStreams.value);
+  unfinished.value = null;
+  if (!targets.length) {
+    writeBulkRecord(recordScope.value, null);
+    return;
+  }
+  resumeBatch.value = { targets, settings: record.settings };
+  bulkOpen.value = true;
+}
+function discardInstall() {
+  writeBulkRecord(recordScope.value, null);
+  unfinished.value = null;
+}
+watch(bulkOpen, (open) => {
+  if (!open) resumeBatch.value = null;
+});
+
 function onBulkDone(n: number) {
   selectedRuleIds.value = [];
   if (n) toast({ variant: "success", message: t("siem.content.bulk.done", { n }, n) });
@@ -985,6 +1045,40 @@ const STATUS_VARIANT: Record<string, "success-soft" | "blue-soft" | "amber-soft"
         class="mx-page-edge mt-2"
         data-test="security-content-notices"
       />
+      <OBanner
+        v-if="unfinished && canAuthor"
+        variant="warning"
+        icon="warning-amber"
+        dense
+        inline-actions
+        class="mx-page-edge mt-2"
+        data-test="security-content-bulk-resume"
+      >
+        {{
+          t(
+            "siem.content.bulk.resumeText",
+            { n: unfinished.pending.length },
+            unfinished.pending.length,
+          )
+        }}
+        <template #actions>
+          <OButton
+            variant="outline"
+            size="sm"
+            data-test="security-content-bulk-discard"
+            @click="discardInstall"
+            >{{ t("siem.content.bulk.discard") }}</OButton
+          >
+          <OButton
+            variant="primary"
+            size="sm"
+            :disabled="!resumeReady"
+            data-test="security-content-bulk-resume-run"
+            @click="resumeInstall"
+            >{{ t("siem.content.bulk.resume") }}</OButton
+          >
+        </template>
+      </OBanner>
 
       <SecurityAccessLock
         v-if="accessDenials.length"
@@ -1123,9 +1217,23 @@ const STATUS_VARIANT: Record<string, "success-soft" | "blue-soft" | "amber-soft"
           <OTag v-else-if="row.installed" variant="success-soft" icon="check-circle" size="xs">{{
             t("siem.content.installed")
           }}</OTag>
-          <OTag v-else-if="row.runnable.length" variant="warning-soft" icon="lightbulb" size="xs">{{
+          <OTag v-else-if="row.matched.length" variant="warning-soft" icon="lightbulb" size="xs">{{
             t("siem.content.readyToInstall")
           }}</OTag>
+          <span
+            v-else-if="row.runnable.length"
+            class="inline-flex"
+            :data-test="`security-content-other-source-${row.id}`"
+          >
+            <OTag variant="default-soft" icon="info-outline" size="xs">{{
+              t("siem.content.otherSourceOnly")
+            }}</OTag>
+            <OTooltip
+              :content="
+                t('siem.content.otherSourceOnlyHint', { logsource: row.rule.logsourceLabel })
+              "
+            />
+          </span>
           <span
             v-else-if="row.streams.length"
             class="inline-flex"
@@ -1563,6 +1671,7 @@ const STATUS_VARIANT: Record<string, "success-soft" | "blue-soft" | "amber-soft"
       :rules="bulkRules"
       :streams="bulkStreams"
       :existing-names="existingNames"
+      :resume="resumeBatch"
       @done="onBulkDone"
     />
   </OPageLayout>

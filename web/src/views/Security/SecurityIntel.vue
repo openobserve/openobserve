@@ -2,6 +2,7 @@
 SPDX-License-Identifier: AGPL-3.0-or-later -->
 
 <script setup lang="ts">
+import { securityTime } from "@/utils/security/time";
 import { displayOrder, stepRow, type NavTable } from "@/utils/security/recordNav";
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -658,13 +659,7 @@ const drawerTabs = computed<RecordTab[]>(() => [
 ]);
 
 function fmtUs(us: number | null | undefined) {
-  if (!us) return "—";
-  return new Date(us / 1000).toLocaleString(undefined, {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  return us ? securityTime(us / 1000) : "—";
 }
 function fmtDate(iso: string) {
   if (!iso) return t("siem.intel.never");
@@ -680,7 +675,7 @@ function fmtDate(iso: string) {
 function fmtIso(iso: string) {
   if (!iso) return t("siem.intel.never");
   const ms = Date.parse(iso);
-  return Number.isFinite(ms) ? new Date(ms).toLocaleString() : iso;
+  return Number.isFinite(ms) ? securityTime(ms) : iso;
 }
 
 const drawerFacts = computed<RecordFact[]>(() => {

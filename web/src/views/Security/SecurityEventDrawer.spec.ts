@@ -25,6 +25,7 @@ import { ATTACKER_IP, cloudtrailEvent, okResponse } from "./__fixtures__/securit
 const search = vi.hoisted(() => vi.fn());
 const promoteEvent = vi.hoisted(() => vi.fn());
 const listCases = vi.hoisted(() => vi.fn());
+const searchCases = vi.hoisted(() => vi.fn());
 const access = vi.hoisted(() => ({ triage: true }));
 
 vi.mock("@/services/search", () => ({ default: { search } }));
@@ -37,7 +38,7 @@ vi.mock("@/composables/security/useSecurityStreamPlans", async (importOriginal) 
 });
 vi.mock("@/services/securityCases", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/services/securityCases")>();
-  return { ...actual, default: { ...actual.default, promoteEvent } };
+  return { ...actual, default: { ...actual.default, promoteEvent, searchCases } };
 });
 vi.mock("@/services/incidents", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/services/incidents")>();
@@ -128,6 +129,7 @@ beforeEach(() => {
   access.triage = true;
   search.mockResolvedValue(okResponse({ hits: [{ r0: 1, r1: 0 }] }));
   listCases.mockResolvedValue(okResponse({ incidents: [], total: 0 }));
+  searchCases.mockResolvedValue(okResponse({ incidents: [], total: 0, capped: false }));
   promoteEvent.mockResolvedValue(okResponse({ id: "case-1", title: "Event from aws_cloudtrail" }));
 });
 
@@ -185,10 +187,30 @@ describe("SecurityEventDrawer", () => {
     expect(w.emitted("add-filter")?.[0]).toEqual(["sourceipaddress", ATTACKER_IP, "="]);
   });
 
-  it("opens a case from the event it shows", async () => {
+  it("opens a case from the event through a prefilled dialog, not in one click", async () => {
     const w = await mountDrawer();
+    // The default priority comes from the matched rules, so wait until they are evaluated.
+    await vi.waitFor(() => expect(w.text()).toContain("1 detection matched"));
     await w.find('[data-test="security-event-drawer-open-case"]').trigger("click");
     await flushPromises();
+    expect(promoteEvent).not.toHaveBeenCalled();
+    await vi.waitFor(() =>
+      expect(w.findComponent({ name: "SecurityOpenCaseDialog" }).props("open")).toBe(true),
+    );
+    const dialog = w.findComponent({ name: "SecurityOpenCaseDialog" });
+    // The event matched a high-level rule, so the case starts where that detection's would.
+    expect(dialog.props("defaultPriority")).toBe("P2");
+    const entities = dialog.props("entities") as { kind: string; value: string }[];
+    expect(entities).toContainEqual({ kind: "ip", value: ATTACKER_IP });
+    expect(String(dialog.props("defaultTitle"))).toMatch(/ on /);
+
+    const ok = await (dialog.props("submit") as (o: unknown) => Promise<boolean>)({
+      title: "Root key created",
+      priority: "P1",
+      entities: [{ kind: "ip", value: ATTACKER_IP }],
+      note: "from the hunt",
+    });
+    expect(ok).toBe(true);
     expect(promoteEvent).toHaveBeenCalledWith(
       "default",
       expect.objectContaining({
@@ -196,7 +218,12 @@ describe("SecurityEventDrawer", () => {
         timestamp: Number(event._timestamp),
         fields: event,
       }),
-      undefined,
+      expect.objectContaining({
+        title: "Root key created",
+        priority: "P1",
+        entities: [{ kind: "ip", value: ATTACKER_IP }],
+        note: "from the hunt",
+      }),
     );
   });
 
@@ -205,5 +232,47 @@ describe("SecurityEventDrawer", () => {
     const w = await mountDrawer();
     expect(w.find('[data-test="security-event-drawer-open-case"]').exists()).toBe(false);
     expect(w.find('[data-test="security-event-drawer-add-to-case"]').exists()).toBe(false);
+  });
+
+  it("offers the open case already on the event's entity, and adds the event to it", async () => {
+    searchCases.mockImplementation(async (_org: string, params: { entity: string }) =>
+      okResponse({
+        incidents:
+          params.entity === ATTACKER_IP
+            ? [
+                {
+                  id: "case-sqli",
+                  title: "2 detections on 185.220.101.47",
+                  status: "acknowledged",
+                  severity: "P1",
+                  last_alert_at: 1,
+                },
+              ]
+            : [],
+        total: 1,
+        capped: false,
+      }),
+    );
+    const w = await mountDrawer();
+    await w.find('[data-test="security-event-drawer-open-case"]').trigger("click");
+    await vi.waitFor(() =>
+      expect(
+        (w.findComponent({ name: "SecurityOpenCaseDialog" }).props("existing") as unknown[]).length,
+      ).toBe(1),
+    );
+    expect(searchCases).toHaveBeenCalledWith(
+      "default",
+      expect.objectContaining({ entity: ATTACKER_IP, status: ["open", "acknowledged"] }),
+    );
+    const dialog = w.findComponent({ name: "SecurityOpenCaseDialog" });
+    await (dialog.props("submit") as (o: unknown) => Promise<boolean>)({
+      caseId: "case-sqli",
+      note: "",
+    });
+    expect(promoteEvent).toHaveBeenCalledWith(
+      "default",
+      expect.objectContaining({ stream: "aws_cloudtrail" }),
+      expect.objectContaining({ caseId: "case-sqli" }),
+    );
   });
 });

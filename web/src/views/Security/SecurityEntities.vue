@@ -4,6 +4,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later -->
 <!-- The server counts each stream and kind with one GROUP BY; the same value in two streams is one entity. -->
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from "vue";
+import { securityTime } from "@/utils/security/time";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import analytics from "@/services/product_analytics";
 import { useStore } from "vuex";
@@ -672,13 +673,7 @@ const drawerTabs = computed<RecordTab[]>(() => [
 ]);
 
 function fmtAbsolute(us: number): string {
-  if (!us) return "—";
-  return new Date(us / 1000).toLocaleString(undefined, {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  return us ? securityTime(us / 1000) : "—";
 }
 
 const facts = computed<RecordFact[]>(() => {

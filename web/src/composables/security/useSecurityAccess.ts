@@ -51,7 +51,8 @@ const SECURITY_PRESET_BY_PERMISSION: Partial<Record<AccessDenial["permission"], 
   };
 
 // The pages read these alongside Security, and the viewer preset grants each of them.
-const SECURITY_READ_COMPANIONS = new Set(["streams", "alerts", "alert_folders", "incidents"]);
+// Security read already covers the sources, so a refused stream is one no Security preset lifts.
+const SECURITY_READ_COMPANIONS = new Set(["alerts", "alert_folders", "incidents"]);
 // Intel reads threat-intel lists, which the viewer preset leaves out and the analyst preset grants.
 const SECURITY_ANALYST_COMPANIONS = new Set(["enrichment_tables"]);
 

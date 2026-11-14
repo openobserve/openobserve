@@ -3,6 +3,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later -->
 
 <!-- Triage state lives on the case, not here: a firing is a fact about one evaluation. -->
 <script setup lang="ts">
+import { securityTime } from "@/utils/security/time";
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import analytics from "@/services/product_analytics";
@@ -51,7 +52,6 @@ import { bucketMsFor, bucketize } from "@/utils/security/history";
 import {
   summarizeError,
   STATUS_VARIANT,
-  evidenceSummary,
   evidenceValueField,
   firingKey,
   firingStatus,
@@ -73,7 +73,9 @@ import {
   type SeverityTone,
 } from "@/utils/security/severity";
 import { normalizeTactic, techniqueUrl } from "@/utils/security/mitre";
-import { fetchSourceMatch } from "@/services/securitySources.queries";
+import { fetchSourceMatch, sourceTypesQuery } from "@/services/securitySources.queries";
+import type { SourceType } from "@/services/securitySources";
+import SecurityEvidenceEvent from "@/components/security/SecurityEvidenceEvent.vue";
 import { detectionEvidenceQuery } from "@/services/securitySigma.queries";
 import type { EvidenceGroup } from "@/services/securitySigma";
 import { useQueryClient } from "@tanstack/vue-query";
@@ -503,7 +505,7 @@ const notices = computed<SecurityNotice[]>(() => {
     out.push({
       key: "narrowed",
       tone: "warning",
-      text: t("siem.mitrePage.historyNarrowed", { from: new Date(narrowedFrom).toLocaleString() }),
+      text: t("siem.mitrePage.historyNarrowed", { from: securityTime(narrowedFrom) }),
       dataTest: "security-alerts-narrowed",
     });
   }
@@ -514,7 +516,7 @@ const notices = computed<SecurityNotice[]>(() => {
       text: t("siem.alerts.cappedRows", {
         n: formatEventCount(history.value.length),
         total: formatEventCount(historyTotal.value),
-        from: new Date(cappedFromMs.value).toLocaleString(),
+        from: securityTime(cappedFromMs.value),
       }),
       dataTest: "security-alerts-capped",
     });
@@ -533,8 +535,8 @@ const notices = computed<SecurityNotice[]>(() => {
       key: "custom-window",
       tone: "info",
       text: t("siem.alerts.customWindow", {
-        from: new Date(custom.startMs).toLocaleString(),
-        to: new Date(custom.endMs).toLocaleString(),
+        from: securityTime(custom.startMs),
+        to: securityTime(custom.endMs),
       }),
       actionLabel: t("siem.alerts.backToRange", { range: t(`siem.alerts.range.${range.value}`) }),
       onAction: () => onRange(range.value),
@@ -632,7 +634,7 @@ const facts = computed<RecordFact[]>(() => {
       label: isFiringStatus.value
         ? t("siem.alerts.fact.firedAt")
         : t("siem.alerts.fact.evaluatedAt"),
-      value: new Date(f.timeMs).toLocaleString(),
+      value: securityTime(f.timeMs),
     },
     { label: t("siem.alerts.fact.value"), value: valueVsThreshold(f.row) || "—", mono: true },
     { label: t("siem.alerts.fact.window"), value: mins ? t("siem.alerts.minutes", mins) : "—" },
@@ -688,7 +690,7 @@ const rowFields = computed<KeyValueRow[]>(() => {
 
 function windowText(row: FiringRow): string {
   if (!row.start_time || !row.end_time) return "—";
-  const fmt = (us: number) => new Date(us / 1000).toLocaleString();
+  const fmt = (us: number) => securityTime(us / 1000);
   return `${fmt(row.start_time)} → ${fmt(row.end_time)}`;
 }
 
@@ -766,6 +768,22 @@ let evidenceSeq = 0;
 const queryClient = useQueryClient();
 const shownEvidenceSql = computed(() => evidenceGroupSql.value || evidenceSql.value);
 
+/** The detection's own source type maps its rows; a projection of a few columns rarely classifies. */
+async function evidenceSource(
+  f: NonNullable<typeof selected.value>,
+  sample: Record<string, unknown> | undefined,
+): Promise<SourceType | null> {
+  const id = f.detection?.meta.sourceType;
+  if (id) {
+    const types = await queryClient.fetchQuery(sourceTypesQuery(orgId.value)).catch(() => []);
+    const known = types.find((s) => s.id === id);
+    if (known) return known;
+  }
+  if (!sample) return null;
+  const match = await fetchSourceMatch(orgId.value, Object.keys(sample), sample).catch(() => null);
+  return match?.classification?.source ?? null;
+}
+
 function groupLabel(group: EvidenceGroup): string {
   return Object.entries(group.values ?? {})
     .map(([k, v]) => `${k}=${v ?? "—"}`)
@@ -787,11 +805,8 @@ async function loadFiredGroups(f: NonNullable<typeof selected.value>): Promise<b
     .catch(() => null);
   if (!evidenceResult || evidenceResult.error || !evidenceResult.groups.length) return false;
   const first = evidenceResult.groups.find((g) => g.rows.length)?.rows[0];
-  const match = first
-    ? await fetchSourceMatch(orgId.value, Object.keys(first), first).catch(() => null)
-    : null;
-  const source = match?.classification?.source ?? null;
-  const fmt = (us: number) => new Date(us / 1000).toLocaleString();
+  const source = await evidenceSource(f, first);
+  const fmt = (us: number) => securityTime(us / 1000);
   evidenceGroups.value = evidenceResult.groups.map((g, i) => ({
     key: `${i}`,
     label: groupLabel(g),
@@ -835,11 +850,9 @@ async function loadEvidence() {
     ]);
     if (mine !== evidenceSeq) return;
     const hits = rows.hits;
-    const match = hits.length
-      ? await fetchSourceMatch(orgId.value, Object.keys(hits[0]), hits[0]).catch(() => null)
-      : null;
+    const source = await evidenceSource(f, hits[0]);
     if (mine !== evidenceSeq) return;
-    evidence.value = normalizeEvents(hits, match?.classification?.source ?? null);
+    evidence.value = normalizeEvents(hits, source);
     evidenceCount.value = Number(count.hits[0]?.zo_n ?? hits.length);
   } catch (e: any) {
     if (mine !== evidenceSeq) return;
@@ -1390,23 +1403,14 @@ onUnmounted(() => {
                 }}</span>
                 <span class="text-text-secondary text-2xs">{{ group.range }}</span>
               </div>
-              <div
+              <SecurityEvidenceEvent
                 v-for="(ev, i) in group.events"
                 :key="i"
-                class="border-border-subtle flex items-start gap-3 border-b px-3 py-2 last:border-b-0"
-              >
-                <OTag variant="primary-soft" size="xs" class="shrink-0">{{
-                  ev.className || t("siem.drawer.eyebrow")
-                }}</OTag>
-                <div class="flex min-w-0 flex-1 flex-col">
-                  <span class="text-text-heading truncate text-xs">{{
-                    evidenceSummary(ev, group.valueField) || "—"
-                  }}</span>
-                  <span class="text-text-secondary text-2xs font-mono">{{
-                    ev.time ? new Date(ev.time).toLocaleString() : "—"
-                  }}</span>
-                </div>
-              </div>
+                :event="ev"
+                :value-field="group.valueField"
+                class="border-border-subtle border-b last:border-b-0"
+                data-test="security-alerts-drawer-evidence-event"
+              />
               <span
                 v-if="!group.events.length"
                 class="text-text-secondary block px-3 py-2 text-xs"
@@ -1419,23 +1423,14 @@ onUnmounted(() => {
             class="border-border-default rounded-surface overflow-hidden border"
             data-test="security-alerts-drawer-evidence"
           >
-            <div
+            <SecurityEvidenceEvent
               v-for="(ev, i) in evidence"
               :key="i"
-              class="border-border-subtle flex items-start gap-3 border-b px-3 py-2 last:border-b-0"
-            >
-              <OTag variant="primary-soft" size="xs" class="shrink-0">{{
-                ev.className || t("siem.drawer.eyebrow")
-              }}</OTag>
-              <div class="flex min-w-0 flex-1 flex-col">
-                <span class="text-text-heading truncate text-xs">{{
-                  evidenceSummary(ev, evidenceField) || "—"
-                }}</span>
-                <span class="text-text-secondary text-2xs font-mono">{{
-                  ev.time ? new Date(ev.time).toLocaleString() : "—"
-                }}</span>
-              </div>
-            </div>
+              :event="ev"
+              :value-field="evidenceField"
+              class="border-border-subtle border-b last:border-b-0"
+              data-test="security-alerts-drawer-evidence-event"
+            />
           </div>
           <span
             v-else-if="!evidenceLoading && !evidenceError && !evidenceDenials.length"

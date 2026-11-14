@@ -681,6 +681,7 @@ pub(crate) mod tests {
             rca_off_reason: None,
             security_case: false,
             historical: false,
+            last_detection_at: None,
         }
         .into();
         alert_incidents::Entity::insert(row.reset_all())
