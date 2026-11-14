@@ -74,7 +74,7 @@ test.describe("assistant approval cards", () => {
     // One target is named in the card's Details, which stay closed until asked for.
     await card.locator('[data-test="assistant-approval-details"] button').first().click();
     await expect(card.locator('[data-test="assistant-approval-args"]')).toContainText('"name": "checkout-latency-old"');
-    await page.keyboard.press("ControlOrMeta+i");
+    await page.keyboard.press("Control+i");
     await expect(heading()).toBeFocused();
     await page.keyboard.press("Enter");
     expect(await confirmations(page)).toHaveLength(0);
@@ -282,14 +282,14 @@ test.describe("assistant approval cards", () => {
       page.evaluate(() => !!document.activeElement?.closest('[data-test="assistant-container"], [data-assistant-root]'));
     // The logs query editor can take focus late and swallow the chord, as SHELL-01 guards against.
     await page.locator("body").click({ position: { x: 5, y: 300 } });
-    await page.keyboard.press("ControlOrMeta+i");
+    await page.keyboard.press("Control+i");
     await expect(assistant.composer()).toBeFocused();
     await page.evaluate(() => (window.__o2mock.next = "confirmation"));
     await page.keyboard.type("clean up stale alerts");
     await page.keyboard.press("Enter");
     await expect(assistant.approval()).toBeVisible({ timeout: 15_000 });
     await expect(assistant.composer()).toBeFocused();
-    await page.keyboard.press("ControlOrMeta+i");
+    await page.keyboard.press("Control+i");
     await expect(heading()).toBeFocused();
     await tabTo(page, approve());
     await harness.setKnobs(page, { confirmDelayMs: 1_500 });
@@ -302,7 +302,7 @@ test.describe("assistant approval cards", () => {
     await expect.poll(() => spokenTimes("Deleted 1 alert")).toBe(1);
     await expect(assistant.composerState()).toHaveAttribute("data-state", "empty", { timeout: 30_000 });
 
-    await page.keyboard.press("ControlOrMeta+i");
+    await page.keyboard.press("Control+i");
     await expect(assistant.composer()).toBeFocused();
     await page.evaluate(() => (window.__o2mock.next = "consent"));
     await page.keyboard.type("why did checkout 5xx spike?");
@@ -310,7 +310,7 @@ test.describe("assistant approval cards", () => {
     const consent = assistant.consentCard();
     await expect(consent).toBeVisible({ timeout: 15_000 });
     await expect(assistant.composer()).toBeFocused();
-    await page.keyboard.press("ControlOrMeta+i");
+    await page.keyboard.press("Control+i");
     await expect(consent.locator('[data-test="assistant-consent-card-org"]')).toBeFocused();
     await tabTo(page, consent.locator('[data-test="assistant-consent-card-checkbox"] [role="checkbox"]'));
     await page.keyboard.press("Space");
@@ -329,7 +329,7 @@ test.describe("assistant approval cards", () => {
     await expect(region()).toContainText("Press Control I to review it.");
     // The strip offers Review only while the card is out of view, so Ctrl+I is the bridge here.
     await expect(assistant.container().locator('[data-test="assistant-strip-review"]')).toHaveCount(0);
-    await page.keyboard.press("ControlOrMeta+i");
+    await page.keyboard.press("Control+i");
     await expect(heading()).toBeFocused();
     await page.keyboard.press("Tab");
     await expect(assistant.approval().locator('[data-test="assistant-approval-more"]')).toBeFocused();

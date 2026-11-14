@@ -49,7 +49,7 @@ test.describe("assistant editors and width", () => {
   async function typeSql(page, dialog, sql) {
     const editor = dialog.locator(".monaco-editor").first();
     await editor.click();
-    await page.keyboard.press("ControlOrMeta+a");
+    await page.keyboard.press("Control+a");
     await page.keyboard.type(sql);
   }
 
@@ -97,8 +97,9 @@ test.describe("assistant editors and width", () => {
     const dock = assistant.dock("alert_query");
     await expect(dock).toBeVisible();
     await assistant.send("errors per service", "nl_sql");
-    const insert = dock.locator('[data-test="assistant-query-insert"]').last();
-    await expect(insert).toBeVisible({ timeout: 30_000 });
+    await dock.locator('[data-test="assistant-query-more"]').last().click({ timeout: 30_000 });
+    const insert = page.locator('[role="menu"] [data-test="assistant-query-insert"]');
+    await expect(insert).toBeVisible();
     const searchesBefore = state.log.filter((r) => /_search/.test(r.url ?? "")).length;
     const searchCalls = [];
     page.on("request", (r) => {
@@ -133,8 +134,9 @@ test.describe("assistant editors and width", () => {
     await typeSql(page, dialog, 'SELECT *   FROM "default"\nWHERE  1 = 1');
     await assistant.dockToggle("alert-query").click();
     await assistant.send("errors per service", "nl_sql");
-    const insert = assistant.dock("alert_query").locator('[data-test="assistant-query-insert"]').last();
-    await expect(insert).toBeVisible({ timeout: 30_000 });
+    await assistant.dock("alert_query").locator('[data-test="assistant-query-more"]').last().click({ timeout: 30_000 });
+    const insert = page.locator('[role="menu"] [data-test="assistant-query-insert"]');
+    await expect(insert).toBeVisible();
     const original = await sqlInEditor(page);
     expect(original).toContain("WHERE  1 = 1");
     await insert.click();
@@ -143,6 +145,7 @@ test.describe("assistant editors and width", () => {
     await expect(assistant.diff()).toBeHidden();
     await expect(dialog).toBeVisible();
     expect(await sqlInEditor(page)).toBe(original);
+    await assistant.dock("alert_query").locator('[data-test="assistant-query-more"]').last().click();
     await insert.click();
     await assistant.diff().locator('[data-test="assistant-diff-reject"]').click();
     expect(await sqlInEditor(page)).toBe(original);

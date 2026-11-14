@@ -256,7 +256,7 @@ test.describe("assistant doors", () => {
     await gotoLogs(page);
     const editor = page.locator('[data-test="logs-search-bar-query-editor"] .monaco-editor').first();
     await editor.click();
-    await page.keyboard.press("ControlOrMeta+a");
+    await page.keyboard.press("Control+a");
     await page.keyboard.type('SELECT * FROM "e2e_automate" WHERE code = 987654');
     // While the page's own search is in flight this button is Cancel, which would kill the run instead.
     await expect(page.locator('[data-test="logs-search-bar-refresh-btn"]')).toHaveAttribute("title", "Run query", { timeout: 30_000 });

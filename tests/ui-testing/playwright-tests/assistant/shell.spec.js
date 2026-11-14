@@ -43,7 +43,7 @@ test.describe("assistant shell", () => {
       );
     await expect.poll(focusedInside).toBe(true);
     await expect(assistant.composer()).toBeFocused();
-    await page.keyboard.press("ControlOrMeta+i");
+    await page.keyboard.press("Control+i");
     await expect(assistant.sidebar).toBeVisible();
     const events = await harness.captureTelemetry(page);
     expect(
@@ -58,7 +58,7 @@ test.describe("assistant shell", () => {
   }) => {
     await page.goto(logsUrl(), { waitUntil: "domcontentloaded" });
     await expect(assistant.headerButton).toHaveAttribute("data-state", "idle", { timeout: 30_000 });
-    await page.keyboard.press("ControlOrMeta+i");
+    await page.keyboard.press("Control+i");
     await expect(assistant.sidebar).toBeVisible();
     await expect(assistant.composer()).toBeFocused();
     await expect(assistant.sidebar.locator('[data-test="assistant-status-region"]')).toHaveText("O2 Assistant opened.");

@@ -69,7 +69,7 @@ test.describe("assistant evidence", () => {
     await expect(block).toBeVisible();
     await expect(block).toHaveAttribute("aria-label", /^SQL query on default, .+–.+/);
     await expect(block.locator('[data-test="assistant-query-run"]')).toBeVisible();
-    await expect(block.locator('[data-test="assistant-query-copy"]')).toBeVisible();
+    await expect(block.locator('[data-test="assistant-query-text-copy"]')).toBeVisible();
     const searches = watchSearches(page);
     await block.locator('[data-test="assistant-query-open"]').click();
     await expect.poll(() => new URL(page.url()).searchParams.get("type")).toBe("ai_chat_query");

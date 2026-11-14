@@ -57,7 +57,7 @@ export class AssistantPage {
 
   /** Opens the assistant by the header button or the chord and waits for its container. */
   async open(via = "header") {
-    if (via === "chord") await this.page.keyboard.press("ControlOrMeta+i");
+    if (via === "chord") await this.page.keyboard.press("Control+i");
     else await this.headerButton.click();
     await this.container().first().waitFor({ state: "visible" });
   }
@@ -138,7 +138,7 @@ export class AssistantPage {
   }
 
   launcher() {
-    return this.page.locator('[data-test="assistant-launcher"]');
+    return this.page.locator('[data-test="assistant-launcher"][data-layout]');
   }
 
   consentCard() {
@@ -196,7 +196,7 @@ export class AssistantPage {
     else {
       // With no other chat the menu offers no All chats, so the history chord opens the list.
       await this.page.keyboard.press("Escape");
-      await this.page.keyboard.press("ControlOrMeta+Shift+h");
+      await this.page.keyboard.press("Control+Shift+h");
     }
     await this.history().waitFor({ state: "visible" });
   }

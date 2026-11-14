@@ -379,7 +379,8 @@ test.describe("assistant accessibility", () => {
     await start(context, page);
     await openOnLogs(page);
     await expectClean(page, "forced-colors-sidebar");
-    const light = page.locator('[data-test="assistant-header-status-light"]');
+    // The status light was folded into the header button; its data-state and name now carry the signal.
+    const light = assistant.headerButton;
     const shots = {};
     const signal = async (name, scenario, ready, closeWhen) => {
       await settled(page);
@@ -393,7 +394,7 @@ test.describe("assistant accessibility", () => {
       await settled(page);
       shots[name] = {
         state: await light.getAttribute("data-state"),
-        shape: await light.getAttribute("data-shape"),
+        shape: await light.getAttribute("aria-label"),
         png: await assistant.headerButton.screenshot({ animations: "disabled" }),
       };
       await a11y.capture(page, `forced-colors-header-${name}`, assistant.headerButton);
@@ -610,7 +611,7 @@ test.describe("assistant accessibility", () => {
     const { blocking } = await a11y.axeScan(page, "docked-approval-1280-dark", { scope: ['[data-test="assistant-shell-docked"]'] });
     expect.soft(blocking).toEqual([]);
     await buffer.click();
-    await page.keyboard.press("ControlOrMeta+i");
+    await page.keyboard.press("Control+i");
     // The chord lands on the card's heading, as APPR-01 asserts.
     await expect(pending.locator('[data-test="assistant-approval-heading"]')).toBeFocused();
   });

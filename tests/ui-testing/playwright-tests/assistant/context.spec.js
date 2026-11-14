@@ -85,12 +85,8 @@ test.describe("assistant composer and context", () => {
     await expect(popover).toBeVisible();
     await expect(popover.locator('[data-test="assistant-context-sees-intro"]')).toHaveText("These go with your next message.");
     const onPage = popover.locator('[data-test="assistant-context-sees-page"]');
-    for (const label of ["This Page", "Organization", "Page", "Streams"]) await expect(onPage).toContainText(label);
-    const time = popover.locator('[data-test="assistant-context-sees-time"]');
-    for (const label of ["Time", "Time range", "Timezone"]) await expect(time).toContainText(label);
-    const notRead = popover.locator('[data-test="assistant-context-sees-not_read"]');
-    await expect(notRead).toContainText("Not Read");
-    await expect(notRead).toContainText("Quick mode");
+    // One card now lists Page, organization, Streams, Time range and the not-sent row together.
+    for (const label of ["Page", "organization", "Streams", "Time range", "Not Sent", "Quick mode"]) await expect(onPage).toContainText(label);
     await page.keyboard.press("Escape");
     await expect(popover).toBeHidden();
     await expect(assistant.sees()).toBeFocused();
@@ -180,7 +176,7 @@ test.describe("assistant composer and context", () => {
     const notice = assistant.container().locator('[data-test="assistant-composer-notice"][data-notice="cap"]');
     await expect(notice).toContainText("wasn't added. Up to 4 images, 2 MB each.");
     await expect(assistant.container().locator('[data-test="assistant-composer-status"]')).toContainText("Up to 4 images, 2 MB each.");
-    await expect(page.locator('[data-test="o2-toast"], [role="alert"]').filter({ hasText: "images" })).toHaveCount(0);
+    await expect(page.locator('[data-test^="o-toast"], [role="alert"]').filter({ hasText: "images" })).toHaveCount(0);
     // The notice gives the strip back to the tray after a few seconds.
     await expect(notice).toHaveCount(0, { timeout: 15_000 });
     await assistant.openMore();

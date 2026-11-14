@@ -186,16 +186,17 @@ test.describe("assistant credits", () => {
       ).toHaveLength(0);
     });
 
-    test("a known exhausted meter predicts the refusal without blocking Send", { tag: ["@mock"] }, async ({
+    test("a known exhausted meter says so in the composer strip and keeps the draft with Send held", { tag: ["@mock"] }, async ({
       page,
     }) => {
+      // K7: out of credits holds Send and keeps the draft; the strip replaces the old helper line.
       state.usage = usage("exhausted", 1000);
       await openOn(page);
       await expect(
         assistant
           .container()
-          .locator('[data-test="assistant-composer-helper"]'),
-      ).toHaveText("AI credits are used up for default.");
+          .locator('[data-test="assistant-composer-notice"][data-notice="credits"]'),
+      ).toContainText("AI credits are used up for default.");
     });
 
     test("a failed turn on Cloud is never called free", { tag: ["@mock"] }, async ({ page }) => {

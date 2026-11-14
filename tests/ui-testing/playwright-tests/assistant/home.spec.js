@@ -62,13 +62,14 @@ test.describe("assistant on Home", () => {
     expect(after[0]).toBe("home-tab-ai");
   });
 
-  test("HOME-03 Escape keeps the typed text, the clear button clears it, and an outage still sends", { tag: ["@mock"] }, async ({ page }) => {
+  test("HOME-03 Escape keeps the typed text, the field can be emptied, and an outage still sends", { tag: ["@mock"] }, async ({ page }) => {
     await openHome(page);
     await input().fill("keep this");
     await input().press("Escape");
     await expect(input()).toHaveValue("keep this");
     await expect(input()).not.toBeFocused();
-    await askBox().locator('[data-test="assistant-launcher-clear"]').click();
+    // The clear button was removed from the Ask box on purpose; emptying the field is the user's own edit now.
+    await input().fill("");
     await expect(input()).toHaveValue("");
     await harness.nextScenario(page, "agent_503");
     await input().fill("still works");

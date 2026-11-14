@@ -66,7 +66,7 @@ test.describe("assistant gates", () => {
     await expect(assistant.v2Ids().and(page.locator(':not([role="status"])'))).toHaveCount(0);
     // WP-07: no object door renders on OSS, only the locked header button.
     await expect(page.locator('[data-test^="ai-entry-"]')).toHaveCount(0);
-    await page.keyboard.press("ControlOrMeta+i");
+    await page.keyboard.press("Control+i");
     await expect(page.locator("[data-assistant-root]")).toHaveCount(0);
     await assistant.headerButton.click();
     const pitch = page.locator('[data-gate="not_entitled"][data-size="hero"]');
