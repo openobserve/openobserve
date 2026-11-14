@@ -17,12 +17,13 @@ use std::sync::atomic::{AtomicI64, Ordering};
 
 use config::{
     Config, get_config, metrics,
-    utils::{size::bytes_to_human_readable, time::now_micros},
+    utils::{rand::get_rand_num_within, size::bytes_to_human_readable, time::now_micros},
 };
 
 use crate::errors::{Error, Result};
 
-const MIN_TRIP_HOLD_MICROS: i64 = 30_000_000;
+const RETRY_AFTER_SECS: u64 = 5;
+const RETRY_AFTER_JITTER_SECS: u64 = 5;
 
 /// Trip time in microseconds, 0 while the breaker is closed.
 static TRIPPED_AT: AtomicI64 = AtomicI64::new(0);
@@ -74,10 +75,9 @@ pub fn check_memory_circuit_breaker() -> Result<()> {
     }
 }
 
-/// Seconds until a tripped breaker can release at the earliest, None while it is closed.
+/// Seconds a refused client should wait before retrying, None while the breaker is closed.
 pub fn memory_circuit_breaker_retry_after() -> Option<u64> {
-    let tripped_at = TRIPPED_AT.load(Ordering::Relaxed);
-    (tripped_at != 0).then(|| retry_after_secs(tripped_at, now_micros()))
+    (TRIPPED_AT.load(Ordering::Relaxed) != 0).then(retry_after_secs)
 }
 
 /// Judges one memory sample and records a trip or a release; only the memory sampler calls it.
@@ -119,22 +119,23 @@ fn current_rss() -> usize {
         .get() as usize
 }
 
-/// The trip time after judging `rss` at `now`: trips above `trip`, releases below `release`
-/// once the trip is at least `MIN_TRIP_HOLD_MICROS` old.
+/// The trip time after judging `rss` at `now`: trips above `trip`, releases below `release`.
 fn next_tripped_at(tripped_at: i64, rss: usize, limits: &Limits, now: i64) -> i64 {
     if tripped_at == 0 {
-        return if rss > limits.trip { now } else { 0 };
-    }
-    if rss < limits.release && now - tripped_at >= MIN_TRIP_HOLD_MICROS {
+        if rss > limits.trip { now } else { 0 }
+    } else if rss < limits.release {
         0
     } else {
         tripped_at
     }
 }
 
-fn retry_after_secs(tripped_at: i64, now: i64) -> u64 {
-    let remaining = (tripped_at + MIN_TRIP_HOLD_MICROS - now).max(0) as u64;
-    remaining.div_ceil(1_000_000).max(1)
+/// Jittered so the clients refused during one trip do not all retry at the same moment.
+fn retry_after_secs() -> u64 {
+    get_rand_num_within(
+        RETRY_AFTER_SECS,
+        RETRY_AFTER_SECS + RETRY_AFTER_JITTER_SECS + 1,
+    )
 }
 
 #[cfg(test)]
@@ -156,36 +157,28 @@ mod tests {
     #[test]
     fn test_next_tripped_at() {
         let t0 = 1_000 * SEC;
-        let hold = MIN_TRIP_HOLD_MICROS;
         for (name, tripped_at, rss, now, expected) in [
             ("closed at the trip limit stays closed", 0, 9 * GIB, t0, 0),
             ("closed above the trip limit trips", 0, 9 * GIB + 1, t0, t0),
             (
-                "below release inside the hold stays tripped",
-                t0,
-                GIB,
-                t0 + hold - 1,
-                t0,
-            ),
-            (
-                "below release after the hold releases",
+                "below release releases on the next sample",
                 t0,
                 8 * GIB - 1,
-                t0 + hold,
+                t0 + SEC,
                 0,
             ),
             (
                 "at the release limit stays tripped",
                 t0,
                 8 * GIB,
-                t0 + 10 * hold,
+                t0 + 600 * SEC,
                 t0,
             ),
             (
                 "between the limits stays tripped",
                 t0,
                 8 * GIB + 1,
-                t0 + 10 * hold,
+                t0 + 600 * SEC,
                 t0,
             ),
             (
@@ -224,35 +217,23 @@ mod tests {
     }
 
     #[test]
-    fn test_no_cycle_shorter_than_the_hold() {
-        // Worst case: RSS swings between above-trip and below-release every second.
+    fn test_a_cycle_needs_a_full_swing_across_the_gap() {
         let mut tripped_at = 0;
-        let mut transitions = vec![];
-        for second in 0..600 {
-            let rss = if second % 2 == 0 { 10 * GIB } else { GIB };
-            let now = (second + 1) * SEC;
-            let next = next_tripped_at(tripped_at, rss, &limits(), now);
-            if next != tripped_at {
-                transitions.push((now, next != 0));
-            }
-            tripped_at = next;
+        let mut states = vec![];
+        for (second, rss) in [100, 85, 95, 85, 70, 85, 89, 95].into_iter().enumerate() {
+            let now = (second as i64 + 1) * SEC;
+            tripped_at = next_tripped_at(tripped_at, rss * GIB / 10, &limits(), now);
+            states.push(tripped_at != 0);
         }
-        assert!(transitions.len() > 2, "{transitions:?}");
-        for pair in transitions.windows(2) {
-            let ((tripped, true), (released, false)) = (pair[0], pair[1]) else {
-                continue;
-            };
-            assert!(released - tripped >= MIN_TRIP_HOLD_MICROS, "{pair:?}");
-        }
+        assert_eq!(states, [true, true, true, true, false, false, false, true]);
     }
 
     #[test]
-    fn test_retry_after_secs_counts_down_the_hold() {
-        let t0 = 1_000 * SEC;
-        assert_eq!(retry_after_secs(t0, t0), 30);
-        assert_eq!(retry_after_secs(t0, t0 + SEC / 2), 30);
-        assert_eq!(retry_after_secs(t0, t0 + 29 * SEC), 1);
-        assert_eq!(retry_after_secs(t0, t0 + 300 * SEC), 1);
+    fn test_retry_after_is_jittered_within_its_window() {
+        let samples: Vec<u64> = (0..1_000).map(|_| retry_after_secs()).collect();
+        let window = RETRY_AFTER_SECS..=RETRY_AFTER_SECS + RETRY_AFTER_JITTER_SECS;
+        assert!(samples.iter().all(|s| window.contains(s)), "{samples:?}");
+        assert!(samples.iter().any(|s| *s != samples[0]), "no jitter");
     }
 
     #[test]
