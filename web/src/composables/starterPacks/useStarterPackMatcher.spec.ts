@@ -2,6 +2,8 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { defineComponent } from "vue";
 
+import { HOSTS_PACK } from "./hostsPack";
+import type { StarterPack } from "./types";
 import {
   MATCH_PARTIAL_AFTER_MS,
   MATCH_POLL_MS,
@@ -51,12 +53,12 @@ vi.mock("@/services/stream.queries", () => ({
   }),
 }));
 
-const setup = (poll = false) => {
+const setup = (poll = false, pack?: StarterPack) => {
   let api!: ReturnType<typeof useStarterPackMatcher>;
   const wrapper = mount(
     defineComponent({
       setup() {
-        api = useStarterPackMatcher("org", { poll });
+        api = useStarterPackMatcher("org", { poll, pack });
         return () => null;
       },
     }),
@@ -135,5 +137,32 @@ describe("useStarterPackMatcher", () => {
     await flushPromises();
     expect(api.state.value).toBe("checking");
     expect(vi.getTimerCount()).toBe(0);
+  });
+
+  describe("hosts pack", () => {
+    it.each([
+      ["OpenTelemetry hostmetrics", "system_cpu_time"],
+      ["node-exporter", "node_cpu_seconds_total"],
+    ])("matches %s data without reading clusters", async (_shape, stream) => {
+      fake.metrics = [stream];
+      fake.columns = { [stream]: ["host_name", "value"] };
+      const { api } = setup(false, HOSTS_PACK);
+      await api.check();
+      expect(api.state.value).toBe("matched");
+      expect(api.clusters.value).toEqual([]);
+      expect(fake.sql).toEqual([]);
+    });
+
+    it("waits on a host stream without a schema and ignores Kubernetes data", async () => {
+      fake.metrics = ["system_memory_usage"];
+      const first = setup(false, HOSTS_PACK);
+      await first.api.check();
+      expect(first.api.state.value).toBe("waiting");
+      fake.metrics = ["kube_pod_status_phase"];
+      fake.columns = { kube_pod_status_phase: ["k8s_cluster"] };
+      const second = setup(false, HOSTS_PACK);
+      await second.api.check();
+      expect(second.api.state.value).toBe("none");
+    });
   });
 });

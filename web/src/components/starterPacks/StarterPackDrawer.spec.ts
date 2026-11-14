@@ -66,6 +66,19 @@ describe("StarterPackDrawer", () => {
     );
   });
 
+  it("tags an item left out for a different data flavour as Needs data", () => {
+    const preview = {
+      ...PREVIEW,
+      notIncluded: [
+        { kind: "dashboard", itemId: "d2", name: "Node metrics", reason: "no_flavour" },
+      ],
+    };
+    const wrapper = render(fakeFlow({ preview: shallowRef(preview) }));
+    const row = wrapper.get('[data-test="starter-pack-drawer-not-included"]').text();
+    expect(row).toContain("Needs data");
+    expect(row).toContain("Node metrics: not available for your metric names yet");
+  });
+
   it("shows one Adapted to your data section holding the adapted rows", () => {
     const wrapper = render(fakeFlow({ preview: shallowRef(PREVIEW) }));
     expect(wrapper.text().split("Adapted to your data")).toHaveLength(2);

@@ -35,7 +35,6 @@ import { RESERVED_FIELD } from "./packBinding";
 import { useStarterPacks } from "./useStarterPacks";
 
 export const UNDO_WINDOW_US = 24 * 60 * 60 * 1_000_000;
-export const KUBERNETES_FEATURE = "kubernetes_monitoring";
 
 const CLOCK_TICK_MS = 60_000;
 
@@ -94,7 +93,9 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
 
   const isAdmin = computed(() => isOrgAdmin(store.state));
   const licensed = computed(
-    () => featureState(store.state.zoConfig?.features, KUBERNETES_FEATURE) === "enabled",
+    () =>
+      !!pack.nativeView &&
+      featureState(store.state.zoConfig?.features, pack.nativeView.feature) === "enabled",
   );
 
   const items = computed(() => (record.value?.items ?? []).filter(countsAsItem));

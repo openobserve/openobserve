@@ -24,14 +24,17 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OText from "@/lib/core/Typography/OText.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import { useAlertLibrary } from "@/composables/alerts/useAlertLibrary";
 import { STARTER_PACKS } from "@/composables/starterPacks/kubernetesPack";
 import { matchPack, readOrgStreams } from "@/composables/starterPacks/packMatchData";
+import { findRawNginxLogs, type RawLogNotice } from "@/composables/starterPacks/rawLogs";
 import type { PackInstallRecord, StarterPack } from "@/composables/starterPacks/types";
 import { useInstallRecords } from "@/composables/starterPacks/useInstallRecords";
 import { useStarterPackFlow } from "@/composables/starterPacks/useStarterPackFlow";
+import { useStreamValues } from "@/composables/starterPacks/useStreamValues";
 import StarterPackDrawer from "./StarterPackDrawer.vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 
@@ -52,6 +55,7 @@ const { t } = useI18nTyped();
 const router = useRouter();
 const records = useInstallRecords(props.org);
 const { loadManifest, loadAlertFile } = useAlertLibrary();
+const { readValues } = useStreamValues(props.org);
 
 const rows = ref<LibraryRow[]>([]);
 const state = ref<"loading" | "ready" | "error">("loading");
@@ -60,6 +64,7 @@ const search = ref("");
 const flows = new Map(STARTER_PACKS.map((pack) => [pack.id, useStarterPackFlow(props.org, pack)]));
 const drawerPackId = ref<string | null>(null);
 const drawerFlow = computed(() => (drawerPackId.value ? flows.get(drawerPackId.value) : undefined));
+const rawLogs = ref<RawLogNotice[]>([]);
 
 const count = (test: (row: LibraryRow) => boolean) => rows.value.filter(test).length;
 const isReadyRow = (row: LibraryRow) => row.ready;
@@ -189,10 +194,20 @@ const dashboardRows = (
     }));
   });
 
+// A failed read only hides the notice, since it offers nothing to act on.
+let rawLogRun = 0;
+const loadRawLogs = async (logs: Map<string, number>) => {
+  rawLogRun += 1;
+  const run = rawLogRun;
+  const found = await findRawNginxLogs(props.org, logs, readValues).catch(() => []);
+  if (run === rawLogRun) rawLogs.value = found;
+};
+
 const load = async () => {
   state.value = "loading";
   try {
     const streams = await readOrgStreams(props.org);
+    if (props.view === "packs") void loadRawLogs(streams.logs ?? new Map());
     const built = await Promise.all(
       STARTER_PACKS.map(async (pack) => {
         const [match, installs] = await Promise.all([
@@ -259,6 +274,14 @@ onMounted(() => void load());
           </OToggleGroupItem>
         </OToggleGroup>
       </div>
+      <OBanner
+        v-for="notice in rawLogs"
+        :key="notice.stream"
+        variant="default"
+        dense
+        :content="t('starterPacks.libraryTabs.rawLogs', { stream: raw(notice.stream) })"
+        :data-test="`library-tab-raw-log-${notice.stream}`"
+      />
       <OEmptyState
         v-if="visibleRows.length === 0"
         size="block"

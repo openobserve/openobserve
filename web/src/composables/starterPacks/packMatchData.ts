@@ -86,7 +86,10 @@ const loadDoc = (dashboard: PackDashboard) => {
   return loaded;
 };
 
-const inBatches = async <T, R>(values: T[], read: (value: T) => Promise<R>): Promise<R[]> => {
+export const inBatches = async <T, R>(
+  values: T[],
+  read: (value: T) => Promise<R>,
+): Promise<R[]> => {
   const results: R[] = [];
   for (let start = 0; start < values.length; start += FILE_READS_AT_ONCE) {
     const batch = values.slice(start, start + FILE_READS_AT_ONCE);

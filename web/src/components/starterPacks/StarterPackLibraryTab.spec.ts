@@ -23,6 +23,8 @@ const fake = vi.hoisted(() => ({
   dashboard: true,
   fail: false,
   records: [] as Array<Record<string, unknown>>,
+  rawLogs: [] as Array<{ stream: string; column: string }>,
+  rawLogsFor: [] as string[][],
   push: vi.fn(async () => {}),
 }));
 
@@ -46,7 +48,7 @@ vi.mock("@/composables/starterPacks/kubernetesPack", () => ({
 vi.mock("@/composables/starterPacks/packMatchData", () => ({
   readOrgStreams: async () => {
     if (fake.fail) throw new Error("down");
-    return {};
+    return { logs: new Map([["edge", 1]]) };
   },
   matchPack: async () => ({
     ready: fake.ready,
@@ -58,6 +60,15 @@ vi.mock("@/composables/starterPacks/useStarterPackFlow", async () => {
   const flow = fakeFlow();
   return { useStarterPackFlow: () => flow };
 });
+vi.mock("@/composables/starterPacks/rawLogs", () => ({
+  findRawNginxLogs: async (_org: string, streams: Map<string, number>) => {
+    fake.rawLogsFor.push([...streams.keys()]);
+    return fake.rawLogs;
+  },
+}));
+vi.mock("@/composables/starterPacks/useStreamValues", () => ({
+  useStreamValues: () => ({ readValues: vi.fn() }),
+}));
 vi.mock("@/composables/starterPacks/useInstallRecords", () => ({
   useInstallRecords: () => ({ list: async () => fake.records }),
 }));
@@ -203,5 +214,27 @@ describe("StarterPackLibraryTab", () => {
     await error.get("button").trigger("click");
     await flushPromises();
     expect(wrapper.find('[data-test="library-tab-row-kubernetes"]').exists()).toBe(true);
+  });
+
+  describe("raw logs", () => {
+    beforeEach(() => Object.assign(fake, { rawLogs: [], rawLogsFor: [] }));
+
+    it("names plain-text Nginx logs without an action", async () => {
+      fake.rawLogs = [{ stream: "edge", column: "message" }];
+      const wrapper = await render();
+      const notice = wrapper.find('[data-test="library-tab-raw-log-edge"]');
+      expect(notice.text()).toBe(
+        "Looks like Nginx logs in edge, stored as plain text · Parsing support comes later",
+      );
+      expect(notice.find("button").exists()).toBe(false);
+      expect(fake.rawLogsFor).toEqual([["edge"]]);
+    });
+
+    it("shows nothing when no stream reads as raw Nginx, and never checks on Dashboards", async () => {
+      const packs = await render();
+      expect(packs.find('[data-test^="library-tab-raw-log-"]').exists()).toBe(false);
+      await render("dashboards");
+      expect(fake.rawLogsFor).toHaveLength(1);
+    });
   });
 });

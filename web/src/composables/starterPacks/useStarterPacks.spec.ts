@@ -20,6 +20,9 @@ import { defineComponent } from "vue";
 import { queryClient } from "@/composables/query/queryClient";
 import store from "@/test/unit/helpers/store";
 
+import { HOST_METRICS_DASHBOARD_TITLE } from "@/composables/useHostMetricsDashboard";
+
+import { HOSTS_PACK } from "./hostsPack";
 import type { StarterPack } from "./types";
 import { StarterPackPermissionError } from "./types";
 
@@ -1020,6 +1023,90 @@ describe("useStarterPacks", () => {
       expect(result.kept).toEqual([]);
       expect(counts()).toEqual(EMPTY);
       expect(fake.state.kv.size).toBe(0);
+    });
+  });
+
+  describe("shared host dashboard", () => {
+    const HOSTS = { ...HOSTS_PACK, alerts: [] };
+    const hostDashboards = () =>
+      fake.state.dashboards.filter((row) => row.title === HOST_METRICS_DASHBOARD_TITLE);
+    const dashboardItem = (record: { items: Array<{ kind: string }> }) =>
+      record.items.find(({ kind }) => kind === "dashboard");
+    const setupCardImport = () =>
+      fake.state.dashboards.push({
+        dashboard_id: "setup-card",
+        title: HOST_METRICS_DASHBOARD_TITLE,
+        folder_id: "default",
+        body: { title: HOST_METRICS_DASHBOARD_TITLE },
+      });
+
+    it("imports through the setup-card importer once and owns what it made", async () => {
+      const record = await packs().installPack(HOSTS);
+      expect(hostDashboards()).toHaveLength(1);
+      expect(hostDashboards()[0].folder_id).toBe("default");
+      expect(dashboardItem(record)).toMatchObject({ status: "created", folderId: "default" });
+      expect(fake.state.folders.dashboards).toHaveLength(0);
+    });
+
+    it("links a dashboard the setup card already imported instead of making another", async () => {
+      setupCardImport();
+      const record = await packs().installPack(HOSTS);
+      expect(hostDashboards()).toHaveLength(1);
+      expect(dashboardItem(record)).toMatchObject({ status: "existing", id: "setup-card" });
+      expect(
+        fake.state.calls.filter((call) => call.startsWith("post /api/org/dashboards")),
+      ).toEqual([]);
+    });
+
+    it("reuses the first install's dashboard on a second install", async () => {
+      const api = packs();
+      await api.installPack(HOSTS);
+      const second = await api.installPack(HOSTS);
+      expect(hostDashboards()).toHaveLength(1);
+      expect(dashboardItem(second)?.status).toBe("existing");
+      await api.undoPack(HOSTS, second.installId);
+      expect(hostDashboards()).toHaveLength(1);
+    });
+
+    it("leaves a reused dashboard on Undo and Remove", async () => {
+      setupCardImport();
+      const api = packs();
+      const record = await api.installPack(HOSTS);
+      await api.undoPack(HOSTS, record.installId);
+      expect(hostDashboards()).toHaveLength(1);
+      await api.installPack(HOSTS);
+      const result = await api.removePack(HOSTS);
+      expect(hostDashboards()).toHaveLength(1);
+      expect(result.removed.some(({ kind }) => kind === "dashboard")).toBe(false);
+    });
+
+    it("does not own a dashboard the importer reports as already there", async () => {
+      let seen = false;
+      const shared = {
+        find: vi.fn(async () => (seen ? { id: "setup-card", folderId: "default" } : null)),
+        create: vi.fn(async () => {
+          seen = true;
+          setupCardImport();
+          return false;
+        }),
+      };
+      const [dashboard] = HOSTS.dashboards;
+      const pack = { ...HOSTS, dashboards: [{ ...dashboard, shared }] };
+      const record = await packs().installPack(pack);
+      expect(shared.create).toHaveBeenCalledTimes(1);
+      expect(dashboardItem(record)).toMatchObject({ status: "existing", id: "setup-card" });
+    });
+
+    it("links a dashboard the setup card imported after the plan, and never owns it", async () => {
+      let imported = false;
+      const record = await packs().installPack(HOSTS, {
+        onProgress: () => {
+          if (!imported) setupCardImport();
+          imported = true;
+        },
+      });
+      expect(hostDashboards()).toHaveLength(1);
+      expect(dashboardItem(record)).toMatchObject({ status: "existing", id: "setup-card" });
     });
   });
 });

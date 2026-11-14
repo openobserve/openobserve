@@ -4,6 +4,8 @@ import { nextTick, ref, shallowRef } from "vue";
 
 import i18n from "@/locales";
 
+import { HOSTS_PACK } from "@/composables/starterPacks/hostsPack";
+
 import StarterPackHomeCard from "./StarterPackHomeCard.vue";
 import { fakeFlow } from "./starterPackTestFlow";
 
@@ -26,10 +28,10 @@ vi.mock("@/composables/starterPacks/packDismissal", () => ({
 }));
 vi.mock("vue-router", () => ({ useRouter: () => ({ push: fake.push }) }));
 
-const render = async () => {
+const render = async (props: Record<string, unknown> = {}) => {
   fake.flow.loaded.value = false;
   const wrapper = mount(StarterPackHomeCard, {
-    props: { org: "org" },
+    props: { org: "org", ...props },
     global: {
       plugins: [i18n],
       stubs: {
@@ -156,6 +158,22 @@ describe("StarterPackHomeCard", () => {
     const wrapper = await render();
     await wrapper.get('[data-test="home-pack-card-retry-btn"]').trigger("click");
     expect(fake.matcher.retry).toHaveBeenCalled();
+  });
+
+  it("offers the Hosts pack under its own title and stays silent when nothing matches", async () => {
+    const hosts = { pack: HOSTS_PACK, showEmpty: false };
+    fake.flow = fakeFlow({ viewCount: ref(0), licensed: ref(false) });
+    const offer = await render(hosts);
+    const card = offer.get('[data-test="home-pack-hosts-card"]');
+    expect(card.text()).toContain("Your Hosts data is ready to monitor");
+    expect(offer.get('[data-test="home-pack-hosts-card-counts"]').text()).toContain("2 alerts");
+    expect(has(offer, "home-pack-card")).toBe(false);
+    expect(has(offer, "home-pack-hosts-card-setup-btn")).toBe(true);
+    expect(offer.emitted("offered")?.at(-1)).toEqual([true]);
+    fake.matcher.state.value = "none";
+    const silent = await render(hosts);
+    expect(silent.find('[data-test="home-pack-hosts-section"]').exists()).toBe(false);
+    expect(silent.emitted("offered")?.at(-1)).toEqual([false]);
   });
 
   it("shows the counts, the matched streams and Install N items without a Library link", async () => {

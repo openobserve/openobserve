@@ -545,8 +545,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <StarterPackLandingRow
           v-if="packLanding"
-          :key="store.state.selectedOrganization?.identifier"
+          :key="`${store.state.selectedOrganization?.identifier}/${packLandingId}`"
           :org="store.state.selectedOrganization?.identifier"
+          :pack-id="packLandingId"
         />
         <KioskStrip
           v-if="kioskMode && !playlistEmbed"
@@ -980,9 +981,14 @@ export default defineComponent({
     const dashboardId = computed(() => route.query.dashboard);
     // Decided per dashboard: its own URL rewrites drop `pack`, so a query watch would lose the row.
     const packLanding = ref(STARTER_PACKS_ENABLED && !!route.query.pack);
+    // Read once per dashboard, since the view later rewrites the query without the pack.
+    const packLandingId = ref(String(route.query.pack ?? ""));
     watch(
       () => route.query.dashboard,
-      () => (packLanding.value = STARTER_PACKS_ENABLED && !!route.query.pack),
+      () => {
+        packLanding.value = STARTER_PACKS_ENABLED && !!route.query.pack;
+        packLandingId.value = String(route.query.pack ?? "");
+      },
     );
 
     const folderId = computed(() => route.query.folder);
@@ -2999,6 +3005,7 @@ export default defineComponent({
 
     return {
       packLanding,
+      packLandingId,
       starterPacksEnabled: STARTER_PACKS_ENABLED,
       reloadAfterRepair,
       isMobile,
