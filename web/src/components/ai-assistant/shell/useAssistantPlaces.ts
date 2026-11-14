@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { computed, type ComputedRef } from "vue";
-import { useRoute, useRouter } from "vue-router";
+import { useRoute, useRouter, type RouteLocationNormalizedLoaded, type Router } from "vue-router";
 
 import {
   MAX_FLOATING_CHATS,
@@ -53,6 +53,15 @@ export interface AssistantPlace {
 export function placementMode(placement: AssistantPlacementName, sheet: boolean): PlacementMode {
   if (placement === "full" || placement === "docked" || placement === "window") return placement;
   return sheet ? "sheet" : "sidebar";
+}
+
+/** Leaves the full view by going back, unless the entry before it is another chat, which would reopen at full page. */
+export function leaveFullThreadRoute(router: Router, route: RouteLocationNormalizedLoaded): void {
+  if (!isFullThreadRoute(route)) return;
+  const back = window.history.state?.back;
+  if (typeof back !== "string") return void router.push("/");
+  if (isFullThreadRoute(router.resolve(back))) void router.replace("/");
+  else router.back();
 }
 
 /** The Open as moves a container offers: Side panel, Full page, Floating window and its editor's dock, by viewport and placement. */
@@ -150,11 +159,8 @@ export function useAssistantPlaces(input: () => AssistantPlacesInput): {
     });
   }
 
-  // The full view leaves by going back, so the page it came from returns beneath the chat.
   function leaveFullView(): void {
-    if (!isFullThreadRoute(route)) return;
-    if (window.history.state?.back) router.back();
-    else void router.push("/");
+    leaveFullThreadRoute(router, route);
   }
 
   function toSidebar(): void {

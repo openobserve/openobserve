@@ -699,7 +699,6 @@ import {
   assistantEvidenceHostKey,
   assistantSessionSourceKey,
   assistantTranscriptHostKey,
-  isFullThreadRoute,
   pushFromThread,
   recordedLedger,
   type AssistantEvidenceHost,
@@ -725,6 +724,7 @@ import { formatCount, formatOrgIsoDay, formatOrgTime } from "@/utils/formatters"
 import AssistantModeButtons from "./AssistantModeButtons.vue";
 import AssistantStatusRegion from "./AssistantStatusRegion.vue";
 import { closeLockedPanel, useLockedPanel } from "./lockedPanel";
+import { leaveFullThreadRoute } from "./useAssistantPlaces";
 import { useOpeningMotion } from "./useOpeningMotion";
 
 // Overlays opened from here are teleported to body, so they carry the assistant colour roles with them.
@@ -1695,9 +1695,7 @@ function closeContainer(): void {
   closeLockedPanel();
   if (scopedSid.value) return store.closeWindow(scopedSid.value);
   store.close("close");
-  if (props.placement !== "full" || !isFullThreadRoute(route)) return;
-  if (window.history.state?.back) router.back();
-  else void router.push("/");
+  if (props.placement === "full") leaveFullThreadRoute(router, route);
 }
 
 // A request from the page's button, the notice or a late mount opens All chats in the primary container.
