@@ -8123,6 +8123,7 @@ dependencies = [
  "http-body 1.1.0",
  "http-body-util",
  "infra",
+ "ingester",
  "ingestion-common",
  "jsonschema",
  "log",

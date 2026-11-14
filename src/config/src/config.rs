@@ -2501,6 +2501,12 @@ pub struct Common {
     pub memory_circuit_breaker_enabled: bool,
     #[env_config(name = "ZO_MEMORY_CIRCUIT_BREAKER_RATIO", default = 90)]
     pub memory_circuit_breaker_ratio: usize,
+    #[env_config(
+        name = "ZO_MEMORY_CIRCUIT_BREAKER_RELEASE_RATIO",
+        default = 0,
+        help = "A tripped memory circuit breaker releases only once memory usage drops below this percentage of total memory. 0 means 10 points below ZO_MEMORY_CIRCUIT_BREAKER_RATIO, but not below half of it; values above the trip ratio are lowered to it"
+    )]
+    pub memory_circuit_breaker_release_ratio: usize,
     #[env_config(name = "ZO_DISK_CIRCUIT_BREAKER_ENABLED", default = false)]
     pub disk_circuit_breaker_enabled: bool,
     #[env_config(
@@ -4997,6 +5003,10 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.search.metrics_blocks_cache_max_size,
         cfg.limit.mem_total,
     );
+    cfg.common.memory_circuit_breaker_release_ratio = memory_circuit_breaker_release_ratio(
+        cfg.common.memory_circuit_breaker_ratio,
+        cfg.common.memory_circuit_breaker_release_ratio,
+    );
     Ok(())
 }
 
@@ -5005,6 +5015,13 @@ fn metrics_blocks_cache_size_mb(configured: usize, mem_total: usize) -> usize {
         0 => (mem_total / SIZE_IN_MB as usize / 20).clamp(128, 4096),
         1..=9 => 0,
         size => size,
+    }
+}
+
+fn memory_circuit_breaker_release_ratio(trip_ratio: usize, configured: usize) -> usize {
+    match configured {
+        0 => trip_ratio.saturating_sub(10).max(trip_ratio / 2).max(1),
+        ratio => ratio.min(trip_ratio),
     }
 }
 
@@ -5634,6 +5651,26 @@ mod tests {
     }
 
     use super::*;
+
+    #[test]
+    fn memory_circuit_breaker_release_ratio_defaults_below_trip_and_never_above_it() {
+        for (trip, configured, expected) in [
+            (90, 0, 80),
+            (95, 0, 85),
+            (16, 0, 8),
+            (10, 0, 5),
+            (1, 0, 1),
+            (90, 70, 70),
+            (90, 90, 90),
+            (90, 95, 90),
+        ] {
+            assert_eq!(
+                memory_circuit_breaker_release_ratio(trip, configured),
+                expected,
+                "trip {trip}, configured {configured}"
+            );
+        }
+    }
 
     /// A coherent starting point, so each ceiling test changes exactly the one
     /// thing it is about. `Synthetics::default()` is all zeroes — the derive

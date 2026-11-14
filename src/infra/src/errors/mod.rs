@@ -240,9 +240,11 @@ pub enum TemplateError {
     ConvertingId(String),
 }
 
-#[derive(ThisError, Debug)]
+#[derive(ThisError, Debug, Clone)]
 pub enum ErrorCodes {
     ServerInternalError(String),
+    /// A transient server-side refusal, such as an overloaded node; carries the reason.
+    ServiceUnavailable(String),
     SearchSQLNotValid(String),
     SearchStreamNotFound(String),
     FullTextSearchFieldNotFound,
@@ -349,6 +351,7 @@ impl ErrorCodes {
             ErrorCodes::AiSessionOwnerUnavailable(_) | ErrorCodes::AiChatSessionBusy(_) => 409,
             ErrorCodes::LicenseFeatureNotEntitled(_) | ErrorCodes::SearchStreamProtected(_) => 403,
             ErrorCodes::ServerInternalError(_) | ErrorCodes::SearchParquetFileNotFound => 500,
+            ErrorCodes::ServiceUnavailable(_) => 503,
             ErrorCodes::InvalidParams(_)
             | ErrorCodes::SearchSQLExecuteError(_)
             | ErrorCodes::SearchFieldHasNoCompatibleDataType(_)
@@ -364,6 +367,7 @@ impl ErrorCodes {
     pub fn get_code(&self) -> u16 {
         match self {
             ErrorCodes::ServerInternalError(_) => 10001,
+            ErrorCodes::ServiceUnavailable(_) => 10002,
             ErrorCodes::SearchSQLNotValid(_) => 20001,
             ErrorCodes::SearchStreamNotFound(_) => 20002,
             ErrorCodes::FullTextSearchFieldNotFound => 20003,
@@ -387,6 +391,7 @@ impl ErrorCodes {
     pub fn get_message(&self) -> String {
         match self {
             ErrorCodes::ServerInternalError(_) => "Server Internal Error".to_string(),
+            ErrorCodes::ServiceUnavailable(_) => "Service unavailable".to_string(),
             ErrorCodes::SearchSQLNotValid(_) => "Search SQL not valid".to_string(),
             ErrorCodes::SearchStreamNotFound(stream) => {
                 format!("Search stream not found: {stream}")
@@ -435,6 +440,7 @@ impl ErrorCodes {
     pub fn get_inner_message(&self) -> String {
         match self {
             ErrorCodes::ServerInternalError(msg) => msg.to_owned(),
+            ErrorCodes::ServiceUnavailable(reason) => reason.to_owned(),
             ErrorCodes::SearchSQLNotValid(sql) => sql.to_owned(),
             ErrorCodes::SearchStreamNotFound(stream) => stream.to_owned(),
             ErrorCodes::FullTextSearchFieldNotFound => "".to_string(),
@@ -458,6 +464,7 @@ impl ErrorCodes {
     pub fn get_error_detail(&self) -> String {
         match self {
             ErrorCodes::ServerInternalError(msg) => msg.to_owned(),
+            ErrorCodes::ServiceUnavailable(reason) => reason.to_owned(),
             ErrorCodes::SearchSQLNotValid(sql) => sql.to_owned(),
             ErrorCodes::SearchStreamNotFound(_) => "".to_string(),
             ErrorCodes::FullTextSearchFieldNotFound => "".to_string(),
@@ -514,6 +521,7 @@ impl ErrorCodes {
         };
         match code {
             10001 => Ok(ErrorCodes::ServerInternalError(message)),
+            10002 => Ok(ErrorCodes::ServiceUnavailable(message)),
             20001 => Ok(ErrorCodes::SearchSQLNotValid(message)),
             20002 => Ok(ErrorCodes::SearchStreamNotFound(message)),
             20003 => Ok(ErrorCodes::FullTextSearchFieldNotFound),
@@ -599,6 +607,19 @@ mod tests {
             ErrorCodes::SearchHistogramNotAvailable("x".into()).get_code(),
             20013
         );
+    }
+
+    #[test]
+    fn test_service_unavailable_is_a_503_that_round_trips() {
+        let err = ErrorCodes::ServiceUnavailable("memory is full".into());
+        assert_eq!(err.get_code(), 10002);
+        assert_eq!(err.http_status(), 503);
+        assert_eq!(err.get_message(), "Service unavailable");
+        assert_eq!(err.get_error_detail(), "memory is full");
+        match ErrorCodes::from_json(&err.to_json()).unwrap() {
+            ErrorCodes::ServiceUnavailable(reason) => assert_eq!(reason, "memory is full"),
+            other => panic!("round trip lost the variant: {other:?}"),
+        }
     }
 
     #[test]

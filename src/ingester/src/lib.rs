@@ -16,6 +16,7 @@
 mod entry;
 pub mod errors;
 mod immutable;
+mod memory_breaker;
 mod memtable;
 mod pack;
 mod partition;
@@ -37,6 +38,9 @@ pub use immutable::{
     check_persist_done, get_immutables_cache_stats, get_processing_tables_cache_stats,
     read_from_immutable,
 };
+pub use memory_breaker::{
+    check_memory_circuit_breaker, memory_circuit_breaker_retry_after, update_memory_circuit_breaker,
+};
 pub use pack::{
     PackSegment, PackSegmentMeta, PendingStreamStats, collect_pack_metrics,
     get_pending_stream_stats, get_segment_index_stats, get_stream_segments, mark_segments_consumed,
@@ -46,8 +50,8 @@ use snafu::ResultExt;
 use tokio::sync::{Mutex, mpsc};
 pub use wal::collect_wal_parquet_metrics;
 pub use writer::{
-    Writer, check_disk_circuit_breaker, check_memory_circuit_breaker, check_memtable_size,
-    flush_all, get_max_memtable_id, get_writer, read_from_memtable, rotate_all,
+    Writer, check_disk_circuit_breaker, check_memtable_size, flush_all, get_max_memtable_id,
+    get_writer, read_from_memtable, rotate_all,
 };
 
 use crate::errors::OpenDirSnafu;

@@ -74,22 +74,6 @@ pub fn check_memtable_size() -> Result<()> {
     }
 }
 
-// check total memory size
-pub fn check_memory_circuit_breaker() -> Result<()> {
-    let cfg = get_config();
-    if !cfg.common.memory_circuit_breaker_enabled || cfg.common.memory_circuit_breaker_ratio == 0 {
-        return Ok(());
-    }
-    let cur_mem = metrics::NODE_MEMORY_USAGE
-        .with_label_values::<&str>(&[])
-        .get() as usize;
-    if cur_mem > cfg.limit.mem_total / 100 * cfg.common.memory_circuit_breaker_ratio {
-        Err(Error::MemoryCircuitBreakerError {})
-    } else {
-        Ok(())
-    }
-}
-
 // check disk space availability
 // Threshold interpretation (similar to memory circuit breaker):
 // - Values < 100: treated as percentage of disk used (e.g., 90 = trigger when 90% full)
