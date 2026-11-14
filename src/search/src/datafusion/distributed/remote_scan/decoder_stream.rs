@@ -65,6 +65,7 @@ impl FlightDecoderStream {
             CustomMessage::ScanStats(stats) => {
                 self.scan_stats.add(&stats);
                 self.query_context.scan_stats.lock().add(&stats);
+                self.query_context.node_profile.add_scan_stats(&stats);
             }
             CustomMessage::Metrics(metrics) => {
                 self.query_context.node_profile.record_plan(metrics);
@@ -194,9 +195,6 @@ impl Stream for FlightDecoderStream {
 impl Drop for FlightDecoderStream {
     fn drop(&mut self) {
         let scan_stats = self.scan_stats;
-        self.query_context
-            .node_profile
-            .finish(&self.metrics, scan_stats);
         let QueryContext {
             trace_id,
             node,

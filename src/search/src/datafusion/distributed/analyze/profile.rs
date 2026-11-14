@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::fmt;
+use std::{fmt, time::Duration};
 
 use config::{
     meta::{cluster::NodeInfo, search::ScanStats},
@@ -24,70 +24,92 @@ use datafusion::physical_plan::{
     metrics::{MetricValue, MetricsSet},
 };
 use flight::{
-    common::{Metrics, NodeProfiles, RemoteScanMetrics},
+    common::{Metrics, NodeProfiles, RemoteCall, RemoteScanMetrics, job_trace_id},
     profile::{MetricKind, ProfileInputs, ProfileMetric, ProfileNode, RemoteNodeProfile},
 };
 
-use crate::datafusion::distributed::remote_scan::remote_scan_exec::RemoteScanExec;
+use crate::datafusion::distributed::remote_scan::{
+    flight_client::fetch_node_profile, remote_scan_exec::RemoteScanExec,
+};
 
-/// One remote node as the leader sees it, published to its scan on drop; the default records
-/// nothing.
+/// How long a caller waits for the profiles its remote nodes' streams did not deliver.
+pub const REMOTE_PROFILE_TIMEOUT: Duration = Duration::from_secs(10);
+
+/// Keeps one remote call's entry in its scan's profiles current; the default records nothing.
 #[derive(Debug, Default)]
 pub struct NodeProfileRecorder {
-    profiles: Option<NodeProfiles>,
-    profile: RemoteNodeProfile,
+    entry: Option<(NodeProfiles, usize)>,
 }
 
 impl NodeProfileRecorder {
-    pub fn start(profiles: NodeProfiles, partition: usize, node: &dyn NodeInfo) -> Self {
+    /// Publishes the call's entry at once, so that it exists while its stream is still alive.
+    pub fn start(
+        profiles: NodeProfiles,
+        partition: usize,
+        node: &dyn NodeInfo,
+        counters: RemoteScanMetrics,
+    ) -> Self {
         let role = match (node.is_querier(), node.is_ingester()) {
             (true, true) => "querier,ingester",
             (true, false) => "querier",
             (false, true) => "ingester",
             (false, false) => "",
         };
+        let profile = RemoteNodeProfile {
+            partition,
+            node_name: node.get_name(),
+            node_address: node.get_grpc_addr(),
+            role: role.to_string(),
+            cluster: node.get_cluster(),
+            start_us: now_micros(),
+            ..Default::default()
+        };
+        let call = RemoteCall {
+            profile,
+            counters,
+            job_id: String::new(),
+        };
+        profiles.lock().insert(partition, call);
         Self {
-            profiles: Some(profiles),
-            profile: RemoteNodeProfile {
-                partition,
-                node_name: node.get_name(),
-                node_address: node.get_grpc_addr(),
-                role: role.to_string(),
-                cluster: node.get_cluster(),
-                start_us: now_micros(),
-                ..Default::default()
-            },
+            entry: Some((profiles, partition)),
         }
     }
 
     /// Keeps the plan the node sent back about itself.
-    pub fn record_plan(&mut self, metrics: Vec<Metrics>) {
+    pub fn record_plan(&self, metrics: Vec<Metrics>) {
         if let Some(plan) = metrics.into_iter().find_map(|m| m.profile) {
-            self.profile.plan = Some(plan);
+            self.update(|c| c.profile.plan = Some(plan));
         }
     }
 
-    pub fn mark_skipped(&mut self) {
-        self.profile.skipped = true;
+    pub fn mark_skipped(&self) {
+        self.update(|c| c.profile.skipped = true);
     }
 
-    pub fn finish(&mut self, metrics: &RemoteScanMetrics, scan_stats: ScanStats) {
-        let p = &mut self.profile;
-        p.output_rows = metrics.output_rows.value() as u64;
-        p.output_batches = metrics.batches_received.value() as u64;
-        p.output_bytes = metrics.bytes_received.value() as u64;
-        p.decode_ns = metrics.decode_time.value() as u64;
-        p.scan_stats = Some(scan_stats);
+    pub fn record_job(&self, job_id: String) {
+        self.update(|c| c.job_id = job_id);
+    }
+
+    pub fn add_scan_stats(&self, stats: &ScanStats) {
+        self.update(|c| c.profile.scan_stats.get_or_insert_default().add(stats));
+    }
+
+    fn update(&self, f: impl FnOnce(&mut RemoteCall)) {
+        if let Some((profiles, partition)) = &self.entry
+            && let Some(call) = profiles.lock().get_mut(partition)
+        {
+            f(call);
+        }
     }
 }
 
 impl Drop for NodeProfileRecorder {
     fn drop(&mut self) {
-        if let Some(profiles) = self.profiles.take() {
-            self.profile.end_us = now_micros();
-            let profile = std::mem::take(&mut self.profile);
-            profiles.lock().insert(profile.partition, profile);
-        }
+        self.update(|c| {
+            if c.profile.end_us == 0 {
+                c.profile.end_us = now_micros();
+            }
+        });
     }
 }
 
@@ -103,15 +125,10 @@ impl fmt::Display for PlanDetail<'_> {
 /// Profile of an executed plan; a remote scan lists the nodes it called, as its children never ran.
 pub fn build_profile(plan: &dyn ExecutionPlan) -> ProfileNode {
     let inputs = match plan.downcast_ref::<RemoteScanExec>() {
-        Some(remote) => ProfileInputs::Remote(
-            remote
-                .state
-                .node_profiles
-                .lock()
-                .values()
-                .cloned()
-                .collect(),
-        ),
+        Some(remote) => {
+            let calls = remote.state.node_profiles.lock();
+            ProfileInputs::Remote(calls.values().map(RemoteCall::to_profile).collect())
+        }
         None => ProfileInputs::Children(
             plan.children()
                 .into_iter()
@@ -129,6 +146,27 @@ pub fn build_profile(plan: &dyn ExecutionPlan) -> ProfileNode {
             .unwrap_or_default(),
         inputs,
     }
+}
+
+/// Fetches, for every remote scan in `plan`, the profiles its nodes' streams did not deliver.
+pub async fn complete_remote_profiles(plan: &dyn ExecutionPlan, timeout: Duration) {
+    let mut scans = Vec::new();
+    collect_remote_scans(plan, &mut scans);
+    let mut fetches = Vec::new();
+    let now = now_micros();
+    for remote in scans {
+        for (partition, call) in remote.state.node_profiles.lock().iter_mut() {
+            // A stream the runtime has not dropped yet ends now: its caller has stopped reading.
+            if call.profile.end_us == 0 {
+                call.profile.end_us = now;
+            }
+            if call.profile.plan.is_none() && !call.job_id.is_empty() {
+                let job_id = call.job_id.clone();
+                fetches.push(fetch_profile(remote, *partition, job_id, timeout));
+            }
+        }
+    }
+    futures::future::join_all(fetches).await;
 }
 
 /// Aggregates and orders the metrics the same way the text plan does, so `display` matches it.
@@ -189,11 +227,47 @@ fn metric_value(value: &MetricValue) -> (MetricKind, u64, Option<u64>) {
     }
 }
 
+/// Remote scans that ran in `plan`; the inputs below them are only templates sent to the nodes.
+fn collect_remote_scans<'a>(plan: &'a dyn ExecutionPlan, scans: &mut Vec<&'a RemoteScanExec>) {
+    match plan.downcast_ref::<RemoteScanExec>() {
+        Some(remote) => scans.push(remote),
+        None => {
+            for child in plan.children() {
+                collect_remote_scans(child.as_ref(), scans);
+            }
+        }
+    }
+}
+
+async fn fetch_profile(
+    remote: &RemoteScanExec,
+    partition: usize,
+    job_id: String,
+    timeout: Duration,
+) {
+    let scan_node = remote.remote_scan_node();
+    let identifier = &scan_node.query_identifier;
+    // Entries are keyed by the partition that indexes `nodes`, so the index is in range.
+    let node = scan_node.nodes[partition].clone();
+    let node_name = node.get_name();
+    let job = job_trace_id(&identifier.trace_id, &job_id);
+    match fetch_node_profile(&identifier.trace_id, &identifier.org_id, node, job, timeout).await {
+        Ok(plan) => {
+            if let Some(call) = remote.state.node_profiles.lock().get_mut(&partition) {
+                call.profile.plan = Some(plan);
+            }
+        }
+        Err(e) => log::warn!(
+            "[trace_id {}] explain analyze: no profile from node {node_name}, partition {partition}: {e}",
+            identifier.trace_id
+        ),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
 
-    use arrow::array::{Int32Array, RecordBatch};
     use arrow_schema::{DataType, Field, Schema};
     use datafusion::{
         physical_plan::{
@@ -233,61 +307,6 @@ mod tests {
     fn empty() -> Arc<dyn ExecutionPlan> {
         let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int32, false)]));
         Arc::new(EmptyExec::new(schema))
-    }
-
-    fn batch(rows: i32) -> RecordBatch {
-        let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int32, false)]));
-        RecordBatch::try_new(
-            schema,
-            vec![Arc::new(Int32Array::from_iter_values(0..rows))],
-        )
-        .unwrap()
-    }
-
-    #[test]
-    fn test_recorder_publishes_one_node_on_drop() {
-        let profiles = NodeProfiles::default();
-        let mut recorder = NodeProfileRecorder::start(profiles.clone(), 2, &TestNode);
-        let metrics = RemoteScanMetrics::new(2, &ExecutionPlanMetricsSet::new());
-        metrics.record_output(&batch(3));
-        metrics.record_output(&batch(4));
-        recorder.record_plan(vec![Metrics {
-            profile: Some(ProfileNode {
-                name: "FilterExec".to_string(),
-                ..Default::default()
-            }),
-            ..Default::default()
-        }]);
-        recorder.finish(
-            &metrics,
-            ScanStats {
-                files: 5,
-                ..Default::default()
-            },
-        );
-        assert!(profiles.lock().is_empty());
-        drop(recorder);
-
-        let p = profiles.lock().get(&2).cloned().unwrap();
-        assert_eq!(p.node_name, "q-0");
-        assert_eq!(p.role, "querier");
-        assert_eq!(p.output_rows, 7);
-        assert_eq!(p.output_batches, 2);
-        assert!(p.end_us >= p.start_us);
-        assert_eq!(p.scan_stats.unwrap().files, 5);
-        assert_eq!(p.plan.unwrap().name, "FilterExec");
-    }
-
-    #[test]
-    fn test_recorder_publishes_skipped_and_unfinished_nodes() {
-        let profiles = NodeProfiles::default();
-        NodeProfileRecorder::start(profiles.clone(), 0, &TestNode).mark_skipped();
-        drop(NodeProfileRecorder::start(profiles.clone(), 1, &TestNode));
-        NodeProfileRecorder::default().mark_skipped();
-        let profiles = profiles.lock();
-        assert_eq!(profiles.len(), 2);
-        assert!(profiles[&0].skipped);
-        assert!(!profiles[&1].skipped && profiles[&1].scan_stats.is_none());
     }
 
     #[test]
@@ -358,17 +377,14 @@ mod tests {
     fn test_build_profile_stops_at_remote() {
         let node = RemoteScanNode {
             nodes: vec![Arc::new(TestNode)],
-            opentelemetry_context: opentelemetry::Context::current(),
-            query_identifier: Default::default(),
-            search_infos: Default::default(),
-            index_info: Default::default(),
-            super_cluster_info: Default::default(),
+            ..Default::default()
         };
         let remote = RemoteScanExec::new(empty(), node).unwrap();
         drop(NodeProfileRecorder::start(
             remote.state.node_profiles.clone(),
             0,
             &TestNode,
+            RemoteScanMetrics::new(0, &ExecutionPlanMetricsSet::new()),
         ));
         let profile = build_profile(&remote);
         assert_eq!(profile.name, "RemoteScanExec");

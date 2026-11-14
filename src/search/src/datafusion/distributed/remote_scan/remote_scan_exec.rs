@@ -108,6 +108,10 @@ impl RemoteScanExec {
         &self.remote_scan_node.search_infos.plan
     }
 
+    pub fn remote_scan_node(&self) -> &RemoteScanNode {
+        &self.remote_scan_node
+    }
+
     pub fn with_state(mut self, state: RemoteScanState) -> Self {
         self.state = state;
         self
@@ -299,8 +303,8 @@ async fn get_remote_batch(
         }
     }
 
-    let mut recorder = if remote_scan_node.search_infos.is_analyze {
-        NodeProfileRecorder::start(node_profiles, partition, node.as_ref())
+    let recorder = if remote_scan_node.search_infos.is_analyze {
+        NodeProfileRecorder::start(node_profiles, partition, node.as_ref(), metrics.clone())
     } else {
         NodeProfileRecorder::default()
     };
@@ -326,7 +330,8 @@ async fn get_remote_batch(
     }
 
     let mut request = remote_scan_node.get_flight_search_request(partition);
-    request.set_job_id(generate_random_string(7));
+    let job_id = generate_random_string(7);
+    request.set_job_id(job_id.clone());
     request.set_partition(partition);
     request.search_info.timeout = timeout as i64;
     request.query_identifier.enrich_mode = enrich_mode;
@@ -372,6 +377,7 @@ async fn get_remote_batch(
         }
     }
     .into_inner();
+    recorder.record_job(job_id);
 
     log::info!(
         "[trace_id {trace_id}] flight->search: prepare to response node: {grpc_addr}, name: {node_name}, is_super: {is_super}, is_querier: {is_querier}",

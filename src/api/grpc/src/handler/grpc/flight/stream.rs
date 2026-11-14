@@ -13,20 +13,25 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::VecDeque, pin::Pin, task::Poll};
+use std::{collections::VecDeque, pin::Pin, sync::Arc, task::Poll};
 
 use arrow::ipc::{CompressionType, writer::IpcWriteOptions};
 use arrow_flight::{FlightData, error::FlightError};
 use config::metrics;
-use datafusion::execution::SendableRecordBatchStream;
+use datafusion::{execution::SendableRecordBatchStream, physical_plan::ExecutionPlan};
 use flight::{common::NodeMessages, encoder::FlightDataEncoder};
 use futures::{Stream, StreamExt};
+use search::datafusion::distributed::analyze::profile::{
+    REMOTE_PROFILE_TIMEOUT, build_profile, complete_remote_profiles,
+};
 use search_service::work_group::DeferredLock;
 use tokio::{sync::mpsc, task::JoinSet};
 use tracing::info_span;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
-use crate::handler::grpc::flight::{SessionGuard, partition_encoder::PartitionEncoderStream};
+use crate::handler::grpc::flight::{
+    SessionGuard, partition_encoder::PartitionEncoderStream, profile_registry::ProfileSlot,
+};
 
 /// Cap on one encoded FlightData message. Mirrors the `ZO_GRPC_MAX_MESSAGE_SIZE` default,
 /// which is what the receiving channel accepts.
@@ -40,6 +45,7 @@ pub struct FlightEncoderStreamBuilder {
     defer_lock: Option<DeferredLock>,
     session_guard: Option<SessionGuard>,
     start: std::time::Instant,
+    held_profile: Option<HeldProfile>,
 }
 
 impl FlightEncoderStreamBuilder {
@@ -51,6 +57,7 @@ impl FlightEncoderStreamBuilder {
             defer_lock: None,
             session_guard: Some(session_guard),
             start: std::time::Instant::now(),
+            held_profile: None,
         }
     }
 
@@ -71,6 +78,11 @@ impl FlightEncoderStreamBuilder {
 
     pub fn with_start(mut self, start: std::time::Instant) -> Self {
         self.start = start;
+        self
+    }
+
+    pub(crate) fn with_held_profile(mut self, held_profile: Option<HeldProfile>) -> Self {
+        self.held_profile = held_profile;
         self
     }
 
@@ -122,6 +134,7 @@ impl FlightEncoderStreamBuilder {
             node_messages: self.node_messages,
             first_data: true,
             done: false,
+            held_profile: self.held_profile,
             ctx: StreamContext {
                 trace_id: self.trace_id,
                 is_super: self.is_super,
@@ -142,6 +155,8 @@ impl FlightEncoderStreamBuilder {
 enum FlightSource {
     Channel(mpsc::Receiver<Result<Vec<FlightData>, FlightError>>),
     Inline(Box<PartitionEncoderStream>),
+    /// The source was dropped early, so that the plan's metrics are final when read.
+    Closed,
 }
 
 pub struct FlightEncoderStream {
@@ -153,6 +168,8 @@ pub struct FlightEncoderStream {
     node_messages: NodeMessages,
     first_data: bool,
     done: bool,
+    /// Set only for EXPLAIN ANALYZE.
+    held_profile: Option<HeldProfile>,
     /// query context + resources consumed by the stream's `Drop` teardown.
     ctx: StreamContext,
     /// per-message logging.
@@ -214,6 +231,12 @@ impl EventLog {
     }
 }
 
+/// The plan of an EXPLAIN ANALYZE run and where its profile goes once the stream has ended.
+pub(crate) struct HeldProfile {
+    pub(crate) slot: ProfileSlot,
+    pub(crate) plan: Arc<dyn ExecutionPlan>,
+}
+
 impl FlightEncoderStream {
     /// Queues the node's messages due now; a stream with no batch sends its first ones at the end.
     fn encode_node_messages(&mut self, at_end: bool) -> Result<(), FlightError> {
@@ -249,6 +272,7 @@ impl FlightEncoderStream {
         match &mut self.source {
             FlightSource::Channel(rx) => rx.poll_recv(cx),
             FlightSource::Inline(stream) => stream.poll_next_unpin(cx),
+            FlightSource::Closed => Poll::Ready(None),
         }
     }
 }
@@ -328,8 +352,6 @@ impl Stream for FlightEncoderStream {
 impl Drop for FlightEncoderStream {
     fn drop(&mut self) {
         let ctx = &mut self.ctx;
-        // Stop partition tasks before clearing session data they may still read.
-        ctx.tasks.abort_all();
 
         let trace_id = &ctx.trace_id;
         let is_super = ctx.is_super;
@@ -353,10 +375,29 @@ impl Drop for FlightEncoderStream {
             .inc();
 
         // the defer only covers the work group slot, so it never gates the session release
-        drop(ctx.defer_lock.take());
-        drop(ctx.session_guard.take());
+        let guards = (ctx.defer_lock.take(), ctx.session_guard.take());
+        let mut tasks = std::mem::take(&mut ctx.tasks);
+        match self.held_profile.take() {
+            None => {
+                // Stop partition tasks before clearing session data they may still read.
+                tasks.abort_all();
+                drop(guards);
+            }
+            Some(held) => {
+                self.source = FlightSource::Closed;
+                tokio::spawn(async move {
+                    // The profile is built once the partitions can no longer change it.
+                    tasks.shutdown().await;
+                    drop(guards);
+                    // A cluster leader must finish its own fetches within its caller's wait.
+                    complete_remote_profiles(held.plan.as_ref(), REMOTE_PROFILE_TIMEOUT / 2).await;
+                    held.slot.fill(build_profile(held.plan.as_ref()));
+                });
+            }
+        }
         log::info!(
-            "[trace_id {trace_id}] flight->search: drop FlightEncoderStream, is_super: {is_super}",
+            "[trace_id {}] flight->search: drop FlightEncoderStream, is_super: {is_super}",
+            self.ctx.trace_id,
         );
     }
 }

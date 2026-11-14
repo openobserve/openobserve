@@ -27,7 +27,7 @@ use datafusion::{
     common::{DataFusionError, Result},
     physical_plan::execute_stream_partitioned,
 };
-use flight::common::{MetricsInfo, NodeMessages};
+use flight::common::{MetricsInfo, NodeMessages, NodeRole, QUERY_PROFILE_ACTION, job_trace_id};
 use futures::{StreamExt, stream::BoxStream};
 use futures_util::pin_mut;
 use prost::Message;
@@ -47,12 +47,14 @@ use {
 use crate::handler::grpc::{
     MetadataMap,
     flight::{
-        stream::FlightEncoderStreamBuilder,
+        profile_registry::{ProfileSlot, take_profile},
+        stream::{FlightEncoderStreamBuilder, HeldProfile},
         visitor::{get_peak_memory_from_ctx, node_role},
     },
 };
 
 mod partition_encoder;
+mod profile_registry;
 mod stream;
 pub mod visitor;
 
@@ -100,10 +102,7 @@ impl FlightService for FlightServiceImpl {
             parent_cx,
             &req.query_identifier.trace_id,
         );
-        let trace_id = format!(
-            "{}-{}",
-            req.query_identifier.trace_id, req.query_identifier.job_id
-        );
+        let trace_id = job_trace_id(&req.query_identifier.trace_id, &req.query_identifier.job_id);
         let session_guard = SessionGuard::new(trace_id.clone());
         let is_super_cluster = req.super_cluster_info.is_super_cluster;
         let timeout = req.search_info.timeout as u64;
@@ -163,29 +162,38 @@ impl FlightService for FlightServiceImpl {
         }
 
         let start = std::time::Instant::now();
+        let role = node_role(&plan);
+        // A cluster leader's own nodes may be cut short, so its caller always fetches its profile.
+        let send_profile = req.search_info.is_analyze && matches!(role, NodeRole::Follower);
         let node_messages = NodeMessages {
             scan_stats,
             peak_memory: get_peak_memory_from_ctx(&ctx),
-            profile: req.search_info.is_analyze.then(|| MetricsInfo {
+            profile: send_profile.then(|| MetricsInfo {
                 plan: plan.clone(),
                 build_profile: profile::build_profile,
             }),
-            role: node_role(&plan),
+            role,
         };
 
         // One stream per output partition so they encode in parallel
-        let streams = execute_stream_partitioned(plan, ctx.task_ctx()).map_err(|e| {
+        let streams = execute_stream_partitioned(plan.clone(), ctx.task_ctx()).map_err(|e| {
             log::error!(
                 "[trace_id {trace_id}] flight->search: do_get physical plan execution error: {e:?}",
             );
             Status::internal(e.to_string())
         })?;
+        // Opened only once the call returns a stream, which is when its caller may fetch.
+        let held_profile = req.search_info.is_analyze.then(|| HeldProfile {
+            slot: ProfileSlot::open(&trace_id, std::time::Duration::from_secs(timeout)),
+            plan,
+        });
 
         let mut stream = FlightEncoderStreamBuilder::new(session_guard, node_messages)
             .with_trace_id(trace_id.to_string())
             .with_is_super(is_super_cluster)
             .with_defer_lock(lock)
             .with_start(start)
+            .with_held_profile(held_profile)
             .build(streams, span);
 
         let stream = async_stream::stream! {
@@ -255,9 +263,25 @@ impl FlightService for FlightServiceImpl {
 
     async fn do_action(
         &self,
-        _request: Request<Action>,
+        request: Request<Action>,
     ) -> Result<Response<Self::DoActionStream>, Status> {
-        Err(Status::unimplemented("Implement do_action"))
+        let action = request.into_inner();
+        if action.r#type != QUERY_PROFILE_ACTION {
+            return Err(Status::unimplemented(format!(
+                "unknown action: {}",
+                action.r#type
+            )));
+        }
+        let key = std::str::from_utf8(&action.body)
+            .map_err(|e| Status::invalid_argument(e.to_string()))?;
+        let profile = take_profile(key)
+            .await
+            .ok_or_else(|| Status::not_found(format!("no profile for {key}")))?;
+        let body = serde_json::to_vec(&profile).map_err(|e| Status::internal(e.to_string()))?;
+        let reply = arrow_flight::Result { body: body.into() };
+        Ok(Response::new(
+            futures::stream::once(async { Ok(reply) }).boxed(),
+        ))
     }
 
     async fn list_actions(

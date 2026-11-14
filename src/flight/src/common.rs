@@ -40,6 +40,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::profile::{ProfileNode, RemoteNodeProfile};
 
+/// Flight action that fetches the profile a node holds for one finished run.
+pub const QUERY_PROFILE_ACTION: &str = "query_profile";
+
 #[derive(Debug, Clone)]
 pub struct RemoteScanMetrics {
     /// Time in nanos to execute child operator and fetch batches
@@ -192,8 +195,30 @@ pub enum NodeRole {
     ClusterLeader(RemoteScanState),
 }
 
-/// Per-partition profiles of one remote scan, keyed by partition.
-pub type NodeProfiles = Arc<Mutex<BTreeMap<usize, RemoteNodeProfile>>>;
+/// The calls one remote scan made, keyed by partition.
+pub type NodeProfiles = Arc<Mutex<BTreeMap<usize, RemoteCall>>>;
+
+/// Everything a caller knows about one call to a remote node.
+#[derive(Debug)]
+pub struct RemoteCall {
+    pub profile: RemoteNodeProfile,
+    /// Read when the profile is built, as the call's stream may still be alive then.
+    pub counters: RemoteScanMetrics,
+    /// Set once the node returned a stream, so it holds a profile to fetch under this id.
+    pub job_id: String,
+}
+
+impl RemoteCall {
+    pub fn to_profile(&self) -> RemoteNodeProfile {
+        RemoteNodeProfile {
+            output_rows: self.counters.output_rows.value() as u64,
+            output_batches: self.counters.batches_received.value() as u64,
+            output_bytes: self.counters.bytes_received.value() as u64,
+            decode_ns: self.counters.decode_time.value() as u64,
+            ..self.profile.clone()
+        }
+    }
+}
 
 /// What a remote scan collects from the nodes it calls, shared by every copy of the scan.
 #[derive(Debug, Clone, Default)]
@@ -209,6 +234,11 @@ pub struct MetricsInfo {
     pub plan: Arc<dyn ExecutionPlan>,
     /// Passed in because it lives in the search crate, which depends on this one.
     pub build_profile: fn(&dyn ExecutionPlan) -> ProfileNode,
+}
+
+/// The id a node keys one run by: the query's trace id and the caller's job id for that call.
+pub fn job_trace_id(trace_id: &str, job_id: &str) -> String {
+    format!("{trace_id}-{job_id}")
 }
 
 fn collect_metrics(metrics_info: &MetricsInfo) -> Vec<Metrics> {
