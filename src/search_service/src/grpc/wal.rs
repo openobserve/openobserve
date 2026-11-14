@@ -40,7 +40,6 @@ use config::{
 use datafusion::{
     arrow::{datatypes::Schema, record_batch::RecordBatch},
     datasource::TableProvider,
-    execution::cache::cache_manager::FileStatisticsCache,
 };
 use futures::StreamExt;
 use hashbrown::{HashMap, HashSet};
@@ -67,7 +66,6 @@ pub async fn search_parquet(
     schema: Arc<Schema>,
     search_partition_keys: &[(String, String)],
     sort_order: FileSortOrder,
-    file_stat_cache: Option<Arc<FileStatisticsCache>>,
     index_condition: Option<IndexCondition>,
     fst_fields: Vec<String>,
     memtable_ids: HashSet<u64>,
@@ -77,7 +75,6 @@ pub async fn search_parquet(
         schema.clone(),
         search_partition_keys,
         sort_order,
-        file_stat_cache,
         index_condition.clone(),
         fst_fields.clone(),
         &memtable_ids,
@@ -109,7 +106,6 @@ async fn search_parquet_files(
     schema: Arc<Schema>,
     search_partition_keys: &[(String, String)],
     sort_order: FileSortOrder,
-    file_stat_cache: Option<Arc<FileStatisticsCache>>,
     index_condition: Option<IndexCondition>,
     fst_fields: Vec<String>,
     memtable_ids: &HashSet<u64>,
@@ -246,7 +242,8 @@ async fn search_parquet_files(
         query.clone(),
         schema,
         sort_order,
-        file_stat_cache,
+        // WAL files are deleted within minutes; caching their stats only churns the global cache.
+        None,
         index_condition,
         fst_fields,
     )
