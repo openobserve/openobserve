@@ -13,6 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 import { parseChatDetail } from "@/services/assistant";
@@ -606,5 +609,36 @@ describe("projectRecord turn versions", () => {
   it("keeps every attempt in an export, which lists turns as stored", () => {
     const turns = parseChatDetail(wire).turns ?? [];
     expect(projectRecord(turns, "export", { timezone: "UTC", scrubModels: true })).toHaveLength(6);
+  });
+});
+
+describe("projectRecord turn agent", () => {
+  it("keeps the agent of a reloaded turn that has no turn_started frame", () => {
+    const detail = parseChatDetail(
+      JSON.parse(readFileSync(join(__dirname, "__fixtures__/history/door-followup.json"), "utf8")),
+    );
+    const followUp = detail.turns!.at(-1)!;
+    expect(followUp.frames.some((frame: any) => frame?.type === "turn_started")).toBe(false);
+    const messages = projectRecord(detail.turns!, "owner", { timezone: "UTC" });
+    const prompts = messages.filter((m) => m.role === "user");
+    expect(prompts.map((m) => m.agentId)).toEqual(["generate-query", "generate-query"]);
+  });
+
+  it("keeps the agent a handed-off turn came from", () => {
+    const detail = parseChatDetail({
+      session_id: "s1",
+      turns: [
+        {
+          turn_id: "t1",
+          user: { text: "why?" },
+          agent_type: "sre",
+          handoff_from: "o2-ai",
+          frames: [{ type: "message_delta", content: "a" }, { type: "complete" }],
+          status: "completed",
+        },
+      ],
+    });
+    const [prompt] = projectRecord(detail.turns!, "owner", { timezone: "UTC" });
+    expect(prompt).toMatchObject({ agentId: "sre", handoffFrom: "o2-ai" });
   });
 });

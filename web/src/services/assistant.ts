@@ -412,6 +412,8 @@ const storedTurnSchema = z.object({
     .catch(undefined),
   error_code: z.string().max(64).nullable().optional().catch(undefined),
   version_of: z.string().max(128).nullable().optional().catch(undefined),
+  agent_type: z.string().max(64).nullable().optional().catch(undefined),
+  handoff_from: z.string().max(64).nullable().optional().catch(undefined),
 });
 
 /** One page of the list, keeping only rows that parse. */
