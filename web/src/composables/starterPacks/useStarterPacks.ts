@@ -18,6 +18,7 @@ import { useStore } from "vuex";
 
 import { useAlertLibrary } from "@/composables/alerts/useAlertLibrary";
 import { fileForInstall } from "@/components/alertLibrary/libraryTunables";
+import { buildInstallPayload } from "@/components/alertLibrary/libraryInstall";
 import { useLibraryInstall } from "@/components/alertLibrary/useLibraryInstall";
 import { readQuery } from "@/composables/query/readQuery";
 import {
@@ -25,6 +26,7 @@ import {
   alertsByTagsQuery,
   alertsListQuery,
   deleteAlertMutation,
+  saveAlertMutation,
 } from "@/services/alerts.queries";
 import {
   createFolderMutation,
@@ -64,6 +66,7 @@ import {
   type PackPreview,
   type PackRecordItem,
   type PackRemovalResult,
+  type PackUpdate,
   type PackChoices,
   type PackFlavourAlert,
   type StarterPack,
@@ -88,6 +91,8 @@ import {
 } from "./packMatchData";
 import { isFresh, MAX_STREAM_COPIES } from "./streamCandidates";
 import { contentHash, useInstallRecords } from "./useInstallRecords";
+import { mergeUpdate, pickFields, revertUpdate } from "./packUpdate";
+import { panelHash } from "./repairLater";
 import { StreamRewriteError } from "./streamRewriter";
 import { useRewriteChecks } from "./useRewriteChecks";
 import { useStreamValues } from "./useStreamValues";
@@ -115,12 +120,31 @@ const ALERT_VOLATILE_FIELDS = [
   "last_satisfied_at",
 ];
 
+/** The user-editable alert body a source hash covers. */
+export const alertBody = (alert: Record<string, any>) => {
+  const body = { ...alert };
+  for (const field of ALERT_VOLATILE_FIELDS) delete body[field];
+  return body;
+};
+
+/** The dashboard body a source hash covers, from a detail read. */
+export const dashboardBody = (data: Record<string, any>) => {
+  const { updatedAt: _updatedAt, ...body } = data[`v${data.version}`];
+  return body;
+};
+
 const withFolder = (pack: StarterPack, name?: string): StarterPack =>
   name ? { ...pack, folder: { ...pack.folder, name } } : pack;
 
 const inFlight = new Map<string, Promise<PackInstallRecord>>();
 
-const isNotFound = (error: any): boolean => error?.response?.status === 404;
+export const isNotFound = (error: any): boolean => error?.response?.status === 404;
+
+/** A read that treats a deleted item as absent rather than as a failure. */
+export const nullIfMissing = (error: any): null => {
+  if (isNotFound(error)) return null;
+  throw error;
+};
 
 // The backend stores tags lowercased, and a filter on any other case matches nothing.
 const alertTags = (packId: string, entryId: string, stream?: string): string[] => [
@@ -179,6 +203,7 @@ export function useStarterPacks(org: string) {
   const createDashboard = useMutation(() => createDashboardMutation(org));
   const deleteDashboard = useMutation(() => deleteDashboardMutation(org));
   const deleteAlert = useMutation(() => deleteAlertMutation(org));
+  const saveAlert = useMutation(() => saveAlertMutation(org, () => true));
   const createSavedView = useMutation(() => createSavedViewMutation(org));
   const deleteSavedView = useMutation(() => deleteSavedViewMutation(org));
 
@@ -259,20 +284,38 @@ export function useStarterPacks(org: string) {
           folderId: folderIdOf(items, "dashboards")!,
         });
       },
-      snapshot: async ({ id, folderId }) => {
-        const data = await readQuery(dashboardDetailQuery(org, id, folderId!), true);
-        const { updatedAt: _updatedAt, ...body } = data[`v${data.version}`];
-        return body;
-      },
+      snapshot: async ({ id, folderId }) =>
+        dashboardBody(await readQuery(dashboardDetailQuery(org, id, folderId!), true)),
       remove: async ({ id, folderId }) => {
         await deleteDashboard.mutateAsync({ dashboardId: id, folderId: folderId! });
       },
     };
   };
 
-  const alertAdapter = (
+  /** The pack's own changes to a library alert: flavour, repairs, bindings, tags, off. */
+  const decorateAlert = async (
     pack: StarterPack,
     { copyOf, itemId, stream }: PackRecordItem,
+    payload: Record<string, unknown>,
+    adaptation: PackAdaptation,
+    flavour?: PackFlavourAlert,
+  ) => {
+    const flavoured = withFlavour(payload, flavour);
+    const doc = await adaptAlert(flavoured, adaptation, rewriteChecks, stream);
+    const own = alertTags(pack.id, copyOf ?? itemId, stream);
+    const tags = [...((payload.tags as string[]) ?? []), ...own];
+    return {
+      ...doc,
+      name: stream ? `${doc.name}_${stream}` : doc.name,
+      enabled: false,
+      destinations: [],
+      tags: [...new Set(tags)],
+    };
+  };
+
+  const alertAdapter = (
+    pack: StarterPack,
+    item: PackRecordItem,
     items: PackRecordItem[],
     entries: Map<string, AlertLibraryEntry>,
     adaptation: PackAdaptation,
@@ -282,6 +325,7 @@ export function useStarterPacks(org: string) {
     return {
       // Alert names and client ids are not unique, so the tags are the only identity.
       lookup: async () => {
+        const { copyOf, itemId, stream } = item;
         const tags = alertTags(pack.id, copyOf ?? itemId, stream);
         const rows = await readQuery(alertsByTagsQuery(org, tags), true);
         if (rows[0]) return { id: rows[0].alert_id, folderId: rows[0].folder_id };
@@ -289,7 +333,7 @@ export function useStarterPacks(org: string) {
         return savedId ? { id: savedId, folderId: folderIdOf(items, "alerts") } : null;
       },
       create: async () => {
-        const entryId = copyOf ?? itemId;
+        const entryId = item.copyOf ?? item.itemId;
         const entry = entries.get(entryId);
         if (!entry) throw new Error(`Alert Library has no entry ${entryId}`);
         const bundled = pack.bundledAlerts?.find((alert) => alert.entry.id === entryId);
@@ -303,28 +347,13 @@ export function useStarterPacks(org: string) {
           owner: store.state.userInfo?.email ?? "",
           timezone: store.state.timezone,
           scheduledOnly: true,
-          decoratePayload: async (payload) => {
-            const flavoured = withFlavour(payload, flavour);
-            const doc = await adaptAlert(flavoured, adaptation, rewriteChecks, stream);
-            const tags = [...(payload.tags as string[]), ...alertTags(pack.id, entryId, stream)];
-            return {
-              ...doc,
-              name: stream ? `${doc.name}_${stream}` : doc.name,
-              enabled: false,
-              destinations: [],
-              tags: [...new Set(tags)],
-            };
-          },
+          decoratePayload: (payload) => decorateAlert(pack, item, payload, adaptation, flavour),
           onSaved: (id) => {
             savedId = id;
           },
         });
       },
-      snapshot: async ({ id }) => {
-        const alert = { ...(await readQuery(alertDetailQuery(org, id), true)) };
-        for (const field of ALERT_VOLATILE_FIELDS) delete alert[field];
-        return alert;
-      },
+      snapshot: async ({ id }) => alertBody(await readQuery(alertDetailQuery(org, id), true)),
       remove: async ({ id, folderId }) => {
         await deleteAlert.mutateAsync({ alertId: id, folderId });
       },
@@ -573,6 +602,21 @@ export function useStarterPacks(org: string) {
     };
   };
 
+  /** What a later update or repair compares against, taken from the body as created. */
+  const updateMarks = (
+    item: PackRecordItem,
+    body: Record<string, any>,
+    entries: Map<string, AlertLibraryEntry>,
+  ): Partial<PackRecordItem> => {
+    if (item.kind === "dashboard") {
+      const panels = (body.tabs ?? []).flatMap((tab: Record<string, any>) => tab.panels ?? []);
+      return { panelHashes: Object.fromEntries(panels.map((p: any) => [p.id, panelHash(p)])) };
+    }
+    if (item.kind !== "alert") return {};
+    const libraryHash = entries.get(item.copyOf ?? item.itemId)?.content_hash;
+    return { ...(libraryHash ? { libraryHash } : {}), base: pickFields(body) };
+  };
+
   const settleItem = async (
     pack: StarterPack,
     item: PackRecordItem,
@@ -592,8 +636,9 @@ export function useStarterPacks(org: string) {
         found = await adapter.lookup();
       }
       if (!found) return { ...item, status: "failed" };
-      const sourceHash = contentHash(await adapter.snapshot(found));
-      return { ...item, ...found, status: "created", sourceHash };
+      const body = (await adapter.snapshot(found)) as Record<string, any>;
+      const settled = { ...item, ...found, status: "created" as const };
+      return { ...settled, sourceHash: contentHash(body), ...updateMarks(item, body, entries) };
     } catch (error) {
       return { ...item, status: error instanceof StreamRewriteError ? "skipped" : "failed" };
     }
@@ -905,7 +950,136 @@ export function useStarterPacks(org: string) {
     return result;
   };
 
+  /** The alert as the current library version would install it, with this install's repairs and bindings. */
+  const draftAlert = async (
+    pack: StarterPack,
+    item: PackRecordItem,
+    entry: AlertLibraryEntry,
+    record: PackInstallRecord,
+  ) => {
+    const file = await alertFile(pack, entry);
+    if (!file) return null;
+    const payload = buildInstallPayload({
+      entry,
+      file: fileForInstall(entry, file),
+      folderId: item.folderId ?? "",
+      owner: store.state.userInfo?.email ?? "",
+      timezone: store.state.timezone,
+    });
+    const adaptation = { repairs: record.repairs ?? [], bindings: record.bindings ?? [] };
+    const flavour = flavourAlert(pack, record.flavours?.[entry.id], entry.id);
+    return decorateAlert(pack, item, payload, adaptation, flavour);
+  };
+
+  const readAlert = (id: string) => readQuery(alertDetailQuery(org, id), true).catch(nullIfMissing);
+
+  const updateFor = async (
+    pack: StarterPack,
+    item: PackRecordItem,
+    entry: AlertLibraryEntry,
+    record: PackInstallRecord,
+  ): Promise<PackUpdate | null> => {
+    const current = await readAlert(item.id!);
+    const fromHash = item.libraryHash ?? current?.context_attributes?.library_hash;
+    if (!current || !fromHash || fromHash === entry.content_hash) return null;
+    const next = await draftAlert(pack, item, entry, record).catch((error) => {
+      if (error instanceof StreamRewriteError) return null;
+      throw error;
+    });
+    if (!next) return null;
+    // An install from before bases were recorded has one only while nobody edited it.
+    const unedited = contentHash(alertBody(current)) === item.sourceHash;
+    const base = item.base ?? (unedited ? pickFields(current) : null);
+    const { rows } = mergeUpdate(current, base, next);
+    const name = String(current.name ?? item.itemId);
+    return { itemId: item.itemId, name, fromHash, hash: entry.content_hash, rows, base, next };
+  };
+
+  /** Alerts whose library file changed since this install, each merged field by field. */
+  const checkUpdates = async (
+    sourcePack: StarterPack,
+    installId: string,
+  ): Promise<PackUpdate[]> => {
+    const record = await records.read(sourcePack.id, installId);
+    if (!record) return [];
+    const pack = withFolder(sourcePack, record.folderName);
+    const { entries, offline } = await loadEntries(pack);
+    if (offline) return [];
+    const updates: PackUpdate[] = [];
+    for (const item of record.items) {
+      const entry = entries.get(item.copyOf ?? item.itemId);
+      if (item.kind !== "alert" || item.status !== "created" || !item.id || !entry) continue;
+      const update = await updateFor(pack, item, entry, record);
+      if (update) updates.push(update);
+    }
+    return updates;
+  };
+
+  /** Saves an alert the pack edited; one nobody else edited stays the pack's for Undo and Remove. */
+  const saveOwnAlert = async (
+    pack: StarterPack,
+    item: PackRecordItem,
+    doc: Record<string, any>,
+  ) => {
+    const unedited = (await hashOf(pack, item)) === item.sourceHash;
+    await saveAlert.mutateAsync({ payload: doc, folderId: item.folderId });
+    if (unedited) item.sourceHash = (await hashOf(pack, item)) ?? item.sourceHash;
+  };
+
+  const withLibraryHash = (doc: Record<string, any>, hash: string) => ({
+    ...doc,
+    context_attributes: { ...doc.context_attributes, library_hash: hash },
+  });
+
+  /** Merges again against the alert as it is now, so edits made since the check stay, and records each step for Revert. */
+  const applyUpdates = async (
+    sourcePack: StarterPack,
+    installId: string,
+    updates: PackUpdate[],
+  ) => {
+    const record = await records.read(sourcePack.id, installId);
+    if (!record) return;
+    const pack = withFolder(sourcePack, record.folderName);
+    for (const update of updates) {
+      const item = record.items.find(({ itemId }) => itemId === update.itemId);
+      const current = item?.id ? await readAlert(item.id) : null;
+      if (!item || !current) continue;
+      const { doc, rows } = mergeUpdate(current, update.base, update.next);
+      await saveOwnAlert(pack, item, withLibraryHash(doc, update.hash));
+      item.update = { fromHash: update.fromHash, fromBase: item.base, rows };
+      item.libraryHash = update.hash;
+      item.base = pickFields(update.next);
+      // Written per alert, so a later failure leaves Revert for the ones already saved.
+      await records.write(record);
+    }
+    await records.write({ ...record, version: sourcePack.version });
+  };
+
+  /** Restores the version before the last update, leaving fields the user kept or edited since. */
+  const revertUpdates = async (sourcePack: StarterPack, installId: string) => {
+    const record = await records.read(sourcePack.id, installId);
+    if (!record) return;
+    const pack = withFolder(sourcePack, record.folderName);
+    for (const item of record.items) {
+      const update = item.update;
+      const current = update && item.id ? await readAlert(item.id) : null;
+      if (!update || !current) continue;
+      await saveOwnAlert(
+        pack,
+        item,
+        withLibraryHash(revertUpdate(current, update.rows), update.fromHash),
+      );
+      item.libraryHash = update.fromHash;
+      item.base = update.fromBase;
+      delete item.update;
+      await records.write(record);
+    }
+  };
+
   return {
+    applyUpdates,
+    checkUpdates,
+    revertUpdates,
     installPack,
     appendToInstall,
     undoItems,

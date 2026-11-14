@@ -29,6 +29,17 @@ const fake = vi.hoisted(() => ({
   flow: null as any,
   turn: null as any,
   isEnterprise: "false",
+  packsOn: false,
+  packs: null as any,
+}));
+
+vi.mock("@/constants/starterPacks", () => ({
+  get STARTER_PACKS_ENABLED() {
+    return fake.packsOn;
+  },
+}));
+vi.mock("@/composables/starterPacks/useStarterPacks", () => ({
+  useStarterPacks: () => fake.packs,
 }));
 
 vi.mock("@/aws-exports", () => ({
@@ -82,6 +93,10 @@ const render = async () => {
         TurnOnAlertsDrawer: true,
         QuickMuteDialog: true,
         OIcon: true,
+        ODrawer: {
+          props: ["open"],
+          template: "<div v-if='open'><slot /><slot name='footer' /></div>",
+        },
       },
     },
   });
@@ -93,6 +108,13 @@ const has = (wrapper: any, id: string) => wrapper.find(`[data-test="${id}"]`).ex
 describe("StarterPackPage", () => {
   beforeEach(() => {
     fake.isEnterprise = "false";
+    fake.packsOn = false;
+    fake.packs = {
+      checkUpdates: vi.fn(async () => []),
+      applyUpdates: vi.fn(async () => undefined),
+      revertUpdates: vi.fn(async () => undefined),
+      appendToInstall: vi.fn(async () => undefined),
+    };
     fake.flow = fakeFlow({ record: shallowRef({ items: [], installedBy: "a@example.com" }) });
     const rows = shallowRef([row(true)]);
     fake.turn = {
@@ -158,5 +180,55 @@ describe("StarterPackPage", () => {
     vi.mocked(readQuery).mockResolvedValue({ total: 4 } as never);
     const banner = (await render()).find('[data-test="starter-pack-page-silent-banner"]');
     expect(banner.text()).toContain("fired 4 times");
+  });
+
+  describe("with a newer catalog version", () => {
+    const update = {
+      itemId: "a",
+      name: "Alert a",
+      fromHash: "v1",
+      hash: "v2",
+      rows: [{ field: "description", yours: "old", library: "new", outcome: "updated" }],
+      base: { description: "old" },
+      next: { description: "new" },
+    };
+    const installed = (items: unknown[]) =>
+      fakeFlow({
+        record: shallowRef({ installId: "i1", version: "1", installedBy: "a@example.com", items }),
+      });
+
+    beforeEach(() => {
+      fake.packsOn = true;
+    });
+
+    it("offers the update and shows each changed field in the drawer", async () => {
+      fake.flow = installed([{ kind: "alert", itemId: "a", status: "created", id: "x" }]);
+      fake.packs.checkUpdates.mockResolvedValue([update]);
+      const wrapper = await render();
+      expect(fake.packs.checkUpdates).toHaveBeenCalledWith(fake.flow.pack, "i1");
+      await wrapper.get('[data-test="starter-pack-page-update-btn"]').trigger("click");
+      await flushPromises();
+      const row = wrapper.get('[data-test="starter-pack-update-row-description"]').text();
+      expect(row).toContain("old");
+      expect(row).toContain("new");
+      await wrapper.get('[data-test="starter-pack-update-apply-btn"]').trigger("click");
+      await flushPromises();
+      expect(fake.packs.applyUpdates).toHaveBeenCalledWith(fake.flow.pack, "i1", [update]);
+      expect(has(wrapper, "starter-pack-update-drawer")).toBe(false);
+    });
+
+    it("reverts an applied update and checks again", async () => {
+      const applied = { fromHash: "v1", rows: update.rows };
+      fake.flow = installed([
+        { kind: "alert", itemId: "a", status: "created", id: "x", update: applied },
+      ]);
+      const wrapper = await render();
+      fake.packs.checkUpdates.mockClear();
+      await wrapper.get('[data-test="starter-pack-page-revert-btn"]').trigger("click");
+      await flushPromises();
+      expect(fake.packs.revertUpdates).toHaveBeenCalledWith(fake.flow.pack, "i1");
+      expect(fake.flow.load).toHaveBeenCalled();
+      expect(fake.packs.checkUpdates).toHaveBeenCalledTimes(1);
+    });
   });
 });

@@ -23,7 +23,14 @@ import store from "@/test/unit/helpers/store";
 import type { StarterPack } from "./types";
 import { StarterPackPermissionError } from "./types";
 
-const library = vi.hoisted(() => ({ down: false, matcher: false, lastIngested: 0 }));
+const library = vi.hoisted(() => ({
+  down: false,
+  matcher: false,
+  lastIngested: 0,
+  version: "",
+  description: "d1",
+  threshold: 3,
+}));
 vi.mock("@/constants/starterPacks", () => ({
   get STARTER_PACKS_ENABLED() {
     return library.matcher;
@@ -93,6 +100,7 @@ const fake = vi.hoisted(() => {
         const alert = state.alerts.find((row) => row.id === id);
         if (!alert) throw httpError(404);
         if (method === "delete") state.alerts = state.alerts.filter((row) => row !== alert);
+        if (method === "put") Object.assign(alert, JSON.parse(JSON.stringify(body)));
         return reply(method === "get" ? { ...alert, last_triggered_at: state.seq } : {});
       }
       const wanted = config?.params?.tags?.split(",") ?? [];
@@ -184,7 +192,11 @@ vi.mock("@/composables/alerts/useAlertLibrary", async () => {
     useAlertLibrary: () => ({
       loadManifest: async () => {
         if (library.down) throw new Error("library down");
-        return { alerts };
+        const hashed = (entry: (typeof alerts)[number]) => ({
+          ...entry,
+          content_hash: `${entry.content_hash}${library.version}`,
+        });
+        return { alerts: alerts.map(hashed) };
       },
       loadAlertFile: async (entry: { id: string }) => {
         if (library.down) throw new Error("library down");
@@ -193,7 +205,8 @@ vi.mock("@/composables/alerts/useAlertLibrary", async () => {
           stream_name: "s",
           destinations: ["someone"],
           enabled: true,
-          trigger_condition: {},
+          description: library.description,
+          trigger_condition: { threshold: library.threshold },
           query_condition: { type: "promql", promql: library.matcher ? "kube_present" : "s" },
         };
       },
@@ -318,6 +331,76 @@ describe("useStarterPacks", () => {
     expect(record.status).toBe("incomplete");
   });
 
+  describe("library updates", () => {
+    const pack = { ...PACK, alerts: ["k8s/one"] };
+
+    afterEach(() => Object.assign(library, { version: "", description: "d1", threshold: 3 }));
+
+    it("keeps a user-edited threshold, takes the unchanged field's new value, and reverts", async () => {
+      const api = packs();
+      const record = await api.installPack(pack);
+      const alert = fake.state.alerts[0];
+      alert.trigger_condition.threshold = 10;
+      Object.assign(library, { version: "-v2", description: "d2", threshold: 5 });
+
+      const updates = await api.checkUpdates(pack, record.installId);
+      expect(updates).toHaveLength(1);
+      const outcome = (field: string) => updates[0].rows.find((row) => row.field === field);
+      expect(outcome("trigger_condition.threshold")).toMatchObject({ yours: 10, outcome: "kept" });
+      expect(outcome("description")).toMatchObject({ library: "d2", outcome: "updated" });
+
+      await api.applyUpdates(pack, record.installId, updates);
+      expect(alert.trigger_condition.threshold).toBe(10);
+      expect(alert.description).toBe("d2");
+      expect(alert.context_attributes.library_hash).toBe("hash-k8s/one-v2");
+      expect(await api.checkUpdates(pack, record.installId)).toEqual([]);
+
+      await api.revertUpdates(pack, record.installId);
+      expect(alert.description).toBe("d1");
+      expect(alert.trigger_condition.threshold).toBe(10);
+      expect(alert.context_attributes.library_hash).toBe("hash-k8s/one");
+    });
+
+    it("keeps edits made between the check and Update", async () => {
+      const api = packs();
+      const record = await api.installPack(pack);
+      Object.assign(library, { version: "-v2", description: "d2", threshold: 5 });
+      const updates = await api.checkUpdates(pack, record.installId);
+      const alert = fake.state.alerts[0];
+      Object.assign(alert, { enabled: true });
+      alert.trigger_condition.threshold = 42;
+
+      await api.applyUpdates(pack, record.installId, updates);
+      expect(alert.enabled).toBe(true);
+      expect(alert.trigger_condition.threshold).toBe(42);
+      expect(alert.description).toBe("d2");
+    });
+
+    it("keeps Revert for the alerts saved before a later save failed", async () => {
+      const api = packs();
+      const record = await api.installPack(PACK);
+      Object.assign(library, { version: "-v2", description: "d2" });
+      const updates = await api.checkUpdates(PACK, record.installId);
+      expect(updates).toHaveLength(2);
+      const second = record.items.find(({ itemId }) => itemId === updates[1].itemId)!;
+      fake.state.faults.push({ method: "put", url: new RegExp(`alerts/${second.id}`) });
+
+      await expect(api.applyUpdates(PACK, record.installId, updates)).rejects.toThrow();
+      const stored = JSON.parse([...fake.state.kv.values()][0]);
+      const first = stored.items.find(({ itemId }: any) => itemId === updates[0].itemId);
+      expect(first.update.fromHash).toBe(`hash-${updates[0].itemId}`);
+    });
+
+    it("re-applies the recorded repair to the new version", async () => {
+      const api = packs();
+      const record = await api.installPack(pack, { repairs: [{ from: "s", to: "renamed" }] });
+      Object.assign(library, { version: "-v2", description: "d2" });
+      const [update] = await api.checkUpdates(pack, record.installId);
+      expect(update.next.stream_name).toBe("renamed");
+      expect(update.rows.map(({ field }) => field)).toEqual(["description"]);
+    });
+  });
+
   describe("Set up in", () => {
     it("uses the chosen folder and keeps it on the record", async () => {
       const record = await packs().installPack(PACK, { folderName: "Platform" });
@@ -389,7 +472,7 @@ describe("useStarterPacks", () => {
       }
     });
 
-    it("stores only ids, kinds, hashes and status in the record", async () => {
+    it("stores only ids, kinds, hashes, status and the library's own fields in the record", async () => {
       await packs().installPack(PACK);
 
       const [value] = [...fake.state.kv.values()];
@@ -397,7 +480,17 @@ describe("useStarterPacks", () => {
       for (const item of record.items) {
         expect(
           Object.keys(item).every((key) =>
-            ["kind", "itemId", "status", "id", "folderId", "sourceHash"].includes(key),
+            [
+              "kind",
+              "itemId",
+              "status",
+              "id",
+              "folderId",
+              "sourceHash",
+              "libraryHash",
+              "base",
+              "panelHashes",
+            ].includes(key),
           ),
         ).toBe(true);
       }

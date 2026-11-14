@@ -15300,7 +15300,11 @@
       "status": {
         "failed": "Could not create",
         "skipped": "Left out"
-      }
+      },
+      "addDashboard": "Your plan no longer includes the built-in Kubernetes view. Add the pack dashboard instead.",
+      "addDashboardBtn": "Add dashboard",
+      "readsInstead": "Reads {stream} · stream setting still says {name}",
+      "readsInsteadTip": "Repaired to read {stream}. The alert's stream setting still says {name}, which can't be changed after creation."
     },
     "adapted": {
       "readsRole": "Reads {what} from {stream}",
@@ -15367,6 +15371,33 @@
       "homeRow": "{count} source has new matches for your data | {count} sources have new matches for your data",
       "homeRowIdle": "Data you started sending may fit more dashboards and alerts.",
       "review": "Review"
+    },
+    "update": {
+      "available": "An update to this pack is available",
+      "review": "Review update",
+      "revert": "Revert update",
+      "title": "Update pack alerts",
+      "note": "Fields you never changed take the new version. Fields you changed keep your value.",
+      "yours": "Yours",
+      "library": "New version",
+      "kept": "Keeps yours",
+      "updated": "Updated",
+      "noFieldChanges": "Only details you don't edit changed",
+      "apply": "Update",
+      "failed": "Couldn't finish the update. Check the alerts and try again."
+    },
+    "repairLater": {
+      "chip": "{count} panel has no data since {since} | {count} panels have no data since {since}",
+      "title": "Repair what went empty",
+      "stopped": "Their stream stopped",
+      "lastData": "Last data {time}",
+      "started": "Same fields, started {time}",
+      "apply": "Point {panels} and {alerts} at {to}",
+      "note": "Panels you changed keep your changes. You can undo this for 24 h.",
+      "undo": "Undo repair to {to}",
+      "failed": "Couldn't finish the repair. Check the panels and try again.",
+      "panels": "{count} panel | {count} panels",
+      "chipAlerts": "{count} alert has no data since {since} | {count} alerts have no data since {since}"
     }
   },
   "alert_library": {
