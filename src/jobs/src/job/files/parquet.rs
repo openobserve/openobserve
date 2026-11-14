@@ -48,7 +48,7 @@ use infra::{
 use ingester::WAL_PARQUET_METADATA;
 use schema::generate_schema_for_defined_schema_fields;
 use search::{
-    datafusion::{exec::TableBuilder, sort_order::FileSortOrder},
+    datafusion::{exec::TableBuilder, sort_order::FileSortOrder, storage::file_statistics_cache},
     merge::{self, MergeMode, MergeOutput},
 };
 use tantivy_utils::index_builder::{TantivyIndexOptions, create_tantivy_index};
@@ -990,6 +990,7 @@ fn is_service_discovery_candidate(
 
 /// Deletes the file, then its directory chain if the hour is old enough that late data is unlikely.
 async fn remove_wal_file(wal_dir: &Path, file_key: &str) -> Result<(), std::io::Error> {
+    file_statistics_cache::GLOBAL_CACHE.remove_file(file_key);
     let path = wal_dir.join(file_key);
     remove_file(&path).await?;
     if wal_bucket_is_stale(file_key, Utc::now())
