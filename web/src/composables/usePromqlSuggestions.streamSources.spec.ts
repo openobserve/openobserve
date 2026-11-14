@@ -46,10 +46,13 @@ vi.mock("@/services/stream", async (importOriginal) => {
   return overlayServiceMock(await importOriginal(), { default: { schema: vi.fn() } });
 });
 vi.mock("@/composables/fieldValueStore", () => ({
+  FIELD_VALUES_REQUEST_SIZE: 10,
   getFieldValuesForSuggestion: vi.fn().mockResolvedValue([]),
   requestFieldValues: vi.fn().mockResolvedValue([]),
   pendingFieldValues: vi.fn(() => null),
   fieldValuesUnavailable: vi.fn(() => false),
+  fieldValuesTruncated: vi.fn(() => false),
+  requestFieldValuesMatching: vi.fn().mockResolvedValue([]),
 }));
 // A SINGLE mutable store, so a test can switch organisation the way the app
 // does — in place, without a page reload.
@@ -64,13 +67,16 @@ vi.mock("vuex", async (importOriginal) => {
 import searchService from "@/services/search";
 import streamService from "@/services/stream";
 import {
+  fieldValuesTruncated,
   fieldValuesUnavailable,
   getFieldValuesForSuggestion,
   requestFieldValues,
+  requestFieldValuesMatching,
 } from "@/composables/fieldValueStore";
 import {
   buildPromqlValueEntries,
   parsePromqlValueContext,
+  promqlValueFilter,
   resolvePromqlLabelValues,
 } from "./usePromqlSuggestions";
 
@@ -123,6 +129,8 @@ beforeEach(() => {
   vi.mocked(getFieldValuesForSuggestion).mockResolvedValue([]);
   vi.mocked(requestFieldValues).mockResolvedValue([]);
   vi.mocked(fieldValuesUnavailable).mockReturnValue(false);
+  vi.mocked(fieldValuesTruncated).mockReturnValue(false);
+  vi.mocked(requestFieldValuesMatching).mockResolvedValue([]);
 });
 
 describe("PromQL no longer asks for every series", () => {
@@ -274,6 +282,7 @@ describe("label VALUES belong to the completion provider", () => {
       metric: "cpu_utilization_percent",
       label: "service",
       hasOpenQuote: true,
+      regex: false,
       typed: "api",
     });
     expect(parsePromqlValueContext("rate(http_total{code!=")).toMatchObject({
@@ -350,6 +359,93 @@ describe("label VALUES belong to the completion provider", () => {
       const [entry] = buildPromqlValueEntries(['a"b\\c'], { hasOpenQuote: false });
       expect(entry.insertText).toBe('"a\\"b\\\\c"');
     });
+  });
+});
+
+describe("label values that contain the typed text", () => {
+  const CTX = { org: "myorg", streamType: "metrics", streamName: "repro_13984_metric" };
+  const value = (digits: string, tail: string) =>
+    `deploy-ft-k8s-meg-rd-${digits}-leader-open-close-emails-${tail}`;
+  const TOP = Array.from({ length: 10 }, (_, i) => value(String(1040 + i), "100200"));
+  const HIT = value("5041", "300400");
+
+  it("asks the server for the typed text when the top list is truncated", async () => {
+    vi.mocked(getFieldValuesForSuggestion).mockResolvedValue(TOP);
+    vi.mocked(fieldValuesTruncated).mockReturnValue(true);
+    vi.mocked(requestFieldValuesMatching).mockResolvedValue([HIT]);
+    const values = await resolvePromqlLabelValues("myorg", "repro_13984_metric", "job_id", {
+      prefix: "5041",
+    });
+    expect(requestFieldValuesMatching).toHaveBeenCalledWith(
+      CTX,
+      "job_id",
+      "5041",
+      expect.objectContaining({ prefix: "5041" }),
+    );
+    expect(values).toContain(HIT);
+  });
+
+  it("shows the stored values rather than waiting on a slow keyword lookup", async () => {
+    vi.useFakeTimers();
+    try {
+      vi.mocked(getFieldValuesForSuggestion).mockResolvedValue(TOP);
+      vi.mocked(requestFieldValuesMatching).mockReturnValue(new Promise(() => {}));
+      const pending = resolvePromqlLabelValues("myorg", "repro_13984_metric", "job_id", {
+        prefix: "5041",
+      });
+      await vi.advanceTimersByTimeAsync(800);
+      expect(await pending).toEqual(TOP);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("asks for a full stored page even without a truncation mark", async () => {
+    vi.mocked(getFieldValuesForSuggestion).mockResolvedValue(TOP);
+    vi.mocked(requestFieldValuesMatching).mockResolvedValue([HIT]);
+    const values = await resolvePromqlLabelValues("myorg", "repro_13984_metric", "job_id", {
+      prefix: "5041",
+    });
+    expect(values).toContain(HIT);
+  });
+
+  it("treats whitespace-only input as nothing typed", () => {
+    expect(promqlValueFilter(parsePromqlValueContext('up{job="  ')!)).toBe("");
+  });
+
+  it("skips the keyword lookup when the top list is complete", async () => {
+    vi.mocked(requestFieldValues).mockResolvedValue(["a-5041"]);
+    await resolvePromqlLabelValues("myorg", "repro_13984_metric", "job_id", { prefix: "5041" });
+    expect(requestFieldValuesMatching).not.toHaveBeenCalled();
+  });
+
+  it("keeps only values containing the typed text, prefix matches first", () => {
+    const entries = buildPromqlValueEntries([value("1042", "100200"), HIT, "5041-solo"], {
+      hasOpenQuote: true,
+      typed: "5041",
+    });
+    expect(entries.map((e) => e.name)).toEqual(["5041-solo", HIT]);
+    expect(entries.map((e) => e.filterText)).toEqual(["5041", "5041"]);
+    expect(entries[1].insertText).toBe(`${HIT}"`);
+  });
+
+  it("matches a typed start of the value case-insensitively", () => {
+    const entries = buildPromqlValueEntries([value("1042", "100200"), HIT], {
+      hasOpenQuote: true,
+      typed: "DEPLOY-ft-k8s-meg-rd-50",
+    });
+    expect(entries.map((e) => e.name)).toEqual([HIT]);
+  });
+
+  it("leaves the list and its filter text alone when nothing is typed", () => {
+    const entries = buildPromqlValueEntries(["b", "a"], { hasOpenQuote: false, typed: "" });
+    expect(entries.map((e) => e.filterText)).toEqual(['"b"', '"a"']);
+  });
+
+  it("treats a regex fragment with metacharacters as no filter", () => {
+    expect(promqlValueFilter(parsePromqlValueContext('up{job=~"50.*')!)).toBe("");
+    expect(promqlValueFilter(parsePromqlValueContext('up{job=~"5041')!)).toBe("5041");
+    expect(promqlValueFilter(parsePromqlValueContext('up{job="a.b')!)).toBe("a.b");
   });
 });
 
