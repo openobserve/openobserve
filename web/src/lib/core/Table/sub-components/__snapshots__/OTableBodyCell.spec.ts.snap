@@ -23,7 +23,7 @@ exports[`OTableBodyCell default render > is byte-identical without focusToolbar 
          row above. -->
       <!--v-if-->
     </td>
-    <td data-v-0d408c72="" data-v-5e072a9b="" data-test="o2-table-cell-code" class="text-text-body px-2 align-middle border-table-row-divider border-b text-right overflow-hidden text-ellipsis whitespace-nowrap" style="width: var(--header-code-size); max-width: var(--header-code-size);">
+    <td data-v-0d408c72="" data-v-5e072a9b="" data-test="o2-table-cell-code" class="text-text-body px-2 align-middle border-table-row-divider border-b text-right tabular-nums overflow-hidden text-ellipsis whitespace-nowrap" style="width: var(--header-code-size); max-width: var(--header-code-size);">
       <!-- Tree-mode wrapper: indent + chevron + cell content -->
       <!-- Pivot-merged cells hide their content (the group's first row shows it). -->
       <!-- Default: plain text --><span data-v-0d408c72="" class="text-inherit">502</span>
@@ -59,7 +59,7 @@ exports[`OTableBodyCell default render > is byte-identical without focusToolbar 
          row above. -->
       <!--v-if-->
     </td>
-    <td data-v-0d408c72="" data-v-5e072a9b="" data-test="o2-table-cell-code" class="text-text-body px-2 align-middle border-table-row-divider border-b text-right overflow-hidden text-ellipsis whitespace-nowrap" style="width: var(--header-code-size); max-width: var(--header-code-size);">
+    <td data-v-0d408c72="" data-v-5e072a9b="" data-test="o2-table-cell-code" class="text-text-body px-2 align-middle border-table-row-divider border-b text-right tabular-nums overflow-hidden text-ellipsis whitespace-nowrap" style="width: var(--header-code-size); max-width: var(--header-code-size);">
       <!-- Tree-mode wrapper: indent + chevron + cell content -->
       <!-- Pivot-merged cells hide their content (the group's first row shows it). -->
       <!-- Default: plain text --><span data-v-0d408c72="" class="text-inherit">200</span>
