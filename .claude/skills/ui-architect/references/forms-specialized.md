@@ -5,7 +5,7 @@ The `OForm` container + `useOForm` composable own field registration, validation
 ## Table of contents
 
 - [OForm + useOForm](#oform--useoform) — container & validation (read first)
-- [OSaveBar + useLeaveGuard](#osavebar--useleaveguard) — the one Save/Discard bar of an always-editable settings page
+- [OSaveBar + useLeaveGuard](#osavebar--useleaveguard) — the one Save/Discard bar of an always-editable settings page, and the Save/Cancel footer of a create page
 - [OColor](#ocolor) — hex color picker
 - [OEmojiPicker](#oemojipicker) — curated emoji picker
 - [ODate](#odate) — single date
@@ -128,10 +128,11 @@ const kind = form.useStore((s) => s.values.kind);
 ### OSaveBar
 
 **Import:** `@/lib/forms/SaveBar/OSaveBar.vue`
-**Use when:** An always-editable settings page (no dialog, no edit mode): one bar pinned to the bottom of the content that says how many values changed and holds Discard and Save. One bar per page; never a second Save button on the page.
-**Don't use for:** Dialog and drawer forms (their footer owns Save), create/edit pages with a Cancel that leaves, or actions that are not values (uploads, "Add …", delete): those keep their own buttons and are not counted.
+**Use when:** An always-editable settings page (no dialog, no edit mode): one bar pinned to the bottom of the content that says how many values changed and holds Discard and Save. A full-page create/edit editor with a Cancel that leaves uses the same bar with `mode="create"`. One bar per page; never a second Save button on the page.
+**Don't use for:** Dialog and drawer forms (their footer owns Save), or actions that are not values (uploads, "Add …", delete): those keep their own buttons and are not counted.
 **Key props:**
 
+- `mode` (`"edit" | "create"`, default `"edit"`) — `"create"` is for a new record: no change count, Save works on an untouched form, and Cancel (emits `cancel`) replaces Discard
 - `form` (`OFormInstance`, default: the enclosing `OForm`) — source of the counts and of submit; pass it only when the bar sits outside the `<OForm>`
 - `changeCount` (`number`, default: fields that differ from the saved values; a number field's text equal to the saved number is not a change) — override for pages with state outside the form. `useFormCounts(form)` (`@/lib/forms/SaveBar/formCounts`) gives the same `changes` and `errors` to add page state to, and for `useLeaveGuard`
 - `errorCount` (`number`, default: fields printing an error; a `coupled` group prints one, so it is one field to fix)
@@ -140,6 +141,10 @@ const kind = form.useStore((s) => s.values.kind);
 - `contentSize` (`"sm" | "md" | "lg" | "xl" | "full"`, default `"lg"`) — the contents end at the form column's width
 - `dataTest` (`string`, default `"save-bar"`) — parts: `-status`, `-fix`, `-discard`, `-save`
 - `saveDataTest`, `discardDataTest` (`string`) — replace `<dataTest>-save` / `-discard` when the page's button already has a selector; an existing `data-test` is never renamed
+- `cancelDataTest` (`string`) — replaces `<dataTest>-cancel` in create mode
+- `saveLabel` (`string`) — replaces "Save" on the primary, such as "Continue" on a step
+- `saveDisabled` (`boolean`) — disables the primary for a reason the form does not know, such as a step with nothing chosen
+- `submit` (`boolean`, default `true`) — `false` makes the primary a plain button that emits `save` without submitting
 - `formId` (`string`) — the `<form>`'s id, when the bar renders outside it (teleported into the Settings shell's slot); Enter in a field then still reaches Save
 
 **States:**
@@ -151,10 +156,11 @@ const kind = form.useStore((s) => s.values.kind);
 | Changed | "1 unsaved change" / "N unsaved changes" ("N changes" below `md`) | shown | enabled |
 | Changed, invalid | same, then the link "Fix N fields" | shown | enabled |
 | Saving | unchanged | disabled | spinner |
+| Create mode (`mode="create"`) | empty; "Fix N fields" when invalid | replaced by Cancel | enabled once loaded |
 
 Save is the form's submit button, so Enter in a text field saves when something changed and does nothing when clean. Save is disabled only when nothing changed. On an invalid form it sends nothing, reveals every error and focuses the first invalid field; "Fix N fields" does the same without submitting. Discard resets the form to the last saved values with no confirm. After a successful save call `form.reset(savedValues)` so the bar returns to Clean; success and failure stay the page's own toasts.
-**Slots:** `start` — page actions that are not values, before the status.
-**Emits:** `save` (a valid submit has run; normally use the form's `@submit`), `discard` (after the reset).
+**Slots:** `start` — page actions that are not values, before the status; `actions` — buttons before Cancel or Discard, such as a step's Back.
+**Emits:** `save` (a valid submit has run; normally use the form's `@submit`), `discard` (after the reset), `cancel` (create mode: the user gave up the new record; the page decides whether to ask first).
 **Example:**
 
 ```vue
@@ -164,6 +170,18 @@ Save is the form's submit button, so Enter in a text field saves when something 
     <OSaveBar class="px-4" form-id="general-settings-form" :loaded="!isLoading" data-test="settings-general-save-bar" />
   </Teleport>
 </OForm>
+```
+
+A create page keeps the bar as the last child of its `OForm`:
+
+```vue
+<OSaveBar
+  mode="create"
+  data-test="add-cipher-key-footer"
+  save-data-test="add-cipher-key-save-btn"
+  cancel-data-test="add-cipher-key-cancel-btn"
+  @cancel="closeEditor"
+/>
 ```
 
 In the Settings shell the bar is teleported to `SAVE_BAR_SLOT` (`@/components/settings/saveBarSlot`), a row below the scroller: the strip spans the pane, stays at its bottom on a short page, and its contents end at the form column. Outside that shell, leave the bar as the last child of the form; it is `sticky bottom-0`.
